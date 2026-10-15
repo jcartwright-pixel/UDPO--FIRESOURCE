@@ -31,6 +31,7 @@ const ud = () => env.authenticatedContext('joe', { email: 'joe@uniteddairy.com',
 test('a signed-in United Dairy account can read the dispatch data', async () => {
   await assertSucceeds(getDoc(doc(ud(), 'runs/2026-10-04__run_t801')));
   await assertSucceeds(getDocs(collection(ud(), 'runs')));
+  await assertSucceeds(getDocs(collection(ud(), 'driverPhones')));
   await assertSucceeds(getDoc(doc(ud(), 'users/joe@uniteddairy.com')));
 });
 
@@ -61,6 +62,9 @@ test('a United Dairy account that is not ACTIVE in the Users list sees no dispat
   await assertSucceeds(getDoc(doc(gone, 'users/gone@uniteddairy.com')));
   const stranger = env.authenticatedContext('new', { email: 'new.hire@uniteddairy.com', email_verified: true }).firestore();
   await assertFails(getDocs(collection(stranger, 'drivers')));
+  // Joe 10/15: drivers' mobile phones and the Schedule Texts log.
+  await assertFails(getDocs(collection(stranger, 'driverPhones')));
+  await assertFails(getDocs(collection(stranger, 'textLog')));
   await assertFails(getDoc(doc(stranger, 'conflicts/c1')));
 });
 
@@ -78,6 +82,7 @@ test('a no-account Plant Station reads only the plant-floor lists, while On and 
   await assertFails(getDoc(doc(station('v1'), 'users/joe@uniteddairy.com')));
   await assertFails(getDocs(collection(station('v1'), 'weeks')));
   await assertFails(getDocs(collection(station('v1'), 'drivers')));
+  await assertFails(getDocs(collection(station('v1'), 'driverPhones')));
   await assertFails(getDoc(doc(station('v1'), 'stationAccess/fac_uniontown')));
   await assertFails(setDoc(doc(station('v1'), 'runs/x'), { route: '1' }));
   // An old code's token, or the switch Off, is refused.

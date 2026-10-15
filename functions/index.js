@@ -7,6 +7,7 @@
  *   garage                the Garage Station tablet (technician name + login ID, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
  *   gps                   a manager or administrator saves, removes or tests the Verizon Connect GPS login (Fleet, or Reveal)
+ *   sms                   Administration > Schedule Texts: the Twilio login, the On / Off switch, who would get a text (src/sms.js)
  *   fleetGpsEvery5Minutes reads where each truck is now from Verizon Connect Fleet, and today's miles every 15 minutes
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
@@ -42,6 +43,7 @@ const FAILS = require('./src/fails');
 const { garageCall } = require('./src/garage');
 const { setSwitch, SwitchError } = require('./src/switch');
 const { gpsCall, GpsError } = require('./src/gps');
+const SMS = require('./src/sms');
 const FLEETGPS = require('./src/fleetgps');
 const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
@@ -97,6 +99,8 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
   // Nobody pressed Publish and the calendar reached the Next week: publish it, as the current app's scheduled refresh does.
   try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
+  // Joe 10/15: Schedule Texts, once a new week is the Live Current week (Off until an administrator turns it On).
+  try { await SMS.postedCheck(db); } catch (e) { console.error('Schedule Texts failed: ' + (e && e.message || e)); }
 });
 
 // Sandbox only: Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js).
@@ -114,7 +118,7 @@ exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSecond
   await require('./src/data-loads').runDataLoads(db);
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof SMS.SmsError || error instanceof MocreoError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
 // Driver Room Check-In tablet, its Driver Room kiosk station code).
@@ -161,6 +165,12 @@ exports.people = onCall(async (request) => {
   if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new HttpsError('permission-denied', 'Only an administrator can see the Users list');
   const snap = await db.collection('users').get();
   return { people: snap.docs.map(d => { const p = d.data(); return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [] }; }) };
+});
+
+// Administration > Schedule Texts (src/sms.js): an administrator saves the Twilio login, turns the texts On or Off, sees who would get one.
+exports.sms = onCall({ timeoutSeconds: 60 }, async (request) => {
+  const user = signedIn(request);
+  try { return await SMS.smsCall(db, user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {

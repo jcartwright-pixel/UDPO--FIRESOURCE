@@ -50,6 +50,21 @@ async function editDriver(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
+/*
+ * Joe 10/15 (Schedule Texts): the driver's mobile phone, typed on the Driver Roster. Kept in driverPhones/{driverId}, not on the
+ * driver record, which the Live sheet copy rewrites; Driver Master is not written with it.
+ */
+async function setDriverPhone(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId)), phoneRef = db.collection('driverPhones').doc(M.safeIdPart(req.driverId));
+  const [snap, was] = await Promise.all([tx.get(ref), tx.get(phoneRef)]);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
+  const before = { phone: was.exists ? was.data().phone || '' : '' };
+  tx.set(phoneRef, { driverId: snap.data().id || req.driverId, phone: req.phone, updatedAt: stamp, updatedBy: email });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: snap.data().id || req.driverId, before, after: { phone: req.phone }, result });
+  return result;
+}
+
 // The truck typed on the driver list ("900001") is the unit number of an active truck in Equipment Master.
 async function truckByUnit(tx, db, unit) {
   if (!unit) return '';
@@ -230,4 +245,4 @@ async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };
+module.exports = { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };

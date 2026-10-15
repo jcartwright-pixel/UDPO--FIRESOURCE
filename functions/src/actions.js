@@ -27,7 +27,7 @@ const STATIONS = require('./stations');
 // Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
 const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
 const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
-const { editDriver, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
+const { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
@@ -38,6 +38,7 @@ const C = M.COLLECTIONS;
 const SAVE_ROLES = L.SAVE_ROLES;
 const REORDER_ROLES = L.REORDER_ROLES;
 const DRIVER_ROLES = L.DRIVER_ROLES;
+const SMS = require('./sms');
 
 const ACTIONS = Object.freeze({
   assignDriver: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
@@ -56,6 +57,8 @@ const ACTIONS = Object.freeze({
   setDriverTruck: { roles: DRIVER_ROLES, screen: 'drivers' },
   setDriverAvailable: { roles: DRIVER_ROLES, screen: 'drivers' },
   setDriverRelief: { roles: DRIVER_ROLES, screen: 'drivers' },
+  // Joe 10/15: the driver's mobile phone for Schedule Texts (driverPhones, app only).
+  setDriverPhone: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriver: { roles: DRIVER_ROLES, screen: 'drivers' },
   removeDrivers: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriverException: { roles: SAVE_ROLES, screen: 'drivers' },
@@ -505,6 +508,14 @@ function validate(input) {
   if (action === 'sendToGarage') return GARAGE.validateSend(input, out);
   if (action === 'deleteGarageJob') return GARAGE.validateDelete(input, out);
   if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(action) >= 0) return GARAGE.validateFleet(action, input, out);
+  if (action === 'setDriverPhone') {
+    out.driverId = text(input.driverId);
+    if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
+    const raw = text(input.phone, 40);
+    out.phone = raw ? SMS.phoneE164(raw) : '';
+    if (raw && !out.phone) throw new SaveError('BAD_REQUEST', 'Type the mobile phone number as 10 digits, like 330-555-1234.');
+    return out;
+  }
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -714,6 +725,7 @@ async function applyAction(db, user, input, now) {
     if (['saveFleetRules', 'saveFleetUnit', 'saveGarageTech'].indexOf(req.action) >= 0) return GARAGE.saveFleet(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setDriverPhone') return setDriverPhone(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'removeDrivers') return removeDrivers(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverException') return saveDriverException(tx, db, req, email, stamp, logRef, mode);

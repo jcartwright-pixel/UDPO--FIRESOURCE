@@ -1139,3 +1139,9 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .sched-day.conflict .sched-status { color: #b3261e; }
 @media (min-width: 600px) { .sched-day { grid-template-columns: 150px minmax(0, 1fr); } .sched-run { display: block; } .sched-run small { display: block; } }
 .sched-run small span { white-space: nowrap; font-weight: 600; }
+/* Joe 10/15: Administration > Schedule Texts (texts.html), built on the GPS Setup page's cards. */
+.gps-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
+.texts-page .texts-list { width: 100%; border-collapse: collapse; font-size: 16px; }
+.texts-page .texts-list th, .texts-page .texts-list td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.texts-page .texts-none { color: #b3261e; font-weight: 800; }
+@media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
