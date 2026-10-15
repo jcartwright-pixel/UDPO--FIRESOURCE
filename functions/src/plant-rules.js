@@ -633,22 +633,43 @@
     return { sensors: (rows || []).filter(function (r) { return r.sensorId; }).length, offline: (rows || []).filter(function (r) { return r.status === 'OFFLINE'; }).length,
       alerts: (rows || []).filter(tempAlert).length, lastManual: last, history: (history || []).length };
   }
-  // Joe 10/15 (Manager Walkthrough): what the manager still has to check: the walk (Coolers, then Quality) and Yard Checks
-  // (its own choice). A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after
-  // that; the newest Coolers or Quality check is the last walkthrough. yard = yardQueue(), temps = tempRows(), lines = qualityLines().
-  var WALK_LATE_MINUTES = 30;
+  // Joe 10/15 (Manager Walkthrough, option 2): what the manager's walk still has to check, in walking order: Yard, Coolers,
+  // Quality. A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after that; the
+  // newest check of the three is the last walkthrough. Joe 10/15 (later): each area also lists what is in it, problems first
+  // (items: name, detail, kind bad / warn / ok). yard = yardQueue(), temps = tempRows(), lines = qualityLines().
+  var WALK_LATE_MINUTES = 30, WALK_CYCLE_MINUTES = 120;
   function managerWalk(yard, temps, lines, nowMs) {
-    var cycle = 120, late = function (at) { var t = when(at); return !t || (nowMs - t) / 60000 >= cycle + WALK_LATE_MINUTES; };
-    var yardDue = ((yard || {}).rows || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
-    var lineDue = (lines || []).filter(function (l) { var x = l.last || {}, t = when(x.recordedAt); return !lineDone(x, nowMs) && (!t || (nowMs - t) / 60000 >= cycle); });
+    var cycle = WALK_CYCLE_MINUTES, late = function (at) { var t = when(at); return !t || (nowMs - t) / 60000 >= cycle + WALK_LATE_MINUTES; };
+    var last = function (at) { return when(at) ? 'last ' + clockOf(at) : 'never checked'; };
+    var rank = { bad: 0, warn: 1, ok: 2 }, sorted = function (a) { return a.map(function (x, i) { return [x, i]; }).sort(function (p, q) { return rank[p[0].kind] - rank[q[0].kind] || p[1] - q[1]; }).map(function (p) { return p[0]; }); };
+    var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
+    var isDue = function (l) { var x = l.last || {}, t = when(x.recordedAt); return !lineDone(x, nowMs) && (!t || (nowMs - t) / 60000 >= cycle); };
+    var lineDue = (lines || []).filter(isDue);
     var all = [];
+    yardDue.concat(yardDone).forEach(function (x) { if (x.recordedAt) all.push({ at: x.recordedAt, by: x.recordedBy }); });
     (temps || []).forEach(function (r) { if (r.lastCheckedAt) all.push({ at: r.lastCheckedAt, by: r.lastCheckedBy }); });
     (lines || []).forEach(function (l) { var x = l.last || {}; if (x.recordedAt && x.inApp) all.push({ at: x.recordedAt, by: x.recordedBy }); });
     all.sort(function (a, b) { return when(b.at) - when(a.at); });
+    var route = function (x) { return x.route ? 'Route ' + x.route : text(x.routeRun); };
+    var yardItems = yardDue.map(function (x) { var l = late(x.recordedAt); return { name: 'Trailer ' + x.trailer, detail: [route(x), l ? 'PAST DUE' : 'DUE', last(x.recordedAt)].filter(Boolean).join(' · '), kind: l ? 'bad' : 'warn' }; })
+      .concat(yardDone.map(function (x) { return { name: 'Trailer ' + x.trailer, detail: [route(x), (x.temperature !== '' ? x.temperature + '°F · ' : '') + 'checked ' + clockOf(x.recordedAt)].filter(Boolean).join(' · '), kind: 'ok' }; }));
+    var coolerItems = (temps || []).map(function (r) {
+      var reading = r.sensorTemp !== '' && r.sensorTemp !== undefined ? r.sensorTemp : r.lastManualTemperature, read = reading !== '' && reading !== undefined && reading !== null ? reading + '°F' : '';
+      var sensorBad = ['HIGH', 'LOW', 'OFFLINE', 'STALE', 'SENSOR ERROR'].indexOf(r.status) >= 0, manualBad = r.lastStatus === 'HIGH' || r.lastStatus === 'LOW';
+      var word = sensorBad ? r.status : manualBad ? r.lastStatus : !r.locked ? (late(r.lastCheckedAt) ? 'PAST DUE' : 'DUE') : 'OK';
+      return { name: r.location, detail: [read, word].filter(Boolean).join(' · '), kind: sensorBad || manualBad || word === 'PAST DUE' ? 'bad' : word === 'DUE' ? 'warn' : 'ok' };
+    });
+    var qualityItems = (lines || []).map(function (l) {
+      var x = l.last || {}, st = text(x.status).toUpperCase();
+      if (lineDone(x, nowMs)) return { name: l.name, detail: 'RUN COMPLETE', kind: 'ok' };
+      var down = st === 'DOWN' || text(x.qualityCheck).toUpperCase() === 'FAIL';
+      if (isDue(l)) { var lt = late(x.recordedAt); return { name: l.name, detail: (down ? 'DOWN · ' : '') + (lt ? 'PAST DUE' : 'DUE') + ' · ' + last(x.recordedAt), kind: lt || down ? 'bad' : 'warn' }; }
+      return { name: l.name, detail: (down ? 'DOWN' : 'OK') + ' · checked ' + clockOf(x.recordedAt), kind: down ? 'bad' : 'ok' };
+    });
     return {
-      yard: { due: yardDue.length, late: yardDue.filter(function (x) { return late(x.recordedAt); }).length, total: yardDue.length + ((yard || {}).locked || []).length },
-      coolers: { due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length },
-      quality: { due: lineDue.length, late: lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length, total: (lines || []).length },
+      yard: { due: yardDue.length, late: yardDue.filter(function (x) { return late(x.recordedAt); }).length, total: yardDue.length + yardDone.length, items: sorted(yardItems) },
+      coolers: { due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length, items: sorted(coolerItems) },
+      quality: { due: lineDue.length, late: lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length, total: (lines || []).length, items: sorted(qualityItems) },
       last: all[0] || null };
   }
   function managerNotes(log) {

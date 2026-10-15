@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Browser check of the Manager Walkthrough (Joe 10/15, look C, option 1) on the made-up plant: the phone and tablet start screen
- * (Manager Walkthrough, Yard Checks, Loadout Center), the walkthrough (Coolers, then Quality) with its numbers from the same rule
+ * Browser check of the Manager Walkthrough (Joe 10/15, option 2) on the made-up plant: the managers' phone and tablet start screen
+ * (Manager Walkthrough, Loading, Unloading), the walkthrough (Yard, Coolers, Quality) with its numbers and lists from the same rule
  * as Manager Center, the walkthrough bar on Coolers and Quality, and a manager signing in on a phone landing on the start screen.
  * Pictures go to SHOTS_DIR.
  */
@@ -58,25 +58,29 @@ async function seed() {
     for (const [w, h, touch] of [[390, 844, true], [600, 960, true], [800, 1280, true], [1536, 730, false], [1920, 950, false]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && w < 700 }, '/walkthrough.html?' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Coolers', 'Quality']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['temps.html?walk=1', 'quality.html?walk=1']);
-      assert.equal(await page.textContent('.wk-choice:nth-child(2) .wk-n'), '5of 5 · 5 past due');
-      assert.match(await page.textContent('.wk-choice:nth-child(1) .wk-n span'), /^1 out of range$/);
-      assert.ok(await page.$eval('.wk-choice:nth-child(2)', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Quality flashes');
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Quality']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['yard.html?walk=1', 'temps.html?walk=1', 'quality.html?walk=1']);
+      assert.equal(await page.textContent('.wk-choice:nth-child(3) .wk-n'), '5of 5 · 5 past due');
+      assert.match(await page.textContent('.wk-choice:nth-child(2) .wk-n span'), /^1 out of range$/);
+      assert.ok(await page.$eval('.wk-choice:nth-child(3)', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Quality flashes');
+      // Each stop lists what it holds, problems first in red (Joe 10/15, later).
+      assert.equal(await page.textContent('.wk-choice:nth-child(2) .wk-items li.bad'), 'Cooler North 44°F · HIGH');
+      assert.equal(await page.$$eval('.wk-choice:nth-child(3) .wk-items li.bad', l => l.length), 5);
       assert.match(await page.textContent('#last'), /^Last walkthrough check: \d{1,2}:\d\d [AP]M · Supervisor Test$/);
       await tidy(page, 'Walkthrough ' + w);
       await shot(page, 'walkthrough-' + w);
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Walkthrough: Coolers then Quality with big numbers, past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
+    results.push('Walkthrough: Yard, Coolers, Quality with big numbers and what each holds, past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
 
     // The phone and tablet start screen: three choices.
     for (const [w, h] of [[390, 844], [800, 1280]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700 }, '/walkthrough.html?view=home&' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Yard Checks', 'Loadout Center']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'yard.html', 'loadout.html']);
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html']);
+      assert.deepEqual(await page.$$eval('.wk-choice:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Quality']);
       assert.equal(await page.textContent('#ask'), 'What are you doing?');
       assert.equal(await page.isVisible('#full'), true);
       await tidy(page, 'Start screen ' + w);
@@ -84,20 +88,27 @@ async function seed() {
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Start screen: Manager Walkthrough, Yard Checks and Loadout Center at 390 and 800, with Open the full Operations app');
+    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Quality), Loading and Unloading at 390 and 800, with Open the full Operations app');
 
     // Coolers and Quality opened from the walkthrough carry its bar: back, which stop, the next stop.
     const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
+    const yd = await openPage(browser, phone, '/yard.html?walk=1&' + MANAGER);
+    await yd.waitForSelector('#walk-bar');
+    assert.equal(await yd.textContent('#walk-bar b'), '1 · Yard');
+    assert.deepEqual(await yd.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Next: Coolers › temps.html?walk=1']);
+    await shot(yd, 'walkthrough-yard-390');
+    assert.deepEqual(yd.errors, []);
+    await yd.context().close();
     const cool = await openPage(browser, phone, '/temps.html?walk=1&' + MANAGER);
     await cool.waitForSelector('#walk-bar');
     assert.deepEqual(await cool.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Next: Quality › quality.html?walk=1']);
-    assert.equal(await cool.textContent('#walk-bar b'), '1 · Coolers');
+    assert.equal(await cool.textContent('#walk-bar b'), '2 · Coolers');
     await cool.waitForSelector('#rows [data-location]');
     await tidy(cool, 'Coolers with the walkthrough bar');
     await shot(cool, 'walkthrough-coolers-390');
     await cool.click('#walk-bar a.next');
     await cool.waitForSelector('#walk-bar');
-    assert.equal(await cool.textContent('#walk-bar b'), '2 · Quality');
+    assert.equal(await cool.textContent('#walk-bar b'), '3 · Quality');
     assert.deepEqual(await cool.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Done ✓ walkthrough.html']);
     await cool.waitForSelector('#fields label');
     await shot(cool, 'walkthrough-quality-390');
@@ -107,7 +118,7 @@ async function seed() {
     await plain.waitForSelector('#rows [data-location]');
     assert.equal(await plain.$('#walk-bar'), null, 'no bar when Coolers is opened from the menu');
     await plain.context().close();
-    results.push('Coolers and Quality from the walkthrough: the bar with Walkthrough, the stop and Next / Done; none from the menu');
+    results.push('Yard, Coolers and Quality from the walkthrough: the bar with Walkthrough, the stop and Next / Done; none from the menu');
 
     // A manager signing in on a phone lands on the start screen; Open the full Operations app stays on the full app.
     const land = await openPage(browser, phone, '/index.html?' + MANAGER);
@@ -121,6 +132,15 @@ async function seed() {
     assert.match(land.url(), /index\.html$/, 'the full app is kept for this tab');
     assert.deepEqual(land.errors, []);
     await land.context().close();
+    // Managers only (Joe 10/15): a dispatcher on a phone keeps the normal home, and the walkthrough page tells them it is for managers.
+    const sup = await openPage(browser, phone, '/index.html?testEmail=dispatch.test@uniteddairy.com');
+    await sup.waitForSelector('#sides .launch-card');
+    await sup.waitForTimeout(500);
+    assert.match(sup.url(), /index\.html/, 'a dispatcher stays on the normal home');
+    await sup.goto(HOSTING + '/walkthrough.html');
+    await sup.waitForSelector('#not-manager:not([hidden])');
+    assert.equal(await sup.isVisible('#list'), false);
+    await sup.context().close();
     const desk = await openPage(browser, { viewport: { width: 1536, height: 730 } }, '/index.html?' + MANAGER);
     await desk.waitForSelector('#sides .launch-card');
     await desk.waitForTimeout(500);

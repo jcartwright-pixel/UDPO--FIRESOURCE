@@ -32,12 +32,13 @@
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <!-- Joe 10/15: a manager on a phone or tablet starts on three choices (view=home); the walkthrough itself is the walking
-         checks, Coolers then Quality, each a big tile that opens that screen (look C, option 1). Yard Checks is its own choice. -->
+    <!-- Joe 10/15: managers only. A manager on a phone or tablet starts on three choices (view=home): Manager Walkthrough,
+         Loading and Unloading. The walkthrough is Yard, Coolers, Quality, each a big tile with what it holds, opening that screen. -->
     <div class="view wk-view">
       <h2 class="wk-ask" id="ask"></h2>
       <div class="wk-list" id="list" aria-live="polite"></div>
       <p class="wk-last" id="last"></p>
+      <div class="notice warning" id="not-manager" hidden>The manager's phone screens are for managers. <a href="index.html?full=1">Open Operations</a></div>
       <a class="wk-full" id="full" href="index.html?full=1" hidden>Open the full Operations app</a>
     </div>
   </div>
@@ -46,20 +47,25 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, shortTime, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
+    import { WALK_ROLES } from './js/walk-bar.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const home = new URLSearchParams(location.search).get('view') === 'home';
     const today = () => L.operatingDay(new Date());
-    let date = today(), app = {};
+    let date = today(), app = {}, person = null;
     const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [] }, loaded = { runs: false, journal: false };
     // The person who made a check, from their sign-in (mike.adams@… reads Mike Adams).
     const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 
-    // One big choice: its number, the line under it and its colour (red flashes while a check is past due).
-    function choice(href, num, title, desc, n, line, kind) {
+    // One big choice: its number, the line under it and its colour (red flashes while a check is past due). Joe 10/15 (later):
+    // under it, what it holds (each trailer, cooler or line, problems first in red), as much as is useful on a phone.
+    const SHOW = 5;
+    function choice(href, num, title, desc, n, line, kind, items) {
+      const list = items ? '<ul class="wk-items">' + (items.length ? items.slice(0, SHOW).map(z => '<li class="' + z.kind + '"><b>' + escapeHtml(z.name) + '</b> ' + escapeHtml(z.detail) + '</li>').join('') +
+        (items.length > SHOW ? '<li class="more">+ ' + (items.length - SHOW) + ' more</li>' : '') : '<li class="ok">Nothing to check</li>') + '</ul>' : '';
       return '<a class="wk-choice ' + kind + '" href="' + href + '">' + (num ? '<span class="wk-num">' + num + '</span>' : '') +
         '<span class="wk-t"><b>' + escapeHtml(title) + '</b><span>' + escapeHtml(desc) + '</span></span>' +
-        '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span></a>';
+        '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span>' + list + '</a>';
     }
     // A step's tile: red when past due or out of range, amber when due, green "OK" when all checked.
     const kindOf = (z) => z.late || z.out ? 'bad' + (z.late ? ' late' : '') : z.due ? 'due' : 'good';
@@ -69,7 +75,11 @@
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const st = L.screenState(app, 'plant');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
-      if (!loaded.runs || !loaded.journal) return;
+      // Joe 10/15: for managers only; anyone else is told so and sees none of it.
+      const manager = !person || L.hasRole(person, WALK_ROLES);
+      document.getElementById('not-manager').hidden = manager;
+      ['list', 'last', 'ask'].forEach(id => { document.getElementById(id).hidden = !manager; });
+      if (!manager || !loaded.runs || !loaded.journal) return;
       const now = Date.now(), journal = data.journal;
       const yard = U.yardQueue(data.runs, journal, date, now);
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
@@ -78,14 +88,21 @@
       const C = W.coolers, Q = W.quality, Y = W.yard;
       let html;
       if (home) {
-        const walk = { due: C.due + Q.due, late: C.late + Q.late, out: C.out };
-        const done = P.counts(P.loadoutRows(data.runs, date));
-        html = choice('walkthrough.html', '', 'Manager Walkthrough', 'Coolers and Quality checks', walk.due, walk.due ? 'due' + (walk.out ? ' · ' + walk.out + ' out of range' : walk.late ? ' · ' + walk.late + ' past due' : '') : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk)) +
-          choice('yard.html', '', 'Yard Checks', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y)) +
-          choice('loadout.html', '', 'Loadout Center', 'Today\'s loads, loading order', done.done, 'of ' + done.total + ' loaded', done.total && done.done === done.total ? 'good' : 'plain');
+        // Joe 10/15 (later): the manager's phone: the walkthrough (Yard, Coolers, Quality), then Loading and Unloading.
+        const walk = { due: Y.due + C.due + Q.due, late: Y.late + C.late + Q.late, out: C.out };
+        const todays = journal.filter(d => d.date === date), loads = P.loadoutRows(data.runs, date), done = P.counts(loads);
+        const uc = P.unloadCounts(P.unloadRows(data.runs, date, todays, P.returnsFor(data.runs, date, todays), loads));
+        const area = (name, z, what) => ({ name, detail: z.out ? z.out + ' out of range' + (z.late ? ' · ' + z.late + ' past due' : '') : z.late ? z.late + ' past due' : z.due ? z.due + ' ' + what : 'all checked', kind: z.out || z.late ? 'bad' : z.due ? 'warn' : 'ok' });
+        html = choice('walkthrough.html', '', 'Manager Walkthrough', 'Yard, Coolers and Quality', walk.due, walk.due ? 'due' : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk),
+          [area('Yard', Y, 'to check'), area('Coolers', C, 'to check'), area('Quality', Q, 'lines due')]) +
+          choice('loadout.html', '', 'Loading', 'Loadout Center · today\'s loads', done.done, 'of ' + done.total + ' loaded', done.total && done.done === done.total ? 'good' : 'plain',
+            [{ name: done.waiting + ' waiting', detail: '· ' + done.loading + ' loading' + (done.paused ? ' · ' + done.paused + ' paused' : ''), kind: 'plain' }]) +
+          choice('unloading.html', '', 'Unloading', 'Trucks back in · cases and returns', uc.complete, 'of ' + uc.total + ' unloaded', uc.total && uc.complete === uc.total ? 'good' : 'plain',
+            [{ name: uc.waiting + ' waiting', detail: '· ' + uc.unloading + ' unloading', kind: 'plain' }]);
       } else {
-        html = choice('temps.html?walk=1', '1', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C)) +
-          choice('quality.html?walk=1', '2', 'Quality', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q));
+        html = choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items) +
+          choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items) +
+          choice('quality.html?walk=1', '3', 'Quality', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q), Q.items);
       }
       document.getElementById('list').innerHTML = html;
       document.getElementById('last').textContent = W.last ? 'Last walkthrough check: ' + shortTime(Date.parse(W.last.at)) + ' · ' + personName(W.last.by) : 'No walkthrough checks yet today.';
@@ -101,7 +118,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
-      watchPerson(db, user, () => later(), { withEmail: true });
+      watchPerson(db, user, p => { person = p || { roles: [] }; later(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
