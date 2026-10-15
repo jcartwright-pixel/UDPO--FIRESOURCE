@@ -141,7 +141,8 @@ async function seed() {
       assert.match(await pg.textContent('#body'), /914 LEWISBURG[\s\S]*Never started/);
       // Joe's screen rules: 16px text or more, no sideways page scrolling, the controls on one line.
       assert.ok(await pg.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth), 'no sideways page scrolling at ' + w);
-      assert.ok(await pg.evaluate(() => { const v = document.querySelector('.rp-view'); return v.scrollWidth <= v.clientWidth + 1; }), 'the report fits across at ' + w);
+      const across = await pg.evaluate(() => { const v = document.querySelector('.rp-view'); return [v.scrollWidth, v.clientWidth]; });
+      assert.ok(across[0] <= across[1] + 1, 'the report fits across at ' + w + ' ' + JSON.stringify(across));
       const small = await pg.$$eval('#body td, #body th, .rp-ctrl select, .rp-ctrl input', els => els.filter(e => e.getClientRects().length && parseFloat(getComputedStyle(e).fontSize) < 16).length);
       assert.equal(small, 0, 'no text under 16px at ' + w);
       const tops = await pg.$$eval('.rp-ctrl > label:not([hidden])', ls => [...new Set(ls.map(l => Math.round(l.getBoundingClientRect().bottom)))]);
