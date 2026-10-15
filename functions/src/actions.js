@@ -694,6 +694,8 @@ async function applyAction(db, user, input, now) {
     const person = await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input));
     // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
     req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
+    // Loading Rundown (Joe 10/15): who saved a load's Start / End, and whether from a Plant Station tablet (plant.js markTimes).
+    if (req.action === 'savePlantLoad') req.saver = { email, name: (person && person.name) || '', station: (user && user.station && user.station.name) || (req.plant && req.plant.station) || '' };
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {

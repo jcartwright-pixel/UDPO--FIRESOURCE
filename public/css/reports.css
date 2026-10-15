@@ -101,3 +101,17 @@ body.sr-page .view.sr-view:not([hidden]) { display: grid; grid-template-columns:
    (the two times go on two lines when the tile is narrow, never cut off). */
 .rp-day b.rp-none-day { font-size: 22px; line-height: 1.2; margin: 8px 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rp-kpi b.small { white-space: normal; line-height: 1.15; margin: 6px 0 4px; }
+/* Loading Rundown (Joe 10/15): where each time came from; a load whose time was entered later or changed is tinted. */
+.rd-src { white-space: nowrap; }
+.rd-src.rd-tablet { color: var(--ud-blue); font-weight: 700; }
+.rd-src.rd-none { color: var(--muted); }
+.rd-src small.rd-typed { display: block; color: #b36200; font-weight: 800; font-size: 16px; line-height: 1.2; }
+.rd-time { font-weight: 800; white-space: nowrap; }
+.rd-loads tbody td { height: auto; min-height: 38px; padding-top: 6px; padding-bottom: 6px; }
+.rd-edits span { display: block; color: #b36200; font-weight: 700; }
+tr.rd-flag td { background: #fff6e5; }
+/* The loads list's header stays in view while the page scrolls (its card does not scroll on its own). */
+.rp-card.rd-loads, .rd-loads .rp-scroll { overflow: visible; }
+.rd-loads thead th { top: 0; z-index: 2; }
+.rd-loads table { width: 100%; }
+.rd-loads td.rd-edits { white-space: normal; min-width: 200px; }

@@ -250,3 +250,94 @@ export function weeksFor(from, to) {
   return out;
 }
 export function datesBetween(from, to) { const out = []; for (let d = from; d <= to; d = L.addDays(d, 1)) out.push(d); return out; }
+
+/*
+ * Loading Rundown (Joe 10/15): one plant day (6 AM to 6 AM the next morning) of loading, load by load, from the first load
+ * started to the last; a background report only, nothing on the loading screens changes. For each load: its Start and End,
+ * who recorded each and from where (a Plant Station tablet, or a manager at the desk on Daily Case Loadout), a time saved well
+ * after (or before) the time it says, and every later change (plant.js markTimes keeps startMark, endMark and timeEdits).
+ * A load counts for the day its Start falls in (its End when it has no Start). Downtime = the time a loadout (Cases, Totes,
+ * Boxing, Tanker, each on its own) had nothing loading between one load ending and the next starting; it is split over the
+ * shifts by the minute.
+ */
+export const TYPED_LATE_MINUTES = 5;
+export const RUNDOWN_AREAS = [['ALL', 'All loadouts']].concat(AREA_ORDER.map(a => [a, AREA_NAME[a]]));
+const wallMark = (v) => U.wallMinutes(v);
+// Where a time came from: TABLET, DESK, NONE (saved before the app kept it) or SHEET (changed outside the app).
+export function timeSource(mark, value) {
+  if (!text(value)) return null;
+  if (!mark || !mark.value) return { kind: 'NONE', text: 'Not recorded', typed: null };
+  if (mark.value !== value) return { kind: 'SHEET', text: 'Changed on the sheet', typed: null };
+  const said = wallMark(value), saved = wallMark(mark.savedAt);
+  const off = said !== null && saved !== null && Math.abs(saved - said) > TYPED_LATE_MINUTES ? saved : null;
+  return { kind: mark.via === 'TABLET' ? 'TABLET' : 'DESK', text: mark.via === 'TABLET' ? 'Tablet · ' + (text(mark.station) || text(mark.name) || 'Plant Station') : 'Desk · ' + (text(mark.name) || text(mark.by) || 'manager'), typed: off, by: text(mark.by) };
+}
+export function loadingRundown(date, runs, shifts, nowMs, area) {
+  const from = dayNum(date) * 1440 + 360, to = from + 1440, nowWall = wallNow(nowMs === undefined ? Date.now() : nowMs);
+  const want = area && area !== 'ALL' ? area : '';
+  shifts = shifts || shiftsFor(null);
+  const byId = {}, seen = {}, loads = [], noTimes = [];
+  (runs || []).forEach(r => { byId[r.id] = r; });
+  [L.addDays(date, -1), date, L.addDays(date, 1)].forEach(ld => P.loadoutRows(runs, ld, ld).forEach(r => {
+    const key = r.runDocId + '|' + r.day;
+    if (seen[key] || (want && r.area !== want)) return;
+    seen[key] = true;
+    const run = byId[r.runDocId], d = (run && run.days && run.days[r.day]) || {};
+    const x = loadOutcome(r, nowWall), at = x.started !== null ? x.started : x.done;
+    if (at === null) { if (ld === date) noTimes.push(Object.assign(x, { state: r.state })); return; }
+    if (at < from || at >= to) return;
+    x.at = at;
+    x.shift = shiftAt(at % 1440, shifts);
+    x.startSource = timeSource(d.startMark, r.startedAt);
+    x.endSource = timeSource(d.endMark, r.completedAt);
+    x.edits = (Array.isArray(d.timeEdits) ? d.timeEdits : []).map(e => ({ what: e.what === 'END' ? 'End' : 'Start', from: wallMark(e.from), to: wallMark(e.to), at: wallMark(e.savedAt),
+      who: e.via === 'TABLET' ? 'Tablet · ' + (text(e.station) || text(e.name)) : 'Desk · ' + (text(e.name) || text(e.by)) }));
+    x.loading = x.done === null;
+    loads.push(x);
+  }));
+  const byRoute = (a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true });
+  loads.sort((a, b) => a.at - b.at || byRoute(a, b));
+  // Downtime, each loadout on its own: the gap from the latest End so far to the next Start. A load still loading counts as
+  // busy until now (or the day's end).
+  const busyTill = {}, gaps = [];
+  loads.forEach(x => {
+    const till = busyTill[x.area];
+    x.gap = till !== undefined && x.at > till ? x.at - till : till !== undefined ? 0 : null;
+    if (x.gap) gaps.push({ area: x.area, from: till, to: x.at, route: x.route, run: x.run });
+    const end = x.done !== null ? x.done : Math.min(nowWall, to);
+    busyTill[x.area] = till === undefined ? Math.max(end, x.at) : Math.max(till, end, x.at);
+  });
+  const rows = shifts.map(sh => ({ shift: sh.name, start: sh.start, end: sh.end, started: 0, finished: 0, taken: 0, takenMinutes: 0, downtime: 0, longestGap: 0, onTime: 0, late: 0,
+    tablet: 0, desk: 0, notRecorded: 0, typed: 0, changed: 0, sheet: 0 }));
+  const row = (name) => rows.find(r => r.shift === name);
+  loads.forEach(x => {
+    const r = row(x.shift);
+    if (!r) return;
+    r.started++;
+    if (x.taken !== null) { r.taken++; r.takenMinutes += x.taken; }
+    if (x.result === 'ON TIME') r.onTime++; else if (x.result === 'LATE') r.late++;
+    [x.startSource, x.endSource].filter(Boolean).forEach(s => {
+      if (s.kind === 'TABLET') r.tablet++; else if (s.kind === 'DESK') r.desk++; else if (s.kind === 'SHEET') r.sheet++; else r.notRecorded++;
+      if (s.typed !== null) r.typed++;
+    });
+    r.changed += x.edits.length;
+    if (x.done !== null) { const f = row(shiftAt(x.done % 1440, shifts)); if (f) f.finished++; }
+  });
+  // A gap's minutes go to the shift each minute falls in; the longest piece is the shift's longest gap.
+  gaps.forEach(g => {
+    const part = {};
+    for (let m = g.from; m < g.to; m++) { const s = shiftAt(m % 1440, shifts); part[s] = (part[s] || 0) + 1; }
+    Object.keys(part).forEach(s => { const r = row(s); if (r) { r.downtime += part[s]; r.longestGap = Math.max(r.longestGap, part[s]); } });
+  });
+  rows.forEach(r => { r.avgTaken = r.taken ? Math.round(r.takenMinutes / r.taken) : null; r.judged = r.onTime + r.late; r.onTimePct = r.judged ? Math.round(r.onTime / r.judged * 100) : null; });
+  const sum = (k) => rows.reduce((a, r) => a + r[k], 0);
+  const total = { started: loads.length, finished: loads.filter(x => x.done !== null).length, downtime: sum('downtime'), longestGap: Math.max(0, ...gaps.map(g => g.to - g.from)),
+    tablet: sum('tablet'), desk: sum('desk'), notRecorded: sum('notRecorded'), typed: sum('typed'), changed: sum('changed'), sheet: sum('sheet'), onTime: sum('onTime'), late: sum('late'),
+    firstStart: loads.length ? loads[0].at : null, lastEnd: loads.reduce((m, x) => (x.done !== null && (m === null || x.done > m) ? x.done : m), null) };
+  const takes = loads.filter(x => x.taken !== null);
+  total.avgTaken = takes.length ? Math.round(takes.reduce((a, x) => a + x.taken, 0) / takes.length) : null;
+  total.judged = total.onTime + total.late;
+  total.onTimePct = total.judged ? Math.round(total.onTime / total.judged * 100) : null;
+  noTimes.sort(byRoute);
+  return { date, from, to, loads, gaps, rows, total, noTimes };
+}

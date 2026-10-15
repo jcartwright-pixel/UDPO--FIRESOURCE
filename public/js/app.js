@@ -88,7 +88,7 @@ export const MENU = [
   ['Yard Checks', [['Yard Checks', 'yard.html', 'yard-checks.webp']]],
   // Joe 10/11: Reports is its own module with every report in one place. The plant's reports moved here from Plant
   // Operations; the Route Distribution and Fleet reports are listed here too and stay on their own sides as well.
-  ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
+  ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Loading Rundown', 'reports.html?view=rundown', 'day'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
   ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'trucks.html', 'pin']]],
   ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
   // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
