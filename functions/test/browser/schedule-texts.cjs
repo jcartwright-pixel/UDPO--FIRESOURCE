@@ -38,6 +38,11 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
   const week = '2026-10-18';
   await db().collection('runs').doc(week + '__run_t905').set({ weekStart: week, route: '905', run: 'UT DSD MILK', runId: 'run_t905', rev: 0, days: { mon: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE' }, tue: { runs: true, driverId: 'drv_test_adams', driver: 'ADAMS, PAT' } } });
   await db().collection('config').doc('app').set({ liveWeeks: { previous: '2026-10-04', current: '2026-10-11', next: week } }, { merge: true });
+  // Joe 10/15 (pick c): the texts sent and the replies, newest first, in the app.
+  const sent = 'United Dairy: your schedule for the week of 10-11-26 to 10-17-26 is posted. Open UD Routes > My Schedule to see it.';
+  await db().collection('textLog').doc('2026-10-11_drv_test_casey').set({ direction: 'out', week: '2026-10-11', driverId: 'drv_test_casey', name: 'CASEY, LEE', to: '+13305551234', body: sent, at: '2026-10-10T14:00:00.000Z', status: 'NOT SENT', reason: 'Test copy: not sent.' });
+  await db().collection('textLog').doc('2026-10-11_drv_test_adams').set({ direction: 'out', week: '2026-10-11', driverId: 'drv_test_adams', name: 'ADAMS, PAT', to: '', body: sent, at: '2026-10-10T14:00:00.000Z', status: 'NO PHONE' });
+  await db().collection('textLog').doc('in_SMtest1').set({ direction: 'in', from: '+13305551234', driverId: 'drv_test_casey', name: 'CASEY, LEE', body: 'Got it. Can I swap Tuesday?', at: '2026-10-10T14:20:00.000Z', status: 'RECEIVED' });
   const browser = await chromium.launch();
   try {
     for (const w of [1536, 1920]) {
@@ -70,9 +75,16 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       await tx.waitForSelector('#preview tr td');
       assert.deepEqual(await tx.$$eval('#preview tr', r => r.map(x => x.textContent)), ['ADAMS, PATNo number', 'CASEY, LEE330-555-1234']);
       assert.match(await tx.textContent('#mode'), /Test copy: texts are written to the log only/);
+      await tx.waitForSelector('#log tr.texts-in');
+      const log = await tx.$$eval('#log tr', r => r.map(x => [...x.cells].map(c => c.textContent)));
+      const rows = log.map(x => [x[1], x[2], x[3], x[5]].join('|'));
+      assert.equal(rows[0], 'CASEY, LEE|Reply|330-555-1234|Received');
+      assert.deepEqual(rows.slice(1).sort(), ['ADAMS, PAT|Sent||No number', 'CASEY, LEE|Sent|330-555-1234|Test copy, not sent']);
+      assert.equal(log[0][4], 'Got it. Can I swap Tuesday?', 'the newest, the reply, on top');
       assert.ok(await fits(tx) <= 0, 'no side scroll on Schedule Texts at ' + w);
       assert.deepEqual(await small(tx), [], 'Schedule Texts: no text under 16px at ' + w);
       if (SHOTS) await tx.screenshot({ path: path.join(SHOTS, 'after-texts-' + w + '.png') });
+      if (SHOTS) { await tx.$eval('#log', e => e.closest('section').scrollIntoView()); await tx.screenshot({ path: path.join(SHOTS, 'after-replies-' + w + '.png') }); await tx.evaluate(() => window.scrollTo(0, 0)); }
       if (w === 1920) {
         await tx.fill('#f-sid', 'AC' + '0123456789abcdef'.repeat(2)); await tx.fill('#f-token', 'tok'); await tx.fill('#f-from', '330-555-0000');
         await tx.click('#save');

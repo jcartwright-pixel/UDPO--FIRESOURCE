@@ -8,6 +8,7 @@
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
  *   gps                   a manager or administrator saves, removes or tests the Verizon Connect GPS login (Fleet, or Reveal)
  *   sms                   Administration > Schedule Texts: the Twilio login, the On / Off switch, who would get a text (src/sms.js)
+ *   smsReply              Twilio posts a driver's reply to a schedule text here; kept in textLog when Twilio's signature checks out
  *   fleetGpsEvery5Minutes reads where each truck is now from Verizon Connect Fleet, and today's miles every 15 minutes
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
  *   writeBackOnSave       writes each save into the SANDBOX Live workbook (phase 2; production is refused)
@@ -432,6 +433,18 @@ exports.deviceReads = onRequest({ maxInstances: 3, timeoutSeconds: 30 }, async (
   } catch (error) {
     console.error('deviceReads', error);
     res.status(500).json({ ok: false, error: 'The server could not count those jugs. Send them again.' });
+  }
+});
+// Joe 10/15 (Schedule Texts): a driver's reply to a schedule text. Twilio posts it here (the number's "A message comes in"
+// webhook); only a request signed with the saved Twilio Auth Token is kept (src/sms.js handleReply).
+exports.smsReply = onRequest({ maxInstances: 2, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+  try {
+    const [status, body] = await SMS.handleReply(db, SMS.replyAddress(projectId()), req.headers, req.body);
+    res.status(status).type('text/xml').send(body);
+  } catch (error) {
+    console.error('smsReply', error);
+    res.status(500).type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
 });
 exports.lineReader = onCall({ timeoutSeconds: 30 }, async (request) => {

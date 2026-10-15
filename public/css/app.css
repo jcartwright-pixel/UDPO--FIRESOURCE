@@ -1145,3 +1145,5 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .texts-page .texts-list th, .texts-page .texts-list td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .texts-page .texts-none { color: #b3261e; font-weight: 800; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
+.texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
+.texts-page .texts-log tr.texts-in td { background: #eef6ff; }

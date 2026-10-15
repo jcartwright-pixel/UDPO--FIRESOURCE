@@ -95,3 +95,26 @@ test('the test copy (no LIVE_TEXTS) never sends: the texts go to the log as not 
   assert.equal(calls.length, 0);
   assert.match((await db().collection('textLog').doc(WEEK + '_drv_test_casey').get()).data().reason, /Test copy: not sent/);
 });
+
+test('replies: kept in the log with the driver only when Twilio signed them with the saved Auth Token', async () => {
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-good-0004', driverId: 'drv_test_casey', phone: '3305551234' });
+  const url = SMS.replyAddress('demo-ud-distribution');
+  assert.equal(url, 'https://us-east4-demo-ud-distribution.cloudfunctions.net/smsReply');
+  const params = { AccountSid: SID, MessageSid: 'SM' + 'a'.repeat(32), From: '+13305551234', To: '+13305550000', Body: 'Got it, thanks' };
+  const signed = { 'x-twilio-signature': SMS.twilioSignature('tok', url, params) };
+  // Not signed, or signed with another token: refused, nothing kept.
+  assert.equal((await SMS.handleReply(db(), url, {}, params))[0], 403);
+  assert.equal((await SMS.handleReply(db(), url, { 'x-twilio-signature': SMS.twilioSignature('other', url, params) }, params))[0], 403);
+  assert.equal((await SMS.handleReply(db(), url, signed, Object.assign({}, params, { Body: 'changed' })))[0], 403, 'a changed message fails the signature');
+  assert.equal((await db().collection('textLog').get()).size, 0);
+  const [code, body] = await SMS.handleReply(db(), url, signed, params, { now: () => new Date('2026-10-18T12:00:00Z') });
+  assert.equal(code, 200);
+  assert.match(body, /<Response><\/Response>/, 'no text back to the driver');
+  const m = (await db().collection('textLog').doc('in_' + params.MessageSid).get()).data();
+  assert.deepEqual([m.direction, m.driverId, m.name, m.body, m.status, m.from], ['in', 'drv_test_casey', 'CASEY, LEE', 'Got it, thanks', 'RECEIVED', '+13305551234']);
+  // A number nobody has is still kept, with no driver.
+  const stranger = Object.assign({}, params, { MessageSid: 'SM' + 'b'.repeat(32), From: '+12165550000' });
+  await SMS.handleReply(db(), url, { 'x-twilio-signature': SMS.twilioSignature('tok', url, stranger) }, stranger);
+  assert.equal((await db().collection('textLog').doc('in_' + stranger.MessageSid).get()).data().driverId, '');
+});

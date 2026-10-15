@@ -50,6 +50,7 @@
           </div>
         </form>
         <p class="hint" id="saved"></p>
+        <p class="hint" id="reply-hint" hidden>So replies show below: in Twilio, open the phone number and set "A message comes in" to Webhook, HTTP POST, <b id="reply-url"></b></p>
       </section>
       <section class="gps-card wide">
         <h2>3. Who would get the next text</h2>
@@ -58,11 +59,18 @@
           <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
         <p class="hint">Mobile phone numbers are typed on the <a href="drivers.html">Driver Roster</a>.</p>
       </section>
+      <!-- Joe 10/15 ("so I could have a list of replies or communication"): every text sent and every reply, newest first. -->
+      <section class="gps-card wide">
+        <h2>4. Texts and replies</h2>
+        <table class="gps-check texts-list texts-log"><colgroup><col style="width:15%"><col style="width:17%"><col style="width:9%"><col style="width:13%"><col style="width:34%"><col style="width:12%"></colgroup>
+          <thead><tr><th>When</th><th>Driver</th><th>Way</th><th>Phone</th><th>Message</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="6" class="hint">Loading…</td></tr></tbody></table>
+      </section>
     </div>
   </div>
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText, serverText } from './js/app.js';
+    import { collection, query, orderBy, limit, onSnapshot } from './js/firebase.js';
 
     let s = null, armed = null;
     const $ = (id) => document.getElementById(id);
@@ -84,6 +92,7 @@
       $('f-token').placeholder = s.hasToken ? 'saved (type to change)' : '';
       $('f-from').placeholder = s.from ? 'saved: ' + s.from + ' (type to change)' : '';
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
+      $('reply-hint').hidden = !s.replyAddress; $('reply-url').textContent = s.replyAddress || '';
       if (s.drivers) {
         const none = s.drivers.filter(d => !d.phone).length;
         $('preview-head').textContent = s.week ? 'Week of ' + day(s.week) + ': ' + s.drivers.length + ' drivers, ' + (s.drivers.length - none) + ' with a number' + (none ? ', ' + none + ' without' : '') + '. The text: "' + s.message + '"' : 'No week to post yet.';
@@ -110,7 +119,18 @@
       await call({ op: 'clear' }, b);
     };
     ['f-sid', 'f-token', 'f-from'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
-    requireSignIn(async () => { await start(); await call({ op: 'preview' }); });
+    // The texts and replies (textLog), newest first; the list follows new ones as they come.
+    const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received' };
+    const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
+    function watchLog(db) {
+      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(200)), snap => {
+        $('log').innerHTML = snap.docs.map(x => x.data()).map(m => { const inbound = m.direction === 'in';
+          return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td>' + escapeHtml(stamp(m.at)) + '</td><td>' + escapeHtml(m.name || 'Unknown number') + '</td><td>' + (inbound ? '<b>Reply</b>' : 'Sent') + '</td><td>' + escapeHtml(phone(inbound ? m.from : m.to)) +
+            '</td><td>' + escapeHtml(m.body || '') + '</td><td>' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && m.status === 'FAILED' ? '<br>' + escapeHtml(m.reason) : '') + '</td></tr>'; }).join('') ||
+          '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
+      }, e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
+    }
+    requireSignIn(async () => { const { db } = await start(); watchLog(db); await call({ op: 'preview' }); });
   </script>
 </body>
 </html>

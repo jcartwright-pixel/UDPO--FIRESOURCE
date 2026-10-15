@@ -10,11 +10,15 @@
  * - Mobile phone numbers are typed on the Driver Roster and kept in driverPhones/{driverId} (the Live sheet copy rewrites
  *   the driver records, so the number does not live on them). A number in Driver Master's own phone column is used when
  *   the roster has none.
+ * - Replies (Joe 10/15, "so I could have a list of replies"): Twilio posts each text a driver sends to the number to
+ *   smsReply (index.js); a reply signed with the saved Auth Token is kept in textLog (direction 'in') with the driver it
+ *   came from, and Schedule Texts lists texts and replies together, newest first.
  * - Until LIVE_TEXTS=1 is set on the server, nothing is sent: each text is written to textLog as "Test copy: not sent".
  *   The test copy (sandbox) never sets it.
  */
 'use strict';
 
+const crypto = require('crypto');
 const L = require('./logic');
 const { COLLECTIONS: C, safeIdPart } = require('./model');
 
@@ -64,17 +68,17 @@ async function weekDrivers(db, week) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const status = (d, env) => ({ on: !!d.on, hasSid: !!d.accountSid, hasToken: !!d.authToken, from: d.fromNumber ? phoneText(d.fromNumber) : '', live: liveTexts(env),
+const status = (d, env, project) => ({ replyAddress: project ? replyAddress(project) : '', on: !!d.on, hasSid: !!d.accountSid, hasToken: !!d.authToken, from: d.fromNumber ? phoneText(d.fromNumber) : '', live: liveTexts(env),
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', switchedAt: d.switchedAt || '', switchedBy: d.switchedBy || '', lastWeek: d.lastWeek || '', lastSend: d.lastSend || null });
 
 /* input.op: status | save {accountSid, authToken, fromNumber} | clear | setOn {on} | preview */
 async function smsCall(db, user, input, options) {
   input = input || {};
-  const o = Object.assign({ now: () => new Date(), env: process.env }, options || {});
+  const o = Object.assign({ now: () => new Date(), env: process.env, project: process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || '' }, options || {});
   const email = await adminOnly(db, user);
   const ref = PRIVATE(db), d = (await ref.get()).data() || {}, op = String(input.op || 'status');
   const stamp = o.now().toISOString();
-  if (op === 'status') return status(d, o.env);
+  if (op === 'status') return status(d, o.env, o.project);
   if (op === 'save') {
     const next = Object.assign({}, d);
     const sid = String(input.accountSid || '').trim(), token = String(input.authToken || '').trim(), from = String(input.fromNumber || '').trim();
@@ -85,12 +89,12 @@ async function smsCall(db, user, input, options) {
     if (from) next.fromNumber = phoneE164(from);
     Object.assign(next, { savedAt: stamp, savedBy: email });
     await ref.set(next);
-    return status(next, o.env);
+    return status(next, o.env, o.project);
   }
   if (op === 'clear') {
     const next = { on: false, lastWeek: d.lastWeek || '', savedAt: stamp, savedBy: email, switchedAt: stamp, switchedBy: email };
     await ref.set(next);
-    return status(next, o.env);
+    return status(next, o.env, o.project);
   }
   if (op === 'setOn') {
     const on = input.on === true;
@@ -99,13 +103,13 @@ async function smsCall(db, user, input, options) {
     const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
     const next = Object.assign({}, d, { on, switchedAt: stamp, switchedBy: email }, on ? { lastWeek: live.current || d.lastWeek || '' } : {});
     await ref.set(next);
-    return status(next, o.env);
+    return status(next, o.env, o.project);
   }
   if (op === 'preview') {
     const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
     const week = live.next || live.current || '';
     const list = week ? await weekDrivers(db, week) : [];
-    return Object.assign(status(d, o.env), { week, message: week ? messageFor(week) : '', drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+    return Object.assign(status(d, o.env, o.project), { week, message: week ? messageFor(week) : '', drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
   }
   throw new SmsError('BAD_REQUEST', 'Unknown Schedule Texts step ' + op.slice(0, 30));
 }
@@ -143,7 +147,7 @@ async function postedCheck(db, options) {
   const stamp = o.now().toISOString(), live = liveTexts(o.env), body = messageFor(week), list = await weekDrivers(db, week);
   let sent = 0, failed = 0, noPhone = 0;
   for (const x of list) {
-    const log = { week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp };
+    const log = { direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp };
     if (!x.phone) { noPhone++; Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
     else if (!live) { Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' }); }
     else {
@@ -159,4 +163,38 @@ async function postedCheck(db, options) {
   return lastSend;
 }
 
-module.exports = { smsCall, postedCheck, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };
+/*
+ * A text a driver sent to the Twilio number (Twilio's "A message comes in" webhook, a form POST). Only a request signed with
+ * the saved Auth Token is kept (Twilio's X-Twilio-Signature: HMAC-SHA1 of the address plus each field name and value in
+ * name order). Returns [status, body]; the body is an empty TwiML answer, so Twilio sends nothing back to the driver.
+ */
+const TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
+function twilioSignature(token, url, params) {
+  const data = url + Object.keys(params || {}).sort().map(k => k + params[k]).join('');
+  return crypto.createHmac('sha1', token).update(Buffer.from(data, 'utf8')).digest('base64');
+}
+const replyAddress = (project) => 'https://us-east4-' + project + '.cloudfunctions.net/smsReply';
+async function handleReply(db, url, headers, params, options) {
+  const o = Object.assign({ now: () => new Date() }, options || {});
+  params = params || {};
+  const d = (await PRIVATE(db).get()).data() || {};
+  const given = String((headers || {})['x-twilio-signature'] || '');
+  if (!d.authToken || !given) return [403, TWIML];
+  const want = twilioSignature(d.authToken, url, params);
+  if (given.length !== want.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want))) return [403, TWIML];
+  if (d.accountSid && params.AccountSid && params.AccountSid !== d.accountSid) return [403, TWIML];
+  const from = phoneE164(params.From), sid = String(params.MessageSid || params.SmsSid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+  if (!sid) return [200, TWIML];
+  // Who sent it: the Driver Roster's number, else Driver Master's own phone column.
+  let driver = null;
+  if (from) {
+    const phones = await db.collection('driverPhones').where('phone', '==', from).limit(1).get();
+    const id = phones.empty ? '' : phones.docs[0].data().driverId || phones.docs[0].id;
+    const all = (await db.collection(C.drivers).get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
+    driver = (id && all.find(x => x.id === id)) || all.find(x => phoneE164(x.phone) === from) || null;
+  }
+  await db.collection('textLog').doc('in_' + sid).set({ direction: 'in', from, driverId: driver ? driver.id : '', name: driver ? driver.name || '' : '', body: String(params.Body || '').slice(0, 1600), at: o.now().toISOString(), status: 'RECEIVED' });
+  return [200, TWIML];
+}
+
+module.exports = { smsCall, postedCheck, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };
