@@ -337,11 +337,18 @@ test('report route tiles: the run\'s short name (Joe 10/14)', () => {
   assert.equal(R.routeNumber('6301_1'), '6301');
 });
 
-test('Run Complete: a Finished line is done for its shift; Undo takes it back (Joe 10/14)', () => {
+test('Run Complete: a Finished line is done until 6 a.m.; Undo takes it back (Joe 10/14, 10/15)', () => {
   const now = Date.parse('2026-10-08T19:40:00Z'); // 3:40 PM in New York, second shift
   const fin = { status: 'FINISHED', product: 'Skim', recordedAt: '2026-10-08T19:30:00Z' };
   assert.equal(R.lineDone(fin, now), true);
-  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T05:30:00Z')), false, 'the next shift (third, 1:30 AM) opens the line again');
+  // Joe 10/15: it stays Run Complete through the shift changes, until 6 a.m. starts the next day.
+  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T03:30:00Z')), true, 'still done at 11:30 PM');
+  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T05:30:00Z')), true, 'still done on third shift (1:30 AM)');
+  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T09:59:00Z')), true, 'still done at 5:59 AM');
+  assert.equal(R.lineDone(fin, Date.parse('2026-10-09T10:00:00Z')), false, '6 AM, the next day, opens the line again');
+  const late = { status: 'FINISHED', recordedAt: '2026-10-09T09:30:00Z' }; // 5:30 AM: the day still ends at 6
+  assert.equal(R.lineDone(late, Date.parse('2026-10-09T09:50:00Z')), true);
+  assert.equal(R.lineDone(late, Date.parse('2026-10-09T10:01:00Z')), false);
   assert.equal(R.lineDone({ status: 'RUNNING', recordedAt: fin.recordedAt }, now), false);
   const r = R.plantReport({ loads: [], lines: [{ name: 'GALLON FILLER', last: fin }, { name: 'BOXING', last: { status: 'RUNNING', product: 'Skim', recordedAt: '2026-10-08T19:00:00Z' } }], temps: [], roundStart: '2026-10-08T19:35:00Z' }, now);
   assert.deepEqual(r.lines.map(l => [l.line, l.status]), [['GALLON FILLER', 'RUN COMPLETE'], ['BOXING', 'NOT CHECKED']], 'a done line is not "not checked"');

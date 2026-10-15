@@ -434,11 +434,13 @@
     });
     return out.sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
   }
-  // Joe 10/14 (Run Complete, A): a line whose last check is Finished is done for the shift it was pressed in; the next shift
-  // (or Start Next Run) opens it again.
+  // Joe 10/14 (Run Complete, A): a line whose last check is Finished is done; Start Next Run opens it again.
+  // Joe 10/15: a run finished tonight stays Run Complete, with its time and its checks, until 6 a.m. when the next day starts
+  // (it no longer clears at the shift change), so nobody has to type it back in without knowing when the line shut down.
+  function opDayAt(ms) { return Math.floor((wallClock(ms) - 360) / 1440); }
   function lineDone(last, nowMs) {
     var t = when((last || {}).recordedAt);
-    return !!t && text(last.status).toUpperCase() === 'FINISHED' && nowMs - t < 12 * 3600000 && shiftAt(t) === shiftAt(nowMs);
+    return !!t && text(last.status).toUpperCase() === 'FINISHED' && t <= nowMs + 60000 && opDayAt(t) === opDayAt(nowMs);
   }
   // Each line with its last check and the number of checks in the last 24 hours.
   function qualityLines(setup, journal, lineStatus, nowMs) {
@@ -858,7 +860,7 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, followLabel: followLabel, shiftLog: shiftLog,
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
