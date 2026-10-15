@@ -306,6 +306,9 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page #ps-top .ps-brand img { width: auto; height: 38px; }
 .ps-page #ps-top .ps-brand strong { font-size: 20px; }
 .ps-page .ps-pill { background: #073c6a; color: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; white-space: nowrap; }
+/* A long line name with a scrollbar showing: the buttons keep their words on one line and the name shortens instead. */
+.ps-page #ps-top button, .ps-page #ps-top .ps-brand strong { white-space: nowrap; }
+.ps-page .ps-pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ps-page .ps-pill::before { content: '\25CF  '; color: #f3b613; }
 .ps-page .ps-title { padding: 16px 18px 4px; }
 .ps-page .ps-title .eyebrow { display: block; color: #5b6b7c; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
