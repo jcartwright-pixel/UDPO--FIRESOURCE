@@ -267,3 +267,41 @@ test('Bag fillers and Fed by (Joe 10/14): Raypak and Boxing weigh bags; a packin
   assert.equal(P.boxingOf({ fedBy: ['a'] }, 100, feeders).diff, null, 'no jugs per box yet');
   assert.equal(P.boxingOf({ fedBy: ['a'], perBox: 4 }, 100, feeders).diff, -100, 'more boxed than filled');
 });
+
+// Joe 10/16: "we run it right around 1,000 and 1,350 degrees"; "the Dairy Queen machines are my Raypak machines";
+// "You already have the sensors already labeled that goes to the blow mold".
+test('the Blow Mold temperature range is 1,000 to 1,350°F until Line Targets sets one', () => {
+  assert.deepEqual(P.machineRange('BLOWMOLD', {}, 'temp'), [1000, 1350]);
+  assert.deepEqual(P.machineRange('BLOWMOLD', { tempLow: 395, tempHigh: 425 }, 'temp'), [395, 425]);
+  assert.deepEqual(P.machineRange('BLOWMOLD', {}, 'speed'), [null, null]);
+  assert.deepEqual(P.machineRange('FILLER', {}, 'temp'), [null, null]);
+  const m = P.machineNow({ machine: { at: '2026-10-16T05:00:00Z', temp: 1400 } }, {}, Date.parse('2026-10-16T05:00:10Z'), 'BLOWMOLD');
+  assert.deepEqual([m.tempLow, m.tempHigh, m.tempFlag], [1000, 1350, 'HIGH']);
+});
+
+test('RedZone lines go with ours by name (Dairy Queen is the RAYPAK); Line Targets can pick another or none', () => {
+  const rz = { locations: [{ uuid: 'bm', name: 'Blow Mold', sensors: ['Default'] }, { uuid: 'dq', name: 'Dairy Queen', sensors: ['Default'] }, { uuid: 'dqm', name: 'Dairy Queen Manual', sensors: ['In=out', 'Box'] },
+    { uuid: 'g', name: 'Gallon' }, { uuid: 'h', name: 'Half Gallon' }, { uuid: 'hqp', name: 'Half, Quart, and Pint' }, { uuid: 'bx', name: 'Box Maker' }, { uuid: 'bxm', name: 'Box Maker Manuel' }] };
+  const of = (name, doc) => (P.rzLocationFor(name, doc || {}, rz) || {}).name || null;
+  assert.deepEqual(['BLOW MOLD', 'RAYPAK', 'GALLON FILLER', 'NEW 1/2 GALLON', 'OLD 1/2 GALLON', 'BOXING', 'TOTES', 'HTST #1'].map(n => of(n)),
+    ['Blow Mold', 'Dairy Queen', 'Gallon', 'Half Gallon', 'Half, Quart, and Pint', 'Box Maker', null, null]);
+  assert.equal(of('RAYPAK', { redzoneLocation: 'dqm' }), 'Dairy Queen Manual');
+  assert.equal(of('BLOW MOLD', { redzoneLocation: 'NONE' }), null);
+});
+
+test('RedZone problem types are the Line Stopped choices for that line; its products fill empty speeds only', () => {
+  const rz = { locations: [{ uuid: 'bm', name: 'Blow Mold' }], assets: [{ locationUUID: 'bm', assetTypeUUID: 'blow' }],
+    problems: [{ name: 'Blow mold is down', assetTypeUUID: 'blow' }, { name: 'Bag Not Sealing', assetTypeUUID: 'bag' }, { name: 'Adjusting weights', assetTypeUUID: '' }, { name: 'Other', assetTypeUUID: '' }],
+    products: [{ uuid: 'p1', name: 'Gallon Jug', sku: '9001', ratePerMin: 50, target: 85 }, { uuid: 'p2', name: 'Cream', sku: '294', ratePerMin: 100, target: 1200 }],
+    runs: [{ locationUUID: 'bm', productTypeUUID: 'p1', startTime: '2026-10-15T10:00:00Z' }, { locationUUID: 'x', productTypeUUID: 'p2', startTime: '2026-10-15T11:00:00Z' }] };
+  const loc = rz.locations[0], names = P.rzProblemsFor(rz, loc);
+  assert.deepEqual(names, ['Blow mold is down', 'Adjusting weights', 'Other']);
+  assert.deepEqual(P.rzStopReasons('BLOWMOLD', names), ['Blow mold is down', 'Adjusting weights', 'Maintenance called', 'Other']);
+  assert.deepEqual(P.rzStopReasons('BLOWMOLD', []), P.stopReasons('BLOWMOLD'), 'not read in: the line\'s own list');
+  assert.equal(P.rzStopReasons('FILLER', Array.from({ length: 15 }, (_, i) => 'P' + i)).length, 12, 'the tablet\'s four rows of three');
+  const ran = P.rzRunsFor(rz, loc);
+  assert.deepEqual([ran.products.map(p => p.name), ran.runs[0].product], [['Gallon Jug'], 'Gallon Jug']);
+  const f = P.rzFill([{ name: 'GALLON JUG', sku: '', ratePerMin: '' }, { name: 'Cream', sku: '294', ratePerMin: 90 }, { name: 'Not in RedZone' }], rz.products);
+  assert.deepEqual(f.list.map(r => [r.ratePerMin, r.targetPct]), [[50, 85], [90, undefined], [undefined, undefined]]);
+  assert.deepEqual(f.changed, ['GALLON JUG: full speed 50, Target % 85'], 'a typed speed stays; a target over 100 is not a Target %');
+});

@@ -339,11 +339,18 @@
   // Joe 10/14: on the Blow Mold the speed is the annealer speed (like 70), unless Line Targets names it otherwise.
   function r0(run) { return run || {}; }
   function speedNameFor(kind, c) { return text((c || {}).speedName) || (kind === 'BLOWMOLD' ? 'Annealer speed' : 'Speed'); }
+  // Joe 10/16: "we run it right around 1,000 and 1,350 degrees" on the Blow Mold. Low and High on Line Targets change it.
+  var DEFAULT_RANGES = { BLOWMOLD: { temp: [1000, 1350] } };
+  function machineRange(kind, c, k) {
+    var lo = num((c || {})[k + 'Low']), hi = num((c || {})[k + 'High']), d = (DEFAULT_RANGES[kind] || {})[k];
+    return lo === null && hi === null && d ? [d[0], d[1]] : [lo, hi];
+  }
   function machineNow(run, lineDoc, nowMs, kind) {
     var m = (run || {}).machine, c = ((lineDoc || {}).controller) || {};
     if (!m || typeof m !== 'object') return null;
+    var sr = machineRange(kind, c, 'speed'), tr = machineRange(kind, c, 'temp');
     var at = when(m.at), o = { at: text(m.at), stale: !at || nowMs - at > 120000, counter: num(m.counter), speed: num(m.speed), temp: num(m.temp),
-      speedName: speedNameFor(kind, c), speedLow: num(c.speedLow), speedHigh: num(c.speedHigh), tempLow: num(c.tempLow), tempHigh: num(c.tempHigh), speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
+      speedName: speedNameFor(kind, c), speedLow: sr[0], speedHigh: sr[1], tempLow: tr[0], tempHigh: tr[1], speedOutSince: text(m.speedOutSince), tempOutSince: text(m.tempOutSince), lastMoveAt: text(m.lastMoveAt) };
     // The filler's add-on sensors: the motor switch (running true / false, since when) and jugs in on the infeed this shift, with
     // the rejects (jugs in less jugs counted out since the infeed eye started counting this shift).
     o.running = m.running === true ? true : m.running === false ? false : null;
@@ -526,7 +533,67 @@
     return { lines: out, topLosses: rank(plantReasons).slice(0, 5) };
   }
 
-  return { COUNTERS: COUNTERS, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
+  /* ---------- RedZone's lines (Joe 10/16) ----------
+   * RedZone's own lines are its locations, each with its sensor names ("Blow Mold: Default"). Each of our lines is matched to
+   * one by name, and Line Targets can change the match (lineDoc.redzoneLocation: a location's uuid, or NONE).
+   * Joe 10/16: "The Dairy Queen machines are my Raypak machines ... I have a Raypak and then the new one." */
+  var RZ_MATCH = [[/^blow\s*mold/i, 'BLOW MOLD'], [/^gallon/i, 'GALLON FILLER'], [/^half\s*gallon/i, 'NEW 1/2 GALLON'], [/^half,?\s*quart/i, 'OLD 1/2 GALLON'],
+    [/^dairy\s*queen$/i, 'RAYPAK'], [/^box\s*maker$/i, 'BOXING'], [/^totes?$/i, 'TOTES'], [/^htst\s*#?\s*1$/i, 'HTST #1'], [/^htst\s*#?\s*2$/i, 'HTST #2']];
+  function rzKey(v) { return text(v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+  function rzGuess(lineName, locations) {
+    var k = rzKey(lineName);
+    return (locations || []).filter(function (l) {
+      return RZ_MATCH.some(function (m) { return m[0].test(text(l.name)) && rzKey(m[1]) === k; }) || rzKey(l.name) === k;
+    })[0] || null;
+  }
+  // The RedZone location for one of our lines: the one picked on Line Targets, else the match by name. null = none.
+  function rzLocationFor(lineName, lineDoc, rz) {
+    var locs = (rz && rz.locations) || [], saved = text((lineDoc || {}).redzoneLocation);
+    if (saved === 'NONE') return null;
+    if (saved) return locs.filter(function (l) { return l.uuid === saved; })[0] || null;
+    return rzGuess(lineName, locs);
+  }
+  // RedZone's problem types for a location: the ones for a machine type at that location, and the ones for every machine.
+  function rzProblemsFor(rz, loc) {
+    if (!rz || !loc) return [];
+    var types = {};
+    (rz.assets || []).forEach(function (a) { if (a.locationUUID === loc.uuid && a.assetTypeUUID) types[a.assetTypeUUID] = 1; });
+    var seen = {};
+    return (rz.problems || []).filter(function (p) { return !p.assetTypeUUID || types[p.assetTypeUUID]; }).map(function (p) { return text(p.name); })
+      .filter(function (n) { var k = n.toUpperCase(); if (!n || seen[k]) return false; seen[k] = 1; return true; });
+  }
+  // The Line Stopped choices: RedZone's problem types for the line when they are read (ten at most, the tablet's rows of three),
+  // then Maintenance called (it opens a work order) and Other; else the line's own list.
+  function rzStopReasons(kind, rzNames) {
+    var keep = (rzNames || []).filter(function (n) { return !/^(maintenance called|other)$/i.test(n); }).slice(0, 10);
+    return keep.length ? keep.concat(['Maintenance called', 'Other']) : stopReasons(kind);
+  }
+  // What RedZone ran on a location: its products (newest run first) with RedZone's numbers, and the latest runs.
+  function rzRunsFor(rz, loc) {
+    if (!rz || !loc) return { products: [], runs: [] };
+    var byId = {};
+    (rz.products || []).forEach(function (p) { byId[p.uuid] = p; });
+    var runs = (rz.runs || []).filter(function (r) { return r.locationUUID === loc.uuid; }).sort(function (a, b) { return (when(b.startTime) || 0) - (when(a.startTime) || 0); });
+    var seen = {}, products = [];
+    runs.forEach(function (r) { var p = byId[r.productTypeUUID]; if (p && !seen[p.uuid]) { seen[p.uuid] = 1; products.push(p); } });
+    return { products: products, runs: runs.map(function (r) { return Object.assign({ product: (byId[r.productTypeUUID] || {}).name || '' }, r); }) };
+  }
+  // Fill empty Full speed and Target % boxes from RedZone (matched by SKU, then name). Boxes with a number stay as they are.
+  function rzFill(list, rzProducts) {
+    var bySku = {}, byName = {}, changed = [];
+    (rzProducts || []).forEach(function (p) { if (text(p.sku)) bySku[text(p.sku)] = bySku[text(p.sku)] || p; byName[rzKey(p.name)] = byName[rzKey(p.name)] || p; });
+    var out = (list || []).map(function (row) {
+      var p = (text(row.sku) && bySku[text(row.sku)]) || byName[rzKey(row.name)], r = Object.assign({}, row), did = [];
+      if (!p) return r;
+      if (num(r.ratePerMin) === null && num(p.ratePerMin) > 0) { r.ratePerMin = num(p.ratePerMin); did.push('full speed ' + r.ratePerMin); }
+      if (num(r.targetPct) === null && num(p.target) > 0 && num(p.target) <= 100) { r.targetPct = num(p.target); did.push('Target % ' + r.targetPct); }
+      if (did.length) changed.push(text(r.name) + ': ' + did.join(', '));
+      return r;
+    });
+    return { list: out, changed: changed };
+  }
+
+  return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
