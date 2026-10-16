@@ -306,7 +306,8 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       b.set(db().collection('gpsAlerts').doc('start_idle_2'), { date: '2026-10-07', tag: '223896', at: iso('2026-10-07', 11, 5), type: 'IDLE', minutes: 9 });
       // EVANS's truck passed through the yard at 11:40 PM leaving on its next run: Fleet's last "return" that day.
       b.set(db().collection('gpsDays').doc('2026-10-07_223897'), { yardIn: '2026-10-08T03:40:00.000Z' }, { merge: true });
-      b.set(db().collection('scorecard').doc('settings'), { countFrom: '2026-10-15' }, { merge: true });
+      // The start date is after the whole month on screen, so the board reads "before the start" whatever today is.
+      b.set(db().collection('scorecard').doc('settings'), { countFrom: '2026-11-15' }, { merge: true });
       await b.commit();
       const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, (BEFORE ? 'before-' : 'after-') + name + '-1536.png') }); };
       const tab = async (page, t) => { await page.click('#cats [data-tab="' + t + '"]'); await page.waitForTimeout(300); return page.$$eval('.sc-board tbody tr', rows => rows.map(r => r.textContent)); };
@@ -316,11 +317,11 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // Joe 10/14 (live): before the start date one driver with an old call-off was alone on the board and read as "stuck"
       // on him. Now nobody is listed, the board says why, No driver dispatched starts at the start date too, and Week / Month switch.
       if (!BEFORE) {
-        assert.equal(await sc.$$eval('.sc-board tr[data-key]', r => r.length), 0, 'no driver is listed from call-offs before 10-15-26');
-        assert.match(await sc.textContent('.sc-board'), /The scorecard counts from 10-15-26 \(Settings\)/);
+        assert.equal(await sc.$$eval('.sc-board tr[data-key]', r => r.length), 0, 'no driver is listed from call-offs before 11-15-26');
+        assert.match(await sc.textContent('.sc-board'), /The scorecard counts from 11-15-26 \(Settings\)/);
         assert.equal(await sc.$('#unassigned'), null, 'No driver dispatched starts at the start date');
         const foot = await sc.textContent('#foot');
-        assert.match(foot, /counted from 10-15-26 \(Settings\)/);
+        assert.match(foot, /counted from 11-15-26 \(Settings\)/);
         assert.ok(!/copied Live weeks/.test(foot), 'the footer no longer talks about copied Live weeks');
         await shot(sc, 'board-before-start');
         await sc.click('[data-mode="week"]');
@@ -331,7 +332,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       for (const t of BEFORE ? ['checkin', 'cases', 'inspection', 'time', 'idling'] : ['checkin', 'cases', 'inspection', 'time']) {
         const rows = await tab(sc, t);
         await shot(sc, 'tab-' + t);
-        if (!BEFORE) assert.ok(rows.every(x => !/−\d/.test(x) || /No misses|^\s*$/.test(x)) && !rows.some(x => /Missed daily check-in|short \(out|No inspection done|Back at the yard/.test(x)), t + ': nothing before 10-15-26 costs points: ' + rows.join(' / '));
+        if (!BEFORE) assert.ok(rows.every(x => !/−\d/.test(x) || /No misses|^\s*$/.test(x)) && !rows.some(x => /Missed daily check-in|short \(out|No inspection done|Back at the yard/.test(x)), t + ': nothing before 11-15-26 costs points: ' + rows.join(' / '));
       }
       await sc.close();
       if (!BEFORE) {
