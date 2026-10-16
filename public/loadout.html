@@ -303,7 +303,7 @@
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
         const isMoved = moved.has(r.id), movedTag = isMoved ? '<span class="moved-tag" title="Moved out of the sheet\'s loading order">MOVED</span>' : '';
-        const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(r.run) + '</span>' + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '') + movedTag;
+        const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '') + movedTag;
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
         // ("Started Wed 3:24 AM · forgot End?") shows on hover, so the line stays one line high.
@@ -312,7 +312,7 @@
           '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? long : P.minutesText(mins)) + '</span>';
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '') + (isMoved ? ' moved' : '');
         if (area === 'TANKER') {
-          html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(r.run) + movedTag + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
+          html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(L.runText(r)) + movedTag + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
@@ -370,10 +370,10 @@
       const driver = '<td class="lo-driver">' + (over || escapeHtml([r.driver, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · '))) + '</td>';
       const editBtn = '<td><button type="button" class="edit-row" data-sedit="' + escapeHtml(r.id) + '">Edit</button></td></tr>';
       // Tanker Loadout's columns: Route, Run, Driver, Truck, Trailer, Quantity Out, Status, Shift (Start / End here), Pickup, Edit.
-      if (r.area === 'TANKER') return tr + '<td>' + escapeHtml(r.run) + '</td>' + driver + '<td></td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+      if (r.area === 'TANKER') return tr + '<td>' + escapeHtml(L.runText(r)) + '</td>' + driver + '<td></td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
         '<td>' + status + '</td><td>' + clockCell + '</td><td>' + escapeHtml(clock24(x.pickupTime)) + '</td>' + editBtn;
       return tr +
-        '<td><span class="lo-run" title="' + escapeHtml([r.run, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · ')) + '">' + escapeHtml(r.run) + '</span></td>' +
+        '<td><span class="lo-run" title="' + escapeHtml([r.run, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · ')) + '">' + escapeHtml(L.runText(r)) + '</span></td>' +
         // A Scheduler load has no driver here: Driver / CVG says Carrier and its PO, or that Route Master needs a LOAD N run.
         '<td class="lo-driver">' + (over || escapeHtml([r.driver, x.poNumber ? 'PO ' + x.poNumber : ''].filter(Boolean).join(' · '))) + '</td><td></td>' +
         '<td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td><td>' + escapeHtml(clock24(x.pickupTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td>' +

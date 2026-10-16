@@ -259,3 +259,13 @@ test('weekly: an as-needed customer\'s Scheduler loads go on its LOAD 1, LOAD 2 
   assert.deepEqual(ctx.plant['c905_2|2026-10-15'].map(e => e.id), ['c', 'a'], 'more loads than LOAD runs share the last one');
   assert.deepEqual(ctx.plant['g892|2026-10-15'].map(e => e.id), ['g']);
 });
+
+test('Run / Destination text: 6301_1 reads Load 1, a blank run reads the route name (Joe 10/16)', () => {
+  assert.equal(L.runText({ route: '6301_1', run: '6301_1', routeName: 'WALMART' }), 'Load 1');
+  assert.equal(L.runText({ route: '8302_2', run: '8302_2' }), 'Load 2');
+  assert.equal(L.runText({ route: '6301_1', run: '6301_1', routeRunType: 'Load 1 AM' }), 'Load 1 AM');
+  assert.equal(L.runText({ route: '844', run: '', routeName: 'Ohio Processor', streamId: 'OH PROCESSORS' }), 'Ohio Processor');
+  assert.equal(L.runText({ route: '877', run: '', streamId: 'COSTCO MD' }), 'COSTCO MD');
+  assert.equal(L.runText({ route: '970', run: '970', routeName: 'ALDI' }), 'ALDI');
+  assert.equal(L.runText({ route: '901_1', run: 'PRODUCT 1', routeName: 'MF' }), 'PRODUCT 1');
+});
