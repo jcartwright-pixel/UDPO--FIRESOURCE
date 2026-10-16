@@ -40,10 +40,28 @@
       <button type="button" id="m-board" class="drv-card blue"><b>View Loadout</b><small>Route list and loadout status</small></button>
       <button type="button" id="m-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button>
       <button type="button" id="m-checkin" class="drv-card green"><b>Check-In</b><small>Cases, returns, truck and trailer issues</small></button>
+      <button type="button" id="m-schedule" class="drv-card purple"><b>My Schedule</b><small>Your routes for the week, Sunday to Saturday</small></button>
     </div>
     <p class="drv-hint" id="m-who"></p>
     <button type="button" id="m-station" hidden>Release</button>
     <div id="release-box" hidden></div>
+  </section>
+
+  <!-- Joe 10/15: My Schedule. The driver types his employee number once (the phone keeps it) and sees his week. -->
+  <form class="phone-card" id="step-sched-id" hidden>
+    <div class="drv-head"><h1>My Schedule</h1><button type="button" data-back>&larr; Back</button></div>
+    <label for="emp-id">Your employee number</label>
+    <input id="emp-id" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="20">
+    <p class="drv-hint">The number Dispatch has for you on the driver list. This phone remembers it.</p>
+    <button type="submit" class="primary">Show my schedule</button>
+  </form>
+  <section class="phone-card" id="step-sched" hidden>
+    <div class="drv-head"><h1>My Schedule</h1><button type="button" id="sched-refresh" class="primary">Refresh</button><button type="button" data-back>&larr; Back</button></div>
+    <p class="sched-who"><b id="sched-name"></b><button type="button" id="sched-not-me">Not you?</button></p>
+    <p class="sched-week" id="sched-week"></p>
+    <p class="sched-note" id="sched-note" hidden></p>
+    <div class="sched-days" id="sched-days"></div>
+    <p class="drv-hint" id="sched-updated"></p>
   </section>
 
   <!-- 2. The driver picks their name once. -->
@@ -147,7 +165,7 @@
   </form>
 
   <script type="module">
-    import { start, escapeHtml, shortDate, showError, isUnitedDairy } from './js/app.js';
+    import { start, escapeHtml, shortDate, dateTimeText, showError, isUnitedDairy } from './js/app.js';
     import { httpsCallable, doc, getDoc } from './js/firebase.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
@@ -177,14 +195,14 @@
     };
     // want: what the driver picked on the three choices ('board', 'dvir', 'checkin'; '' shows the choices).
     const view = new URLSearchParams(location.search).get('view');
-    let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : view === 'checkin' ? 'checkin' : '';
+    let want = view === 'dvir' ? 'dvir' : view === 'loadout' ? 'board' : view === 'checkin' ? 'checkin' : view === 'schedule' ? 'schedule' : '';
     let code = room ? 'room' : store.get('code'), driverId = store.get('driverId'), driverName = store.get('driverName'), date = '', dates = [], loads = [], open = null, units = { trucks: [], trailers: [], jacks: [] };
 
     // One call as it goes to the server: the phone's code (or the Driver Room station) goes with every call.
     const withWho = (op, fields) => Object.assign(room ? { station } : { code }, { op }, fields || {});
     const rawCall = async (op, input) => { const { functions } = await start(); return (await httpsCallable(functions, 'phone')(input)).data; };
     // Joe 10/12 (no signal): the last roster, loads and board are kept on the phone and shown when there is no signal.
-    const READ_OPS = ['roster', 'loads', 'board'], readKey = (op, fields) => op + '|' + (room ? 'room:' + (station && station.key) : code) + '|' + JSON.stringify(fields || {});
+    const READ_OPS = ['roster', 'loads', 'board', 'schedule'], readKey = (op, fields) => op + '|' + (room ? 'room:' + (station && station.key) : code) + '|' + JSON.stringify(fields || {});
     async function call(op, fields) {
       try {
         const out = await rawCall(op, withWho(op, fields));
@@ -208,7 +226,7 @@
         throw e;
       }
     }
-    const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir'];
+    const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir', 'step-sched-id', 'step-sched'];
     function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
 
     async function show() {
@@ -217,6 +235,7 @@
       if (!code) return step('step-code');
       if (!want) { document.getElementById('m-who').textContent = driverId && driverId !== 'skip' ? 'Signed in as ' + driverName + (room ? '. Done at the top signs you out.' : '. Change it with Change at the top.') : ''; return step('step-menu'); }
       if (want === 'board') return openBoard();
+      if (want === 'schedule') return openSchedule();
       if (!driverId) {
         const r = await call('roster'), opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
         document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => opt(d.id, d.name)).join('') +
@@ -343,7 +362,7 @@
     }));
     document.getElementById('skip').addEventListener('click', run(async () => { driverId = 'skip'; driverName = ''; store.set('driverId', driverId); await show(); }));
     // The Driver Room's Done: signs the driver out, back to the three choices.
-    const signOut = () => { driverId = ''; driverName = ''; store.set('driverId', ''); store.set('driverName', ''); open = null; };
+    const signOut = () => { driverId = ''; driverName = ''; store.set('driverId', ''); store.set('driverName', ''); store.set('empId', ''); open = null; };
     document.getElementById('change').addEventListener('click', run(async () => { signOut(); if (room) want = ''; await show(); }));
     if (room && station) {
       document.body.classList.add('room');
@@ -413,6 +432,38 @@
     document.getElementById('m-board').addEventListener('click', () => { want = 'board'; show().catch(err => showError(err.message)); });
     document.getElementById('m-dvir').addEventListener('click', run(async () => { want = 'dvir'; await show(); }));
     document.getElementById('m-checkin').addEventListener('click', run(async () => { want = 'checkin'; await show(); }));
+
+    /* ---------- My Schedule (Joe 10/15): the week, Sunday to Saturday; from Saturday 6 AM the coming week ---------- */
+    document.getElementById('m-schedule').addEventListener('click', run(async () => { want = 'schedule'; await show(); }));
+    const DAY_WORDS = { sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday' };
+    async function openSchedule() {
+      const emp = store.get('empId');
+      if (!emp) { document.getElementById('emp-id').value = ''; return step('step-sched-id'); }
+      let r;
+      try { r = await call('schedule', { employeeId: emp }); }
+      catch (e) { if (/employee number/.test(e.message)) { store.set('empId', ''); document.getElementById('emp-id').value = emp; step('step-sched-id'); } throw e; }
+      // Signing in with the employee number also tells DVIR and Check-In who is driving.
+      if (!driverId || driverId === 'skip') { driverId = r.driverId; driverName = r.name; store.set('driverId', driverId); store.set('driverName', driverName); }
+      document.getElementById('who').textContent = driverName; document.getElementById('change').hidden = !driverId;
+      document.getElementById('sched-name').textContent = r.name + (r.employeeId ? ' · ' + r.employeeId : '');
+      document.getElementById('sched-week').textContent = 'Week of ' + shortDate(r.week) + ' to ' + shortDate(r.end);
+      const note = document.getElementById('sched-note');
+      note.hidden = r.posted; note.textContent = r.built ? 'Dispatch has not posted this week yet, so it can still change.' : 'Dispatch has not posted this week yet. Check back later.';
+      const unit = (x) => [x.truck && 'Truck ' + x.truck, x.trailer && 'Trailer ' + x.trailer, x.leaves && 'Leaves ' + x.leaves].filter(Boolean).map(t => '<span>' + escapeHtml(t) + '</span>').join(' · ');
+      document.getElementById('sched-days').innerHTML = r.days.map(d => '<div class="sched-day ' + d.kind + (d.date === r.today ? ' today' : '') + '"><div class="sched-date"><b>' + DAY_WORDS[d.day] + '</b><span>' + escapeHtml(shortDate(d.date)) + '</span></div><div class="sched-what">' +
+        d.runs.map(x => '<div class="sched-run"><b>' + escapeHtml(x.route) + '</b>' + (x.run ? ' <span>' + escapeHtml(x.run) + '</span>' : '') + (unit(x) ? '<small>' + unit(x) + '</small>' : '') + '</div>').join('') +
+        (d.status ? '<div class="sched-status">' + escapeHtml(d.status) + '</div>' : '') + '</div></div>').join('');
+      document.getElementById('sched-updated').textContent = 'As of ' + dateTimeText(r.at);
+      step('step-sched');
+    }
+    document.getElementById('step-sched-id').addEventListener('submit', run(async () => {
+      const v = document.getElementById('emp-id').value.trim();
+      if (!v) throw new Error('Type your employee number.');
+      store.set('empId', v);
+      await openSchedule();
+    }));
+    document.getElementById('sched-refresh').addEventListener('click', run(openSchedule));
+    document.getElementById('sched-not-me').addEventListener('click', run(async () => { signOut(); document.getElementById('emp-id').value = ''; await show(); }));
     // Joe 10/12 "these will still also need to have a United Dairy email address to log in first": the Driver Room tablet is
     // signed in with a United Dairy Google account on the Driver Station link; without it, back there to sign in.
     const signedIn = room ? start().then(async ({ auth }) => { await auth.authStateReady(); if (isUnitedDairy(auth.currentUser)) return true; location.replace('driver-station.html'); return false; }) : Promise.resolve(true);

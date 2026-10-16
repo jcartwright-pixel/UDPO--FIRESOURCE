@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO', 'WRITEBACK_JSON', 'LIVE_EMAIL'];
+const ALLOWED = ['READ_UNIONTOWN_SHEETS', 'MAIL_FROM', 'REPORT_TO', 'WRITEBACK_JSON', 'LIVE_EMAIL', 'LIVE_TEXTS'];
 const REAL_LIVE = require('../functions/src/sources').UNIONTOWN.live.spreadsheetId;
 const WHY = {
   DEMO_DATA: 'production must show the real sheets, not the made-up ones',
@@ -67,6 +67,9 @@ function productionEnv(settings, extra, sandbox) {
     }
   }
   if (String(env.READ_UNIONTOWN_SHEETS) !== '1') problems.push('READ_UNIONTOWN_SHEETS must be 1: production reads the real Uniontown sheets (read only)');
+  // Joe 10/15: Schedule Texts may reach real drivers on production; they still go out only once an administrator saves the Twilio
+  // account and turns them On in Administration > Schedule Texts (src/sms.js). The sandbox never sets it.
+  if (env.LIVE_TEXTS !== undefined && ['', '1'].indexOf(String(env.LIVE_TEXTS).trim()) < 0) problems.push('LIVE_TEXTS must be 1 (Schedule Texts may be sent once turned On) or empty (texts only written to the log)');
   if (env.LIVE_EMAIL !== undefined && ['', '1'].indexOf(String(env.LIVE_EMAIL).trim()) < 0) problems.push('LIVE_EMAIL must be 1 (email goes to the people it is meant for) or empty (only to the person who pressed Send)');
   if (env.MAIL_FROM && !UD.test(String(env.MAIL_FROM).trim())) problems.push('MAIL_FROM must be one @uniteddairy.com address');
   String(env.REPORT_TO || '').split(',').map(s => s.trim()).filter(Boolean).forEach(a => {

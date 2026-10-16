@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Schedule Texts · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<!-- Joe 10/15: when a new week is posted, each driver on it gets a text. Built ready, Off until an administrator turns it On. -->
+<body class="gps-page texts-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Schedule Texts</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Schedule Texts</h1><small>When Dispatch posts a new week, every driver on it with a mobile phone number gets one text: his schedule is posted, open My Schedule.</small></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="gps-grid">
+      <section class="gps-card">
+        <h2>1. Texts <span class="pill" id="state">-</span></h2>
+        <p class="hint" id="state-text"></p>
+        <div class="gps-buttons"><button type="button" class="primary big" id="turn"></button></div>
+        <p class="hint" id="mode"></p>
+        <p class="hint" id="last"></p>
+      </section>
+      <section class="gps-card">
+        <h2>2. Twilio texting account <span class="pill" id="keys">-</span></h2>
+        <p class="hint">Type these here only, never in a chat or email. They are locked away on the server and never shown again. Leave a box blank to keep what is saved.</p>
+        <form id="form" autocomplete="off" onsubmit="return false">
+          <label>Account SID<input id="f-sid" autocomplete="off" spellcheck="false" maxlength="40"></label>
+          <label>Auth Token<input id="f-token" type="password" autocomplete="new-password" maxlength="200"></label>
+          <label>Twilio phone number<input id="f-from" type="tel" inputmode="tel" autocomplete="off" maxlength="20"></label>
+          <div class="gps-buttons">
+            <button type="button" class="primary" id="save">Save account</button>
+            <button type="button" id="clear">Remove account</button>
+          </div>
+        </form>
+        <p class="hint" id="saved"></p>
+        <p class="hint" id="reply-hint" hidden>So replies show below: in Twilio, open the phone number and set "A message comes in" to Webhook, HTTP POST, <b id="reply-url"></b></p>
+      </section>
+      <section class="gps-card wide">
+        <h2>3. Who would get the next text</h2>
+        <p class="hint" id="preview-head"></p>
+        <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
+          <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
+        <p class="hint">Mobile phone numbers are typed on the <a href="drivers.html">Driver Roster</a>.</p>
+      </section>
+      <!-- Joe 10/15 ("so I could have a list of replies or communication"): every text sent and every reply, newest first. -->
+      <section class="gps-card wide">
+        <h2>4. Texts and replies</h2>
+        <table class="gps-check texts-list texts-log"><colgroup><col style="width:15%"><col style="width:17%"><col style="width:9%"><col style="width:13%"><col style="width:34%"><col style="width:12%"></colgroup>
+          <thead><tr><th>When</th><th>Driver</th><th>Way</th><th>Phone</th><th>Message</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="6" class="hint">Loading…</td></tr></tbody></table>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText, serverText } from './js/app.js';
+    import { collection, query, orderBy, limit, onSnapshot } from './js/firebase.js';
+
+    let s = null, armed = null;
+    const $ = (id) => document.getElementById(id);
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
+    const day = (k) => { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
+    function render() {
+      if (!s) return;
+      const keys = s.hasSid && s.hasToken && s.from, some = s.hasSid || s.hasToken || s.from;
+      $('state').textContent = s.on ? 'On' : 'Off'; $('state').className = 'pill ' + (s.on ? 'yes' : 'no');
+      $('state-text').textContent = s.on ? 'On: the next week Dispatch posts is texted to its drivers once.' : 'Off: no texts are sent.' + (keys ? '' : ' Save the Twilio account first, then turn it On.');
+      $('turn').textContent = s.on ? 'Turn Off' : 'Turn On';
+      $('turn').disabled = !s.on && !keys;
+      $('mode').textContent = s.live ? '' : 'Test copy: texts are written to the log only and never sent to anyone.';
+      $('mode').hidden = s.live;
+      const l = s.lastSend;
+      $('last').textContent = l ? 'Last posted week ' + day(l.week) + ', ' + stamp(l.at) + ': ' + (l.live ? l.sent + ' sent, ' + l.failed + ' failed' : l.drivers + ' written to the log') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'No texts yet.';
+      $('keys').textContent = keys ? 'Saved' : some ? 'Partly saved' : 'Not saved'; $('keys').className = 'pill ' + (keys ? 'yes' : some ? 'warn' : 'no');
+      $('f-sid').placeholder = s.hasSid ? 'saved (type to change)' : '';
+      $('f-token').placeholder = s.hasToken ? 'saved (type to change)' : '';
+      $('f-from').placeholder = s.from ? 'saved: ' + s.from + ' (type to change)' : '';
+      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
+      $('reply-hint').hidden = !s.replyAddress; $('reply-url').textContent = s.replyAddress || '';
+      if (s.drivers) {
+        const none = s.drivers.filter(d => !d.phone).length;
+        $('preview-head').textContent = s.week ? 'Week of ' + day(s.week) + ': ' + s.drivers.length + ' drivers, ' + (s.drivers.length - none) + ' with a number' + (none ? ', ' + none + ' without' : '') + '. The text: "' + s.message + '"' : 'No week to post yet.';
+        $('preview').innerHTML = s.drivers.map(d => '<tr><td>' + escapeHtml(d.name) + '</td><td>' + (d.phone ? escapeHtml(d.phone) : '<span class="texts-none">No number</span>') + '</td></tr>').join('') || '<tr><td colspan="2" class="hint">No drivers on that week yet.</td></tr>';
+      }
+    }
+    async function call(fields, button) {
+      showError('');
+      if (button) button.disabled = true;
+      try { const keep = s && s.drivers ? { drivers: s.drivers, week: s.week, message: s.message } : {}; s = Object.assign(keep, await callServer('sms', fields)); render(); return s; }
+      catch (e) { showError(serverText(e, 'Schedule Texts')); return null; }
+      finally { if (button) button.disabled = false; render(); }
+    }
+    $('turn').onclick = () => call({ op: 'setOn', on: !s.on }, $('turn'));
+    $('save').onclick = async () => {
+      const r = await call({ op: 'save', accountSid: $('f-sid').value, authToken: $('f-token').value, fromNumber: $('f-from').value }, $('save'));
+      if (r) ['f-sid', 'f-token', 'f-from'].forEach(id => { $(id).value = ''; });
+    };
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the account (and turns texts Off).
+    $('clear').onclick = async () => {
+      const b = $('clear');
+      if (!armed) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); armed = setTimeout(() => { armed = null; b.textContent = 'Remove account'; b.classList.remove('armed'); }, 5000); return; }
+      clearTimeout(armed); armed = null; b.textContent = 'Remove account'; b.classList.remove('armed');
+      await call({ op: 'clear' }, b);
+    };
+    ['f-sid', 'f-token', 'f-from'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    // The texts and replies (textLog), newest first; the list follows new ones as they come.
+    const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received' };
+    const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
+    function watchLog(db) {
+      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(200)), snap => {
+        $('log').innerHTML = snap.docs.map(x => x.data()).map(m => { const inbound = m.direction === 'in';
+          return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td>' + escapeHtml(stamp(m.at)) + '</td><td>' + escapeHtml(m.name || 'Unknown number') + '</td><td>' + (inbound ? '<b>Reply</b>' : 'Sent') + '</td><td>' + escapeHtml(phone(inbound ? m.from : m.to)) +
+            '</td><td>' + escapeHtml(m.body || '') + '</td><td>' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && m.status === 'FAILED' ? '<br>' + escapeHtml(m.reason) : '') + '</td></tr>'; }).join('') ||
+          '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
+      }, e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
+    }
+    requireSignIn(async () => { const { db } = await start(); watchLog(db); await call({ op: 'preview' }); });
+  </script>
+</body>
+</html>

@@ -46,7 +46,9 @@ const MASTER_KINDS = Object.freeze({
       employmentStatus: get('employment_status'), reliefDriver: L.yes(get('relief_driver')),
       positionOrder: L.number(get('position_order')), defaultTruckId: get('default_tractor_id'),
       defaultTrailerId: get('default_trailer_id'), facilityId: get('facility_id'),
-      hireDate: L.dateKey(get('hire_date')), seniorityDate: L.dateKey(get('seniority_date')), unavailableReason: get('unavailable_reason')
+      hireDate: L.dateKey(get('hire_date')), seniorityDate: L.dateKey(get('seniority_date')), unavailableReason: get('unavailable_reason'),
+      // Joe 10/15: Driver Master's own phone column, used for Schedule Texts when the Driver Roster has no mobile number (driverPhones).
+      phone: get('phone')
     })
   },
   equipment: {
