@@ -803,16 +803,22 @@
     var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', GREY = '#5b6775', INK = '#1c2733';
     function head(title, count, color) { return '<tr><td style="' + F + 'padding:16px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (color || GREY) + '">' + e(title) + (count !== null && count !== undefined ? '<span style="float:right;color:' + (color || INK) + '">' + e(count) + '</span>' : '') + '</td></tr>'; }
     function pill(t, bg, fg) { return '<span style="display:inline-block;font-size:12px;font-weight:800;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + fg + '">' + e(t) + '</span>'; }
-    function rows(list) { return '<tr><td style="padding:0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + list.map(function (x) { return '<tr><td style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3;font-size:16px;font-weight:700;color:' + INK + '">' + e(x[0]) + '</td><td align="right" style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3;font-size:14px;color:' + GREY + '">' + x[1] + '</td></tr>'; }).join('') + '</table></td></tr>'; }
+    // Joe 10/15: one column on a phone. Each item is one full-width row: its name on the left and its one status on the right,
+    // with any detail on a full-width line under it (never a narrow second column).
+    function rows(list) { return '<tr><td style="padding:0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + list.map(function (x) {
+      var line = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="' + F + 'font-size:16px;font-weight:700;color:' + INK + '">' + e(x[0]) + '</td><td align="right" style="' + F + 'font-size:14px;color:' + GREY + ';white-space:nowrap">' + (x[1] || '') + '</td></tr></table>';
+      return '<tr><td style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3">' + line + (x[2] ? '<div style="' + F + 'font-size:14px;color:' + GREY + ';margin-top:3px">' + x[2] + '</div>' : '') + '</td></tr>'; }).join('') + '</table></td></tr>'; }
     function plain(t) { return '<tr><td style="' + F + 'padding:0 14px 4px;font-size:15px;color:' + GREY + '">' + e(t) + '</td></tr>'; }
+    // Joe 10/15: the route tiles run one to a row, full width, so the email is one column on a phone.
     function grid(list) {
-      var out = '';
-      for (var i = 0; i < list.length; i += 2) out += '<tr>' + [list[i], list[i + 1]].map(function (x) {
-        if (!x) return '<td width="50%" style="padding:3px"></td>';
-        return '<td width="50%" style="padding:3px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + (x.name ? ' <span style="font-weight:600">' + e(x.name) + '</span>' : '') + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td>';
-      }).join('') + '</tr>';
-      return '<tr><td style="padding:2px 11px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + out + '</table></td></tr>';
+      return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + list.map(function (x) {
+        return '<tr><td style="padding:3px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + (x.name ? ' <span style="font-weight:600">' + e(x.name) + '</span>' : '') + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td></tr>';
+      }).join('') + '</table></td></tr>';
     }
+    // Short words so a name or heading fits one row on a phone: "HALF GALLON FILLER 1" -> "HALF GAL FILLER 1",
+    // "Second Shift 2:00 PM to 10:30 PM" -> "2nd Shift 2 PM-10:30 PM".
+    function shortName(v) { v = text(v); return v.length > 16 ? v.replace(/\bGALLON\b/g, 'GAL').replace(/\bGallon\b/g, 'Gal') : v; }
+    function shortShift(v) { return text(v).replace(/^First\b/i, '1st').replace(/^Second\b/i, '2nd').replace(/^Third\b/i, '3rd').replace(/:00\b/g, '').replace(/ to /g, '-'); }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     var loaded = (r.loaded || []).slice().sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
       .map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: '', bg: '#e2f4ea', fg: GREEN }; });
@@ -831,19 +837,21 @@
     pickups.forEach(function (p) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid ' + RED + ';background:#fff6f5;padding:7px 10px;font-size:15px;color:' + INK + '"><b style="color:' + RED + '">PICKUP ' + e([p.route, p.run].filter(Boolean).join(' ')) + '</b> ' + e([p.quantity, p.product].filter(Boolean).join(' ')) + '</div></td></tr>'); });
     H.push(head('Plant breakdowns', down.length, down.length ? RED : null));
     if (!down.length) H.push(plain('None open.'));
-    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', e([d.entry, d.at ? 'logged ' + d.at : '', d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · ')) + ' ' + (d.carried ? pill('CARRIED OVER', '#fff1d6', '#9a5b00') + ' ' : '') + pill(followWord(d.status), d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'MONITOR' ? '#9a5b00' : RED)]; })));
+    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', pill(followWord(d.status), d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'MONITOR' ? '#9a5b00' : RED), e([d.entry, d.at ? 'logged ' + d.at : '', d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · ')) + (d.carried ? ' ' + pill('CARRIED OVER', '#fff1d6', '#9a5b00') : '')]; })));
     var fixed = r.fixed || [], handoff = r.handoff || [], others = r.others || [];
-    if (fixed.length) { H.push(head('Fixed since last report', fixed.length, GREEN)); H.push(rows(fixed.map(function (d) { return [d.equipment || 'Plant equipment', e([d.review || d.entry, d.reviewAt].filter(Boolean).join(' · ')) + ' ' + pill('RESOLVED', '#e2f4ea', GREEN)]; }))); }
+    if (fixed.length) { H.push(head('Fixed since last report', fixed.length, GREEN)); H.push(rows(fixed.map(function (d) { return [d.equipment || 'Plant equipment', pill('RESOLVED', '#e2f4ea', GREEN), e([d.review || d.entry, d.reviewAt].filter(Boolean).join(' · '))]; }))); }
     if (handoff.length) { H.push(head('Shift handoff')); handoff.forEach(function (d) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid #0b4f8a;background:#f0f5fb;padding:8px 10px;font-size:15px;color:' + INK + '"><b>' + e((d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff') + (d.at ? ' (' + d.at + ')' : '')) + ':</b> ' + e([d.entry, d.notes].filter(Boolean).join(' · ')) + '</div></td></tr>'); }); }
-    if (others.length) { H.push(head('Incidents · Safety · Quality', others.length)); H.push(rows(others.map(function (d) { return [d.equipment || d.type, e(d.entry || '') + ' <span style="color:' + GREY + '">' + e(d.type) + '</span> ' + pill(followWord(d.status), d.status === 'RESOLVED' ? '#e2f4ea' : d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'RESOLVED' ? GREEN : d.status === 'MONITOR' ? '#9a5b00' : RED)]; }))); }
+    if (others.length) { H.push(head('Incidents · Safety · Quality', others.length)); H.push(rows(others.map(function (d) { return [d.equipment || d.type, pill(followWord(d.status), d.status === 'RESOLVED' ? '#e2f4ea' : d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'RESOLVED' ? GREEN : d.status === 'MONITOR' ? '#9a5b00' : RED), e([d.entry, d.type].filter(Boolean).join(' · '))]; }))); }
     H.push(head('Production'));
     if (!lines.length) H.push(plain('No production lines set up.'));
-    else H.push(rows(lines.map(function (l) { if (l.runComplete) return [l.line, pill('RUN COMPLETE ' + l.lastCheckedAt, '#eef1f4', GREY)]; return [l.line, (l.product ? e(l.product) + ' ' : '') + (l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) + ' ' : '') + (l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status')]; })));
+    else H.push(rows(lines.map(function (l) { if (l.runComplete) return [shortName(l.line), pill('RUN COMPLETE ' + l.lastCheckedAt, '#eef1f4', GREY)]; return [shortName(l.line), l.notChecked ? pill('NOT CHECKED', '#fff1d6', '#9a5b00') : l.status ? pill(l.status, l.flag ? '#fde8e6' : '#eef1f4', l.flag ? RED : GREY) : 'no status',
+      [l.product ? e(l.product) : '', l.qualityCheck ? pill('QC ' + l.qualityCheck, l.qualityCheck === 'FAIL' ? '#fde8e6' : '#e2f4ea', l.qualityCheck === 'FAIL' ? RED : GREEN) : ''].filter(Boolean).join(' ')]; })));
     var output = r.output || [];
     if (output.length) {
-      H.push(head('Line output' + (r.outputShift ? ' · ' + r.outputShift : '')));
+      H.push(head('Line output' + (r.outputShift ? ' · ' + shortShift(r.outputShift) : '')));
       H.push(rows(output.map(function (o) { var k = o.pct === null ? null : o.pct >= 100 ? 'g' : o.pct >= 90 ? 'a' : 'r';
-        return [o.line, e(outputText(o).replace(/ \(\d+%\)/, '')) + (k ? ' ' + pill(o.pct + '%', k === 'g' ? '#e2f4ea' : k === 'a' ? '#fff1d6' : '#fde8e6', k === 'g' ? GREEN : k === 'a' ? '#9a5b00' : RED) : '')]; })));
+        return [shortName(o.line), k ? pill(o.pct + '%', k === 'g' ? '#e2f4ea' : k === 'a' ? '#fff1d6' : '#fde8e6', k === 'g' ? GREEN : k === 'a' ? '#9a5b00' : RED) : '',
+          e(outputText(o).replace(/ \(\d+%\)/, '').replace(' · stopped ', ' · down ').replace(/ changeovers? /, ' chg ').replace(' · efficiency ', ' · eff. '))]; })));
     }
     H.push(head('Temperatures'));
     if (!temps.length) H.push(plain('No temperature locations set up.'));
