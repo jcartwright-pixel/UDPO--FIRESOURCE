@@ -227,11 +227,20 @@
     // The time the board last came from the server (kept on the tablet), not when it was read from the tablet with no signal.
     function lastLive(s) {
       try {
-        if (!s.metadata.fromCache) { localStorage.setItem('udBoardLive', String(Date.now())); return new Date(); }
+        if (!s.metadata.fromCache) { liveSinceLoad = true; localStorage.setItem('udBoardLive', String(Date.now())); return new Date(); }
         const t = Number(localStorage.getItem('udBoardLive')); return t ? new Date(t) : updated;
       } catch (e) { return new Date(); }
     }
     window.addEventListener('online', () => render()); window.addEventListener('offline', () => render());
+    // Joe 10/16 (Fire Stick TV): the TV comes back by itself after a power or internet loss. If it started with no signal
+    // (power back before the Wi-Fi), it reloads once the signal returns; a TV left on reloads at the 6 a.m. day roll so the
+    // week's loads never go stale. The code and sign-in are kept on the Fire Stick, so nothing is retyped.
+    let liveSinceLoad = false;
+    const loadedDay = date;
+    if (full) {
+      window.addEventListener('online', () => { if (!liveSinceLoad) setTimeout(() => location.reload(), 5000); });
+      setInterval(() => { if (navigator.onLine && L.operatingDay(new Date()) !== loadedDay) location.reload(); }, 60000);
+    }
     startOffline(['driver-station.html'], { scopes: ['driver-station'], device: 'tablet', files: [] });
     requireSignIn(async () => {
       const { db } = await start();
