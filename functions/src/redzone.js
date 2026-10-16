@@ -363,6 +363,81 @@ async function readForOps(d, o, ref) {
   return out;
 }
 
+// Joe 10/16 ("I was wanting to see the efficiency of the blow mold today"): RedZone's lists carry only the plan (product,
+// standard speed, planned quantity); the real counts come only from its events feed (Run Count Updated, Run Started, Run
+// Stopped), which RedZone turns on for a client. Read only, like the rest: an event is hidden for 12 hours once read and never
+// deleted, and a run keeps only its newest count, so reading the same event again changes nothing. Until RedZone turns the
+// feed on it answers 404, which config/redzone.events says so Line Targets can tell.
+const EVENT_HIDE = 43200, EVENT_READS = 30, RUN_LOOKUPS = 20;
+const msOf = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  if (isFinite(n)) return n > 0 ? (n < 1e12 ? n * 1000 : n) : null;
+  const t = Date.parse(v); return isNaN(t) ? null : t;
+};
+const numOf = (v) => { if (v === null || v === undefined || v === '') return null; const n = Number(v); return isFinite(n) ? n : null; };
+// One event -> [run UUID, what it says about the run], or null for an event that is not about a run on our site.
+function runEvent(e, ent) {
+  if (!e || typeof e !== 'object') return null;
+  const type = text(e.eventType), at = msOf(e.eventTimestamp) || 0;
+  if (ent && text(e.enterpriseUUID) && text(e.enterpriseUUID) !== ent) return null;
+  if (type === 'RunCountUpdated') {
+    const count = numOf(e.count);
+    return text(e.runUUID) ? [text(e.runUUID), { product: clean(e.productTypeName, 120), sku: clean(e.productTypeExternalId, 60), productTypeUUID: clean(e.productTypeUUID, 60),
+      unit: clean(e.unitOfMeasureName, 40), count, countAt: count === null ? null : at }] : null;
+  }
+  if (type === 'RunStarted' || type === 'RunStopped') {
+    const r = e.run || {}, l = e.location || {}, out = numOf(r.outCount);
+    return text(r.runUUID) ? [text(r.runUUID), { product: clean(r.productName, 120), sku: clean(r.sku, 60), unit: clean(r.unitOfMeasureName, 40), startTime: msOf(r.startTime),
+      endTime: type === 'RunStopped' ? msOf(r.endTime) || at : null, ratePerMin: numOf(r.standardRatePerMinute), plannedQuantity: numOf(r.plannedQuantity),
+      locationUUID: clean(l.locationUUID, 60), locationName: clean(l.locationName, 120), inCount: numOf(r.inCount), unitsLost: numOf(r.totalUnitsLost), manHours: numOf(r.manHours),
+      count: out, countAt: out === null ? null : at }] : null;
+  }
+  return null;
+}
+// Two notes about one run -> one: filled values win over empty ones, and the newer count wins.
+function mergeRun(a, b) {
+  const out = Object.assign({}, a);
+  Object.entries(b).forEach(([k, v]) => { if (k !== 'count' && k !== 'countAt' && v !== null && v !== undefined && v !== '') out[k] = v; });
+  if (b.count !== null && b.count !== undefined && (b.countAt || 0) >= (a.countAt || 0)) { out.count = b.count; out.countAt = b.countAt; }
+  return out;
+}
+async function readEvents(db, options) {
+  const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
+  const ref = db.collection('private').doc('redzone'), status = db.collection('config').doc('redzone');
+  const d = (await ref.get()).data() || {}, org = orgOf(d), ent = entOf(d), at = o.now().toISOString();
+  if (!(d.token || (d.clientId && d.clientSecret)) || !org) return { skipped: 'RedZone is not set up' };
+  const token = await accessToken(d, o, ref), address = addressOf(d);
+  const url = urlFor(address, '/organizations/' + encodeURIComponent(org) + '/events') + '?limit=10&visibility-timeout=' + EVENT_HIDE;
+  const runs = {};
+  let read = 0, feed = { on: true, at };
+  for (let i = 0; i < EVENT_READS; i++) {
+    const got = await getList(url, token, o);
+    if (!got.list) { if (i === 0) feed = { on: false, at, status: got.status, note: got.note || '' }; break; }
+    got.list.forEach(e => { read++; const x = runEvent(e, ent); if (x) runs[x[0]] = mergeRun(runs[x[0]] || {}, x[1]); });
+    if (got.list.length < 10) break;
+  }
+  const col = db.collection('redzoneRuns');
+  let looked = 0;
+  for (const [id, note] of Object.entries(runs)) {
+    const key = safeIdPart(id), old = (await col.doc(key).get()).data() || {};
+    let run = mergeRun(old, note);
+    // A count alone does not say which line or when the run started: RedZone's run record does (once a run).
+    if ((!run.locationUUID || !run.startTime || run.ratePerMin === null || run.ratePerMin === undefined) && ent && looked < RUN_LOOKUPS) {
+      looked++;
+      let res, body;
+      try { res = await o.fetch(urlFor(address, '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(ent) + '/runs/' + encodeURIComponent(id)), { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+        body = res.ok ? JSON.parse(await res.text()) : null; } catch (e) { body = null; }
+      if (body && typeof body === 'object') run = mergeRun({ locationUUID: clean(body.locationUUID, 60), startTime: msOf(body.startTime), endTime: msOf(body.endTime),
+        ratePerMin: numOf(body.standardRatePerMin), plannedQuantity: numOf(body.plannedQuantity), productTypeUUID: clean(body.productTypeUUID, 60) }, run);
+    }
+    await col.doc(key).set(Object.assign({}, run, { runUUID: id, facilityId: 'fac_uniontown', at }));
+  }
+  feed.events = read; feed.runs = Object.keys(runs).length;
+  await status.set({ events: feed }, { merge: true });
+  return feed;
+}
+
 const plain = (e) => /answered 403 for the products address/.test(e.message) ? 'Signed in, but RedZone said no to the product list (' + e.message.replace(/^RedZone answered 403 for the products address:? ?/, '403 ').trim()
     + '). Press Show What RedZone Gives Us, then Test Connection again.'
   : /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
@@ -374,7 +449,7 @@ const view = (d) => ({ orgId: d.orgId || '', enterpriseId: d.enterpriseId || '',
   hasToken: !!d.token, tokenEnds: ends(d.token), hasClient: !!d.clientId, clientEnds: ends(d.clientId), hasSecret: !!d.clientSecret,
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null, lastDiscover: d.lastDiscover || null, lastSync: d.lastSync || null });
 
-/* input.op: status | discover {path} | sync {facilityId} | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
+/* input.op: status | discover {path} | sync {facilityId} | events | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
 async function redzoneCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
@@ -383,7 +458,7 @@ async function redzoneCall(db, user, input, options) {
   const op = String(input.op || 'status');
   if (!person || person.status !== 'ACTIVE') throw new RedzoneError('NOT_ALLOWED', 'Sign in with an active account first');
   // Get from RedZone on Products is for whoever changes the product lists; the connection itself is administrators only.
-  if (op === 'products' ? !L.hasRole(person, L.REORDER_ROLES) : !L.isAdmin(person)) throw new RedzoneError('NOT_ALLOWED', op === 'products' ? 'Only a manager or administrator can load products from RedZone' : 'Only an administrator can change the RedZone connection');
+  if (op === 'products' || op === 'events' ? !L.hasRole(person, L.REORDER_ROLES) : !L.isAdmin(person)) throw new RedzoneError('NOT_ALLOWED', op === 'products' ? 'Only a manager or administrator can load products from RedZone' : op === 'events' ? 'Only a manager or administrator can refresh from RedZone' : 'Only an administrator can change the RedZone connection');
   const ref = db.collection('private').doc('redzone'), status = db.collection('config').doc('redzone');
   const d = (await ref.get()).data() || {}, at = o.now().toISOString();
   if (op === 'status') return view(d);
@@ -438,7 +513,9 @@ async function redzoneCall(db, user, input, options) {
           sample: active.slice(0, 3).map(p => p.name + (p.sku ? ' (' + p.sku + ')' : '')) };
       } catch (e) {
         if (!signedIn || /answered 40[13]/.test(e.message) || e instanceof RedzoneError) throw e;
-        result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').', products: 0 };
+        result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. ' + (!orgOf(fresh) || !entOf(fresh)
+          ? 'Now type the Organization ID and Enterprise ID in box 1 (RedZone: Organization Settings > Organization IDs), press Save, then Test Connection again.'
+          : 'The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').'), products: 0 };
       }
     } catch (e) { result = { ok: false, message: e instanceof RedzoneError ? 'Not tested: ' + e.message : plain(e) }; }
     const lastTest = Object.assign({ at, by: email }, result);
@@ -477,6 +554,10 @@ async function redzoneCall(db, user, input, options) {
     await ref.set({ lastSync: summary }, { merge: true });
     return Object.assign(view(Object.assign({}, d, { lastSync: summary })), { sync: summary });
   }
+  // Refresh from RedZone on Line Targets: the count feed read now, instead of at the next 5-minute read.
+  if (op === 'events') {
+    try { return { events: await readEvents(db, o) }; } catch (e) { throw new RedzoneError('FAILED', plain(e)); }
+  }
   if (op === 'products') {
     if (!(d.lastTest && d.lastTest.ok)) throw new RedzoneError('FAILED', 'RedZone is not connected yet: Administration > Connections & Keys > RedZone, then Test Connection.');
     const plant = (L.PLANTS || []).find(p => p.id === String(input.facilityId || '')) || null;
@@ -489,4 +570,4 @@ async function redzoneCall(db, user, input, options) {
   throw new RedzoneError('BAD_REQUEST', 'Unknown RedZone step ' + op.slice(0, 30));
 }
 
-module.exports = { discover, redzoneCall, RedzoneError, fetchProducts, normalize, listIn, nextIn, accessToken };
+module.exports = { discover, redzoneCall, readEvents, runEvent, mergeRun, RedzoneError, fetchProducts, normalize, listIn, nextIn, accessToken };

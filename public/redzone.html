@@ -35,8 +35,8 @@
         <form id="form" autocomplete="off" onsubmit="return false">
           <label>Client ID<input id="f-client" type="password" autocomplete="new-password" spellcheck="false"></label>
           <label>Client secret<input id="f-secret" type="password" autocomplete="new-password" spellcheck="false"></label>
-          <label>Organization ID (only if RedZone gave you one)<input id="f-org" autocomplete="off" spellcheck="false"></label>
-          <label>Enterprise ID (only if RedZone gave you one)<input id="f-ent" autocomplete="off" spellcheck="false"></label>
+          <label>Organization ID (RedZone: Organization Settings &gt; Organization IDs)<input id="f-org" autocomplete="off" spellcheck="false"></label>
+          <label>Enterprise ID (the site code on that page)<input id="f-ent" autocomplete="off" spellcheck="false"></label>
           <label>API address<input id="f-address" autocomplete="off" spellcheck="false"></label>
           <label>Token address<input id="f-tokenurl" autocomplete="off" spellcheck="false"></label>
           <label>API token (only instead of a client ID and secret)<input id="f-token" type="password" autocomplete="new-password" spellcheck="false"></label>
@@ -93,6 +93,8 @@
     // Joe 10/16: back, with RedZone's own addresses filled in (support's answer).
     // Joe 10/11: "tap into" RedZone. The sign-in is administrators only and never shown back (functions/src/redzone.js).
     let s = null, armed = null;
+    const typed = new Set();
+    ['f-org', 'f-ent', 'f-address', 'f-tokenurl', 'f-path'].forEach(id => document.getElementById(id).addEventListener('input', () => typed.add(id)));
     const $ = (id) => document.getElementById(id);
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
     function render() {
@@ -103,7 +105,8 @@
       $('f-token').placeholder = s.hasToken ? 'saved, ends ' + s.tokenEnds + ' (paste to replace)' : '';
       $('f-client').placeholder = s.hasClient ? 'saved, ends ' + s.clientEnds + ' (paste to replace)' : '';
       $('f-secret').placeholder = s.hasSecret ? 'saved (paste to replace)' : '';
-      [['f-org', 'orgId'], ['f-ent', 'enterpriseId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
+      // Joe 10/16 (live): a box typed in before the saved settings came back is never wiped by them.
+      [['f-org', 'orgId'], ['f-ent', 'enterpriseId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id) && !typed.has(id)) $(id).value = s[k] || ''; });
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
       drawGive(s.lastDiscover);
@@ -119,7 +122,7 @@
     }
     $('save').onclick = async () => {
       const r = await call({ op: 'save', orgId: $('f-org').value, enterpriseId: $('f-ent').value, address: $('f-address').value, token: $('f-token').value, clientId: $('f-client').value, clientSecret: $('f-secret').value, tokenUrl: $('f-tokenurl').value, productsPath: $('f-path').value }, $('save'));
-      if (r) { ['f-token', 'f-client', 'f-secret'].forEach(id => { $(id).value = ''; }); $('result').hidden = true; }
+      if (r) { ['f-token', 'f-client', 'f-secret'].forEach(id => { $(id).value = ''; }); typed.clear(); render(); $('result').hidden = true; }
     };
     // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the token, client ID and secret.
     $('clear').onclick = async () => {
@@ -149,7 +152,7 @@
       if (!r) { $('give-result').hidden = true; return; }
       const found = r.discover.items.filter(x => x.found).length;
       $('give-result').className = 'gps-result ' + (found ? 'ok' : 'bad');
-      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' lists came back.' : 'Nothing came back yet. Send us a picture of this and we will find RedZone\'s addresses.';
+      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' lists came back.' : (!s.orgId || !s.enterpriseId ? 'Nothing came back. Type the Organization ID and Enterprise ID in box 1 (RedZone: Organization Settings > Organization IDs), press Save, then press this again.' : 'Nothing came back yet. Send us a picture of this and we will find RedZone\'s addresses.');
       drawGive(r.discover);
     };
     $('give-download').onclick = () => {

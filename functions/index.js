@@ -56,7 +56,7 @@ const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
-const { redzoneCall, RedzoneError } = require('./src/redzone');
+const { redzoneCall, RedzoneError, readEvents: readRedzoneEvents } = require('./src/redzone');
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
 const STATIONS = require('./src/stations');
@@ -398,6 +398,12 @@ exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeou
   // Joe 10/14: this week's history, read once, a part each run after the live read.
   const h = await FLEETGPS.history(db, { budgetMs: 150000 });
   if (h && h.error) console.error('fleetGps history', h.error);
+});
+
+// RedZone's count feed (src/redzone.js readEvents): read only, every 5 minutes; nothing happens until RedZone is set up, and
+// until RedZone turns the feed on it only notes that it is off.
+exports.redzoneEventsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  try { await readRedzoneEvents(db); } catch (e) { console.error('redzone events', e.message); }
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.

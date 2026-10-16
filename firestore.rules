@@ -32,6 +32,7 @@ service cloud.firestore {
     match /config/redzone { allow read: if activeUser(); }
     // What RedZone has (its lines, products, runs, problem types and check sheets), read in by Administration > RedZone.
     match /redzoneData/{id} { allow read: if activeUserOrStation(); }
+    match /redzoneRuns/{id} { allow read: if activeUserOrStation(); }
     // Fleet Service's service rules (Fleet Service Setup; the server writes them).
     match /config/fleetRules { allow read: if activeUser(); }
     // MOCREO cooler sensors (server only writes them).

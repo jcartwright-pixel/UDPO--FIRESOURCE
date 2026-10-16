@@ -52,6 +52,20 @@ async function locked(p, sel, name) {
   }
 }
 const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth);
+// Joe 10/16 (Window Test Center, Phone 412 x 915): the code screen fits a phone with no sideways scroll; the box shrinks
+// with the window, the code input included. Back to the page's own size after.
+async function codeFitsPhones(p, name) {
+  const size = p.viewportSize();
+  for (const w of [390, 412]) {
+    await p.setViewportSize({ width: w, height: 900 });
+    await p.waitForTimeout(200);
+    assert.ok(await noSideScroll(p), name + ' code screen fits a ' + w + ' phone (' + await p.evaluate(() => document.scrollingElement.scrollWidth) + ' px wide)');
+    const inp = await p.$eval('.st-code input', el => { const r = el.getBoundingClientRect(); return { right: r.right, font: parseFloat(getComputedStyle(el).fontSize) }; });
+    assert.ok(inp.right <= w && inp.font >= 16, name + ' code box stays inside a ' + w + ' phone ' + JSON.stringify(inp));
+    if (w === 412) await shot(p, name.toLowerCase().replace(/ /g, '-') + '-code-screen-412.png');
+  }
+  await p.setViewportSize(size);
+}
 
 (async () => {
   await clear();
@@ -115,6 +129,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await ps.waitForSelector('#code-box form.st-code');
     assert.equal(await ps.isVisible('#pick'), false, 'no station list once the plant has codes');
     await shot(ps, '4-plant-station-code-screen-1536.png');
+    await codeFitsPhones(ps, 'Plant Station');
     await ps.fill('#code-box input', 'ZZZZZZ');
     await ps.click('#code-box button');
     await ps.waitForSelector('.st-code-msg:text("not recognized")');
@@ -194,6 +209,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
 
     const ds = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
     await ds.waitForSelector('#code-box form.st-code');
+    await codeFitsPhones(ds, 'Driver Station');
     await shot(ds, '7-driver-kiosk-code-screen-1536.png');
     assert.equal(await ds.textContent('.head h1'), 'Driver Station', 'the code screen is a plain setup screen, not the loadout');
     assert.equal(await ds.isVisible('#tv'), false);

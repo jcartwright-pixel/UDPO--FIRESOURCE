@@ -111,7 +111,7 @@ test('RedZone\'s own addresses are filled in; the client ID and secret alone sig
   };
   const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
   assert.equal(r.result.ok, true);
-  assert.match(r.result.message, /Signed in to RedZone: the client ID and secret work\. The product list did not come back yet \(.*404/);
+  assert.match(r.result.message, /Signed in to RedZone: the client ID and secret work\. Now type the Organization ID and Enterprise ID in box 1/, "no IDs yet: it says to type them");
   assert.deepEqual(calls.map(c => [c.url, c.type]), [
     ['https://api.rz-ops.com/public/v3/oauth/token', 'application/x-www-form-urlencoded'],
     ['https://api.rz-ops.com/public/v2/oauth/token', 'application/x-www-form-urlencoded'],
@@ -318,4 +318,68 @@ test('Read RedZone into Operations: lines, sensors, products, runs, problem type
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
   await db().collection('private').doc('redzone').update({ orgId: '', enterpriseId: '' });
   await assert.rejects(R.redzoneCall(db(), ADMIN, { op: 'sync' }, { fetch }), /Show What RedZone Gives Us first/);
+});
+
+// Joe 10/16 (live 6.21): signed in with the Organization ID and Enterprise ID boxes empty, Test Connection says to type them.
+test('Test Connection with the IDs empty: signed in, and it says to type the Organization ID and Enterprise ID', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
+  const fetch = async (url) => ({ ok: /oauth\/token$/.test(url), status: /oauth\/token$/.test(url) ? 200 : 404, text: async () => JSON.stringify(/oauth\/token$/.test(url) ? { access_token: 't' } : { message: 'Not Found' }) });
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
+  assert.equal(r.result.ok, true);
+  assert.match(r.result.message, /^Signed in to RedZone: the client ID and secret work\. Now type the Organization ID and Enterprise ID in box 1/);
+  // A failed What RedZone Gives Us keeps no organization or site.
+  const g = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
+  assert.deepEqual([g.discover.used, g.foundOrgId, g.foundEnterpriseId], [null, '', '']);
+});
+
+// Joe 10/16 ("I was wanting to see the efficiency of the blow mold today"): the real counts come only from RedZone's events feed.
+test('RedZone count feed: off says so; on, each run keeps its newest count and its line; read only (hidden 12 hours, never deleted)', async () => {
+  await people();
+  const ORG = 'org_x', ENT = 'ent-uniontown';
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: ORG, enterpriseId: ENT });
+  const calls = [];
+  let queue = null;
+  const fetch = async (url, opts) => {
+    calls.push([(opts && opts.method) || 'GET', url]);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    const u = new URL(url);
+    if (u.pathname.endsWith('/organizations/' + ORG + '/events')) return queue ? reply(200, { items: queue.splice(0, Number(u.searchParams.get('limit'))) }) : reply(404, { message: 'Not Found' });
+    if (u.pathname.endsWith('/enterprises/' + ENT + '/runs/run-2')) return reply(200, { uuid: 'run-2', locationUUID: 'loc-blow', startTime: Date.parse('2026-10-16T10:00:00Z'), standardRatePerMin: 20, plannedQuantity: 5000 });
+    return reply(404, {});
+  };
+  // A driver cannot; the feed off is noted for Line Targets.
+  await assert.rejects(R.redzoneCall(db(), DRIVER, { op: 'events' }, { fetch }), /Only a manager or administrator/);
+  const off = await R.redzoneCall(db(), MANAGER, { op: 'events' }, { fetch });
+  assert.deepEqual([off.events.on, off.events.status], [false, 404]);
+  assert.equal((await db().collection('config').doc('redzone').get()).data().events.on, false);
+  // On: a stopped run (with its line and counts), a running one known only by its counts, and another site's run.
+  const ev = (type, at, more) => Object.assign({ eventId: type + at, receiptHandle: 'h', eventType: type, eventTimestamp: at, enterpriseUUID: ENT }, more);
+  queue = [
+    ev('RunStopped', '2026-10-16T09:00:00Z', { run: { runUUID: 'run-1', startTime: Date.parse('2026-10-16T08:00:00Z'), endTime: Date.parse('2026-10-16T09:00:00Z'), outCount: 1080, inCount: 1100,
+      standardRatePerMinute: 20, plannedQuantity: 1200, productName: 'Gallon Jug', sku: '9001', totalUnitsLost: 20, manHours: 2 }, location: { locationUUID: 'loc-blow', locationName: 'Blow Mold' } }),
+    ev('RunCountUpdated', '2026-10-16T11:00:00Z', { runUUID: 'run-2', productTypeName: 'Gallon Jug', count: 900, unitOfMeasureName: 'jugs' }),
+    ev('RunCountUpdated', '2026-10-16T10:30:00Z', { runUUID: 'run-2', productTypeName: 'Gallon Jug', count: 500 }),
+    ev('RunCountUpdated', '2026-10-16T11:00:00Z', { runUUID: 'run-9', enterpriseUUID: 'ent-charleston', count: 5 }),
+    ev('NcrCreated', '2026-10-16T11:00:00Z', {})
+  ];
+  const on = await R.readEvents(db(), { fetch });
+  assert.deepEqual([on.on, on.events, on.runs], [true, 5, 2]);
+  const run = async (id) => (await db().collection('redzoneRuns').doc(id).get()).data();
+  const r1 = await run('run-1'), r2 = await run('run-2');
+  assert.deepEqual([r1.count, r1.locationUUID, r1.unitsLost, r1.ratePerMin], [1080, 'loc-blow', 20, 20]);
+  assert.deepEqual([r2.count, r2.locationUUID, r2.ratePerMin, r2.unit], [900, 'loc-blow', 20, 'jugs'], 'the newest count wins; the line comes from RedZone\'s run record');
+  assert.equal(await run('run-9'), undefined, 'another site\'s run is left out');
+  const P = require('../../src/production-rules');
+  assert.equal(P.rzEfficiency(r1).pct, 90, '1080 of 20 a minute for 60 minutes');
+  assert.equal(P.rzEfficiency(r2).pct, 75, '900 of 20 a minute for 60 minutes');
+  // An older count read again later does not replace the newer one.
+  queue = [ev('RunCountUpdated', '2026-10-16T10:45:00Z', { runUUID: 'run-2', count: 700 })];
+  await R.readEvents(db(), { fetch });
+  assert.equal((await run('run-2')).count, 900);
+  const reads = calls.filter(([, u]) => !/oauth/.test(u));
+  assert.ok(reads.every(([m]) => m === 'GET'), 'only GETs: nothing is deleted from RedZone');
+  assert.ok(reads.filter(([, u]) => /\/events/.test(u)).every(([, u]) => /visibility-timeout=43200/.test(u)), 'each event is hidden for 12 hours once read');
+  assert.ok(!JSON.stringify(await run('run-1')).includes('v3_token'));
 });
