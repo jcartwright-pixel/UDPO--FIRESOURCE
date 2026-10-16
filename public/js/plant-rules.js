@@ -696,7 +696,7 @@
       if (!areas[r.area]) return;
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { route: text(r.route), run: text(r.run), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
-        startedAt: r.startedAt ? clockOf(r.startedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
+        startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
@@ -809,10 +809,14 @@
       var line = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="' + F + 'font-size:16px;font-weight:700;color:' + INK + '">' + e(x[0]) + '</td><td align="right" style="' + F + 'font-size:14px;color:' + GREY + ';white-space:nowrap">' + (x[1] || '') + '</td></tr></table>';
       return '<tr><td style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3">' + line + (x[2] ? '<div style="' + F + 'font-size:14px;color:' + GREY + ';margin-top:3px">' + x[2] + '</div>' : '') + '</td></tr>'; }).join('') + '</table></td></tr>'; }
     function plain(t) { return '<tr><td style="' + F + 'padding:0 14px 4px;font-size:15px;color:' + GREY + '">' + e(t) + '</td></tr>'; }
-    // Joe 10/15: the route tiles run one to a row, full width, so the email is one column on a phone.
+    // Joe 10/16: each route is one row: route number, a very short run name, when it was loaded (Done) and its dispatch time,
+    // under one small heading row. Run names longer than 12 letters are cut so the row fits a phone.
+    function brief(v) { v = text(v); return v.length > 12 ? v.replace(/\bLoad (\d+)$/, 'L$1').slice(0, 12).trim() : v; }
     function grid(list) {
-      return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + list.map(function (x) {
-        return '<tr><td style="padding:3px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + x.bg + ';border-radius:6px"><tr><td style="' + F + 'padding:9px 10px;font-size:17px;font-weight:800;color:' + x.fg + '">' + e(x.route) + (x.name ? ' <span style="font-weight:600">' + e(x.name) + '</span>' : '') + '</td><td align="right" style="' + F + 'padding:9px 10px;font-size:12px;font-weight:800;color:' + x.fg + '">' + e(x.word) + '</td></tr></table></td></tr>';
+      var th = function (t, al) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + GREY + '">' + t + '</td>'; };
+      var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:3px solid #ffffff">' + t + '</td>'; };
+      return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + th('Done', 1) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
+        return '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
     // Short words so a name or heading fits one row on a phone: "HALF GALLON FILLER 1" -> "HALF GAL FILLER 1",
@@ -821,9 +825,9 @@
     function shortShift(v) { return text(v).replace(/^First\b/i, '1st').replace(/^Second\b/i, '2nd').replace(/^Third\b/i, '3rd').replace(/:00\b/g, '').replace(/ to /g, '-'); }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     var loaded = (r.loaded || []).slice().sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: '', bg: '#e2f4ea', fg: GREEN }; });
-    var notLoaded = (r.behind || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
-      .concat((r.nextUp || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), word: '', bg: '#fde8e6', fg: RED }; }));
+      .map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' }; })
+      .concat((r.nextUp || []).map(function (x) { return { route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', bg: '#fde8e6', fg: RED }; }));
     var H = [];
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');

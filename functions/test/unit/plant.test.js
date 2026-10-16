@@ -308,7 +308,7 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
   const now = Date.parse('2026-10-08T14:00:00Z');
   const load = (route, state, dispatchTime, seq, extra) => Object.assign({ route, run: route, area: 'CASE', state, dispatchTime, loadDate: '2026-10-08', loadSequence: seq, truck: '', trailer: '' }, extra);
   const r = R.plantReport({
-    loads: [load('801', 'WAITING', 615, 2, { trailer: 'T-12' }), load('802', 'DONE', 300, 1), load('803', 'LOADING', 720, 3, { area: 'TOTES' }), load('799', 'WAITING', 600, 0, { prior: true, loadDate: '2026-10-07' })],
+    loads: [load('801', 'WAITING', 615, 2, { trailer: 'T-12' }), load('802', 'DONE', 300, 1, { completedAt: '2026-10-08T12:40:00Z' }), load('803', 'LOADING', 720, 3, { area: 'TOTES' }), load('799', 'WAITING', 600, 0, { prior: true, loadDate: '2026-10-07' })],
     pickups: [{ route: '801', run: '801', item: 'Chocolate milk', quantity: '3', status: 'PENDING' }, { route: '802', status: 'COMPLETE' }],
     shiftLog: [{ type: 'Breakdown', equipment: 'Palletizer', entry: 'Jammed', status: 'OPEN', recordedAt: '2026-10-08T13:00:00Z', shift: 'FIRST SHIFT' }, { type: 'Breakdown', status: 'RESOLVED' }],
     lines: [{ name: 'BOXING', last: { status: 'DOWN', product: 'Skim', notes: 'Belt' } }],
@@ -318,6 +318,8 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
   assert.deepEqual(r.behind.map(x => [x.route, x.late]), [['799', '24 h 0 min late']]);
   assert.deepEqual([r.nextUp.map(x => x.route), r.loaded.map(x => x.route), r.leftToLoad, r.totalLoads], [['801', '803'], ['802'], 3, 4]);
   assert.deepEqual(r.counts, { behind: 1, leftToLoad: 3, pickups: 1, down: 1, linesDown: 1, tempsOut: 1 });
+  // Joe 10/16: the email's route row shows when the load was done and its dispatch time.
+  assert.deepEqual([r.loaded[0].doneAt, r.loaded[0].depart], ['8:40 AM', '5:00 AM']);
   assert.match(r.text, /ROUTES BEHIND \(1\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
   assert.match(r.text, /PLANT BREAKDOWNS \(1\)\n {2}Palletizer {2}Jammed {2}logged 9:00 AM first shift {2}OPEN/);
   assert.match(r.text, /STILL TO LOAD: 3 of 4 {3}Case 2 of 3 · Totes 1 of 1/);

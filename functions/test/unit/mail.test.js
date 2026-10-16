@@ -88,11 +88,15 @@ test('report email: HELD without a sender; FAILED with a plain reason; nothing d
 });
 
 test('report email: the HTML of a real report matches the screen numbers', () => {
-  const html = R.reportHtml({ dayLabel: 'Thursday 10/8', behind: [{ route: '801', run: 'UT DSD MILK' }], loaded: [{ route: '802', run: 'UT WALMART', loadSequence: 2 }], nextUp: [{ route: '6304_1', run: 'LANCASTER' }], totalLoads: 4, leftToLoad: 3,
+  const html = R.reportHtml({ dayLabel: 'Thursday 10/8', behind: [{ route: '801', run: 'UT DSD MILK', depart: '1:00 PM' }], loaded: [{ route: '802', run: 'UT WALMART', loadSequence: 2, doneAt: '3:42 PM', depart: '5:00 AM' }], nextUp: [{ route: '6304_1', run: 'LANCASTER' }], totalLoads: 4, leftToLoad: 3,
     pickups: [{ route: '503', run: 'MASSILLON', quantity: '3 cases', product: 'Chocolate milk' }], down: [], lines: [], temperatures: [{ location: 'Cooler North', reading: 44, status: 'HIGH', flag: true }] }, '');
   assert.match(html, /1 ROUTE BEHIND<\/div><div style="font-size:14px;margin-top:3px">Thursday 10\/8 &middot; 1 of 4 loaded/);
-  // Joe 10/14: each tile is the route number and the run's short name; only BEHIND has a word (green is loaded, red is not).
-  assert.match(html, /802 <span style="font-weight:600">Walmart<\/span><\/td>[\s\S]*801 <span style="font-weight:600">DSD<\/span><\/td>[\s\S]*BEHIND[\s\S]*6304 <span style="font-weight:600">Lancaster<\/span><\/td>/);
+  // Joe 10/16: each route is one row: route number, the run's short name, Done time and Dispatch time; only BEHIND has a word.
+  const row = (...cells) => new RegExp(cells.map(c => '>' + c + '</td>').join('[^<]*<td[^>]*'));
+  assert.match(html, /Route<\/td>.*Run<\/td>.*Done<\/td>.*Dispatch<\/td>/);
+  assert.match(html, row('802', 'Walmart', '3:42 PM', '5:00 AM'));
+  assert.match(html, /801<\/td>[^]*?>DSD<\/td>[^]*?BEHIND[^]*?>1:00 PM<\/td>/);
+  assert.match(html, row('6304', 'Lancaster', '–', '–'));
   assert.doesNotMatch(html, /NOT LOADED|>LOADED</);
   assert.match(html, /PICKUP 503 MASSILLON<\/b> 3 cases Chocolate milk/);
   assert.match(html, /Cooler North[\s\S]*44&deg;F [\s\S]*HIGH/);
