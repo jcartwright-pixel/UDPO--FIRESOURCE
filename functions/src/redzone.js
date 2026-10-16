@@ -24,6 +24,13 @@ class RedzoneError extends Error { constructor(code, message) { super(message); 
 const DEFAULTS = { productsPath: '/products', address: 'https://api.rz-ops.com/public/v2', tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token' };
 const TOKEN_V3 = 'https://api.rz-ops.com/public/v3/oauth/token';
 const addressOf = (d) => d.address || DEFAULTS.address, tokenUrlOf = (d) => d.tokenUrl || DEFAULTS.tokenUrl;
+// The enterprise (RedZone site): the one typed, else the one What RedZone Gives Us found answering.
+const entOf = (d) => d.enterpriseId || d.foundEnterpriseId || '';
+// RedZone's lists are under /organizations/{org}/enterprises/{enterprise}; with both known that is the products address.
+// "/products" alone was the old default the screen saved back, so it counts as not typed.
+const productsPathOf = (d) => d.productsPath && d.productsPath !== DEFAULTS.productsPath ? d.productsPath
+  : d.foundProductsPath ? d.foundProductsPath
+  : d.orgId && entOf(d) ? '/organizations/{org}/enterprises/{enterprise}/product-types' : DEFAULTS.productsPath;
 const PAGE_LIMIT = 40, PRODUCT_LIMIT = 4000;
 const flat = (k) => String(k).replace(/[_\-\s]/g, '').toLowerCase();
 const clean = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
@@ -123,7 +130,8 @@ async function accessToken(d, o, ref) {
 // Every product, following next-page links on the same host.
 async function fetchProducts(d, o, ref) {
   const token = await accessToken(d, o, ref), out = [], address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
-  let url = urlFor(address, withOrg(d.productsPath || DEFAULTS.productsPath, d.orgId, d.enterpriseId));
+  if (/\{(enterprise|enterpriseId)\}/i.test(productsPathOf(d)) && !entOf(d)) throw new Error('RedZone\'s lists need the site (enterprise): press Show What RedZone Gives Us first');
+  let url = urlFor(address, withOrg(productsPathOf(d), d.orgId, entOf(d)));
   for (let page = 0; url && page < PAGE_LIMIT && out.length < PRODUCT_LIMIT; page++) {
     if (!sameHost(url, address)) throw new Error('The products address must be https on the same RedZone address');
     const res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
@@ -144,16 +152,29 @@ async function fetchProducts(d, o, ref) {
  * RedZone's own address list is in its Developer Hub (not reachable from outside), so the usual names are tried, plain and
  * under the organization (and enterprise) the way Boomi's RedZone connector builds its addresses; an administrator can also
  * type one address to try. */
+// Names from RedZone's API reference menu (Joe 10/16): Assets, Characteristics, Data Sheets, Locations, Manufacturing Types,
+// Problems, Product Groups, Product Types (RedZone's word for a product, a SKU), Labels; the older guesses stay behind them.
 const KINDS = [
-  ['Lines and areas', ['locations', 'areas', 'lines', 'production-lines', 'places']],
-  ['Machines', ['assets', 'machines', 'equipment']],
-  ['Sensors and data points', ['data-points', 'datapoints', 'sensors', 'tags', 'signals', 'counters']],
-  ['Products', ['products']],
-  ['Runs', ['runs', 'production-runs']],
-  ['Downtime', ['losses', 'downtime', 'downtime-events', 'problem-types']],
+  ['Lines and areas', ['locations', 'location-types', 'areas', 'lines']],
+  ['Machines', ['assets', 'asset-types', 'machines', 'equipment']],
+  ['Sensors', ['sensor-configurations', 'sensors', 'data-points', 'tags']],
+  ['Characteristics (checks and readings)', ['characteristics']],
+  ['Data sheets', ['data-sheet-templates', 'data-sheets', 'completed-data-sheets']],
+  ['Products', ['product-types', 'products']],
+  ['Product groups', ['product-groups']],
+  ['Manufacturing types', ['manufacturing-types']],
+  ['Problems and downtime', ['problems', 'problem-types', 'losses', 'downtime']],
+  ['Labels', ['labels']],
+  ['Runs', ['runs', 'production-runs', 'production-schedules']],
   ['Shifts', ['shifts', 'shift-types']],
   ['Sites', ['sites', 'enterprises']]
 ];
+// RedZone's sensors are kept by line (List Sensor Configurations: .../locations/{locationId}/sensor-configurations), so
+// they are asked line by line, for this many lines at most.
+const SENSOR_LINES = 25;
+// Joe 10/16 (RedZone's API reference, List Asset Types): https://api.rz-ops.com/public/v2/organizations/{organizationId}/
+// enterprises/{enterpriseId}/asset-types. Every list is under the organization and an enterprise (RedZone's sites).
+const NEST = '/organizations/{org}/enterprises/{enterprise}';
 const SHOW = ['value', 'lastValue', 'latestValue', 'currentValue', 'unit', 'units', 'uom', 'type', 'status', 'location', 'locationName', 'asset', 'assetName'];
 function sample(item) {
   // In this order of preference (field() alone takes whichever comes first in the record).
@@ -164,18 +185,82 @@ function sample(item) {
 async function getList(url, token, o) {
   let res;
   try { res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } }); } catch (e) { return { status: 0 }; }
-  if (!res.ok) return { status: res.status };
-  let body; try { body = JSON.parse(await res.text()); } catch (e) { return { status: res.status, note: 'not JSON' }; }
+  let body; try { body = JSON.parse(await res.text()); } catch (e) { return { status: res.status, note: res.ok ? 'not JSON' : '' }; }
+  // RedZone's own words on a refusal ("Organization not found" says more than a bare 404).
+  if (!res.ok) return { status: res.status, note: clean(text(field(body || {}, ['message', 'error', 'detail', 'title'])), 120) };
   const list = listIn(body);
   return list ? { status: res.status, list, total: Number(field(body, ['total', 'totalCount', 'count'])) || list.length } : { status: res.status, note: 'no list in the answer' };
 }
+// The organization and site IDs the sign-in itself carries (a token is often a JWT naming them). Only those names are kept:
+// never the client, the subject or the token itself.
+function tokenIds(token) {
+  const out = { orgs: [], enterprises: [], claims: [] };
+  const part = String(token || '').split('.')[1];
+  if (!part) return out;
+  let c; try { c = JSON.parse(Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch (e) { return out; }
+  if (!c || typeof c !== 'object') return out;
+  const walk = (k, v) => {
+    if (Array.isArray(v)) return v.forEach(x => walk(k, x));
+    if (v && typeof v === 'object') return Object.entries(v).forEach(([k2, v2]) => walk(k + '.' + k2, v2));
+    if (typeof v !== 'string' && typeof v !== 'number') return;
+    const leaf = k.split('.').pop().replace(/[_\-\s]/g, '').toLowerCase();
+    if (!/org|enterprise|site|tenant/i.test(k) || /client|secret|azp/.test(leaf) || leaf === 'sub') return;
+    const val = clean(v, 120);
+    out.claims.push(clean(k, 60) + ' ' + val);
+    // Only ID-looking names are used as IDs (not org_name and the like).
+    if (!/(id|uuid)$|^(org|organization|enterprise|site|tenant)s?$/.test(leaf)) return;
+    if (/enterprise|site/i.test(k)) out.enterprises.push({ id: val, name: '', from: 'sign-in' });
+    else if (/org/i.test(k)) out.orgs.push(val);
+  };
+  Object.entries(c).forEach(([k, v]) => walk(k, v));
+  return out;
+}
+const idOf = (x) => text(field(x, ['id', 'enterpriseId', 'siteId', 'uuid']));
+const nameOf = (x) => text(field(x, ['name', 'displayName', 'title', 'label']));
 async function discover(d, o, ref, extra) {
-  const token = await accessToken(d, o, ref), address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
-  const prefixes = [''].concat(d.orgId ? ['/organizations/{org}'] : []).concat(d.orgId && d.enterpriseId ? ['/organizations/{org}/enterprises/{enterprise}'] : []);
+  let token = await accessToken(d, o, ref);
+  const address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
+  const urlOf = (path) => urlFor(address, path) + (path.includes('?') ? '&' : '?') + 'limit=50';
+  // Which organization and enterprise: the saved ones, the ones the sign-in names, and RedZone's own enterprise list.
+  const ids = tokenIds(token);
+  const orgs = [...new Set([d.orgId].concat(ids.orgs).filter(Boolean))].slice(0, 3);
+  const ents = [];
+  const addEnt = (e) => { if (e.id && !ents.some(x => x.id === e.id)) ents.push(e); else if (e.name) { const x = ents.find(y => y.id === e.id); if (x && !x.name) x.name = e.name; } };
+  if (d.enterpriseId) addEnt({ id: d.enterpriseId, name: '', from: 'saved' });
+  ids.enterprises.forEach(addEnt);
+  let entList = null;
+  for (const org of orgs) {
+    for (const p of ['/organizations/' + encodeURIComponent(org) + '/enterprises', '/organizations/' + encodeURIComponent(org) + '/sites']) {
+      const got = await getList(urlOf(p), token, o);
+      if (got.list) { entList = { path: p, list: got.list, total: got.total }; got.list.forEach(x => addEnt({ id: idOf(x), name: nameOf(x), from: 'list' })); break; }
+    }
+    if (entList) break;
+  }
+  // Uniontown first (Joe's plant), then the rest.
+  ents.sort((a, b) => (/uniontown/i.test(b.name) ? 1 : 0) - (/uniontown/i.test(a.name) ? 1 : 0));
+  // The first organization and enterprise pair RedZone answers for (a list, or 403: there but not allowed) is used for every kind.
+  let base = null, tokenUrl = '';
+  const probes = [];
+  const findBase = async (v) => {
+    for (const org of orgs) for (const e of ents.slice(0, 4)) for (const probe of ['/asset-types', '/locations']) {
+      if (base) return;
+      const pre = '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(e.id);
+      const got = await getList(urlOf(pre + probe), token, o);
+      if (probes.length < 12) probes.push({ path: pre + probe, sign: v, status: got.status, note: got.note || '' });
+      if (got.list || got.status === 403) base = { pre, org, enterprise: e };
+    }
+  };
+  await findBase('v2');
+  // RedZone's API reference names .../public/v3/oauth/token (support named v2, which also signs in). When no site answers
+  // to the v2 sign-in, a v3 sign-in is tried once; if that one answers it is kept as the token address.
+  if (!base && !d.token && ents.length && tokenUrlOf(d) !== TOKEN_V3) {
+    try { token = await accessToken(Object.assign({}, d, { tokenUrl: TOKEN_V3, access: null }), o, null); await findBase('v3'); if (base) tokenUrl = TOKEN_V3; } catch (e) { /* the v2 answer stands */ }
+  }
+  const prefixes = base ? [base.pre] : [''].concat(d.orgId ? ['/organizations/{org}'] : []).concat(d.orgId && d.enterpriseId ? [NEST] : []);
   const one = async (kind, paths, pres) => {
     let best = null;
     for (const p of paths) for (const pre of p.startsWith('/') ? [''] : (pres || prefixes)) {
-      const path = withOrg(pre + '/' + p.replace(/^\/+/, ''), d.orgId, d.enterpriseId), url = urlFor(address, path) + (path.includes('?') ? '&' : '?') + 'limit=50';
+      const path = withOrg(pre + '/' + p.replace(/^\/+/, ''), d.orgId, d.enterpriseId), url = urlOf(path);
       if (!sameHost(url, address)) continue;
       const got = await getList(url, token, o);
       if (got.list) {
@@ -187,14 +272,36 @@ async function discover(d, o, ref, extra) {
     }
     return best;
   };
-  const kinds = KINDS.map(([k, p]) => one(k, p));
-  if (extra) kinds.push(one('Address typed', [clean(extra, 300).startsWith('/') ? clean(extra, 300) : '/' + clean(extra, 300)]));
+  const kinds = KINDS.map(([k, p]) => k === 'Sites' && entList
+    ? Promise.resolve({ kind: k, found: true, path: entList.path, count: entList.total, fields: Object.keys(entList.list.find(x => x && typeof x === 'object') || {}).slice(0, 30), examples: entList.list.slice(0, 5).map(sample), list: entList.list })
+    : one(k, p));
+  if (extra) {
+    const typed = clean(extra, 300).startsWith('/') ? clean(extra, 300) : '/' + clean(extra, 300);
+    kinds.push(one('Address typed', [typed]).then(x => x && x.found || !base ? x : one('Address typed', [typed.replace(/^\/+/, '')])));
+  }
   const items = (await Promise.all(kinds)).filter(Boolean);
+  const lines = items.find(x => x.kind === 'Lines and areas' && x.found && /\/locations$/.test(x.path));
+  const si = items.findIndex(x => x.kind === 'Sensors');
+  if (lines && si >= 0 && !items[si].found) {
+    const pre = lines.path.replace(/\/locations$/, ''), all = [];
+    let best = null, asked = 0;
+    for (const l of (lines.list || []).filter(x => x && idOf(x)).slice(0, SENSOR_LINES)) {
+      asked++;
+      const got = await getList(urlOf(pre + '/locations/' + encodeURIComponent(idOf(l)) + '/sensor-configurations'), token, o);
+      if (got.list) got.list.forEach(x => all.push({ line: nameOf(l), x }));
+      else if (!best || (got.status === 403 && best.status !== 403)) best = got;
+    }
+    const path = pre + '/locations/{locationId}/sensor-configurations';
+    if (all.length) {
+      const first = all.map(a => a.x).find(x => x && typeof x === 'object') || {};
+      items[si] = { kind: 'Sensors', found: true, path, count: all.length, lines: asked, fields: Object.keys(first).slice(0, 30), examples: all.slice(0, 8).map(a => (a.line ? a.line + ': ' : '') + sample(a.x)) };
+    } else if (asked) items[si] = { kind: 'Sensors', found: false, path, status: best ? best.status : 200, note: best ? best.note || '' : 'no sensors on ' + asked + ' lines' };
+  }
   // Joe 10/16: RedZone's Organization IDs list sites (Uniontown, Charleston, Martin's Ferry), no enterprise. When the sites
   // list came back, a kind not found yet is tried once more under Uniontown's site, so nobody types the long site ID.
-  const sites = items.find(x => x.kind === 'Sites' && x.found);
-  const ut = sites && (sites.list || []).find(x => /uniontown/i.test(text(field(x, ['name', 'displayName', 'title'])) || ''));
-  const siteId = ut && text(field(ut, ['id', 'siteId', 'uuid']));
+  const sites = !base && items.find(x => x.kind === 'Sites' && x.found);
+  const ut = sites && (sites.list || []).find(x => /uniontown/i.test(nameOf(x) || ''));
+  const siteId = ut && idOf(ut);
   if (siteId) {
     const pres = ['/sites/' + encodeURIComponent(siteId)].concat(d.orgId ? ['/organizations/{org}/sites/' + encodeURIComponent(siteId)] : []);
     await Promise.all(items.map(async (x, i) => {
@@ -203,14 +310,18 @@ async function discover(d, o, ref, extra) {
       if (again && (again.found || (again.status === 403 && x.status !== 403))) items[i] = again;
     }));
   }
-  return items.map(({ list, ...x }) => x);
+  const used = base ? Object.assign({ org: base.org, enterprise: base.enterprise.id, name: base.enterprise.name || '' }, tokenUrl ? { tokenUrl } : {}) : null;
+  const prod = items.find(x => x.kind === 'Products' && x.found);
+  if (used && prod) used.productsPath = prod.path.replace(base.pre, '/organizations/{org}/enterprises/{enterprise}');
+  return { items: items.map(({ list, ...x }) => x), used, claims: ids.claims.slice(0, 12), enterprises: ents.slice(0, 10), probes };
 }
 
 const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
   : /answered 404/.test(e.message) ? 'RedZone has no page at that address (404). Check the API address and products address from the Developer Hub.'
   : 'Could not read RedZone: ' + e.message;
 
-const view = (d) => ({ orgId: d.orgId || '', enterpriseId: d.enterpriseId || '', address: addressOf(d), tokenUrl: tokenUrlOf(d), productsPath: d.productsPath || DEFAULTS.productsPath, scope: d.scope || '',
+const view = (d) => ({ orgId: d.orgId || '', enterpriseId: d.enterpriseId || '', foundEnterpriseId: d.foundEnterpriseId || '', foundEnterpriseName: d.foundEnterpriseName || '',
+  address: addressOf(d), tokenUrl: tokenUrlOf(d), productsPath: productsPathOf(d), scope: d.scope || '',
   hasToken: !!d.token, tokenEnds: ends(d.token), hasClient: !!d.clientId, clientEnds: ends(d.clientId), hasSecret: !!d.clientSecret,
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null, lastDiscover: d.lastDiscover || null });
 
@@ -275,11 +386,17 @@ async function redzoneCall(db, user, input, options) {
     return Object.assign(view(Object.assign({}, d, { lastTest })), { result });
   }
   if (op === 'discover') {
-    let items;
-    try { items = await discover(d, o, ref, input.path); } catch (e) { throw new RedzoneError('FAILED', e instanceof RedzoneError ? e.message : plain(e)); }
-    const lastDiscover = { at, by: email, items };
-    await ref.set({ lastDiscover }, { merge: true });
-    return Object.assign(view(Object.assign({}, d, { lastDiscover })), { discover: lastDiscover });
+    let got;
+    try { got = await discover(d, o, ref, input.path); } catch (e) { throw new RedzoneError('FAILED', e instanceof RedzoneError ? e.message : plain(e)); }
+    const lastDiscover = Object.assign({ at, by: email }, got);
+    // The enterprise RedZone answered for is kept, so the products address works without anyone typing it.
+    const keep = { lastDiscover };
+    if (got.used && got.used.enterprise !== d.enterpriseId) Object.assign(keep, { foundEnterpriseId: got.used.enterprise, foundEnterpriseName: got.used.name });
+    // The products address RedZone answered (Product Types is RedZone's word for products).
+    if (got.used && got.used.productsPath) keep.foundProductsPath = got.used.productsPath;
+    if (got.used && got.used.tokenUrl) Object.assign(keep, { tokenUrl: got.used.tokenUrl, access: null });
+    await ref.set(keep, { merge: true });
+    return Object.assign(view(Object.assign({}, d, keep)), { discover: lastDiscover });
   }
   if (op === 'products') {
     if (!(d.lastTest && d.lastTest.ok)) throw new RedzoneError('FAILED', 'RedZone is not connected yet: Administration > Connections & Keys > RedZone, then Test Connection.');
