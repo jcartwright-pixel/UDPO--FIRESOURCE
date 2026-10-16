@@ -17,7 +17,7 @@ const L = window.UDLogic;
  */
 let pending = 0, failed = false;
 window.UD_EDIT_PILL = true;   // this module shows the sign itself, around a whole save
-// Joe 10/16: Daily Dispatch (window.UD_QUIET_SAVES) shows no "Saving... / Saved" sign at all; only a save that failed says
+// Joe 10/16: Daily and Weekly Dispatch (window.UD_QUIET_SAVES) show no "Saving... / Saved" sign at all; only a save that failed says
 // "Not saved", and the next save that works takes it away.
 function pill(state) {
   if (window.UD_QUIET_SAVES && state !== 'failed') { const p = document.getElementById('save-pill'); if (p) p.hidden = true; return; }
