@@ -124,14 +124,14 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       // (reviewed) -15 -> 85 (B); complaints and PDAs none (100). Overall (70+100+100+100+92+98+100+100+100+70+85+100+100)/13 = 93 (A).
       assert.deepEqual(ray.slice(2), ['D', 'A', 'A', 'A', 'B', 'A', 'A', '–', 'A', 'A', 'D', 'B', 'A', 'A', '93 A'], 'grades by points per day; overall = average of the areas');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_BAKER"] td:nth-child(13)', td => td.textContent.trim()), '–', 'not rated this month: no grade');
-      assert.match(await sc.textContent('#sc-how'), /How scoring works: each area earns \+1 for a perfect day \(no miss in it\) and \+2 for every 5 perfect days in a row/);
+      assert.match(await sc.textContent('#sc-how'), /How scoring works: each area \(but Attendance\) earns \+1 for a perfect day \(no miss in it\) and \+2 for every 5 perfect days in a row[\s\S]*Attendance earns nothing: the first 4 call-off days in the calendar year are free and each day after costs 3/);
       // Joe 10/13 Time grade: left too early (EVANS, 10 days) and back too late (FOX, 10 days) each cost 1 a day: -10 -> 60 (D).
       assert.equal(await sc.$eval('tr[data-key="DRV_S_EVANS"] td:nth-child(12)', td => td.textContent.trim()), 'D');
       assert.equal(await sc.$eval('tr[data-key="DRV_S_FOX"] td:nth-child(12)', td => td.textContent.trim()), 'D');
       // Joe 10/13: driving and distribution only, nothing for the plant.
       assert.doesNotMatch(await sc.textContent('#screen'), /plant/i, 'no plant card or plant items on the scorecard');
       assert.match(await sc.textContent('#kpis'), /Average driver score/);
-      assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\), complaints \(6 months\) and call-offs \(3 months\) count past the period shown/);
+      assert.match(await sc.textContent('#sc-how'), /Accidents \(12 months\), PDAs \(9 months\) and complaints \(6 months\) count past the period shown/);
       assert.match(await sc.textContent('#unassigned'), /No driver dispatched[\s\S]*10-8-26\s*229001\s*Speeding \(66 mph in a 45/, 'the alert on a truck with no driver is kept for a manager');
       assert.match(await sc.textContent('#unassigned'), /Hard turn \(1:35 PM/, 'harsh cornering is listed as a hard turn');
       assert.doesNotMatch(await sc.textContent('#unassigned'), /551234/, 'another plant\'s Fleet unit is not under No driver dispatched');
@@ -200,7 +200,10 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         await sc.click('.tabs [data-mode="settings"]');
         await sc.waitForSelector('.sc-n[data-k="speeding"]');
         assert.deepEqual(await sc.$$eval('.sc-n[data-k="speeding"], .sc-n[data-k="hardBrake"], .sc-n[data-k="hardAccel"], .sc-n[data-k="hardTurn"], .sc-n[data-k="idle"], .sc-n[data-k="gpsDayCap"]', l => l.map(x => x.value)), ['2', '2', '1', '1', '1', '10']);
-        assert.deepEqual(await sc.$$eval('.sc-n[data-k="sleeperIdlePct"], .sc-n[data-k="accidentBase"], .sc-n[data-k="accident2"], .sc-n[data-k="complaintMajor"], .sc-n[data-k="sickFade2"]', l => l.map(x => x.value)), ['66', '25', '15', '2', '10']);
+        assert.deepEqual(await sc.$$eval('.sc-n[data-k="sleeperIdlePct"], .sc-n[data-k="accidentBase"], .sc-n[data-k="accident2"], .sc-n[data-k="complaintMajor"], .sc-n[data-k="attendanceFreeDays"]', l => l.map(x => x.value)), ['4', '25', '15', '2', '10']);
+        // Joe 10/16: attendance by the calendar year, the first 4 days free, no reward, a manager can excuse a day.
+        assert.deepEqual(await sc.$$eval('.sc-n[data-k="callOff"]', l => l.map(x => x.value)), ['3']);
+        assert.match(await sc.textContent('#sheet'), /Attendance\s*call-off days a year cost nothing\s*Each call-off day after\s*points\s*The year is January 1 to December 31\. Perfect attendance earns no extra points\. A call-off a manager excuses \(FMLA or Other\) does not count\./);
         assert.equal(await sc.$eval('#sc-kiosk-reasons', c => c.checked), false, 'Show reasons on kiosk starts off');
         assert.equal(await sc.$$eval('[data-kiosk-area]', l => l.length), AREA_HEADS.length - 3, 'every area can be ticked for the kiosk');
         assert.equal(await sc.$$eval('[data-kiosk-area]:checked', l => l.length), 0, 'none ticked to start');
@@ -364,6 +367,58 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         await sc.close();
         results.push('Driver Scorecard (Joe 10/14): nothing before Scorecard counted from costs points; CARRIER is never graded; idling is one line a day with a pop-up to excuse each time; an 11:40 PM pass through the yard is not a late return');
       }
+    }
+    // Joe 10/16: "not penalized nor reward unless it has been over four days in the calendar year", with a manager override
+    // (FMLA, or Other with a note). DIAZ called off 6 days in October; a manager excused 10-3 as FMLA. BEFORE=1 takes the old screen.
+    {
+      await db().collection('scorecard').doc('settings').set({ countFrom: '2026-10-01' }, { merge: true });
+      const b = db().batch();
+      ['2026-10-02', '2026-10-03', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'].forEach(date =>
+        b.set(db().collection('exceptions').doc('att_diaz_' + date), { cells: { driver_id: 'drv_s_diaz', start_date: date, end_date: date, reason_code: 'SICK DAY', status: 'APPROVED' } }));
+      b.set(db().collection('scorecardExcuses').doc('att_diaz_fmla'), { key: 'att|2026-10-03|DRV_S_DIAZ|', reason: 'FMLA', by: 'manager.test@uniteddairy.com', at: '2026-10-16T15:00:00.000Z', driverKey: 'DRV_S_DIAZ', what: 'Call-off (sick day)' });
+      await b.commit();
+      const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, (BEFORE ? 'before-' : 'after-') + name + '-1536.png') }); };
+      const sc = await openPage(browser, 1536, 760, '/scorecard.html?month=2026-10&testEmail=manager.test@uniteddairy.com');
+      await sc.waitForSelector('.sc-board tr[data-key]');
+      await sc.click('#cats [data-tab="attendance"]');
+      await sc.waitForFunction(() => /DIAZ/.test((document.querySelector('.sc-board') || {}).textContent || ''));
+      await sc.waitForTimeout(500);
+      const toDiaz = () => sc.$$eval('table.sc-board tbody tr', rows => { const r = rows.find(x => /DIAZ, RAY/.test(x.textContent)); if (r) r.scrollIntoView({ block: 'center' }); });
+      await toDiaz();
+      await shot(sc, 'attendance-tab');
+      if (!BEFORE) {
+        const diaz = await sc.$$eval('table.sc-area tbody tr', rows => rows.map(r => r.textContent).find(t => /DIAZ, RAY/.test(t)) || '');
+        assert.deepEqual(await heads(sc, 'table.sc-area thead th'), ['#', 'Driver', 'Grade', 'Score', 'Call-off days', 'Perfect days', 'Earned', 'Points off', 'Attendance details']);
+        assert.match(diaz, /DIAZ, RAY\s*A\s*97\s*6\s*–\s*–\s*−3/, 'grade A, score 97, 6 call-off days, nothing earned, 3 off');
+        assert.match(diaz, /10-2-26 Call-off \(sick day\), day 1 this year, within the 4 allowed/);
+        assert.match(diaz, /10-7-26 Call-off \(sick day\), day 4 this year, within the 4 allowed/);
+        assert.match(diaz, /10-8-26 Call-off \(sick day\), day 5 this year\s*−3/, 'the 5th day costs 3');
+        assert.match(diaz, /10-3-26 Call-off \(sick day\)\s*−0\s*Excused: FMLA · manager test · 10-16-26/, 'the FMLA day is kept, with who and when');
+        assert.ok(!/day 1 this year, within the 4 allowed\s*−/.test(diaz), 'a free day shows no points');
+        await sc.locator('table.sc-area tbody tr', { hasText: 'DIAZ, RAY' }).locator('.sc-excuse').last().click();
+        await sc.waitForSelector('.sc-ex-form .sc-ex-why');
+        assert.deepEqual(await sc.$$eval('.sc-ex-why option', o => o.map(x => x.textContent)), ['Pick a reason', 'FMLA', 'Other']);
+        await sc.selectOption('.sc-ex-why', 'Other');
+        await sc.click('.sc-ex-save');
+        await sc.waitForFunction(() => /Type a note for Other/.test(document.body.textContent));
+        await sc.fill('.sc-ex-reason', 'jury duty');
+        await toDiaz();
+        await shot(sc, 'attendance-excuse');
+        await sc.click('.sc-ex-cancel');
+        assert.equal(await sc.$eval('#error', e => e.hidden), true, 'Cancel clears the message');
+        await sc.click('#cats [data-tab="overall"]');
+        await sc.click('tr[data-key="DRV_S_DIAZ"]');
+        await sc.waitForFunction(() => /this year, 4 allowed/.test(document.body.textContent));
+        assert.match(await sc.textContent('#sheet'), /6 call-offs \(5 this year, 4 allowed\)/);
+        assert.deepEqual(sc.errors.filter(e => !/Type a note/.test(e)), []);
+        results.push('Driver Scorecard attendance (Joe 10/16): the first 4 call-off days in the calendar year cost nothing, the 5th costs 3, an FMLA day is excused with who and when, and the Excuse box offers FMLA or Other');
+      }
+      // Settings: the attendance line.
+      await sc.click('.tabs [data-mode="settings"]');
+      await sc.waitForSelector('.sc-n[data-k="callOff"]');
+      await sc.$eval('.sc-n[data-k="callOff"]', e => e.scrollIntoView({ block: 'center' }));
+      await shot(sc, 'attendance-settings');
+      await sc.close();
     }
     // With no alerts at all the board says so plainly.
     if (!BEFORE) {

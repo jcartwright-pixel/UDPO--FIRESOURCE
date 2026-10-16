@@ -149,11 +149,12 @@
       // Joe 10/14: No driver dispatched starts at Scorecard counted from too.
       const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z && d >= s.countFrom).sort().reduce((l, d) => l.concat(unassigned[d]), []);
       const exMap = {};
-      excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '' }; });
-      // Accidents (12 months), PDAs (9), complaints (6) and call-offs (3) look back past the period, fading as they age.
+      excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '', at: x.at || '' }; });
+      // Accidents (12 months), PDAs (9) and complaints (6) look back past the period, fading as they age.
       const opts = (a, z, ratingEnd) => ({ alertsOn: alertsEver !== false || gpsAlerts.length > 0, seatbeltOn: gpsAlerts.some(x => S.scAlertKind_(x.type) === 'seatbelt'), ratings: ratingsIn(a, ratingEnd),
         excuses: exMap, incidents, accidentsOn: incidents.some(x => x.kind === 'accident'), complaintsOn: incidents.some(x => x.kind === 'complaint'), pdaOn: incidents.some(x => x.kind === 'pda'), start: a, asOf: z });
-      const offs = (a, z) => S.scCallOffDays_(ex, S.scAddDays_(a, -95), z, s);
+      // Joe 10/16: call-offs count through the calendar year, so read them from January 1.
+      const offs = (a, z) => S.scCallOffDays_(ex, a.slice(0, 4) + '-01-01', z, s);
       if (mode === 'week') {
         const w = S.scWeekRange_(weekStart), end = w.end < yesterday ? w.end : yesterday;
         let list = [];
@@ -202,8 +203,10 @@
           '<p><b>Scorecard counted from</b> <input type="date" id="sc-count-from" value="' + s.countFrom + '"' + (edit ? '' : ' disabled') + '> ' + escapeHtml(shortDate(s.countFrom)) + ' · runs before this day are not graded (check-in, cases, inspections, driving, time, MPG, call-offs). A check-in in the app or by the answering-service email counts.</p>' +
           '<p><b>Cases out vs in</b> ' + n('lostCase') + ' point per lost case, at most ' + n('lostCaseDayCap') + ' a day</p>' +
           '<p><b>Clean inspections</b> ' + n('inspectionDefect') + ' points per inspection with a defect, ' + n('inspectionMissing') + ' if none done</p>' +
-          '<p><b>Attendance</b> ' + n('callOff') + ' points per call-off day</p>' +
-          '<h2>Attendance fades over 3 months</h2><p>A call-off counts ' + n('sickFade1') + '% in its first month, ' + n('sickFade2') + '% in the second, ' + n('sickFade3') + '% in the third, then it is gone</p>' +
+          // Joe 10/16: attendance by the calendar year, the first days free, no reward; a manager can excuse a day (FMLA, Other).
+          '<p><b>Attendance</b> ' + n('attendanceFreeDays') + ' call-off days a year cost nothing</p>' +
+          '<p><b>Each call-off day after</b> ' + n('callOff') + ' points</p>' +
+          '<p class="hint">The year is January 1 to December 31. Perfect attendance earns no extra points. A call-off a manager excuses (FMLA or Other) does not count.</p>' +
           '<h2>Driving (Verizon Fleet GPS)</h2><p class="hint">Counted on the truck, against the driver Daily Dispatch put in it that day.</p>' +
           '<p><b>Speeding</b> ' + n('speeding') + ' points per speeding alert</p>' +
           '<p><b>Hard stops</b> ' + n('hardBrake') + ' points per hard braking alert</p>' +
@@ -284,7 +287,7 @@
         r.runDays + ' run' + (r.runDays === 1 ? '' : 's'), 'check-ins ' + (r.runDays - r.missedCheckins) + ' of ' + r.runDays,
         r.casesOut ? 'cases ' + r.casesOut.toLocaleString() + ' out / ' + r.casesIn.toLocaleString() + ' in' : 'cases not recorded',
         r.inspected + ' clean inspection' + (r.inspected === 1 ? '' : 's') + (r.defects ? ', ' + r.defects + ' with a defect' : '') + (r.notInspected ? ', ' + r.notInspected + ' not done' : ''),
-        r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') : 'perfect attendance',
+        r.callOffs ? r.callOffs + ' call-off' + (r.callOffs === 1 ? '' : 's') + (r.yearCallOffs ? ' (' + r.yearCallOffs + ' this year, ' + s.attendanceFreeDays + ' allowed)' : '') : 'perfect attendance',
         (r.speeding || 0) + ' speeding, ' + (r.hardBrakes || 0) + ' hard stop' + (r.hardBrakes === 1 ? '' : 's') + ', ' + (r.hardAccels || 0) + ' hard start' + (r.hardAccels === 1 ? '' : 's') + (r.hardTurns ? ', ' + r.hardTurns + ' hard turn' + (r.hardTurns === 1 ? '' : 's') : '') + ', ' + (r.idles || 0) + ' idling' + (r.idleMinutes ? ' (' + Math.round(r.idleMinutes) + ' min)' : '') + (r.seatbelts ? ', ' + r.seatbelts + ' seatbelt' : ''),
         r.gpsMiles ? Math.round(r.gpsMiles).toLocaleString() + ' GPS miles' : r.miles ? r.miles.toLocaleString() + ' planned miles' : '',
         'MPG ' + (r.mpg ? r.mpg.toFixed(1) : 'coming'),
@@ -311,19 +314,21 @@
       const idlePop = (r, m) => '<div class="sc-pop-back"><div class="sc-pop" role="dialog" aria-label="Each idling time"><h3>Idling ' + shortDate(m.date) + '</h3>' +
         m.events.map(x => missLine(r, Object.assign({ event: true }, x))).join('') + '<div class="sc-pop-foot"><button type="button" class="sc-pop-close">Close</button></div></div></div>';
       const missLine = (r, m) => '<div class="' + (m.excused ? 'sc-excused' : '') + '"><b>' + shortDate(m.date) + '</b> <span class="sc-what">' + escapeHtml(m.what) + '</span>' +
-        (m.carried && m.area === 'attendance' ? ' <small class="sc-carry">from before this period</small>' : '') + (m.event ? '' : ' <span class="sc-pts">−' + pts(m.points) + '</span>') +
+        (m.carried && m.area === 'attendance' ? ' <small class="sc-carry">from before this period</small>' : '') + (m.event || m.noMiss ? '' : ' <span class="sc-pts">−' + pts(m.points) + '</span>') +
         (m.events ? ' <button type="button" class="sc-idle-open" data-pop="' + escapeHtml(popKey(r, m)) + '">Each time (' + m.events.length + ')</button>' + (idleOpen === popKey(r, m) ? idlePop(r, m) : '') : '') +
-        (m.excused ? ' <span class="sc-ex">Excused: ' + escapeHtml(m.excused.reason) + (m.excused.by ? ' · ' + who(m.excused.by) : '') + '</span>' + (edit ? ' <button type="button" class="sc-unexcuse" data-key="' + escapeHtml(m.key) + '">Undo excuse</button>' : '')
-          : m.key && edit ? (excuseOpen === m.key ? ' <span class="sc-ex-form" data-key="' + escapeHtml(m.key) + '" data-driver="' + escapeHtml(r.driverKey) + '" data-what="' + escapeHtml(m.what) + '"><input type="text" class="sc-ex-reason" maxlength="300" value="' + escapeHtml(excuseText) + '" placeholder="Reason, for example: deer in the road"> <button type="button" class="primary sc-ex-save">Excuse</button> <button type="button" class="sc-ex-cancel">Cancel</button></span>'
+        (m.excused ? ' <span class="sc-ex">Excused: ' + escapeHtml(m.excused.reason) + (m.excused.by ? ' · ' + who(m.excused.by) : '') + (m.excused.at ? ' · ' + shortDate(String(m.excused.at).slice(0, 10)) : '') + '</span>' + (edit ? ' <button type="button" class="sc-unexcuse" data-key="' + escapeHtml(m.key) + '">Undo excuse</button>' : '')
+          : m.key && edit ? (excuseOpen === m.key ? ' <span class="sc-ex-form" data-key="' + escapeHtml(m.key) + '" data-driver="' + escapeHtml(r.driverKey) + '" data-what="' + escapeHtml(m.what) + '">' +
+            (m.area === 'attendance' ? '<select class="sc-ex-why" aria-label="Why it is excused"><option value="">Pick a reason</option>' + CORE.ATTENDANCE_EXCUSES.map(x => '<option>' + x + '</option>').join('') + '</select> ' : '') + '<input type="text" class="sc-ex-reason" maxlength="300" value="' + escapeHtml(excuseText) + '" placeholder="' + (m.area === 'attendance' ? 'Note (needed for Other)' : 'Reason, for example: deer in the road') + '"> <button type="button" class="primary sc-ex-save">Excuse</button> <button type="button" class="sc-ex-cancel">Cancel</button></span>'
             : ' <button type="button" class="sc-excuse" data-key="' + escapeHtml(m.key) + '">Excuse</button>') : '') + '</div>';
       const pendingLine = (p) => '<div class="sc-pending"><b>' + shortDate(p.date) + '</b> ' + escapeHtml(p.what) + ' <span class="sc-review">Under review</span></div>';
       const detail = (r, area) => {
         // Joe 10/14: a miss that costs nothing (No inspection done at 0) is not listed; it still keeps the day from earning a reward.
-        const list = (r.misses || []).filter(m => (!area || m.area === area) && (m.points || m.excused || (m.events && m.events.some(x => x.excused)))), pend = (r.pending || []).filter(p => !area || p.area === area);
+        // Joe 10/16: every call-off is listed (with its day of the year) so a manager can excuse it.
+        const list = (r.misses || []).filter(m => (!area || m.area === area) && (m.points || m.excused || m.area === 'attendance' || (m.events && m.events.some(x => x.excused)))), pend = (r.pending || []).filter(p => !area || p.area === area);
         return pend.map(pendingLine).join('') + (list.length ? list.map(m => missLine(r, m)).join('') : pend.length ? '' : 'No misses.');
       };
       // Joe 10/13: one line on how the scoring works, above the board.
-      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Accidents (12 months), PDAs (9 months), complaints (6 months) and call-offs (3 months) count past the period shown, fading as they age; accidents and complaints count once a manager reviews them. Overall is the average of the area grades.</p>';
+      const how = '<p class="sc-how" id="sc-how"><b>How scoring works:</b> each area (but Attendance) earns +' + s.cleanDay + ' for a perfect day (no miss in it) and +' + s.streakBonus + ' for every ' + s.streakDays + ' perfect days in a row, and loses the Settings points for each miss; its grade goes by points per day worked (perfect every day = 100; A ' + s.gradeA + '+, B ' + s.gradeB + '+, C ' + s.gradeC + '+). Attendance earns nothing: the first ' + s.attendanceFreeDays + ' call-off days in the calendar year are free and each day after costs ' + s.callOff + ' (a day a manager excuses does not count). Accidents (12 months), PDAs (9 months) and complaints (6 months) count past the period shown, fading as they age; accidents and complaints count once a manager reviews them. Overall is the average of the area grades.</p>';
       const shown = b.rows.filter(r => r.runDays || r.callOffs);
       // Joe 10/14: before Scorecard counted from, say why the board is empty.
       const empty = (cols) => '<tr><td colspan="' + cols + '" class="empty">No driving days counted for ' + escapeHtml(label) + ' yet.' + (b.through < s.countFrom ? ' The scorecard counts from ' + shortDate(s.countFrom) + ' (Settings).' : '') + '</td></tr>';
@@ -331,9 +336,10 @@
       const areaTable = (key) => {
         const a = CORE.AREAS.find(x => x[0] === key), rows = shown.slice().sort((x, y) => ((y.areas[key] || {}).score ?? -1) - ((x.areas[key] || {}).score ?? -1) || (x.driver < y.driver ? -1 : 1));
         const rolling = key === 'accidents' || key === 'complaints' || key === 'pda';
+        // Joe 10/16: attendance shows its call-off days in the period and earns nothing (no perfect days or rewards).
         return '<table class="issues sc-board sc-area"><colgroup><col style="width:4%"><col style="width:16%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:35%"></colgroup>' +
-          '<thead><tr><th>#</th><th>Driver</th><th>Grade</th><th>Score</th><th>' + (key === 'cleanliness' ? 'Ratings' : 'Days') + '</th><th>Perfect days</th><th>Earned</th><th>Points off</th><th>' + escapeHtml(a[1]) + ' details</th></tr></thead><tbody>' +
-          (rows.map((r, i) => { const o = r.areas[key] || {}; return '<tr><td>' + (i + 1) + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + grade(o) + '</td><td>' + (o.score == null ? '–' : o.score) + '</td><td>' + (rolling ? '–' : o.days || 0) + '</td><td>' + (rolling || key === 'cleanliness' ? '–' : o.clean || 0) + '</td><td>' + (o.rewards ? '+' + pts(o.rewards) : '0') + '</td><td>' + (o.lost ? '−' + pts(o.lost) : '0') + '</td><td class="sc-detail">' + detail(r, key) + '</td></tr>'; }).join('') || empty(9)) + '</tbody></table>';
+          '<thead><tr><th>#</th><th>Driver</th><th>Grade</th><th>Score</th><th>' + (key === 'cleanliness' ? 'Ratings' : key === 'attendance' ? 'Call-off days' : 'Days') + '</th><th>Perfect days</th><th>Earned</th><th>Points off</th><th>' + escapeHtml(a[1]) + ' details</th></tr></thead><tbody>' +
+          (rows.map((r, i) => { const o = r.areas[key] || {}; return '<tr><td>' + (i + 1) + '</td><td class="strong">' + escapeHtml(r.driver) + '</td><td>' + grade(o) + '</td><td>' + (o.score == null ? '–' : o.score) + '</td><td>' + (rolling ? '–' : key === 'attendance' ? r.callOffs || 0 : o.days || 0) + '</td><td>' + (rolling || key === 'cleanliness' || key === 'attendance' ? '–' : o.clean || 0) + '</td><td>' + (key === 'attendance' ? '–' : o.rewards ? '+' + pts(o.rewards) : '0') + '</td><td>' + (o.lost ? '−' + pts(o.lost) : '0') + '</td><td class="sc-detail">' + detail(r, key) + '</td></tr>'; }).join('') || empty(9)) + '</tbody></table>';
       };
       // Joe 10/13: every accident / incident and complaint, one row each; a manager reviews them here or on Driver Roster.
       const incidentTable = () => {
@@ -401,11 +407,14 @@
       if (exb) { excuseOpen = exb.dataset.key; excuseText = ''; render(); const i = document.querySelector('.sc-ex-reason'); if (i) i.focus(); return; }
       const exf = e.target.closest('.sc-ex-form');
       if (exf) {
-        if (e.target.closest('.sc-ex-cancel')) { excuseOpen = ''; render(); return; }
+        if (e.target.closest('.sc-ex-cancel')) { excuseOpen = ''; showError(''); render(); return; }
         if (e.target.closest('.sc-ex-save')) {
-          const reason = exf.querySelector('.sc-ex-reason').value.trim();
+          const why = exf.querySelector('.sc-ex-why'), note = exf.querySelector('.sc-ex-reason').value.trim();
+          if (why && !why.value) { showError('Pick why it is excused: FMLA or Other.'); return; }
+          if (why && why.value === 'Other' && !note) { showError('Type a note for Other.'); return; }
+          const reason = why ? why.value + (note ? ': ' + note : '') : note;
           if (!reason) { showError('Type the reason for excusing it.'); return; }
-          try { await save('excuseScorecardMiss', { key: exf.dataset.key, reason, driverKey: exf.dataset.driver, what: exf.dataset.what }); excuseOpen = ''; excuseText = ''; render(); } catch (err) { showError('Could not excuse it (' + err.message + ').'); }
+          try { await save('excuseScorecardMiss', { key: exf.dataset.key, reason, driverKey: exf.dataset.driver, what: exf.dataset.what }); excuseOpen = ''; excuseText = ''; showError(''); render(); } catch (err) { showError('Could not excuse it (' + err.message + ').'); }
         }
         return;
       }

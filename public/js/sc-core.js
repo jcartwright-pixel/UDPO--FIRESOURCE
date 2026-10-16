@@ -57,6 +57,9 @@ var SC_CORE = Object.freeze({
     complaintMinor: 3, complaintMajor: 10, complaintFade1: 100, complaintFade2: 50,
     // Call-offs fade over 3 months: sickFade1..3 percent in the first, second and third month, then gone.
     sickFade1: 100, sickFade2: 66, sickFade3: 33,
+    // Joe 10/16: attendance counts call-off days in the calendar year (January 1 to December 31); the first
+    // attendanceFreeDays cost nothing and earn nothing, each day after costs callOff. (The 3-month fade above is no longer used.)
+    attendanceFreeDays: 4,
     // Joe 10/13 PDA (Progressive Discipline Action), a manager's decision (no review step): Verbal warning, Written warning,
     // Final written warning, Suspension; 100% for 0-3 months, 66% for 3-6, 33% for 6-9, then gone.
     pdaVerbal: 5, pdaWritten: 10, pdaFinal: 20, pdaSuspension: 30, pdaFade1: 100, pdaFade2: 66, pdaFade3: 33,
@@ -70,14 +73,15 @@ var SC_CORE = Object.freeze({
     'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
     'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'idleAllowMinutes', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
-    'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'kioskReasons',
+    'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'attendanceFreeDays', 'kioskReasons',
     'pdaVerbal', 'pdaWritten', 'pdaFinal', 'pdaSuspension', 'pdaFade1', 'pdaFade2', 'pdaFade3']),
   GPS_KINDS: Object.freeze(['speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'seatbelt']),
   // Joe 10/13 (later): the board shows one grade per area and the overall score; the details are one click away.
   AREAS: Object.freeze([['checkin', 'Check-in'], ['cases', 'Cases'], ['inspection', 'Inspections'], ['attendance', 'Attendance'],
     ['speeding', 'Speeding'], ['hardStops', 'Hard Stops'], ['idling', 'Idling'], ['seatbelt', 'Seatbelt'], ['fuel', 'Fuel MPG'], ['time', 'Time'],
     ['cleanliness', 'Truck Clean'], ['accidents', 'Accidents'], ['complaints', 'Complaints'], ['pda', 'PDA']]),
-  // Accidents, complaints and attendance look back past the period on screen (12, 6 and 3 months), fading as they age.
+  // Accidents and complaints look back past the period on screen (12 and 6 months), fading as they age; attendance looks
+  // back to January 1 (Joe 10/16).
   ROLLING: Object.freeze(['attendance', 'accidents', 'complaints', 'pda']),
   PDA_STEPS: Object.freeze([['verbal', 'Verbal warning', 'pdaVerbal'], ['written', 'Written warning', 'pdaWritten'], ['final', 'Final written warning', 'pdaFinal'], ['suspension', 'Suspension', 'pdaSuspension']]),
   INCIDENT_AREA: Object.freeze({ accident: 'accidents', complaint: 'complaints', pda: 'pda' }),
@@ -88,6 +92,8 @@ var SC_CORE = Object.freeze({
   // A yard leave this far (minutes) from the run's dispatch time is another trip's; a return later than LATE_MAX_MINUTES past the
   // expected time is most likely the truck's next trip passing through the yard, not this run coming back.
   YARD_NEAR_MINUTES: 240, LATE_MAX_MINUTES: 360,
+  // Joe 10/16: why a manager excused a call-off (it then does not count toward the year's days).
+  ATTENDANCE_EXCUSES: Object.freeze(['FMLA', 'Other']),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off|.*carrier.*)$/i
 });
 
@@ -486,7 +492,7 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     r.routes[d.route] = (r.routes[d.route] || 0) + 1;
     if (d.truck) r.trucks[d.truck] = (r.trucks[d.truck] || 0) + 1;
     scAddGps_(r, d, s, ex);
-    ['checkin', 'inspection', 'attendance'].forEach(function (a) { scored(r, d.date, a); });
+    ['checkin', 'inspection'].forEach(function (a) { scored(r, d.date, a); });
     if (d.casesOut != null && d.casesIn != null) scored(r, d.date, 'cases');
     var gps = d.gpsMiles != null || (d.alertList || []).length;
     if (alertsOn && gps) ['speeding', 'hardStops', 'idling'].forEach(function (a) { scored(r, d.date, a); });
@@ -518,22 +524,23 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
       }
     }
   });
-  // Call-offs fade over 3 months; those before the period carry over onto drivers who worked in it.
-  var carried = [];
-  (callOffs || []).forEach(function (c) {
-    var w = scSickFade_(c.date, asOf, s);
-    if (!w) return;
-    if (start && c.date < start) { carried.push(c); return; }
-    var r = get(c.driverKey, names[c.driverKey]);
+  // Joe 10/16: call-off days are counted through the calendar year (callOffs should start January 1). The first
+  // attendanceFreeDays neither cost nor earn; each later day costs callOff. A day a manager excused (FMLA, Other) is kept and
+  // shown but does not count toward the year's days. Days earlier in the year than the period only move the count.
+  var nth = {};
+  (callOffs || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).forEach(function (c) {
+    if (asOf && c.date > asOf) return;
+    var key = scMissKey_('att', c.date, c.driverKey, ''), e = ex[key], yk = c.driverKey + '|' + c.date.slice(0, 4);
+    var n = e ? null : (nth[yk] = (nth[yk] || 0) + 1);
+    if (start && c.date < start) return;
+    var r = get(c.driverKey, names[c.driverKey]), over = n != null && n > s.attendanceFreeDays;
     r.callOffs++;
-    scored(r, c.date, 'attendance');
-    r.misses.push({date: c.date, what: 'Call-off (' + c.reason.toLowerCase() + ')' + (w < 1 ? ', ' + Math.round(w * 100) + '% as it ages' : ''), points: scRound_(s.callOff * w), area: 'attendance'});
-  });
-  carried.forEach(function (c) {
-    var r = by[c.driverKey], w = scSickFade_(c.date, asOf, s);
-    if (!r) return;
-    r.carriedCallOffs = (r.carriedCallOffs || 0) + 1;
-    r.misses.push({date: c.date, what: 'Call-off (' + c.reason.toLowerCase() + '), earlier, ' + Math.round(w * 100) + '% as it ages', points: scRound_(s.callOff * w), area: 'attendance', carried: true});
+    if (n != null) r.yearCallOffs = Math.max(r.yearCallOffs || 0, n);
+    var miss = {date: c.date, area: 'attendance', key: key, points: over ? s.callOff : 0,
+      what: 'Call-off (' + c.reason.toLowerCase() + ')' + (n == null ? '' : ', day ' + n + ' this year' + (over ? '' : ', within the ' + s.attendanceFreeDays + ' allowed'))};
+    if (e) miss.excused = {reason: e.reason || '', by: e.by || '', at: e.at || ''};
+    else if (!over) miss.noMiss = true;
+    r.misses.push(miss);
   });
   // Accidents and complaints count once a manager reviews them as counting; under review they show but cost nothing yet.
   var byName = {};
@@ -664,8 +671,8 @@ function scFinishGps_(r) {
  * row earn streakBonus, a miss costs its points (Settings). The area's score comes from its points per day, so a driver
  * with fewer days is not held back: 80 + 20 x points per day, at most 100 (a clean day every day is 100; a 4-point miss in
  * 10 days is 90). An area with no days to score shows no grade. The overall score is the average of the scored areas.
- * Accidents and complaints are 100 less what the counted ones cost now (after fading); a call-off from before the period
- * (carried over) takes its faded points off Attendance.
+ * Accidents and complaints are 100 less what the counted ones cost now (after fading). Attendance (Joe 10/16) earns nothing
+ * and is 100 less the call-off days in the period past the year's allowance.
  */
 function scAreaScore_(points, days) { return days ? Math.max(0, Math.min(100, Math.round(80 + 20 * points / days))) : null; }
 function scCleanPoints_(n, s) { return n === 5 ? s.clean5 : n === 4 ? s.clean4 : n === 3 ? s.clean3 : n === 2 ? -s.clean2Off : -s.clean1Off; }
@@ -686,6 +693,16 @@ function scAreas_(r, s, on) {
       (r.cleanRatings || []).forEach(function (x) { o.days++; if (x.points >= 0) o.rewards += x.points; else o.lost -= x.points; });
       o.ratings = o.days; o.points = o.rewards - o.lost;
       o.score = o.days ? Math.max(0, Math.min(100, Math.round(80 + 10 * o.points / o.days))) : null;
+      o.grade = o.score == null ? '' : scGrade_(o.score, s);
+      out[k] = o;
+      return;
+    }
+    // Joe 10/16: attendance earns nothing; it is 100 less the call-off days past the year's allowance in the period.
+    if (k === 'attendance') {
+      (r.misses || []).forEach(function (m) { if (m.area === 'attendance' && !m.excused && !m.noMiss) o.lost += m.points || 0; });
+      o.lost = scRound_(o.lost); o.points = o.lost ? -o.lost : 0;
+      o.days = dates.length || r.callOffs ? 1 : 0;
+      o.score = o.days ? Math.max(0, Math.round(100 - o.lost)) : null;
       o.grade = o.score == null ? '' : scGrade_(o.score, s);
       out[k] = o;
       return;

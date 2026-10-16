@@ -420,8 +420,10 @@ function validate(input) {
     out.undo = input.undo === true;
     out.driverKey = text(input.driverKey, 80).toUpperCase();
     out.what = text(input.what, 300);
-    if (!/^(gps|time)\|\d{4}-\d{2}-\d{2}\|/.test(out.key)) throw new SaveError('BAD_REQUEST', 'Only a GPS or Time miss can be excused');
+    if (!/^(gps|time|att)\|\d{4}-\d{2}-\d{2}\|/.test(out.key)) throw new SaveError('BAD_REQUEST', 'Only a GPS, Time or attendance miss can be excused');
     if (!out.undo && !out.reason) throw new SaveError('BAD_REQUEST', 'Type the reason');
+    // Joe 10/16: a call-off is excused for FMLA or Other (Other with a note).
+    if (!out.undo && /^att\|/.test(out.key) && !/^(FMLA(: .+)?|Other: .+)$/.test(out.reason)) throw new SaveError('BAD_REQUEST', 'Pick FMLA or Other (with a note)');
     return out;
   }
   if (action === 'saveScorecard') {
