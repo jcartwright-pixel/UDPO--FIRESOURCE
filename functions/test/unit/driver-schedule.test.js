@@ -40,6 +40,9 @@ test('each day: his routes, else why he is off, else Off from Driver Master, els
   assert.equal(days[5].status, 'Not scheduled');
   assert.equal(days[6].status, 'Off');
   days.forEach(d => assert.ok(d.runs.length || d.status, 'never blank: ' + d.day));
+  // Joe 10/16: a Backup day reads Backup, also on his regular day off; a route still wins.
+  const backed = scheduleDays(driver, L.weeklyRows(runs, week), exceptions, week, [{ driverId: 'drv_a', date: '2026-10-23' }, { driverId: 'drv_a', date: '2026-10-24' }, { driverId: 'drv_a', date: '2026-10-19' }]);
+  assert.deepEqual(backed.map(d => d.status), ['Off', '', '', 'Not scheduled', 'Off: Vacation', 'Backup', 'Backup']);
 });
 
 test('the phone page has My Schedule with the employee number box', () => {

@@ -94,7 +94,7 @@
         const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');
         const at = r.checkinCompletedAt ? new Date(r.checkinCompletedAt) : null;
         return '<tr data-index="' + i + '"' + (edit ? ' class="editable" tabindex="0" title="Enter or fix the check-in for ' + escapeHtml(r.route) + '"' : '') + '>' +
-          '<td>' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run) + '</td>' +
+          '<td>' + escapeHtml(L.routeNumber(r.route)) + '</td><td>' + escapeHtml(L.runText(r)) + '</td>' +
           '<td class="' + (driver ? '' : 'empty') + '">' + escapeHtml(driver) + '</td>' +
           '<td>' + escapeHtml(r.truck) + '</td><td>' + escapeHtml(r.trailer) + '</td>' +
           '<td>' + escapeHtml(show(r.casesOut)) + '</td><td>' + escapeHtml(show(r.casesDelivered)) + '</td><td>' + escapeHtml(show(r.driverCaseReturn)) + '</td>' +

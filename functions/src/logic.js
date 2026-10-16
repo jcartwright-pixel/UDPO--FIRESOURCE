@@ -257,6 +257,16 @@
   // trailing _1 / _2 from the route; runLabel joins Route Name, Run and Run Type (route_run_type: Load 1, Load 2), skipping a
   // part another part already says (JERSEY LOAD 1 on Jersey), and an old "6301_1" run name reads as "Load 1".
   function routeNumber(route) { return String(route == null ? '' : route).trim().replace(/_\d+$/, ''); }
+  // Joe 10/16: the Run / Destination text for one run on Weekly, Loadout and the other run lists. A run code such as
+  // 6301_1 reads "Load 1" (or its Run Type); a blank run, or one that only repeats the route number (970), reads as the
+  // route name, then the Stream ID (844 Ohio Processor, 870 COSTCO - NEW JERSEY). Any other run name is shown as typed.
+  function runText(r) {
+    var t = function (v) { return String(v == null ? '' : v).trim(); };
+    var run = t(r && r.run), route = t(r && r.route), type = t(r && r.routeRunType), m = run.match(/^\d+_(\d+)$/);
+    if (m) return type || 'Load ' + m[1];
+    if (!run || run === route || run === routeNumber(route)) return [t(r && r.routeName) || t(r && r.streamId) || run, type].filter(Boolean).join(' ');
+    return run;
+  }
   function runLabel(routeName, run, runType) {
     var r = String(run == null ? '' : run).trim(), m = r.match(/^\d+_(\d+)$/), out = [];
     if (m) r = 'Load ' + m[1];
@@ -345,7 +355,7 @@
           plantLoadOff: d.plantLoadOff === true
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;
@@ -826,6 +836,10 @@
     });
     return hit;
   }
+  // Joe 10/16: a driver marked Backup for a day (Weekly board's availability; driverBackups, app only, never the sheets).
+  function backupOn(backups, driverId, day) {
+    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day; });
+  }
   function exceptionLabel(e) {
     if (!e) return '';
     var t = String(e.type || '').toUpperCase();
@@ -952,7 +966,7 @@
   }
 
   // One line per active driver (relief drivers first, then seniority): each day shows the routes they have, else why
-  // they are off, else AVAILABLE. kind = assigned, booked (two or more), vacation, unavailable, available.
+  // they are off, else BACKUP (Joe 10/16), else AVAILABLE. kind = assigned, booked (two or more), vacation, unavailable, backup, available.
   function boardLabel(r) {
     var stream = String(r.streamId || '').trim(), route = String(r.route || '').trim(), run = String(r.run || '').trim();
     return stream || (!run || run.toUpperCase() === route.toUpperCase() ? route : route + ' ' + run);
@@ -963,7 +977,7 @@
     try { list = raw ? JSON.parse(raw) : []; } catch (e) { list = []; }
     return (Array.isArray(list) ? list : [list]).map(function (a) { return String(typeof a === 'string' ? a : a && (a.runId || a.run_id) || '').trim(); }).filter(Boolean);
   }
-  function driverBoardRows(drivers, rows, exceptions, week) {
+  function driverBoardRows(drivers, rows, exceptions, week, backups) {
     var list = (drivers || []).filter(driverActive).map(function (d) {
       return { id: d.id, name: d.name || '', relief: !!d.reliefDriver, cells: d.cells && Object.keys(d.cells).length ? d.cells : null, seniorityDate: dateKey(d.seniorityDate) || dateKey(d.hireDate) || '9999-12-31', days: {} };
     });
@@ -980,7 +994,9 @@
         // Joe 10/11: off on a day he normally works is red whatever the reason (vacation, sick, unpaid...); off on his regular day
         // off stays as before (red only for vacation).
         var scheduled = !!driver.cells && (p + '_available') in driver.cells && !dayOff;
-        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayOff ? 'off' : 'available';
+        // Backup (Joe 10/16): not on a route, on call to cover one; shows BACKUP even on his regular day off. A route or a day off wins.
+        var backup = backupOn(backups, driver.id, date);
+        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : backup ? 'backup' : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
         // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
         // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (yellow on the board): his Driver
@@ -996,7 +1012,7 @@
         var lines = [], seen = {};
         routes.forEach(function (n) { if (seen[n]) seen[n].n++; else { seen[n] = { name: n, n: 1 }; lines.push(seen[n]); } });
         lines = lines.map(function (x) { return x.n > 1 ? x.name + ' \u00d7' + x.n : x.name; });
-        driver.days[p] = { date: date, routes: routes, lines: lines, kind: kind, extra: extra && routes.length > 0, added: added, text: routes.length ? lines.join(' / ') : off ? exceptionLabel(off) : dayOff ? 'OFF' : 'AVAILABLE' };
+        driver.days[p] = { date: date, routes: routes, lines: lines, kind: kind, extra: extra && routes.length > 0, added: added, backup: backup, text: routes.length ? lines.join(' / ') : off ? exceptionLabel(off) : backup ? 'BACKUP' : dayOff ? 'OFF' : 'AVAILABLE' };
       });
     });
     return list;
@@ -1221,7 +1237,7 @@
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
-    exceptionOn: exceptionOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
+    exceptionOn: exceptionOn, backupOn: backupOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
@@ -1232,7 +1248,7 @@
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
-    routeNumber: routeNumber, runLabel: runLabel,
+    routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };

@@ -50,6 +50,8 @@ service cloud.firestore {
     // Joe 10/15: drivers' mobile phones typed on the Driver Roster, and the Schedule Texts log (the server writes both; the
     // Twilio login stays in private/sms).
     match /driverPhones/{id} { allow read: if activeUser(); }
+    // Joe 10/16: drivers marked Backup for a day on the Weekly board (the server writes them; app only).
+    match /driverBackups/{id} { allow read: if activeUser(); }
     match /textLog/{id} { allow read: if activeUser(); }
     match /equipment/{id} { allow read: if activeUserOrStation(); }
     match /routes/{id} { allow read: if activeUser(); }

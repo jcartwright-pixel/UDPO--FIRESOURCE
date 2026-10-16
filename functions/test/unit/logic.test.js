@@ -112,6 +112,15 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   assert.deepEqual([board[1].days.mon.text, board[1].days.mon.kind], ['801 / 802', 'booked']);
   assert.deepEqual([board[2].days.mon.text, board[2].days.mon.kind], ['806', 'conflict']);
   assert.deepEqual([board[2].days.tue.text, board[2].days.tue.kind], ['AVAILABLE', 'available']);
+  // Joe 10/16: Backup shows on a day with no route and no day off; a route or a day off wins.
+  const backups = [{ driverId: 'c', date: '2026-10-06' }, { driverId: 'c', date: '2026-10-05' }, { driverId: 'a', date: '2026-10-05' }];
+  const withBackup = L.driverBoardRows(drivers, rows, exceptions, '2026-10-04', backups);
+  assert.deepEqual([withBackup[2].days.tue.text, withBackup[2].days.tue.kind], ['BACKUP', 'backup']);
+  assert.deepEqual([withBackup[2].days.mon.text, withBackup[2].days.mon.kind], ['806', 'conflict']);
+  assert.deepEqual([withBackup[1].days.mon.text, withBackup[1].days.mon.kind], ['801 / 802', 'booked']);
+  assert.equal(withBackup[2].days.wed.kind, 'available');
+  assert.equal(L.backupOn(backups, 'c', '2026-10-06'), true);
+  assert.equal(L.backupOn(backups, 'c', '2026-10-07'), false);
 });
 
 test('Driver Assignment Board names a repeated run once with its count, one line each', () => {
@@ -258,4 +267,14 @@ test('weekly: an as-needed customer\'s Scheduler loads go on its LOAD 1, LOAD 2 
   assert.deepEqual(ctx.plant['c905_1|2026-10-15'].map(e => e.id), ['b']);
   assert.deepEqual(ctx.plant['c905_2|2026-10-15'].map(e => e.id), ['c', 'a'], 'more loads than LOAD runs share the last one');
   assert.deepEqual(ctx.plant['g892|2026-10-15'].map(e => e.id), ['g']);
+});
+
+test('Run / Destination text: 6301_1 reads Load 1, a blank run reads the route name (Joe 10/16)', () => {
+  assert.equal(L.runText({ route: '6301_1', run: '6301_1', routeName: 'WALMART' }), 'Load 1');
+  assert.equal(L.runText({ route: '8302_2', run: '8302_2' }), 'Load 2');
+  assert.equal(L.runText({ route: '6301_1', run: '6301_1', routeRunType: 'Load 1 AM' }), 'Load 1 AM');
+  assert.equal(L.runText({ route: '844', run: '', routeName: 'Ohio Processor', streamId: 'OH PROCESSORS' }), 'Ohio Processor');
+  assert.equal(L.runText({ route: '877', run: '', streamId: 'COSTCO MD' }), 'COSTCO MD');
+  assert.equal(L.runText({ route: '970', run: '970', routeName: 'ALDI' }), 'ALDI');
+  assert.equal(L.runText({ route: '901_1', run: 'PRODUCT 1', routeName: 'MF' }), 'PRODUCT 1');
 });

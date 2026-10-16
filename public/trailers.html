@@ -92,7 +92,7 @@
           // Review item 25 (Joe 10/13): data-l names each box on the phone's card (as on Yard Checks).
           return '<div class="ta-row' + cls + (r.id === selected ? ' sel' : '') + '" role="row" data-row="' + escapeHtml(r.id) + '">' +
             '<span class="rt"><b>' + escapeHtml(String(r.route).replace(/_\d+$/, '')) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
-            '<span data-l="Run">' + escapeHtml(r.run) + '</span><span data-l="Driver">' + escapeHtml(r.driver || '—') + '</span><span class="grey" data-l="Truck">' + escapeHtml(r.truck || '—') + '</span>' +
+            '<span data-l="Run">' + escapeHtml(L.runText(r)) + '</span><span data-l="Driver">' + escapeHtml(r.driver || '—') + '</span><span class="grey" data-l="Truck">' + escapeHtml(r.truck || '—') + '</span>' +
             '<span class="tr" data-l="Trailer"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
             ' aria-label="Trailer for route ' + escapeHtml(r.route + ' ' + r.run) + '"' + (can ? '' : ' disabled') + '><small>' + escapeHtml(note) + '</small></span>' +
             '<span class="ta-depart" data-l="Depart">' + escapeHtml(P.timeOfDay(r.dispatchTime) || '—') + '</span></div>';

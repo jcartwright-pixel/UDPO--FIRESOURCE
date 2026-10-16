@@ -83,6 +83,25 @@ test('a day off takes the driver off that day\'s runs (Weekly shows who it was f
   assert.equal(mon.driverExceptionStatus, '');
 });
 
+test('Backup (Joe 10/16): kept in the app only, clears a day off for that day, and any other choice takes it off', async () => {
+  const backups = async () => (await all('driverBackups')).map(b => b.docId).sort();
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', reason: 'VACATION', status: 'UNAVAILABLE' });
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', status: 'BACKUP', note: 'on call' });
+  assert.deepEqual(await backups(), ['drv_test_casey__2026-10-05']);
+  const b = (await db().collection('driverBackups').doc('drv_test_casey__2026-10-05').get()).data();
+  assert.deepEqual([b.driverId, b.date, b.note, b.setBy], ['drv_test_casey', '2026-10-05', 'on call', DISPATCHER.email]);
+  assert.equal(L.exceptionOn(await all('exceptions'), 'drv_test_casey', '2026-10-05'), null, 'the vacation day is cancelled');
+  const mon = (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.mon;
+  assert.equal(mon.driver, 'CASEY, LEE', 'his run comes back to him as with Available');
+  assert.equal((await all('masterOutbox')).filter(x => JSON.stringify(x).includes('BACKUP')).length, 0, 'nothing for the sheets');
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', reason: 'SICK DAY', status: 'UNAVAILABLE' });
+  assert.deepEqual(await backups(), []);
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-06', endDate: '2026-10-07', status: 'BACKUP' });
+  assert.deepEqual(await backups(), ['drv_test_casey__2026-10-06', 'drv_test_casey__2026-10-07']);
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-07', endDate: '2026-10-07', status: 'AVAILABLE' });
+  assert.deepEqual(await backups(), ['drv_test_casey__2026-10-06']);
+});
+
 test('Weekly: CARRIER and OPEN are saved as words; Publish is recorded and kept by the minute copy', async () => {
   const RUN = '2026-10-04__run_t802';
   await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'mon', driverId: '__CARRIER__' });
