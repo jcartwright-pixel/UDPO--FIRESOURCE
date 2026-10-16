@@ -672,11 +672,24 @@ export function isUnitedDairy(user) {
 // The screens a Plant Station signed in by its code alone may open: only the Plant Station, whose tabs hold the station's work.
 // Joe 10/12: the manager screens (Loadout Center, Unloading & Washing, Washing, Returns) are not for the employees' tablets.
 export const STATION_PAGES = ['plant-station.html'];
+// Joe 10/16 (Fire Stick): a Driver's Kiosk Station TV signed in by its code opens only the Driver Station board.
+export const TV_PAGES = ['driver-station.html'];
+const TV_KEY = 'udSignedTv';
 async function stationOf(user) {
   try {
     const c = (await user.getIdTokenResult()).claims || {};
+    if (c.udTv) {
+      const tv = { tv: true, key: c.udTv, version: c.udTvVersion || '', type: 'TV', facilityId: c.udPlant || '', name: c.udName || 'Driver\'s Kiosk Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || ''), uid: user.uid };
+      try { localStorage.setItem(TV_KEY, JSON.stringify(tv)); } catch (e) { /* no storage */ }
+      return tv;
+    }
     return c.udStation ? { key: c.udStation, version: c.udVersion || '', type: c.udType || '', facilityId: c.udPlant || '', name: c.udName || 'Plant Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || '') } : null;
-  } catch (e) { return null; }
+  } catch (e) {
+    // A TV that starts with no signal after a power loss cannot renew its sign-in yet: it stays the TV station it was (Joe
+    // 10/16), and the board reloads once the signal is back.
+    try { const tv = JSON.parse(localStorage.getItem(TV_KEY) || 'null'); if (tv && tv.uid === user.uid) return tv; } catch (e2) { /* none kept */ }
+    return null;
+  }
 }
 // The person a screen shows buttons for: the Users list entry, or a code-signed Plant Station as a plant employee.
 // Review item 76 (Joe 10/13): every screen watches the signed-in person here. opts.withEmail puts the sign-in email on the
@@ -696,6 +709,14 @@ export function maySave(person, roles, app, screen, allowedSave) {
 export async function stationCodeSignIn(code) {
   const { auth } = await start();
   const out = await callServer('stationSignIn', { op: 'enter', code });
+  if (!out.ok) return out;
+  await signInWithCustomToken(auth, out.token);
+  return out;
+}
+// The Driver's Kiosk Station TV with no UD account (Joe 10/16): the TV's code signs it in as that TV station only.
+export async function tvCodeSignIn(code) {
+  const { auth } = await start();
+  const out = await callServer('stationSignIn', { op: 'enter', tv: true, code });
   if (!out.ok) return out;
   await signInWithCustomToken(auth, out.token);
   return out;
@@ -753,10 +774,11 @@ export async function requireSignIn(ready) {
       if (out) out.hidden = true;
       const who = document.getElementById('who');
       if (who) { who.textContent = station.name; who.title = station.name + ' · ' + station.plant + ' (no UD account)'; }
-      if (STATION_PAGES.indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
+      if ((station.tv ? TV_PAGES : STATION_PAGES).indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
         screen.hidden = true;
         gate.hidden = false;
-        showError('This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
+        showError(station.tv ? 'This TV is signed in as the ' + station.name + ' (no UD account). Only the Driver Station board opens on it.'
+          : 'This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
         return;
       }
       if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }

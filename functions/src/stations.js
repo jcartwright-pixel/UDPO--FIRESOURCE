@@ -17,6 +17,10 @@
  * in as that station only (signIn below; index.js makes the sign-in token). stationAccess/{plant} mirrors what the database
  * rules need to let such a tablet read the plant screens: the switch and each coded station's version, so Off, New code
  * and Remove shut it out at once. Its saves are only the plant-floor ones (STATION_ACTIONS).
+ *
+ * The Driver's Kiosk Station TV with no UD account (Joe 10/16, a Fire Stick: Google's sign-in does not open in a kiosk browser):
+ * the TV's code signs it in as that Driver's Kiosk Station only (signIn {tv: true}; index.js makes the token). stationAccess/tv
+ * mirrors each coded TV station's version for the database rules, so New code and Remove shut the TV out at once.
  */
 'use strict';
 
@@ -71,6 +75,13 @@ function access(list, noAccount, facilityId) {
   Object.keys(list).forEach(k => { const s = list[k]; if (s.kind === 'PLANT' && s.facilityId === facilityId && s.hash && s.version) keys[k] = s.version; });
   return { on: noAccount[facilityId] === true, keys };
 }
+// What the database rules read for a TV signed in by its code: each coded Driver's Kiosk Station's version.
+const TV_ACCESS = (db) => db.collection('stationAccess').doc('tv');
+function tvAccess(list) {
+  const keys = {};
+  Object.keys(list).forEach(k => { const s = list[k]; if (s.kind === 'KIOSK' && s.type === 'TV' && s.hash && s.version) keys[k] = s.version; });
+  return { keys };
+}
 // What a screen may know about a station (never the salt or hash; the code only for administrators).
 function shown(s, admin) {
   const out = { key: s.key, kind: s.kind, type: s.type, typeName: KINDS[s.kind].types[s.type] || s.type, name: s.name, facilityId: s.facilityId, plant: plantName(s.facilityId), set: !!s.hash };
@@ -96,6 +107,7 @@ async function change(db, fn) {
     const out = fn(list, noAccount);
     tx.set(DOC(db), Object.assign({}, d, { list, noAccount }));
     plants().forEach(p => tx.set(ACCESS(db, p.id), access(list, noAccount, p.id)));
+    tx.set(TV_ACCESS(db), tvAccess(list));
     return out;
   });
 }
@@ -188,6 +200,7 @@ async function tabletCall(db, input, now) {
  *   'status' / 'release' {facilityId, code}: the plant's manager release code, to move the tablet (admin.js releaseCheck).
  */
 async function signIn(db, input, now) {
+  if (input.tv === true) return tvSignIn(db, input, now);
   const all = await readAll(db);
   if (input.op === 'check') {
     const r = await check(db, 'PLANT', input.key, input.version);
@@ -202,6 +215,18 @@ async function signIn(db, input, now) {
   return r;
 }
 
+// The Driver's Kiosk Station TV: 'enter' {code} (a TV station's code only) and 'check' {key, version}. No plant switch: the TV
+// reads only the board (loads, pickups, drivers), never saves.
+async function tvSignIn(db, input, now) {
+  if (input.op === 'check') return check(db, 'KIOSK', input.key, input.version);
+  if (input.op !== 'enter') fail('BAD_REQUEST', 'Unknown station step');
+  const r = await enter(db, 'KIOSK', input.code, (now ? now() : new Date()).getTime(), F.who(input));
+  if (!r.ok) return r;
+  if (r.station.type !== 'TV') return { ok: false, message: 'That code is not a Driver\'s Kiosk Station (TV) code. Use the TV\'s code from Administration > Driver Station Codes.' };
+  await TV_ACCESS(db).set(tvAccess(await read(db)));
+  return r;
+}
+
 // The server's check of a tablet signed in by its code alone (its token's claims): the station it is, or null.
 async function stationSaver(db, claims) {
   if (!claims || typeof claims.udStation !== 'string') return null;
@@ -210,4 +235,4 @@ async function stationSaver(db, claims) {
   return { key: s.key, name: s.name, type: s.type, facilityId: s.facilityId, plant: plantName(s.facilityId) };
 }
 
-module.exports = { KINDS, STARTERS, STATION_ACTIONS, stations, stationAdd, stationCode, stationRemove, noAccountSet, needsCode, tabletCall, signIn, stationSaver, StationError, MAX_FAILS_PER_MINUTE, read, check };
+module.exports = { KINDS, STARTERS, STATION_ACTIONS, stations, stationAdd, stationCode, stationRemove, noAccountSet, tvAccess, needsCode, tabletCall, signIn, stationSaver, StationError, MAX_FAILS_PER_MINUTE, read, check };
