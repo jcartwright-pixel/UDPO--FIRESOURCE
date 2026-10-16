@@ -44,6 +44,17 @@ const SECRET = 'rz-secret-typed-once-5678';
   ], used: { org: 'org1', enterprise: 'f99e6965', tokenUrl: '' }, orgChecks: [{ sign: 'v3', org: 'org1', status: 200, note: '' }] } });
   const browser = await chromium.launch();
   try {
+    // Joe 10/16 (live): the IDs typed while the page was still reading the saved settings were wiped before Save.
+    {
+      const early = await openPage(browser, 1536, 730, '/redzone.html?testEmail=admin.test@uniteddairy.com');
+      await early.fill('#f-org', 'org_typed_early');
+      await early.fill('#f-ent', 'f99e-typed-early');
+      await early.focus('#f-client');
+      await early.waitForFunction(() => document.getElementById('f-address').value !== '');
+      await early.waitForTimeout(500);
+      assert.deepEqual([await early.inputValue('#f-org'), await early.inputValue('#f-ent')], ['org_typed_early', 'f99e-typed-early'], 'what was typed stays');
+      await early.context().close();
+    }
     for (const [w, h] of [[1536, 730], [1920, 950], [800, 1100]]) {
       const rz = await openPage(browser, w, h, '/redzone.html?testEmail=admin.test@uniteddairy.com');
       await rz.waitForFunction(() => document.getElementById('f-address').value !== '');

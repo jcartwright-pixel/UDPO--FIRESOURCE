@@ -438,7 +438,9 @@ async function redzoneCall(db, user, input, options) {
           sample: active.slice(0, 3).map(p => p.name + (p.sku ? ' (' + p.sku + ')' : '')) };
       } catch (e) {
         if (!signedIn || /answered 40[13]/.test(e.message) || e instanceof RedzoneError) throw e;
-        result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').', products: 0 };
+        result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. ' + (!orgOf(fresh) || !entOf(fresh)
+          ? 'Now type the Organization ID and Enterprise ID in box 1 (RedZone: Organization Settings > Organization IDs), press Save, then Test Connection again.'
+          : 'The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').'), products: 0 };
       }
     } catch (e) { result = { ok: false, message: e instanceof RedzoneError ? 'Not tested: ' + e.message : plain(e) }; }
     const lastTest = Object.assign({ at, by: email }, result);
