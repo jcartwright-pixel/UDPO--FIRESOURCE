@@ -562,11 +562,16 @@
     return (rz.problems || []).filter(function (p) { return !p.assetTypeUUID || types[p.assetTypeUUID]; }).map(function (p) { return text(p.name); })
       .filter(function (n) { var k = n.toUpperCase(); if (!n || seen[k]) return false; seen[k] = 1; return true; });
   }
-  // The Line Stopped choices: RedZone's problem types for the line when they are read (ten at most, the tablet's rows of three),
-  // then Maintenance called (it opens a work order) and Other; else the line's own list.
+  // The Line Stopped choices: RedZone's problem types for the line first, then the line's own until there are ten (nothing of
+  // ours is dropped while there is room), then Maintenance called (it opens a work order) and Other: twelve, the tablet's rows.
   function rzStopReasons(kind, rzNames) {
-    var keep = (rzNames || []).filter(function (n) { return !/^(maintenance called|other)$/i.test(n); }).slice(0, 10);
-    return keep.length ? keep.concat(['Maintenance called', 'Other']) : stopReasons(kind);
+    var own = stopReasons(kind), seen = {}, keep = [];
+    (rzNames || []).concat(own).forEach(function (n) {
+      var k = text(n).toUpperCase();
+      if (!k || seen[k] || k === 'MAINTENANCE CALLED' || k === 'OTHER' || keep.length >= 10) return;
+      seen[k] = 1; keep.push(text(n));
+    });
+    return (rzNames || []).length ? keep.concat(['Maintenance called', 'Other']) : own;
   }
   // What RedZone ran on a location: its products (newest run first) with RedZone's numbers, and the latest runs.
   function rzRunsFor(rz, loc) {

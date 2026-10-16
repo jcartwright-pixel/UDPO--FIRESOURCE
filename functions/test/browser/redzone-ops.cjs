@@ -96,7 +96,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
       const box = await lt.textContent('#rz');
       assert.match(box, /Sensors: Default/);
       assert.match(box, /Machines: Blow Molder, Changeover and Cleaning/);
-      assert.match(box, /Line Stopped choices on the Line Tablet: Blow mold is down, Bottle Jam, Adjusting weights, No Orders, Maintenance called, Other/);
+      assert.match(box, /Line Stopped choices on the Line Tablet: Blow mold is down, Bottle Jam, Adjusting weights, No Orders, Mold change, Resin feed, Leak tester down, Trimmer jam, Conveyor \/ bottle jam, Heater \/ temperature, Maintenance called, Other/);
       assert.doesNotMatch(box, /Bag Not Sealing/, 'the bag sealer\'s problems are the Dairy Queen\'s');
       assert.deepEqual(await lt.$$eval('#rz table', t => [...t[0].querySelectorAll('tbody tr')].map(x => [...x.children].map(c => c.textContent))), [['Gallon Jug', '', '50', '85', '2']]);
       assert.equal(await lt.$$eval('#rz table', t => t[1].querySelectorAll('tbody tr').length), 2, 'the latest runs');
@@ -136,15 +136,16 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     const tb = await openPage(browser, 1024, 1180, '/line.html?line=' + BLOW + '&' + ADMIN);
     await tb.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');
     await tb.click('#status-btn');
-    await tb.waitForFunction(() => document.querySelectorAll('#reasons button').length === 6);
-    assert.deepEqual(await tb.$$eval('#reasons button', b => b.map(x => x.textContent)), ['Blow mold is down', 'Bottle Jam', 'Adjusting weights', 'No Orders', 'Maintenance called', 'Other']);
+    await tb.waitForFunction(() => document.querySelector('#reasons button') && document.querySelector('#reasons button').textContent === 'Blow mold is down');
+    assert.deepEqual(await tb.$$eval('#reasons button', b => b.map(x => x.textContent)), ['Blow mold is down', 'Bottle Jam', 'Adjusting weights', 'No Orders', 'Mold change', 'Resin feed', 'Leak tester down', 'Trimmer jam',
+      'Conveyor / bottle jam', 'Heater / temperature', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room');
     await tb.$eval('#reasons', e => e.scrollIntoView({ block: 'center' }));
     await shot(tb, 'rz-line-tablet-stopped-1024');
     await tb.click('#reasons button[data-reason="Bottle Jam"]');
     await tb.waitForFunction(() => document.querySelector('#reasons button.on') && document.querySelector('#reasons button.on').textContent === 'Bottle Jam');
     assert.deepEqual(tb.errors, []);
     await tb.close();
-    results.push('Line Tablet: Line Stopped on the Blow Mold shows Blow mold is down, Bottle Jam, Adjusting weights, No Orders, Maintenance called, Other, and Bottle Jam is kept');
+    results.push('Line Tablet: Line Stopped on the Blow Mold shows RedZone\'s Blow mold is down, Bottle Jam, Adjusting weights, No Orders first, then the Blow Mold\'s own while there is room, Maintenance called and Other; Bottle Jam is kept');
   } finally {
     await browser.close();
   }

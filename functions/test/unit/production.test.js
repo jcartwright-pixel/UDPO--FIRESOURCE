@@ -296,7 +296,8 @@ test('RedZone problem types are the Line Stopped choices for that line; its prod
     runs: [{ locationUUID: 'bm', productTypeUUID: 'p1', startTime: '2026-10-15T10:00:00Z' }, { locationUUID: 'x', productTypeUUID: 'p2', startTime: '2026-10-15T11:00:00Z' }] };
   const loc = rz.locations[0], names = P.rzProblemsFor(rz, loc);
   assert.deepEqual(names, ['Blow mold is down', 'Adjusting weights', 'Other']);
-  assert.deepEqual(P.rzStopReasons('BLOWMOLD', names), ['Blow mold is down', 'Adjusting weights', 'Maintenance called', 'Other']);
+  assert.deepEqual(P.rzStopReasons('BLOWMOLD', names), ['Blow mold is down', 'Adjusting weights', 'Mold change', 'Resin feed', 'Leak tester down', 'Trimmer jam', 'Conveyor / bottle jam',
+    'Heater / temperature', 'Compressed air', 'Filler backed up (jugs full)', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room');
   assert.deepEqual(P.rzStopReasons('BLOWMOLD', []), P.stopReasons('BLOWMOLD'), 'not read in: the line\'s own list');
   assert.equal(P.rzStopReasons('FILLER', Array.from({ length: 15 }, (_, i) => 'P' + i)).length, 12, 'the tablet\'s four rows of three');
   const ran = P.rzRunsFor(rz, loc);
