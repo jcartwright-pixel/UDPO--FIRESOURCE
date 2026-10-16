@@ -7,9 +7,10 @@
  * same way; nothing anyone picked is changed. Weeks before Previous stay in the app and open read only. If nobody presses
  * Publish, the minute copy does it once the calendar reaches the Next week (the current app's forgotten-Publish safety net).
  *
- * In this phase the weeks move in the new app's storage only (sandbox): the Live sheet and its copies are not written. The
- * three weeks the app shows are config/app liveWeeks; the copy keeps reading the sheet's three tabs, and once the sheet's own
- * weeks catch up (or pass) the app's, the sheet's weeks win again (transfer.js).
+ * With the write-back off the weeks move in the new app's storage only (sandbox): the Live sheet and its copies are not written.
+ * The three weeks the app shows are config/app liveWeeks; the copy keeps reading the sheet's three tabs, and once the sheet's own
+ * weeks catch up (or pass) the app's, the sheet's weeks win again (transfer.js). With the write-back on (Joe 10/16) the Live
+ * sheet's three tabs are moved first, the way the current app's Publish moves them (liveroll.js), and then the weeks here.
  *
  * Route Editor and Driver Roster saves reaching the Current and Next weeks are actions.js routeToLive / driverToLive (D6).
  */
@@ -121,12 +122,10 @@ function applyDays(tx, db, snap, run, days, stamp, email, mode, queue, requestId
 const shortDate = (k) => { const [, m, d] = String(k).split('-').map(Number); return m + '/' + d; };
 
 /*
- * Publish of the Live Next week (actions.publishWeek sends it here). `live` is config/app liveWeeks.
- * Returns {previousWeek, currentWeek, nextWeek, built, filled, message}.
+ * What Publish changes, read through `tx` (a transaction, or { get: q => q.get() } for liveroll.js's look ahead): the weeks after
+ * it, the new Next week's runs built from the masters, and the new Current week's blank drivers, trucks and trailers filled.
  */
-async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError) {
-  if (mode.writeBack) throw new SaveError('NOT_ALLOWED', 'To publish this week, press Publish to Daily Dispatch in the old app\'s Weekly Dispatch. While the write-back is on the Live sheet\'s weeks are moved there, and Operations shows the new weeks about a minute later.');
-  if (!live.current || !live.next || L.addDays(live.current, 7) !== live.next) throw new SaveError('CHANGED', 'The Live weeks are not in order (Current ' + (live.current || '?') + ', Next ' + (live.next || '?') + '). Refresh Weekly Dispatch before publishing.');
+async function planRoll(tx, db, live, stamp, email) {
   const weeks = { previous: live.current, current: live.next, next: L.addDays(live.next, 7) };
   const today = L.operatingDay(new Date(stamp));
   const [nextRuns, curRuns, nextWeekSnap] = await Promise.all([tx.get(db.collection(C.runs).where('weekStart', '==', weeks.next)),
@@ -142,6 +141,19 @@ async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveEr
   const curCtx = contextOf(m), fills = [];
   curRuns.docs.forEach(s => bookExisting(curCtx, s.data()));
   curRuns.docs.forEach(s => { const run = s.data(), days = fillBlanks(run, m.routes[run.runId], curCtx, today); if (Object.keys(days).length) fills.push([s, run, days]); });
+  return { weeks, built, fills, have, nextWeekSnap, routes: m.routes, nextRuns };
+}
+
+/*
+ * Publish of the Live Next week (actions.publishWeek sends it here). `live` is config/app liveWeeks.
+ * Returns {previousWeek, currentWeek, nextWeek, built, filled, message}.
+ */
+async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError) {
+  // Joe 10/16 ("Let Operations' Publish move the weeks in the real Live sheet, the same way the old app's Publish does"): with
+  // the write-back on, actions.js first moves the Live sheet's weeks (liveroll.js) and marks the request sheetRolled.
+  if (mode.writeBack && !req.sheetRolled) throw new SaveError('NOT_ALLOWED', 'The Live sheet could not be reached from here, so the weeks were not moved. Press Publish again in a minute; if it still says this, ask the administrator.');
+  if (!live.current || !live.next || L.addDays(live.current, 7) !== live.next) throw new SaveError('CHANGED', 'The Live weeks are not in order (Current ' + (live.current || '?') + ', Next ' + (live.next || '?') + '). Refresh Weekly Dispatch before publishing.');
+  const { weeks, built, fills, have, nextWeekSnap } = await planRoll(tx, db, live, stamp, email);
   if (Object.keys(built).length + fills.length + 4 > TX_WRITES) throw new SaveError('NOT_ALLOWED', 'Publish would change more than ' + TX_WRITES + ' runs at once; ask the administrator.');
 
   Object.keys(built).forEach(id => tx.set(db.collection(C.runs).doc(id), built[id]));
@@ -158,7 +170,8 @@ async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveEr
   tx.set(db.collection(C.config).doc('app'), { liveWeeks: weeks, weekRoll: Object.assign({}, weeks, { at: stamp, by: email, before: live }) }, { merge: true });
   const filled = fills.reduce((n, f) => n + Object.keys(f[2]).length, 0);
   const message = 'Week pushed live. Current is now ' + shortDate(weeks.current) + ' and the new Next week (' + shortDate(weeks.next) + ') was built from Route Master and Driver Master' +
-    (Object.keys(built).length ? ' (' + Object.keys(built).length + ' runs)' : '') + '.' + (filled ? ' ' + filled + ' blank day' + (filled === 1 ? '' : 's') + ' in ' + shortDate(weeks.current) + ' got the standard driver or units.' : '');
+    (Object.keys(built).length ? ' (' + Object.keys(built).length + ' runs)' : '') + '.' + (filled ? ' ' + filled + ' blank day' + (filled === 1 ? '' : 's') + ' in ' + shortDate(weeks.current) + ' got the standard driver or units.' : '') +
+    (req.sheetRolled ? ' The Live sheet\'s weeks moved too.' : '');
   const result = { ok: true, requestId: req.requestId, runs, previousWeek: weeks.previous, currentWeek: weeks.current, nextWeek: weeks.next, built: Object.keys(built).length, filled, message };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before: { liveWeeks: live }, after: { liveWeeks: weeks }, built: Object.keys(built), filled: fills.map(f => ({ runDocId: f[0].id, days: f[2] })), result });
   return result;
@@ -207,4 +220,4 @@ function missingRuns(routes, runsByWeek, ctxFor, stamp, email, today) {
   return add;
 }
 
-module.exports = { BUILT_TAB, runDoc, readMasters, contextOf, bookExisting, fillBlanks, publishRoll, autoPublish, missingRuns, dayLocked };
+module.exports = { BUILT_TAB, shortDate, planRoll, routeOrder, runDoc, readMasters, contextOf, bookExisting, fillBlanks, publishRoll, autoPublish, missingRuns, dayLocked };

@@ -46,6 +46,14 @@ async function publishWeek(tx, db, req, email, stamp, logRef, mode) {
   // Joe 10/11 (review item 6): publishing the Live Next week moves the weeks on and builds the new Next week, as the current app does.
   const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
   if (live.next && req.weekStart === live.next) return ROLL.publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError);
+  // The Live sheet's weeks were just moved (liveroll.js) and the copy from the sheet already brought them here: nothing more to move.
+  if (req.sheetRolled && live.current === req.weekStart) {
+    const result = { ok: true, requestId: req.requestId, runs: [], previousWeek: live.previous, currentWeek: live.current, nextWeek: live.next, built: 0, filled: 0,
+      message: 'Week pushed live. Current is now ' + ROLL.shortDate(live.current) + ' and the Live sheet\'s weeks moved too.' };
+    tx.set(db.collection(C.weeks).doc(live.current), { weekStart: live.current, publishedAt: stamp, publishedBy: email }, { merge: true });
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before: { liveWeeks: live }, after: { liveWeeks: live }, result });
+    return result;
+  }
   const ref = db.collection(C.weeks).doc(req.weekStart);
   const snap = await tx.get(ref);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'The week of ' + req.weekStart + ' is not one of the copied Live weeks');

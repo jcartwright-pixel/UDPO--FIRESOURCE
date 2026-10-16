@@ -31,6 +31,7 @@ const { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplat
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
+const LIVEROLL = require('./liveroll');
 const { saveOtr, otrColumnKey } = require('./actions-otr');
 
 const C = M.COLLECTIONS;
@@ -694,11 +695,32 @@ async function checkSaves(db, user, actions, facilityId) {
   return out;
 }
 
-async function applyAction(db, user, input, now) {
+async function applyAction(db, user, input, now, deps) {
   const req = validate(input);
   const spec = ACTIONS[req.action];
   const stamp = (now ? now() : new Date()).toISOString();
   const email = String(user && user.email || '').toLowerCase();
+  // Joe 10/16: with the write-back on, Publish of the Next week first moves the Live sheet's weeks (liveroll.js), once the
+  // person is known to be allowed to publish; the weeks here move in the transaction below.
+  if (req.action === 'publishWeek' && deps && deps.liveRoll) {
+    const live = await db.runTransaction(async (tx) => {
+      if ((await tx.get(db.collection(C.actions).doc(req.requestId))).exists) return null;
+      const mode = await requireTestMode(tx, db, spec.screen);
+      await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input));
+      const weeks = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
+      return mode.writeBack && weeks.next && weeks.next === req.weekStart ? weeks : null;
+    });
+    if (live) {
+      try {
+        const rolled = await LIVEROLL.rollLiveSheet(db, deps.liveRoll(), live, stamp, email);
+        req.sheetRolled = true;
+        req.sheetAlready = !!rolled.already;
+      } catch (e) {
+        if (e instanceof LIVEROLL.RollError) throw new SaveError(e.code, e.message);
+        throw e;
+      }
+    }
+  }
   const out = await db.runTransaction(async (tx) => {
     const logRef = db.collection(C.actions).doc(req.requestId);
     const logSnap = await tx.get(logRef);

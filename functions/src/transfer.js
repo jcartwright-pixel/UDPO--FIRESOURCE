@@ -570,7 +570,9 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const tab = live[k];
     const weekRef = db.collection(C.weeks).doc(tab.weekStart);
     const prev = (await weekRef.get()).data() || {};
-    const d = diffOps(db, C.runs, tab.runs, prev.rowHashes || {}, force, { transferredAt: stamp }, revBase, hold);
+    // Joe 10/16: a week Publish moved to another tab is rewritten whole, so every run names the tab (and row) it is on now.
+    const moved = !!prev.sourceTab && prev.sourceTab !== tab.tab;
+    const d = diffOps(db, C.runs, tab.runs, prev.rowHashes || {}, force || moved, { transferredAt: stamp }, revBase, hold);
     if (!newSource) await keepAppOnlyDays(db, d.ops);
     ops.push(...d.ops, { ref: weekRef, data: { weekStart: tab.weekStart, sourceTab: tab.tab, rowHashes: d.hashes, rows: Object.keys(tab.runs).length, transferredAt: stamp,
       // Weekly's Publish record is kept by the copy.

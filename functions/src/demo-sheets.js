@@ -201,7 +201,12 @@ function fakeReader(tabs) {
     calls,
     async batchGet(spreadsheetId, ranges) {
       calls.push({ spreadsheetId, ranges });
-      return ranges.map(r => { if (!tabs[r]) throw new Error('no fake tab ' + r); return JSON.parse(JSON.stringify(tabs[r])); });
+      return ranges.map(r => {
+        // 'TAB'!A:A: column A only.
+        const colA = r.match(/^('.*')!A:A$/);
+        if (colA) { if (!tabs[colA[1]]) throw new Error('no fake tab ' + r); return tabs[colA[1]].map(row => [row[0] === undefined ? '' : row[0]]); }
+        if (!tabs[r]) throw new Error('no fake tab ' + r); return JSON.parse(JSON.stringify(tabs[r]));
+      });
     }
   };
 }
@@ -209,7 +214,8 @@ function fakeReader(tabs) {
 // A sandbox copy of the Live workbook that can be written: batchUpdate applies 'TAB'!A1 cells in memory.
 function fakeWritableSheets(tabs) {
   const reader = fakeReader(tabs);
-  const writes = [];
+  const writes = [], ids = {};
+  let lastId = 100;
   const colIndex = (letters) => letters.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   return {
     calls: reader.calls, writes, tabs,
@@ -225,12 +231,61 @@ function fakeWritableSheets(tabs) {
         rows[r][c] = values[0][0];
       });
     },
-    // Only what the write-back uses: a new tab (LOADOUT HISTORY on the first Done load).
+    // The tabs, numbered in order, each at least 300 rows by its widest row (the Publish move needs their sheetIds and sizes).
+    async tabs() {
+      Object.keys(tabs).forEach(t => { if (ids[t] === undefined) ids[t] = ++lastId; });
+      return Object.keys(tabs).map(t => ({ title: t.slice(1, -1), sheetId: ids[t], rows: Math.max(300, tabs[t].length), cols: Math.max(1, ...tabs[t].map(r => r.length)) }));
+    },
+    // What the write-back and the Publish move use: a new tab (LOADOUT HISTORY on the first Done load), and the Publish move's
+    // appendDimension, updateCells, copyPaste and appendCells, all applied in order to the cell texts.
     async structure(spreadsheetId, requests) {
       writes.push({ spreadsheetId, requests });
-      requests.forEach(q => { if (q.addSheet) { const t = "'" + q.addSheet.properties.title + "'"; if (tabs[t]) throw new Error('tab exists ' + t); tabs[t] = []; } });
+      Object.keys(tabs).forEach(t => { if (ids[t] === undefined) ids[t] = ++lastId; });
+      const byId = (id) => { const t = Object.keys(ids).find(k => ids[k] === id); if (!t || !tabs[t]) throw new Error('no fake sheetId ' + id); return tabs[t]; };
+      const put = (rows, r, c, v) => { while (rows.length <= r) rows.push([]); while (rows[r].length <= c) rows[r].push(''); rows[r][c] = v; };
+      requests.forEach(q => {
+        if (q.addSheet) { const t = "'" + q.addSheet.properties.title + "'"; if (tabs[t]) throw new Error('tab exists ' + t); tabs[t] = []; ids[t] = q.addSheet.properties.sheetId !== undefined ? q.addSheet.properties.sheetId : ++lastId; return; }
+        if (q.appendDimension) { byId(q.appendDimension.sheetId); return; }
+        if (q.updateCells && q.updateCells.range && !q.updateCells.rows) {
+          const g = q.updateCells.range, rows = byId(g.sheetId);
+          for (let r = g.startRowIndex; r < Math.min(g.endRowIndex, rows.length); r++) for (let c = g.startColumnIndex; c < Math.min(g.endColumnIndex, rows[r].length); c++) rows[r][c] = '';
+          return;
+        }
+        if (q.updateCells) {
+          const st = q.updateCells.start, rows = byId(st.sheetId);
+          q.updateCells.rows.forEach((row, i) => row.values.forEach((cell, j) => put(rows, st.rowIndex + i, st.columnIndex + j, cellShown(cell))));
+          return;
+        }
+        if (q.copyPaste) {
+          const a = q.copyPaste.source, b = q.copyPaste.destination, from = JSON.parse(JSON.stringify(byId(a.sheetId))), to = byId(b.sheetId);
+          for (let r = a.startRowIndex; r < a.endRowIndex; r++) for (let c = a.startColumnIndex; c < a.endColumnIndex; c++) {
+            const v = (from[r] || [])[c];
+            if (v !== undefined || (to[b.startRowIndex + r - a.startRowIndex] || [])[b.startColumnIndex + c - a.startColumnIndex] !== undefined) put(to, b.startRowIndex + r - a.startRowIndex, b.startColumnIndex + c - a.startColumnIndex, v === undefined ? '' : v);
+          }
+          return;
+        }
+        if (q.appendCells) {
+          const rows = byId(q.appendCells.sheetId);
+          let last = rows.length; while (last > 0 && !(rows[last - 1] || []).some(v => String(v || '') !== '')) last--;
+          rows.length = last;
+          q.appendCells.rows.forEach(row => rows.push(row.values.map(cellShown)));
+          return;
+        }
+        throw new Error('the fake sheets cannot do ' + Object.keys(q)[0]);
+      });
     }
   };
+}
+
+// A typed cell as the sheet would show it (FORMATTED_VALUE): dates yyyy-mm-dd, times h:mm:ss AM, ticks TRUE/FALSE.
+function cellShown(cell) {
+  const v = (cell && cell.userEnteredValue) || {}, f = (cell && cell.userEnteredFormat && cell.userEnteredFormat.numberFormat) || {};
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.boolValue !== undefined) return v.boolValue ? 'TRUE' : 'FALSE';
+  if (v.numberValue === undefined) return '';
+  if (f.type === 'DATE') return new Date(Date.UTC(1899, 11, 30) + Math.round(v.numberValue) * 86400000).toISOString().slice(0, 10);
+  if (f.type === 'TIME') { const s = Math.round(v.numberValue * 86400), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60; return ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0') + (h < 12 ? ' AM' : ' PM'); }
+  return String(v.numberValue);
 }
 
 // The sandbox's demo copy: the made-up sheets plus the given people as administrators, so they can sign in.

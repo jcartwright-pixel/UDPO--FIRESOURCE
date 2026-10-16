@@ -86,7 +86,7 @@ test('once the sheet holds the weeks Publish built, the sheet rows replace the b
 
 test('Publish is refused for a stale week and while the write-back is on; a forgotten Publish happens on its own', async () => {
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
-  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT), /write-back/);
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT), /Live sheet could not be reached/);
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true);
   assert.equal(await ROLL.autoPublish(db(), () => new Date('2026-10-10T12:00:00Z')), null, 'Saturday 10/10 is still before the Next week');
   const auto = await ROLL.autoPublish(db(), () => new Date('2026-10-11T12:00:00Z'));

@@ -402,20 +402,14 @@
           () => { weekDoc = before; showPublished(); }, render);
         return;
       }
-      // Joe 10/16 (screenshot of the refused Publish, [403]): with the write-back on, the Live sheet's weeks are moved by the
-      // current app's Publish, and Operations follows the sheet within a minute. Say so plainly instead of a refusal
-      // (no link: Joe 10/10, no screen opens the old program).
-      if (writeBack) {
-        say('To publish ' + shortDate(target) + ', press Publish to Daily Dispatch in the old app\'s Weekly Dispatch. That moves the weeks in the Live sheet, and Operations shows the new weeks here about a minute later. Nothing on this screen was lost.', 'warn');
-        return;
-      }
       if (publishArmed !== target) {
         publishArmed = target; b.textContent = 'Click Again: Push ' + shortDate(target) + ' Live'; b.classList.add('armed');
-        say('This will move Current to Previous, Next to Current, and create the new Next week. Click again to confirm publication.', 'warn');
+        // Joe 10/16: with the write-back on, the Live sheet's weeks move too (the old app's Publish is not needed).
+        say('This will move Current to Previous, Next to Current, and create the new Next week' + (writeBack ? ', here and in the Live sheet' : '') + '. Click again to confirm publication.', 'warn');
         setTimeout(() => { if (publishArmed === target && !publishBusy) { publishArmed = ''; b.classList.remove('armed'); say(''); } }, 8000);
         return;
       }
-      publishBusy = true; b.textContent = 'Publishing\u2026'; b.classList.remove('armed'); say('Waiting for saves still on their way, then publishing ' + shortDate(target) + '\u2026', 'warn');
+      publishBusy = true; b.textContent = 'Publishing\u2026'; b.classList.remove('armed'); say('Waiting for saves still on their way, then publishing ' + shortDate(target) + (writeBack ? ' and moving the Live sheet\'s weeks' : '') + '\u2026', 'warn');
       await savesDone();
       const out = await saveOptimistic('publishWeek', { weekStart: target }, () => {}, () => {}, render);
       publishBusy = false; publishArmed = '';

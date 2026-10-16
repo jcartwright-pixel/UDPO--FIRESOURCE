@@ -45,11 +45,11 @@ function makeSheetsWriter(options) {
         data: { valueInputOption: 'RAW', data }
       });
     },
-    // The tabs of a workbook: [{title, sheetId, rows}] (Archive now and Date Convert need a tab's sheetId).
+    // The tabs of a workbook: [{title, sheetId, rows, cols}] (Archive now, Date Convert and Publish need a tab's sheetId and size).
     async tabs(spreadsheetId) {
       const client = await auth.getClient();
-      const res = await client.request({ url: 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties(sheetId,title,gridProperties.rowCount)', method: 'GET' });
-      return ((res.data && res.data.sheets) || []).map(s => ({ title: s.properties.title, sheetId: s.properties.sheetId, rows: (s.properties.gridProperties || {}).rowCount || 0 }));
+      const res = await client.request({ url: 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))', method: 'GET' });
+      return ((res.data && res.data.sheets) || []).map(s => ({ title: s.properties.title, sheetId: s.properties.sheetId, rows: (s.properties.gridProperties || {}).rowCount || 0, cols: (s.properties.gridProperties || {}).columnCount || 0 }));
     },
     // Rows added under the last row of a tab (RAW).
     async append(spreadsheetId, range, values) {
