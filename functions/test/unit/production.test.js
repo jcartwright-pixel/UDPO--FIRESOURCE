@@ -306,3 +306,12 @@ test('RedZone problem types are the Line Stopped choices for that line; its prod
   assert.deepEqual(f.list.map(r => [r.ratePerMin, r.targetPct]), [[50, 85], [90, undefined], [undefined, undefined]]);
   assert.deepEqual(f.changed, ['GALLON JUG: full speed 50, Target % 85'], 'a typed speed stays; a target over 100 is not a Target %');
 });
+
+test('rzEfficiency: a RedZone run\'s count against its standard speed for the minutes run', () => {
+  const t0 = Date.parse('2026-10-16T08:00:00Z');
+  assert.deepEqual(P.rzEfficiency({ startTime: t0, endTime: t0 + 3600000, ratePerMin: 20, count: 1080 }), { minutes: 60, expected: 1200, pct: 90 });
+  assert.deepEqual(P.rzEfficiency({ startTime: t0, countAt: t0 + 1800000, ratePerMin: 20, count: 600 }), { minutes: 30, expected: 600, pct: 100 });
+  assert.equal(P.rzEfficiency({ startTime: t0, countAt: t0 + 1800000, ratePerMin: 0, count: 600 }), null, 'no standard speed');
+  assert.equal(P.rzEfficiency({ startTime: t0, ratePerMin: 20, count: 600 }), null, 'no end or count time');
+  assert.equal(P.rzEfficiency({ startTime: t0, countAt: t0 + 60000, ratePerMin: 20 }), null, 'no count');
+});

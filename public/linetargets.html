@@ -66,7 +66,7 @@
 
   <script type="module">
     import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
-    import { doc, onSnapshot } from './js/firebase.js';
+    import { doc, onSnapshot, collection, query, orderBy, limit } from './js/firebase.js';
     import { watchProduction, fmt } from './js/production.js';
     import { savedText } from './js/autosave.js';
 
@@ -280,12 +280,27 @@
         '<p><b>Sensors:</b> ' + escapeHtml(loc.sensors.length ? loc.sensors.join(', ') : 'none') + ' <span class="lt-mut">(RedZone gives each sensor\'s name, not its readings)</span></p>' +
         (machines.length ? '<p><b>Machines:</b> ' + escapeHtml(machines.join(', ')) + '</p>' : '') +
         '<p><b>Line Stopped choices on the Line Tablet:</b> ' + escapeHtml(problems.length ? R.rzStopReasons(R.lineKind(line.name), problems).join(', ') : 'RedZone has no problem types for this line, so the tablet keeps its own') + '</p>' +
+        '<h4>Efficiency from RedZone counts</h4>' + rzCounts(loc, ck) +
         '<h4>What RedZone ran here</h4>' + (got.products.length ? '<div class="lt-scroll"><table class="loadout lt-rztable"><thead><tr><th>Product</th><th>SKU</th><th class="num">Full speed / min</th><th class="num">Target</th><th class="num">Crew</th></tr></thead><tbody>' +
           got.products.slice(0, 15).map(p => '<tr><td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.sku || '') + '</td><td class="num">' + n(p.ratePerMin) + '</td><td class="num">' + n(p.target) + '</td><td class="num">' + n(p.crew) + '</td></tr>').join('') + '</tbody></table></div>' +
           (ck ? '<div class="lt-reader-btns"><button type="button" id="rz-fill">Fill Empty Speeds from RedZone</button></div>' : '') : '<p>No runs in RedZone\'s latest ' + fmt((rz.runs || []).length) + '.</p>') +
         (got.runs.length ? '<h4>Latest runs</h4><div class="lt-scroll"><table class="loadout lt-rztable"><thead><tr><th>Product</th><th>Started</th><th>Ended</th><th class="num">Planned</th><th class="num">Speed / min</th></tr></thead><tbody>' +
           got.runs.slice(0, 5).map(r => '<tr><td>' + escapeHtml(r.product) + '</td><td>' + escapeHtml(day(r.startTime)) + '</td><td>' + escapeHtml(r.endTime ? day(r.endTime) : 'running') + '</td><td class="num">' + n(r.plannedQuantity) + '</td><td class="num">' + n(r.ratePerMin) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
         (rzNote ? '<p class="lt-note" id="rz-note">' + escapeHtml(rzNote) + '</p>' : '');
+    }
+    // Joe 10/16: each run's count from RedZone's count feed (read every 5 minutes, functions/src/redzone.js readEvents) against
+    // its standard speed. Until RedZone turns the feed on for our account this says so.
+    let rzRuns = [], rzFeed = null;
+    function rzCounts(loc, ck) {
+      const since = Date.now() - 24 * 3600000;
+      const rows = rzRuns.filter(r => r.locationUUID === loc.uuid && (r.endTime || r.countAt || r.startTime || 0) >= since).sort((a, b) => (b.startTime || 0) - (a.startTime || 0)).slice(0, 8);
+      const btn = ck ? '<div class="lt-reader-btns"><button type="button" id="rz-refresh">Refresh from RedZone</button></div>' : '';
+      if (!rows.length) return '<p id="rz-counts">' + escapeHtml(rzFeed && rzFeed.on === false ? 'RedZone\'s count feed is off for our account (asked RedZone 10-16-26). Each run\'s count and efficiency show here once RedZone turns it on.'
+        : rzFeed && rzFeed.on ? 'No runs counted on this line in the last 24 hours.' : 'Counts come from RedZone\'s count feed, read every 5 minutes.') + '</p>' + btn;
+      const n = (v) => v === null || v === undefined ? '' : fmt(v);
+      return '<div class="lt-scroll"><table class="loadout lt-rztable" id="rz-counts"><thead><tr><th>Product</th><th>Started</th><th>Ended</th><th class="num">Count</th><th class="num">At full speed</th><th class="num">Efficiency</th></tr></thead><tbody>' +
+        rows.map(r => { const e = R.rzEfficiency(r); return '<tr><td>' + escapeHtml(r.product || '') + '</td><td>' + escapeHtml(r.startTime ? day(r.startTime) : '') + '</td><td>' + escapeHtml(r.endTime ? day(r.endTime) : 'running') +
+          '</td><td class="num">' + n(r.count) + '</td><td class="num">' + (e ? n(e.expected) : '') + '</td><td class="num">' + (e ? e.pct + '%' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>' + btn;
     }
     document.getElementById('rz').addEventListener('change', async e => {
       const line = current();
@@ -295,6 +310,13 @@
       note = 'Saving…'; render('keep');
       try { await save('saveLineSetup', { operationId: line.operationId, redzoneLocation: v }); note = savedText(); showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+      render(true);
+    });
+    document.getElementById('rz').addEventListener('click', async e => {
+      if (!e.target.closest('#rz-refresh') || !canSave()) return;
+      rzNote = 'Reading RedZone…'; render(true);
+      try { const r = (await callServer('redzone', { op: 'events' })).events || {}; rzNote = r.skipped ? r.skipped + '.' : r.on === false ? 'RedZone\'s count feed is still off (' + (r.status || 'no answer') + ').' : 'Read ' + fmt(r.events || 0) + ' RedZone update' + (r.events === 1 ? '' : 's') + '.'; }
+      catch (err) { rzNote = 'Could not read RedZone (' + (err.message || err) + ').'; }
       render(true);
     });
     document.getElementById('rz').addEventListener('click', e => {
@@ -408,12 +430,16 @@
     });
     document.getElementById('lines').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; chosen = b.dataset.line; note = ''; setUrl(); render(true); });
 
-    let rzStop = null, rzPlant = '';
+    let rzStop = null, rzPlant = '', rzRunsStop = null;
     function followRz() {
       if (!plant || rzPlant === plant) return;
       rzPlant = plant;
       if (rzStop) rzStop();
       rzStop = onSnapshot(doc(db, 'redzoneData', plant), s => { rz = s.exists() ? s.data() : null; if (data) render(true); }, () => {});
+      if (!rzRunsStop) {
+        rzRunsStop = onSnapshot(query(collection(db, 'redzoneRuns'), orderBy('at', 'desc'), limit(100)), s => { rzRuns = s.docs.map(x => x.data()); if (data) render(true); }, () => {});
+        onSnapshot(doc(db, 'config', 'redzone'), s => { rzFeed = s.exists() ? s.data().events || null : null; if (data) render(true); }, () => {});
+      }
     }
     function follow() {
       if (stop) stop();
