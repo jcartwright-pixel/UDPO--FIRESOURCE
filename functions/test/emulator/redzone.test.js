@@ -125,3 +125,78 @@ test('RedZone\'s own addresses are filled in; the client ID and secret alone sig
   assert.equal(bad.result.ok, false);
   assert.match(bad.result.message, /refused the sign-in \(401\)/);
 });
+
+// Boomi's RedZone connector names .../public/v3/oauth/token, and puts the organization and enterprise IDs in the address.
+test('a 404 at the v2 token address tries v3; {org} and {enterprise} in the products address are filled in', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org 1', enterpriseId: 'ent-2', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' });
+  const urls = [];
+  const fetch = async (url, opts) => {
+    urls.push(url);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (url === 'https://api.rz-ops.com/public/v3/oauth/token') return reply(200, { access_token: 'v3_token' });
+    if (url === 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products' && opts.headers.Authorization === 'Bearer v3_token') return reply(200, [{ name: 'UD Wildberry', sku: '3934' }]);
+    return reply(404, {});
+  };
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
+  assert.equal(r.result.ok, true);
+  assert.match(r.result.message, /Connected\. RedZone sent 1 product\./);
+  assert.deepEqual(urls, ['https://api.rz-ops.com/public/v2/oauth/token', 'https://api.rz-ops.com/public/v3/oauth/token', 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products']);
+  assert.equal(r.enterpriseId, 'ent-2');
+});
+
+// Joe 10/16: "what everything reads ... what sensors we have available".
+test('What RedZone gives us: each kind tried plain and under the organization; counts, fields and examples; only GETs; administrators only', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org1' });
+  const calls = [];
+  const fetch = async (url, opts) => {
+    calls.push([opts.method || 'GET', url]);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'rz_bearer' });
+    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
+    if (path === '/organizations/org1/data-points') return reply(200, { data: [{ id: 7, name: 'Gallon Filler Count', locationName: 'GALLON FILLER', lastValue: 1234, unit: 'jugs' }, { id: 8, name: 'Blow Mold Temp', lastValue: 212, unit: 'F' }], total: 46 });
+    if (path === '/locations') return reply(200, [{ name: 'GALLON FILLER', type: 'Line' }]);
+    if (path === '/runs') return reply(403, {});
+    return reply(404, {});
+  };
+  await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'discover' }, { fetch }), /Only an administrator/);
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover', path: '/my-extra' }, { fetch });
+  const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
+  assert.deepEqual([by['Sensors and data points'].found, by['Sensors and data points'].count, by['Sensors and data points'].path], [true, 46, '/organizations/org1/data-points']);
+  assert.deepEqual(by['Sensors and data points'].fields, ['id', 'name', 'locationName', 'lastValue', 'unit']);
+  assert.deepEqual(by['Sensors and data points'].examples, ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)']);
+  assert.deepEqual([by['Lines and areas'].found, by['Lines and areas'].count, by['Lines and areas'].examples], [true, 1, ['GALLON FILLER (type Line)']]);
+  assert.deepEqual([by.Runs.found, by.Runs.status], [false, 403], 'there but not allowed says more than not found');
+  assert.deepEqual([by.Shifts.found, by.Shifts.status], [false, 404]);
+  assert.equal(by['Address typed'].path, '/my-extra');
+  assert.ok(calls.filter(c => !/oauth/.test(c[1])).every(c => c[0] === 'GET'), 'only GETs to RedZone');
+  assert.ok(calls.every(c => c[1].startsWith('https://api.rz-ops.com/')));
+  const saved = (await db().collection('private').doc('redzone').get()).data().lastDiscover;
+  assert.equal(saved.items.length, 9);
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 9, 'the screen shows the last list again');
+  assert.ok(!JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('rz_bearer'));
+});
+
+// Joe 10/16: RedZone's Organization IDs list the organization and three sites, no enterprise. Enterprise ID stays blank.
+test('What RedZone gives us with no Enterprise ID: kinds not found are tried again under Uniontown\'s site from the sites list', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7' });
+  const urls = [];
+  const fetch = async (url) => {
+    urls.push(url);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'rz_bearer' });
+    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
+    if (path === '/organizations/org_mA7/sites') return reply(200, { items: [{ id: 'c-332a', name: 'Charleston' }, { id: 'u-f99e', name: 'Uniontown' }] });
+    if (path === '/organizations/org_mA7/sites/u-f99e/data-points') return reply(200, [{ name: 'Gallon Filler Count', lastValue: 5, unit: 'jugs' }]);
+    return reply(404, {});
+  };
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
+  const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
+  assert.deepEqual([by.Sites.found, by.Sites.count, by.Sites.examples], [true, 2, ['Charleston', 'Uniontown']]);
+  assert.deepEqual([by['Sensors and data points'].found, by['Sensors and data points'].path], [true, '/organizations/org_mA7/sites/u-f99e/data-points']);
+  assert.equal(by.Products.found, false);
+  assert.ok(!urls.some(u => /enterprises/.test(u)), 'no enterprise addresses when Enterprise ID is blank');
+  assert.ok(!('list' in by.Sites), 'the raw lists are not kept');
+});

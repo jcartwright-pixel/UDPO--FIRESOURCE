@@ -616,6 +616,13 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .redzone-page .hint, .redzone-page .gps-steps { font-size: 16px; }
 .redzone-page label { font-size: 16px; text-transform: none; letter-spacing: 0; }
 .redzone-page .gps-result small { display: block; margin-top: 6px; font-size: 16px; }
+/* What RedZone gives us (Joe 10/16): one row per kind, scrolls sideways inside the card on a tablet. */
+.redzone-page .rz-try { display: block; margin: 10px 0; }
+.redzone-page .rz-scroll { overflow-x: auto; }
+.redzone-page .rz-table { min-width: 760px; }
+.redzone-page .rz-table th[scope="row"] { font-weight: 800; color: inherit; position: static; }
+.redzone-page .rz-table td { vertical-align: top; overflow-wrap: anywhere; white-space: normal; }
+.redzone-page .rz-path { font-family: ui-monospace, Consolas, monospace; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
    cross-fades from one screen to the next with the header and the menu held in place. */

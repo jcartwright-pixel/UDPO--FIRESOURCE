@@ -35,6 +35,13 @@ const SECRET = 'rz-secret-typed-once-5678';
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
+  // Joe 10/16: What RedZone gives us, as the last ask left it (the emulator tests cover the asking).
+  await db().collection('private').doc('redzone').set({ lastDiscover: { at: '2026-10-16T01:30:00.000Z', by: 'admin.test@uniteddairy.com', items: [
+    { kind: 'Lines and areas', found: true, path: '/locations', count: 14, fields: ['id', 'name', 'type'], examples: ['GALLON FILLER (type Line)', 'BLOW MOLD (type Line)'] },
+    { kind: 'Sensors and data points', found: true, path: '/organizations/org1/data-points', count: 46, fields: ['id', 'name', 'locationName', 'lastValue', 'unit'], examples: ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)'] },
+    { kind: 'Runs', found: false, path: '/runs', status: 403 },
+    { kind: 'Shifts', found: false, path: '/shifts', status: 404 }
+  ] } });
   const browser = await chromium.launch();
   try {
     for (const [w, h] of [[1536, 730], [1920, 950], [800, 1100]]) {
@@ -44,7 +51,13 @@ const SECRET = 'rz-secret-typed-once-5678';
       assert.equal(await rz.inputValue('#f-address'), 'https://api.rz-ops.com/public/v2');
       assert.equal(await rz.inputValue('#f-tokenurl'), 'https://api.rz-ops.com/public/v2/oauth/token');
       assert.deepEqual(await rz.$$eval('#form label', l => l.slice(0, 2).map(x => x.firstChild.textContent.trim())), ['Client ID', 'Client secret'], 'the two boxes Joe types come first');
-      assert.match(await rz.textContent('.gps-steps'), /Manage Access > Roles > Create Role: name it "Operations App \(read only\)"/);
+      assert.match(await rz.textContent('.gps-steps'), /Manage Access > Roles > Create Role: name it "Operations App Read Only" and turn on only Basic Access/);
+      // What RedZone gives us: one row per kind, with how many, the address, the fields and examples.
+      await rz.waitForSelector('#give-list tbody tr');
+      assert.deepEqual(await rz.$$eval('#give-list tbody tr', r => r.map(x => [...x.children].slice(0, 2).map(c => c.textContent))),
+        [['Lines and areas', '14'], ['Sensors and data points', '46'], ['Runs', 'Not allowed (403)'], ['Shifts', 'Not found']]);
+      assert.match(await rz.textContent('#give-list'), /Gallon Filler Count \(lastValue 1234, unit jugs, locationName GALLON FILLER\)/);
+      assert.equal(await rz.isVisible('#give-download'), true);
       assert.deepEqual(await small(rz), [], 'text 16px or larger at ' + w);
       assert.ok(await fits(rz) <= 0, 'no sideways scrolling at ' + w);
       if (w === 1536) {
@@ -61,12 +74,14 @@ const SECRET = 'rz-secret-typed-once-5678';
         assert.ok(!(await rz.content()).includes(SECRET), 'the secret is never shown back');
       } else assert.equal(await rz.textContent('#state'), 'Saved');
       if (SHOTS) await rz.screenshot({ path: path.join(SHOTS, 'redzone-' + w + '.png'), fullPage: true });
+      if (SHOTS) { await rz.$eval('#give-card', e => e.scrollIntoView({ block: 'start' })); await rz.screenshot({ path: path.join(SHOTS, 'redzone-what-it-gives-' + w + '.png') }); }
       assert.deepEqual(rz.errors, []);
       await rz.context().close();
     }
   } finally {
     await browser.close();
   }
+  console.log('ok - RedZone, What RedZone gives us: lines 14, sensors 46 with latest values, runs not allowed, shifts not found; Download the List');
   console.log('ok - RedZone: RedZone\'s addresses filled in, the client ID and secret typed and saved locked away (only the last 4 shown), 16px text, fits at 1536, 1920 and 800');
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });
