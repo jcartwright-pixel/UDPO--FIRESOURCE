@@ -72,8 +72,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.isDisabled('#st-list [data-st-tv]'), true, 'Send to TV waits for the Cast App ID');
     await p.fill('#cast-id', '1a2b3c');
     await p.click('#cast-save');
-    await p.waitForSelector('#view .ap-msg.bad:not([hidden])');
-    assert.match(await p.textContent('#view .ap-msg.bad'), /8 letters and numbers/);
+    // The refusal shows in the page's message bar (the SANDBOX banner is a message bar too, so wait for the words).
+    await p.waitForSelector('#view .ap-msg.bad:not([hidden]):has-text("8 letters and numbers")');
     await p.fill('#cast-id', '1a2b3c4d');
     await p.click('#cast-save');
     await p.waitForSelector('#cast-note:text("Cast App ID saved")');
