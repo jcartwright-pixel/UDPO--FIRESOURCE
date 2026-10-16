@@ -86,5 +86,5 @@ test('Shift Notes option A in the report: open breakdowns carry over until resol
   assert.match(r.text, /FIXED SINCE LAST REPORT \(1\)\n {2}Filler {2}Belt off {2}RESOLVED/);
   assert.match(r.text, /SHIFT HANDOFF \(1\)/);
   assert.match(r.text, /INCIDENTS · SAFETY · QUALITY \(1\)/);
-  assert.match(R.reportHtml(r, ''), /CARRIED OVER[\s\S]*MONITOR[\s\S]*Fixed since last report/);
+  assert.match(R.reportHtml(r, ''), /MONITOR[\s\S]*CARRIED OVER[\s\S]*Fixed since last report/);
 });

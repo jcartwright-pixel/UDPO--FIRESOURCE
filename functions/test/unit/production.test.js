@@ -144,8 +144,10 @@ test('Joe 10/14 follow-on: the Current Report carries each line\'s shift (made, 
   const r = U.plantReport({ loads: [], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '', output: out, outputShift: 'Second Shift 2:00 PM to 10:30 PM' }, Date.parse('2026-10-14T21:00:00Z'));
   assert.match(r.text, /LINE OUTPUT · Second Shift 2:00 PM to 10:30 PM\n  GALLON FILLER  GV 2% Gallon  6,420 of 6,300 \(102%\)/);
   const html = U.reportHtml(r, '');
-  assert.match(html, /Line output · Second Shift/);
-  assert.match(html, /GALLON FILLER.*6,420 of 6,300 · stopped 14 min \(Filler jam\).*102%/s);
+  // Joe 10/15: one column on a phone: the line and its percent on one row, the shortened numbers full width under it.
+  assert.match(html, /Line output · 2nd Shift 2 PM-10:30 PM/);
+  assert.match(html, /GALLON FILLER.*102%.*6,420 of 6,300 · down 14 min \(Filler jam\) · waste 19 · 1 chg 22 min · eff\. 87%/s);
+  assert.doesNotMatch(html, /width="50%"/, 'no two-across tiles');
   assert.doesNotMatch(U.reportHtml(U.plantReport({ loads: [], lines: [], temps: [] }, Date.now()), ''), /Line output/, 'no section without line output');
 });
 
