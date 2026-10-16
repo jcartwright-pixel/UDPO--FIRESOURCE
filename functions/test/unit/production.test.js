@@ -279,13 +279,13 @@ test('the Blow Mold temperature range is 1,000 to 1,350°F until Line Targets se
   assert.deepEqual([m.tempLow, m.tempHigh, m.tempFlag], [1000, 1350, 'HIGH']);
 });
 
-test('RedZone lines go with ours by name (Dairy Queen is the RAYPAK); Line Targets can pick another or none', () => {
+test('RedZone lines go with ours by name (Dairy Queen is the RAYPAK, Dairy Queen Manual the 5-gallon filler that feeds BOXING); Line Targets can pick another or none', () => {
   const rz = { locations: [{ uuid: 'bm', name: 'Blow Mold', sensors: ['Default'] }, { uuid: 'dq', name: 'Dairy Queen', sensors: ['Default'] }, { uuid: 'dqm', name: 'Dairy Queen Manual', sensors: ['In=out', 'Box'] },
     { uuid: 'g', name: 'Gallon' }, { uuid: 'h', name: 'Half Gallon' }, { uuid: 'hqp', name: 'Half, Quart, and Pint' }, { uuid: 'bx', name: 'Box Maker' }, { uuid: 'bxm', name: 'Box Maker Manuel' }] };
   const of = (name, doc) => (P.rzLocationFor(name, doc || {}, rz) || {}).name || null;
   assert.deepEqual(['BLOW MOLD', 'RAYPAK', 'GALLON FILLER', 'NEW 1/2 GALLON', 'OLD 1/2 GALLON', 'BOXING', 'TOTES', 'HTST #1'].map(n => of(n)),
-    ['Blow Mold', 'Dairy Queen', 'Gallon', 'Half Gallon', 'Half, Quart, and Pint', 'Box Maker', null, null]);
-  assert.equal(of('RAYPAK', { redzoneLocation: 'dqm' }), 'Dairy Queen Manual');
+    ['Blow Mold', 'Dairy Queen', 'Gallon', 'Half Gallon', 'Half, Quart, and Pint', 'Dairy Queen Manual', null, null]);
+  assert.equal(of('BOXING', { redzoneLocation: 'bx' }), 'Box Maker');
   assert.equal(of('BLOW MOLD', { redzoneLocation: 'NONE' }), null);
 });
 

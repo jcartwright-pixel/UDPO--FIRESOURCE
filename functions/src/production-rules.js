@@ -536,9 +536,10 @@
   /* ---------- RedZone's lines (Joe 10/16) ----------
    * RedZone's own lines are its locations, each with its sensor names ("Blow Mold: Default"). Each of our lines is matched to
    * one by name, and Line Targets can change the match (lineDoc.redzoneLocation: a location's uuid, or NONE).
-   * Joe 10/16: "The Dairy Queen machines are my Raypak machines ... I have a Raypak and then the new one." */
+   * Joe 10/16: "The Dairy Queen machines are my Raypak machines ... I have a Raypak and then the new one." The new one is the
+   * 5-gallon dispenser filler that feeds the box, our BOXING line (Joe 10/14), so Dairy Queen Manual goes with BOXING. */
   var RZ_MATCH = [[/^blow\s*mold/i, 'BLOW MOLD'], [/^gallon/i, 'GALLON FILLER'], [/^half\s*gallon/i, 'NEW 1/2 GALLON'], [/^half,?\s*quart/i, 'OLD 1/2 GALLON'],
-    [/^dairy\s*queen$/i, 'RAYPAK'], [/^box\s*maker$/i, 'BOXING'], [/^totes?$/i, 'TOTES'], [/^htst\s*#?\s*1$/i, 'HTST #1'], [/^htst\s*#?\s*2$/i, 'HTST #2']];
+    [/^dairy\s*queen$/i, 'RAYPAK'], [/^dairy\s*queen\s*manual$/i, 'BOXING'], [/^totes?$/i, 'TOTES'], [/^htst\s*#?\s*1$/i, 'HTST #1'], [/^htst\s*#?\s*2$/i, 'HTST #2']];
   function rzKey(v) { return text(v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
   function rzGuess(lineName, locations) {
     var k = rzKey(lineName);

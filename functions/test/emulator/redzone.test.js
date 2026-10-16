@@ -274,7 +274,7 @@ test('Read RedZone into Operations: lines, sensors, products, runs, problem type
   await people();
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e' });
   const setup = (id, name) => db().collection('plantSetup').doc(id).set({ operationId: id, type: 'PRODUCTION_AREA', status: 'ACTIVE', name, facilityId: 'fac_uniontown' });
-  await setup('ut_prod_blow_mold', 'BLOW MOLD'); await setup('ut_prod_raypak', 'RAYPAK'); await setup('ut_prod_gallon_filler', 'GALLON FILLER');
+  await setup('ut_prod_blow_mold', 'BLOW MOLD'); await setup('ut_prod_raypak', 'RAYPAK'); await setup('ut_prod_gallon_filler', 'GALLON FILLER'); await setup('ut_prod_boxing', 'BOXING');
   // Line Targets picked no RedZone line for the Gallon Filler.
   await db().collection('productionLines').doc('ut_prod_gallon_filler').set({ operationId: 'ut_prod_gallon_filler', redzoneLocation: 'NONE' });
   const pre = '/organizations/org_mA7/enterprises/f99e', urls = [];
@@ -305,7 +305,7 @@ test('Read RedZone into Operations: lines, sensors, products, runs, problem type
   await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'sync' }, { fetch }), /Only an administrator/);
   const r = await R.redzoneCall(db(), ADMIN, { op: 'sync' }, { fetch });
   assert.deepEqual([r.sync.lines, r.sync.sensors, r.sync.machines, r.sync.products, r.sync.runs, r.sync.problems, r.sync.checkSheets, r.sync.failed], [4, 3, 2, 2, 2, 25, 3, []]);
-  assert.deepEqual(r.sync.matches.map(m => [m.redzone, m.sensors.join('/'), m.line]), [['Blow Mold', 'Default', 'BLOW MOLD'], ['Dairy Queen', '', 'RAYPAK'], ['Dairy Queen Manual', 'In=out/Box', ''], ['Gallon', '', '']]);
+  assert.deepEqual(r.sync.matches.map(m => [m.redzone, m.sensors.join('/'), m.line]), [['Blow Mold', 'Default', 'BLOW MOLD'], ['Dairy Queen', '', 'RAYPAK'], ['Dairy Queen Manual', 'In=out/Box', 'BOXING'], ['Gallon', '', '']]);
   const saved = (await db().collection('redzoneData').doc('fac_uniontown').get()).data();
   assert.deepEqual(saved.products[0], { uuid: 'p1', name: 'Gallon Jug', sku: '9001', ratePerMin: 50, target: 85, crew: 2, perManHour: null });
   assert.equal(saved.runs[0].productTypeUUID, 'p2', 'newest run first');

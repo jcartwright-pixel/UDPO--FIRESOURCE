@@ -61,8 +61,8 @@ const RZ = {
   failed: []
 };
 const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products: 2, runs: 3, problems: 5, checkSheets: 2, failed: [],
-  matches: [{ redzone: 'Blow Mold', sensors: ['Default'], line: 'BLOW MOLD' }, { redzone: 'Box Maker', sensors: ['Default'], line: 'BOXING' }, { redzone: 'Dairy Queen', sensors: ['Default'], line: 'RAYPAK' },
-    { redzone: 'Dairy Queen Manual', sensors: ['In=out', 'Box'], line: '' }, { redzone: 'Gallon', sensors: ['Default'], line: 'GALLON FILLER' }, { redzone: 'Half Gallon', sensors: ['Default'], line: 'NEW 1/2 GALLON' }] };
+  matches: [{ redzone: 'Blow Mold', sensors: ['Default'], line: 'BLOW MOLD' }, { redzone: 'Box Maker', sensors: ['Default'], line: '' }, { redzone: 'Dairy Queen', sensors: ['Default'], line: 'RAYPAK' },
+    { redzone: 'Dairy Queen Manual', sensors: ['In=out', 'Box'], line: 'BOXING' }, { redzone: 'Gallon', sensors: ['Default'], line: 'GALLON FILLER' }, { redzone: 'Half Gallon', sensors: ['Default'], line: 'NEW 1/2 GALLON' }] };
 
 (async () => {
   await clear();
@@ -79,7 +79,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     await rz.waitForSelector('#sync-list tbody tr');
     assert.match(await rz.textContent('#sync-list'), /6 lines, 7 sensors, 3 machines, 2 products, 3 runs, 5 problem types, 2 check sheets\./);
     assert.deepEqual(await rz.$$eval('#sync-list tbody tr', r => r.map(x => [...x.children].map(c => c.textContent))).then(r => r.slice(2, 4)),
-      [['Dairy Queen', 'Default', 'RAYPAK'], ['Dairy Queen Manual', 'In=out, Box', 'not one of our lines yet']]);
+      [['Dairy Queen', 'Default', 'RAYPAK'], ['Dairy Queen Manual', 'In=out, Box', 'BOXING']]);
     assert.equal(await rz.textContent('#sync'), 'Read RedZone into Operations');
     assert.deepEqual(await small(rz, '#ops-card'), [], 'text 16px or larger');
     assert.ok(await fits(rz) <= 0, 'no sideways scrolling');
@@ -87,7 +87,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     await shot(rz, 'rz-read-into-ops-1536');
     assert.deepEqual(rz.errors, []);
     await rz.close();
-    results.push('Administration > RedZone: Read RedZone into Operations, 6 lines with their sensors; Dairy Queen goes with RAYPAK; Dairy Queen Manual is not one of our lines yet');
+    results.push('Administration > RedZone: Read RedZone into Operations, 6 lines with their sensors; Dairy Queen goes with RAYPAK and Dairy Queen Manual with BOXING (the 5-gallon filler that feeds the box)');
 
     // Line Targets, the Blow Mold: RedZone's Blow Mold with its sensor, Line Stopped choices, what ran, Fill Empty Speeds.
     for (const w of [1536, 1920, 800]) {
