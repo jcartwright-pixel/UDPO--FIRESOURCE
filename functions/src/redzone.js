@@ -29,7 +29,8 @@ const entOf = (d) => d.enterpriseId || d.foundEnterpriseId || '';
 // RedZone's lists are under /organizations/{org}/enterprises/{enterprise}; with both known that is the products address.
 // "/products" alone was the old default the screen saved back, so it counts as not typed.
 const productsPathOf = (d) => d.productsPath && d.productsPath !== DEFAULTS.productsPath ? d.productsPath
-  : d.orgId && entOf(d) ? '/organizations/{org}/enterprises/{enterprise}/products' : DEFAULTS.productsPath;
+  : d.foundProductsPath ? d.foundProductsPath
+  : d.orgId && entOf(d) ? '/organizations/{org}/enterprises/{enterprise}/product-types' : DEFAULTS.productsPath;
 const PAGE_LIMIT = 40, PRODUCT_LIMIT = 4000;
 const flat = (k) => String(k).replace(/[_\-\s]/g, '').toLowerCase();
 const clean = (v, n) => String(v === undefined || v === null ? '' : v).trim().slice(0, n);
@@ -151,17 +152,26 @@ async function fetchProducts(d, o, ref) {
  * RedZone's own address list is in its Developer Hub (not reachable from outside), so the usual names are tried, plain and
  * under the organization (and enterprise) the way Boomi's RedZone connector builds its addresses; an administrator can also
  * type one address to try. */
+// Names from RedZone's API reference menu (Joe 10/16): Assets, Characteristics, Data Sheets, Locations, Manufacturing Types,
+// Problems, Product Groups, Product Types (RedZone's word for a product, a SKU), Labels; the older guesses stay behind them.
 const KINDS = [
   ['Lines and areas', ['locations', 'location-types', 'areas', 'lines']],
   ['Machines', ['assets', 'asset-types', 'machines', 'equipment']],
-  ['Sensors and data points', ['characteristics', 'data-points', 'datapoints', 'sensors', 'tags']],
-  ['Data sheets', ['data-sheets']],
-  ['Products', ['products', 'product-types']],
-  ['Runs', ['runs', 'production-runs', 'production-schedules', 'schedules']],
-  ['Downtime', ['losses', 'downtime', 'problem-types']],
+  ['Sensors', ['sensor-configurations', 'sensors', 'data-points', 'tags']],
+  ['Characteristics (checks and readings)', ['characteristics']],
+  ['Data sheets', ['data-sheet-templates', 'data-sheets', 'completed-data-sheets']],
+  ['Products', ['product-types', 'products']],
+  ['Product groups', ['product-groups']],
+  ['Manufacturing types', ['manufacturing-types']],
+  ['Problems and downtime', ['problems', 'problem-types', 'losses', 'downtime']],
+  ['Labels', ['labels']],
+  ['Runs', ['runs', 'production-runs', 'production-schedules']],
   ['Shifts', ['shifts', 'shift-types']],
   ['Sites', ['sites', 'enterprises']]
 ];
+// RedZone's sensors are kept by line (List Sensor Configurations: .../locations/{locationId}/sensor-configurations), so
+// they are asked line by line, for this many lines at most.
+const SENSOR_LINES = 25;
 // Joe 10/16 (RedZone's API reference, List Asset Types): https://api.rz-ops.com/public/v2/organizations/{organizationId}/
 // enterprises/{enterpriseId}/asset-types. Every list is under the organization and an enterprise (RedZone's sites).
 const NEST = '/organizations/{org}/enterprises/{enterprise}';
@@ -259,6 +269,23 @@ async function discover(d, o, ref, extra) {
     kinds.push(one('Address typed', [typed]).then(x => x && x.found || !base ? x : one('Address typed', [typed.replace(/^\/+/, '')])));
   }
   const items = (await Promise.all(kinds)).filter(Boolean);
+  const lines = items.find(x => x.kind === 'Lines and areas' && x.found && /\/locations$/.test(x.path));
+  const si = items.findIndex(x => x.kind === 'Sensors');
+  if (lines && si >= 0 && !items[si].found) {
+    const pre = lines.path.replace(/\/locations$/, ''), all = [];
+    let best = null, asked = 0;
+    for (const l of (lines.list || []).filter(x => x && idOf(x)).slice(0, SENSOR_LINES)) {
+      asked++;
+      const got = await getList(urlOf(pre + '/locations/' + encodeURIComponent(idOf(l)) + '/sensor-configurations'), token, o);
+      if (got.list) got.list.forEach(x => all.push({ line: nameOf(l), x }));
+      else if (!best || (got.status === 403 && best.status !== 403)) best = got;
+    }
+    const path = pre + '/locations/{locationId}/sensor-configurations';
+    if (all.length) {
+      const first = all.map(a => a.x).find(x => x && typeof x === 'object') || {};
+      items[si] = { kind: 'Sensors', found: true, path, count: all.length, lines: asked, fields: Object.keys(first).slice(0, 30), examples: all.slice(0, 8).map(a => (a.line ? a.line + ': ' : '') + sample(a.x)) };
+    } else if (asked) items[si] = { kind: 'Sensors', found: false, path, status: best ? best.status : 200, note: best ? best.note || '' : 'no sensors on ' + asked + ' lines' };
+  }
   // Joe 10/16: RedZone's Organization IDs list sites (Uniontown, Charleston, Martin's Ferry), no enterprise. When the sites
   // list came back, a kind not found yet is tried once more under Uniontown's site, so nobody types the long site ID.
   const sites = !base && items.find(x => x.kind === 'Sites' && x.found);
@@ -273,6 +300,8 @@ async function discover(d, o, ref, extra) {
     }));
   }
   const used = base ? { org: base.org, enterprise: base.enterprise.id, name: base.enterprise.name || '' } : null;
+  const prod = items.find(x => x.kind === 'Products' && x.found);
+  if (used && prod) used.productsPath = prod.path.replace(base.pre, '/organizations/{org}/enterprises/{enterprise}');
   return { items: items.map(({ list, ...x }) => x), used, claims: ids.claims.slice(0, 12), enterprises: ents.slice(0, 10) };
 }
 
@@ -352,6 +381,8 @@ async function redzoneCall(db, user, input, options) {
     // The enterprise RedZone answered for is kept, so the products address works without anyone typing it.
     const keep = { lastDiscover };
     if (got.used && got.used.enterprise !== d.enterpriseId) Object.assign(keep, { foundEnterpriseId: got.used.enterprise, foundEnterpriseName: got.used.name });
+    // The products address RedZone answered (Product Types is RedZone's word for products).
+    if (got.used && got.used.productsPath) keep.foundProductsPath = got.used.productsPath;
     await ref.set(keep, { merge: true });
     return Object.assign(view(Object.assign({}, d, keep)), { discover: lastDiscover });
   }

@@ -163,9 +163,9 @@ test('What RedZone gives us: each kind tried plain and under the organization; c
   await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'discover' }, { fetch }), /Only an administrator/);
   const r = await R.redzoneCall(db(), ADMIN, { op: 'discover', path: '/my-extra' }, { fetch });
   const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
-  assert.deepEqual([by['Sensors and data points'].found, by['Sensors and data points'].count, by['Sensors and data points'].path], [true, 46, '/organizations/org1/data-points']);
-  assert.deepEqual(by['Sensors and data points'].fields, ['id', 'name', 'locationName', 'lastValue', 'unit']);
-  assert.deepEqual(by['Sensors and data points'].examples, ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)']);
+  assert.deepEqual([by['Sensors'].found, by['Sensors'].count, by['Sensors'].path], [true, 46, '/organizations/org1/data-points']);
+  assert.deepEqual(by['Sensors'].fields, ['id', 'name', 'locationName', 'lastValue', 'unit']);
+  assert.deepEqual(by['Sensors'].examples, ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)']);
   assert.deepEqual([by['Lines and areas'].found, by['Lines and areas'].count, by['Lines and areas'].examples], [true, 1, ['GALLON FILLER (type Line)']]);
   assert.deepEqual([by.Runs.found, by.Runs.status], [false, 403], 'there but not allowed says more than not found');
   assert.deepEqual([by.Shifts.found, by.Shifts.status], [false, 404]);
@@ -173,8 +173,8 @@ test('What RedZone gives us: each kind tried plain and under the organization; c
   assert.ok(calls.filter(c => !/oauth/.test(c[1])).every(c => c[0] === 'GET'), 'only GETs to RedZone');
   assert.ok(calls.every(c => c[1].startsWith('https://api.rz-ops.com/')));
   const saved = (await db().collection('private').doc('redzone').get()).data().lastDiscover;
-  assert.equal(saved.items.length, 10);
-  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 10, 'the screen shows the last list again');
+  assert.equal(saved.items.length, 14);
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 14, 'the screen shows the last list again');
   assert.ok(!JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('rz_bearer'));
 });
 
@@ -195,7 +195,7 @@ test('What RedZone gives us with no Enterprise ID: kinds not found are tried aga
   const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
   const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
   assert.deepEqual([by.Sites.found, by.Sites.count, by.Sites.examples], [true, 2, ['Charleston', 'Uniontown']]);
-  assert.deepEqual([by['Sensors and data points'].found, by['Sensors and data points'].path], [true, '/organizations/org_mA7/sites/u-f99e/data-points']);
+  assert.deepEqual([by['Sensors'].found, by['Sensors'].path], [true, '/organizations/org_mA7/sites/u-f99e/data-points']);
   assert.equal(by.Products.found, false);
   assert.deepEqual(urls.filter(u => /enterprises\/[^/?]+\//.test(u)).map(u => u.replace(/\?.*$/, '')), [
     'https://api.rz-ops.com/public/v2/organizations/org_mA7/enterprises/u-f99e/asset-types',
@@ -223,17 +223,23 @@ test('What RedZone gives us finds the site (enterprise) by itself, lists every k
     if (path === '/organizations/org_mA7/enterprises') return reply(200, { data: [{ id: '332a2f5f', name: 'Charleston' }, { id: 'f99e6965', name: 'Uniontown' }, { id: '81f6e61a', name: "Martin's Ferry" }] });
     if (path === UT + '/asset-types') return reply(200, { data: [{ id: 'at1', name: 'Filler' }] });
     if (path === UT + '/assets') return reply(200, { data: [{ id: 'a1', name: 'Gallon Filler', status: 'Running' }, { id: 'a2', name: 'Blow Mold' }], total: 12 });
-    if (path === UT + '/locations') return reply(200, [{ name: 'GALLON FILLER', type: 'Line' }]);
+    if (path === UT + '/locations') return reply(200, [{ id: 'loc-g', name: 'GALLON FILLER', type: 'Line' }, { id: 'loc-b', name: 'BLOW MOLD', type: 'Line' }]);
+    if (path === UT + '/locations/loc-g/sensor-configurations') return reply(200, { data: [{ id: 's1', name: 'Filler Count', type: 'Counter' }] });
+    if (path === UT + '/locations/loc-b/sensor-configurations') return reply(200, { data: [{ id: 's2', name: 'Head 1 Temp', unit: 'F' }, { id: 's3', name: 'Cycle Count', type: 'Counter' }] });
     if (path === UT + '/products') return reply(200, { data: [{ name: 'UD Wildberry', sku: '3934' }] });
     if (path === UT + '/characteristics') return reply(403, { message: 'Missing permission' });
+    if (path === UT + '/product-types') return reply(404, { message: 'Not Found' });
     return reply(404, { message: 'Not Found' });
   };
   const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
-  assert.deepEqual(r.discover.used, { org: 'org_mA7', enterprise: 'f99e6965', name: 'Uniontown' }, 'Uniontown first');
+  assert.deepEqual(r.discover.used, { org: 'org_mA7', enterprise: 'f99e6965', name: 'Uniontown', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' }, 'Uniontown first');
   const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
   assert.deepEqual([by.Machines.found, by.Machines.count, by.Machines.path, by.Machines.examples], [true, 12, '/organizations/org_mA7/enterprises/f99e6965/assets', ['Gallon Filler (status Running)', 'Blow Mold']]);
   assert.deepEqual([by['Lines and areas'].found, by.Products.found, by.Sites.count], [true, true, 3]);
-  assert.deepEqual([by['Sensors and data points'].status, by['Sensors and data points'].note], [403, 'Missing permission'], 'RedZone\'s own words on a refusal');
+  assert.deepEqual([by['Characteristics (checks and readings)'].status, by['Characteristics (checks and readings)'].note], [403, 'Missing permission'], 'RedZone\'s own words on a refusal');
+  // Sensors are kept by line in RedZone: asked line by line, named with their line.
+  assert.deepEqual([by.Sensors.found, by.Sensors.count, by.Sensors.lines, by.Sensors.path], [true, 3, 2, '/organizations/org_mA7/enterprises/f99e6965/locations/{locationId}/sensor-configurations']);
+  assert.deepEqual(by.Sensors.examples, ['GALLON FILLER: Filler Count (type Counter)', 'BLOW MOLD: Head 1 Temp (unit F)', 'BLOW MOLD: Cycle Count (type Counter)']);
   assert.deepEqual([by.Shifts.found, by.Shifts.path], [false, '/organizations/org_mA7/enterprises/f99e6965/shifts']);
   assert.ok(urls.every(([m, u]) => m === 'GET' || /oauth\/token$/.test(u)), 'only GETs');
   assert.ok(!urls.some(([, u]) => /enterprises\/(332a2f5f|81f6e61a)/.test(u)), 'the other sites are not asked once Uniontown answers');
