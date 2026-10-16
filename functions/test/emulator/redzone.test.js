@@ -125,3 +125,22 @@ test('RedZone\'s own addresses are filled in; the client ID and secret alone sig
   assert.equal(bad.result.ok, false);
   assert.match(bad.result.message, /refused the sign-in \(401\)/);
 });
+
+// Boomi's RedZone connector names .../public/v3/oauth/token, and puts the organization and enterprise IDs in the address.
+test('a 404 at the v2 token address tries v3; {org} and {enterprise} in the products address are filled in', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org 1', enterpriseId: 'ent-2', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' });
+  const urls = [];
+  const fetch = async (url, opts) => {
+    urls.push(url);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (url === 'https://api.rz-ops.com/public/v3/oauth/token') return reply(200, { access_token: 'v3_token' });
+    if (url === 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products' && opts.headers.Authorization === 'Bearer v3_token') return reply(200, [{ name: 'UD Wildberry', sku: '3934' }]);
+    return reply(404, {});
+  };
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
+  assert.equal(r.result.ok, true);
+  assert.match(r.result.message, /Connected\. RedZone sent 1 product\./);
+  assert.deepEqual(urls, ['https://api.rz-ops.com/public/v2/oauth/token', 'https://api.rz-ops.com/public/v3/oauth/token', 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products']);
+  assert.equal(r.enterpriseId, 'ent-2');
+});
