@@ -111,7 +111,7 @@ test('RedZone\'s own addresses are filled in; the client ID and secret alone sig
   };
   const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
   assert.equal(r.result.ok, true);
-  assert.match(r.result.message, /Signed in to RedZone: the client ID and secret work\. The product list did not come back yet \(.*404/);
+  assert.match(r.result.message, /Signed in to RedZone: the client ID and secret work\. Now type the Organization ID and Enterprise ID in box 1/, "no IDs yet: it says to type them");
   assert.deepEqual(calls.map(c => [c.url, c.type]), [
     ['https://api.rz-ops.com/public/v3/oauth/token', 'application/x-www-form-urlencoded'],
     ['https://api.rz-ops.com/public/v2/oauth/token', 'application/x-www-form-urlencoded'],
@@ -318,4 +318,17 @@ test('Read RedZone into Operations: lines, sensors, products, runs, problem type
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
   await db().collection('private').doc('redzone').update({ orgId: '', enterpriseId: '' });
   await assert.rejects(R.redzoneCall(db(), ADMIN, { op: 'sync' }, { fetch }), /Show What RedZone Gives Us first/);
+});
+
+// Joe 10/16 (live 6.21): signed in with the Organization ID and Enterprise ID boxes empty, Test Connection says to type them.
+test('Test Connection with the IDs empty: signed in, and it says to type the Organization ID and Enterprise ID', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
+  const fetch = async (url) => ({ ok: /oauth\/token$/.test(url), status: /oauth\/token$/.test(url) ? 200 : 404, text: async () => JSON.stringify(/oauth\/token$/.test(url) ? { access_token: 't' } : { message: 'Not Found' }) });
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
+  assert.equal(r.result.ok, true);
+  assert.match(r.result.message, /^Signed in to RedZone: the client ID and secret work\. Now type the Organization ID and Enterprise ID in box 1/);
+  // A failed What RedZone Gives Us keeps no organization or site.
+  const g = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
+  assert.deepEqual([g.discover.used, g.foundOrgId, g.foundEnterpriseId], [null, '', '']);
 });
