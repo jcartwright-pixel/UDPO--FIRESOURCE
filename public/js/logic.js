@@ -257,6 +257,16 @@
   // trailing _1 / _2 from the route; runLabel joins Route Name, Run and Run Type (route_run_type: Load 1, Load 2), skipping a
   // part another part already says (JERSEY LOAD 1 on Jersey), and an old "6301_1" run name reads as "Load 1".
   function routeNumber(route) { return String(route == null ? '' : route).trim().replace(/_\d+$/, ''); }
+  // Joe 10/16: the Run / Destination text for one run on Weekly, Loadout and the other run lists. A run code such as
+  // 6301_1 reads "Load 1" (or its Run Type); a blank run, or one that only repeats the route number (970), reads as the
+  // route name, then the Stream ID (844 Ohio Processor, 870 COSTCO - NEW JERSEY). Any other run name is shown as typed.
+  function runText(r) {
+    var t = function (v) { return String(v == null ? '' : v).trim(); };
+    var run = t(r && r.run), route = t(r && r.route), type = t(r && r.routeRunType), m = run.match(/^\d+_(\d+)$/);
+    if (m) return type || 'Load ' + m[1];
+    if (!run || run === route || run === routeNumber(route)) return [t(r && r.routeName) || t(r && r.streamId) || run, type].filter(Boolean).join(' ');
+    return run;
+  }
   function runLabel(routeName, run, runType) {
     var r = String(run == null ? '' : run).trim(), m = r.match(/^\d+_(\d+)$/), out = [];
     if (m) r = 'Load ' + m[1];
@@ -345,7 +355,7 @@
           plantLoadOff: d.plantLoadOff === true
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;
@@ -1232,7 +1242,7 @@
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
-    routeNumber: routeNumber, runLabel: runLabel,
+    routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
   };

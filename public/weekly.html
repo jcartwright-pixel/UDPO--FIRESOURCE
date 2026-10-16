@@ -166,7 +166,7 @@
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"' + (move && r.runId ? ' class="mover" data-drag="' + i + '" tabindex="0" title="Drag the line up or down to change the order"' : '') + '>' +
-        '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td><td class="strong">' + escapeHtml(r.run) + '</td>' +
+        '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td><td class="strong">' + escapeHtml(L.runText(r)) + '</td>' +
         L.DAYS.map(p => {
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
           const can = edit && !locked;
@@ -253,7 +253,7 @@
       // and closes it (a day that was off turns on). Trucks and trailers are picked on Daily Dispatch (they show when you hover a box).
       popover = document.createElement('div');
       popover.className = 'popover cell-pick';
-      popover.innerHTML = '<select data-kind="driver" aria-label="' + escapeHtml('Driver for ' + row.route + ' ' + row.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '">' + driverOptions(row, day) + '</select>';
+      popover.innerHTML = '<select data-kind="driver" aria-label="' + escapeHtml('Driver for ' + routeNumber(row.route) + ' ' + L.runText(row) + ', ' + L.DAY_NAMES[L.DAYS.indexOf(day)] + ' ' + shortDate(d.date)) + '">' + driverOptions(row, day) + '</select>';
       document.body.appendChild(popover);
       const box = td.getBoundingClientRect();
       Object.assign(popover.style, { left: (box.left + 3) + 'px', top: (box.top + 3) + 'px', width: Math.max(box.width - 6, 180) + 'px', height: (box.height - 6) + 'px' });
@@ -340,8 +340,8 @@
     function paintRunDays() {
       document.getElementById('days-week').textContent = 'Week of ' + shortDate(week);
       document.getElementById('days-heads').innerHTML = headCells('<th>Route</th><th>Run</th>');
-      document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(r.route) + '</b></td><td>' + escapeHtml(r.run) + '</td>' +
-        L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + !!r.days[p].runs + '" aria-label="' + escapeHtml(r.route + ' ' + r.run + ', ' + L.DAY_NAMES[L.DAYS.indexOf(p)]) + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
+      document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(routeNumber(r.route)) + '</b></td><td>' + escapeHtml(L.runText(r)) + '</td>' +
+        L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + !!r.days[p].runs + '" aria-label="' + escapeHtml(routeNumber(r.route) + ' ' + L.runText(r) + ', ' + L.DAY_NAMES[L.DAYS.indexOf(p)]) + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
     }
     // As in the current app (WeeklyDispatch.html weeklyRoutes): Route Run Days opens Route Week Override at the week shown here.
     document.getElementById('run-days').onclick = () => { location.href = 'routeweek.html?week=' + encodeURIComponent(week); };
