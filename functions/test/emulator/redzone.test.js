@@ -221,3 +221,26 @@ test('What RedZone gives us: the organization name and the v2 sign-in are tried 
   assert.ok(none.discover.probes.length >= 6 && none.discover.probes.every(p => p.status === 404 && p.note === 'Not Found'));
   assert.ok(none.discover.enterprises.includes('uniontown') && none.discover.enterprises.includes('united-dairy-uniontown') && none.discover.enterprises.includes('martinsferry') && none.discover.enterprises.includes('uniteddairyuniontown'));
 });
+
+// Joe 10/16 11:44 PM (test copy): the list used "united-dairy" because RedZone answered it 403 "invalid organization", while
+// Test Connection had just read 154 products with the saved organization ID. A 403 never picks the organization or site.
+test('What RedZone gives us: a 403 "invalid organization" never picks the organization; the saved one is used, as in Test Connection', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e6965' });
+  const urls = [];
+  const fetch = async (url) => {
+    urls.push(url);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    const u = new URL(url), path = u.pathname.replace('/public/v2', '');
+    if (path.startsWith('/organizations/united-dairy/')) return reply(403, { message: 'security requirements failed: invalid organization' });
+    if (path === '/organizations/org_mA7/events') return reply(400, { message: 'parameter "visibility-timeout" in query has an error' });
+    if (path.startsWith('/organizations/org_mA7/enterprises/f99e6965/')) return u.searchParams.has('offset') ? reply(200, { items: [{ uuid: 'x1', name: 'GALLON FILLER' }] }) : reply(400, { message: 'parameter "offset" in query has an error' });
+    return reply(404, { message: 'Not Found' });
+  };
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
+  assert.deepEqual([r.discover.used.org, r.discover.used.enterprise], ['org_mA7', 'f99e6965']);
+  assert.equal(r.discover.items.find(x => x.kind === 'Lines and areas').count, 1);
+  assert.ok(!urls.some(u => /united-dairy\/enterprises/.test(u)), 'the saved organization answered first, so the name is never tried as one');
+  assert.equal(r.foundOrgId, 'org_mA7');
+});

@@ -256,10 +256,12 @@ async function discover(d, o, ref, extra) {
     for (const org of orgs) {
       const got = await getList(urlOf('/organizations/' + encodeURIComponent(org) + '/events', '?limit=10&visibility-timeout=0'), token, o);
       orgChecks.push({ sign: v, org, status: got.status, note: got.note || '' });
-      if (got.list || got.status === 403) { good.push(org); (got.list || []).forEach(e => { const u = text(field(e, ['enterpriseUUID'])); if (u) uuids.push(u); }); }
+      // Only a real answer counts: RedZone says 403 "invalid organization" for a wrong one (Joe 10/16, "united-dairy").
+      if (got.list) { good.push(org); (got.list || []).forEach(e => { const u = text(field(e, ['enterpriseUUID'])); if (u) uuids.push(u); }); }
     }
     // 2. The site: what was typed, what the sign-in names, then the usual namespaces of our plants.
-    const tryOrgs = good.length ? good : orgs;
+    // The organizations that answered first, then the saved one, which Test Connection signs in with.
+    const tryOrgs = [...new Set(good.concat(orgs))];
     enterprises = [...new Set([d.enterpriseId].concat(ids.enterprises, PLANTS.flatMap(p => namespaces(p, tryOrgs)), uuids).filter(Boolean))];
     // At most 24 site names per organization, so the whole ask stays well inside the server's 2 minutes.
     for (const org of tryOrgs.slice(0, 2)) for (const ent of enterprises.slice(0, 24)) {
@@ -267,9 +269,9 @@ async function discover(d, o, ref, extra) {
       const pre = '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(ent);
       const got = await getList(urlOf(pre + '/locations', '?limit=1&offset=0'), token, o);
       if (got.status !== 404 || probes.length < 6) probes.push({ sign: v, path: pre + '/locations', status: got.status, note: got.note || '' });
-      // 403 (there but not allowed) and RedZone's 400 about a query value (Joe 10/16: "parameter offset ... missing") both
-      // mean the address itself was taken.
-      if (got.list || got.status === 403 || (got.status === 400 && /parameter|query/i.test(got.note || ''))) base = { pre, org, enterprise: ent, token, signIn };
+      // A list, or RedZone's 400 about a query value (Joe 10/16: "parameter offset ... missing"), means the organization and
+      // site were taken. A 403 does not: a wrong organization answers 403 "invalid organization" (Joe 10/16, "united-dairy").
+      if (got.list || (got.status === 400 && /parameter|query/i.test(got.note || ''))) base = { pre, org, enterprise: ent, token, signIn };
     }
     if (base) break;
   }
