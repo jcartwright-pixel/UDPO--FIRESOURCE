@@ -279,6 +279,8 @@ async function stationRelease(db, user, input, now) {
   if (!p || p.status !== 'ACTIVE') fail('NOT_ALLOWED', 'Sign in with an active United Dairy account.');
   // A tablet's station code (stations.js): has / enter / check.
   if (['has', 'enter', 'check'].indexOf(input.op) >= 0) return STATIONS.tabletCall(db, input, now);
+  // Send to TV (stations.js): the TVs to pick from, and the one picked (index.js signs that TV in).
+  if (input.op === 'tvList' || input.op === 'tvSend') return STATIONS.tvCall(db, input);
   return releaseCheck(db, input, now);
 }
 
@@ -427,7 +429,8 @@ const OPS = {
   emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
   repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem,
   // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
-  stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove, noAccountSet: STATIONS.noAccountSet
+  stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove, noAccountSet: STATIONS.noAccountSet,
+  castAppSet: STATIONS.castAppSet
 };
 
 async function adminCall(db, user, input, deps) {

@@ -24,7 +24,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/stationAccess/$(request.auth.token.get('udPlant', 'none'))).data.get('keys', {}).get(request.auth.token.udStation, '') == request.auth.token.get('udVersion', 'none');
     }
     function activeUserOrStation() { return activeUser() || plantStation(); }
-    match /config/app { allow read: if activeUserOrStation(); }
+    // A TV sent by Send to TV (Joe 10/16; index.js stationRelease tvSend): the Driver's Kiosk Station it was sent as, while that
+    // station is still there on the same code (stationAccess/tv). Only the board's lists: loads, pickups, drivers, config/app.
+    function tvStation() {
+      return request.auth != null && request.auth.token.get('udTv', '') != ''
+        && get(/databases/$(database)/documents/stationAccess/tv).data.get('keys', {}).get(request.auth.token.udTv, '') == request.auth.token.get('udTvVersion', 'none');
+    }
+    match /config/app { allow read: if activeUserOrStation() || tvStation(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/fleetSyncPreview { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
@@ -45,8 +51,8 @@ service cloud.firestore {
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
-    match /runs/{id} { allow read: if activeUserOrStation(); }
-    match /drivers/{id} { allow read: if activeUser(); }
+    match /runs/{id} { allow read: if activeUserOrStation() || tvStation(); }
+    match /drivers/{id} { allow read: if activeUser() || tvStation(); }
     // Joe 10/15: drivers' mobile phones typed on the Driver Roster, and the Schedule Texts log (the server writes both; the
     // Twilio login stays in private/sms).
     match /driverPhones/{id} { allow read: if activeUser(); }
@@ -88,7 +94,7 @@ service cloud.firestore {
     match /opsAssignments/{id} { allow read: if activeUser(); }
     // The plant side: the plant journal, pickups, and the wash and returns lists.
     match /plantJournal/{id} { allow read: if activeUserOrStation(); }
-    match /pickups/{id} { allow read: if activeUserOrStation(); }
+    match /pickups/{id} { allow read: if activeUserOrStation() || tvStation(); }
     match /plantWash/{id} { allow read: if activeUserOrStation(); }
     match /plantReturns/{id} { allow read: if activeUser(); }
     // The production lines, temperature locations and the lines' last checks.

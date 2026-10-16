@@ -22,6 +22,13 @@ async function phoneLocal(input) {
   return require('../../src/phone').phoneCall(db(), input);
 }
 
+// index.js stationRelease, with Send to TV's token for the TV (Joe 10/16).
+async function stationReleaseLocal(user, input) {
+  const r = await require('../../src/admin').stationRelease(db(), user, input);
+  if (input.op === 'tvSend' && r.ok) r.token = await require('firebase-admin').auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name });
+  return r;
+}
+
 const { unitedDairyUser } = require('../../src/auth');
 
 module.exports = async function localCalls(page) {
@@ -45,7 +52,7 @@ module.exports = async function localCalls(page) {
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
         return;
       }
-      const result = name === 'phone' ? await phoneLocal(data) : name === 'garage' ? await garageCall(db(), data, undefined, { user: unitedDairyUser(user && { uid: user.user_id, token: user }), claims: user }) : name === 'admin' ? await A.adminCall(db(), user, data, {}) : name === 'stationSignIn' ? await stationSignIn(data) : name === 'setSwitch' ? await require('../../src/switch').setSwitch(db(), user, data, true) : name === 'sms' ? await require('../../src/sms').smsCall(db(), user, data) : await A.stationRelease(db(), user, data);
+      const result = name === 'phone' ? await phoneLocal(data) : name === 'garage' ? await garageCall(db(), data, undefined, { user: unitedDairyUser(user && { uid: user.user_id, token: user }), claims: user }) : name === 'admin' ? await A.adminCall(db(), user, data, {}) : name === 'stationSignIn' ? await stationSignIn(data) : name === 'setSwitch' ? await require('../../src/switch').setSwitch(db(), user, data, true) : name === 'sms' ? await require('../../src/sms').smsCall(db(), user, data) : await stationReleaseLocal(user, data);
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
     } catch (e) { await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: { status: 'FAILED_PRECONDITION', message: e.message } }) }); }
   });

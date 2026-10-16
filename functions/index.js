@@ -225,7 +225,12 @@ exports.adminJobsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeo
 
 exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
   const user = signedIn(request);
-  try { return await stationRelease(db, user, FAILS.withDevice(request, request.data)); } catch (error) { throw asHttps(error); }
+  try {
+    const input = FAILS.withDevice(request, request.data), r = await stationRelease(db, user, input);
+    // Send to TV (Joe 10/16): the TV is signed in as that Driver's Kiosk Station only (database rules: tvStation()).
+    if (input.op === 'tvSend' && r.ok) r.token = await admin.auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name });
+    return r;
+  } catch (error) { throw asHttps(error); }
 });
 
 // Open to tablets with no United Dairy account (Joe 10/12, the old app's public Plant Station): a plant station's code, only

@@ -66,7 +66,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer, tvTokenSignIn } from './js/app.js';
+    import { CAST_NS } from './js/send-to-tv.js';
     import { startOffline } from './js/offline-saves.js';
     import { collection, query, where, onSnapshot } from './js/firebase.js';
     import * as W from './js/weather.js';
@@ -82,6 +83,27 @@
     // Joe 10/10: the Driver Room board opens as the old Driver Room display: both lists roll and the weather window sits on the
     // right. ?tv=1 is the TV itself (no header); ?view=desk is the plain list for the office.
     const full = params.get('tv') === '1', tv = full || params.get('view') !== 'desk', forRoom = params.get('for') === 'room';
+    // Joe 10/16: ?cast=1 is the TV itself running our Google Cast receiver (Send to TV in Administration > Driver Station Codes).
+    // It waits on a big "Send to TV" screen until a manager's Send to TV signs it in as that Driver's Kiosk Station.
+    const castTv = full && params.get('cast') === '1';
+    if (castTv) castReceiver();
+    function castReceiver() {
+      document.body.classList.add('ds-cast');
+      const g = document.getElementById('signin');
+      g.innerHTML = '<h1>Driver\'s Kiosk Station</h1><p>Waiting for Send to TV.</p><p>On a manager\'s PC:<br>Administration &gt; Driver Station Codes &gt; Send to TV</p><button id="signin-button" type="button" hidden></button><div class="notice error" id="signin-error" hidden></div>';
+      const s = document.createElement('script');
+      s.src = 'https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js';
+      s.onload = () => {
+        const ctx = cast.framework.CastReceiverContext.getInstance();
+        ctx.addCustomMessageListener(CAST_NS, (ev) => {
+          const d = ev.data || {};
+          if (d.token) tvTokenSignIn(d.token).catch(err => showError('Could not open the board: ' + (err.message || err) + '. Press Send to TV again.'));
+        });
+        // The board is not a video: keep it open with no sender connected (the PC or phone that sent it can close).
+        ctx.start({ disableIdleTimeout: true, customNamespaces: { [CAST_NS]: cast.framework.system.MessageType.JSON } });
+      };
+      document.head.appendChild(s);
+    }
     // The code screen's own heading (setUp('') puts the loadout heading back once the code is in).
     const loadHead = document.querySelector('.head .title h1').innerHTML;
     function setUp(which) {
@@ -221,7 +243,7 @@
       location.replace('index.html');
     });
     // A TV with no code: Exit goes to the plain Driver Station link. A coded TV leaves only by Release at the bottom.
-    document.getElementById('tv-exit').hidden = !full;
+    document.getElementById('tv-exit').hidden = !full || castTv;
     document.getElementById('tv-exit').addEventListener('click', async () => { if (await leave()) location.replace(location.pathname); });
 
     // The time the board last came from the server (kept on the tablet), not when it was read from the tablet with no signal.
@@ -232,16 +254,22 @@
       } catch (e) { return new Date(); }
     }
     window.addEventListener('online', () => render()); window.addEventListener('offline', () => render());
-    startOffline(['driver-station.html'], { scopes: ['driver-station'], device: 'tablet', files: [] });
-    requireSignIn(async () => {
+    if (!castTv) startOffline(['driver-station.html'], { scopes: ['driver-station'], device: 'tablet', files: [] });
+    requireSignIn(async (user) => {
       const { db } = await start();
-      await gate().catch(err => showError('Could not check this kiosk\'s code: ' + (err.message || err)));
+      // Joe 10/16: a TV sent by Send to TV is already its Driver's Kiosk Station (no code screen, no Release: nobody taps a TV).
+      // The scorecard panel needs a United Dairy sign-in, so a sent TV keeps the weekly schedule.
+      if (user && user.station && user.station.tv) {
+        kiosk = user.station;
+        document.getElementById('eyebrow').textContent = kiosk.name + ' · ' + kiosk.plant;
+        sig = ''; weekSig = ''; render();
+      } else await gate().catch(err => showError('Could not check this kiosk\'s code: ' + (err.message || err)));
       // A new code or a removed kiosk sends it back to the code screen (checked every 5 minutes).
       setInterval(async () => {
-        if (!kiosk) return;
+        if (!kiosk || kiosk.tv) return;
         try { const r = await stationCall('check', { kind: 'KIOSK', key: kiosk.key, version: kiosk.version }); if (!r.ok) { remember(CODE_KEY, null); gate(r.message).catch(() => {}); } } catch (e) { /* offline: keep the kiosk */ }
       }, 300000);
-      const week = L.weekStart(date), err = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      const week = L.weekStart(date), err = (what) => (e) => showError(kiosk && kiosk.tv && e.code === 'permission-denied' ? 'This TV was taken off the ' + kiosk.name + ' (new code or removed). Press Send to TV again.' : 'Could not read ' + what + ': ' + e.message);
       // The board updates the moment Dispatch or the plant saves (no 10-minute wait).
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = lastLive(s); render(); }, err('the loads'));
       // Review item 73 (Joe 10/13): only pickups from yesterday on (the board is today's loads), not every pickup ever made.

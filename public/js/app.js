@@ -672,9 +672,12 @@ export function isUnitedDairy(user) {
 // The screens a Plant Station signed in by its code alone may open: only the Plant Station, whose tabs hold the station's work.
 // Joe 10/12: the manager screens (Loadout Center, Unloading & Washing, Washing, Returns) are not for the employees' tablets.
 export const STATION_PAGES = ['plant-station.html'];
+export const TV_PAGES = ['driver-station.html'];
 async function stationOf(user) {
   try {
     const c = (await user.getIdTokenResult()).claims || {};
+    // Joe 10/16: a TV sent by Send to TV is signed in as its Driver's Kiosk Station only (driver-station.html).
+    if (c.udTv) return { tv: true, key: c.udTv, version: c.udTvVersion || '', type: 'TV', facilityId: c.udPlant || '', name: c.udName || 'Driver\'s Kiosk Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || '') };
     return c.udStation ? { key: c.udStation, version: c.udVersion || '', type: c.udType || '', facilityId: c.udPlant || '', name: c.udName || 'Plant Station', plant: ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === c.udPlant) || {}).name || String(c.udPlant || '') } : null;
   } catch (e) { return null; }
 }
@@ -700,6 +703,8 @@ export async function stationCodeSignIn(code) {
   await signInWithCustomToken(auth, out.token);
   return out;
 }
+// Joe 10/16: a TV sent by Send to TV signs in with the token the manager's Send to TV passed it (driver-station.html?cast=1).
+export async function tvTokenSignIn(token) { const { auth } = await start(); await signInWithCustomToken(auth, token); }
 export async function signOutHere() { const { auth } = await start(); await signOut(auth); }
 
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
@@ -753,10 +758,11 @@ export async function requireSignIn(ready) {
       if (out) out.hidden = true;
       const who = document.getElementById('who');
       if (who) { who.textContent = station.name; who.title = station.name + ' · ' + station.plant + ' (no UD account)'; }
-      if (STATION_PAGES.indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
+      if ((station.tv ? TV_PAGES : STATION_PAGES).indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
         screen.hidden = true;
         gate.hidden = false;
-        showError('This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
+        showError(station.tv ? 'This TV is signed in as the ' + station.name + ' only. Sign in with a United Dairy account for this screen.'
+          : 'This tablet is signed in as the ' + station.name + ' Plant Station (no UD account). Only the Plant Station screens open on it; sign in with a United Dairy account for this screen.');
         return;
       }
       if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }

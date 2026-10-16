@@ -17,6 +17,11 @@
  * in as that station only (signIn below; index.js makes the sign-in token). stationAccess/{plant} mirrors what the database
  * rules need to let such a tablet read the plant screens: the switch and each coded station's version, so Off, New code
  * and Remove shut it out at once. Its saves are only the plant-floor ones (STATION_ACTIONS).
+ *
+ * Send to TV (Joe 10/16, his Vizio has no browser, only Chromecast built in): a signed-in manager presses Send to TV and
+ * picks the TV; the TV opens our own Cast receiver (driver-station.html?tv=1&cast=1) and is signed in as that Driver's
+ * Kiosk Station only (tvSend below; index.js makes the token). stationAccess/tv mirrors each TV station's version for the
+ * database rules, so New code and Remove shut the TV out at once. castAppId is the Google Cast App ID Joe registers once.
  */
 'use strict';
 
@@ -63,13 +68,20 @@ function listOf(d) {
   plants().forEach(p => STARTERS.forEach(([kind, type, name]) => { const key = (p.id + '_' + kind + '_' + type).toLowerCase(); list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(list).length }; }));
   return list;
 }
-async function readAll(db) { const s = await DOC(db).get(), d = s.exists ? s.data() : {}; return { list: listOf(d), noAccount: d.noAccount || {} }; }
+async function readAll(db) { const s = await DOC(db).get(), d = s.exists ? s.data() : {}; return { list: listOf(d), noAccount: d.noAccount || {}, castAppId: d.castAppId || '' }; }
 async function read(db) { return (await readAll(db)).list; }
 // What the database rules read for the no-account Plant Station: the plant's switch and its coded stations' versions.
 function access(list, noAccount, facilityId) {
   const keys = {};
   Object.keys(list).forEach(k => { const s = list[k]; if (s.kind === 'PLANT' && s.facilityId === facilityId && s.hash && s.version) keys[k] = s.version; });
   return { on: noAccount[facilityId] === true, keys };
+}
+// What the database rules read for a TV sent by Send to TV: each Driver's Kiosk Station's version ('open' before its first code).
+const TV_ACCESS = (db) => db.collection('stationAccess').doc('tv');
+function tvAccess(list) {
+  const keys = {};
+  Object.keys(list).forEach(k => { const s = list[k]; if (s.kind === 'KIOSK' && s.type === 'TV') keys[k] = s.version || 'open'; });
+  return { keys };
 }
 // What a screen may know about a station (never the salt or hash; the code only for administrators).
 function shown(s, admin) {
@@ -86,7 +98,7 @@ const sorted = (list, kind) => Object.keys(list).map(k => list[k]).filter(s => !
 async function stations(db, email, input) {
   const kind = KINDS[input.kind] ? input.kind : 'PLANT';
   const all = await readAll(db);
-  return { kind, noAccount: plants().map(p => ({ id: p.id, name: p.name, on: all.noAccount[p.id] === true })), stations: sorted(all.list, kind).map(s => shown(s, true)), types: Object.keys(KINDS[kind].types).map(id => ({ id, name: KINDS[kind].types[id] })), plants: plants().map(p => ({ id: p.id, name: p.name })) };
+  return { kind, castAppId: all.castAppId, noAccount: plants().map(p => ({ id: p.id, name: p.name, on: all.noAccount[p.id] === true })), stations: sorted(all.list, kind).map(s => shown(s, true)), types: Object.keys(KINDS[kind].types).map(id => ({ id, name: KINDS[kind].types[id] })), plants: plants().map(p => ({ id: p.id, name: p.name })) };
 }
 
 // Every change rewrites the list and keeps stationAccess (the rules' copy) in step, in one transaction.
@@ -96,6 +108,7 @@ async function change(db, fn) {
     const out = fn(list, noAccount);
     tx.set(DOC(db), Object.assign({}, d, { list, noAccount }));
     plants().forEach(p => tx.set(ACCESS(db, p.id), access(list, noAccount, p.id)));
+    tx.set(TV_ACCESS(db), tvAccess(list));
     return out;
   });
 }
@@ -136,6 +149,29 @@ async function noAccountSet(db, email, input, stamp) {
   const on = input.on === true;
   await change(db, (list, noAccount) => { noAccount[facilityId] = on; });
   return Object.assign({ ok: true, message: plantName(facilityId) + ' Plant Station with no UD account is ' + (on ? 'On' : 'Off') + '.' }, await stations(db, email, { kind: 'PLANT' }));
+}
+
+// The Google Cast App ID for Send to TV (Joe registers the receiver once at cast.google.com/publish; 8 letters and numbers).
+async function castAppSet(db, email, input, stamp) {
+  const id = String(input.castAppId || '').trim().toUpperCase();
+  if (id && !/^[0-9A-F]{8}$/.test(id)) fail('BAD_REQUEST', 'The Cast App ID is 8 letters and numbers, like 1A2B3C4D.');
+  await DOC(db).set({ castAppId: id, castAppSetAt: stamp, castAppSetBy: email }, { merge: true });
+  return Object.assign({ ok: true, message: id ? 'Cast App ID saved. Send to TV is ready.' : 'Cast App ID cleared.' }, await stations(db, email, { kind: 'KIOSK' }));
+}
+
+/* ---------- Send to TV (any active signed-in person; index.js makes the TV's token) ---------- */
+
+// 'tvList': the Cast App ID and the Driver's Kiosk Stations a manager can send to.
+// 'tvSend' {key}: that TV station, its version for the token, and stationAccess/tv brought up to date.
+async function tvCall(db, input) {
+  const all = await readAll(db);
+  const tvs = sorted(all.list, 'KIOSK').filter(s => s.type === 'TV');
+  if (input.op === 'tvList') return { castAppId: all.castAppId, tvs: tvs.map(s => ({ key: s.key, name: s.name, facilityId: s.facilityId, plant: plantName(s.facilityId) })) };
+  if (input.op !== 'tvSend') fail('BAD_REQUEST', 'Unknown Send to TV step');
+  const s = tvs.find(t => t.key === text(input.key, 40));
+  if (!s) return { ok: false, message: 'That Driver\'s Kiosk Station is gone. Refresh and pick the TV again.' };
+  await TV_ACCESS(db).set(tvAccess(all.list));
+  return { ok: true, station: { key: s.key, name: s.name, type: s.type, facilityId: s.facilityId, plant: plantName(s.facilityId), version: s.version || 'open' } };
 }
 
 /* ---------- The tablets ---------- */
@@ -210,4 +246,4 @@ async function stationSaver(db, claims) {
   return { key: s.key, name: s.name, type: s.type, facilityId: s.facilityId, plant: plantName(s.facilityId) };
 }
 
-module.exports = { KINDS, STARTERS, STATION_ACTIONS, stations, stationAdd, stationCode, stationRemove, noAccountSet, needsCode, tabletCall, signIn, stationSaver, StationError, MAX_FAILS_PER_MINUTE, read, check };
+module.exports = { KINDS, STARTERS, STATION_ACTIONS, stations, stationAdd, stationCode, stationRemove, noAccountSet, castAppSet, tvCall, tvAccess, needsCode, tabletCall, signIn, stationSaver, StationError, MAX_FAILS_PER_MINUTE, read, check };

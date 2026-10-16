@@ -4,6 +4,7 @@
  * Administrators only. A change that cannot be undone asks for a second press first.
  */
 import { escapeHtml, callServer, dateTimeText } from './app.js';
+import { sendToTv } from './send-to-tv.js';
 
 const L = window.UDLogic;
 const e = escapeHtml;
@@ -516,12 +517,20 @@ function stationSection(kind) {
   return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><details class="ap-how"><summary>How it works</summary><p>' + e(p.help) + '</p></details><div class="ap-list" id="st-list"></div>' +
     '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="st-name" maxlength="60" placeholder="For example ' + (kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : 'Case Loadout dock 2') + '"></label>' +
     '<label class="ap-field">Type<select id="st-type"></select></label><label class="ap-field">Plant<select id="st-plant"></select></label>' +
-    '<div><button type="button" class="ap-btn main" id="st-add">' + p.add + '</button></div></div></div>';
+    '<div><button type="button" class="ap-btn main" id="st-add">' + p.add + '</button></div></div>' + (kind === 'KIOSK' ? castSection() : '') + '</div>';
+}
+// Joe 10/16: Send to TV puts the Driver's Kiosk Station on a TV with Chromecast built in (his Vizio has no browser). The Cast
+// App ID comes from Joe's one-time Google Cast sign-up (cast.google.com/publish, receiver URL shown here).
+function castSection() {
+  return '<div class="ap-form" id="cast-row" style="margin-top:12px"><label class="ap-field">Cast App ID (for Send to TV)<input id="cast-id" maxlength="8" placeholder="For example 1A2B3C4D" style="text-transform:uppercase"></label>' +
+    '<div><button type="button" class="ap-btn main" id="cast-save">Save</button></div></div><p class="ap-help" id="cast-note" style="font-size:16px"></p>' +
+    '<details class="ap-how"><summary>How Send to TV works</summary><p>Press Send to TV on a Driver\'s Kiosk Station above, in Google Chrome on a PC or an Android phone on the same Wi-Fi as the TV, and pick the TV. The TV runs the board by itself after that; this computer can be closed. When the TV is turned off, press Send to TV again the next time it is on. Nothing is typed on the TV.</p>' +
+    '<p>Set up once: register a Custom Receiver at cast.google.com/publish with this address, publish it, and save its App ID above.</p><p class="ap-url">' + e(location.origin + '/driver-station.html?tv=1&cast=1') + '</p></details>';
 }
 function bindStations(box, kind) {
   const $ = (s) => box.querySelector(s), what = STATION_PAGES[kind].what;
   // The no-account On / Off sits in the link card, which may draw after the stations load (and again on Refresh).
-  let noAccount = null;
+  let noAccount = null, castAppId = '', lastStations = [];
   function drawNoAccount() {
     if (!noAccount || !$('#na-row')) return;
     $('#na-row').innerHTML = noAccount.map(p => '<b>' + e(p.name) + ':</b> <span class="ap-chip ' + (p.on ? 'good' : 'bad') + '">' + (p.on ? 'ON' : 'OFF') + '</span>' +
@@ -539,11 +548,15 @@ function bindStations(box, kind) {
       }
       // The no-account Plant Station's On / Off for each plant (Plant Station Codes only).
       noAccount = data.noAccount || null;
+      castAppId = data.castAppId || '';
+      if ($('#cast-id') && document.activeElement !== $('#cast-id')) $('#cast-id').value = castAppId;
+      lastStations = data.stations;
       drawNoAccount();
       $('#st-list').innerHTML = data.stations.map(s => '<div class="ap-item" data-station-key="' + e(s.key) + '"><div><b>' + e(s.name) + '</b><small>' + e(s.typeName) + ' &middot; ' + e(s.plant) +
         (s.changedAt ? ' &middot; code changed ' + e(when(s.changedAt)) + ' by ' + e(s.changedBy) : '') + '</small></div>' +
         (s.code ? '<code>' + e(s.code) + '</code><button type="button" class="ap-btn small" data-st-copy="' + e(s.code) + '">Copy Code</button>' : '<span class="ap-chip">' + (s.set ? 'Code is set' : 'No code yet') + '</span>') +
         '<button type="button" class="ap-btn ' + (s.set ? 'warn' : 'main') + '" data-st-code="' + e(s.key) + '"' + (s.set ? ' data-again="1"' : '') + '>' + (s.set ? 'New code' : 'Create code') + '</button>' +
+        (s.kind === 'KIOSK' && s.type === 'TV' ? '<button type="button" class="ap-btn main" data-st-tv="' + e(s.key) + '"' + (castAppId ? '' : ' disabled title="Save the Cast App ID below first"') + '>Send to TV</button>' : '') +
         '<button type="button" class="ap-btn" data-st-remove="' + e(s.key) + '">Remove</button></div>').join('') || '<div class="ap-empty">No ' + what + ' yet. Add one below.</div>';
     } catch (err) { say(box, errText(err), 'bad'); }
   }
@@ -558,6 +571,8 @@ function bindStations(box, kind) {
       const go = () => busy(box, b, async () => { const out = await call('stationCode', { key: b.dataset.stCode }); await load(out); say(box, ''); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
+    if (b.id === 'cast-save') busy(box, b, async () => { const out = await call('castAppSet', { castAppId: $('#cast-id').value }); await load(out); say(box, ''); $('#cast-note').textContent = out.message; });
+    if (b.dataset.stTv) busy(box, b, async () => { const msg = await sendToTv(lastStations.find(s => s.key === b.dataset.stTv), castAppId); say(box, ''); if (msg) $('#cast-note').textContent = msg; });
     if (b.dataset.stRemove) twice(b, 'Press again to remove', () => busy(box, b, async () => { const out = await call('stationRemove', { key: b.dataset.stRemove }); await load(out); say(box, ''); }));
     if (b.id === 'st-add') busy(box, b, async () => {
       const out = await call('stationAdd', { kind, type: $('#st-type').value, facilityId: $('#st-plant').value, name: $('#st-name').value });
