@@ -69,11 +69,11 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-typing-1920.png') });
     await p.keyboard.press('Enter');
     await p.waitForFunction((s) => document.querySelector(s).children[5].textContent === '900001', R802);
-    // The Saving... / Saved sign beside the title (shared by Daily and Weekly through edit.js).
-    await p.waitForFunction(() => { const x = document.getElementById('save-pill'); return x && !x.hidden && /Saved/.test(x.textContent); });
-    assert.equal(await p.evaluate(() => { const r = document.getElementById('save-pill').getBoundingClientRect(), h = document.querySelector('.head .title h1').getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (h.top + h.bottom) / 2) < 20; }), true, 'the sign sits beside the title');
+    // Joe 10/16: Daily shows no Saving... / Saved sign (Weekly still does); only a failed save says "Not saved" (below).
+    await p.waitForFunction(() => window.__udEditDone || import('./js/edit.js').then(m => { window.__udEditDone = m.savesPending() === 0; return false; }), null, { timeout: 8000 });
+    assert.equal(await p.evaluate(() => { const x = document.getElementById('save-pill'); return !!(x && !x.hidden); }), false, 'no save sign on Daily');
     assert.equal(await at(p), 'run_t802|tue truck');
-    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it and "Saved \u2713" showed beside the title');
+    results.push('typing 1 in the Truck cell highlighted 900001; Enter saved it with no Saving / Saved sign popping up');
 
     // Esc keeps the old value.
     await p.keyboard.press('ArrowUp');
