@@ -124,9 +124,9 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0];
   assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints', 'pda']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
-    { checkin: -4, cases: -3, inspection: 1, attendance: 1, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0, pda: 0 });
+    { checkin: -4, cases: -3, inspection: 1, attendance: 0, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0, pda: 0 });
   assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
-  assert.equal(r.points, -7, 'the day\'s points add up');
+  assert.equal(r.points, -8, 'the day\'s points add up (attendance earns nothing, Joe 10/16)');
   // One day: 80 + 20 x points per day, at most 100.
   assert.deepEqual([r.areas.checkin.score, r.areas.inspection.score, r.areas.speeding.score], [0, 100, 40]);
   assert.equal(r.score, Math.round((0 + 20 + 100 + 100 + 40 + 60 + 100) / 7), 'overall = the average of the graded areas');
@@ -244,14 +244,53 @@ test('Joe 10/13 accidents and complaints: count only once reviewed as counting; 
   assert.match(score([comp]).misses.find(m => m.area === 'complaints').what, /Customer complaint \(Major\) from Kroger 512/);
 });
 
-test('Joe 10/13 call-offs fade over 3 months; earlier ones carry over onto the period', () => {
+// Joe 10/16: "not penalized nor reward unless it has been over four days in the calendar year, January to December 31st",
+// with a manager override for FMLA and the like.
+test('Joe 10/16 attendance: the first 4 call-off days in the calendar year cost nothing; each day after costs 3', () => {
+  const s = S.scSettings_({ countFrom: '2026-01-01' });
+  assert.deepEqual([s.attendanceFreeDays, s.callOff], [4, 3]);
+  assert.ok(S.SC_CORE.NUMBER_SETTINGS.includes('attendanceFreeDays'));
+  const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
+  const off = (date) => ({ date, driverKey: 'D1', reason: 'SICK DAY' });
+  // Three days back in the spring, three in October: October's are days 4, 5 and 6 of the year.
+  const offs = [off('2026-03-02'), off('2026-10-02'), off('2026-04-10'), off('2026-05-20'), off('2026-10-06'), off('2026-10-09')];
+  const r = S.scScoreMonth_(recs, offs, s, {}, { start: '2026-10-01', asOf: DAY })[0];
+  const att = r.misses.filter(m => m.area === 'attendance');
+  assert.deepEqual(att.map(m => [m.date, m.points, !!m.noMiss]), [['2026-10-02', 0, true], ['2026-10-06', 3, false], ['2026-10-09', 3, false]], 'only the period\'s days are listed');
+  assert.match(att[0].what, /Call-off \(sick day\), day 4 this year, within the 4 allowed/);
+  assert.match(att[1].what, /day 5 this year$/);
+  assert.deepEqual([r.callOffs, r.yearCallOffs], [3, 6]);
+  assert.deepEqual([r.areas.attendance.lost, r.areas.attendance.score, r.areas.attendance.points], [6, 94, -6]);
+  // Four or fewer days: Attendance stays 100 and nothing is rewarded.
+  const four = S.scScoreMonth_(recs, offs.slice(0, 4), s, {}, { start: '2026-10-01', asOf: DAY })[0];
+  assert.deepEqual([four.areas.attendance.score, four.areas.attendance.points], [100, 0]);
+  // The count starts over on January 1.
+  const jan = S.scScoreMonth_(S.scBuildDay_('2027-01-05', [run({})], [], {}), offs.concat([off('2027-01-04')]), s, {}, { start: '2027-01-01', asOf: '2027-01-05' })[0];
+  assert.match(jan.misses.find(m => m.area === 'attendance').what, /day 1 this year, within the 4 allowed/);
+  assert.equal(jan.areas.attendance.score, 100);
+  // Settings can change the free days and the points.
+  const two = S.scScoreMonth_(recs, offs, S.scSettings_({ countFrom: '2026-01-01', attendanceFreeDays: 5, callOff: 4 }), {}, { start: '2026-10-01', asOf: DAY })[0];
+  assert.equal(two.areas.attendance.score, 96, 'only day 6 costs, 4 points');
+});
+
+test('Joe 10/16 attendance override: an excused call-off (FMLA) costs nothing, does not use up a free day, and keeps who and when', () => {
   const s = S.scSettings_({ countFrom: '2026-01-01' });
   const recs = S.scBuildDay_(DAY, [run({})], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
-  const offs = [{ date: '2026-08-20', driverKey: 'D1', reason: 'SICK DAY' }, { date: '2026-10-02', driverKey: 'D1', reason: 'SICK DAY' }, { date: '2026-06-01', driverKey: 'D1', reason: 'SICK DAY' }];
-  const r = S.scScoreMonth_(recs, offs, s, {}, { start: '2026-10-01', asOf: DAY })[0];
-  assert.deepEqual(r.misses.filter(m => m.area === 'attendance').map(m => m.points), [1.98, 3], 'August is in its 2nd month (66%); June is gone');
-  assert.equal(r.callOffs, 1, 'only October\'s is in the month');
-  assert.equal(r.areas.attendance.carried, 1.98);
+  const offs = ['2026-10-01', '2026-10-02', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'].map(date => ({ date, driverKey: 'D1', reason: 'SICK DAY' }));
+  const key = S.scMissKey_('att', '2026-10-05', 'D1', '');
+  assert.equal(key, 'att|2026-10-05|D1|');
+  const ex = { [key]: { reason: 'FMLA', by: 'manager@uniteddairy.com', at: '2026-10-16T15:00:00.000Z' } };
+  const r = S.scScoreMonth_(recs, offs, s, {}, { start: '2026-10-01', asOf: DAY, excuses: ex })[0];
+  const att = r.misses.filter(m => m.area === 'attendance');
+  const fmla = att.find(m => m.date === '2026-10-05');
+  assert.deepEqual([fmla.excused.reason, fmla.excused.by, fmla.excused.at], ['FMLA', 'manager@uniteddairy.com', '2026-10-16T15:00:00.000Z']);
+  assert.doesNotMatch(fmla.what, /this year/, 'an excused day is not numbered');
+  // Five counted days (the FMLA day skipped): only the 5th, 10-8, costs.
+  assert.deepEqual(att.filter(m => !m.excused).map(m => m.what.match(/day (\d)/)[1]), ['1', '2', '3', '4', '5']);
+  assert.deepEqual([r.areas.attendance.lost, r.areas.attendance.score, r.callOffs, r.yearCallOffs], [3, 97, 6, 5], 'the record stays; the FMLA day is still listed');
+  const none = S.scScoreMonth_(recs, offs, s, {}, { start: '2026-10-01', asOf: DAY })[0];
+  assert.equal(none.areas.attendance.score, 94, 'without the excuse, days 5 and 6 cost');
+  assert.deepEqual(S.SC_CORE.ATTENDANCE_EXCUSES, ['FMLA', 'Other']);
 });
 
 test('Joe 10/13 Excuse: an excused GPS or Time miss costs nothing and keeps the perfect day', () => {

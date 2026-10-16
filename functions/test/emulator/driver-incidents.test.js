@@ -48,8 +48,22 @@ test('Excuse: a manager excuses a GPS miss with a reason, and can take it back',
   let list = (await db().collection('scorecardExcuses').get()).docs.map(d => d.data());
   assert.deepEqual(list.map(x => [x.key, x.reason, x.by]), [[key, 'Deer in the road', MANAGER.email]]);
   await assert.rejects(applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: '' }, now), /reason/);
-  await assert.rejects(applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key: 'cases|2026-10-12|x|y', reason: 'no' }, now), /GPS or Time/);
+  await assert.rejects(applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key: 'cases|2026-10-12|x|y', reason: 'no' }, now), /GPS, Time or attendance/);
   await applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, undo: true }, now);
   list = (await db().collection('scorecardExcuses').get()).docs;
   assert.equal(list.length, 0);
+});
+
+// Joe 10/16: a manager can excuse a call-off (FMLA, or Other with a note); the excuse keeps who and when.
+test('Excuse: a call-off can be excused only as FMLA or Other with a note', async () => {
+  const key = 'att|2026-10-08|DRV_TEST_ADAMS|';
+  await assert.rejects(applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: 'Sick' }, now), /FMLA or Other/);
+  await assert.rejects(applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: 'Other' }, now), /FMLA or Other/);
+  await applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: 'FMLA', driverKey: 'DRV_TEST_ADAMS', what: 'Call-off (sick day)' }, now);
+  let x = (await db().collection('scorecardExcuses').get()).docs.map(d => d.data())[0];
+  assert.deepEqual([x.key, x.reason, x.by, !!x.at], [key, 'FMLA', MANAGER.email, true]);
+  await applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, reason: 'Other: jury duty' }, now);
+  x = (await db().collection('scorecardExcuses').get()).docs.map(d => d.data())[0];
+  assert.equal(x.reason, 'Other: jury duty');
+  await applyAction(db(), MANAGER, { requestId: rid(), action: 'excuseScorecardMiss', key, undo: true }, now);
 });
