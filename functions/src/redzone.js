@@ -218,7 +218,8 @@ function tokenIds(token) {
 const idOf = (x) => text(field(x, ['id', 'enterpriseId', 'siteId', 'uuid']));
 const nameOf = (x) => text(field(x, ['name', 'displayName', 'title', 'label']));
 async function discover(d, o, ref, extra) {
-  const token = await accessToken(d, o, ref), address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
+  let token = await accessToken(d, o, ref);
+  const address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
   const urlOf = (path) => urlFor(address, path) + (path.includes('?') ? '&' : '?') + 'limit=50';
   // Which organization and enterprise: the saved ones, the ones the sign-in names, and RedZone's own enterprise list.
   const ids = tokenIds(token);
@@ -238,12 +239,22 @@ async function discover(d, o, ref, extra) {
   // Uniontown first (Joe's plant), then the rest.
   ents.sort((a, b) => (/uniontown/i.test(b.name) ? 1 : 0) - (/uniontown/i.test(a.name) ? 1 : 0));
   // The first organization and enterprise pair RedZone answers for (a list, or 403: there but not allowed) is used for every kind.
-  let base = null;
-  for (const org of orgs) for (const e of ents.slice(0, 4)) {
-    if (base) break;
-    const pre = '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(e.id);
-    const got = await getList(urlOf(pre + '/asset-types'), token, o);
-    if (got.list || got.status === 403) base = { pre, org, enterprise: e };
+  let base = null, tokenUrl = '';
+  const probes = [];
+  const findBase = async (v) => {
+    for (const org of orgs) for (const e of ents.slice(0, 4)) for (const probe of ['/asset-types', '/locations']) {
+      if (base) return;
+      const pre = '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(e.id);
+      const got = await getList(urlOf(pre + probe), token, o);
+      if (probes.length < 12) probes.push({ path: pre + probe, sign: v, status: got.status, note: got.note || '' });
+      if (got.list || got.status === 403) base = { pre, org, enterprise: e };
+    }
+  };
+  await findBase('v2');
+  // RedZone's API reference names .../public/v3/oauth/token (support named v2, which also signs in). When no site answers
+  // to the v2 sign-in, a v3 sign-in is tried once; if that one answers it is kept as the token address.
+  if (!base && !d.token && ents.length && tokenUrlOf(d) !== TOKEN_V3) {
+    try { token = await accessToken(Object.assign({}, d, { tokenUrl: TOKEN_V3, access: null }), o, null); await findBase('v3'); if (base) tokenUrl = TOKEN_V3; } catch (e) { /* the v2 answer stands */ }
   }
   const prefixes = base ? [base.pre] : [''].concat(d.orgId ? ['/organizations/{org}'] : []).concat(d.orgId && d.enterpriseId ? [NEST] : []);
   const one = async (kind, paths, pres) => {
@@ -299,10 +310,10 @@ async function discover(d, o, ref, extra) {
       if (again && (again.found || (again.status === 403 && x.status !== 403))) items[i] = again;
     }));
   }
-  const used = base ? { org: base.org, enterprise: base.enterprise.id, name: base.enterprise.name || '' } : null;
+  const used = base ? Object.assign({ org: base.org, enterprise: base.enterprise.id, name: base.enterprise.name || '' }, tokenUrl ? { tokenUrl } : {}) : null;
   const prod = items.find(x => x.kind === 'Products' && x.found);
   if (used && prod) used.productsPath = prod.path.replace(base.pre, '/organizations/{org}/enterprises/{enterprise}');
-  return { items: items.map(({ list, ...x }) => x), used, claims: ids.claims.slice(0, 12), enterprises: ents.slice(0, 10) };
+  return { items: items.map(({ list, ...x }) => x), used, claims: ids.claims.slice(0, 12), enterprises: ents.slice(0, 10), probes };
 }
 
 const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
@@ -383,6 +394,7 @@ async function redzoneCall(db, user, input, options) {
     if (got.used && got.used.enterprise !== d.enterpriseId) Object.assign(keep, { foundEnterpriseId: got.used.enterprise, foundEnterpriseName: got.used.name });
     // The products address RedZone answered (Product Types is RedZone's word for products).
     if (got.used && got.used.productsPath) keep.foundProductsPath = got.used.productsPath;
+    if (got.used && got.used.tokenUrl) Object.assign(keep, { tokenUrl: got.used.tokenUrl, access: null });
     await ref.set(keep, { merge: true });
     return Object.assign(view(Object.assign({}, d, keep)), { discover: lastDiscover });
   }

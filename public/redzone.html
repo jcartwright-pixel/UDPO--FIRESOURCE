@@ -128,7 +128,8 @@
       // Which RedZone site (enterprise) answered, and the sites it knows of.
       const sites = (g.enterprises || []).map(e => (e.name ? e.name + ' ' : '') + e.id).join('; ');
       const site = g.used ? '<p id="give-site"><b>Site used: ' + escapeHtml(g.used.name || 'the site') + '</b> (' + escapeHtml(g.used.enterprise) + ')</p>'
-        : g.enterprises ? '<p id="give-site" class="hint">No site answered yet.' + (sites ? ' Sites tried: ' + escapeHtml(sites) + '.' : ' RedZone did not name any sites.') + '</p>' : '';
+        : g.enterprises ? '<p id="give-site" class="hint">No site answered yet.' + (sites ? ' Sites tried: ' + escapeHtml(sites) + '.' : ' RedZone did not name any sites.') + '</p>' +
+          (g.probes || []).map(p => '<div class="hint rz-path">' + escapeHtml(p.sign + ' sign-in, ' + p.path + ': ' + p.status + (p.note ? ' ' + p.note : '')) + '</div>').join('') : '';
       $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' + site +
         '<div class="rz-scroll"><table class="gps-check rz-table"><colgroup><col style="width:13%"><col style="width:11%"><col style="width:22%"><col style="width:22%"><col style="width:32%"></colgroup><thead><tr><th>What</th><th>How many</th><th>RedZone address</th><th>What each one has</th><th>Examples</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
       $('give-download').hidden = false;
