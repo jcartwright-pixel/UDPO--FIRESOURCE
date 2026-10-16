@@ -251,14 +251,14 @@ async function saver(request) {
   return { uid: request.auth.uid, email: 'station:' + station.key, station };
 }
 
-exports.save = onCall(async (request) => {
+exports.save = onCall({ timeoutSeconds: 120 }, async (request) => {
   const user = await saver(request);
   try {
     // Asking, not saving: which of these saves this person may make (People & Roles counts).
     if (request.data && Array.isArray(request.data.checkSaves)) return { allowed: await checkSaves(db, user, request.data.checkSaves, request.data.facilityId) };
     // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.
     const testNow = process.env.FUNCTIONS_EMULATOR === 'true' && request.data && request.data.testNow ? new Date(request.data.testNow) : null;
-    const result = await applyAction(db, user, request.data, testNow && !isNaN(testNow) ? () => testNow : undefined);
+    const result = await applyAction(db, user, request.data, testNow && !isNaN(testNow) ? () => testNow : undefined, { liveRoll: request.data && request.data.action === 'publishWeek' ? liveRollDeps() : null });
     // A manager's Lessor button: the repair email goes out after the save (Administration > Repair Email).
     return await TOOLS.afterSave(db, user, request.data, result);
   } catch (error) {
@@ -272,6 +272,28 @@ exports.save = onCall(async (request) => {
 // no other target there).
 function realLive() {
   return process.env.READ_UNIONTOWN_SHEETS === '1' && !process.env.SOURCES_JSON && process.env.DEMO_DATA !== '1';
+}
+
+// Weekly's Publish with the write-back on (Joe 10/16) moves the Live sheet's weeks in the workbook the write-back writes (liveroll.js),
+// after writing the saves still waiting for it. null when this server has no Live workbook to write (Publish then says so).
+// The local test database (UD_FAKE_LIVE_ROLL=1) uses an in-memory copy of the made-up sheets instead.
+let fakeLive = null;
+function liveRollDeps() {
+  if (process.env.FUNCTIONS_EMULATOR === 'true' && process.env.UD_FAKE_LIVE_ROLL === '1') {
+    const D = require('./src/demo-sheets');
+    fakeLive = fakeLive || D.fakeWritableSheets(D.fakeSheets());
+    return () => ({ sheets: fakeLive, spreadsheetId: 'fake-live', allowRealLive: false, flush: async () => null });
+  }
+  if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  let target;
+  try {
+    target = JSON.parse(process.env.WRITEBACK_JSON);
+    if (!target.spreadsheetId || target.spreadsheetId !== transferSources(process.env).live.spreadsheetId) return null;
+  } catch (e) { return null; }
+  return () => {
+    const sheets = makeSheetsWriter();
+    return { sheets, spreadsheetId: target.spreadsheetId, allowRealLive: realLive(), flush: () => runWriteBack({ db, sheets, target, allowRealLive: realLive() }) };
+  };
 }
 
 // The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the Live workbook the

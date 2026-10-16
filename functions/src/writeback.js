@@ -73,6 +73,16 @@ function columnLetter(index) {
 
 function text(v) { return v === null || v === undefined ? '' : String(v).trim(); }
 
+// A Live tab's week: most of its rows' week_start_date, else the Week Start label (B2), as the copy reads it (transfer.parseLiveTab).
+function weekOf(values) {
+  const rows = values || [], header = (rows[M.LIVE_HEADER_ROW - 1] || []).map(M.normalizeHeader), col = header.indexOf('week_start_date'), count = {};
+  rows.slice(M.LIVE_HEADER_ROW).forEach(r => { const k = col >= 0 ? L.dateKey(text((r || [])[col])) : ''; if (k) count[L.weekStart(k)] = (count[L.weekStart(k)] || 0) + 1; });
+  const best = Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+  if (best) return best;
+  const label = L.dateKey(text((rows[1] || [])[1]));
+  return label ? L.weekStart(label) : '';
+}
+
 // The sheet row for one queued save: same week, same run_id, and (for a run on two rows) the same running days.
 function findRow(values, item) {
   const header = (values[M.LIVE_HEADER_ROW - 1] || []).map(M.normalizeHeader);
@@ -133,8 +143,15 @@ async function writeClaimed({ db, sheets, target, stamp, all }) {
 
   // One read per tab touched. Review item 66 (Joe 10/13): a tab the workbook does not have (renamed or deleted) no longer
   // stops every save: its saves go on the conflicts list and the other tabs are still written.
-  const tabs = [...new Set(items.map(i => i.tab))];
+  // Joe 10/16: Publish moves a week to another Live tab; a save queued before the copy caught up still names the old tab, so a
+  // save for a Live week goes to the tab that holds that week now.
+  const LIVE = Object.values(M.LIVE_TABS);
+  let tabs = [...new Set(items.map(i => i.tab))];
+  if (tabs.some(t => LIVE.indexOf(t) >= 0)) tabs = [...new Set(tabs.concat(LIVE))];
   const { sheet, badTabs } = await readTabs(sheets, target.spreadsheetId, tabs);
+  const tabOfWeek = {};
+  LIVE.forEach(t => { const w = sheet[t] ? weekOf(sheet[t]) : ''; if (w) tabOfWeek[w] = t; });
+  items.forEach(i => { if (LIVE.indexOf(i.tab) >= 0 && i.weekStart && tabOfWeek[i.weekStart] && tabOfWeek[i.weekStart] !== i.tab) i.tab = tabOfWeek[i.weekStart]; });
 
   // What the new app last knew for each cell: the run's copy of the sheet row, updated as cells are written.
   const runIds = [...new Set(items.map(i => i.runDocId))];
@@ -299,4 +316,4 @@ async function historyWrites(sheets, spreadsheetId, items, stamp, db) {
   return { updates, ops, written, conflicts: 0 };
 }
 
-module.exports = { runWriteBack, assertSandboxTarget, assertLiveTarget, assertMasterTarget, REAL_MASTER_LISTS, REAL_LIVE_QUEUE_LISTS, findRow, columnLetter, PRODUCTION_IDS, HISTORY_TAB, HISTORY_HEADERS };
+module.exports = { runWriteBack, weekOf, assertSandboxTarget, assertLiveTarget, assertMasterTarget, REAL_MASTER_LISTS, REAL_LIVE_QUEUE_LISTS, findRow, columnLetter, PRODUCTION_IDS, HISTORY_TAB, HISTORY_HEADERS };

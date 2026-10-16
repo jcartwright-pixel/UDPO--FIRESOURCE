@@ -69,6 +69,36 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     assert.equal(await page.$('#rows td.day.editable'), null, 'an older week cannot be edited');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '5-older-week-1920.png') });
     assert.deepEqual(page.errors, []);
+
+    // Joe 10/16: "Let Operations' Publish move the weeks in the real Live sheet, the same way the old app's Publish does".
+    // With the write-back on, Publish moves the Live sheet's weeks too (here an in-memory copy, UD_FAKE_LIVE_ROLL=1): the
+    // click-again note says so, the weeks move and there is no "Not saved". Fresh copy first so the sheet and Operations agree.
+    await clear();
+    await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
+    for (const id of ['run_t801', 'run_t802', 'run_t810']) await db().collection('routes').doc(id).update({ displayDaily: true, displayWeekly: true });
+    await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+    for (const [width, height] of [[1536, 864], [1920, 950]]) {
+      const liveBefore = (await db().collection('config').doc('app').get()).data().liveWeeks;
+      const wb = await openPage(browser, width, height, '/weekly.html?week=' + liveBefore.next + '&testEmail=dispatch.test@uniteddairy.com');
+      await wb.waitForSelector('#rows tr td.day');
+      await wb.waitForFunction(() => !document.getElementById('publish').disabled);
+      await wb.click('#publish');
+      assert.match(await wb.textContent('#publish'), /^Click Again: Push /);
+      assert.match(await wb.textContent('#wk-note'), /create the new Next week, here and in the Live sheet\. Click again/);
+      if (SHOTS) await wb.screenshot({ path: path.join(SHOTS, '6-writeback-click-again-' + width + '.png') });
+      await wb.click('#publish');
+      await wb.waitForFunction(() => /Week pushed live/.test(document.getElementById('wk-note').textContent) || !document.getElementById('error').hidden, null, { timeout: 30000 });
+      assert.equal(await wb.$eval('#error', el => el.hidden ? '' : el.textContent), '', 'no refusal');
+      assert.match(await wb.textContent('#wk-note'), /The Live sheet's weeks moved too\./);
+      await wb.waitForFunction(() => document.querySelectorAll('#rows tr td.day').length > 0, null, { timeout: 8000 });
+      assert.equal(await wb.$eval('#error', el => el.hidden), true, 'no red refusal');
+      assert.doesNotMatch(await wb.innerText('body'), /Not saved/);
+      if (SHOTS) await wb.screenshot({ path: path.join(SHOTS, '7-writeback-published-' + width + '.png') });
+      assert.deepEqual(wb.errors, []);
+      await wb.close();
+      const after = (await db().collection('config').doc('app').get()).data().liveWeeks;
+      assert.equal(after.current, liveBefore.next, 'the weeks moved on');
+    }
     console.log('weekly-publish: OK');
   } finally {
     await browser.close();

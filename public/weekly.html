@@ -404,11 +404,12 @@
       }
       if (publishArmed !== target) {
         publishArmed = target; b.textContent = 'Click Again: Push ' + shortDate(target) + ' Live'; b.classList.add('armed');
-        say('This will move Current to Previous, Next to Current, and create the new Next week. Click again to confirm publication.', 'warn');
+        // Joe 10/16: with the write-back on, the Live sheet's weeks move too (the old app's Publish is not needed).
+        say('This will move Current to Previous, Next to Current, and create the new Next week' + (writeBack ? ', here and in the Live sheet' : '') + '. Click again to confirm publication.', 'warn');
         setTimeout(() => { if (publishArmed === target && !publishBusy) { publishArmed = ''; b.classList.remove('armed'); say(''); } }, 8000);
         return;
       }
-      publishBusy = true; b.textContent = 'Publishing\u2026'; b.classList.remove('armed'); say('Waiting for saves still on their way, then publishing ' + shortDate(target) + '\u2026', 'warn');
+      publishBusy = true; b.textContent = 'Publishing\u2026'; b.classList.remove('armed'); say('Waiting for saves still on their way, then publishing ' + shortDate(target) + (writeBack ? ' and moving the Live sheet\'s weeks' : '') + '\u2026', 'warn');
       await savesDone();
       const out = await saveOptimistic('publishWeek', { weekStart: target }, () => {}, () => {}, render);
       publishBusy = false; publishArmed = '';
