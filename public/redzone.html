@@ -57,7 +57,7 @@
       </section>
       <section class="gps-card wide" id="give-card">
         <h2>3. What RedZone gives us</h2>
-        <p class="hint">Asks RedZone for every kind of thing it may hold: lines and areas, machines, sensors and data points, products, runs, downtime, shifts and sites. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
+        <p class="hint">Asks RedZone for every kind of thing it may hold: lines and areas, machines, sensors and data points, data sheets, products, runs, downtime, shifts and sites. RedZone keeps them by site, so it finds our sites first. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
         <div class="gps-buttons">
           <button type="button" class="primary big" id="give">Show What RedZone Gives Us</button>
           <button type="button" id="give-download" hidden>Download the List</button>
@@ -123,9 +123,13 @@
     function drawGive(g) {
       if (!g || !g.items) { $('give-list').innerHTML = ''; $('give-download').hidden = true; return; }
       const rows = g.items.map(x => '<tr' + (x.found ? '' : ' class="not-yet"') + '><th scope="row">' + escapeHtml(x.kind) + '</th><td>' +
-        (x.found ? '<b>' + escapeHtml(String(x.count)) + '</b>' : escapeHtml(x.status === 403 ? 'Not allowed (403)' : x.status === 404 || !x.status ? 'Not found' : 'Answered ' + x.status)) +
+        (x.found ? '<b>' + escapeHtml(String(x.count)) + '</b>' : escapeHtml(x.status === 403 ? 'Not allowed (403)' : x.status === 404 || !x.status ? 'Not found' : 'Answered ' + x.status) + (x.note ? '<div class="hint">' + escapeHtml(x.note) + '</div>' : '')) +
         '</td><td class="rz-path">' + escapeHtml(x.path || '') + '</td><td>' + escapeHtml((x.fields || []).join(', ')) + '</td><td>' + (x.examples || []).map(e => '<div>' + escapeHtml(e) + '</div>').join('') + '</td></tr>').join('');
-      $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' +
+      // Which RedZone site (enterprise) answered, and the sites it knows of.
+      const sites = (g.enterprises || []).map(e => (e.name ? e.name + ' ' : '') + e.id).join('; ');
+      const site = g.used ? '<p id="give-site"><b>Site used: ' + escapeHtml(g.used.name || 'the site') + '</b> (' + escapeHtml(g.used.enterprise) + ')</p>'
+        : g.enterprises ? '<p id="give-site" class="hint">No site answered yet.' + (sites ? ' Sites tried: ' + escapeHtml(sites) + '.' : ' RedZone did not name any sites.') + '</p>' : '';
+      $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' + site +
         '<div class="rz-scroll"><table class="gps-check rz-table"><colgroup><col style="width:13%"><col style="width:11%"><col style="width:22%"><col style="width:22%"><col style="width:32%"></colgroup><thead><tr><th>What</th><th>How many</th><th>RedZone address</th><th>What each one has</th><th>Examples</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
       $('give-download').hidden = false;
     }

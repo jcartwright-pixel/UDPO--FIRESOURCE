@@ -40,8 +40,8 @@ const SECRET = 'rz-secret-typed-once-5678';
     { kind: 'Lines and areas', found: true, path: '/locations', count: 14, fields: ['id', 'name', 'type'], examples: ['GALLON FILLER (type Line)', 'BLOW MOLD (type Line)'] },
     { kind: 'Sensors and data points', found: true, path: '/organizations/org1/data-points', count: 46, fields: ['id', 'name', 'locationName', 'lastValue', 'unit'], examples: ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)'] },
     { kind: 'Runs', found: false, path: '/runs', status: 403 },
-    { kind: 'Shifts', found: false, path: '/shifts', status: 404 }
-  ] } });
+    { kind: 'Shifts', found: false, path: '/shifts', status: 404, note: 'Not Found' }
+  ], used: { org: 'org1', enterprise: 'f99e6965', name: 'Uniontown' }, enterprises: [{ id: 'f99e6965', name: 'Uniontown', from: 'list' }] } });
   const browser = await chromium.launch();
   try {
     for (const [w, h] of [[1536, 730], [1920, 950], [800, 1100]]) {
@@ -55,7 +55,8 @@ const SECRET = 'rz-secret-typed-once-5678';
       // What RedZone gives us: one row per kind, with how many, the address, the fields and examples.
       await rz.waitForSelector('#give-list tbody tr');
       assert.deepEqual(await rz.$$eval('#give-list tbody tr', r => r.map(x => [...x.children].slice(0, 2).map(c => c.textContent))),
-        [['Lines and areas', '14'], ['Sensors and data points', '46'], ['Runs', 'Not allowed (403)'], ['Shifts', 'Not found']]);
+        [['Lines and areas', '14'], ['Sensors and data points', '46'], ['Runs', 'Not allowed (403)'], ['Shifts', 'Not foundNot Found']]);
+      assert.equal(await rz.textContent('#give-site'), 'Site used: Uniontown (f99e6965)', 'RedZone keeps its lists by site (enterprise)');
       assert.match(await rz.textContent('#give-list'), /Gallon Filler Count \(lastValue 1234, unit jugs, locationName GALLON FILLER\)/);
       assert.equal(await rz.isVisible('#give-download'), true);
       assert.deepEqual(await small(rz), [], 'text 16px or larger at ' + w);
