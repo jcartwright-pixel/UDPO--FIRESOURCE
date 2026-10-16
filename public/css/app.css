@@ -612,6 +612,10 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-mark.wait { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 .gps-page .gps-mark.none { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
+/* RedZone (Joe 10/11): the same cards, text at 16px. */
+.redzone-page .hint, .redzone-page .gps-steps { font-size: 16px; }
+.redzone-page label { font-size: 16px; text-transform: none; letter-spacing: 0; }
+.redzone-page .gps-result small { display: block; margin-top: 6px; font-size: 16px; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
    cross-fades from one screen to the next with the header and the menu held in place. */
