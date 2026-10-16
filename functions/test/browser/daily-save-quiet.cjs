@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Browser check (Joe 10/16): on Daily Dispatch a save is quiet. No "Saving... / Saved" sign pops up beside the title, and
+ * Browser check (Joe 10/16): on Daily and Weekly Dispatch a save is quiet. No "Saving... / Saved" sign pops up beside the title, and
  * the sheet does not jump: a busy day that scrolls inside the table keeps its scroll place after a save. A save that fails
  * still shows "Not saved" in red. Pictures go to SHOTS_DIR.
  */
@@ -74,6 +74,32 @@ async function openPage(browser, width, height, url) {
         await p.waitForFunction(() => { const x = document.getElementById('save-pill'); return x && !x.hidden && /Not saved/.test(x.textContent); });
         results.push(w + ': a refused save still showed "Not saved"');
       }
+      assert.deepEqual(p.errors, []);
+      await p.close();
+    }
+    // Weekly Dispatch the same (Joe 10/16): a driver pick saves with no sign and the buttons stay where they are.
+    {
+      const p = await openPage(browser, 1536, 864, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
+      await p.waitForSelector('tr td.day.editable[data-day="mon"]');
+      await p.waitForTimeout(800);
+      const btns = () => p.evaluate(() => [...document.querySelectorAll('.head button, .head a')].filter(b => b.offsetParent).map(b => Math.round(b.getBoundingClientRect().left)).join(','));
+      const before = await btns();
+      await p.click('xpath=//tr[td[1][text()="899"]]/td[@data-day="mon"]');
+      await p.selectOption('.popover select[data-kind="driver"]', 'drv_test_brook');
+      const seen = [];
+      for (let i = 0; i < 20; i++) {
+        seen.push(await p.evaluate(() => { const x = document.getElementById('save-pill'); return x && !x.hidden ? x.textContent : ''; }));
+        if (i === 2 && SHOTS) await p.screenshot({ path: path.join(SHOTS, (process.env.SHOT_NAME || 'weekly-save-quiet') + '-1536.png') });
+        await p.waitForTimeout(100);
+      }
+      await p.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '899' && /BROOK/.test(tr.children[3].textContent)), null, { timeout: 5000 });
+      if (process.env.SHOT_NAME !== 'weekly-before') {
+        assert.equal(seen.some(Boolean), false, 'no Saving / Saved sign on Weekly: ' + seen.join('|'));
+        assert.equal(await btns(), before, 'the Weekly buttons did not move');
+        await p.evaluate(async () => { const m = await import('./js/edit.js'); try { await m.saveOptimistic('noSuchAction', {}, () => {}, () => {}, () => {}); } catch (e) { /* shown on screen */ } });
+        await p.waitForFunction(() => { const x = document.getElementById('save-pill'); return x && !x.hidden && /Not saved/.test(x.textContent); });
+        results.push('Weekly 1536: a driver pick saved with no sign, the buttons stayed put, and a refused save still showed "Not saved"');
+      } else console.log('weekly before', seen.join('|'));
       assert.deepEqual(p.errors, []);
       await p.close();
     }
