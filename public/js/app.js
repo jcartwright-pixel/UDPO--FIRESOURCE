@@ -954,6 +954,9 @@ export function fitToWindow(lineCount, gap) {
   const sheet = document.querySelector('.sheet');
   if (!sheet) return;
   // Joe 10/10: rows never shrink below readable print (16px text). A busy day scrolls inside the table instead.
+  // Joe 10/16: a save redraws the table; the table and the page stay where they were scrolled instead of jumping.
+  const box = sheet.closest('.side-main') || document.scrollingElement;
+  const keepSheet = sheet.scrollTop, keepBox = box.scrollTop;
   sheet.classList.remove('fit-scroll');
   sheet.style.maxHeight = '';
   const top = sheet.getBoundingClientRect().top;
@@ -972,7 +975,6 @@ export function fitToWindow(lineCount, gap) {
   apply(row);
   // Borders and the RUNS tags add a little to each line; step down until the page truly fits.
   // The page scrolls in the side-menu shell's content box when there is one, else the window.
-  const box = sheet.closest('.side-main') || document.scrollingElement;
   const over = () => box.scrollHeight > box.clientHeight + 1 || document.scrollingElement.scrollHeight > window.innerHeight;
   while (row > FIT_ROW_MIN && over()) apply(--row);
   if (over()) {
@@ -980,6 +982,8 @@ export function fitToWindow(lineCount, gap) {
     sheet.classList.add('fit-scroll');
     sheet.style.maxHeight = Math.max(160, Math.min(window.innerHeight, box.getBoundingClientRect().bottom || window.innerHeight) - top - footerH - 8) + 'px';
   }
+  if (sheet.scrollTop !== keepSheet) sheet.scrollTop = keepSheet;
+  if (box.scrollTop !== keepBox) box.scrollTop = keepBox;
 }
 const FIT_ROW_MIN = 32, FIT_FONT_MIN = 16;
 

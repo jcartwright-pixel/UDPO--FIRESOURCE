@@ -17,21 +17,27 @@ const L = window.UDLogic;
  */
 let pending = 0, failed = false;
 window.UD_EDIT_PILL = true;   // this module shows the sign itself, around a whole save
+// Joe 10/16: Daily Dispatch (window.UD_QUIET_SAVES) shows no "Saving... / Saved" sign at all; only a save that failed says
+// "Not saved", and the next save that works takes it away.
+function pill(state) {
+  if (window.UD_QUIET_SAVES && state !== 'failed') { const p = document.getElementById('save-pill'); if (p) p.hidden = true; return; }
+  savePill(state);
+}
 async function save(action, fields) {
   if (!pending) failed = false;
   pending++;
-  savePill('saving');
+  pill('saving');
   try {
     const out = await sendSave(action, fields);
     pending--;
-    if (!pending) savePill(failed ? 'failed' : 'saved');
+    if (!pending) pill(failed ? 'failed' : 'saved');
     // A save that worked clears an old error from an earlier one.
     if (!pending && !failed) showError('');
     return out;
   } catch (e) {
     pending--;
     failed = true;
-    savePill(pending ? 'saving' : 'failed');
+    pill(pending ? 'saving' : 'failed');
     throw e;
   }
 }
