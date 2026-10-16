@@ -25,7 +25,9 @@ const COLLECTIONS = Object.freeze({
   config: 'config', weeks: 'weeks', runs: 'runs', drivers: 'drivers', equipment: 'equipment',
   routes: 'routes', users: 'users', actions: 'actions', transfers: 'transfers',
   outbox: 'outbox', conflicts: 'conflicts', exceptions: 'exceptions', vacations: 'vacations',
-  plantLoads: 'plantLoads', masterOutbox: 'masterOutbox', maintenance: 'maintenance'
+  plantLoads: 'plantLoads', masterOutbox: 'masterOutbox', maintenance: 'maintenance',
+  // Joe 10/16: drivers marked Backup for a day on the Weekly board (app only; never written to the sheets).
+  backups: 'driverBackups'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });

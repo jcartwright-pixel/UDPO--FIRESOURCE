@@ -199,7 +199,10 @@ function validate(input) {
     out.endDate = dateOrBlank(input.endDate || input.startDate, 'End date');
     if (!out.driverId || !out.startDate || !out.endDate) throw new SaveError('BAD_REQUEST', 'Driver, Start Date and End Date are required');
     if (out.endDate < out.startDate) throw new SaveError('BAD_REQUEST', 'End Date cannot be before Start Date');
-    out.status = text(input.status, 20).toUpperCase() === 'AVAILABLE' || text(input.status, 20).toUpperCase() === 'CLEAR' ? 'AVAILABLE' : 'UNAVAILABLE';
+    const status = text(input.status, 20).toUpperCase();
+    // Joe 10/16: BACKUP marks the driver Backup on those days (available, on call to cover a route).
+    out.status = status === 'AVAILABLE' || status === 'CLEAR' ? 'AVAILABLE' : status === 'BACKUP' ? 'BACKUP' : 'UNAVAILABLE';
+    if (out.status === 'BACKUP' && L.daysBetween(out.startDate, out.endDate) > 62) throw new SaveError('BAD_REQUEST', 'Backup can be set for at most two months at a time');
     out.reason = text(input.reason, 40).toUpperCase() || 'OTHER';
     if (EXCEPTION_REASONS.indexOf(out.reason) < 0) out.reason = 'OTHER';
     out.note = text(input.note, 300);

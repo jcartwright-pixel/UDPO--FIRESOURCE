@@ -187,8 +187,8 @@ function checkinExtras(f, d, equipment) {
 function scheduleWeek(today) { const week = L.weekStart(today); return L.dayPrefix(today) === 'sat' ? L.addDays(week, 7) : week; }
 const employeeKey = (v) => { const t = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' '); return /^\d+$/.test(t) ? String(Number(t)) : t; };
 const titleWord = (t) => String(t || '').toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
-function scheduleDays(driver, rows, exceptions, week) {
-  const board = L.driverBoardRows([driver], rows, exceptions, week)[0];
+function scheduleDays(driver, rows, exceptions, week, backups) {
+  const board = L.driverBoardRows([driver], rows, exceptions, week, backups)[0];
   return L.DAYS.map((p, i) => {
     const date = L.addDays(week, i), c = board ? board.days[p] : null;
     const runs = rows.filter(r => r.days[p].runs && r.days[p].driverId === driver.id).map(r => {
@@ -197,8 +197,9 @@ function scheduleDays(driver, rows, exceptions, week) {
     });
     // Off on a day with a run (the exception wins on the board too): the run still shows, marked off.
     const off = c && (c.kind === 'vacation' || c.kind === 'unavailable' || c.kind === 'conflict') ? titleWord(L.exceptionLabel(L.exceptionOn(exceptions, driver.id, date)) || 'Off') : '';
-    const status = runs.length ? (off ? 'Off: ' + off : '') : off ? 'Off: ' + off : c && c.kind === 'off' ? 'Off' : 'Not scheduled';
-    return { day: p, date, runs, status, kind: runs.length ? (off ? 'conflict' : 'work') : c && c.kind === 'available' || !c ? 'none' : 'off' };
+    // Joe 10/16: a Backup day reads Backup (on call to cover a route).
+    const status = runs.length ? (off ? 'Off: ' + off : '') : off ? 'Off: ' + off : c && c.kind === 'backup' ? 'Backup' : c && c.kind === 'off' ? 'Off' : 'Not scheduled';
+    return { day: p, date, runs, status, kind: runs.length ? (off ? 'conflict' : 'work') : c && (c.kind === 'available' || c.kind === 'backup') || !c ? 'none' : 'off' };
   });
 }
 async function mySchedule(db, input, stamp) {
@@ -210,12 +211,13 @@ async function mySchedule(db, input, stamp) {
   const today = L.operatingDay(new Date(stamp)), week = scheduleWeek(today);
   const runs = (await db.collection(C.runs).where('weekStart', '==', week).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
   const exceptions = (await db.collection(C.exceptions).where('driverId', '==', driver.id).get()).docs.map(d => d.data());
+  const backups = (await db.collection(C.backups).where('driverId', '==', driver.id).get()).docs.map(d => d.data());
   const rows = L.weeklyRows(runs, week);
   // Posted: Weekly Publish has made the week the Live Current week (or it is already behind it); before that Dispatch may still change it.
   const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
   const posted = rows.length > 0 && (!live.current || week <= live.current);
   return { driverId: driver.id, name: driver.name, employeeId: String(driver.employeeId || '').trim(), week, end: L.addDays(week, 6), today, posted, built: rows.length > 0,
-    days: scheduleDays(driver, rows, exceptions, week), at: stamp };
+    days: scheduleDays(driver, rows, exceptions, week, backups), at: stamp };
 }
 
 async function phoneCall(db, input, now) {
