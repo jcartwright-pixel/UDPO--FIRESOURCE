@@ -61,7 +61,8 @@ function exceptionValues(reason) {
 }
 
 /*
- * Driver Call-Off (Daily) and Driver availability (Weekly board). UNAVAILABLE adds a day-off entry. AVAILABLE
+ * Driver Call-Off (Daily) and Driver availability (Weekly board). UNAVAILABLE adds a day-off entry. BACKUP (Joe 10/16) does
+ * what AVAILABLE does and also marks the driver Backup on those days. AVAILABLE
  * ("Return Available") frees only the days given: an entry inside them is cancelled, one that starts before keeps
  * its earlier days, one that ends after keeps its later days, one around them keeps both sides. Test copy only.
  */
@@ -71,6 +72,15 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
   const mine = await tx.get(db.collection(C.exceptions).where('driverId', '==', driver.id));
   const runSnaps = await runsForDays(tx, db, req.startDate, req.endDate);
   freeRunsForDayOff(tx, db, req, runSnaps, driver, req.status === 'UNAVAILABLE' ? exceptionValues(req.reason).reasonCode : '', stamp, email, mode, result);
+  // Joe 10/16: Backup is kept in the app only (driverBackups, one per driver and day). Any other choice for those days takes it off.
+  const backupDays = [];
+  for (let day = req.startDate; day <= req.endDate && backupDays.length < 100; day = L.addDays(day, 1)) backupDays.push(day);
+  backupDays.forEach(day => {
+    const ref = db.collection(C.backups).doc(driver.id + '__' + day);
+    if (req.status === 'BACKUP') tx.set(ref, { driverId: driver.id, date: day, note: req.note || '', setAt: stamp, setBy: email });
+    else tx.delete(ref);
+  });
+  if (req.status === 'BACKUP') result.backup = backupDays;
   if (req.status === 'UNAVAILABLE') {
     const id = 'dav_' + req.requestId.slice(-12).toLowerCase();
     const v = exceptionValues(req.reason);
@@ -106,7 +116,7 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
     }
     changed.push({ id: snap.id, startDate: a, endDate: z, status: e.status });
   });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: changed, after: { available: [req.startDate, req.endDate] }, result });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: changed, after: req.status === 'BACKUP' ? { backup: [req.startDate, req.endDate] } : { available: [req.startDate, req.endDate] }, result });
   return result;
 }
 

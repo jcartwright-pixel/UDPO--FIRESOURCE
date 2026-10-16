@@ -43,7 +43,7 @@ async function save(action, fields) {
 }
 export function savesPending() { return pending; }
 window.addEventListener('beforeunload', e => { if (pending) { e.preventDefault(); e.returnValue = 'A change is still saving. Leave anyway?'; } });
-export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], ops: L.opsAssignments([]), person: null, app: {} };
+export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], backups: [], ops: L.opsAssignments([]), person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
 let screenKey = 'dailyDispatch';
@@ -78,6 +78,8 @@ export async function watchLists(user, onChange) {
   // Review item 73 (Joe 10/13): only days off ending in the previous Live week or later (Daily and Weekly show the Live weeks),
   // not every one ever entered.
   onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.addDays(L.weekStart(L.operatingDay(new Date())), -7))), snap => { lists.exceptions = snap.docs.map(d => d.data()); onChange(); });
+  // Joe 10/16: drivers marked Backup for a day (Weekly board).
+  onSnapshot(query(collection(db, 'driverBackups'), where('date', '>=', L.addDays(L.weekStart(L.operatingDay(new Date())), -7))), snap => { lists.backups = snap.docs.map(d => d.data()); onChange(); });
   // Operational Assignments: Carrier, Fairmont... offered under Other CVG / Carriers in the driver lists.
   onSnapshot(collection(db, 'opsAssignments'), snap => { lists.ops = L.opsAssignments(snap.docs.map(d => d.data())); onChange(); });
   // Which app runs each screen: a screen still run from the current app is view only here once any screen has moved.
@@ -114,7 +116,8 @@ const KINDS = {
       const off = opts.date ? L.exceptionOn(lists.exceptions, d.id, opts.date) : null;
       if (off && !opts.override) return null;
       const why = !L.driverActive(d) ? d.status : off ? L.exceptionLabel(off) : '';
-      return { id: d.id, text: d.name + (why && opts.override ? '  [' + why + ']' : '') };
+      const backup = !why && opts.date && L.backupOn(lists.backups, d.id, opts.date) ? '  [BACKUP]' : '';
+      return { id: d.id, text: d.name + (why && opts.override ? '  [' + why + ']' : '') + backup };
     }).filter(Boolean);
   } },
   truck: { action: 'assignTruck', field: 'equipmentId', idKey: 'truckId', textKey: 'truck', list: (opts) => units(lists.allTrucks, opts).map(e => ({ id: e.id, text: e.unit + (unitWhy(e, opts) ? '  [' + unitWhy(e, opts) + ']' : ''), why: !!unitWhy(e, opts) })) },

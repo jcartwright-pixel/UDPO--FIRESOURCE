@@ -112,6 +112,15 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   assert.deepEqual([board[1].days.mon.text, board[1].days.mon.kind], ['801 / 802', 'booked']);
   assert.deepEqual([board[2].days.mon.text, board[2].days.mon.kind], ['806', 'conflict']);
   assert.deepEqual([board[2].days.tue.text, board[2].days.tue.kind], ['AVAILABLE', 'available']);
+  // Joe 10/16: Backup shows on a day with no route and no day off; a route or a day off wins.
+  const backups = [{ driverId: 'c', date: '2026-10-06' }, { driverId: 'c', date: '2026-10-05' }, { driverId: 'a', date: '2026-10-05' }];
+  const withBackup = L.driverBoardRows(drivers, rows, exceptions, '2026-10-04', backups);
+  assert.deepEqual([withBackup[2].days.tue.text, withBackup[2].days.tue.kind], ['BACKUP', 'backup']);
+  assert.deepEqual([withBackup[2].days.mon.text, withBackup[2].days.mon.kind], ['806', 'conflict']);
+  assert.deepEqual([withBackup[1].days.mon.text, withBackup[1].days.mon.kind], ['801 / 802', 'booked']);
+  assert.equal(withBackup[2].days.wed.kind, 'available');
+  assert.equal(L.backupOn(backups, 'c', '2026-10-06'), true);
+  assert.equal(L.backupOn(backups, 'c', '2026-10-07'), false);
 });
 
 test('Driver Assignment Board names a repeated run once with its count, one line each', () => {
