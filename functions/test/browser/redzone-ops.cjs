@@ -71,6 +71,8 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
   // The Blow Mold's one product, with no speed typed yet (its SKU on the Product Sheet is its name).
   await db().collection('plantProducts').doc(BLOW).set({ operationId: BLOW, line: 'BLOW MOLD', facilityId: 'fac_uniontown', products: [{ name: 'Gallon Jug', sku: 'Gallon Jug' }] });
   await db().collection('private').doc('redzone').set({ lastSync: SYNC });
+  // RedZone's count feed is off for our account (Joe 10/16).
+  await db().collection('config').doc('redzone').set({ events: { on: false, at: RZ.at, status: 404 } }, { merge: true });
   const results = [];
   const browser = await chromium.launch();
   try {
@@ -95,6 +97,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
       await lt.waitForFunction(() => /RedZone · Blow Mold/.test((document.getElementById('rz') || {}).textContent || ''));
       const box = await lt.textContent('#rz');
       assert.match(box, /Sensors: Default/);
+      assert.match(box, /Efficiency from RedZone counts\s*RedZone's count feed is off for our account \(asked RedZone 10-16-26\)\. Each run's count and efficiency show here once RedZone turns it on\./);
       assert.match(box, /Machines: Blow Molder, Changeover and Cleaning/);
       assert.match(box, /Line Stopped choices on the Line Tablet: Blow mold is down, Bottle Jam, Adjusting weights, No Orders, Mold change, Resin feed, Leak tester down, Trimmer jam, Conveyor \/ bottle jam, Heater \/ temperature, Maintenance called, Other/);
       assert.doesNotMatch(box, /Bag Not Sealing/, 'the bag sealer\'s problems are the Dairy Queen\'s');
@@ -131,6 +134,30 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
       await lt.close();
     }
     results.push('Line Targets (1536, 1920, 800): RedZone · Blow Mold, Sensors: Default, its machines, the Line Stopped choices from RedZone, Gallon Jug ran at 50 a minute; Fill Empty Speeds from RedZone saved 50 and 85%; another RedZone line can be picked; temperature 1,000 to 1,350°F when empty');
+
+    // With the feed on: today's Blow Mold run, its count against 50 a minute, and Refresh from RedZone.
+    {
+      const now = Date.now();
+      await db().collection('config').doc('redzone').set({ events: { on: true, at: new Date().toISOString(), events: 3, runs: 1 } }, { merge: true });
+      await db().collection('redzoneRuns').doc('run-today').set({ runUUID: 'run-today', locationUUID: 'loc-bm', product: 'Gallon Jug', startTime: now - 3600000, countAt: now, count: 2700, ratePerMin: 50, at: new Date().toISOString() });
+      await db().collection('redzoneRuns').doc('run-gallon').set({ runUUID: 'run-gallon', locationUUID: 'loc-g', product: 'Broughton 2% Gallon', startTime: now - 3600000, countAt: now, count: 10, ratePerMin: 74, at: new Date().toISOString() });
+      for (const w of [1536, 800]) {
+        const lt = await openPage(browser, w, w === 800 ? 1200 : 960, '/linetargets.html?line=' + BLOW + '&' + ADMIN);
+        await lt.waitForSelector('#rz-counts tbody tr');
+        assert.deepEqual(await lt.$$eval('#rz-counts tbody tr', r => r.map(x => [...x.children].map(c => c.textContent)).map(c => [c[0], c[2], c[3], c[4], c[5]])), [['Gallon Jug', 'running', '2,700', '3,000', '90%']], 'only the Blow Mold\'s run');
+        assert.deepEqual(await small(lt, '#rz'), [], 'text 16px or larger at ' + w);
+        assert.ok(await fits(lt) <= 0, 'no sideways scrolling at ' + w);
+        if (w === 1536) {
+          await lt.$eval('#rz-counts', e => e.scrollIntoView({ block: 'center' }));
+          await shot(lt, 'rz-line-targets-efficiency-1536');
+          await lt.click('#rz-refresh');
+          await lt.waitForFunction(() => /RedZone is not set up\./.test(document.getElementById('rz').textContent));
+        }
+        assert.deepEqual(lt.errors, []);
+        await lt.close();
+      }
+    }
+    results.push('Line Targets: with RedZone\'s count feed off it says so; on, today\'s Blow Mold run shows 2,700 counted against 3,000 at full speed, 90%, and Refresh from RedZone reads it now');
 
     // The Line Tablet: Line Stopped shows RedZone's problem types for the Blow Mold.
     const tb = await openPage(browser, 1024, 1180, '/line.html?line=' + BLOW + '&' + ADMIN);

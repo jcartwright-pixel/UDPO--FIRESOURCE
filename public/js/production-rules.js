@@ -584,6 +584,14 @@
     runs.forEach(function (r) { var p = byId[r.productTypeUUID]; if (p && !seen[p.uuid]) { seen[p.uuid] = 1; products.push(p); } });
     return { products: products, runs: runs.map(function (r) { return Object.assign({ product: (byId[r.productTypeUUID] || {}).name || '' }, r); }) };
   }
+  // Joe 10/16: a run's efficiency from RedZone's count feed: the count against the standard speed for the minutes it has run
+  // (start to its end, or to the newest count). null when RedZone has not given all three.
+  function rzEfficiency(run) {
+    var start = num(run && run.startTime), upTo = num(run && (run.endTime || run.countAt)), rate = num(run && run.ratePerMin), count = num(run && run.count);
+    if (start === null || upTo === null || !(rate > 0) || count === null || upTo <= start) return null;
+    var minutes = (upTo - start) / 60000, expected = rate * minutes;
+    return { minutes: Math.round(minutes), expected: Math.round(expected), pct: Math.round(count / expected * 100) };
+  }
   // Fill empty Full speed and Target % boxes from RedZone (matched by SKU, then name). Boxes with a number stay as they are.
   function rzFill(list, rzProducts) {
     var bySku = {}, byName = {}, changed = [];
@@ -599,7 +607,7 @@
     return { list: out, changed: changed };
   }
 
-  return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
+  return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, rzEfficiency: rzEfficiency, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
