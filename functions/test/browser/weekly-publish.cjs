@@ -69,6 +69,26 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     assert.equal(await page.$('#rows td.day.editable'), null, 'an older week cannot be edited');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '5-older-week-1920.png') });
     assert.deepEqual(page.errors, []);
+
+    // Joe 10/16 (a refused Publish, "[403]"): with the write-back on, the Live sheet's weeks are moved by the current app's
+    // Publish. One click says so plainly, saves nothing, and shows no "Not saved".
+    const liveBefore = (await db().collection('config').doc('app').get()).data().liveWeeks;
+    await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
+    for (const [width, height] of [[1536, 864], [1920, 950]]) {
+      const wb = await openPage(browser, width, height, '/weekly.html?week=' + liveBefore.next + '&testEmail=dispatch.test@uniteddairy.com');
+      await wb.waitForSelector('#rows tr td.day');
+      await wb.waitForFunction(() => !document.getElementById('publish').disabled);
+      await wb.click('#publish');
+      await wb.waitForFunction(() => /press Publish to Daily Dispatch in the old app/.test(document.getElementById('wk-note').textContent));
+      assert.equal(await wb.textContent('#publish'), 'Publish to Daily Dispatch', 'no Click Again step: nothing is sent');
+      await wb.waitForTimeout(800);
+      assert.equal(await wb.$eval('#error', el => el.hidden), true, 'no red refusal');
+      assert.doesNotMatch(await wb.innerText('body'), /Not saved/);
+      if (SHOTS) await wb.screenshot({ path: path.join(SHOTS, '6-writeback-publish-' + width + '.png') });
+      assert.deepEqual(wb.errors, []);
+      await wb.close();
+    }
+    assert.deepEqual((await db().collection('config').doc('app').get()).data().liveWeeks, liveBefore, 'the weeks did not move');
     console.log('weekly-publish: OK');
   } finally {
     await browser.close();

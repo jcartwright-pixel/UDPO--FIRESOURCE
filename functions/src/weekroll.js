@@ -125,7 +125,7 @@ const shortDate = (k) => { const [, m, d] = String(k).split('-').map(Number); re
  * Returns {previousWeek, currentWeek, nextWeek, built, filled, message}.
  */
 async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveError) {
-  if (mode.writeBack) throw new SaveError('NOT_ALLOWED', 'Publish moves the weeks in Operations only. With the write-back on, publish in the current app so the sheet and the Operations app keep the same weeks.');
+  if (mode.writeBack) throw new SaveError('NOT_ALLOWED', 'To publish this week, press Publish to Daily Dispatch in the old app\'s Weekly Dispatch. While the write-back is on the Live sheet\'s weeks are moved there, and Operations shows the new weeks about a minute later.');
   if (!live.current || !live.next || L.addDays(live.current, 7) !== live.next) throw new SaveError('CHANGED', 'The Live weeks are not in order (Current ' + (live.current || '?') + ', Next ' + (live.next || '?') + '). Refresh Weekly Dispatch before publishing.');
   const weeks = { previous: live.current, current: live.next, next: L.addDays(live.next, 7) };
   const today = L.operatingDay(new Date(stamp));
