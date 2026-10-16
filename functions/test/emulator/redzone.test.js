@@ -244,3 +244,26 @@ test('What RedZone gives us: a 403 "invalid organization" never picks the organi
   assert.ok(!urls.some(u => /united-dairy\/enterprises/.test(u)), 'the saved organization answered first, so the name is never tried as one');
   assert.equal(r.foundOrgId, 'org_mA7');
 });
+
+// Joe 10/16 (test copy): "Why did the test connection fail this time and gave me an error code?" A wrong organization kept
+// from an earlier list made Test Connection say RedZone "refused the sign-in (403)". The typed IDs are tried too, and a
+// refused list is said as a refused list, with RedZone's own words.
+test('Test Connection: a stale organization found earlier falls back to the typed one and is fixed; a refused list is not called a refused sign-in', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e6965' });
+  await db().collection('private').doc('redzone').set({ foundOrgId: 'united-dairy', foundEnterpriseId: 'f99e6965', foundTokenUrl: 'https://api.rz-ops.com/public/v3/oauth/token' }, { merge: true });
+  const make = (good) => async (url) => {
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    const path = new URL(url).pathname.replace('/public/v2', '');
+    if (good && path === '/organizations/org_mA7/enterprises/f99e6965/product-types') return reply(200, { items: [{ uuid: 'p1', name: '36% Cream', sku: '294' }] });
+    return reply(403, { message: 'security requirements failed: invalid organization' });
+  };
+  const bad = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: make(false) });
+  assert.equal(bad.result.ok, false);
+  assert.match(bad.result.message, /^Signed in, but RedZone said no to the product list \(403 security requirements failed: invalid organization\)\. Press Show What RedZone Gives Us/);
+  assert.doesNotMatch(bad.result.message, /refused the sign-in/);
+  const ok = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: make(true) });
+  assert.match(ok.result.message, /Connected\. RedZone sent 1 product\./);
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).foundOrgId, 'org_mA7', 'the organization that answered is kept');
+});

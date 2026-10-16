@@ -141,7 +141,12 @@ async function fetchProducts(d, o, ref) {
   for (let page = 0; url && page < PAGE_LIMIT && out.length < PRODUCT_LIMIT; page++) {
     if (!sameHost(url, address)) throw new Error('The products address must be https on the same RedZone address');
     const res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-    if (!res.ok) throw new Error('RedZone answered ' + res.status + ' for the products address');
+    if (!res.ok) {
+      // RedZone's own words ("invalid organization") say more than the bare number.
+      let note = ''; try { note = clean(text(field(JSON.parse(await res.text()) || {}, ['message', 'error', 'detail', 'title'])), 120); } catch (e) { /* no words */ }
+      if (note.includes(token) || (d.clientSecret && note.includes(d.clientSecret))) note = '';
+      throw new Error('RedZone answered ' + res.status + ' for the products address' + (note ? ': ' + note : ''));
+    }
     let body; try { body = JSON.parse(await res.text()); } catch (e) { throw new Error('RedZone sent something that is not JSON for the products address'); }
     const list = listIn(body);
     if (!list) throw new Error('RedZone\'s answer has no product list in it');
@@ -306,7 +311,9 @@ async function discover(d, o, ref, extra) {
   return { items: items.map(({ list, ...x }) => x), used, orgChecks, probes: probes.slice(0, 30), claims: claims.slice(0, 12) };
 }
 
-const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
+const plain = (e) => /answered 403 for the products address/.test(e.message) ? 'Signed in, but RedZone said no to the product list (' + e.message.replace(/^RedZone answered 403 for the products address:? ?/, '403 ').trim()
+    + '). Press Show What RedZone Gives Us, then Test Connection again.'
+  : /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
   : /answered 404/.test(e.message) ? 'RedZone has no page at that address (404). Check the API address and products address from the Developer Hub.'
   : 'Could not read RedZone: ' + e.message;
 
@@ -363,12 +370,22 @@ async function redzoneCall(db, user, input, options) {
     try {
       // The sign-in first: a client ID and secret RedZone takes are a pass even before the products address is right.
       const signedIn = !d.token && !!(await accessToken(d, o, ref)), fresh = (await ref.get()).data() || d;
+      // Joe 10/16: the organization and site found earlier can be stale (a wrong one was kept once). The ones typed on this
+      // screen are tried too, and whichever answers is kept.
+      const typed = Object.assign({}, fresh, { foundOrgId: '', foundEnterpriseId: '' });
+      const tries = fresh.orgId && fresh.enterpriseId && (orgOf(typed) !== orgOf(fresh) || entOf(typed) !== entOf(fresh)) ? [fresh, typed] : [fresh];
       try {
-        const list = await fetchProducts(fresh, o, ref), active = list.filter(p => p.active);
+        let list;
+        for (let i = 0; i < tries.length; i++) {
+          try { list = await fetchProducts(tries[i], o, ref); } catch (e) { if (i === tries.length - 1 || !/for the products address/.test(e.message)) throw e; continue; }
+          if (i > 0) await ref.set({ foundOrgId: orgOf(typed), foundEnterpriseId: entOf(typed) }, { merge: true });
+          break;
+        }
+        const active = list.filter(p => p.active);
         result = { ok: true, message: 'Connected. RedZone sent ' + list.length + ' product' + (list.length === 1 ? '' : 's') + (active.length !== list.length ? ' (' + active.length + ' active)' : '') + '.', products: list.length,
           sample: active.slice(0, 3).map(p => p.name + (p.sku ? ' (' + p.sku + ')' : '')) };
       } catch (e) {
-        if (!signedIn || /answered 40[13]/.test(e.message)) throw e;
+        if (!signedIn || /answered 40[13]/.test(e.message) || e instanceof RedzoneError) throw e;
         result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').', products: 0 };
       }
     } catch (e) { result = { ok: false, message: e instanceof RedzoneError ? 'Not tested: ' + e.message : plain(e) }; }
