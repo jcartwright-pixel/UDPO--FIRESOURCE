@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>RedZone · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="gps-page redzone-page">
+  <div class="signin" id="signin" hidden>
+    <h1>RedZone</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · Connections &amp; Keys</span><h1>RedZone</h1></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="gps-grid">
+      <section class="gps-card">
+        <h2>1. RedZone API sign-in <span class="pill" id="state">-</span></h2>
+        <p class="hint">Type these here only, never in a chat or email. Once saved they are locked away and never shown again; only the last 4 characters show. A box left blank keeps what is saved.</p>
+        <form id="form" autocomplete="off" onsubmit="return false">
+          <label>Client ID<input id="f-client" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Client secret<input id="f-secret" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Organization ID (only if RedZone gave you one)<input id="f-org" autocomplete="off" spellcheck="false"></label>
+          <label>Enterprise ID (only if RedZone gave you one)<input id="f-ent" autocomplete="off" spellcheck="false"></label>
+          <label>API address<input id="f-address" autocomplete="off" spellcheck="false"></label>
+          <label>Token address<input id="f-tokenurl" autocomplete="off" spellcheck="false"></label>
+          <label>API token (only instead of a client ID and secret)<input id="f-token" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Products address<input id="f-path" autocomplete="off" spellcheck="false" placeholder="/products"></label>
+          <div class="gps-buttons">
+            <button type="button" class="primary" id="save">Save</button>
+            <button type="button" id="clear">Remove Sign-in</button>
+          </div>
+        </form>
+        <p class="hint" id="saved"></p>
+      </section>
+      <section class="gps-card">
+        <h2>2. Test connection</h2>
+        <p class="hint">Signs in to RedZone with what is saved and reads the product list. Nothing is ever changed in RedZone.</p>
+        <div class="gps-buttons"><button type="button" class="primary big" id="test">Test Connection</button></div>
+        <div class="gps-result" id="result" hidden></div>
+        <p class="hint" id="last"></p>
+      </section>
+      <section class="gps-card wide" id="give-card">
+        <h2>3. What RedZone gives us</h2>
+        <p class="hint">Reads every list RedZone's API has: lines and areas, machines, sensors, products, product groups, units, characteristics, check sheets (blank and completed), problem types, runs, shifts and labels. RedZone keeps them by site, so it checks our organization and finds our site first. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
+        <p class="hint" id="give-not">Not in RedZone's API (per its own reference): sensor readings, logged downtime and problems, and past counts or OEE. Counts and units lost only come as a live feed from the moment we start reading.</p>
+        <div class="gps-buttons">
+          <button type="button" class="primary big" id="give">Show What RedZone Gives Us</button>
+          <button type="button" id="give-download" hidden>Download the List</button>
+        </div>
+        <label class="rz-try">Also try this list (optional, for example assets)<input id="give-path" autocomplete="off" spellcheck="false"></label>
+        <div class="gps-result" id="give-result" hidden></div>
+        <div class="rz-give" id="give-list"></div>
+      </section>
+      <section class="gps-card wide" id="ops-card">
+        <h2>4. Read RedZone into Operations</h2>
+        <p class="hint">Copies RedZone's lines with their sensor names, its products with full speed, target and crew, its latest runs, its problem types and its check sheets into Operations. Line Targets then shows each line's RedZone match and fills empty speeds, and the Line Tablet's Line Stopped choices become RedZone's problem types for that line. Read again any time; nothing is ever changed in RedZone.</p>
+        <div class="gps-buttons"><button type="button" class="primary big" id="sync">Read RedZone into Operations</button></div>
+        <div class="gps-result" id="sync-result" hidden></div>
+        <div class="rz-give" id="sync-list"></div>
+      </section>
+      <section class="gps-card wide">
+        <h2>5. Where these come from</h2>
+        <ol class="gps-steps">
+          <li>Your everyday RedZone user name and password do not go here. RedZone's API uses a client ID and secret, made by a RedZone login with admin rights.</li>
+          <li>In RedZone, Manage Access &gt; Roles &gt; Create Role: name it "Operations App Read Only" and turn on only <b>Basic Access</b>. Everything else stays off: Admin and every "Configure" or manage switch.</li>
+          <li>Organization drop-down &gt; Organization Settings &gt; Client Applications &gt; Create Application: name it "Operations App" and pick that role. RedZone shows the Client ID and Client Secret.</li>
+          <li>Type the client ID and client secret in box 1 and press <b>Save</b>. The API and token addresses are already filled in (RedZone's api.rz-ops.com). The app gets and renews its own tokens; you never handle one.</li>
+          <li>Press <b>Test Connection</b>. Green means it works; red says what to fix. RedZone's integrations team: integrations@rzsoftware.com.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText } from './js/app.js';
+
+    // Joe 10/16: back, with RedZone's own addresses filled in (support's answer).
+    // Joe 10/11: "tap into" RedZone. The sign-in is administrators only and never shown back (functions/src/redzone.js).
+    let s = null, armed = null;
+    const $ = (id) => document.getElementById(id);
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
+    function render() {
+      if (!s) return;
+      const signIn = s.hasToken || (s.hasClient && s.hasSecret), ready = signIn, some = s.orgId || s.hasToken || s.hasClient;
+      $('state').textContent = ready ? 'Saved' : some ? 'Partly saved' : 'Not saved';
+      $('state').className = 'pill ' + (ready ? 'yes' : some ? 'warn' : 'no');
+      $('f-token').placeholder = s.hasToken ? 'saved, ends ' + s.tokenEnds + ' (paste to replace)' : '';
+      $('f-client').placeholder = s.hasClient ? 'saved, ends ' + s.clientEnds + ' (paste to replace)' : '';
+      $('f-secret').placeholder = s.hasSecret ? 'saved (paste to replace)' : '';
+      [['f-org', 'orgId'], ['f-ent', 'enterpriseId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
+      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
+      const t = s.lastTest;
+      drawGive(s.lastDiscover);
+      drawSync(s.lastSync);
+      $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
+    }
+    async function call(fields, button) {
+      showError('');
+      if (button) button.disabled = true;
+      try { s = await callServer('redzone', fields); render(); return s; }
+      catch (e) { showError('Could not reach the RedZone settings (' + (e.message || String(e)) + ').'); return null; }
+      finally { if (button) button.disabled = false; }
+    }
+    $('save').onclick = async () => {
+      const r = await call({ op: 'save', orgId: $('f-org').value, enterpriseId: $('f-ent').value, address: $('f-address').value, token: $('f-token').value, clientId: $('f-client').value, clientSecret: $('f-secret').value, tokenUrl: $('f-tokenurl').value, productsPath: $('f-path').value }, $('save'));
+      if (r) { ['f-token', 'f-client', 'f-secret'].forEach(id => { $(id).value = ''; }); $('result').hidden = true; }
+    };
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the token, client ID and secret.
+    $('clear').onclick = async () => {
+      const b = $('clear');
+      if (!armed) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); armed = setTimeout(() => { armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed'); }, 5000); return; }
+      clearTimeout(armed); armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed');
+      await call({ op: 'clear' }, b);
+    };
+    // Joe 10/16: "what everything reads ... what sensors we have available".
+    function drawGive(g) {
+      if (!g || !g.items) { $('give-list').innerHTML = ''; $('give-download').hidden = true; return; }
+      const rows = g.items.map(x => '<tr' + (x.found ? '' : ' class="not-yet"') + '><th scope="row">' + escapeHtml(x.kind) + '</th><td>' +
+        (x.found ? '<b>' + escapeHtml(String(x.count)) + '</b>' : escapeHtml(x.status === 403 ? 'Not allowed (403)' : x.status === 404 || !x.status ? 'Not found' : 'Answered ' + x.status) + (x.note ? '<div class="hint">' + escapeHtml(x.note) + '</div>' : '')) +
+        '</td><td class="rz-path">' + escapeHtml(x.path || '') + '</td><td>' + escapeHtml((x.fields || []).join(', ')) + '</td><td>' + (x.examples || []).map(e => '<div>' + escapeHtml(e) + '</div>').join('') + '</td></tr>').join('');
+      // Whether the organization answered, and which site (namespace) answered.
+      const line = (t) => '<div class="hint rz-path">' + escapeHtml(t) + '</div>';
+      const orgs = (g.orgChecks || []).map(c => line(c.sign + ' sign-in, organization ' + c.org + ': ' + (c.status === 200 ? 'OK' : c.status) + (c.note ? ' ' + c.note : ''))).join('');
+      const site = g.used ? '<p id="give-site"><b>Organization ' + escapeHtml(g.used.org) + ', site ' + escapeHtml(g.used.enterprise) + '</b></p>'
+        : g.orgChecks ? '<p id="give-site" class="hint">No site answered yet. Tried ' + escapeHtml(String((g.enterprises || []).length)) + ' site names. What RedZone said:</p>' + orgs + (g.probes || []).map(p => line(p.sign + ' sign-in, ' + p.path + ': ' + p.status + (p.note ? ' ' + p.note : ''))).join('') : '';
+      $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' + site +
+        '<div class="rz-scroll"><table class="gps-check rz-table"><colgroup><col style="width:13%"><col style="width:11%"><col style="width:22%"><col style="width:22%"><col style="width:32%"></colgroup><thead><tr><th>What</th><th>How many</th><th>RedZone address</th><th>What each one has</th><th>Examples</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      $('give-download').hidden = false;
+    }
+    $('give').onclick = async () => {
+      $('give-result').hidden = false; $('give-result').className = 'gps-result'; $('give-result').textContent = 'Asking RedZone...';
+      const r = await call({ op: 'discover', path: $('give-path').value }, $('give'));
+      if (!r) { $('give-result').hidden = true; return; }
+      const found = r.discover.items.filter(x => x.found).length;
+      $('give-result').className = 'gps-result ' + (found ? 'ok' : 'bad');
+      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' lists came back.' : 'Nothing came back yet. Send us a picture of this and we will find RedZone\'s addresses.';
+      drawGive(r.discover);
+    };
+    $('give-download').onclick = () => {
+      if (!s || !s.lastDiscover) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(s.lastDiscover, null, 2)], { type: 'application/json' }));
+      a.download = 'what-redzone-gives-us.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    // Joe 10/16: "build everything complete": RedZone's lines, products, runs, problem types and check sheets, read-only.
+    function drawSync(y) {
+      if (!y) { $('sync-list').innerHTML = '<p class="hint">Not read yet.</p>'; return; }
+      const n = (v, one, many) => escapeHtml(String(v || 0)) + ' ' + (v === 1 ? one : many);
+      $('sync-list').innerHTML = '<p class="hint">Read ' + escapeHtml(stamp(y.at)) + (y.by ? ' by ' + escapeHtml(y.by) : '') + ': ' +
+        [n(y.lines, 'line', 'lines'), n(y.sensors, 'sensor', 'sensors'), n(y.machines, 'machine', 'machines'), n(y.products, 'product', 'products'), n(y.runs, 'run', 'runs'), n(y.problems, 'problem type', 'problem types'), n(y.checkSheets, 'check sheet', 'check sheets')].join(', ') + '.</p>' +
+        (y.failed && y.failed.length ? '<p class="hint rz-bad">Not read: ' + escapeHtml(y.failed.join(', ')) + '</p>' : '') +
+        '<table class="rz-match"><thead><tr><th>RedZone line</th><th>Its sensors</th><th>Our line</th></tr></thead><tbody>' +
+        (y.matches || []).map(m => '<tr><td>' + escapeHtml(m.redzone) + '</td><td>' + escapeHtml((m.sensors || []).join(', ') || 'none') + '</td><td>' + (m.line ? escapeHtml(m.line) : '<span class="rz-none">not one of our lines yet</span>') + '</td></tr>').join('') +
+        '</tbody></table><p class="hint">Line Targets changes which RedZone line goes with each of ours.</p>';
+    }
+    $('sync').onclick = async () => {
+      $('sync-result').hidden = false; $('sync-result').className = 'gps-result'; $('sync-result').textContent = 'Reading RedZone...';
+      const r = await call({ op: 'sync' }, $('sync'));
+      if (!r) { $('sync-result').hidden = true; return; }
+      $('sync-result').className = 'gps-result ' + (r.sync.failed && r.sync.failed.length ? 'bad' : 'ok');
+      $('sync-result').textContent = 'Read ' + r.sync.lines + ' lines, ' + r.sync.products + ' products, ' + r.sync.runs + ' runs and ' + r.sync.problems + ' problem types.';
+    };
+    $('test').onclick = async () => {
+      $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';
+      const r = await call({ op: 'test' }, $('test'));
+      if (!r) { $('result').hidden = true; return; }
+      $('result').className = 'gps-result ' + (r.result.ok ? 'ok' : 'bad');
+      $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message) +
+        (r.result.sample && r.result.sample.length ? '<small>For example: ' + escapeHtml(r.result.sample.join(' · ')) + '</small>' : '');
+    };
+    ['f-org', 'f-ent', 'f-address', 'f-token', 'f-client', 'f-secret', 'f-tokenurl', 'f-path'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    requireSignIn(async () => { await start(); await call({ op: 'status' }); });
+  </script>
+</body>
+</html>

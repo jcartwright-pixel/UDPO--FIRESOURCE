@@ -349,7 +349,7 @@ async function saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveErro
 // Joe 10/14: and each filler's fill weight check: how often (fillEvery MINUTES / JUGS / CHANGE, fillEveryN), the empty jug and cap
 // in grams, and how far under or over the product's target fill weight is flagged.
 // Joe 10/14: and a packing line's feeders (fedBy, the lines whose jugs it boxes) and how many jugs go in each box (perBox).
-const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh', 'fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver', 'fedBy', 'perBox'];
+const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh', 'fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver', 'fedBy', 'perBox', 'redzoneLocation'];
 function validateLineSetup(input, SaveError) {
   const out = { operationId: lineId(input.operationId, SaveError) };
   [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72], ['jugWeightTarget', 'Jug weight target grams', 500], ['jugWeightLow', 'Lowest jug weight grams', 500], ['jugWeightHigh', 'Highest jug weight grams', 500],
@@ -369,6 +369,12 @@ function validateLineSetup(input, SaveError) {
     const ids = input.fedBy.map(v => lineId(v, SaveError));
     if (ids.indexOf(out.operationId) >= 0) throw new SaveError('BAD_REQUEST', 'A line cannot feed itself.');
     out.fedBy = ids.filter((v, i) => ids.indexOf(v) === i);
+  }
+  // Joe 10/16: which RedZone line (its location's uuid) goes with this line; NONE for none, empty for the match by name.
+  if ('redzoneLocation' in input) {
+    const v = text(input.redzoneLocation);
+    if (v && v !== 'NONE' && !/^[A-Za-z0-9-]{1,60}$/.test(v)) throw new SaveError('BAD_REQUEST', 'Pick a RedZone line.');
+    out.redzoneLocation = v || null;
   }
   if (Object.keys(out).length < 2) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
   return out;

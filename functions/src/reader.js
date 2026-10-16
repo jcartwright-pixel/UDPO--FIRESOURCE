@@ -197,7 +197,7 @@ async function applyMachine(db, id, r, opts) {
       const only = productsSnap ? P.targetsFor(productsSnap.exists ? productsSnap.data().products : []) : [];
       if (!had.exists && only.length === 1 && P.lineKind(line.name) === 'BLOWMOLD') { run.product = only[0].name; run.sku = text(only[0].sku); run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' }); }
       const m = Object.assign({}, run.machine || {}), log = Array.isArray(run.machineLog) ? run.machineLog : [];
-      const sf = P.machineFlag(speed, cfg.speedLow, cfg.speedHigh), tf = P.machineFlag(temp, cfg.tempLow, cfg.tempHigh);
+      const kind = P.lineKind(line.name), sr = P.machineRange(kind, cfg, 'speed'), tr = P.machineRange(kind, cfg, 'temp'), sf = P.machineFlag(speed, sr[0], sr[1]), tf = P.machineFlag(temp, tr[0], tr[1]);
       const lastLog = log[log.length - 1], logDue = !lastLog || ms - when(lastLog.at) >= 60000;
       const switched = running !== null && running !== (m.running === undefined ? null : m.running);
       const write = !had.exists || delta > 0 || inDelta > 0 || switched || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
