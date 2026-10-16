@@ -623,6 +623,12 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .redzone-page .rz-table th[scope="row"] { font-weight: 800; color: inherit; position: static; }
 .redzone-page .rz-table td { vertical-align: top; overflow-wrap: anywhere; white-space: normal; }
 .redzone-page .rz-path { font-family: ui-monospace, Consolas, monospace; }
+/* Read RedZone into Operations (Joe 10/16): RedZone's lines and ours. */
+.redzone-page .rz-match { width: 100%; border-collapse: collapse; font-size: 16px; margin-top: 8px; }
+.redzone-page .rz-match th { text-align: left; color: #fff; background: var(--ud-blue-dark, #0b3d6e); font-weight: 800; padding: 8px; }
+.redzone-page .rz-match td { text-align: left; }
+.redzone-page .rz-match td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.redzone-page .rz-none, .redzone-page .rz-bad { color: var(--pill-red-ink); font-weight: 700; }
 
 /* One app, not page after page (Joe 10/9): the page colour shows while a screen loads (no white flash), and Chrome
    cross-fades from one screen to the next with the header and the menu held in place. */

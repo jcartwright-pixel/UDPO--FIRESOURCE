@@ -106,7 +106,7 @@
     // Local test database only: a browser test sets the tablet's clock (?now=...).
     const testNow = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Date.parse(params.get('now') || '') ? Date.parse(params.get('now')) : 0;
     const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
-    let lineId = read() || params.get('line') || '', person = null, data = null, stop = null, db = null, pane = '', find = '', busy = false;
+    let lineId = read() || params.get('line') || '', person = null, data = null, stop = null, db = null, pane = '', find = '', busy = false, rz = null, rzStop = null;
     if (lineId && !read()) write(lineId);
     const plant = () => { const ids = person ? L.plantsFor(person) : []; return params.get('plant') || ids[0] || 'fac_uniontown'; };
     const plantName = (id) => ((L.PLANTS || []).find(p => p.id === id) || { name: 'Uniontown' }).name;
@@ -205,7 +205,9 @@
       const rs = document.getElementById('reasons');
       rs.hidden = reasonFor < 0;
       rs.dataset.stop = reasonFor;
-      rs.innerHTML = reasonFor < 0 ? '' : R.stopReasons(v.kind).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+      // Joe 10/16: RedZone's problem types for this line, once Administration > RedZone has read them in.
+      const rzLoc = rz ? R.rzLocationFor(v.line ? v.line.name : '', (data.lineInfo || {})[lineId] || {}, rz) : null;
+      rs.innerHTML = reasonFor < 0 ? '' : R.rzStopReasons(v.kind, R.rzProblemsFor(rz, rzLoc)).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
       drawMoreBoard(v);
     }
     // ---------- Joe 10/14 ("all of your picks", mock-ups C to H): Up next, each hour, six buttons for the kind of line and what they open ----------
@@ -631,6 +633,7 @@
       watchPerson(db, user, p => {
         person = p;
         if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);
+        if (!rzStop) rzStop = onSnapshot(doc(db, 'redzoneData', plant()), s => { rz = s.exists() ? s.data() : null; if (data) render(); }, () => {});
       }, { withEmail: true });
       // The clock moves the stopped minutes and target so far.
       setInterval(render, 15000);

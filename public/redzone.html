@@ -67,8 +67,15 @@
         <div class="gps-result" id="give-result" hidden></div>
         <div class="rz-give" id="give-list"></div>
       </section>
+      <section class="gps-card wide" id="ops-card">
+        <h2>4. Read RedZone into Operations</h2>
+        <p class="hint">Copies RedZone's lines with their sensor names, its products with full speed, target and crew, its latest runs, its problem types and its check sheets into Operations. Line Targets then shows each line's RedZone match and fills empty speeds, and the Line Tablet's Line Stopped choices become RedZone's problem types for that line. Read again any time; nothing is ever changed in RedZone.</p>
+        <div class="gps-buttons"><button type="button" class="primary big" id="sync">Read RedZone into Operations</button></div>
+        <div class="gps-result" id="sync-result" hidden></div>
+        <div class="rz-give" id="sync-list"></div>
+      </section>
       <section class="gps-card wide">
-        <h2>4. Where these come from</h2>
+        <h2>5. Where these come from</h2>
         <ol class="gps-steps">
           <li>Your everyday RedZone user name and password do not go here. RedZone's API uses a client ID and secret, made by a RedZone login with admin rights.</li>
           <li>In RedZone, Manage Access &gt; Roles &gt; Create Role: name it "Operations App Read Only" and turn on only <b>Basic Access</b>. Everything else stays off: Admin and every "Configure" or manage switch.</li>
@@ -100,6 +107,7 @@
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
       drawGive(s.lastDiscover);
+      drawSync(s.lastSync);
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
     }
     async function call(fields, button) {
@@ -151,6 +159,24 @@
       a.download = 'what-redzone-gives-us.json';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    // Joe 10/16: "build everything complete": RedZone's lines, products, runs, problem types and check sheets, read-only.
+    function drawSync(y) {
+      if (!y) { $('sync-list').innerHTML = '<p class="hint">Not read yet.</p>'; return; }
+      const n = (v, one, many) => escapeHtml(String(v || 0)) + ' ' + (v === 1 ? one : many);
+      $('sync-list').innerHTML = '<p class="hint">Read ' + escapeHtml(stamp(y.at)) + (y.by ? ' by ' + escapeHtml(y.by) : '') + ': ' +
+        [n(y.lines, 'line', 'lines'), n(y.sensors, 'sensor', 'sensors'), n(y.machines, 'machine', 'machines'), n(y.products, 'product', 'products'), n(y.runs, 'run', 'runs'), n(y.problems, 'problem type', 'problem types'), n(y.checkSheets, 'check sheet', 'check sheets')].join(', ') + '.</p>' +
+        (y.failed && y.failed.length ? '<p class="hint rz-bad">Not read: ' + escapeHtml(y.failed.join(', ')) + '</p>' : '') +
+        '<table class="rz-match"><thead><tr><th>RedZone line</th><th>Its sensors</th><th>Our line</th></tr></thead><tbody>' +
+        (y.matches || []).map(m => '<tr><td>' + escapeHtml(m.redzone) + '</td><td>' + escapeHtml((m.sensors || []).join(', ') || 'none') + '</td><td>' + (m.line ? escapeHtml(m.line) : '<span class="rz-none">not one of our lines yet</span>') + '</td></tr>').join('') +
+        '</tbody></table><p class="hint">Line Targets changes which RedZone line goes with each of ours.</p>';
+    }
+    $('sync').onclick = async () => {
+      $('sync-result').hidden = false; $('sync-result').className = 'gps-result'; $('sync-result').textContent = 'Reading RedZone...';
+      const r = await call({ op: 'sync' }, $('sync'));
+      if (!r) { $('sync-result').hidden = true; return; }
+      $('sync-result').className = 'gps-result ' + (r.sync.failed && r.sync.failed.length ? 'bad' : 'ok');
+      $('sync-result').textContent = 'Read ' + r.sync.lines + ' lines, ' + r.sync.products + ' products, ' + r.sync.runs + ' runs and ' + r.sync.problems + ' problem types.';
     };
     $('test').onclick = async () => {
       $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';

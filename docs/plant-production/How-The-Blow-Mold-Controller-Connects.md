@@ -27,7 +27,7 @@ On **Line Targets**, pick BLOW MOLD and set **Counted by** to **Machine controll
 | IP address | The controller's network address. Maintenance or the machine supplier knows it, and it is often on the HMI's network screen. |
 | Where each reading is | The tag name (Allen-Bradley, like `Jug_Count`), the register number (Modbus, like `40001`) or the address (Siemens, like `DB10.DBD4`). The machine supplier or the person who programs the PLC can tell us. |
 | Divide by | Use it when the controller sends 4312 for 431.2°F. Then type 10. |
-| Low and high | The range the production manager wants for speed and temperature. |
+| Low and high | The range the production manager wants for speed and temperature. With both temperature boxes empty, the Blow Mold uses 1,000°F to 1,350°F (Joe, 10/16/2026: what the plant runs at). |
 
 Each reading has a **Test read** button. It asks the line PC to read that number now, and shows what came back, or why it couldn't read it.
 

@@ -244,3 +244,78 @@ test('What RedZone gives us: a 403 "invalid organization" never picks the organi
   assert.ok(!urls.some(u => /united-dairy\/enterprises/.test(u)), 'the saved organization answered first, so the name is never tried as one');
   assert.equal(r.foundOrgId, 'org_mA7');
 });
+
+// Joe 10/16 (test copy): "Why did the test connection fail this time and gave me an error code?" A wrong organization kept
+// from an earlier list made Test Connection say RedZone "refused the sign-in (403)". The typed IDs are tried too, and a
+// refused list is said as a refused list, with RedZone's own words.
+test('Test Connection: a stale organization found earlier falls back to the typed one and is fixed; a refused list is not called a refused sign-in', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e6965' });
+  await db().collection('private').doc('redzone').set({ foundOrgId: 'united-dairy', foundEnterpriseId: 'f99e6965', foundTokenUrl: 'https://api.rz-ops.com/public/v3/oauth/token' }, { merge: true });
+  const make = (good) => async (url) => {
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    const path = new URL(url).pathname.replace('/public/v2', '');
+    if (good && path === '/organizations/org_mA7/enterprises/f99e6965/product-types') return reply(200, { items: [{ uuid: 'p1', name: '36% Cream', sku: '294' }] });
+    return reply(403, { message: 'security requirements failed: invalid organization' });
+  };
+  const bad = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: make(false) });
+  assert.equal(bad.result.ok, false);
+  assert.match(bad.result.message, /^Signed in, but RedZone said no to the product list \(403 security requirements failed: invalid organization\)\. Press Show What RedZone Gives Us/);
+  assert.doesNotMatch(bad.result.message, /refused the sign-in/);
+  const ok = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: make(true) });
+  assert.match(ok.result.message, /Connected\. RedZone sent 1 product\./);
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).foundOrgId, 'org_mA7', 'the organization that answered is kept');
+});
+
+// Joe 10/16: "build everything complete". Read RedZone into Operations: its lines with their sensor names, machines,
+// products, latest runs, problem types (paged 20 at a time) and check sheets go to redzoneData; only GETs.
+test('Read RedZone into Operations: lines, sensors, products, runs, problem types and check sheets, matched to our lines; only GETs', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e' });
+  const setup = (id, name) => db().collection('plantSetup').doc(id).set({ operationId: id, type: 'PRODUCTION_AREA', status: 'ACTIVE', name, facilityId: 'fac_uniontown' });
+  await setup('ut_prod_blow_mold', 'BLOW MOLD'); await setup('ut_prod_raypak', 'RAYPAK'); await setup('ut_prod_gallon_filler', 'GALLON FILLER'); await setup('ut_prod_boxing', 'BOXING');
+  // Line Targets picked no RedZone line for the Gallon Filler.
+  await db().collection('productionLines').doc('ut_prod_gallon_filler').set({ operationId: 'ut_prod_gallon_filler', redzoneLocation: 'NONE' });
+  const pre = '/organizations/org_mA7/enterprises/f99e', urls = [];
+  const problems = Array.from({ length: 25 }, (_, i) => ({ uuid: 'pr' + i, name: 'Problem ' + i, problemCategory: 'AVAILABILITY', assetTypeUUID: i < 3 ? 'at-blow' : i < 5 ? 'at-bag' : '' }));
+  const lists = {
+    '/locations': [{ uuid: 'loc-bm', name: 'Blow Mold' }, { uuid: 'loc-dq', name: 'Dairy Queen' }, { uuid: 'loc-dqm', name: 'Dairy Queen Manual' }, { uuid: 'loc-g', name: 'Gallon' }],
+    '/locations/loc-bm/sensor-configurations': [{ uuid: 's1', name: 'Default' }],
+    '/locations/loc-dqm/sensor-configurations': [{ uuid: 's2', name: 'In=out' }, { uuid: 's3', name: 'Box' }],
+    '/assets': [{ uuid: 'a1', name: 'Blow Molder', locationUUID: 'loc-bm', assetTypeUUID: 'at-blow' }, { uuid: 'a2', name: 'Bag Sealer', locationUUID: 'loc-dq', assetTypeUUID: 'at-bag' }],
+    '/asset-types': [{ uuid: 'at-blow', name: 'Depositer /Extruder' }, { uuid: 'at-bag', name: 'Bag Sealer' }],
+    '/product-types': [{ uuid: 'p1', name: 'Gallon Jug', externalId: '9001', standardRatePerMin: 50, target: 85, targetCrewSize: 2 }, { uuid: 'p2', name: '5 Gal Bag Mix', externalId: '777', standardRatePerMin: 8, target: 90, targetCrewSize: 1 }],
+    '/runs': [{ uuid: 'r1', locationUUID: 'loc-bm', productTypeUUID: 'p1', startTime: '2026-10-15T10:39:24Z', endTime: '', plannedQuantity: 20000, standardRatePerMin: 50, crewSize: 2 },
+      { uuid: 'r2', locationUUID: 'loc-dq', productTypeUUID: 'p2', startTime: '2026-10-15T23:42:21Z', endTime: '2026-10-16T01:00:00Z', plannedQuantity: 400, standardRatePerMin: 8, crewSize: 1 }],
+    '/data-sheet-templates': [{ uuid: 'd1', name: 'OPS - Weight Sheet', dataSheetType: 'QUALITY_CHECK' }, { uuid: 'd2', name: 'GMP Audit', dataSheetType: 'AUDIT' }, { uuid: 'd3', name: 'Something New', dataSheetType: 'PRODUCTION_CHECK' }]
+  };
+  const fetch = async (url, opts) => {
+    urls.push([opts.method || 'GET', url]);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    const u = new URL(url), path = u.pathname.replace('/public/v2', '');
+    if (!path.startsWith(pre)) return reply(403, { message: 'security requirements failed: invalid organization' });
+    if (!u.searchParams.has('offset')) return reply(400, { message: 'parameter "offset" in query has an error' });
+    const rest = path.slice(pre.length), off = Number(u.searchParams.get('offset')), lim = Number(u.searchParams.get('limit'));
+    if (rest === '/problem-types') return lim > 20 ? reply(400, { message: 'limit too big' }) : reply(200, { items: problems.slice(off, off + lim) });
+    if (rest === '/shift-types') return reply(500, {});
+    return reply(200, { items: (lists[rest] || []).slice(off, off + lim) });
+  };
+  await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'sync' }, { fetch }), /Only an administrator/);
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'sync' }, { fetch });
+  assert.deepEqual([r.sync.lines, r.sync.sensors, r.sync.machines, r.sync.products, r.sync.runs, r.sync.problems, r.sync.checkSheets, r.sync.failed], [4, 3, 2, 2, 2, 25, 3, []]);
+  assert.deepEqual(r.sync.matches.map(m => [m.redzone, m.sensors.join('/'), m.line]), [['Blow Mold', 'Default', 'BLOW MOLD'], ['Dairy Queen', '', 'RAYPAK'], ['Dairy Queen Manual', 'In=out/Box', 'BOXING'], ['Gallon', '', '']]);
+  const saved = (await db().collection('redzoneData').doc('fac_uniontown').get()).data();
+  assert.deepEqual(saved.products[0], { uuid: 'p1', name: 'Gallon Jug', sku: '9001', ratePerMin: 50, target: 85, crew: 2, perManHour: null });
+  assert.equal(saved.runs[0].productTypeUUID, 'p2', 'newest run first');
+  assert.deepEqual(saved.checkSheets.map(c => [c.name, c.ours]), [['OPS - Weight Sheet', 'Fill weight check on the Line Tablet, and Quality Checks package weight'], ['GMP Audit', 'Manager Walkthrough'], ['Something New', '']]);
+  assert.ok(urls.filter(([, u]) => /problem-types/.test(u)).every(([, u]) => /limit=20&/.test(u)), 'problem types 20 at a time');
+  assert.ok(urls.filter(([, u]) => !/oauth/.test(u)).every(([m]) => m === 'GET'), 'only GETs to RedZone');
+  assert.ok(!JSON.stringify(saved).includes('v3_token') && !JSON.stringify(r).includes(SECRET));
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastSync.products, 2);
+  // Without the organization and site, it says what to press first.
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
+  await db().collection('private').doc('redzone').update({ orgId: '', enterpriseId: '' });
+  await assert.rejects(R.redzoneCall(db(), ADMIN, { op: 'sync' }, { fetch }), /Show What RedZone Gives Us first/);
+});

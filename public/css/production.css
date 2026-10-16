@@ -331,3 +331,11 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lb-last { margin: 4px 0 10px; font-size: 18px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 /* A wide Earlier this shift table scrolls sideways inside its box, one line per cell, instead of squeezing into letters. */
 .lb-strip > .lb-box { min-width: 0; overflow-x: auto; }
+/* RedZone on Line Targets (Joe 10/16): the RedZone line, its sensor names, and what RedZone ran here. */
+.lt-rz { border-left-color: #c0392b; }
+.lt-rz h3 small { font-size: 16px; font-weight: 600; color: var(--muted); }
+.lt-rz h4 { margin: 12px 0 4px; font-size: 16px; color: var(--ud-blue-dark); }
+.lt-rzpick { margin: 6px 0; }
+.lt-rzpick select { font-size: 16px; min-height: 40px; }
+.lt-rztable { width: 100%; font-size: 16px; }
+.lt-rz .lt-mut { color: var(--muted); }

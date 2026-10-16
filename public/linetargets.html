@@ -52,6 +52,8 @@
           </div>
           <!-- Joe 10/14: the line's changeover standard and hours between CIP washes (the production manager sets them). -->
           <div class="lt-setup" id="setup"></div>
+          <!-- RedZone (Joe 10/16): this line's RedZone line with its sensor names, what RedZone ran here, and Fill from RedZone. -->
+          <div class="lt-reader lt-rz" id="rz" hidden></div>
           <!-- Machine controller (Joe 10/14, the Blow Mold): brand, IP address and where each reading is, with a Test read; read-only. -->
           <div class="lt-reader lt-ctrl" id="controller" hidden></div>
           <!-- Label reader (Joe 10/11): the line PC's key and the sandbox test feed; administrators only (src/reader.js). -->
@@ -165,7 +167,8 @@
           (keys.indexOf('speed') >= 0 ? inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') : '') + '</div>' +
         '<div class="lt-scroll"><table class="loadout lt-ctable"><colgroup><col style="width:15%"><col style="width:16%">' + (modbus ? '<col style="width:9%">' : '') + '<col style="width:9%"><col style="width:9%"><col style="width:9%"><col></colgroup><thead><tr><th>Reading</th><th>Where it is</th>' + (modbus ? '<th>Size</th>' : '') + '<th>Divide by</th><th>Low</th><th>High</th><th>Test read</th></tr></thead><tbody>' +
           keys.map(row).join('') + '</tbody></table></div>' +
-        '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : (addOn ? 'Pick the brand first (Modbus TCP for the I/O module). ' : 'Pick the brand first (it is on the controller\'s nameplate). ')) + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.</p>' +
+        '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : (addOn ? 'Pick the brand first (Modbus TCP for the I/O module). ' : 'Pick the brand first (it is on the controller\'s nameplate). ')) + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.' +
+          (R.DEFAULT_RANGES[kind] && R.DEFAULT_RANGES[kind].temp ? ' Temperature with Low and High empty: ' + fmt(R.DEFAULT_RANGES[kind].temp[0]) + '°F to ' + fmt(R.DEFAULT_RANGES[kind].temp[1]) + '°F (what the plant runs at).' : '') + '</p>' +
         '<p' + (info.machineError ? ' class="lt-bad"' : '') + '>' + escapeHtml(heard) + (info.machineError ? ' Last read problem: ' + escapeHtml(info.machineError) : '') + '</p>' +
         '<p>The line PC sends to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' + (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' +
         (shownKey && shownKey.line === line.operationId ? '<p class="lt-key">Line key (copy it now, it is not shown again): <b class="lt-mono" id="ctrl-key">' + escapeHtml(shownKey.key) + '</b></p><p class="lt-key">On the line PC: <b class="lt-mono">node bridge.cjs --address ' + escapeHtml(readsAddress()) + ' --device ' + escapeHtml(line.operationId) + ' --key ' + escapeHtml(shownKey.key) + ' --controller</b></p>' : '') +
@@ -244,6 +247,7 @@
       drawReader(line, counter);
       drawController(line, counter);
       drawSetup(line, ck);
+      drawRz(line, ck);
       // Not drawn again while someone types in the list.
       if (force !== true && document.getElementById('rows').contains(document.activeElement)) return;
       const cell = (i, k, v, label, cls, ph) => '<td' + (cls ? ' class="' + cls + '"' : '') + '><input data-i="' + i + '" data-k="' + k + '" value="' + escapeHtml(v === null || v === undefined ? '' : v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + escapeHtml(label) + '"' + (k === 'upc' ? ' maxlength="20" inputmode="numeric"' : ' inputmode="decimal" maxlength="8"') + dis + '></td>';
@@ -255,6 +259,53 @@
           '<td class="num lt-calc">' + (t.perHour ? fmt(t.perHour) : '') + '</td><td class="num lt-calc">' + (t.perHour ? fmt(Math.round(t.perHour * hours)) : '') + '</td></tr>';
       }).join('') || '<tr><td colspan="10" class="empty">' + escapeHtml(line.name) + ' has no products yet. Products List adds them.</td></tr>';
     }
+
+    // RedZone (Joe 10/16, "build everything complete"; "You already have the sensors already labeled that goes to the blow mold"):
+    // the RedZone line that goes with this one (matched by name, or picked here), its sensor names and machines, the products
+    // RedZone ran on it with RedZone's numbers, and its latest runs. Read in on Administration > RedZone; read-only.
+    let rz = null, rzNote = '';
+    const day = (t) => { const d = new Date(t); return isNaN(d) ? '' : dateTimeText(d); };
+    function drawRz(line, ck) {
+      const box = document.getElementById('rz');
+      box.hidden = false;
+      if (box.contains(document.activeElement) && document.activeElement.matches('select')) return;
+      if (!rz || !(rz.locations || []).length) { box.innerHTML = '<h3>RedZone</h3><p>Not read in yet. Administration &gt; RedZone &gt; Read RedZone into Operations.</p>'; return; }
+      const info = data.lineInfo[line.operationId] || {}, loc = R.rzLocationFor(line.name, info, rz), guess = R.rzGuess(line.name, rz.locations), saved = info.redzoneLocation || '';
+      const pick = '<label class="lt-counter">RedZone line <select id="rz-loc" aria-label="Which RedZone line goes with ' + escapeHtml(line.name) + '"' + (ck ? '' : ' disabled') + '>' +
+        opt('', saved, 'Match by name' + (guess ? ' (' + guess.name + ')' : ' (none)')) + rz.locations.map(l => opt(l.uuid, saved, l.name)).join('') + opt('NONE', saved, 'None') + '</select></label>';
+      if (!loc) { box.innerHTML = '<h3>RedZone</h3><div class="lt-rzpick">' + pick + '</div><p>No RedZone line goes with ' + escapeHtml(line.name) + '. Pick one if RedZone has it.</p>'; return; }
+      const got = R.rzRunsFor(rz, loc), machines = (rz.assets || []).filter(a => a.locationUUID === loc.uuid).map(a => a.name);
+      const problems = R.rzProblemsFor(rz, loc), n = (v) => v === null || v === undefined ? '' : fmt(v);
+      box.innerHTML = '<h3>RedZone · ' + escapeHtml(loc.name) + ' <small>read ' + escapeHtml(day(rz.at)) + ', read-only</small></h3><div class="lt-rzpick">' + pick + '</div>' +
+        '<p><b>Sensors:</b> ' + escapeHtml(loc.sensors.length ? loc.sensors.join(', ') : 'none') + ' <span class="lt-mut">(RedZone gives each sensor\'s name, not its readings)</span></p>' +
+        (machines.length ? '<p><b>Machines:</b> ' + escapeHtml(machines.join(', ')) + '</p>' : '') +
+        '<p><b>Line Stopped choices on the Line Tablet:</b> ' + escapeHtml(problems.length ? R.rzStopReasons(R.lineKind(line.name), problems).join(', ') : 'RedZone has no problem types for this line, so the tablet keeps its own') + '</p>' +
+        '<h4>What RedZone ran here</h4>' + (got.products.length ? '<div class="lt-scroll"><table class="loadout lt-rztable"><thead><tr><th>Product</th><th>SKU</th><th class="num">Full speed / min</th><th class="num">Target</th><th class="num">Crew</th></tr></thead><tbody>' +
+          got.products.slice(0, 15).map(p => '<tr><td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.sku || '') + '</td><td class="num">' + n(p.ratePerMin) + '</td><td class="num">' + n(p.target) + '</td><td class="num">' + n(p.crew) + '</td></tr>').join('') + '</tbody></table></div>' +
+          (ck ? '<div class="lt-reader-btns"><button type="button" id="rz-fill">Fill Empty Speeds from RedZone</button></div>' : '') : '<p>No runs in RedZone\'s latest ' + fmt((rz.runs || []).length) + '.</p>') +
+        (got.runs.length ? '<h4>Latest runs</h4><div class="lt-scroll"><table class="loadout lt-rztable"><thead><tr><th>Product</th><th>Started</th><th>Ended</th><th class="num">Planned</th><th class="num">Speed / min</th></tr></thead><tbody>' +
+          got.runs.slice(0, 5).map(r => '<tr><td>' + escapeHtml(r.product) + '</td><td>' + escapeHtml(day(r.startTime)) + '</td><td>' + escapeHtml(r.endTime ? day(r.endTime) : 'running') + '</td><td class="num">' + n(r.plannedQuantity) + '</td><td class="num">' + n(r.ratePerMin) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
+        (rzNote ? '<p class="lt-note" id="rz-note">' + escapeHtml(rzNote) + '</p>' : '');
+    }
+    document.getElementById('rz').addEventListener('change', async e => {
+      const line = current();
+      if (e.target.id !== 'rz-loc' || !line || !canSave()) return;
+      const v = e.target.value;
+      e.target.blur();
+      note = 'Saving…'; render('keep');
+      try { await save('saveLineSetup', { operationId: line.operationId, redzoneLocation: v }); note = savedText(); showError(''); }
+      catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+      render(true);
+    });
+    document.getElementById('rz').addEventListener('click', e => {
+      const line = current();
+      if (!e.target.closest('#rz-fill') || !line || !canSave() || !rz) return;
+      const loc = R.rzLocationFor(line.name, data.lineInfo[line.operationId] || {}, rz);
+      // The products RedZone ran here first, then every RedZone product (a product can run on more than one line).
+      const filled = R.rzFill(listOf(line.operationId), R.rzRunsFor(rz, loc).products.concat(rz.products || []));
+      rzNote = filled.changed.length ? 'Filled from RedZone: ' + filled.changed.join('; ') + '.' : 'Nothing to fill: every product RedZone has a speed for already has one here.';
+      if (filled.changed.length) send(line, filled.list); else render(true);
+    });
 
     // Changeover standard and CIP wash hours (Joe 10/14, mock-ups A, D and G): each box saves as it is left.
     function drawSetup(line, ck) {
@@ -357,6 +408,13 @@
     });
     document.getElementById('lines').addEventListener('click', e => { const b = e.target.closest('[data-line]'); if (!b) return; chosen = b.dataset.line; note = ''; setUrl(); render(true); });
 
+    let rzStop = null, rzPlant = '';
+    function followRz() {
+      if (!plant || rzPlant === plant) return;
+      rzPlant = plant;
+      if (rzStop) rzStop();
+      rzStop = onSnapshot(doc(db, 'redzoneData', plant), s => { rz = s.exists() ? s.data() : null; if (data) render(true); }, () => {});
+    }
     function follow() {
       if (stop) stop();
       data = null;
@@ -372,9 +430,11 @@
       watchPerson(db, user, p => {
         person = p;
         drawTop();
+        followRz();
         if (!stop) follow(); else if (data) render(true);
       }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
+      document.getElementById('lines').addEventListener('click', () => { rzNote = ''; });
     });
   </script>
 </body>

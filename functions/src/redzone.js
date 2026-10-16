@@ -18,6 +18,7 @@
 
 const { safeIdPart } = require('./model');
 const L = require('./logic');
+const P = require('./production-rules');
 
 class RedzoneError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -141,7 +142,12 @@ async function fetchProducts(d, o, ref) {
   for (let page = 0; url && page < PAGE_LIMIT && out.length < PRODUCT_LIMIT; page++) {
     if (!sameHost(url, address)) throw new Error('The products address must be https on the same RedZone address');
     const res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-    if (!res.ok) throw new Error('RedZone answered ' + res.status + ' for the products address');
+    if (!res.ok) {
+      // RedZone's own words ("invalid organization") say more than the bare number.
+      let note = ''; try { note = clean(text(field(JSON.parse(await res.text()) || {}, ['message', 'error', 'detail', 'title'])), 120); } catch (e) { /* no words */ }
+      if (note.includes(token) || (d.clientSecret && note.includes(d.clientSecret))) note = '';
+      throw new Error('RedZone answered ' + res.status + ' for the products address' + (note ? ': ' + note : ''));
+    }
     let body; try { body = JSON.parse(await res.text()); } catch (e) { throw new Error('RedZone sent something that is not JSON for the products address'); }
     const list = listIn(body);
     if (!list) throw new Error('RedZone\'s answer has no product list in it');
@@ -306,16 +312,69 @@ async function discover(d, o, ref, extra) {
   return { items: items.map(({ list, ...x }) => x), used, orgChecks, probes: probes.slice(0, 30), claims: claims.slice(0, 12) };
 }
 
-const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
+/* ---------- Read RedZone into Operations (Joe 10/16: "build everything complete") ----------
+ * Only GETs, as in What RedZone Gives Us, with the organization and site that answered there. One copy for the plant goes in
+ * redzoneData/{plant}: RedZone's lines (locations) with their sensor names and machines, its products with full speed,
+ * target and crew, its latest runs, its problem types (the Line Stopped choices) and its check sheets matched to ours.
+ * Nothing is ever written to RedZone, and nothing here is a reading: RedZone's API has none. */
+const RUN_PAGES = 10, KEEP_RUNS = 400;
+// Our screens that do the same job as each RedZone check sheet (by its name).
+const OUR_CHECKS = [[/weight/i, 'Fill weight check on the Line Tablet, and Quality Checks package weight'], [/bottle|jug|blow|leak/i, 'Blow Mold bottle check on the Line Tablet'],
+  [/label|code date|lot|trac/i, 'Code date check (label reader) and Quality Checks'], [/htst|pasteur|chart|divert/i, 'HTST on the Line Tablet and Quality'],
+  [/temp|cooler/i, 'Temperatures (sensors)'], [/change\s*over|mold change/i, 'Changeover checklist on the Line Tablet'], [/cip|wash|sanit|clean/i, 'CIP wash on the Line Tablet'],
+  [/5.?why|root cause/i, 'Shift Notes and Breakdowns'], [/gmp|audit|biosecur|walk/i, 'Manager Walkthrough']];
+const oursFor = (name) => (OUR_CHECKS.find(([re]) => re.test(name)) || [null, ''])[1];
+async function readForOps(d, o, ref) {
+  const org = orgOf(d), ent = entOf(d);
+  if (!org || !ent) throw new RedzoneError('BAD_REQUEST', 'Press Show What RedZone Gives Us first, so the organization and site are found.');
+  const token = await accessToken(d, o, ref), address = addressOf(d);
+  const pre = '/organizations/' + encodeURIComponent(org) + '/enterprises/' + encodeURIComponent(ent);
+  const all = async (p, pages) => {
+    const per = p === 'problem-types' ? 20 : 100, out = [];
+    for (let i = 0; i < (pages || PAGE_LIMIT); i++) {
+      const got = await getList(urlFor(address, pre + '/' + p) + '?limit=' + per + '&offset=' + out.length, token, o);
+      if (!got.list) { if (i === 0) return { failed: got.status + (got.note ? ' ' + got.note : '') }; break; }
+      out.push(...got.list.filter(x => x && typeof x === 'object'));
+      if (got.list.length < per) break;
+    }
+    return { list: out };
+  };
+  const [locs, assets, types, prods, runs, probs, sheets] = await Promise.all([all('locations'), all('assets'), all('asset-types'), all('product-types'), all('runs', RUN_PAGES),
+    all('problem-types'), all('data-sheet-templates')]);
+  if (locs.failed) throw new Error('RedZone answered ' + locs.failed + ' for its lines');
+  const t = (x, k) => text(field(x, [k])), n = (x, k) => { const v = Number(field(x, [k])); return isFinite(v) && field(x, [k]) !== '' && field(x, [k]) !== null ? v : null; };
+  const locations = [];
+  for (const l of locs.list.slice(0, 60)) {
+    const got = await getList(urlFor(address, pre + '/locations/' + encodeURIComponent(idOf(l)) + '/sensor-configurations') + '?limit=100&offset=0', token, o);
+    locations.push({ uuid: idOf(l), name: nameOf(l), sensors: (got.list || []).map(nameOf).filter(Boolean).slice(0, 20) });
+  }
+  const typeName = {};
+  (types.list || []).forEach(x => { typeName[idOf(x)] = nameOf(x); });
+  const out = {
+    locations,
+    assets: (assets.list || []).filter(a => a.deactivated !== true).slice(0, 300).map(a => ({ uuid: idOf(a), name: nameOf(a), locationUUID: t(a, 'locationUUID'), assetTypeUUID: t(a, 'assetTypeUUID'), type: typeName[t(a, 'assetTypeUUID')] || '', model: t(a, 'modelNumber') })),
+    products: (prods.list || []).slice(0, 1500).map(p => ({ uuid: idOf(p), name: nameOf(p), sku: t(p, 'externalId'), ratePerMin: n(p, 'standardRatePerMin'), target: n(p, 'target'), crew: n(p, 'targetCrewSize'), perManHour: n(p, 'standardRatePerManHour') })),
+    runs: (runs.list || []).map(r => ({ locationUUID: t(r, 'locationUUID'), productTypeUUID: t(r, 'productTypeUUID'), startTime: t(r, 'startTime'), endTime: t(r, 'endTime'), plannedQuantity: n(r, 'plannedQuantity'),
+      ratePerMin: n(r, 'standardRatePerMin'), crew: n(r, 'crewSize') })).sort((a, b) => (Date.parse(b.startTime) || 0) - (Date.parse(a.startTime) || 0)).slice(0, KEEP_RUNS),
+    problems: (probs.list || []).slice(0, 300).map(p => ({ name: nameOf(p), category: t(p, 'problemCategory'), assetTypeUUID: t(p, 'assetTypeUUID'), planned: field(p, ['planned']) === true, breakdown: field(p, ['breakdown']) === true })),
+    checkSheets: (sheets.list || []).slice(0, 200).map(x => ({ name: nameOf(x), type: t(x, 'dataSheetType'), ours: oursFor(nameOf(x)) })),
+    failed: Object.entries({ machines: assets, 'machine types': types, products: prods, runs, 'problem types': probs, 'check sheets': sheets }).filter(([, v]) => v.failed).map(([k, v]) => k + ' (' + v.failed + ')')
+  };
+  return out;
+}
+
+const plain = (e) => /answered 403 for the products address/.test(e.message) ? 'Signed in, but RedZone said no to the product list (' + e.message.replace(/^RedZone answered 403 for the products address:? ?/, '403 ').trim()
+    + '). Press Show What RedZone Gives Us, then Test Connection again.'
+  : /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
   : /answered 404/.test(e.message) ? 'RedZone has no page at that address (404). Check the API address and products address from the Developer Hub.'
   : 'Could not read RedZone: ' + e.message;
 
 const view = (d) => ({ orgId: d.orgId || '', enterpriseId: d.enterpriseId || '', foundOrgId: d.foundOrgId || '', foundEnterpriseId: d.foundEnterpriseId || '',
   address: addressOf(d), tokenUrl: tokenUrlOf(d), productsPath: productsPathOf(d), scope: d.scope || '',
   hasToken: !!d.token, tokenEnds: ends(d.token), hasClient: !!d.clientId, clientEnds: ends(d.clientId), hasSecret: !!d.clientSecret,
-  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null, lastDiscover: d.lastDiscover || null });
+  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null, lastDiscover: d.lastDiscover || null, lastSync: d.lastSync || null });
 
-/* input.op: status | discover {path} | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
+/* input.op: status | discover {path} | sync {facilityId} | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
 async function redzoneCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
@@ -363,12 +422,22 @@ async function redzoneCall(db, user, input, options) {
     try {
       // The sign-in first: a client ID and secret RedZone takes are a pass even before the products address is right.
       const signedIn = !d.token && !!(await accessToken(d, o, ref)), fresh = (await ref.get()).data() || d;
+      // Joe 10/16: the organization and site found earlier can be stale (a wrong one was kept once). The ones typed on this
+      // screen are tried too, and whichever answers is kept.
+      const typed = Object.assign({}, fresh, { foundOrgId: '', foundEnterpriseId: '' });
+      const tries = fresh.orgId && fresh.enterpriseId && (orgOf(typed) !== orgOf(fresh) || entOf(typed) !== entOf(fresh)) ? [fresh, typed] : [fresh];
       try {
-        const list = await fetchProducts(fresh, o, ref), active = list.filter(p => p.active);
+        let list;
+        for (let i = 0; i < tries.length; i++) {
+          try { list = await fetchProducts(tries[i], o, ref); } catch (e) { if (i === tries.length - 1 || !/for the products address/.test(e.message)) throw e; continue; }
+          if (i > 0) await ref.set({ foundOrgId: orgOf(typed), foundEnterpriseId: entOf(typed) }, { merge: true });
+          break;
+        }
+        const active = list.filter(p => p.active);
         result = { ok: true, message: 'Connected. RedZone sent ' + list.length + ' product' + (list.length === 1 ? '' : 's') + (active.length !== list.length ? ' (' + active.length + ' active)' : '') + '.', products: list.length,
           sample: active.slice(0, 3).map(p => p.name + (p.sku ? ' (' + p.sku + ')' : '')) };
       } catch (e) {
-        if (!signedIn || /answered 40[13]/.test(e.message)) throw e;
+        if (!signedIn || /answered 40[13]/.test(e.message) || e instanceof RedzoneError) throw e;
         result = { ok: true, signedIn: true, message: 'Signed in to RedZone: the client ID and secret work. The product list did not come back yet (' + plain(e).replace(/^Could not read RedZone: /, '') + ').', products: 0 };
       }
     } catch (e) { result = { ok: false, message: e instanceof RedzoneError ? 'Not tested: ' + e.message : plain(e) }; }
@@ -387,6 +456,26 @@ async function redzoneCall(db, user, input, options) {
       got.used.tokenUrl && got.used.tokenUrl !== tokenUrlOf(d) ? { access: null } : {});
     await ref.set(keep, { merge: true });
     return Object.assign(view(Object.assign({}, d, keep)), { discover: lastDiscover });
+  }
+  if (op === 'sync') {
+    let got;
+    try { got = await readForOps(d, o, ref); } catch (e) { throw new RedzoneError('FAILED', e instanceof RedzoneError ? e.message : plain(e)); }
+    const fac = L.PLANTS && L.PLANTS.some(p => p.id === input.facilityId) ? input.facilityId : 'fac_uniontown';
+    const doc = Object.assign({ facilityId: fac, at, by: email }, got);
+    await db.collection('redzoneData').doc(fac).set(doc);
+    // Which of our lines each RedZone line goes with (Line Targets can change it).
+    const ours = (await db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA').get()).docs.map(x => x.data())
+      .filter(x => x.status === 'ACTIVE' && (text(x.facilityId) || 'fac_uniontown') === fac);
+    const docs = {};
+    (await db.collection('productionLines').get()).docs.forEach(x => { docs[x.data().operationId || x.id] = x.data(); });
+    const matches = got.locations.map(l => {
+      const line = ours.find(x => { const m = P.rzLocationFor(text(x.name) || text(x.area), docs[x.operationId] || {}, got); return m && m.uuid === l.uuid; });
+      return { redzone: l.name, sensors: l.sensors, line: line ? text(line.name) || text(line.area) : '' };
+    });
+    const summary = { at, by: email, matches, lines: got.locations.length, sensors: got.locations.reduce((a, l) => a + l.sensors.length, 0), machines: got.assets.length, products: got.products.length,
+      runs: got.runs.length, problems: got.problems.length, checkSheets: got.checkSheets.length, failed: got.failed };
+    await ref.set({ lastSync: summary }, { merge: true });
+    return Object.assign(view(Object.assign({}, d, { lastSync: summary })), { sync: summary });
   }
   if (op === 'products') {
     if (!(d.lastTest && d.lastTest.ok)) throw new RedzoneError('FAILED', 'RedZone is not connected yet: Administration > Connections & Keys > RedZone, then Test Connection.');
