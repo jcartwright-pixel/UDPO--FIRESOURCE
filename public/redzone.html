@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>RedZone · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="gps-page redzone-page">
+  <div class="signin" id="signin" hidden>
+    <h1>RedZone</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · Connections &amp; Keys</span><h1>RedZone</h1></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="gps-grid">
+      <section class="gps-card">
+        <h2>1. RedZone API sign-in <span class="pill" id="state">-</span></h2>
+        <p class="hint">Type these here only, never in a chat or email. Once saved they are locked away and never shown again; only the last 4 characters show. A box left blank keeps what is saved.</p>
+        <form id="form" autocomplete="off" onsubmit="return false">
+          <label>Client ID<input id="f-client" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Client secret<input id="f-secret" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Organization ID (only if RedZone gave you one)<input id="f-org" autocomplete="off" spellcheck="false"></label>
+          <label>API address<input id="f-address" autocomplete="off" spellcheck="false"></label>
+          <label>Token address<input id="f-tokenurl" autocomplete="off" spellcheck="false"></label>
+          <label>API token (only instead of a client ID and secret)<input id="f-token" type="password" autocomplete="new-password" spellcheck="false"></label>
+          <label>Products address<input id="f-path" autocomplete="off" spellcheck="false" placeholder="/products"></label>
+          <div class="gps-buttons">
+            <button type="button" class="primary" id="save">Save</button>
+            <button type="button" id="clear">Remove Sign-in</button>
+          </div>
+        </form>
+        <p class="hint" id="saved"></p>
+      </section>
+      <section class="gps-card">
+        <h2>2. Test connection</h2>
+        <p class="hint">Signs in to RedZone with what is saved and reads the product list. Nothing is ever changed in RedZone.</p>
+        <div class="gps-buttons"><button type="button" class="primary big" id="test">Test Connection</button></div>
+        <div class="gps-result" id="result" hidden></div>
+        <p class="hint" id="last"></p>
+      </section>
+      <section class="gps-card wide">
+        <h2>3. Where these come from</h2>
+        <ol class="gps-steps">
+          <li>Your everyday RedZone user name and password do not go here. RedZone's API uses a client ID and secret, made by a RedZone login with admin rights.</li>
+          <li>In RedZone, Manage Access &gt; Roles &gt; Create Role: name it "Operations App (read only)" and turn on only the view (read) permissions for lines, products, production, shifts and downtime. Nothing that creates, edits or deletes.</li>
+          <li>Organization drop-down &gt; Organization Settings &gt; Client Applications &gt; Create Application: name it "Operations App" and pick that role. RedZone shows the Client ID and Client Secret.</li>
+          <li>Type the client ID and client secret in box 1 and press <b>Save</b>. The API and token addresses are already filled in (RedZone's api.rz-ops.com). The app gets and renews its own tokens; you never handle one.</li>
+          <li>Press <b>Test Connection</b>. Green means it works; red says what to fix. RedZone's integrations team: integrations@rzsoftware.com.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText } from './js/app.js';
+
+    // Joe 10/16: back, with RedZone's own addresses filled in (support's answer).
+    // Joe 10/11: "tap into" RedZone. The sign-in is administrators only and never shown back (functions/src/redzone.js).
+    let s = null, armed = null;
+    const $ = (id) => document.getElementById(id);
+    const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
+    function render() {
+      if (!s) return;
+      const signIn = s.hasToken || (s.hasClient && s.hasSecret), ready = signIn, some = s.orgId || s.hasToken || s.hasClient;
+      $('state').textContent = ready ? 'Saved' : some ? 'Partly saved' : 'Not saved';
+      $('state').className = 'pill ' + (ready ? 'yes' : some ? 'warn' : 'no');
+      $('f-token').placeholder = s.hasToken ? 'saved, ends ' + s.tokenEnds + ' (paste to replace)' : '';
+      $('f-client').placeholder = s.hasClient ? 'saved, ends ' + s.clientEnds + ' (paste to replace)' : '';
+      $('f-secret').placeholder = s.hasSecret ? 'saved (paste to replace)' : '';
+      [['f-org', 'orgId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
+      $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
+      const t = s.lastTest;
+      $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
+    }
+    async function call(fields, button) {
+      showError('');
+      if (button) button.disabled = true;
+      try { s = await callServer('redzone', fields); render(); return s; }
+      catch (e) { showError('Could not reach the RedZone settings (' + (e.message || String(e)) + ').'); return null; }
+      finally { if (button) button.disabled = false; }
+    }
+    $('save').onclick = async () => {
+      const r = await call({ op: 'save', orgId: $('f-org').value, address: $('f-address').value, token: $('f-token').value, clientId: $('f-client').value, clientSecret: $('f-secret').value, tokenUrl: $('f-tokenurl').value, productsPath: $('f-path').value }, $('save'));
+      if (r) { ['f-token', 'f-client', 'f-secret'].forEach(id => { $(id).value = ''; }); $('result').hidden = true; }
+    };
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds removes the token, client ID and secret.
+    $('clear').onclick = async () => {
+      const b = $('clear');
+      if (!armed) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); armed = setTimeout(() => { armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed'); }, 5000); return; }
+      clearTimeout(armed); armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed');
+      await call({ op: 'clear' }, b);
+    };
+    $('test').onclick = async () => {
+      $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';
+      const r = await call({ op: 'test' }, $('test'));
+      if (!r) { $('result').hidden = true; return; }
+      $('result').className = 'gps-result ' + (r.result.ok ? 'ok' : 'bad');
+      $('result').innerHTML = '<b>' + (r.result.ok ? 'PASSED' : 'FAILED') + '</b> ' + escapeHtml(r.result.message) +
+        (r.result.sample && r.result.sample.length ? '<small>For example: ' + escapeHtml(r.result.sample.join(' · ')) + '</small>' : '');
+    };
+    ['f-org', 'f-address', 'f-token', 'f-client', 'f-secret', 'f-tokenurl', 'f-path'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    requireSignIn(async () => { await start(); await call({ op: 'status' }); });
+  </script>
+</body>
+</html>

@@ -149,7 +149,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/13: Sheet Conflicts added under Diagnostics, so Find a setting finds it.
     // Joe 10/13: Machine Setup added under Plant Setup.
     // Joe 10/15: Schedule Texts added under Connections & Keys.
-    assert.equal(all, 36, 'every item from the current app\'s Administration is in the menu');
+    // Joe 10/16: Connections & Keys > RedZone back (the RedZone API, read only).
+    assert.equal(all, 37, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
