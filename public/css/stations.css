@@ -426,7 +426,9 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .st-code h2 { margin: 0; font-size: 26px; color: #0b2f55; }
 .st-code p { margin: 0; color: #33475b; }
 .st-code label { display: grid; gap: 6px; font-weight: 700; color: #33475b; }
-.st-code input { font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
+/* Fits a phone: the code box shrinks with the window instead of pushing the screen sideways. */
+.st-code > * { min-width: 0; }
+.st-code input { width: 100%; box-sizing: border-box; font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
 .st-code button { min-height: 58px; border: 0; border-radius: 10px; background: #0b3d6b; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
 .st-code .st-code-msg { min-height: 1.4em; color: #b3261e; font-weight: 700; }
 /* The Plant Station with no UD account: the station code form inside the sign-in card (Joe 10/12). */
