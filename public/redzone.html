@@ -55,11 +55,22 @@
         <div class="gps-result" id="result" hidden></div>
         <p class="hint" id="last"></p>
       </section>
+      <section class="gps-card wide" id="give-card">
+        <h2>3. What RedZone gives us</h2>
+        <p class="hint">Asks RedZone for every kind of thing it may hold: lines and areas, machines, sensors and data points, products, runs, downtime, shifts and sites. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
+        <div class="gps-buttons">
+          <button type="button" class="primary big" id="give">Show What RedZone Gives Us</button>
+          <button type="button" id="give-download" hidden>Download the List</button>
+        </div>
+        <label class="rz-try">Also try this address (optional, for example /assets)<input id="give-path" autocomplete="off" spellcheck="false"></label>
+        <div class="gps-result" id="give-result" hidden></div>
+        <div class="rz-give" id="give-list"></div>
+      </section>
       <section class="gps-card wide">
-        <h2>3. Where these come from</h2>
+        <h2>4. Where these come from</h2>
         <ol class="gps-steps">
           <li>Your everyday RedZone user name and password do not go here. RedZone's API uses a client ID and secret, made by a RedZone login with admin rights.</li>
-          <li>In RedZone, Manage Access &gt; Roles &gt; Create Role: name it "Operations App (read only)" and turn on only the view (read) permissions for lines, products, production, shifts and downtime. Nothing that creates, edits or deletes.</li>
+          <li>In RedZone, Manage Access &gt; Roles &gt; Create Role: name it "Operations App Read Only" and turn on only <b>Basic Access</b>. Everything else stays off: Admin and every "Configure" or manage switch.</li>
           <li>Organization drop-down &gt; Organization Settings &gt; Client Applications &gt; Create Application: name it "Operations App" and pick that role. RedZone shows the Client ID and Client Secret.</li>
           <li>Type the client ID and client secret in box 1 and press <b>Save</b>. The API and token addresses are already filled in (RedZone's api.rz-ops.com). The app gets and renews its own tokens; you never handle one.</li>
           <li>Press <b>Test Connection</b>. Green means it works; red says what to fix. RedZone's integrations team: integrations@rzsoftware.com.</li>
@@ -87,6 +98,7 @@
       [['f-org', 'orgId'], ['f-ent', 'enterpriseId'], ['f-address', 'address'], ['f-tokenurl', 'tokenUrl'], ['f-path', 'productsPath']].forEach(([id, k]) => { if (document.activeElement !== $(id)) $(id).value = s[k] || ''; });
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       const t = s.lastTest;
+      drawGive(s.lastDiscover);
       $('last').textContent = t ? 'Last test ' + stamp(t.at) + (t.by ? ' by ' + t.by : '') + ': ' + (t.ok ? 'passed' : 'failed') : 'Not tested yet.';
     }
     async function call(fields, button) {
@@ -106,6 +118,33 @@
       if (!armed) { b.textContent = 'Tap again to remove'; b.classList.add('armed'); armed = setTimeout(() => { armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed'); }, 5000); return; }
       clearTimeout(armed); armed = null; b.textContent = 'Remove Sign-in'; b.classList.remove('armed');
       await call({ op: 'clear' }, b);
+    };
+    // Joe 10/16: "what everything reads ... what sensors we have available".
+    function drawGive(g) {
+      if (!g || !g.items) { $('give-list').innerHTML = ''; $('give-download').hidden = true; return; }
+      const rows = g.items.map(x => '<tr' + (x.found ? '' : ' class="not-yet"') + '><th scope="row">' + escapeHtml(x.kind) + '</th><td>' +
+        (x.found ? '<b>' + escapeHtml(String(x.count)) + '</b>' : escapeHtml(x.status === 403 ? 'Not allowed (403)' : x.status === 404 || !x.status ? 'Not found' : 'Answered ' + x.status)) +
+        '</td><td class="rz-path">' + escapeHtml(x.path || '') + '</td><td>' + escapeHtml((x.fields || []).join(', ')) + '</td><td>' + (x.examples || []).map(e => '<div>' + escapeHtml(e) + '</div>').join('') + '</td></tr>').join('');
+      $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' +
+        '<div class="rz-scroll"><table class="gps-check rz-table"><colgroup><col style="width:13%"><col style="width:11%"><col style="width:22%"><col style="width:22%"><col style="width:32%"></colgroup><thead><tr><th>What</th><th>How many</th><th>RedZone address</th><th>What each one has</th><th>Examples</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      $('give-download').hidden = false;
+    }
+    $('give').onclick = async () => {
+      $('give-result').hidden = false; $('give-result').className = 'gps-result'; $('give-result').textContent = 'Asking RedZone...';
+      const r = await call({ op: 'discover', path: $('give-path').value }, $('give'));
+      if (!r) { $('give-result').hidden = true; return; }
+      const found = r.discover.items.filter(x => x.found).length;
+      $('give-result').className = 'gps-result ' + (found ? 'ok' : 'bad');
+      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' kinds came back.' : 'Nothing came back yet. Send us this list and we will find RedZone\'s addresses.';
+      drawGive(r.discover);
+    };
+    $('give-download').onclick = () => {
+      if (!s || !s.lastDiscover) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(s.lastDiscover, null, 2)], { type: 'application/json' }));
+      a.download = 'what-redzone-gives-us.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
     $('test').onclick = async () => {
       $('result').hidden = false; $('result').className = 'gps-result'; $('result').textContent = 'Testing...';

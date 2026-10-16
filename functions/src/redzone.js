@@ -137,15 +137,70 @@ async function fetchProducts(d, o, ref) {
   }
   return out;
 }
+/* ---------- What RedZone gives us (Joe 10/16) ----------
+ * "Will you be able to tell me what everything reads ... what sensors we have available": with the sign-in working, ask
+ * RedZone's API for each kind of thing it may hold and list what comes back: how many, the address, the fields each one has
+ * and a few examples (name, latest value and unit where RedZone sends them). Only GETs; nothing is ever written to RedZone.
+ * RedZone's own address list is in its Developer Hub (not reachable from outside), so the usual names are tried, plain and
+ * under the organization (and enterprise) the way Boomi's RedZone connector builds its addresses; an administrator can also
+ * type one address to try. */
+const KINDS = [
+  ['Lines and areas', ['locations', 'areas', 'lines', 'production-lines', 'places']],
+  ['Machines', ['assets', 'machines', 'equipment']],
+  ['Sensors and data points', ['data-points', 'datapoints', 'sensors', 'tags', 'signals', 'counters']],
+  ['Products', ['products']],
+  ['Runs', ['runs', 'production-runs']],
+  ['Downtime', ['losses', 'downtime', 'downtime-events', 'problem-types']],
+  ['Shifts', ['shifts', 'shift-types']],
+  ['Sites', ['sites', 'enterprises']]
+];
+const SHOW = ['value', 'lastValue', 'latestValue', 'currentValue', 'unit', 'units', 'uom', 'type', 'status', 'location', 'locationName', 'asset', 'assetName'];
+function sample(item) {
+  // In this order of preference (field() alone takes whichever comes first in the record).
+  const name = ['name', 'displayName', 'title', 'label', 'description', 'code', 'id'].map(k => text(field(item, [k]))).find(Boolean) || '';
+  const more = SHOW.map(k => [k, field(item, [k])]).filter(([, v]) => v !== undefined && typeof v !== 'object').map(([k, v]) => k + ' ' + clean(v, 40));
+  return clean(name, 80) + (more.length ? ' (' + more.join(', ') + ')' : '');
+}
+async function getList(url, token, o) {
+  let res;
+  try { res = await o.fetch(url, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } }); } catch (e) { return { status: 0 }; }
+  if (!res.ok) return { status: res.status };
+  let body; try { body = JSON.parse(await res.text()); } catch (e) { return { status: res.status, note: 'not JSON' }; }
+  const list = listIn(body);
+  return list ? { status: res.status, list, total: Number(field(body, ['total', 'totalCount', 'count'])) || list.length } : { status: res.status, note: 'no list in the answer' };
+}
+async function discover(d, o, ref, extra) {
+  const token = await accessToken(d, o, ref), address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
+  const prefixes = [''].concat(d.orgId ? ['/organizations/{org}'] : []).concat(d.orgId && d.enterpriseId ? ['/organizations/{org}/enterprises/{enterprise}'] : []);
+  const one = async (kind, paths) => {
+    let best = null;
+    for (const p of paths) for (const pre of p.startsWith('/') ? [''] : prefixes) {
+      const path = withOrg(pre + '/' + p.replace(/^\/+/, ''), d.orgId, d.enterpriseId), url = urlFor(address, path) + (path.includes('?') ? '&' : '?') + 'limit=50';
+      if (!sameHost(url, address)) continue;
+      const got = await getList(url, token, o);
+      if (got.list) {
+        const first = got.list.find(x => x && typeof x === 'object') || {};
+        return { kind, found: true, path, count: got.total, fields: Object.keys(first).slice(0, 30), examples: got.list.slice(0, 5).map(sample) };
+      }
+      // 403 (there but not allowed) says more than 404 (not there).
+      if (!best || (got.status === 403 && best.status !== 403)) best = { kind, found: false, path, status: got.status, note: got.note || '' };
+    }
+    return best;
+  };
+  const kinds = KINDS.map(([k, p]) => one(k, p));
+  if (extra) kinds.push(one('Address typed', [clean(extra, 300).startsWith('/') ? clean(extra, 300) : '/' + clean(extra, 300)]));
+  return (await Promise.all(kinds)).filter(Boolean);
+}
+
 const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
   : /answered 404/.test(e.message) ? 'RedZone has no page at that address (404). Check the API address and products address from the Developer Hub.'
   : 'Could not read RedZone: ' + e.message;
 
 const view = (d) => ({ orgId: d.orgId || '', enterpriseId: d.enterpriseId || '', address: addressOf(d), tokenUrl: tokenUrlOf(d), productsPath: d.productsPath || DEFAULTS.productsPath, scope: d.scope || '',
   hasToken: !!d.token, tokenEnds: ends(d.token), hasClient: !!d.clientId, clientEnds: ends(d.clientId), hasSecret: !!d.clientSecret,
-  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null });
+  savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastTest: d.lastTest || null, lastDiscover: d.lastDiscover || null });
 
-/* input.op: status | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
+/* input.op: status | discover {path} | save {orgId, enterpriseId, address, tokenUrl, productsPath, scope, token, clientId, clientSecret} | clear | test | products {facilityId} */
 async function redzoneCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date() }, options || {});
@@ -205,6 +260,13 @@ async function redzoneCall(db, user, input, options) {
     await status.set({ configured: result.ok, message: result.message, at, products: result.products || 0 }, { merge: true });
     return Object.assign(view(Object.assign({}, d, { lastTest })), { result });
   }
+  if (op === 'discover') {
+    let items;
+    try { items = await discover(d, o, ref, input.path); } catch (e) { throw new RedzoneError('FAILED', e instanceof RedzoneError ? e.message : plain(e)); }
+    const lastDiscover = { at, by: email, items };
+    await ref.set({ lastDiscover }, { merge: true });
+    return Object.assign(view(Object.assign({}, d, { lastDiscover })), { discover: lastDiscover });
+  }
   if (op === 'products') {
     if (!(d.lastTest && d.lastTest.ok)) throw new RedzoneError('FAILED', 'RedZone is not connected yet: Administration > Connections & Keys > RedZone, then Test Connection.');
     const plant = (L.PLANTS || []).find(p => p.id === String(input.facilityId || '')) || null;
@@ -217,4 +279,4 @@ async function redzoneCall(db, user, input, options) {
   throw new RedzoneError('BAD_REQUEST', 'Unknown RedZone step ' + op.slice(0, 30));
 }
 
-module.exports = { redzoneCall, RedzoneError, fetchProducts, normalize, listIn, nextIn, accessToken };
+module.exports = { discover, redzoneCall, RedzoneError, fetchProducts, normalize, listIn, nextIn, accessToken };
