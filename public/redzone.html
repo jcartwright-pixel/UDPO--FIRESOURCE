@@ -57,12 +57,13 @@
       </section>
       <section class="gps-card wide" id="give-card">
         <h2>3. What RedZone gives us</h2>
-        <p class="hint">Asks RedZone for every kind of thing it may hold: lines and areas, machines, sensors and data points, data sheets, products, runs, downtime, shifts and sites. RedZone keeps them by site, so it finds our sites first. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
+        <p class="hint">Reads every list RedZone's API has: lines and areas, machines, sensors, products, product groups, units, characteristics, check sheets (blank and completed), problem types, runs, shifts and labels. RedZone keeps them by site, so it checks our organization and finds our site first. Each row says how many came back, what each one has and a few examples. Nothing is ever changed in RedZone.</p>
+        <p class="hint" id="give-not">Not in RedZone's API (per its own reference): sensor readings, logged downtime and problems, and past counts or OEE. Counts and units lost only come as a live feed from the moment we start reading.</p>
         <div class="gps-buttons">
           <button type="button" class="primary big" id="give">Show What RedZone Gives Us</button>
           <button type="button" id="give-download" hidden>Download the List</button>
         </div>
-        <label class="rz-try">Also try this address (optional, for example /assets)<input id="give-path" autocomplete="off" spellcheck="false"></label>
+        <label class="rz-try">Also try this list (optional, for example assets)<input id="give-path" autocomplete="off" spellcheck="false"></label>
         <div class="gps-result" id="give-result" hidden></div>
         <div class="rz-give" id="give-list"></div>
       </section>
@@ -125,11 +126,11 @@
       const rows = g.items.map(x => '<tr' + (x.found ? '' : ' class="not-yet"') + '><th scope="row">' + escapeHtml(x.kind) + '</th><td>' +
         (x.found ? '<b>' + escapeHtml(String(x.count)) + '</b>' : escapeHtml(x.status === 403 ? 'Not allowed (403)' : x.status === 404 || !x.status ? 'Not found' : 'Answered ' + x.status) + (x.note ? '<div class="hint">' + escapeHtml(x.note) + '</div>' : '')) +
         '</td><td class="rz-path">' + escapeHtml(x.path || '') + '</td><td>' + escapeHtml((x.fields || []).join(', ')) + '</td><td>' + (x.examples || []).map(e => '<div>' + escapeHtml(e) + '</div>').join('') + '</td></tr>').join('');
-      // Which RedZone site (enterprise) answered, and the sites it knows of.
-      const sites = (g.enterprises || []).map(e => (e.name ? e.name + ' ' : '') + e.id).join('; ');
-      const site = g.used ? '<p id="give-site"><b>Site used: ' + escapeHtml(g.used.name || 'the site') + '</b> (' + escapeHtml(g.used.enterprise) + ')</p>'
-        : g.enterprises ? '<p id="give-site" class="hint">No site answered yet.' + (sites ? ' Sites tried: ' + escapeHtml(sites) + '.' : ' RedZone did not name any sites.') + '</p>' +
-          (g.probes || []).map(p => '<div class="hint rz-path">' + escapeHtml(p.sign + ' sign-in, ' + p.path + ': ' + p.status + (p.note ? ' ' + p.note : '')) + '</div>').join('') : '';
+      // Whether the organization answered, and which site (namespace) answered.
+      const line = (t) => '<div class="hint rz-path">' + escapeHtml(t) + '</div>';
+      const orgs = (g.orgChecks || []).map(c => line(c.sign + ' sign-in, organization ' + c.org + ': ' + (c.status === 200 ? 'OK' : c.status) + (c.note ? ' ' + c.note : ''))).join('');
+      const site = g.used ? '<p id="give-site"><b>Organization ' + escapeHtml(g.used.org) + ', site ' + escapeHtml(g.used.enterprise) + '</b></p>'
+        : g.orgChecks ? '<p id="give-site" class="hint">No site answered yet. Tried ' + escapeHtml(String((g.enterprises || []).length)) + ' site names. What RedZone said:</p>' + orgs + (g.probes || []).map(p => line(p.sign + ' sign-in, ' + p.path + ': ' + p.status + (p.note ? ' ' + p.note : ''))).join('') : '';
       $('give-list').innerHTML = '<p class="hint">Asked ' + escapeHtml(stamp(g.at)) + (g.by ? ' by ' + escapeHtml(g.by) : '') + '.</p>' + site +
         '<div class="rz-scroll"><table class="gps-check rz-table"><colgroup><col style="width:13%"><col style="width:11%"><col style="width:22%"><col style="width:22%"><col style="width:32%"></colgroup><thead><tr><th>What</th><th>How many</th><th>RedZone address</th><th>What each one has</th><th>Examples</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
       $('give-download').hidden = false;
@@ -140,7 +141,7 @@
       if (!r) { $('give-result').hidden = true; return; }
       const found = r.discover.items.filter(x => x.found).length;
       $('give-result').className = 'gps-result ' + (found ? 'ok' : 'bad');
-      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' kinds came back.' : 'Nothing came back yet. Send us this list and we will find RedZone\'s addresses.';
+      $('give-result').textContent = found ? found + ' of ' + r.discover.items.length + ' lists came back.' : 'Nothing came back yet. Send us a picture of this and we will find RedZone\'s addresses.';
       drawGive(r.discover);
     };
     $('give-download').onclick = () => {

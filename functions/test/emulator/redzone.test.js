@@ -91,12 +91,12 @@ test('Get from RedZone: managers only, after a passing test, active products for
   assert.equal(got.skipped, 2);
 });
 
-// Joe 10/16 (RedZone support): POST https://api.rz-ops.com/public/v2/oauth/token with the client ID and secret; the API is under
-// https://api.rz-ops.com/public/v2. Only the client ID and secret are typed.
-test('RedZone\'s own addresses are filled in; the client ID and secret alone sign in, sent as JSON when the form is refused', async () => {
+// RedZone's API reference (10/16): POST https://api.rz-ops.com/public/v3/oauth/token; support's .../public/v2/oauth/token also
+// signs in. The API is under https://api.rz-ops.com/public/v2. Only the client ID and secret are typed.
+test('RedZone\'s own addresses are filled in; the client ID and secret alone sign in (v3, then v2), sent as JSON when the form is refused', async () => {
   await people();
   const fresh = await R.redzoneCall(db(), ADMIN, { op: 'status' });
-  assert.deepEqual([fresh.address, fresh.tokenUrl], ['https://api.rz-ops.com/public/v2', 'https://api.rz-ops.com/public/v2/oauth/token']);
+  assert.deepEqual([fresh.address, fresh.tokenUrl], ['https://api.rz-ops.com/public/v2', 'https://api.rz-ops.com/public/v3/oauth/token']);
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET });
   const calls = [];
   const fetch = async (url, opts) => {
@@ -113,163 +113,111 @@ test('RedZone\'s own addresses are filled in; the client ID and secret alone sig
   assert.equal(r.result.ok, true);
   assert.match(r.result.message, /Signed in to RedZone: the client ID and secret work\. The product list did not come back yet \(.*404/);
   assert.deepEqual(calls.map(c => [c.url, c.type]), [
+    ['https://api.rz-ops.com/public/v3/oauth/token', 'application/x-www-form-urlencoded'],
     ['https://api.rz-ops.com/public/v2/oauth/token', 'application/x-www-form-urlencoded'],
     ['https://api.rz-ops.com/public/v2/oauth/token', 'application/json'],
     ['https://api.rz-ops.com/public/v2/products', '']
   ]);
-  assert.equal(calls[2].auth, 'Bearer rz_bearer');
+  assert.equal(calls[3].auth, 'Bearer rz_bearer');
   assert.ok(!JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('rz_bearer'));
-  // A wrong secret is a plain FAILED.
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientSecret: 'wrong' });
   const bad = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
   assert.equal(bad.result.ok, false);
   assert.match(bad.result.message, /refused the sign-in \(401\)/);
 });
 
-// Boomi's RedZone connector names .../public/v3/oauth/token, and puts the organization and enterprise IDs in the address.
-test('a 404 at the v2 token address tries v3; {org} and {enterprise} in the products address are filled in', async () => {
+test('{org} and {enterprise} in the products address are filled in; the old v2 token address counts as not typed', async () => {
   await people();
-  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org 1', enterpriseId: 'ent-2', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' });
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org 1', enterpriseId: 'ent-2', tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' });
   const urls = [];
   const fetch = async (url, opts) => {
     urls.push(url);
     const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
     if (url === 'https://api.rz-ops.com/public/v3/oauth/token') return reply(200, { access_token: 'v3_token' });
-    if (url === 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products' && opts.headers.Authorization === 'Bearer v3_token') return reply(200, [{ name: 'UD Wildberry', sku: '3934' }]);
+    if (url === 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products?limit=100&offset=0' && opts.headers.Authorization === 'Bearer v3_token') return reply(200, [{ name: 'UD Wildberry', sku: '3934' }]);
     return reply(404, {});
   };
   const r = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
-  assert.equal(r.result.ok, true);
   assert.match(r.result.message, /Connected\. RedZone sent 1 product\./);
-  assert.deepEqual(urls, ['https://api.rz-ops.com/public/v2/oauth/token', 'https://api.rz-ops.com/public/v3/oauth/token', 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products']);
+  assert.deepEqual(urls, ['https://api.rz-ops.com/public/v3/oauth/token', 'https://api.rz-ops.com/public/v2/organizations/org%201/enterprises/ent-2/products?limit=100&offset=0'], 'RedZone\'s lists want limit and offset');
   assert.equal(r.enterpriseId, 'ent-2');
 });
 
-// Joe 10/16: "what everything reads ... what sensors we have available".
-test('What RedZone gives us: each kind tried plain and under the organization; counts, fields and examples; only GETs; administrators only', async () => {
-  await people();
-  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org1' });
-  const calls = [];
-  const fetch = async (url, opts) => {
-    calls.push([opts.method || 'GET', url]);
+// A stand-in for RedZone as its API reference describes it: lists under /organizations/{org}/enterprises/{site namespace},
+// { items: [...] }, the organization's events queue, sensors by line.
+function fakeRz(opts) {
+  const urls = [];
+  const fetch = async (url, o) => {
+    urls.push([o.method || 'GET', url]);
     const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
-    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'rz_bearer' });
-    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
-    if (path === '/organizations/org1/data-points') return reply(200, { data: [{ id: 7, name: 'Gallon Filler Count', locationName: 'GALLON FILLER', lastValue: 1234, unit: 'jugs' }, { id: 8, name: 'Blow Mold Temp', lastValue: 212, unit: 'F' }], total: 46 });
-    if (path === '/locations') return reply(200, [{ name: 'GALLON FILLER', type: 'Line' }]);
-    if (path === '/runs') return reply(403, {});
-    return reply(404, {});
+    if (/oauth\/token$/.test(url)) return url === opts.tokenUrl ? reply(200, { access_token: opts.token }) : reply(opts.tokenUrl ? 200 : 404, { access_token: 'other_token' });
+    if (o.headers.Authorization !== 'Bearer ' + opts.token) return reply(404, { message: 'Not Found' });
+    const u = new URL(url), path = u.pathname.replace('/public/v2', '');
+    if (path === '/organizations/' + opts.org + '/events') return reply(200, { items: [] });
+    const ut = '/organizations/' + opts.org + '/enterprises/' + opts.site;
+    // Joe 10/16 (test copy): RedZone refuses a list without offset.
+    if (path.startsWith(ut) && !u.searchParams.has('offset')) return reply(400, { message: 'parameter "offset" in query has an error: value is required but missing' });
+    const lists = {
+      '/locations': [{ uuid: 'loc-g', name: 'GALLON FILLER' }, { uuid: 'loc-b', name: 'BLOW MOLD' }],
+      '/assets': [{ uuid: 'a1', name: 'Gallon Filler', modelNumber: 'GF-9' }],
+      '/product-types': [{ uuid: 'p1', name: 'UD Wildberry', sku: '3934' }],
+      '/locations/loc-g/sensor-configurations': [{ uuid: 's1', name: 'Filler Count' }],
+      '/locations/loc-b/sensor-configurations': [{ uuid: 's2', name: 'Head 1 Count' }, { uuid: 's3', name: 'Reject Count' }]
+    };
+    if (path.startsWith(ut) && lists[path.slice(ut.length)]) return reply(200, { items: lists[path.slice(ut.length)] });
+    if (path === ut + '/characteristics') return reply(403, { message: 'Missing permission' });
+    if (path.startsWith(ut)) return reply(200, { items: [] });
+    return reply(404, { message: 'Not Found' });
   };
-  await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'discover' }, { fetch }), /Only an administrator/);
-  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover', path: '/my-extra' }, { fetch });
+  return { fetch, urls };
+}
+
+// Joe 10/16: "what everything reads ... what sensors we have available".
+test('What RedZone gives us: checks the organization, finds the site namespace (Uniontown first), reads every list; only GETs; administrators only', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e6965-uuid', tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token' });
+  const rz = fakeRz({ tokenUrl: 'https://api.rz-ops.com/public/v3/oauth/token', token: 'rz_bearer', org: 'org_mA7', site: 'uniontown' });
+  await assert.rejects(R.redzoneCall(db(), MANAGER, { op: 'discover' }, { fetch: rz.fetch }), /Only an administrator/);
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover', path: 'labels' }, { fetch: rz.fetch });
+  assert.deepEqual(r.discover.used, { org: 'org_mA7', enterprise: 'uniontown', tokenUrl: 'https://api.rz-ops.com/public/v3/oauth/token' });
+  assert.deepEqual(r.discover.orgChecks.map(c => [c.org, c.status]), [['org_mA7', 200], ['united-dairy', 404]]);
+  const events = rz.urls.find(([, u]) => /\/events/.test(u))[1];
+  assert.match(events, /visibility-timeout=0/, 'the events queue is left as it was');
+  const sitesTried = rz.urls.filter(([, u]) => /\/enterprises\/[^/]+\/locations\?limit=1&/.test(u)).map(([, u]) => decodeURIComponent(u.split('/enterprises/')[1].split('/')[0]));
+  assert.deepEqual(sitesTried, ['f99e6965-uuid', 'uniontown'], 'what was typed first, then Uniontown\'s namespace');
   const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
-  assert.deepEqual([by['Sensors'].found, by['Sensors'].count, by['Sensors'].path], [true, 46, '/organizations/org1/data-points']);
-  assert.deepEqual(by['Sensors'].fields, ['id', 'name', 'locationName', 'lastValue', 'unit']);
-  assert.deepEqual(by['Sensors'].examples, ['Gallon Filler Count (lastValue 1234, unit jugs, locationName GALLON FILLER)', 'Blow Mold Temp (lastValue 212, unit F)']);
-  assert.deepEqual([by['Lines and areas'].found, by['Lines and areas'].count, by['Lines and areas'].examples], [true, 1, ['GALLON FILLER (type Line)']]);
-  assert.deepEqual([by.Runs.found, by.Runs.status], [false, 403], 'there but not allowed says more than not found');
-  assert.deepEqual([by.Shifts.found, by.Shifts.status], [false, 404]);
-  assert.equal(by['Address typed'].path, '/my-extra');
-  assert.ok(calls.filter(c => !/oauth/.test(c[1])).every(c => c[0] === 'GET'), 'only GETs to RedZone');
-  assert.ok(calls.every(c => c[1].startsWith('https://api.rz-ops.com/')));
-  const saved = (await db().collection('private').doc('redzone').get()).data().lastDiscover;
-  assert.equal(saved.items.length, 14);
-  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 14, 'the screen shows the last list again');
+  assert.deepEqual([by['Lines and areas'].count, by.Machines.examples, by.Products.examples], [2, ['Gallon Filler (modelNumber GF-9)'], ['UD Wildberry (sku 3934)']]);
+  assert.deepEqual([by.Sensors.found, by.Sensors.count, by.Sensors.lines, by.Sensors.examples], [true, 3, 2, ['GALLON FILLER: Filler Count', 'BLOW MOLD: Head 1 Count', 'BLOW MOLD: Reject Count']]);
+  assert.deepEqual([by['Characteristics (checks and readings)'].status, by['Characteristics (checks and readings)'].note], [403, 'Missing permission']);
+  assert.equal(by['Address typed'].path, '/organizations/org_mA7/enterprises/uniontown/labels');
+  assert.equal(r.discover.items.length, 17);
+  assert.ok(rz.urls.filter(([, u]) => !/oauth/.test(u)).every(([m]) => m === 'GET'), 'only GETs to RedZone');
+  assert.ok(rz.urls.filter(([, u]) => /problem-types/.test(u)).every(([, u]) => /limit=20&offset=0/.test(u)), 'problem types 20 at a time');
+  assert.ok(rz.urls.filter(([, u]) => /\/assets\?/.test(u)).every(([, u]) => /limit=100&offset=0/.test(u)));
   assert.ok(!JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('rz_bearer'));
+  // Kept: the organization, site and sign-in that answered; Test Connection then reads the products from them.
+  assert.deepEqual([r.foundOrgId, r.foundEnterpriseId, r.tokenUrl, r.productsPath], ['org_mA7', 'uniontown', 'https://api.rz-ops.com/public/v3/oauth/token', '/organizations/{org}/enterprises/{enterprise}/product-types']);
+  assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 17, 'the screen shows the last list again');
+  const t = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch: rz.fetch });
+  assert.match(t.result.message, /Connected\. RedZone sent 1 product\./);
+  assert.equal(rz.urls[rz.urls.length - 1][1], 'https://api.rz-ops.com/public/v2/organizations/org_mA7/enterprises/uniontown/product-types?limit=100&offset=0');
+  // A new site typed is looked for again.
+  const again = await R.redzoneCall(db(), ADMIN, { op: 'save', enterpriseId: 'ud-uniontown' });
+  assert.deepEqual([again.foundEnterpriseId, again.foundOrgId], ['', '']);
 });
 
-// Joe 10/16: RedZone's Organization IDs list the organization and three sites, no enterprise. Enterprise ID stays blank.
-test('What RedZone gives us with no Enterprise ID: kinds not found are tried again under Uniontown\'s site from the sites list', async () => {
+test('What RedZone gives us: the organization name and the v2 sign-in are tried too; when nothing answers, every answer is shown', async () => {
   await people();
   await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7' });
-  const urls = [];
-  const fetch = async (url) => {
-    urls.push(url);
-    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
-    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'rz_bearer' });
-    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
-    if (path === '/organizations/org_mA7/sites') return reply(200, { items: [{ id: 'c-332a', name: 'Charleston' }, { id: 'u-f99e', name: 'Uniontown' }] });
-    if (path === '/organizations/org_mA7/sites/u-f99e/data-points') return reply(200, [{ name: 'Gallon Filler Count', lastValue: 5, unit: 'jugs' }]);
-    return reply(404, {});
-  };
-  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
-  const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
-  assert.deepEqual([by.Sites.found, by.Sites.count, by.Sites.examples], [true, 2, ['Charleston', 'Uniontown']]);
-  assert.deepEqual([by['Sensors'].found, by['Sensors'].path], [true, '/organizations/org_mA7/sites/u-f99e/data-points']);
-  assert.equal(by.Products.found, false);
-  const probes = ['u-f99e', 'c-332a'].flatMap(e => ['asset-types', 'locations'].map(k => 'https://api.rz-ops.com/public/v2/organizations/org_mA7/enterprises/' + e + '/' + k));
-  assert.deepEqual(urls.filter(u => /enterprises\/[^/?]+\//.test(u)).map(u => u.replace(/\?.*$/, '')), probes.concat(probes),
-    'each listed site is tried as the enterprise, Uniontown first, with the v2 sign-in and once more with v3; none answered, so the kinds are tried the old ways');
-  assert.ok(urls.includes('https://api.rz-ops.com/public/v3/oauth/token'));
-  assert.deepEqual(r.discover.probes.map(p => p.sign + ' ' + p.status), ['v2 404', 'v2 404', 'v2 404', 'v2 404', 'v3 404', 'v3 404', 'v3 404', 'v3 404'], 'the screen shows what each site answered');
-  assert.equal(r.discover.used, null);
-  assert.ok(!('list' in by.Sites), 'the raw lists are not kept');
-});
-
-// Joe 10/16 (RedZone's API reference): GET https://api.rz-ops.com/public/v2/organizations/{organizationId}/enterprises/{enterpriseId}/asset-types.
-// The sites RedZone lists are its enterprises; the first one that answers is used for every kind and kept for the products.
-test('What RedZone gives us finds the site (enterprise) by itself, lists every kind under it, and Products then reads from it', async () => {
-  await people();
-  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', productsPath: '/products' });
-  const b64 = (x) => Buffer.from(JSON.stringify(x)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const jwt = b64({ alg: 'none' }) + '.' + b64({ sub: 'client-abc@clients', azp: 'client-abc', org_id: 'org_mA7', org_name: 'united-dairy' }) + '.sig';
-  const urls = [];
-  const fetch = async (url, opts) => {
-    urls.push([opts.method || 'GET', url]);
-    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
-    if (/oauth\/token$/.test(url)) return reply(200, { access_token: jwt });
-    if (opts.headers.Authorization !== 'Bearer ' + jwt) return reply(401, {});
-    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
-    const UT = '/organizations/org_mA7/enterprises/f99e6965';
-    if (path === '/organizations/org_mA7/enterprises') return reply(200, { data: [{ id: '332a2f5f', name: 'Charleston' }, { id: 'f99e6965', name: 'Uniontown' }, { id: '81f6e61a', name: "Martin's Ferry" }] });
-    if (path === UT + '/asset-types') return reply(200, { data: [{ id: 'at1', name: 'Filler' }] });
-    if (path === UT + '/assets') return reply(200, { data: [{ id: 'a1', name: 'Gallon Filler', status: 'Running' }, { id: 'a2', name: 'Blow Mold' }], total: 12 });
-    if (path === UT + '/locations') return reply(200, [{ id: 'loc-g', name: 'GALLON FILLER', type: 'Line' }, { id: 'loc-b', name: 'BLOW MOLD', type: 'Line' }]);
-    if (path === UT + '/locations/loc-g/sensor-configurations') return reply(200, { data: [{ id: 's1', name: 'Filler Count', type: 'Counter' }] });
-    if (path === UT + '/locations/loc-b/sensor-configurations') return reply(200, { data: [{ id: 's2', name: 'Head 1 Temp', unit: 'F' }, { id: 's3', name: 'Cycle Count', type: 'Counter' }] });
-    if (path === UT + '/products') return reply(200, { data: [{ name: 'UD Wildberry', sku: '3934' }] });
-    if (path === UT + '/characteristics') return reply(403, { message: 'Missing permission' });
-    if (path === UT + '/product-types') return reply(404, { message: 'Not Found' });
-    return reply(404, { message: 'Not Found' });
-  };
-  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
-  assert.deepEqual(r.discover.used, { org: 'org_mA7', enterprise: 'f99e6965', name: 'Uniontown', productsPath: '/organizations/{org}/enterprises/{enterprise}/products' }, 'Uniontown first');
-  const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
-  assert.deepEqual([by.Machines.found, by.Machines.count, by.Machines.path, by.Machines.examples], [true, 12, '/organizations/org_mA7/enterprises/f99e6965/assets', ['Gallon Filler (status Running)', 'Blow Mold']]);
-  assert.deepEqual([by['Lines and areas'].found, by.Products.found, by.Sites.count], [true, true, 3]);
-  assert.deepEqual([by['Characteristics (checks and readings)'].status, by['Characteristics (checks and readings)'].note], [403, 'Missing permission'], 'RedZone\'s own words on a refusal');
-  // Sensors are kept by line in RedZone: asked line by line, named with their line.
-  assert.deepEqual([by.Sensors.found, by.Sensors.count, by.Sensors.lines, by.Sensors.path], [true, 3, 2, '/organizations/org_mA7/enterprises/f99e6965/locations/{locationId}/sensor-configurations']);
-  assert.deepEqual(by.Sensors.examples, ['GALLON FILLER: Filler Count (type Counter)', 'BLOW MOLD: Head 1 Temp (unit F)', 'BLOW MOLD: Cycle Count (type Counter)']);
-  assert.deepEqual([by.Shifts.found, by.Shifts.path], [false, '/organizations/org_mA7/enterprises/f99e6965/shifts']);
-  assert.ok(urls.every(([m, u]) => m === 'GET' || /oauth\/token$/.test(u)), 'only GETs');
-  assert.ok(!urls.some(([, u]) => /enterprises\/(332a2f5f|81f6e61a)/.test(u)), 'the other sites are not asked once Uniontown answers');
-  assert.deepEqual(r.discover.claims, ['org_id org_mA7', 'org_name united-dairy'], 'the sign-in\'s organization names, never the client');
-  assert.ok(!JSON.stringify(r).includes(jwt) && !JSON.stringify(r).includes('client-abc') && !JSON.stringify(r).includes(SECRET));
-  // The site that answered is kept: the products address is now under it, with nothing typed.
-  assert.deepEqual([r.foundEnterpriseId, r.foundEnterpriseName, r.productsPath], ['f99e6965', 'Uniontown', '/organizations/{org}/enterprises/{enterprise}/products']);
-  const t = await R.redzoneCall(db(), ADMIN, { op: 'test' }, { fetch });
-  assert.match(t.result.message, /Connected\. RedZone sent 1 product\./);
-  assert.equal(urls[urls.length - 1][1], 'https://api.rz-ops.com/public/v2/organizations/org_mA7/enterprises/f99e6965/products');
-});
-
-// RedZone's API reference: the token address is .../public/v3/oauth/token. Support's v2 address also signs in; when no site
-// answers to that sign-in, v3 is tried and kept.
-test('What RedZone gives us: when no site answers the v2 sign-in, the v3 sign-in is tried and kept as the token address', async () => {
-  await people();
-  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7', enterpriseId: 'f99e6965', tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token' });
-  const fetch = async (url, opts) => {
-    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
-    if (url === 'https://api.rz-ops.com/public/v2/oauth/token') return reply(200, { access_token: 'v2_token' });
-    if (url === 'https://api.rz-ops.com/public/v3/oauth/token') return reply(200, { access_token: 'v3_token' });
-    if (opts.headers.Authorization !== 'Bearer v3_token') return reply(404, { message: 'Not Found' });
-    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
-    if (path === '/organizations/org_mA7/enterprises/f99e6965/asset-types') return reply(200, [{ id: 'at1', name: 'Filler' }]);
-    if (path === '/organizations/org_mA7/enterprises/f99e6965/assets') return reply(200, [{ id: 'a1', name: 'Gallon Filler' }]);
-    return reply(404, { message: 'Not Found' });
-  };
-  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
-  assert.deepEqual([r.discover.used.enterprise, r.discover.used.tokenUrl, r.tokenUrl], ['f99e6965', 'https://api.rz-ops.com/public/v3/oauth/token', 'https://api.rz-ops.com/public/v3/oauth/token']);
+  const rz = fakeRz({ tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token', token: 'v2_token', org: 'united-dairy', site: 'united-dairy-uniontown' });
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch: rz.fetch });
+  assert.deepEqual(r.discover.used, { org: 'united-dairy', enterprise: 'united-dairy-uniontown', tokenUrl: 'https://api.rz-ops.com/public/v2/oauth/token' });
+  assert.deepEqual(r.discover.orgChecks.map(c => [c.sign, c.org, c.status]), [['v3', 'org_mA7', 404], ['v3', 'united-dairy', 404], ['v2', 'org_mA7', 404], ['v2', 'united-dairy', 200]]);
   assert.equal(r.discover.items.find(x => x.kind === 'Machines').found, true);
-  assert.ok(!JSON.stringify(r).includes('v3_token'));
+  const nothing = fakeRz({ tokenUrl: 'https://api.rz-ops.com/public/v3/oauth/token', token: 't', org: 'nobody', site: 'nowhere' });
+  await R.redzoneCall(db(), ADMIN, { op: 'save', orgId: 'org_mA7' });
+  const none = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch: nothing.fetch });
+  assert.deepEqual([none.discover.used, none.discover.items.length], [null, 0]);
+  assert.ok(none.discover.probes.length >= 6 && none.discover.probes.every(p => p.status === 404 && p.note === 'Not Found'));
+  assert.ok(none.discover.enterprises.includes('uniontown') && none.discover.enterprises.includes('united-dairy-uniontown') && none.discover.enterprises.includes('martinsferry') && none.discover.enterprises.includes('uniteddairyuniontown'));
 });
