@@ -47,11 +47,11 @@
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:4%"><col style="width:4%"><col style="width:13%"><col style="width:7%"><col style="width:10%"><col style="width:11%">
-              <col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:5%"><col style="width:6%">
+              <col style="width:4%"><col style="width:4%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:9%"><col style="width:10%">
+              <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4%"><col style="width:6%">
             </colgroup>
             <thead><tr>
-              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th>
+              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th><th>Mobile Phone</th>
               <th>Vacation wks</th><th>Status</th><th>Avail&shy;able</th><th>Acci&shy;dents</th><th>Com&shy;plaints</th><th>PDA</th><th>Edit</th>
             </tr></thead>
             <tbody id="rows"></tbody>
@@ -92,6 +92,10 @@
     const reviewing = (r, kind) => kind === 'pda' ? 0 : incidentsOf(r).filter(x => x.kind === kind && (!x.status || x.status === 'review')).length;
     const countCell = (r, kind) => { const n = counting(r, kind), w = reviewing(r, kind); return '<td class="inc-count">' + (n ? '<b class="inc-n">' + n + '</b>' : '0') + (w ? ' <span class="inc-review" title="Under review">+' + w + ' review</span>' : '') + '</td>'; };
     const canEdit = () => canManage();
+    // Joe 10/15: mobile phones typed here (driverPhones), else Driver Master's own phone column; written like 330-555-1234.
+    let phones = {};
+    const phoneText = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : String(v || ''); };
+    const phoneOf = (id) => { const p = phones[id]; return phoneText(p !== undefined ? p : (drivers.find(x => x.id === id) || {}).phone || ''); };
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
     function years(key) {
       if (!key) return '-';
@@ -123,12 +127,14 @@
           '<td class="relief-col">' + (r.reliefDriver ? '<span class="relief-yes">Relief</span>' : '') + '</td>' +
           '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + shortDate(r.seniorityDate) : '') + '</small></td>' +
           '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
+          // Joe 10/15: the driver's mobile phone for Schedule Texts (saved on its own, app only; Driver Master's phone column if none).
+          '<td><input class="truck phone" type="tel" inputmode="tel" data-phone="' + id + '" value="' + escapeHtml(phoneOf(r.id)) + '" placeholder="No number" maxlength="20" autocomplete="off"' + dis + '></td>' +
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
           countCell(r, 'accident') + countCell(r, 'complaint') + countCell(r, 'pda') +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="13" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
+      }).join('') || '<tr><td colspan="14" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
@@ -280,6 +286,15 @@
     });
     table.addEventListener('change', e => {
       if (e.target.matches('[data-select]')) return syncRemove();
+      const ph = e.target.closest('[data-phone]');
+      if (ph) {
+        typing = null;
+        const r = rows.find(x => x.id === ph.dataset.phone), was = phones[r.id], typed = ph.value.trim();
+        if (typed === phoneOf(r.id)) return;
+        const digits = typed.replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, '');
+        if (typed && digits.length !== 10) { showError('Type ' + r.name + '\'s mobile phone as 10 digits, like 330-555-1234. It was not changed.'); ph.value = phoneOf(r.id); return; }
+        return saveOptimistic('setDriverPhone', { driverId: r.id, phone: typed }, () => { phones[r.id] = typed ? '+1' + digits : ''; }, () => { if (was === undefined) delete phones[r.id]; else phones[r.id] = was; }, render);
+      }
       const input = e.target.closest('[data-truck]');
       if (!input) return;
       typing = null;
@@ -290,8 +305,8 @@
       change(r.id, 'setDriverTruck', { driverId: r.id, equipmentId: truck ? truck.id : '' }, { defaultTruckId: truck ? truck.id : '' });
     });
     // Enter saves the truck and moves to the next driver's truck; Up and Down move between the truck boxes.
-    table.addEventListener('focusin', e => { if (e.target.matches('[data-truck]')) typing = e.target.dataset.truck; });
-    table.addEventListener('focusout', e => { if (e.target.matches('[data-truck]')) { typing = null; setTimeout(render, 0); } });
+    table.addEventListener('focusin', e => { if (e.target.matches('[data-truck], [data-phone]')) typing = e.target.dataset.truck || e.target.dataset.phone; });
+    table.addEventListener('focusout', e => { if (e.target.matches('[data-truck], [data-phone]')) { typing = null; setTimeout(render, 0); } });
     table.addEventListener('keydown', e => {
       const input = e.target.closest('[data-truck]');
       if (!input || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
@@ -321,6 +336,7 @@
       watchLists(user, render);
       onSnapshot(collection(db, 'driverIncidents'), snap => { incidents = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); const r = rows.find(x => x.id === editingId); if (panelOpen && r) paintIncidents(r); }, e => showError('Could not read the accidents and complaints: ' + friendlyError(e)));
       onSnapshot(doc(db, 'scorecard', 'settings'), snap => { scoreSaved = snap.exists() ? snap.data() : {}; render(); }, () => {});
+      onSnapshot(collection(db, 'driverPhones'), snap => { phones = {}; snap.docs.forEach(d => { phones[d.data().driverId || d.id] = d.data().phone || ''; }); render(); }, () => {});
       onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); loaded = true; render(); }, e => showError('Could not read the driver list: ' + friendlyError(e)));
       window.addEventListener('resize', render);
     });

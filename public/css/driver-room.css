@@ -24,7 +24,7 @@
   body.room .phone-card label { font-size: 15px; }
   body.room .phone-card .drv-card small, body.room .phone-load small { font-size: 15px; }
   /* The three choices side by side, big enough for a finger. */
-  body.room #step-menu .drv-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  body.room #step-menu .drv-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   body.room #step-menu .drv-choices .drv-card { min-height: 170px; align-content: center; padding: 20px 24px; }
   body.room #step-menu .drv-choices .drv-card b { font-size: 32px; }
   body.room #step-menu .drv-choices .drv-card small { font-size: 18px; }
