@@ -177,3 +177,26 @@ test('What RedZone gives us: each kind tried plain and under the organization; c
   assert.equal((await R.redzoneCall(db(), ADMIN, { op: 'status' })).lastDiscover.items.length, 9, 'the screen shows the last list again');
   assert.ok(!JSON.stringify(r).includes(SECRET) && !JSON.stringify(r).includes('rz_bearer'));
 });
+
+// Joe 10/16: RedZone's Organization IDs list the organization and three sites, no enterprise. Enterprise ID stays blank.
+test('What RedZone gives us with no Enterprise ID: kinds not found are tried again under Uniontown\'s site from the sites list', async () => {
+  await people();
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: 'org_mA7' });
+  const urls = [];
+  const fetch = async (url) => {
+    urls.push(url);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'rz_bearer' });
+    const path = url.replace('https://api.rz-ops.com/public/v2', '').replace(/\?.*$/, '');
+    if (path === '/organizations/org_mA7/sites') return reply(200, { items: [{ id: 'c-332a', name: 'Charleston' }, { id: 'u-f99e', name: 'Uniontown' }] });
+    if (path === '/organizations/org_mA7/sites/u-f99e/data-points') return reply(200, [{ name: 'Gallon Filler Count', lastValue: 5, unit: 'jugs' }]);
+    return reply(404, {});
+  };
+  const r = await R.redzoneCall(db(), ADMIN, { op: 'discover' }, { fetch });
+  const by = Object.fromEntries(r.discover.items.map(x => [x.kind, x]));
+  assert.deepEqual([by.Sites.found, by.Sites.count, by.Sites.examples], [true, 2, ['Charleston', 'Uniontown']]);
+  assert.deepEqual([by['Sensors and data points'].found, by['Sensors and data points'].path], [true, '/organizations/org_mA7/sites/u-f99e/data-points']);
+  assert.equal(by.Products.found, false);
+  assert.ok(!urls.some(u => /enterprises/.test(u)), 'no enterprise addresses when Enterprise ID is blank');
+  assert.ok(!('list' in by.Sites), 'the raw lists are not kept');
+});

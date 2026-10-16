@@ -172,15 +172,15 @@ async function getList(url, token, o) {
 async function discover(d, o, ref, extra) {
   const token = await accessToken(d, o, ref), address = withOrg(addressOf(d), d.orgId, d.enterpriseId);
   const prefixes = [''].concat(d.orgId ? ['/organizations/{org}'] : []).concat(d.orgId && d.enterpriseId ? ['/organizations/{org}/enterprises/{enterprise}'] : []);
-  const one = async (kind, paths) => {
+  const one = async (kind, paths, pres) => {
     let best = null;
-    for (const p of paths) for (const pre of p.startsWith('/') ? [''] : prefixes) {
+    for (const p of paths) for (const pre of p.startsWith('/') ? [''] : (pres || prefixes)) {
       const path = withOrg(pre + '/' + p.replace(/^\/+/, ''), d.orgId, d.enterpriseId), url = urlFor(address, path) + (path.includes('?') ? '&' : '?') + 'limit=50';
       if (!sameHost(url, address)) continue;
       const got = await getList(url, token, o);
       if (got.list) {
         const first = got.list.find(x => x && typeof x === 'object') || {};
-        return { kind, found: true, path, count: got.total, fields: Object.keys(first).slice(0, 30), examples: got.list.slice(0, 5).map(sample) };
+        return { kind, found: true, path, count: got.total, fields: Object.keys(first).slice(0, 30), examples: got.list.slice(0, 5).map(sample), list: got.list };
       }
       // 403 (there but not allowed) says more than 404 (not there).
       if (!best || (got.status === 403 && best.status !== 403)) best = { kind, found: false, path, status: got.status, note: got.note || '' };
@@ -189,7 +189,21 @@ async function discover(d, o, ref, extra) {
   };
   const kinds = KINDS.map(([k, p]) => one(k, p));
   if (extra) kinds.push(one('Address typed', [clean(extra, 300).startsWith('/') ? clean(extra, 300) : '/' + clean(extra, 300)]));
-  return (await Promise.all(kinds)).filter(Boolean);
+  const items = (await Promise.all(kinds)).filter(Boolean);
+  // Joe 10/16: RedZone's Organization IDs list sites (Uniontown, Charleston, Martin's Ferry), no enterprise. When the sites
+  // list came back, a kind not found yet is tried once more under Uniontown's site, so nobody types the long site ID.
+  const sites = items.find(x => x.kind === 'Sites' && x.found);
+  const ut = sites && (sites.list || []).find(x => /uniontown/i.test(text(field(x, ['name', 'displayName', 'title'])) || ''));
+  const siteId = ut && text(field(ut, ['id', 'siteId', 'uuid']));
+  if (siteId) {
+    const pres = ['/sites/' + encodeURIComponent(siteId)].concat(d.orgId ? ['/organizations/{org}/sites/' + encodeURIComponent(siteId)] : []);
+    await Promise.all(items.map(async (x, i) => {
+      if (x.found || x.kind === 'Sites' || x.kind === 'Address typed') return;
+      const k = KINDS.find(([n]) => n === x.kind), again = await one(x.kind, k[1], pres);
+      if (again && (again.found || (again.status === 403 && x.status !== 403))) items[i] = again;
+    }));
+  }
+  return items.map(({ list, ...x }) => x);
 }
 
 const plain = (e) => /answered 40[13]/.test(e.message) ? 'RedZone refused the sign-in (' + e.message.replace(/^RedZone answered (\d+).*/, '$1') + '). Check the client ID and secret, and that the role has the read permissions on.'
