@@ -185,7 +185,9 @@ function checkinExtras(f, d, equipment) {
  * from Driver Master (<day>_available), else Not scheduled.
  */
 function scheduleWeek(today) { const week = L.weekStart(today); return L.dayPrefix(today) === 'sat' ? L.addDays(week, 7) : week; }
-const employeeKey = (v) => { const t = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' '); return /^\d+$/.test(t) ? String(Number(t)) : t; };
+// Joe 10/17: zeros in front never matter, on either side: typed 009980 or 9980 finds 9980 or 009980 on Driver Master. Done as
+// text, so a long number is never rounded.
+const employeeKey = (v) => { const t = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ' '); return /^\d+$/.test(t) ? t.replace(/^0+(?=\d)/, '') : t; };
 const titleWord = (t) => String(t || '').toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
 function scheduleDays(driver, rows, exceptions, week, backups) {
   const board = L.driverBoardRows([driver], rows, exceptions, week, backups)[0];

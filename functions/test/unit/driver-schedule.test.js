@@ -16,6 +16,11 @@ test('the week shown: this week until Saturday, then the coming Sunday to Saturd
 
 test('employee numbers match with or without leading zeros and spaces', () => {
   assert.equal(employeeKey(' 09959 '), '9959');
+  // Joe 10/17: typed with or without zeros in front, and stored on Driver Master with or without them, all the same driver.
+  for (const typed of ['9980', '09980', '009980', '0009980']) for (const stored of ['9980', '009980']) assert.equal(employeeKey(typed), employeeKey(stored), typed + ' vs ' + stored);
+  assert.equal(employeeKey('0'), '0'); assert.equal(employeeKey('000'), '0');
+  assert.equal(employeeKey('0012345678901234567'), '12345678901234567', 'a long number is not rounded');
+  assert.notEqual(employeeKey('9980'), employeeKey('99800'), 'zeros at the end still count');
   assert.equal(employeeKey('Ramsey  Keyshawn'), 'RAMSEY KEYSHAWN');
   assert.equal(employeeKey(''), '');
 });
