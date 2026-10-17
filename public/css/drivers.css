@@ -57,3 +57,8 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .inc-form .panel-row > label { min-width: 0; }
 .inc-form input[type=text], .inc-form input[type=date], .inc-form select, .inc-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
 .inc-item .inc-state { margin-left: auto; color: #4a5b6c; font-weight: 700; }
+/* Joe 10/17: Employee ID column in place of the select box and # count; Remove Driver in the Edit panel. */
+.drivers-page td.emp-id { font-weight: 700; font-variant-numeric: tabular-nums; }
+.drivers-page td.emp-id.none { color: var(--muted); font-weight: 500; }
+.drivers-page .panel-actions button { white-space: nowrap; }
+.drivers-page .panel-actions #d-remove { margin-right: auto; color: #b42318; border-color: #f1b4ae; }
