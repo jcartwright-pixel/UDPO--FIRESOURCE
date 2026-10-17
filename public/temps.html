@@ -62,7 +62,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortTime, maySave, watchPerson } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortTime, shortDay, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
     import { walkBar } from './js/walk-bar.js';
@@ -80,6 +80,8 @@
     const drafts = {}, pending = {}, fills = {}, notes = {};
     const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : '—'; };
+    // Joe 10/17: a sensor that stopped reporting on an earlier day shows that day too, so an old reading never looks current.
+    const readAt = (v) => { const t = Date.parse(v || ''); if (!isFinite(t)) return '—'; const day = shortDay(t); return escapeHtml(shortTime(t)) + (day !== shortDay(Date.now()) ? '<small>' + escapeHtml(day) + '</small>' : ''); };
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : '—'; };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const statusClass = (v) => { v = String(v || '').toUpperCase(); return v === 'IN RANGE' || v === 'RECORDED' ? 'ok' : v === 'HIGH' || v === 'LOW' || v === 'OFFLINE' || v === 'SENSOR ERROR' ? 'bad' : v === 'STALE' ? 'warn' : 'neutral'; };
@@ -133,7 +135,7 @@
           '<td class="tp-trend">—</td>' +
           '<td><span class="tp-status ' + statusClass(r.status) + '">' + escapeHtml(r.status) + '</span>' + detail + '</td>' +
           '<td>' + (r.batteryLevel === '' ? '—' : escapeHtml(r.batteryLevel) + '%') + '</td>' +
-          '<td>' + escapeHtml(clock(r.sensorLastReadingAt)) + '</td>' +
+          '<td class="tp-last">' + readAt(r.sensorLastReadingAt) + '</td>' +
           '<td><input class="tp-notes" aria-label="Notes for ' + escapeHtml(r.location) + '" placeholder="' + (phone ? 'Notes' : 'Add notes (optional)…') + '" maxlength="800" value="' + escapeHtml(d.notes || '') + '"' + dis + '></td>' +
           '<td class="tp-last">' + (r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
           '<td>' + escapeHtml(initials(r.lastCheckedBy) || '—') + '</td>' +
