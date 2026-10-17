@@ -76,11 +76,8 @@ const misfits = (page) => page.evaluate(() => {
       const sizes = await page.$$eval('.co-plant .co-cell span, .co-plant .co-act > *, .co-plant .co-what > *', s => s.map(x => parseFloat(getComputedStyle(x).fontSize)));
       assert.ok(sizes.every(n => n >= 16), 'text stays 16px or larger');
       assert.equal(await page.$$eval('.co-plant[data-plant="fac_charleston"] .co-soon, .co-plant[data-plant="fac_martins_ferry"] .co-soon', s => s.length), 2, 'Charleston and Martins Ferry keep their being-built line');
-      // At desk sizes the card fits the screen, footer and all, with the tiles four across.
-      if (w >= 1366) {
-        assert.ok(await page.evaluate(() => document.querySelector('.co-plant:not(.planned) footer').getBoundingClientRect().bottom <= innerHeight), w + ': the whole card fits the screen');
-        assert.equal(await page.$eval('.co-plant:not(.planned) .co-grid', g => getComputedStyle(g).gridTemplateColumns.split(' ').length), 4);
-      }
+      // Joe 10/16: at desk sizes the three plant cards stay the same width side by side (all three must fit once they are live).
+      if (w >= 1366) assert.equal(new Set(await page.$$eval('.co-plant', c => c.map(x => Math.round(x.getBoundingClientRect().width)))).size, 1, w + ': the plant cards are the same width');
       assert.deepEqual(page.errors, []);
       await page.close();
     }

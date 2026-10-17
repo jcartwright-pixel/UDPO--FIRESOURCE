@@ -13,8 +13,9 @@
 .co-plant header em { font-style: normal; font-size: 16px; font-weight: 900; padding: 3px 10px; border-radius: 999px; background: #8996a3; color: #fff; }
 .co-plant header em.on { background: #20ad54; }
 .co-plant header span { font-size: 20px; }
-/* Joe 10/16: every tile shows its whole word (MAINTENANCE spilled out, COMPLETED and SCHEDULED touched the edges). A plant card
-   narrower than four whole tiles shows them two to a row, taller; a wide card (one card to a row) keeps four across. */
+/* Joe 10/16: every tile shows its whole word (MAINTENANCE spilled out, COMPLETED and SCHEDULED touched the edges). The three
+   plant cards keep the same width (all three must fit once Charleston and Martins Ferry are live), so a card narrower than four
+   whole tiles shows them two to a row and runs a little further down; a wide card (one card to a row) keeps four across. */
 .co-plant { container-type: inline-size; }
 .co-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 6px; }
 @container (min-width: 700px) { .co-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -24,7 +25,7 @@
   .co-cell { padding: 12px 4px; }
   .co-cell span { letter-spacing: 0; }
 }
-.co-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 86px; padding: 12px 10px; border-radius: 10px; background: #f3f8ff; text-align: center; }
+.co-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 78px; padding: 10px 10px; border-radius: 10px; background: #f3f8ff; text-align: center; }
 .co-cell.good b { color: #0c9a4b; }
 .co-cell.bad b { color: #b3261e; }
 .co-cell.warn b { color: #b86b00; }
@@ -48,12 +49,6 @@
 .co-plant footer em { margin-left: auto; font-style: normal; color: #1f6feb; }
 .co-soon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 260px; padding: 24px; text-align: center; color: #5a6b7d; }
 .co-plant.planned { opacity: .92; }
-/* Joe 10/16: a plant that is live takes two of the three places on a desk screen (the plants still being built stack in the
-   third), so its tiles have room for every word four across and the card still fits a laptop screen. */
-@media (min-width: 1201px) {
-  .co-plants { grid-template-rows: auto 1fr; }
-  .co-plants:has(.co-plant.planned) .co-plant:not(.planned) { grid-column: span 2; grid-row: span 2; }
-}
 @media (max-width: 1200px) {
   .co-plants { grid-template-columns: 1fr; }
 }
