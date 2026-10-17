@@ -299,7 +299,7 @@
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
         const isMoved = moved.has(r.id) || P.movedBySomeone(r), note = P.moveNote(r);
-        const movedTag = isMoved ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.short ? ' · ' + escapeHtml(note.short) : '') + '</span>' : '';
+        const movedTag = isMoved ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.short ? ' · <span class="mv-who">' + escapeHtml(note.short) + '</span>' : '') + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
