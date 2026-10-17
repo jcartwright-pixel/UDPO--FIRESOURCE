@@ -59,12 +59,18 @@
       </div>
       <section class="gps-card mc-therm">
         <h2>3. Thermometers</h2>
-        <p class="hint">Each box saves as you leave it. The MOCREO Sensor list shows the names you gave the sensors on the MOCREO website; "Manual only" means the cooler is read by hand. Match to MOCREO Names pairs each cooler with the sensor named for it. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
+        <p class="hint">Every sensor MOCREO sends is listed by the name you gave it on the MOCREO website. Pick your location for each one; it saves as you pick, and a location can be on one sensor only. Your locations are below: each box saves as you leave it, a location on no sensor is read by hand, Off leaves it off Cooler Temperatures and Remove (press twice) takes it off the list.</p>
         <div class="mc-match" id="match-box" hidden></div>
         <div class="mc-scroll">
+          <table class="loadout mc-table mc-sensors">
+            <colgroup><col style="width:34%"><col style="width:12%"><col style="width:11%"><col style="width:43%"></colgroup>
+            <thead><tr><th>MOCREO Sensor</th><th>Now</th><th>Battery</th><th>Your Location</th></tr></thead>
+            <tbody id="srows"></tbody>
+          </table>
+          <h3 class="mc-sub">Your locations</h3>
           <table class="loadout mc-table">
             <colgroup><col style="width:27%"><col style="width:30%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:11%"></colgroup>
-            <thead><tr><th>Location</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
+            <thead><tr><th>Location</th><th>Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -84,7 +90,7 @@
     const $ = (id) => document.getElementById(id);
     // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
-    const typing = () => $('rows').contains(document.activeElement) && document.activeElement.matches('input');
+    const typing = () => ($('rows').contains(document.activeElement) && document.activeElement.matches('input')) || ($('srows').contains(document.activeElement) && document.activeElement.matches('select'));
 
     // Every thermometer, off ones too (removed ones are gone), in view order.
     // A row just saved shows as typed until the database has it (a redraw in between must not undo a box).
@@ -124,18 +130,26 @@
       if (typing()) return;
       // MOCREO names most sensors alike ("Temperature Humidity Sensor"), so a shared name leads with the end of the sensor's ID.
       const named = {}; sensors.forEach(x => { named[x.name] = (named[x.name] || 0) + 1; });
-      const short = (n) => String(n).replace(/Temperature/i, 'Temp').replace(/\s+Humidity/i, '/Humidity').replace(/\s*Sensor$/i, '');
-      const label = (x) => (named[x.name] > 1 ? '…' + String(x.sensorId).slice(-4) + ' ' : '') + short(x.name) + (x.returned === false ? ' (not sending)' : '');
+      // Joe 10/17: the whole name as it comes from MOCREO, never shortened.
+      const label = (x) => (named[x.name] > 1 ? '…' + String(x.sensorId).slice(-4) + ' ' : '') + String(x.name) + (x.returned === false ? ' (not sending)' : '');
       // Joe 10/17: a sensor already on another cooler says which, so one sensor is not picked for two coolers by mistake.
-      const onWhich = {}; all.forEach(l => { if (l.sensorId) onWhich[l.sensorId] = l.location; });
-      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + ' title="' + escapeHtml(x.name + ' · ' + x.sensorId) + '">' + escapeHtml(label(x) + (x.sensorId !== cur && onWhich[x.sensorId] ? ' · on ' + onWhich[x.sensorId] : '')) + '</option>').join('') +
-        // A sensor named on the thermometer but not read from MOCREO yet shows by the end of its ID (the full ID stays saved).
-        (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected title="' + escapeHtml(cur) + '">' + escapeHtml('Sensor …' + cur.slice(-4)) + '</option>' : '');
+      // A sensor named on a location but not read from MOCREO yet shows by the end of its ID (the full ID stays saved).
+      const sensorText = (id) => { if (!id) return 'Manual only'; const x = sensors.find(y => y.sensorId === id); return x ? label(x) : 'Sensor …' + id.slice(-4); };
+      // Joe 10/17: "It should be the complete list of the name coming from the API. And then I have a list of my names and that's
+      // how I assign it." One fixed line per MOCREO sensor; the drop-down is his locations, blank until one is picked, and a
+      // location already on another sensor says which (picking it moves it here).
+      const locOpts = (sid) => { const here = all.filter(l => l.sensorId === sid)[0]; return '<option value=""' + (here ? '' : ' selected') + '></option>' + all.map(l => '<option value="' + escapeHtml(l.locationId) + '"' + (here && here.locationId === l.locationId ? ' selected' : '') + '>' +
+        escapeHtml(l.location + (l.sensorId && l.sensorId !== sid ? ' · on ' + sensorText(l.sensorId) : '') + (l.active ? '' : ' (off)')) + '</option>').join(''); };
+      $('srows').innerHTML = sensors.map(x => '<tr data-sensor="' + escapeHtml(x.sensorId) + '"' + (x.returned === false ? ' class="off"' : '') + '><td class="mc-name" title="' + escapeHtml(x.name + ' · ' + x.sensorId) + '">' + escapeHtml(label(x)) + '</td>' +
+        '<td class="mc-now">' + (x.temperatureF === null || x.temperatureF === undefined ? '—' : escapeHtml(x.temperatureF + '°F')) + '</td>' +
+        '<td class="mc-now">' + (x.batteryLevel === null || x.batteryLevel === undefined ? '—' : escapeHtml(x.batteryLevel + '%')) + '</td>' +
+        '<td><select data-k="locationFor" aria-label="Your location for ' + escapeHtml(x.name) + '">' + locOpts(x.sensorId) + '</select></td></tr>').join('') ||
+        '<tr><td colspan="4" class="empty">No sensors read from MOCREO yet. Save the key and press Test Connection.</td></tr>';
       const live = (l) => { const x = sensors.find(y => y.sensorId === l.sensorId); return x && x.temperatureF !== null && x.temperatureF !== undefined ? x.temperatureF + '°F' : '—'; };
       const rows = (draft ? [draft] : []).concat(all);
       $('rows').innerHTML = rows.map(l => '<tr data-id="' + escapeHtml(l.locationId || '') + '"' + (l.active ? '' : ' class="off"') + '>' +
         '<td><input data-k="location" value="' + escapeHtml(l.location) + '" placeholder="Location name" maxlength="80"></td>' +
-        '<td><select data-k="sensorId">' + sensorOpts(l.sensorId) + '</select></td>' +
+        '<td class="mc-on">' + escapeHtml(sensorText(l.sensorId)) + '</td>' +
         '<td class="mc-now">' + escapeHtml(live(l)) + '</td>' +
         '<td><input data-k="lowLimit" inputmode="decimal" value="' + escapeHtml(l.lowLimit === '' ? '' : String(l.lowLimit)) + '"></td>' +
         '<td><input data-k="highLimit" inputmode="decimal" value="' + escapeHtml(l.highLimit === '' ? '' : String(l.highLimit)) + '"></td>' +
@@ -210,12 +224,37 @@
       note = saved + ' of ' + plan.changes.length + ' matches saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.';
       plan = null; matchBox(); render();
     });
+    // A location saved with its sensor changed (the rest as it is).
+    async function onSensor(l, sensorId) {
+      const sensor = sensors.find(x => x.sensorId === sensorId);
+      const row = { op: 'location', locationId: l.locationId, location: l.location, area: l.area || l.location, sensorId: sensorId, sensorName: sensor ? sensor.name : '', lowLimit: l.lowLimit, highLimit: l.highLimit, active: l.active };
+      sent[l.locationId] = { at: Date.now(), row: Object.assign({}, row, { removed: false }) };
+      const run = busy.then(() => call(row));
+      busy = run.catch(() => {});
+      const r = await run;
+      if (!r) delete sent[l.locationId];
+      return r;
+    }
+    // Picking a location for a MOCREO sensor: the location moves onto it, and whatever location was on it goes to manual.
+    $('srows').addEventListener('change', async e => {
+      const tr = e.target.closest('tr[data-sensor]');
+      if (!tr) return;
+      const sid = tr.dataset.sensor, pick = e.target.value, all = list();
+      const name = (sensors.find(x => x.sensorId === sid) || {}).name || sid;
+      note = 'Saving…'; e.target.blur(); render();
+      let ok = true;
+      for (const l of all.filter(l => l.sensorId === sid && l.locationId !== pick)) ok = !!(await onSensor(l, '')) && ok;
+      const to = all.find(l => l.locationId === pick);
+      if (to) ok = !!(await onSensor(to, sid)) && ok;
+      note = ok ? (to ? to.location + ' is on ' + name : name + ' is on no location') + ', saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : 'Not saved.';
+      render();
+    });
     // Each box saves as it is left: the whole row goes, so the server keeps one record per thermometer.
     $('rows').addEventListener('change', async e => {
       const tr = e.target.closest('tr[data-id]');
       if (!tr) return;
-      const v = (k) => tr.querySelector('[data-k="' + k + '"]'), sensor = sensors.find(x => x.sensorId === v('sensorId').value);
-      const row = { op: 'location', locationId: tr.dataset.id, location: v('location').value, area: v('location').value, sensorId: v('sensorId').value, sensorName: sensor ? sensor.name : '',
+      const v = (k) => tr.querySelector('[data-k="' + k + '"]'), had = list().find(l => l.locationId === tr.dataset.id), sid = had ? had.sensorId : '', sensor = sensors.find(x => x.sensorId === sid);
+      const row = { op: 'location', locationId: tr.dataset.id, location: v('location').value, area: v('location').value, sensorId: sid, sensorName: sensor ? sensor.name : '',
         lowLimit: v('lowLimit').value, highLimit: v('highLimit').value, active: v('active').checked };
       if (!row.location.trim()) { note = tr.dataset.id ? 'A thermometer needs a location name; not saved.' : 'Type the location name first.'; render(); return; }
       if (row.locationId) sent[row.locationId] = { at: Date.now(), row: Object.assign({}, row, { lowLimit: row.lowLimit.trim() === '' ? '' : Number(row.lowLimit), highLimit: row.highLimit.trim() === '' ? '' : Number(row.highLimit), removed: false }) };
