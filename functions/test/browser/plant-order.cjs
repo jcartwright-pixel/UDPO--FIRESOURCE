@@ -129,6 +129,8 @@ async function keyMove(page, route, dir) {
     // on the other open screen too, and it looks different from a Done line.
     await loader.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
     await watcher.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
+    // The line can turn green (sheet order) a moment before the record of who moved it arrives; wait for the name, then check it.
+    await loader.waitForFunction(() => { const t = document.querySelector('#rows tr.moved .moved-tag'); return t && /^MOVED · \S/.test(t.textContent); }, null, { timeout: 5000 }).catch(() => {});
     const look = await loader.evaluate(() => {
       const bg = (sel) => getComputedStyle(document.querySelector(sel).children[1]).backgroundColor;
       const tag = document.querySelector('#rows tr.moved .moved-tag');

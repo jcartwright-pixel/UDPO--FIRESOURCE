@@ -51,7 +51,7 @@ const cell = (n) => '#board-rows tr[data-driver="drv_test_casey"] td:nth-child('
       await page.click('#avail-save');
       await page.waitForFunction((sel) => { const td = document.querySelector(sel); return td.textContent === 'BACKUP' && td.classList.contains('b-backup'); }, cell(4), { timeout: 5000 });
       const look = await page.$eval(cell(4), td => { const s = getComputedStyle(td); return { bg: s.backgroundColor, size: parseFloat(s.fontSize) }; });
-      assert.equal(look.bg, 'rgb(228, 216, 251)');
+      assert.equal(look.bg, 'rgb(255, 228, 92)');
       assert.ok(look.size >= 16, 'text at least 16px');
       // Saturday too, then 810's Saturday driver list marks him BACKUP.
       await page.click(cell(8) + ' button');
