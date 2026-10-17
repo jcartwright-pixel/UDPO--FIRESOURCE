@@ -412,3 +412,23 @@ test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Com
   const none = R.managerWalk({ rows: [], locked: [] }, [], [], now);
   assert.deepEqual([pick(none.coolers), none.yard.items, none.last], [{ due: 0, late: 0, out: 0, total: 0 }, [], null]);
 });
+
+test('Match to MOCREO names (Joe 10/17): each cooler gets the sensor named for its place; a sensor named for another place leaves', () => {
+  const R = require('../../src/plant-rules');
+  // The live picks from 9/16 (made while every sensor was "Temperature Humidity Sensor") against the names Joe gave them.
+  const locs = [['ut_temp_dispensers', 'Dispensers', 'af'], ['ut_temp_boxing_east', 'Boxing East', 'e6'], ['ut_temp_boxing_west', 'Boxing West', '1e'], ['ut_temp_cooler_north', 'Cooler North', '42'],
+    ['ut_temp_cooler_east', 'Cooler East', '73'], ['ut_temp_cooler_south', 'Cooler South', 'e0'], ['ut_temp_cooler_west', 'Cooler West', 'a8'], ['ut_temp_cooler_middle', 'Cooler Middle', ''], ['ut_temp_palletizer', 'Palletizer', 'c3']]
+    .map(([locationId, location, sensorId]) => ({ locationId, location, sensorId }));
+  const sensors = [['af', 'Main Palletizer'], ['e6', 'Main South'], ['1e', 'Main North'], ['42', 'Main Center'], ['73', 'DQ Cooler'], ['e0', 'Main West'], ['a8', 'Boxing Cooler'], ['c3', 'Temperature Sensor'], ['gone', 'Main East', false]]
+    .map(([sensorId, name, returned]) => ({ sensorId, name, returned: returned !== false }));
+  const m = R.matchSensors(locs, sensors), to = {};
+  m.changes.forEach(c => { to[c.location] = c.why === 'pick' ? 'PICK' : c.toName; });
+  assert.deepEqual(to, { 'Dispensers': 'PICK', 'Boxing East': 'PICK', 'Boxing West': 'PICK', 'Cooler North': 'Main North', 'Cooler East': 'PICK', 'Cooler South': 'Main South', 'Cooler West': 'Main West',
+    'Cooler Middle': 'Main Center', 'Palletizer': 'Main Palletizer' });
+  // "Boxing Cooler" fits both Boxing East and Boxing West, so neither gets it; a sensor MOCREO stopped sending is never offered.
+  assert.deepEqual(m.unmatched.map(x => x.name).sort(), ['Boxing Cooler', 'DQ Cooler', 'Temperature Sensor']);
+  // With only one Boxing cooler, "Boxing Cooler" goes to it; a cooler already on its own sensor is left alone.
+  const one = R.matchSensors([{ locationId: 'b', location: 'Boxing East', sensorId: 'x' }, { locationId: 'n', location: 'Cooler North', sensorId: '1e' }], [{ sensorId: 'x', name: 'Boxing Cooler' }, { sensorId: '1e', name: 'Main North' }]);
+  assert.deepEqual(one.changes, []);
+  assert.deepEqual(R.placeWords('Main Center'), R.placeWords('Cooler Middle'));
+});

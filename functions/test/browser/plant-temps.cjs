@@ -112,6 +112,25 @@ async function shots(page, name, w) {
     assert.ok(await tablet.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at 800');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, 'temps-tablet-800.png'), scale: 'css' });
     results.push('Plant Temperatures on an 800 tablet: each location is a card with every column named; no side-menu strip');
+    // Joe 10/17: a sensor that stopped reporting on an earlier day shows that day under the time, so its old reading is not
+    // taken for today's; one that read today shows the time alone.
+    const old = new Date(Date.now() - 2 * 86400000), today = new Date(Date.now() - 5 * 60000);
+    await db().collection('config').doc('mocreo').set({ configured: true, lastSuccess: today.toISOString(), lastError: '', sensors: 2 });
+    await db().collection('sensors').doc('S_OLD').set({ sensorId: 'S_OLD', name: 'Cooler Middle', temperatureF: 36.3, batteryLevel: 100, online: false, lastReadingAt: old.toISOString(), returned: true, error: '' });
+    await db().collection('sensors').doc('S_NOW').set({ sensorId: 'S_NOW', name: 'Cooler North', temperatureF: 37.9, batteryLevel: 100, online: true, lastReadingAt: today.toISOString(), returned: true, error: '' });
+    const day = (d) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).format(d).replace(/\//g, '-');
+    for (const [w, h] of [[1920, 950], [1536, 760]]) {
+      const page = w === 1920 ? desk : await openPage(browser, w, h, '/temps.html' + MANAGER);
+      if (w === 1920) await desk.click('[data-pane="current"]');
+      await page.waitForFunction(() => { const r = document.querySelector('[data-location="ut_temp_cooler_middle"]'); return r && /OFFLINE/.test(r.textContent); });
+      const lastRead = await page.$$eval('#rows [data-location]', rows => rows.map(r => r.children[6].innerText.replace(/\s+/g, ' ').trim()));
+      assert.match(lastRead[1], new RegExp('^\\d{1,2}:\\d\\d [AP]M ' + day(old) + '$'), 'the offline sensor shows its day: ' + lastRead[1]);
+      assert.match(lastRead[0], /^\d{1,2}:\d\d [AP]M$/, 'a sensor that read today shows the time alone: ' + lastRead[0]);
+      await fits(page, 'Temperatures with sensors ' + w + 'x' + h);
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'temps-old-reading-' + w + '.png'), scale: 'css' });
+      if (w !== 1920) { assert.deepEqual(page.errors, []); await page.close(); }
+    }
+    results.push('Plant Temperatures: an offline sensor\'s Last Reading shows its day (' + day(old) + '); today\'s shows the time alone');
     for (const p of [desk, watcher, phone, tablet]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();
