@@ -19,11 +19,12 @@
 .co-plant { container-type: inline-size; }
 .co-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 6px; }
 @container (min-width: 700px) { .co-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-/* A phone's card: the tiles take a little more of the width and the words drop their extra spacing, so MAINTENANCE still fits. */
+/* A phone's card: one tile to a row, its word on the left and its number on the right, so MAINTENANCE fits whatever the phone's
+   letters; each Recent Activity line's name gets the whole width, the time goes beside the route. */
 @container (max-width: 340px) {
-  .co-grid { gap: 8px; padding: 12px 12px 6px; }
-  .co-cell { padding: 12px 4px; }
-  .co-cell span { letter-spacing: 0; }
+  .co-plant .co-grid { grid-template-columns: 1fr; gap: 6px; padding: 12px 12px 6px; }
+  .co-plant .co-cell { flex-direction: row; justify-content: space-between; min-height: 0; padding: 10px 14px; text-align: left; }
+  .co-plant .co-act { grid-template-areas: "label label" "what time"; }
 }
 .co-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 78px; padding: 10px 10px; border-radius: 10px; background: #f3f8ff; text-align: center; }
 .co-cell.good b { color: #0c9a4b; }
