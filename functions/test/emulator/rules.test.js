@@ -94,6 +94,29 @@ test('a no-account Plant Station reads only the plant-floor lists, while On and 
   await assertFails(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')));
 });
 
+// Joe 10/16 (Fire Stick): the Driver's Kiosk Station TV signed in by its code (index.js stationSignIn {tv: true}) reads only the
+// board's lists, and only while its station keeps the same code (stationAccess/tv, kept by the server).
+test('a Driver\'s Kiosk Station TV signed in by its code reads only the board, while its code stays the same', async () => {
+  const tv = (version) => env.authenticatedContext('tv-ds', { udTv: 'ds', udTvVersion: version, udPlant: 'fac_uniontown', udName: "Driver's Kiosk Station" }).firestore();
+  const setAccess = (data) => env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), 'stationAccess/tv'), data));
+  await assertFails(getDoc(doc(tv('v1'), 'runs/2026-10-04__run_t801')), 'no stationAccess yet');
+  await setAccess({ keys: { ds: 'v1' } });
+  await assertSucceeds(getDoc(doc(tv('v1'), 'runs/2026-10-04__run_t801')));
+  await assertSucceeds(getDocs(collection(tv('v1'), 'pickups')));
+  await assertSucceeds(getDocs(collection(tv('v1'), 'drivers')));
+  await assertSucceeds(getDoc(doc(tv('v1'), 'config/app')));
+  // Never a person's entry, phone numbers, dispatch weeks, plant lists or anything else; never a write.
+  await assertFails(getDoc(doc(tv('v1'), 'users/joe@uniteddairy.com')));
+  await assertFails(getDocs(collection(tv('v1'), 'driverPhones')));
+  await assertFails(getDocs(collection(tv('v1'), 'weeks')));
+  await assertFails(getDocs(collection(tv('v1'), 'equipment')));
+  await assertFails(getDoc(doc(tv('v1'), 'stationAccess/tv')));
+  await assertFails(setDoc(doc(tv('v1'), 'runs/x'), { route: '1' }));
+  // A new code on the station (or Remove) shuts the old sign-in out.
+  await setAccess({ keys: { ds: 'v2' } });
+  await assertFails(getDoc(doc(tv('v1'), 'runs/2026-10-04__run_t801')));
+});
+
 // Joe 10/14: each person reads their own ticked screens (People & Roles) so their Home and menu show only those; nobody else's.
 test('a person reads only their own ticked screens', async () => {
   await assertSucceeds(getDoc(doc(ud(), 'personRights/joe@uniteddairy.com')));

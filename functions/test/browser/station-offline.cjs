@@ -134,8 +134,11 @@ async function kept(page, files) {
       assert.equal(await page.$$eval('.ds-row:not(.ds-headrow)', r => r.length), before, 'the same board as before the signal went');
       assert.match(await page.textContent('#foot'), /No signal · last board from/);
       await shot(page, 'station-offline-tv-1024.png');
+      // Joe 10/16 (Fire Stick): a TV that started with no signal reloads by itself when the signal comes back.
+      await Promise.all([page.waitForEvent('load', { timeout: 30000 }), offline(false)]);
+      await page.waitForFunction(() => /Updated /.test(document.getElementById('foot').textContent), null, { timeout: 30000 });
       assert.deepEqual(errors, []);
-      results.push('Driver\'s Kiosk Station: with no signal it opens from the tablet and shows the last board, saying when it was from');
+      results.push('Driver\'s Kiosk Station: with no signal it opens from the tablet and shows the last board, saying when it was from; it reloads by itself when the signal is back');
       await ctx.close();
     }
 

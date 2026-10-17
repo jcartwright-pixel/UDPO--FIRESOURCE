@@ -192,6 +192,8 @@
 .ds-welcome { margin: 0; font-size: 16px; } .ds-welcome i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2eb872; margin-right: 6px; }
 .ds-weather { background: #fff; border-radius: 12px; padding: 14px; } .ds-weather h3 { margin: 6px 0; }
 body.ds-tv { background: #071d30; }
+/* The sign-in card's top margin shows the page behind it: the TV is dark all the way up (Joe 10/16, Fire Stick code screen). */
+html:has(body.ds-tv) { background: #071d30; }
 body.ds-tv .sidemenu, body.ds-tv .side-flyouts { display: none !important; }
 /* The TV itself (?tv=1): no header and no buttons, the board only. */
 body.ds-full .topbar, body.ds-full .actions.in-head { display: none !important; }

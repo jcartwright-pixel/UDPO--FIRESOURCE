@@ -25,6 +25,7 @@
  *   admin                 Administration's own pages (src/admin.js): people, role templates, links and codes, email, repairs, tools
  *   stationRelease        the Plant Station tablet's Change Station: the plant's manager release code, when one is set
  *   stationSignIn         the Plant Station with no UD account: a plant station's code signs the tablet in as that station
+ *                         (and the Driver's Kiosk Station TV: its code signs the TV in, {tv: true})
  *                         only, while the plant's switch is On (Administration > Plant Station Codes)
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
  *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
@@ -237,6 +238,8 @@ exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
     if (input.op === 'status' || input.op === 'release') return await ADMIN.releaseCheck(db, input);
     const r = await STATIONS.signIn(db, input);
     if (!r.ok || input.op !== 'enter') return r;
+    // The Driver's Kiosk Station TV (Joe 10/16): signed in as that TV station only (database rules: tvStation()).
+    if (input.tv === true) return Object.assign({ token: await admin.auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name }) }, r);
     const token = await admin.auth().createCustomToken('station-' + r.station.key, { udStation: r.station.key, udVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name, udType: r.station.type });
     return Object.assign({ token }, r);
   } catch (error) { throw asHttps(error); }

@@ -12,6 +12,7 @@ async function stationSignIn(input) {
   const r = await ST.signIn(db(), input);
   if (!r.ok || input.op !== 'enter') return r;
   const admin = require('firebase-admin');
+  if (input.tv === true) return Object.assign({ token: await admin.auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name }) }, r);
   const token = await admin.auth().createCustomToken('station-' + r.station.key, { udStation: r.station.key, udVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name, udType: r.station.type });
   return Object.assign({ token }, r);
 }
