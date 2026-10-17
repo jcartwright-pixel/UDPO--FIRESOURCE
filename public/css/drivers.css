@@ -60,5 +60,6 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 /* Joe 10/17: Employee ID column in place of the select box and # count; Remove Driver in the Edit panel. */
 .drivers-page td.emp-id { font-weight: 700; font-variant-numeric: tabular-nums; }
 .drivers-page td.emp-id.none { color: var(--muted); font-weight: 500; }
+.drivers-page .panel-actions { flex-wrap: wrap; }
 .drivers-page .panel-actions button { white-space: nowrap; }
 .drivers-page .panel-actions #d-remove { margin-right: auto; color: #b42318; border-color: #f1b4ae; }
