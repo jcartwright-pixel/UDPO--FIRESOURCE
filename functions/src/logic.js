@@ -838,7 +838,11 @@
   }
   // Joe 10/16: a driver marked Backup for a day (Weekly board's availability; driverBackups, app only, never the sheets).
   function backupOn(backups, driverId, day) {
-    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day; });
+    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day && b.kind !== 'AVAILABLE'; });
+  }
+  // Joe 10/17: a driver made Available on his regular day off (same list, kind AVAILABLE; app only, never the sheets).
+  function availableOn(backups, driverId, day) {
+    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day && b.kind === 'AVAILABLE'; });
   }
   function exceptionLabel(e) {
     if (!e) return '';
@@ -990,10 +994,12 @@
         (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) { routes.push(boardLabel(r)); runIds.push(String(r.runId || '').trim()); if (d.routeOverride) extra = true; } });
         var off = exceptionOn(exceptions, driver.id, date);
         // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
-        var dayOff = !!driver.cells && !yes(driver.cells[p + '_available']);
+        var regularOff = !!driver.cells && !yes(driver.cells[p + '_available']);
+        // Joe 10/17: made Available on the Weekly board for that day, he shows AVAILABLE (a route then is still "added").
+        var dayOff = regularOff && !availableOn(backups, driver.id, date);
         // Joe 10/11: off on a day he normally works is red whatever the reason (vacation, sick, unpaid...); off on his regular day
         // off stays as before (red only for vacation).
-        var scheduled = !!driver.cells && (p + '_available') in driver.cells && !dayOff;
+        var scheduled = !!driver.cells && (p + '_available') in driver.cells && !regularOff;
         // Backup (Joe 10/16): not on a route, on call to cover one; shows BACKUP even on his regular day off. A route or a day off wins.
         var backup = backupOn(backups, driver.id, date);
         var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : backup ? 'backup' : dayOff ? 'off' : 'available';
@@ -1003,7 +1009,7 @@
         // Master <day>_assignments_json does not list it, or he is normally off that day. Relief drivers have no normal week.
         var added = false;
         if (routes.length && !driver.relief && driver.cells) {
-          if ((p + '_available') in driver.cells && dayOff) added = true;
+          if ((p + '_available') in driver.cells && regularOff) added = true;
           else if ((p + '_assignments_json') in driver.cells) {
             var normal = normalRuns(driver.cells[p + '_assignments_json']);
             added = runIds.some(function (id) { return normal.indexOf(id) < 0; });
@@ -1237,7 +1243,7 @@
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
-    exceptionOn: exceptionOn, backupOn: backupOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
+    exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,

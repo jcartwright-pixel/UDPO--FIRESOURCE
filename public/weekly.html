@@ -313,7 +313,9 @@
       const reason = off ? (off.type === 'UNAVAILABLE' ? off.reasonCode : off.type) : 'AVAILABLE';
       const sel = document.getElementById('avail-reason');
       sel.value = [...sel.options].some(o => o.value === reason) ? reason : 'OFF';
-      if (!off) sel.value = L.backupOn(lists.backups, driver.id, avail.date) ? 'BACKUP' : 'AVAILABLE';
+      // Joe 10/17: on his regular day off the box starts at Off (as the board shows), so picking Available is a change.
+      const shown = L.driverBoardRows([driver], [], lists.exceptions, week, lists.backups)[0];
+      if (!off) sel.value = L.backupOn(lists.backups, driver.id, avail.date) ? 'BACKUP' : shown && shown.days[L.dayPrefix(avail.date)].kind === 'off' ? 'OFF' : 'AVAILABLE';
       document.getElementById('avail-note').value = '';
       openModal('avail-modal');
       sel.focus();
@@ -329,7 +331,7 @@
       const temp = { driverId: a.driverId, startDate: a.date, endDate: a.date, type: choice === 'VACATION' ? 'VACATION' : 'UNAVAILABLE', status: 'UNAVAILABLE', reasonCode: choice };
       const removed = [], hidden = [], backupsBefore = lists.backups;
       saveOptimistic('saveDriverException', fields, () => {
-        lists.backups = lists.backups.filter(x => !(x.driverId === a.driverId && x.date === a.date)).concat(choice === 'BACKUP' ? [{ driverId: a.driverId, date: a.date }] : []);
+        lists.backups = lists.backups.filter(x => !(x.driverId === a.driverId && x.date === a.date)).concat(choice === 'BACKUP' ? [{ driverId: a.driverId, date: a.date }] : choice === 'AVAILABLE' ? [{ driverId: a.driverId, date: a.date, kind: 'AVAILABLE' }] : []);
         if (freeDay) {
           lists.exceptions.forEach(x => { if (x.driverId === a.driverId && x.startDate <= a.date && (x.endDate || x.startDate) >= a.date && !x.hiddenByScreen) { x.hiddenByScreen = true; x.status = 'CANCELLED'; hidden.push(x); } });
           return;
