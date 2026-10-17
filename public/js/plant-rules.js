@@ -597,6 +597,54 @@
     if (f === null || f === undefined || !isFinite(Number(f))) return 'SENSOR ERROR';
     return loc.highLimit !== '' && Number(f) > loc.highLimit ? 'HIGH' : loc.lowLimit !== '' && Number(f) < loc.lowLimit ? 'LOW' : 'IN RANGE';
   }
+  // Joe 10/17: "I named the sensors ... on the MOCREO website and we need to match them up." The words that tell one place from
+  // another, so "Main North" goes with "Cooler North" and "Main Center" with "Cooler Middle".
+  var NAME_FILLER = { MAIN: 1, COOLER: 1, SENSOR: 1, TEMP: 1, TEMPERATURE: 1, HUMIDITY: 1, THE: 1, AREA: 1, ROOM: 1 };
+  function placeWords(v) {
+    return nameKey(v).split(' ').filter(function (w) { return w && !NAME_FILLER[w]; }).map(function (w) { return w === 'CENTER' || w === 'CENTRE' ? 'MIDDLE' : w.replace(/S$/, ''); }).sort();
+  }
+  function sameWords(a, b) { return a.length > 0 && a.length === b.length && a.every(function (w, i) { return w === b[i]; }); }
+  function someWords(a, b) { return a.length > 0 && a.every(function (w) { return b.indexOf(w) >= 0; }); }
+  // Each thermometer paired with the MOCREO sensor named for the same place: the same words first, then (only when there is
+  // exactly one either way) one name's words all inside the other's. locations = tempLocations() rows (with active),
+  // sensors = sensors/*. Returns {changes: [{locationId, location, from, fromName, to, toName, why}], unmatched sensors}.
+  // A thermometer with no match keeps its sensor when that sensor's name fits no other place, else goes to Manual only.
+  function matchSensors(locations, sensors) {
+    var locs = (locations || []).filter(function (l) { return l && l.locationId; }), list = (sensors || []).filter(function (x) { return x && x.sensorId && x.returned !== false; });
+    var words = {}, pick = {}, taken = {};
+    list.forEach(function (x) { words[x.sensorId] = placeWords(x.name); });
+    locs.forEach(function (l) {
+      var w = placeWords(l.location), same = list.filter(function (x) { return !taken[x.sensorId] && sameWords(words[x.sensorId], w); });
+      if (same.length === 1) { pick[l.locationId] = same[0]; taken[same[0].sensorId] = true; }
+    });
+    locs.forEach(function (l) {
+      if (pick[l.locationId]) return;
+      var w = placeWords(l.location), near = list.filter(function (x) { return !taken[x.sensorId] && (someWords(words[x.sensorId], w) || someWords(w, words[x.sensorId])); });
+      if (near.length !== 1) return;
+      var x = near[0], rivals = locs.filter(function (o) { return !pick[o.locationId] && o !== l; }).filter(function (o) { var ow = placeWords(o.location); return someWords(words[x.sensorId], ow) || someWords(ow, words[x.sensorId]); });
+      if (rivals.length) return;
+      pick[l.locationId] = x; taken[x.sensorId] = true;
+    });
+    var byId = {};
+    list.forEach(function (x) { byId[tempKey(x.sensorId)] = x; });
+    var changes = [];
+    locs.forEach(function (l) {
+      var cur = byId[tempKey(l.sensorId)] || null, to = pick[l.locationId] || null, why = 'matched';
+      if (!to) {
+        // No match: its sensor stays unless another thermometer took it or its MOCREO name is for somewhere else.
+        if (!cur) return;
+        var w = placeWords(l.location), cw = words[cur.sensorId];
+        if (!taken[cur.sensorId] && (!cw.length || someWords(cw, w) || someWords(w, cw))) return;
+        why = 'pick';
+      }
+      var toId = to ? text(to.sensorId) : '';
+      if (tempKey(toId) === tempKey(l.sensorId)) return;
+      changes.push({ locationId: l.locationId, location: l.location, from: text(l.sensorId), fromName: cur ? text(cur.name) : '', to: toId, toName: to ? text(to.name) : '', why: why });
+    });
+    var used = {};
+    locs.forEach(function (l) { var c = changes.filter(function (x) { return x.locationId === l.locationId; })[0]; var id = c ? c.to : l.sensorId; if (id) used[tempKey(id)] = true; });
+    return { changes: changes, unmatched: list.filter(function (x) { return !used[tempKey(x.sensorId)]; }).map(function (x) { return { sensorId: text(x.sensorId), name: text(x.name) }; }) };
+  }
   // The Current table: one row per location with its sensor (when MOCREO is connected), its last manual reading and lock.
   function tempRows(setup, journal, nowMs, sensors) {
     var readings = tempReadings(journal);
@@ -873,7 +921,7 @@
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
-    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

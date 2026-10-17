@@ -29,6 +29,7 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Administration · Connections &amp; Keys</span><h1>MOCREO &amp; Sensors</h1></div>
       <div class="hstats" id="hstats"></div>
+      <button type="button" id="match" data-top>Match to MOCREO Names</button>
       <button type="button" id="add" data-top>Add Thermometer</button>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -58,11 +59,12 @@
       </div>
       <section class="gps-card mc-therm">
         <h2>3. Thermometers</h2>
-        <p class="hint">Each box saves as you leave it. A sensor picked here is that cooler's MOCREO sensor; "Manual only" means the cooler is read by hand. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
+        <p class="hint">Each box saves as you leave it. The MOCREO Sensor list shows the names you gave the sensors on the MOCREO website; "Manual only" means the cooler is read by hand. Match to MOCREO Names pairs each cooler with the sensor named for it. Off leaves it off Cooler Temperatures; Remove (press twice) takes it off the list.</p>
+        <div class="mc-match" id="match-box" hidden></div>
         <div class="mc-scroll">
           <table class="loadout mc-table">
-            <colgroup><col style="width:20%"><col style="width:19%"><col style="width:22%"><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:11%"></colgroup>
-            <thead><tr><th>Location</th><th>Cooler / Area</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
+            <colgroup><col style="width:27%"><col style="width:30%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:6%"><col style="width:11%"></colgroup>
+            <thead><tr><th>Location</th><th>MOCREO Sensor</th><th>Now</th><th>Low °F</th><th>High °F</th><th>On</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -78,7 +80,7 @@
     // Joe 10/10: "Any of the API keys that we mess with, it should be in the administration app for updating ... replace the key
     // and then adjust the locations of the thermometers, add, subtract." Administrators only (functions/src/mocreo.js).
     const U = window.UDPlant;
-    let s = null, setup = [], mine = [], sensors = [], sync = {}, armed = null, note = '', draft = null;
+    let s = null, setup = [], mine = [], sensors = [], sync = {}, armed = null, note = '', draft = null, plan = null;
     const $ = (id) => document.getElementById(id);
     // Date and time both in New York time (the stored time is UTC, so its first 10 characters are tomorrow after 8 p.m.).
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
@@ -124,21 +126,22 @@
       const named = {}; sensors.forEach(x => { named[x.name] = (named[x.name] || 0) + 1; });
       const short = (n) => String(n).replace(/Temperature/i, 'Temp').replace(/\s+Humidity/i, '/Humidity').replace(/\s*Sensor$/i, '');
       const label = (x) => (named[x.name] > 1 ? '…' + String(x.sensorId).slice(-4) + ' ' : '') + short(x.name) + (x.returned === false ? ' (not sending)' : '');
-      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + ' title="' + escapeHtml(x.name + ' · ' + x.sensorId) + '">' + escapeHtml(label(x)) + '</option>').join('') +
+      // Joe 10/17: a sensor already on another cooler says which, so one sensor is not picked for two coolers by mistake.
+      const onWhich = {}; all.forEach(l => { if (l.sensorId) onWhich[l.sensorId] = l.location; });
+      const sensorOpts = (cur) => '<option value="">Manual only</option>' + sensors.map(x => '<option value="' + escapeHtml(x.sensorId) + '"' + (x.sensorId === cur ? ' selected' : '') + ' title="' + escapeHtml(x.name + ' · ' + x.sensorId) + '">' + escapeHtml(label(x) + (x.sensorId !== cur && onWhich[x.sensorId] ? ' · on ' + onWhich[x.sensorId] : '')) + '</option>').join('') +
         // A sensor named on the thermometer but not read from MOCREO yet shows by the end of its ID (the full ID stays saved).
         (cur && !sensors.some(x => x.sensorId === cur) ? '<option value="' + escapeHtml(cur) + '" selected title="' + escapeHtml(cur) + '">' + escapeHtml('Sensor …' + cur.slice(-4)) + '</option>' : '');
       const live = (l) => { const x = sensors.find(y => y.sensorId === l.sensorId); return x && x.temperatureF !== null && x.temperatureF !== undefined ? x.temperatureF + '°F' : '—'; };
       const rows = (draft ? [draft] : []).concat(all);
       $('rows').innerHTML = rows.map(l => '<tr data-id="' + escapeHtml(l.locationId || '') + '"' + (l.active ? '' : ' class="off"') + '>' +
         '<td><input data-k="location" value="' + escapeHtml(l.location) + '" placeholder="Location name" maxlength="80"></td>' +
-        '<td><input data-k="area" value="' + escapeHtml(l.area || '') + '" placeholder="Cooler / area" maxlength="80"></td>' +
         '<td><select data-k="sensorId">' + sensorOpts(l.sensorId) + '</select></td>' +
         '<td class="mc-now">' + escapeHtml(live(l)) + '</td>' +
         '<td><input data-k="lowLimit" inputmode="decimal" value="' + escapeHtml(l.lowLimit === '' ? '' : String(l.lowLimit)) + '"></td>' +
         '<td><input data-k="highLimit" inputmode="decimal" value="' + escapeHtml(l.highLimit === '' ? '' : String(l.highLimit)) + '"></td>' +
         '<td><input type="checkbox" data-k="active"' + (l.active ? ' checked' : '') + ' aria-label="On"></td>' +
         '<td>' + (l.locationId ? '<button type="button" class="pm-remove" data-remove="' + escapeHtml(l.locationId) + '">' + (armed === l.locationId ? 'Press again' : 'Remove') + '</button>' : '') + '</td></tr>').join('') ||
-        '<tr><td colspan="8" class="empty">No thermometers yet. Add Thermometer puts one in.</td></tr>';
+        '<tr><td colspan="7" class="empty">No thermometers yet. Add Thermometer puts one in.</td></tr>';
     }
     async function call(fields, button) {
       showError('');
@@ -174,12 +177,45 @@
       render();
       $('rows').querySelector('tr input[data-k="location"]').focus();
     };
+    // Joe 10/17: "I named the sensors ... on the MOCREO website and we need to match them up." The pairs show first; nothing
+    // saves until Save Matches. A cooler with no sensor named for it is left for a pick by hand.
+    function matchBox() {
+      const box = $('match-box');
+      if (!plan) { box.hidden = true; box.innerHTML = ''; return; }
+      const nameOf = (c, k) => c[k + 'Name'] || (c[k] ? 'Sensor …' + c[k].slice(-4) : 'Manual only');
+      const off = new Set(list().filter(l => !l.active).map(l => l.locationId));
+      const lines = plan.changes.map(c => '<li class="' + (c.why === 'pick' ? 'bad' : '') + '"><b>' + escapeHtml(c.location) + '</b>: ' + escapeHtml(nameOf(c, 'from')) + ' → ' +
+        (c.why === 'pick' ? '<b>Manual only</b> (no sensor named for it; pick it by hand)' : '<b>' + escapeHtml(c.toName) + '</b>') + (off.has(c.locationId) ? ' (turned off; tick On to show it on Cooler Temperatures)' : '') + '</li>');
+      const spare = plan.unmatched.length ? '<p class="hint">Not on any cooler: ' + plan.unmatched.map(x => escapeHtml(x.name)).join(', ') + '. Add Thermometer adds a cooler for one.</p>' : '';
+      box.hidden = false;
+      box.innerHTML = plan.changes.length
+        ? '<h3>Match to MOCREO names</h3><ul>' + lines.join('') + '</ul>' + spare + '<div class="gps-buttons"><button type="button" class="primary" id="match-save">Save Matches</button><button type="button" id="match-cancel">Cancel</button></div>'
+        : '<h3>Match to MOCREO names</h3><p class="hint">Every cooler already has the sensor named for it.</p>' + spare + '<div class="gps-buttons"><button type="button" id="match-cancel">Close</button></div>';
+    }
+    $('match').onclick = () => { plan = U.matchSensors(list(), sensors); matchBox(); };
+    $('match-box').addEventListener('click', async e => {
+      if (e.target.id === 'match-cancel') { plan = null; matchBox(); return; }
+      if (e.target.id !== 'match-save') return;
+      const b = e.target, all = list();
+      let saved = 0;
+      for (const c of plan.changes) {
+        const l = all.find(x => x.locationId === c.locationId);
+        if (!l) continue;
+        const row = { op: 'location', locationId: l.locationId, location: l.location, area: l.area || l.location, sensorId: c.to, sensorName: c.toName, lowLimit: l.lowLimit, highLimit: l.highLimit, active: l.active };
+        sent[l.locationId] = { at: Date.now(), row: Object.assign({}, row, { removed: false }) };
+        const r = await call(row, b);
+        if (!r) { delete sent[l.locationId]; break; }
+        saved++;
+      }
+      note = saved + ' of ' + plan.changes.length + ' matches saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.';
+      plan = null; matchBox(); render();
+    });
     // Each box saves as it is left: the whole row goes, so the server keeps one record per thermometer.
     $('rows').addEventListener('change', async e => {
       const tr = e.target.closest('tr[data-id]');
       if (!tr) return;
       const v = (k) => tr.querySelector('[data-k="' + k + '"]'), sensor = sensors.find(x => x.sensorId === v('sensorId').value);
-      const row = { op: 'location', locationId: tr.dataset.id, location: v('location').value, area: v('area').value, sensorId: v('sensorId').value, sensorName: sensor ? sensor.name : '',
+      const row = { op: 'location', locationId: tr.dataset.id, location: v('location').value, area: v('location').value, sensorId: v('sensorId').value, sensorName: sensor ? sensor.name : '',
         lowLimit: v('lowLimit').value, highLimit: v('highLimit').value, active: v('active').checked };
       if (!row.location.trim()) { note = tr.dataset.id ? 'A thermometer needs a location name; not saved.' : 'Type the location name first.'; render(); return; }
       if (row.locationId) sent[row.locationId] = { at: Date.now(), row: Object.assign({}, row, { lowLimit: row.lowLimit.trim() === '' ? '' : Number(row.lowLimit), highLimit: row.highLimit.trim() === '' ? '' : Number(row.highLimit), removed: false }) };
