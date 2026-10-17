@@ -99,7 +99,14 @@ test('Backup (Joe 10/16): kept in the app only, clears a day off for that day, a
   await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-06', endDate: '2026-10-07', status: 'BACKUP' });
   assert.deepEqual(await backups(), ['drv_test_casey__2026-10-06', 'drv_test_casey__2026-10-07']);
   await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-07', endDate: '2026-10-07', status: 'AVAILABLE' });
-  assert.deepEqual(await backups(), ['drv_test_casey__2026-10-06']);
+  // Joe 10/17: Available on his regular day off (Driver Master has him off Wednesday) takes Backup off and marks him available, app only.
+  const kinds = async () => (await all('driverBackups')).map(b => b.docId + ':' + (b.kind || '')).sort();
+  assert.deepEqual(await kinds(), ['drv_test_casey__2026-10-06:', 'drv_test_casey__2026-10-07:AVAILABLE']);
+  // On a day he normally works there is nothing to mark.
+  await db().collection('drivers').doc('drv_test_casey').set({ cells: { wed_available: 'TRUE' } }, { merge: true });
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-07', endDate: '2026-10-07', status: 'AVAILABLE' });
+  assert.deepEqual(await kinds(), ['drv_test_casey__2026-10-06:']);
+  assert.equal((await all('masterOutbox')).filter(x => JSON.stringify(x).includes('AVAILABLE') && JSON.stringify(x).includes('2026-10-07')).length, 0, 'nothing for the sheets');
 });
 
 test('Weekly: CARRIER and OPEN are saved as words; Publish is recorded and kept by the minute copy', async () => {
