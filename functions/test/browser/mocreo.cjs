@@ -68,15 +68,22 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
 
     // The thermometers: the two coolers from the sheet, then a new freezer.
     await page.waitForSelector(row('Cooler North'));
-    await page.selectOption(row('Cooler North') + ' select[data-k="sensorId"]', 'S1');
+    // Joe 10/17: one fixed line per MOCREO sensor (its name can't be typed over) with his locations in a drop-down that starts blank.
+    await page.waitForFunction(() => document.querySelectorAll('#srows tr[data-sensor]').length === 2);
+    assert.deepEqual(await page.$$eval('.mc-sensors th', t => t.map(x => x.textContent)), ['MOCREO Sensor', 'Now', 'Battery', 'Your Location']);
+    assert.deepEqual(await page.$$eval('#srows tr[data-sensor]', r => r.map(x => [x.querySelector('.mc-name').textContent, x.querySelectorAll('input').length, x.querySelector('select').value])),
+      [['Dock freezer sensor', 0, ''], ['Walk-in sensor A', 0, '']]);
+    const coolerNorth = await page.getAttribute(row('Cooler North'), 'data-id');
+    await page.selectOption('#srows tr[data-sensor="S1"] select', coolerNorth);
     await page.waitForFunction(() => /saved/.test(document.getElementById('foot').textContent));
     await page.click('#add');
     await page.fill('#rows tr:first-child input[data-k="location"]', 'Freezer 2');
     await page.press('#rows tr:first-child input[data-k="location"]', 'Tab');
     await page.waitForSelector(row('Freezer 2'), { timeout: 8000 });
     // Joe 10/17: one Location column; the Cooler / Area box that repeated it is gone.
-    assert.deepEqual(await page.$$eval('.mc-table th', t => t.map(x => x.textContent)), ['Location', 'MOCREO Sensor', 'Now', 'Low °F', 'High °F', 'On', '']);
-    await page.selectOption(row('Freezer 2') + ' select[data-k="sensorId"]', 'S2');
+    assert.deepEqual(await page.$$eval('.mc-table:not(.mc-sensors) th', t => t.map(x => x.textContent)), ['Location', 'Sensor', 'Now', 'Low °F', 'High °F', 'On', '']);
+    await page.selectOption('#srows tr[data-sensor="S2"] select', await page.getAttribute(row('Freezer 2'), 'data-id'));
+    await page.waitForFunction(() => /Freezer 2 is on Dock freezer sensor/.test(document.getElementById('foot').textContent), null, { timeout: 8000 });
     await page.fill(row('Freezer 2') + ' input[data-k="highLimit"]', '0');
     await page.press(row('Freezer 2') + ' input[data-k="highLimit"]', 'Tab');
     await page.uncheck(row('Cooler Middle') + ' input[data-k="active"]');
@@ -100,8 +107,8 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     // "Main Center", and Freezer 2, whose sensor is named for no cooler here, is left to pick by hand.
     await db().collection('sensors').doc('S3').set({ sensorId: 'S3', name: 'Main North', temperatureF: 35.1, batteryLevel: 100, online: true, returned: true, lastReadingAt: now, lastSyncAt: now });
     await db().collection('sensors').doc('S4').set({ sensorId: 'S4', name: 'Main Center', temperatureF: 37.2, batteryLevel: 100, online: true, returned: true, lastReadingAt: now, lastSyncAt: now });
-    await page.waitForFunction(() => document.querySelectorAll('#rows select[data-k="sensorId"] option').length >= 5 * 3);
-    assert.match(await page.textContent(row('Freezer 2') + ' select[data-k="sensorId"]'), /Walk-in sensor A · on Cooler North/, 'a sensor on another cooler says which');
+    await page.waitForFunction(() => document.querySelectorAll('#srows tr[data-sensor]').length === 4);
+    assert.match(await page.textContent('#srows tr[data-sensor="S3"] select'), /Cooler North · on Walk-in sensor A/, 'a location on another sensor says which');
     await page.click('#match');
     await page.waitForSelector('#match-box:not([hidden]) #match-save');
     const plan = (await page.textContent('#match-box')).replace(/\s+/g, ' ');
@@ -128,6 +135,19 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     assert.deepEqual([got.ut_temp_cooler_north, got.ut_temp_cooler_middle, freezer.sensorId, freezer.highLimit], ['S3', 'S4', '', 0]);
     await page.waitForFunction(() => /35\.1°F/.test(document.querySelector('#rows').textContent));
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'mocreo-matched-1920.png'), scale: 'css' });
+    // A location goes on one sensor only: picking Cooler North for "Main Center" moves it off "Main North", and Cooler Middle,
+    // which was on "Main Center", goes to manual.
+    await page.selectOption('#srows tr[data-sensor="S4"] select', 'ut_temp_cooler_north');
+    await page.waitForFunction(() => /Cooler North is on Main Center/.test(document.getElementById('foot').textContent), null, { timeout: 10000 });
+    const moved = {};
+    for (const id of ['ut_temp_cooler_north', 'ut_temp_cooler_middle']) moved[id] = (await db().collection('tempLocations').doc(id).get()).data().sensorId;
+    assert.deepEqual(moved, { ut_temp_cooler_north: 'S4', ut_temp_cooler_middle: '' });
+    assert.equal(await page.inputValue('#srows tr[data-sensor="S3"] select'), '', 'Main North is left with no location');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'mocreo-sensor-list-1920.png'), scale: 'css' });
+    await narrow.waitForFunction(() => /Cooler North/.test(document.querySelector('#srows tr[data-sensor="S4"] select').selectedOptions[0].textContent));
+    await fits(narrow, 'MOCREO & Sensors sensor list 1536x864');
+    if (SHOTS) await narrow.screenshot({ path: path.join(SHOTS, 'mocreo-sensor-list-1536.png'), scale: 'css' });
+    results.push('A location is on one sensor only: picking it for another sensor moves it there');
     results.push('Match to MOCREO Names: Cooler North → Main North, Cooler Middle → Main Center, Freezer 2 left to pick by hand; saved only on Save Matches');
     for (const p of [page, temps, narrow]) assert.deepEqual(p.errors, []);
   } finally {
