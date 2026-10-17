@@ -637,6 +637,8 @@ async function noScroll(page) {
     }
     for (let i = 0; i < 50 && (await kim()).status !== 'INACTIVE'; i++) await roster.waitForTimeout(100);
     assert.equal((await kim()).status, 'INACTIVE');
+    const brook = async () => (await db().collection('drivers').doc('drv_test_brook').get()).data();
+    for (let i = 0; i < 50 && (await brook()).unavailableReason !== 'Removed from operational roster'; i++) await roster.waitForTimeout(100);
     assert.equal((await db().collection('drivers').doc('drv_test_brook').get()).data().unavailableReason, 'Removed from operational roster');
     if (SHOTS) await roster.screenshot({ path: path.join(SHOTS, 'drivers-after-edits-1366.png') });
     // Typing a truck in the list saves it.
