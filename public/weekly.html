@@ -11,12 +11,13 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/weekly.css">
   <style>
-    /* Joe 10/11: a run added to a driver's day outside his normal week is yellow on the Driver Assignment Board. */
-    .legend i.added { background: #ffe45c; }
+    /* Joe 10/11: a run added to a driver's day outside his normal week stands out on the Driver Assignment Board.
+       Joe 10/17: added days are purple (easier to spot) and Backup is yellow (the two colors swapped). */
+    .legend i.added { background: #e4d8fb; border: 1px solid #7a4fd0; }
     /* Joe 10/16: a driver marked Backup for a day. */
-    .legend i.backup { background: #e4d8fb; border: 1px solid #7a4fd0; }
-    .weekly-page .board td.b-backup, .weekly-page .board tr.relief td.b-backup { background: #e4d8fb !important; color: #4b2a91 !important; }
-    .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #ffe45c !important; color: #3d2f00 !important; }
+    .legend i.backup { background: #ffe45c; }
+    .weekly-page .board td.b-backup, .weekly-page .board tr.relief td.b-backup { background: #ffe45c !important; color: #3d2f00 !important; }
+    .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #e4d8fb !important; color: #4b2a91 !important; }
   </style>
   <script src="js/logic.js"></script>
 </head>

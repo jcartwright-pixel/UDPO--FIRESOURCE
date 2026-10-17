@@ -1005,7 +1005,7 @@
         var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : backup ? 'backup' : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
         // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
-        // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (yellow on the board): his Driver
+        // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (purple on the board, Joe 10/17): his Driver
         // Master <day>_assignments_json does not list it, or he is normally off that day. Relief drivers have no normal week.
         var added = false;
         if (routes.length && !driver.relief && driver.cells) {
