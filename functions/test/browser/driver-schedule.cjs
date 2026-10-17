@@ -116,6 +116,28 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     const texts = await pg.$$eval('.sched-what', x => x.map(e => e.textContent));
     assert.deepEqual(texts, ['Off', 'Not scheduled', 'Not scheduled', 'Not scheduled', 'Off: Vacation', 'Not scheduled', 'Off']);
     await ctx.close();
+    // Joe 10/17: zeros in front never matter. Driver Master has 009980: 9980 and 009980 both sign him in, on phones and a laptop.
+    await db().collection('drivers').doc('drv_test_casey').update({ employeeId: '009980' });
+    for (const w of [390, 412, 1536]) {
+      for (const typed of ['9980', '009980']) {
+        const c2 = await browser.newContext({ viewport: { width: w, height: w < 700 ? 844 : 864 }, isMobile: w < 700, hasTouch: w < 700, serviceWorkers: 'block' });
+        await c2.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));
+        await localCalls(c2);
+        const p2 = await c2.newPage();
+        await p2.goto(HOSTING + '/route.html?view=schedule');
+        await p2.fill('#code', code); await p2.click('#step-code button[type=submit]');
+        await p2.waitForSelector('#step-sched-id:not([hidden])');
+        await p2.fill('#emp-id', typed);
+        await shot(p2, 'zeros-typed-' + typed + '-' + w + '.png');
+        await p2.click('#step-sched-id button[type=submit]');
+        await p2.waitForSelector('#step-sched:not([hidden]) .sched-day');
+        assert.match(await p2.textContent('#sched-name'), /CASEY, LEE · 009980/, typed + ' finds 009980 at ' + w);
+        assert.equal(await p2.textContent('#who'), 'CASEY, LEE');
+        assert.ok(await p2.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), 'no side scroll at ' + w);
+        await shot(p2, 'zeros-signed-in-' + typed + '-' + w + '.png');
+        await c2.close();
+      }
+    }
     console.log('driver-schedule: ok');
   } finally { await browser.close(); }
   process.exit(0);
