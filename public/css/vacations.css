@@ -43,3 +43,31 @@
 #day-modal .day-row { flex-wrap: wrap; }
 #day-modal .day-row > div:first-child { flex: 1 1 200px; }
 #day-modal .day-row b { white-space: nowrap; margin-right: 6px; }
+
+/* Joe 10/17: the calendar and its day box line up. */
+/* Month controls, the key and the print pair share one height; the key shows each type as the coloured name on the calendar,
+   and the driver choice stays beside its Print button when the row wraps. */
+#view-calendar .actions > :is(#cal-prev, #cal-next, #cal-month), #view-calendar .cal-print > * { height: 40px; min-height: 40px; box-sizing: border-box; }
+#view-calendar .actions > :is(#cal-prev, #cal-next) { width: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; }
+#view-calendar .actions > #cal-month { padding: 0 10px; }
+.cal-key { flex-wrap: wrap; align-items: center; gap: 6px; }
+.cal-key span { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+.cal-print { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin-left: auto; max-width: 100%; }
+.cal-print select { min-width: 0; max-width: 100%; }
+/* Day box rows: name, type and status on one line, the dates under them, Edit and Remove centred on the right. */
+#day-modal .day-row { flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; }
+#day-modal .day-row .day-who { flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; }
+#day-modal .day-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#day-modal .day-line b { margin: 0; line-height: 28px; }
+#day-modal .day-line :is(.type, .vstatus) { margin: 0; height: 28px; line-height: 28px; padding: 0 10px; border-radius: 14px; white-space: nowrap; }
+#day-modal .day-row small { line-height: 1.3; }
+#day-modal .day-row .day-acts { gap: 6px; margin-left: auto; }
+#day-modal .day-row .day-acts button { height: 36px; min-height: 36px; }
+#day-modal h3 { margin: 0 0 10px; line-height: 24px; }
+/* The side menu draws above pop-ups, so the day box is centred in the space beside it and never slides under it. */
+body:has(.sidemenu) .modal.wide-modal#day-modal { left: calc(50% + 32px); width: min(1040px, calc(100vw - 96px)); }
+@media (max-width: 760px) {
+  #day-modal .day-body { grid-template-columns: 1fr; }
+  #day-modal .day-row .day-who { flex-basis: 100%; }
+}
+@media (max-width: 480px) { #day-modal .modal-grid { grid-template-columns: 1fr; } #day-modal .modal-grid .wide { grid-column: auto; } }
