@@ -193,6 +193,10 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
     u['days.' + t.item.day + '.loadSequenceOverride'] = slots[i];
     u['days.' + t.item.day + '.updatedAt'] = stamp;
     u['days.' + t.item.day + '.updatedBy'] = email;
+    // Joe 10/16 ("noted, just like manually moving the sequence, that it was moved, and then who did it"): app-only, never on the sheet.
+    if (req.moved && req.saver && req.moved.runDocId === t.item.runDocId && req.moved.day === t.item.day) {
+      u['days.' + t.item.day + '.moveMark'] = { how: req.moved.how, savedAt: stamp, by: email, name: req.saver.name || '', via: req.saver.station ? 'TABLET' : 'DESK', station: req.saver.station || '' };
+    }
     before.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: t.seq });
     after.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: slots[i] });
   });
@@ -202,7 +206,7 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
     tx.update(refs[id], Object.assign(updates[id], { rev, testEdited: true, editedAt: stamp }));
     result.runs.push({ runDocId: id, rev });
   });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, loadDate: req.loadDate, before, after, result });
+  tx.set(logRef, Object.assign({ action: req.action, by: email, at: stamp, mode: mode.mode, loadDate: req.loadDate, before, after, result }, req.moved ? { moved: req.moved } : {}));
   return result;
 }
 

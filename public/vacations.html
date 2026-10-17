@@ -72,10 +72,11 @@
         <h2 class="cal-title" id="cal-title"></h2>
         <button type="button" id="cal-next" aria-label="Next month">&rsaquo;</button>
         <input type="month" id="cal-month" aria-label="Month and year">
-        <span class="cal-key"><span><i class="t-vacation"></i>Vacation Day</span><span><i class="t-personal"></i>Personal Day</span><span><i class="t-sick"></i>Sick Day</span><span><i class="t-bereavement"></i>Bereavement Day</span><span><i class="t-unpaid"></i>Unpaid Day</span></span>
-        <span class="spacer"></span>
-        <select id="print-who" aria-label="Print the year for"></select>
-        <button type="button" class="primary" id="print-year">&#128424; Print <span id="print-year-label"></span> Year</button>
+        <span class="cal-key"><span class="t-vacation">Vacation Day</span><span class="t-personal">Personal Day</span><span class="t-sick">Sick Day</span><span class="t-bereavement">Bereavement Day</span><span class="t-unpaid">Unpaid Day</span></span>
+        <span class="cal-print">
+          <select id="print-who" aria-label="Print the year for"></select>
+          <button type="button" class="primary" id="print-year">&#128424; Print <span id="print-year-label"></span> Year</button>
+        </span>
       </div>
       <div class="calendar" id="calendar"></div>
     </section>
@@ -299,9 +300,9 @@
       const off = vacations.filter(v => v.status !== 'CANCELLED' && v.status !== 'DENIED' && v.startDate <= dayOpen && (v.endDate || v.startDate) >= dayOpen), limit = L.dayLimit(dayOpen);
       document.getElementById('day-title').textContent = L.dayName(dayOpen) + ', ' + shortDate(dayOpen);
       document.getElementById('day-sub').textContent = off.filter(approved).length + ' of ' + limit.maxOff + ' drivers off' + (limit.label ? ' (' + limit.label + ' week: holiday limit ' + limit.maxOff + ')' : '');
-      document.getElementById('day-list').innerHTML = off.map(v => '<div class="day-row' + (v.status === 'PENDING' ? ' pending' : '') + '" data-id="' + escapeHtml(v.id) + '"><div><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) +
+      document.getElementById('day-list').innerHTML = off.map(v => '<div class="day-row' + (v.status === 'PENDING' ? ' pending' : '') + '" data-id="' + escapeHtml(v.id) + '"><div class="day-who"><div class="day-line"><b>' + escapeHtml(nameOf(v.driverId)) + '</b>' + typeChip(v.vacationType) +
+        '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span></div>' +
         '<small>' + escapeHtml(v.startDate === (v.endDate || v.startDate) ? shortDate(v.startDate) : shortDate(v.startDate) + ' – ' + shortDate(v.endDate)) + ' &middot; ' + days(v.startDate, v.endDate) + ' day' + (days(v.startDate, v.endDate) === 1 ? '' : 's') + (v.notes ? ' &middot; ' + escapeHtml(v.notes) : '') + '</small></div>' +
-        '<span class="vstatus s-' + escapeHtml(String(v.status).toLowerCase()) + '">' + escapeHtml(v.status) + '</span>' +
         (canEdit() && !v.saving ? '<span class="day-acts"><button type="button" data-day-edit="' + escapeHtml(v.id) + '">Edit</button><button type="button" class="danger" data-day-remove="' + escapeHtml(v.id) + '">Remove</button></span>' : '') + '</div>').join('') || '<p class="empty">Nobody is off this day.</p>';
       const editing = document.getElementById('day-form').vacationId.value;
       document.querySelectorAll('#day-list .day-row').forEach(r => r.classList.toggle('editing', r.dataset.id === editing));

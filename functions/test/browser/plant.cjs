@@ -14,14 +14,27 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
+const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 const DATE = PD.PLANT_DATE;
 
-async function openPage(browser, width, height, url) {
+async function openPage(browser, width, height, url, clock) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SHOTS && width === 1920 ? 2 : 1 });
+  // A page on the made-up plant day (clock): the browser and, for each save, the local server's clock are set to it.
+  await localCalls(page);
+  if (clock) {
+    await page.clock.setFixedTime(clock);
+    await page.route(/127\.0\.0\.1:5001\/.*\/save$/, (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST') return route.fallback();
+      const body = JSON.parse(req.postData() || '{}');
+      body.data = Object.assign({}, body.data, { testNow: clock.toISOString() });
+      route.fallback({ postData: JSON.stringify(body) });
+    });
+  }
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     const file = route.request().url().split('/').pop();
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, file)) });
@@ -208,19 +221,31 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     }
     results.push('Plant Distribution Departments: loads, unloading, washing and returns counted');
 
-    // Plant Station tablet (1280x800): Skip moves a waiting load to the bottom of today's loads, marked SKIPPED · COME BACK,
-    // still there after a reload; Start takes the mark off. Wednesday's open load stays on top under "finish these first".
+    // Plant Station tablet (1280x800) on the plant day: Joe 10/16, Skip moves a waiting load down one place only (each press
+    // one more), marked SKIPPED with who pressed it, still there after a reload; Start takes the Skip button off. Wednesday's
+    // open load stays on top under "finish these first".
     {
-      const tab = await openPage(browser, 1280, 800, '/loadout.html?date=' + DATE + '&area=CASE&testEmail=viewer.test@uniteddairy.com');
+      const tab = await openPage(browser, 1280, 800, '/loadout.html?date=' + DATE + '&area=CASE&testEmail=viewer.test@uniteddairy.com', new Date(DATE + 'T16:00:00Z'));
       await tab.waitForSelector('#rows tr[data-row] button.skip');
       assert.match(await tab.textContent('.divider.prior'), /still open, finish these first/);
       const id = await tab.$eval('#rows tr[data-row]:not(.done):not(.loading) button.skip', b => b.dataset.skip);
-      const sel = 'tr[data-row="' + id + '"]';
+      const sel = 'tr[data-row="' + id + '"]', place = () => tab.$$eval('#rows tr[data-row]', (t, x) => t.map(r => r.dataset.row).indexOf(x), id);
+      const below = await tab.$eval('#rows', (b, x) => { const rows = [...b.querySelectorAll('tr[data-drag]')], i = rows.findIndex(r => r.dataset.row === x); return rows[i + 1].dataset.row; }, id);
+      // One place down = past the next load still to load (a load already loaded between them keeps its place).
+      const step = async (x) => { const rows = await tab.$$eval('#rows tr[data-row]', t => t.map(r => r.dataset.row)); return rows.indexOf(x); };
       await tab.click(sel + ' button.skip');
-      await tab.waitForSelector(sel + '.skipped');
-      assert.equal(await tab.$eval('#rows tr[data-row]:last-child', t => t.dataset.row), id, 'the skipped load goes to the bottom');
-      assert.match(await tab.textContent(sel), /SKIPPED · COME BACK/);
-      assert.equal(await tab.$(sel + ' button.skip'), null, 'no second Skip on a skipped load');
+      await tab.waitForFunction(([x, b]) => { const rows = [...document.querySelectorAll('#rows tr[data-row]')].map(r => r.dataset.row); return rows.indexOf(x) === rows.indexOf(b) + 1; }, [id, below], { timeout: 8000 })
+        .catch(async e => { throw new Error('Skip ' + id + ' below ' + below + ': ' + JSON.stringify(await tab.$$eval('#rows tr[data-row]', t => t.map(r => r.dataset.row))) + ' / ' + (await tab.textContent('#error').catch(() => '')) + ' / ' + tab.errors.join()); });
+      assert.equal(await place(), await step(below) + 1, 'one Skip moves the load down one place (just past the next load to load), not to the bottom');
+      assert.notEqual(await place(), (await tab.$$eval('#rows tr[data-row]', t => t.length)) - 1, 'not to the bottom');
+      await tab.waitForFunction(x => /^SKIPPED · \S/.test((document.querySelector(x + ' .moved-tag') || {}).textContent || ''), sel, { timeout: 8000 });
+      assert.ok(await tab.$(sel + ' button.skip'), 'Skip can be pressed again to move it one more place');
+      const below2 = await tab.$eval('#rows', (b, x) => { const rows = [...b.querySelectorAll('tr[data-drag]')], i = rows.findIndex(r => r.dataset.row === x); return rows[i + 1].dataset.row; }, id);
+      await tab.click(sel + ' button.skip');
+      await tab.waitForFunction(([x, b]) => { const rows = [...document.querySelectorAll('#rows tr[data-row]')].map(r => r.dataset.row); return rows.indexOf(x) === rows.indexOf(b) + 1; }, [id, below2], { timeout: 8000 });
+      const twice = await place();
+      const last = await tab.$eval('#rows tr[data-row]:last-child', t => t.dataset.row);
+      assert.equal(await tab.$('tr[data-row="' + last + '"] button.skip'), null, 'the last load to load has no Skip (it stays where it is)');
       if (SHOTS) {
         await tab.screenshot({ path: path.join(SHOTS, 'loadout-skip-tablet-1280.png'), scale: 'css' });
         await tab.$eval('.sheet.scroll-list', el => { el.scrollTop = el.scrollHeight; });
@@ -230,12 +255,12 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       const fit = await tab.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1));
       assert.ok(fit, 'Start and Skip fit their cell at 1280 wide');
       await tab.reload();
-      await tab.waitForSelector(sel + '.skipped');
-      results.push('Skip: the load went to the bottom marked SKIPPED · COME BACK and stayed skipped after a reload');
+      await tab.waitForFunction(([x, n]) => [...document.querySelectorAll('#rows tr[data-row]')].map(r => r.dataset.row).indexOf(x) === n && /^SKIPPED/.test((document.querySelector('tr[data-row="' + x + '"] .moved-tag') || {}).textContent || ''), [id, twice], { timeout: 8000 });
+      results.push('Skip: each press moved the load down one place, marked SKIPPED with who pressed it, kept after a reload; the last load has no Skip');
       await tab.click(sel + ' button.clock');
       await tab.waitForSelector(sel + '.loading', { timeout: 8000 });
-      assert.doesNotMatch(await tab.textContent(sel), /SKIPPED/);
-      results.push('Start on the skipped load takes the mark off');
+      assert.equal(await tab.$(sel + ' button.skip'), null, 'a load loading has no Skip');
+      results.push('Start on the skipped load takes its Skip button off');
       assert.deepEqual(tab.errors, []);
       await tab.close();
     }
