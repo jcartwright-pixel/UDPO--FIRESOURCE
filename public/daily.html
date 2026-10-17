@@ -627,6 +627,9 @@
       }).join('');
       document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
+      // Joe 10/17: the day on screen is the day kept, however he got here (his own pick, or Weekly's Daily Dispatch tile), so going
+      // back and forth never drops him on today. Print Layouts' hidden copy does not change it.
+      try { if (dayKey && window.self === window.top) localStorage.setItem(dayKey, loadDate); } catch (e) { /* storage off */ }
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
       const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
       const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
@@ -642,7 +645,7 @@
     let dayKey = '';
     function goTo(key) {
       if (!L.isDateKey(key) || key === loadDate) return;
-      const go = () => { closeModals(); loadDate = key; try { if (dayKey) localStorage.setItem(dayKey, key); } catch (e) { /* storage off */ } watchRuns(); };
+      const go = () => { closeModals(); loadDate = key; watchRuns(); };
       if (weekBegin(key) === weekBegin(loadDate)) return go();
       document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(L.addDays(weekBegin(loadDate), 1)) +
         ' to the week beginning ' + shortDate(L.addDays(weekBegin(key), 1)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';

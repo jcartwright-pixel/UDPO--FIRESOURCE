@@ -1083,7 +1083,8 @@ async function noScroll(page) {
     await Promise.all([tp.waitForURL(/distribution\.html/), tp.tap('.sidemenu a.side-name')]);
     await tab.close();
     results.push('Menu: a slim icon strip that opens over the screen on hover (screen does not move), fly-outs beside it, folds when the mouse leaves; the menu button pins it open and is remembered and ends with the version line; a tablet tap opens it before picking');
-    // Joe 10/10: a menu click always opens the screen's own first view (first tab, this week), never the last one used.
+    // Joe 10/10: a menu click always opens the screen's own first view (first tab), never the last one used.
+    // Joe 10/17: except the week: Weekly keeps the week he picked (date-keep.cjs).
     let dv = await openPage(browser, 1920, 950, '/weekly.html?testEmail=dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
     const thisWeek = new URL(dv.url()).searchParams.get('week');
@@ -1091,6 +1092,7 @@ async function noScroll(page) {
     await dv.waitForFunction(() => document.body.dataset.view === 'board');
     await dv.click('#next');
     await dv.waitForFunction((w) => new URL(location.href).searchParams.get('week') !== w, thisWeek);
+    const pickedWeek = new URL(dv.url()).searchParams.get('week');
     // (The test sign-in rides on the address, so the menu link carries it here.)
     const viaMenu = async (href, who) => {
       const moved = dv.waitForEvent('framenavigated', f => f === dv.mainFrame());
@@ -1101,7 +1103,7 @@ async function noScroll(page) {
     await viaMenu('weekly.html', 'dispatch.test@uniteddairy.com');
     await dv.waitForSelector('#rows tr');
     assert.equal(await dv.evaluate(() => document.body.dataset.view), 'routes', 'Weekly opens on Route / Run Assignments');
-    assert.equal(new URL(dv.url()).searchParams.get('week'), thisWeek, 'Weekly opens on this week');
+    assert.equal(new URL(dv.url()).searchParams.get('week'), pickedWeek, 'Weekly opens on the week picked');
     assert.deepEqual(dv.errors, []);
     await dv.close();
     for (const [pg, pick] of [['fleet.html', '[role="tab"][data-view="history"]'], ['vacations.html', '[role="tab"][data-view="calendar"]'], ['otr.html', '[role="tab"][data-view="figures"]']]) {
@@ -1115,7 +1117,7 @@ async function noScroll(page) {
       assert.deepEqual(dv.errors, []);
       await dv.close();
     }
-    results.push('Menu clicks open each screen\'s first view: Weekly on Route / Run Assignments and this week, Fleet Service, Vacations and Over the Road on their first tab');
+    results.push('Menu clicks open each screen\'s first view: Weekly on Route / Run Assignments (on the week he picked, Joe 10/17), Fleet Service, Vacations and Over the Road on their first tab');
     // Joe 10/10: Equipment leaves off inactive units that are not down, and shows each unit's default runs Sun to Sat (Route Master).
     await db().collection('equipment').doc('veh_trailer_t_904').set({ id: 'veh_trailer_t_904', type: 'TRAILER', unit: 'T-904', status: 'INACTIVE', location: 'UNIONTOWN', notes: 'External Fleet: 2001 | GREAT DANE' });
     const eqd = await openPage(browser, 1920, 950, '/equipment.html?testEmail=dispatch.test@uniteddairy.com');

@@ -120,7 +120,7 @@
     const params = new URLSearchParams(location.search);
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
-    let rowDrag = null, held = false;
+    let rowDrag = null, held = false, who = '';
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, plantLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
@@ -469,9 +469,15 @@
       document.getElementById('week-date').value = week;
       watchRoutes(db);
       // Daily Dispatch for this week: today's loadout when today is in it, else the Saturday loadout that delivers its Sunday.
-      const opDay = L.operatingDay(new Date());
-      document.getElementById("go-daily").href = 'daily.html?date=' + (opDay >= L.addDays(week, -1) && opDay <= L.addDays(week, 5) ? opDay : L.addDays(week, -1)) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
+      // Joe 10/17: the day last picked on Daily comes first when it is in this week, so switching back and forth keeps his day.
+      const opDay = L.operatingDay(new Date()), inWeek = (k) => L.isDateKey(k) && k >= L.addDays(week, -1) && k <= L.addDays(week, 5);
+      let dailyDay = '';
+      try { dailyDay = localStorage.getItem('ud.daily.day.' + who) || ''; } catch (e) { /* storage off */ }
+      document.getElementById("go-daily").href = 'daily.html?date=' + (inWeek(dailyDay) ? dailyDay : inWeek(opDay) ? opDay : L.addDays(week, -1)) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
+      // Joe 10/17: the week picked stays picked (per person, on this computer) after leaving the page and coming back, until he
+      // changes it. Print Layouts' hidden copy does not change it.
+      try { if (who && window.self === window.top) localStorage.setItem('ud.weekly.week.' + who, week); } catch (e) { /* storage off */ }
       loaded = false;
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         // Picks still saving stay on screen until the update holds them, as on Daily: an update from another save used to put the
@@ -513,6 +519,8 @@
       document.getElementById('prev').onclick = () => move(-7);
       document.getElementById('next').onclick = () => move(7);
       document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { noteText = ''; week = L.weekStart(e.target.value); watch(); } };
+      who = String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
+      if (!L.isDateKey(params.get('week'))) { try { const kept = localStorage.getItem('ud.weekly.week.' + who); if (L.isDateKey(kept)) week = L.weekStart(kept); } catch (e) { /* storage off */ } }
       window.addEventListener('resize', render);
       watch();
     });
