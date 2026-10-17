@@ -59,7 +59,8 @@
       return { total: c.total, done: c.done, loading: c.loading, unloaded: uc.complete, waiting: uc.waiting, pickups, issues, loadingRow: loading, lastRow: last, nextRow: next };
     }
     const unit = (r) => [r.truck, r.trailer].filter(Boolean).join(' / ') || 'No truck yet';
-    const act = (label, r, time) => '<div class="co-act"><span>' + label + '</span>' + (r ? '<b>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</b><i>' + escapeHtml(unit(r)) + '</i><time>' + escapeHtml(time || '') + '</time>' : '<b class="none">None</b>') + '</div>';
+    // Joe 10/16: the route and the truck / trailer sit together under the line's name, each kept whole (no "T-" / "993" split).
+    const act = (label, r, time) => '<div class="co-act"><span>' + label + '</span>' + (r ? '<div class="co-what"><b>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</b><i>' + escapeHtml(unit(r)) + '</i></div><time>' + escapeHtml(time || '') + '</time>' : '<b class="none">None</b>') + '</div>';
     // Joe 10/12: a click anywhere on a plant's tile (its numbers and lines too) opens that plant's home, so the numbers no
     // longer open their own screens here.
     const cell = (label, value, cls) => '<div class="co-cell' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><b>' + value + '</b></div>';
