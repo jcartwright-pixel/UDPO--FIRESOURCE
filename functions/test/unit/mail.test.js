@@ -101,3 +101,18 @@ test('report email: the HTML of a real report matches the screen numbers', () =>
   assert.match(html, /PICKUP 503 MASSILLON<\/b> 3 cases Chocolate milk/);
   assert.match(html, /Cooler North[\s\S]*44&deg;F [\s\S]*HIGH/);
 });
+
+test('report email: routes split by delivery day, loaded in finish order, a blank run uses the route name (Joe 10/17)', () => {
+  const now = Date.parse('2026-10-17T22:00:00Z'); // Saturday 6 PM at the plant
+  const L = (route, run, routeName, state, disp, deliv, seq, done) => ({ route, run, routeName, area: 'CASE', state, dispatchTime: disp, loadDate: '2026-10-17', deliveryDate: deliv, departureDate: deliv, loadSequence: seq, completedAt: done || '', truck: '', trailer: '' });
+  const r = R.plantReport({ loads: [
+    L('827', 'UT WALMART', '', 'DONE', '02:00', '2026-10-18', 1, '2026-10-17T16:00:00Z'),
+    L('836', 'UT PECK', '', 'DONE', '03:00', '2026-10-18', 2, '2026-10-17T14:00:00Z'),
+    L('852_2', 'UT JERSEY LOAD 2', '', 'WAITING', '13:00', '2026-10-19', 3),
+    L('844', '', 'UT ZANESVILLE DSD', 'WAITING', '18:00', '2026-10-18', 4)], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
+  assert.equal(r.behind.length, 0, 'Jersey leaves Monday, so it is not late on Saturday');
+  const html = R.reportHtml(r, '');
+  assert.match(html, /Delivers Sunday 10-18-26[\s\S]*>836<[\s\S]*>827<[\s\S]*Delivers Sunday 10-18-26[\s\S]*>844<\/td>[^]*?>Zanesville<\/td>[\s\S]*Delivers Monday 10-19-26[\s\S]*>852</);
+  const one = R.reportHtml(R.plantReport({ loads: [L('827', 'UT WALMART', '', 'DONE', '02:00', '2026-10-18', 1, '2026-10-17T16:00:00Z')], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now), '');
+  assert.doesNotMatch(one, /Delivers/, 'no separator when every load delivers the same day');
+});
