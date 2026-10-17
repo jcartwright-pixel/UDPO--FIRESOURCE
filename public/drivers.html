@@ -42,16 +42,15 @@
           <select id="status"><option value="ALL">Status: All</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select>
           <select id="relief-filter"><option value="ALL">Relief: All</option><option value="YES">Relief</option><option value="NO">Regular</option></select>
           <span class="sort">Sorted by seniority, most senior first</span>
-          <button id="remove" class="danger" type="button" disabled>Remove Selected</button>
         </div>
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:4%"><col style="width:4%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:9%"><col style="width:10%">
+              <col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:10%">
               <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4%"><col style="width:6%">
             </colgroup>
             <thead><tr>
-              <th><input id="all" type="checkbox" aria-label="Select all drivers"></th><th>#</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th><th>Mobile Phone</th>
+              <th>Employee ID</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th><th>Mobile Phone</th>
               <th>Vacation wks</th><th>Status</th><th>Avail&shy;able</th><th>Acci&shy;dents</th><th>Com&shy;plaints</th><th>PDA</th><th>Edit</th>
             </tr></thead>
             <tbody id="rows"></tbody>
@@ -95,7 +94,10 @@
     // Joe 10/15: mobile phones typed here (driverPhones), else Driver Master's own phone column; written like 330-555-1234.
     let phones = {};
     const phoneText = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : String(v || ''); };
-    const phoneOf = (id) => { const p = phones[id]; return phoneText(p !== undefined ? p : (drivers.find(x => x.id === id) || {}).phone || ''); };
+    // Joe 10/17: a blank typed number does not hide the Driver Master number (his 24 drivers' cell phones are in Driver Master).
+    const phoneOf = (id) => { const p = phones[id]; return phoneText(p || (drivers.find(x => x.id === id) || {}).phone || ''); };
+    // Joe 10/17: the Employee ID column (Driver Master employee_id, the number drivers sign in with); a name typed there shows as No ID.
+    const employeeIdOf = (id) => { const e = String((drivers.find(x => x.id === id) || {}).employeeId || '').trim(); return /\d/.test(e) ? e : ''; };
     const truckUnit = (id) => { const t = lists.trucks.find(e => e.id === id); return t ? t.unit : ''; };
     function years(key) {
       if (!key) return '-';
@@ -116,13 +118,13 @@
       const edit = canEdit();
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
-      const shown = visible(), checked = new Set([...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select));
+      const shown = visible();
       const dis = edit ? '' : ' disabled';
       document.getElementById('rows').innerHTML = shown.map(r => {
         const id = escapeHtml(r.id);
         return '<tr data-id="' + id + '" class="' + (r.active ? '' : 'off') + (editingId === r.id ? ' editing' : '') + '">' +
-          '<td><input type="checkbox" data-select="' + id + '"' + (checked.has(r.id) ? ' checked' : '') + dis + ' aria-label="Select ' + escapeHtml(r.name) + '"></td>' +
-          '<td>' + r.position + '</td>' +
+          // Joe 10/17: Employee ID where the select box and the # count were (Remove is in the Edit panel; seniority # is there too).
+          '<td class="emp-id' + (employeeIdOf(r.id) ? '' : ' none') + '">' + (escapeHtml(employeeIdOf(r.id)) || 'No ID') + '</td>' +
           '<td class="name">' + escapeHtml(r.name) + (r.reliefDriver ? '<span class="chip">RELIEF</span>' : '') + '</td>' +
           '<td class="relief-col">' + (r.reliefDriver ? '<span class="relief-yes">Relief</span>' : '') + '</td>' +
           '<td><b>' + years(r.seniorityDate) + '</b> <small>' + (r.seniorityDate ? 'since ' + shortDate(r.seniorityDate) : '') + '</small></td>' +
@@ -134,14 +136,13 @@
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
           countCell(r, 'accident') + countCell(r, 'complaint') + countCell(r, 'pda') +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="14" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
+      }).join('') || '<tr><td colspan="13" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
       document.getElementById('n-inactive').textContent = rows.length - active.length;
       document.getElementById('count').textContent = shown.length + ' of ' + rows.length + ' drivers';
       document.getElementById('add').disabled = !edit;
-      syncRemove();
       // Review item 10 (Joe 10/13): the edit panel opens only on Edit or + Add Driver; otherwise the list takes the full width
       // and the three counts sit above it.
       document.querySelector('.split').classList.toggle('closed', !panelOpen);
@@ -155,7 +156,6 @@
       sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - footer.offsetHeight - 8) + 'px';
     }
 
-    function syncRemove() { document.getElementById('remove').disabled = !canEdit() || !document.querySelector('[data-select]:checked'); }
 
     // Every change shows at once and saves in the background as one call; a refused save puts the row back.
     function change(id, action, fields, values) {
@@ -181,13 +181,23 @@
         (r ? '<div class="panel-facts"><span>Seniority: <b>' + years(r.seniorityDate) + '</b></span><span>Vacation: <b>' + r.vacationWeeks + ' wks</b></span></div>' : '') +
         '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
         (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
-        '<div class="panel-actions"><button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>' +
+        '<div class="panel-actions">' + (r && r.active ? '<button id="d-remove" class="danger" type="button">Remove</button>' : '') + '<button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>' +
         (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA <a href="scorecard.html?tab=incidents">See all</a></h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
       incForm = '';
       render();
       if (r) { paintIncidents(r); document.getElementById('d-add-accident').onclick = () => incidentForm(r, 'accident'); document.getElementById('d-add-complaint').onclick = () => incidentForm(r, 'complaint'); document.getElementById('d-add-pda').onclick = () => incidentForm(r, 'pda'); }
       document.getElementById('d-name').focus();
       document.getElementById('d-cancel').onclick = closePanel;
+      // Joe 10/17: Remove moved here from the list (the select boxes are gone). Press twice; the driver stays on the list as Inactive.
+      const rm = document.getElementById('d-remove');
+      if (rm) rm.onclick = () => {
+        if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = 'Press again'; return; }
+        const d = drivers.find(x => x.id === r.id), before = { status: d.status, reason: d.unavailableReason };
+        closePanel();
+        saveOptimistic('removeDrivers', { driverIds: [r.id] },
+          () => Object.assign(d, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' }),
+          () => Object.assign(d, { status: before.status, unavailableReason: before.reason }), render);
+      };
       document.getElementById('d-save').onclick = () => {
         const fields = {
           name: document.getElementById('d-name').value.trim(), hireDate: document.getElementById('d-hire').value,
@@ -285,7 +295,6 @@
       if (edit) openPanel(rows.find(x => x.id === (edit.dataset.edit || edit.dataset.id)));
     });
     table.addEventListener('change', e => {
-      if (e.target.matches('[data-select]')) return syncRemove();
       const ph = e.target.closest('[data-phone]');
       if (ph) {
         typing = null;
@@ -316,17 +325,6 @@
       const boxes = [...document.querySelectorAll('[data-truck]')], next = boxes[boxes.indexOf(input) + step];
       if (next) { next.focus(); next.select(); } else input.blur();
     });
-    document.getElementById('all').onchange = e => { document.querySelectorAll('[data-select]:not(:disabled)').forEach(x => { x.checked = e.target.checked; }); syncRemove(); };
-    document.getElementById('remove').onclick = () => {
-      const ids = [...document.querySelectorAll('[data-select]:checked')].map(x => x.dataset.select);
-      if (!ids.length) return;
-      const before = ids.map(id => { const d = drivers.find(x => x.id === id); return { d, status: d.status, reason: d.unavailableReason }; });
-      document.getElementById('all').checked = false;
-      document.querySelectorAll('[data-select]:checked').forEach(x => { x.checked = false; });
-      saveOptimistic('removeDrivers', { driverIds: ids },
-        () => before.forEach(b => Object.assign(b.d, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' })),
-        () => before.forEach(b => Object.assign(b.d, { status: b.status, unavailableReason: b.reason })), render);
-    };
     ['search', 'status', 'relief-filter'].forEach(id => { document.getElementById(id).oninput = render; });
     document.getElementById('add').onclick = () => openPanel(null);
     document.getElementById('refresh').onclick = render;

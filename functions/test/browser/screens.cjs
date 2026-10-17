@@ -613,7 +613,10 @@ async function noScroll(page) {
     assert.equal((await casey()).name, 'CASEY, LEIGH');
     assert.equal((await casey()).reliefDriver, true);
     assert.equal((await casey()).seniorityDate, '2025-11-15');
-    // Add a driver, then remove two with Remove Selected (they stay as Inactive).
+    // Add a driver, then remove two with Remove in the Edit panel, pressed twice (they stay as Inactive). Joe 10/17: the select
+    // boxes and the # count are gone; Employee ID is the first column.
+    assert.deepEqual((await roster.$$eval('.sheet thead th', t => t.map(x => x.textContent.replace(/\u00ad/g, '')))).slice(0, 2), ['Employee ID', 'Driver']);
+    assert.equal(await roster.$$eval('[data-select], #remove, #all', x => x.length), 0);
     await roster.click('#add');
     await roster.fill('#d-name', 'Evans, Kim');
     await roster.fill('#d-hire', '2019-04-01');
@@ -625,11 +628,17 @@ async function noScroll(page) {
     for (let i = 0; i < 50 && !(await kim()); i++) await roster.waitForTimeout(100);
     assert.equal((await kim()).defaultTruckId, 'veh_truck_900002');
     await roster.waitForSelector('#rows tr[data-id="' + (await kim()).id + '"]');
-    await roster.check('#rows tr[data-id="' + (await kim()).id + '"] [data-select]');
-    await roster.check('#rows tr[data-id="drv_test_brook"] [data-select]');
-    await roster.click('#remove');
+    for (const id of [(await kim()).id, 'drv_test_brook']) {
+      await roster.click('#rows tr[data-id="' + id + '"] [data-edit]');
+      await roster.click('#d-remove');
+      assert.equal(await roster.textContent('#d-remove'), 'Press again', 'one press does not remove');
+      await roster.click('#d-remove');
+      await roster.waitForFunction((i) => document.querySelector('#rows tr[data-id="' + i + '"]').classList.contains('off'), id);
+    }
     for (let i = 0; i < 50 && (await kim()).status !== 'INACTIVE'; i++) await roster.waitForTimeout(100);
     assert.equal((await kim()).status, 'INACTIVE');
+    const brook = async () => (await db().collection('drivers').doc('drv_test_brook').get()).data();
+    for (let i = 0; i < 50 && (await brook()).unavailableReason !== 'Removed from operational roster'; i++) await roster.waitForTimeout(100);
     assert.equal((await db().collection('drivers').doc('drv_test_brook').get()).data().unavailableReason, 'Removed from operational roster');
     if (SHOTS) await roster.screenshot({ path: path.join(SHOTS, 'drivers-after-edits-1366.png') });
     // Typing a truck in the list saves it.

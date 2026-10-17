@@ -52,6 +52,14 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       assert.ok((await ro.$$eval('.sheet thead th', t => t.map(x => x.textContent))).includes('Mobile Phone'));
       const box = '#rows tr[data-id="drv_test_casey"] [data-phone]';
       assert.equal(await ro.inputValue(box), w === 1536 ? '' : '330-555-1234');
+      // Joe 10/17: his drivers' cell phones are in Driver Master; a blank typed number does not hide that one.
+      if (w === 1536) {
+        await db().collection('drivers').doc('drv_test_adams').update({ phone: '724-555-0110' });
+        await db().collection('driverPhones').doc('drv_test_adams').set({ driverId: 'drv_test_adams', phone: '' });
+        await ro.waitForFunction(() => document.querySelector('#rows tr[data-id="drv_test_adams"] [data-phone]').value === '724-555-0110');
+        await db().collection('driverPhones').doc('drv_test_adams').delete();
+        await db().collection('drivers').doc('drv_test_adams').update({ phone: '' });
+      }
       if (w === 1536) {
         await ro.fill(box, '555-1234'); await ro.press(box, 'Tab');
         await ro.waitForFunction(() => /10 digits/.test(document.getElementById('error').textContent));
