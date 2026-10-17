@@ -13,6 +13,7 @@ const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
+const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -24,6 +25,7 @@ async function openPage(browser, opts, url) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   await page.clock.setFixedTime(NOON);
+  await localCalls(page);
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     const file = route.request().url().split('/').pop();
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, file)) });
@@ -31,10 +33,10 @@ async function openPage(browser, opts, url) {
   // The local server's clock is set to the same made-up day for each save (index.js reads testNow on the emulator only).
   await page.route(/127\.0\.0\.1:5001\/.*\/save$/, (route) => {
     const req = route.request();
-    if (req.method() !== 'POST') return route.continue();
+    if (req.method() !== 'POST') return route.fallback();
     const body = JSON.parse(req.postData() || '{}');
     body.data = Object.assign({}, body.data, { testNow: NOON.toISOString() });
-    route.continue({ postData: JSON.stringify(body) });
+    route.fallback({ postData: JSON.stringify(body) });
   });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -133,7 +135,8 @@ async function keyMove(page, route, dir) {
       return { moved: bg('#rows tr.moved'), done: bg('#rows tr.done:not(.moved)'), plain: bg('#rows tr[data-drag]:not(.moved):not(.done)'), tag: tag && tag.textContent, size: tag && parseFloat(getComputedStyle(tag).fontSize) };
     });
     assert.ok(look.moved !== look.done && look.moved !== look.plain && /^rgb\(\d+, \d+, \d+\)$/.test(look.moved), 'a moved line has its own green, not the Done one ' + JSON.stringify(look));
-    assert.deepEqual([look.tag, look.size >= 16], ['MOVED', true], 'a MOVED tag at 16px or more ' + JSON.stringify(look));
+    // Joe 10/16: the tag also says who moved it ("MOVED · <name>"; the full name and time on hover).
+    assert.deepEqual([/^MOVED · \S/.test(look.tag), look.size >= 16], [true, true], 'a MOVED tag naming who moved it, at 16px or more ' + JSON.stringify(look));
     if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, '3b-loadout-moved-1920.png'), scale: 'css' });
     results.push('Loaded loads (801, 802, 805) do not move; 808 is the first line that can be dragged; the hand shows over a line');
     results.push('Mouse: 811 dragged below 812 by its Driver cell (the whole line grabs); no text selected; the other open screen shows it');
@@ -159,16 +162,18 @@ async function keyMove(page, route, dir) {
     results.push('Finger on a 1280 tablet: 6302 held and slid up to the first open place, right after the loaded 805');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '4-loadout-order-tablet-1280.png') });
 
-    // Skip: 812 waits at the bottom and does not move; 808 slides down past 811.
+    // Joe 10/16: Skip moves 812 down one place only (past 811), saved as the loading order every screen follows, and the load
+    // is marked SKIPPED with who pressed it (as a dragged load is MOVED); it can still be dragged. 808 then slides down past 811.
     await tablet.click(row('812') + ' button.skip');
-    await tablet.waitForSelector(row('812') + '.skipped');
-    assert.equal(await tablet.$(row('812') + '[data-drag]'), null, 'a skipped load does not move');
+    await waitOrder(tablet, ['801', '802', '805', '6302', '815', '808', '811', '812']);
+    await waitOrder(watcher, ['801', '802', '805', '6302', '815', '808', '811', '812']);
+    await tablet.waitForFunction(r => /^SKIPPED · \S/.test((document.querySelector(r + ' .moved-tag') || {}).textContent || ''), row('812'));
+    assert.ok(await tablet.$(row('812') + '[data-drag]'), 'a skipped load can still be dragged');
     assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell');
     // Review item 59: a finger holds 808 by its Depart cell (not Route or Run) and slides it.
     await touchDrag(tablet, '808', '811', 'below', 7);
-    await waitOrder(tablet, ['801', '802', '805', '6302', '815', '811', '808']);
-    assert.equal(await tablet.$eval('#rows tr[data-row]:last-child', t => t.dataset.row.split('|')[0]), '2026-10-04__run_p812', 'the skipped load stays at the bottom');
-    results.push('Skip: 812 waits at the bottom and does not move; 808 held by its Depart cell slid down past 811');
+    await waitOrder(tablet, ['801', '802', '805', '6302', '815', '811', '808', '812']);
+    results.push('Skip: 812 moved down one place (past 811), marked SKIPPED with who pressed it; 808 held by its Depart cell slid down past 811');
     if (SHOTS) await tablet.screenshot({ path: path.join(SHOTS, '5-loadout-order-skip-tablet-1280.png') });
 
 

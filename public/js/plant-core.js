@@ -60,7 +60,7 @@ function rowFor(run, block, loadDate, prior) {
     loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
     baseSequence: day.loadSequence == null ? null : day.loadSequence,
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
-    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '',
+    quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '', moveMark: day.moveMark || null,
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day),
     // Joe 10/12: a paused load is started but not loading now (it does not count toward the loadout's limit).
     paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED'
@@ -85,6 +85,26 @@ export function movedIds(rows) {
     list.forEach(r => { if (!keep.has(r.id)) moved.add(r.id); });
   });
   return moved;
+}
+
+// Joe 10/16 ("noted, just like we did manually moving the sequence, that it was moved, and then who did it"): the tag on a load
+// moved out of the sheet's order says how (dragged = MOVED, the Skip button = SKIPPED) and who did it, when the app knows.
+export function moveNote(r) {
+  const m = r && r.moveMark;
+  if (!m || typeof m !== 'object') return { word: 'MOVED', who: '', short: '', title: 'Moved out of the sheet\'s loading order' };
+  const person = m.name || (/@/.test(String(m.by || '')) ? String(m.by).split('@')[0] : ''), tablet = m.via === 'TABLET' && m.station ? m.station + ' tablet' : '';
+  const who = person && tablet ? person + ' on the ' + tablet : person || tablet;
+  const at = m.savedAt ? new Date(m.savedAt) : null, when = at && !isNaN(at) ? at.toLocaleString('en-US', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const word = m.how === 'SKIP' ? 'SKIPPED' : 'MOVED', parts = String(m.name || '').trim().split(/\s+/).filter(Boolean);
+  // On the line, short so the load stays one line high: "Joe C." or the station's name; the full name and time show on hover.
+  const short = parts.length > 1 ? parts[0] + ' ' + parts[parts.length - 1][0] + '.' : person || m.station || '';
+  return { word, who, short, title: (m.how === 'SKIP' ? 'Skipped down one place' : 'Moved out of the sheet\'s loading order') + (who ? ' by ' + who : '') + (when ? ' at ' + when : '') };
+}
+
+// A load someone moved (moveMark) that is still out of the sheet's place: a Skip past one load can leave either of the two
+// marked by movedIds, so the one that was moved is always marked too.
+export function movedBySomeone(r) {
+  return !!(r && r.moveMark && r.baseSequence != null && r.loadSequence != null && Number(r.loadSequence) !== Number(r.baseSequence));
 }
 
 const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDate).localeCompare(String(b.loadDate)) ||

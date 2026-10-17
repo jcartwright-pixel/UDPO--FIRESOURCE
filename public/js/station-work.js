@@ -15,9 +15,8 @@ const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
 const today = () => L.operatingDay(new Date());
 const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
 const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-// SKIP saves nothing (PlantStation.html:263-269): the load waits at the bottom until it is started. Kept for the day on this tablet.
-const SKIP_KEY = 'udLoadoutSkipped';
-const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '{}') || {}; } catch (e) { return {}; } };
+// Joe 10/16: SKIP moves a load not yet started down one place in today's loading order (past the next load still to load) and
+// saves it like the Loadout Center's drag, marked SKIPPED with this station's name. The last load to load has no SKIP.
 
 export function mountStationWork({ db, box, person, onDraw }) {
   let station = null, view = '', date = today();
@@ -34,9 +33,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
   const refuse = (id, m) => { showError(m); refused[id] = m; render(); setTimeout(() => { if (refused[id] === m) { delete refused[id]; render(); } }, 8000); };
   const refusal = (id) => (refused[id] ? '<p class="sw-refuse" role="alert">' + escapeHtml(refused[id]) + '</p>' : '');
   const returned = {}, washedNow = {};
-  const skipped = readSkips();
-  const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window */ } };
-  const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state === 'WAITING';
+  // A Skip's new order shows at once, until the server has it (load ids in their new order for the date).
+  let orderShown = null, orderNo = 0, orderChain = Promise.resolve();
   let unsubs = [];
   // Receiving scan-in (Joe 10/13, mock-up A): each scan of a delivery is a line (receivingScans); what the plant receives is
   // receivingItems. recvLocal holds a line as the tablet shows it until the database has the same (a scan made with no signal
@@ -145,10 +143,39 @@ export function mountStationWork({ db, box, person, onDraw }) {
     return '<section class="sw-panel"><div class="sw-panel-head"><h2>' + title + '</h2><span>' + count + ' · ' + escapeHtml(shortDate(date)) + '</span></div>' + body + '</section>';
   }
 
+  // Prior-day loads still open first, then today's in the loading order (a Skip's new order shows until the server has it).
+  function inOrder(all) {
+    const at = (r) => (orderShown && orderShown.date === date ? orderShown.ids.indexOf(r.id) : -1);
+    return all.map((r, i) => ({ r, i, k: r.prior ? 0 : 2, o: at(r) })).sort((a, b) => a.k - b.k || (a.o >= 0 && b.o >= 0 ? a.o - b.o : a.i - b.i)).map(x => x.r);
+  }
+  // The loads the order is changed among (as on the Loadout Center): today's, of one loadout, not yet loaded.
+  const orderable = (rows, a) => rows.filter(x => !x.prior && x.loadDate === date && x.area === a && x.state !== 'DONE');
+  // id -> true for a waiting load of today with a load still to load below it in its loadout (it can be skipped down one).
+  function skippable(rows) {
+    const out = {};
+    P.AREAS.forEach(a => { const list = orderable(rows, a); list.forEach((x, i) => { if (x.state === 'WAITING' && i < list.length - 1) out[x.id] = true; }); });
+    return out;
+  }
+  // SKIP: down one place, past the next load still to load; the loads already loaded keep their places. Saved like a drag.
+  function skipDown(r) {
+    const rows = inOrder(loads()), list = orderable(rows, r.area), i = list.findIndex(x => x.id === r.id);
+    if (i < 0 || i >= list.length - 1) { render(); return; }
+    const full = rows.filter(x => !x.prior && x.loadDate === date && x.area === r.area), from = full.indexOf(list[i]), to = full.indexOf(list[i + 1]);
+    const next = full.slice();
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    let k = 0;
+    const ids = rows.map(x => (full.indexOf(x) >= 0 ? next[k++].id : x.id));
+    const mine = ++orderNo;
+    orderShown = { date, ids, no: mine };
+    render();
+    orderChain = orderChain.then(() => save('reorderPlantLoads', { loadDate: date, order: next.map(x => ({ runDocId: x.runDocId, day: x.day })), moved: { runDocId: r.runDocId, day: r.day, how: 'SKIP' }, station: myName() }))
+      .then(() => showError(''), e => showError(r.route + ' ' + r.run + ': ' + (e.message || e)))
+      .then(() => { if (orderShown && orderShown.no === mine) { orderShown = null; render(); } });
+  }
+
   function loadingView() {
     const all = loads(), ck = canSave(), unit = P.AREA[area() || 'CASE'];
-    const order = (r) => (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0);
-    const rows = all.map((r, i) => ({ r, i })).sort((a, b) => order(a.r) - order(b.r) || a.i - b.i).map(x => x.r);
+    const rows = inOrder(all), below = skippable(rows);
     const pk = P.withNotePickups(all, pickups), ships = shipments(), box = boxing();
     // A box load the Scheduler marks Carrier is a carrier's load (the Scheduler's line itself is worked on this card).
     const carried = box ? numbered().filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER' && !x.overSlots).map(x => (x.slot ? Object.assign({}, x, x.slot) : x)) : [];
@@ -171,23 +198,24 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (r.prior && lastPrior !== true) html += '<p class="sw-group prior">Still open from ' + escapeHtml(L.dayName(r.loadDate) + ' ' + shortDate(r.loadDate)) + ': finish these first</p>';
       if (!r.prior && lastPrior === true) html += '<p class="sw-group">Today</p>';
       lastPrior = r.prior;
-      const items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length, st = r.state, skip = isSkipped(r);
+      const items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length, st = r.state, skip = !!below[r.id];
+      const moved = P.movedBySomeone(r) ? P.moveNote(r) : null;
       const going = st === 'LOADING' && !r.paused, isOpen = going ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
       const status = done ? badge('COMPLETE', 'done') : r.paused ? badge('PAUSED', 'paused') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
-      const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary') + '</span>'
+      const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + (skip ? btn('SKIP', 'skip', r.id, 'warn') : '') + btn('START LOADING', 'start', r.id, 'primary') + '</span>'
         : r.paused ? '<span class="sw-quick">' + btn('RESUME', 'resume', r.id, 'primary') + '</span>' : '') : '';
       const by = box ? hauler(r, carried.some(x => sameRun(r, x))) : '';
-      html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (skip ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
+      html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (moved ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
         '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
-        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (skip ? '<i class="sw-flag skip">SKIPPED · COME BACK</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
+        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + (moved.short ? ' · ' + escapeHtml(moved.short) : '') + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
       if (isOpen) {
         const dis = !ck || done;
         html += '<div class="sw-body"><div class="sw-fields">' + field(r.id, 'quantity', unit.label, qty(r.quantity), { mode: 'numeric', disabled: dis }) + field(r.id, 'truck', 'Truck', r.truck, { disabled: dis }) +
           field(r.id, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + field(r.id, 'temperature', 'Temperature', qty(r.temperature), { mode: 'decimal', disabled: dis }) + '</div>' +
           field(r.id, 'notes', 'Notes', r.notes, { wide: true, disabled: dis }) + pickupBox(r, items, ck) +
           pauseBox(r.id, ck && !done) +
-          (ck ? '<div class="sw-actions">' + btn('+ ADD PICKUP', 'pickup', r.id, 'pick') + (st === 'WAITING' ? (skip ? '' : btn('SKIP', 'skip', r.id, 'warn')) + btn('START LOADING', 'start', r.id, 'primary')
+          (ck ? '<div class="sw-actions">' + btn('+ ADD PICKUP', 'pickup', r.id, 'pick') + (st === 'WAITING' ? (skip ? btn('SKIP', 'skip', r.id, 'warn') : '') + btn('START LOADING', 'start', r.id, 'primary')
             : r.paused ? btn('SAVE LOADING', 'saveload', r.id, 'primary') + btn('RESUME', 'resume', r.id, 'good')
             : st === 'LOADING' ? btn('SAVE LOADING', 'saveload', r.id, 'primary') + btn('PAUSE', 'pause', r.id, 'warn') + btn('COMPLETE', 'complete', r.id, 'good') : badge('COMPLETE', 'done')) + '</div>' : '') + '</div>';
       }
@@ -590,7 +618,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (['skip', 'start', 'resume', 'pausego', 'saveload', 'complete', 'pickup', 'puadd', 'pucancel', 'pudone'].indexOf(a) >= 0) {
       const r = loads().find(x => x.id === id);
       if (!r) return;
-      if (a === 'skip') { (skipped[date] = skipped[date] || {})[r.id] = true; keepSkips(); delete opened[r.id]; render(); return; }
+      if (a === 'skip') { delete opened[r.id]; skipDown(r); return; }
       if (a === 'pickup') { puForm[r.id] = true; opened[r.id] = true; delete closed[r.id]; render(); const f = box.querySelector('[data-id="' + CSS.escape(r.id) + '"][data-k="puItem"]'); if (f) f.focus(); return; }
       if (a === 'pucancel') { delete puForm[r.id]; if (drafts[r.id]) ['puItem', 'puQty', 'puNote'].forEach(k => delete drafts[r.id][k]); render(); return; }
       if (a === 'puadd') {
@@ -620,7 +648,6 @@ export function mountStationWork({ db, box, person, onDraw }) {
       }
       let typed;
       try { typed = typedLoad(r); } catch (e) { showError(e.message); return; }
-      if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
       if (a === 'start' || a === 'resume') { const m = limitMessage(r.id); if (m) { refuse(r.id, m); return; } delete refused[r.id]; }
       if (a === 'start') { delete closed[r.id]; saveLoad(r, Object.assign(typed.fields, { startedAt: now, completedAt: '' }), Object.assign(typed.shown, { startedAt: now, completedAt: '', state: 'LOADING', paused: false })); return; }
       if (a === 'resume') { delete closed[r.id]; saveLoad(r, Object.assign(typed.fields, { status: 'LOADING' }), Object.assign(typed.shown, { state: 'LOADING', paused: false })); return; }
