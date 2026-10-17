@@ -2,7 +2,7 @@
 /*
  * Joe 10/16: on Weekly Dispatch's Driver Assignment Board a driver's day can be set to Backup, beside Available and Off.
  * The day shows BACKUP in its own color (with a legend entry), the run's driver list marks the driver BACKUP, and
- * Available takes it off again. Pictures at 1536 and 1920 go to SHOTS_DIR when it is set.
+ * Available takes it off again. Joe 10/17: Available on his regular day off shows AVAILABLE (app only). Pictures at 1536 and 1920 go to SHOTS_DIR when it is set.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -40,7 +40,9 @@ const cell = (n) => '#board-rows tr[data-driver="drv_test_casey"] td:nth-child('
       await page.waitForSelector(cell(4) + ' button');
       assert.match(await page.textContent('#legend'), /Backup Driver/);
       // Tuesday is CASEY's regular day off; Backup shows BACKUP in its own color.
+      // Joe 10/17: on his regular day off the box opens on Off, as the board shows.
       await page.click(cell(4) + ' button');
+      assert.equal(await page.$eval('#avail-reason', s => s.value), 'OFF');
       const choices = await page.$$eval('#avail-reason option', o => o.map(x => x.textContent));
       assert.deepEqual(choices.slice(0, 2), ['Available', 'Backup'], 'Backup right under Available');
       assert.ok(choices.includes('Off'), 'nothing taken away');
@@ -65,12 +67,24 @@ const cell = (n) => '#board-rows tr[data-driver="drv_test_casey"] td:nth-child('
       assert.equal(await page.$eval('#avail-reason', s => s.value), 'BACKUP');
       await page.selectOption('#avail-reason', 'AVAILABLE');
       await page.click('#avail-save');
-      // Available takes Backup off; on his regular day off the board reads OFF again.
-      await page.waitForFunction((sel) => document.querySelector(sel).textContent === 'OFF', cell(4), { timeout: 5000 });
+      // Joe 10/17: Available takes Backup off and, on his regular day off, the board reads AVAILABLE (it used to stay OFF).
+      await page.waitForFunction((sel) => document.querySelector(sel).textContent === 'AVAILABLE', cell(4), { timeout: 5000 });
       let saved = '';
-      for (let i = 0; i < 50 && saved !== 'drv_test_casey__2026-10-10'; i++) { await page.waitForTimeout(200); saved = (await db().collection('driverBackups').get()).docs.map(d => d.id).join(); }
-      assert.equal(saved, 'drv_test_casey__2026-10-10', 'Available took Tuesday\'s Backup off on the server');
+      for (let i = 0; i < 50 && saved !== 'drv_test_casey__2026-10-06:AVAILABLE,drv_test_casey__2026-10-10:'; i++) {
+        await page.waitForTimeout(200);
+        saved = (await db().collection('driverBackups').get()).docs.map(d => d.id + ':' + (d.data().kind || '')).join();
+      }
+      assert.equal(saved, 'drv_test_casey__2026-10-06:AVAILABLE,drv_test_casey__2026-10-10:', 'Tuesday Available (app only), Saturday still Backup');
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'after-available-' + w + '.png') });
+      // Stays after a reload, and the box opens on Available.
+      await page.reload();
+      await page.waitForFunction((sel) => { const td = document.querySelector(sel); return td && td.textContent === 'AVAILABLE'; }, cell(4), { timeout: 8000 });
+      await page.click(cell(4) + ' button');
+      assert.equal(await page.$eval('#avail-reason', s => s.value), 'AVAILABLE');
+      await page.click('[data-close]');
+      await db().collection('driverBackups').doc('drv_test_casey__2026-10-06').delete();
       await db().collection('driverBackups').doc('drv_test_casey__2026-10-10').delete();
+      await page.waitForFunction((sel) => document.querySelector(sel).textContent === 'OFF', cell(4), { timeout: 5000 });
       assert.deepEqual(page.errors, []);
       await page.close();
     }

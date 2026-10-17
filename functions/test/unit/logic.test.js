@@ -121,6 +121,15 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   assert.equal(withBackup[2].days.wed.kind, 'available');
   assert.equal(L.backupOn(backups, 'c', '2026-10-06'), true);
   assert.equal(L.backupOn(backups, 'c', '2026-10-07'), false);
+  // Joe 10/17: made Available on his regular day off (Driver Master <day>_available FALSE), the board shows AVAILABLE, not OFF.
+  const offTue = drivers.map(d => d.id === 'c' ? Object.assign({}, d, { cells: { tue_available: 'FALSE', wed_available: 'FALSE' } }) : d);
+  const marks = [{ driverId: 'c', date: '2026-10-06', kind: 'AVAILABLE' }];
+  assert.deepEqual([L.driverBoardRows(offTue, rows, exceptions, '2026-10-04')[2].days.tue.text], ['OFF']);
+  const madeAvailable = L.driverBoardRows(offTue, rows, exceptions, '2026-10-04', marks)[2];
+  assert.deepEqual([madeAvailable.days.tue.text, madeAvailable.days.tue.kind], ['AVAILABLE', 'available']);
+  assert.equal(madeAvailable.days.wed.text, 'OFF', 'only the day marked');
+  assert.equal(L.backupOn(marks, 'c', '2026-10-06'), false, 'Available is not Backup');
+  assert.equal(L.availableOn(marks, 'c', '2026-10-06'), true);
 });
 
 test('Driver Assignment Board names a repeated run once with its count, one line each', () => {

@@ -1,7 +1,7 @@
 /* company.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
 .company-page #screen { background: #f3f6fa; }
-.co-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 16px 16px 14px; padding: 22px 28px; border-radius: 18px; background: linear-gradient(100deg, #1768c6, #6fb0ef); color: #fff; box-shadow: 0 10px 26px rgba(23, 104, 198, .25); }
+.co-hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin: 16px 16px 14px; padding: 22px 28px; border-radius: 18px; background: linear-gradient(100deg, #1768c6, #6fb0ef); color: #fff; box-shadow: 0 10px 26px rgba(23, 104, 198, .25); }
 .co-date { display: flex; flex-direction: column; align-items: center; padding: 10px 22px; border-radius: 12px; background: #fff; color: #0b3d6b; }
 .co-plants { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 16px 24px; }
 .co-plant { display: flex; flex-direction: column; border-radius: 16px; background: #fff; border: 1px solid #dfe6ee; box-shadow: 0 6px 18px rgba(11, 61, 107, .10); color: #0b3d6b; text-decoration: none; overflow: hidden; transition: transform .12s, box-shadow .12s; }
@@ -13,14 +13,35 @@
 .co-plant header em { font-style: normal; font-size: 16px; font-weight: 900; padding: 3px 10px; border-radius: 999px; background: #8996a3; color: #fff; }
 .co-plant header em.on { background: #20ad54; }
 .co-plant header span { font-size: 20px; }
-.co-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 14px 16px 6px; }
-.co-cell { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 10px; background: #f3f8ff; }
+/* Joe 10/16: every tile shows its whole word (MAINTENANCE spilled out, COMPLETED and SCHEDULED touched the edges). The three
+   plant cards keep the same width (all three must fit once Charleston and Martins Ferry are live), so a card narrower than four
+   whole tiles shows them two to a row and runs a little further down; a wide card (one card to a row) keeps four across. */
+.co-plant { container-type: inline-size; }
+.co-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 6px; }
+@container (min-width: 700px) { .co-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* A phone's card: one tile to a row, its word on the left and its number on the right, so MAINTENANCE fits whatever the phone's
+   letters; each Recent Activity line's name gets the whole width, the time goes beside the route. */
+@container (max-width: 340px) {
+  .co-plant .co-grid { grid-template-columns: 1fr; gap: 6px; padding: 12px 12px 6px; }
+  .co-plant .co-cell { flex-direction: row; justify-content: space-between; min-height: 0; padding: 10px 14px; text-align: left; }
+  .co-plant .co-act { grid-template-areas: "label label" "what time"; }
+}
+.co-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 78px; padding: 10px 10px; border-radius: 10px; background: #f3f8ff; text-align: center; }
 .co-cell.good b { color: #0c9a4b; }
 .co-cell.bad b { color: #b3261e; }
 .co-cell.warn b { color: #b86b00; }
 .co-recent { padding: 6px 16px 10px; }
 .co-recent h3 { margin: 6px 0; font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #4a6b8d; }
-.co-act { display: grid; grid-template-columns: 150px 1fr auto auto; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid #edf1f5; font-size: 16px; }
+/* Joe 10/16: each Recent Activity line is its name with the time on the right, then the route and truck / trailer under it, so
+   "Route Being Loaded" stays on one line and no route or unit number breaks in the middle. A wide card keeps it on one line. */
+.co-act { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label time" "what what"; align-items: center; column-gap: 12px; row-gap: 2px; padding: 8px 0; border-top: 1px solid #edf1f5; font-size: 16px; }
+.co-act > span { grid-area: label; }
+.co-act time, .co-act b.none { grid-area: time; white-space: nowrap; }
+.co-what { grid-area: what; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; row-gap: 2px; min-width: 0; }
+.co-what b, .co-what i { white-space: nowrap; }
+@container (min-width: 700px) {
+  .co-act { grid-template-columns: 190px minmax(0, 1fr) auto; grid-template-areas: "label what time"; }
+}
 .co-act b.none { color: #8996a3; font-weight: 700; }
 .co-act i { font-style: normal; color: #4a6b8d; }
 .co-act time { font-weight: 800; }

@@ -62,10 +62,15 @@ function exceptionValues(reason) {
 
 /*
  * Driver Call-Off (Daily) and Driver availability (Weekly board). UNAVAILABLE adds a day-off entry. BACKUP (Joe 10/16) does
- * what AVAILABLE does and also marks the driver Backup on those days. AVAILABLE
+ * what AVAILABLE does and also marks the driver Backup on those days. AVAILABLE on his regular day off marks him available (app only). AVAILABLE
  * ("Return Available") frees only the days given: an entry inside them is cancelled, one that starts before keeps
  * its earlier days, one that ends after keeps its later days, one around them keeps both sides. Test copy only.
  */
+// Driver Master has the driver off that weekday (<day>_available not yes), as the Weekly board reads it.
+function regularOff(driver, day) {
+  const cells = driver.cells && Object.keys(driver.cells).length ? driver.cells : null;
+  return !!cells && !L.yes(cells[L.dayPrefix(day) + '_available']);
+}
 async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
   const driver = await requireDriver(tx, db, req.driverId);
   const result = { ok: true, requestId: req.requestId, runs: [] };
@@ -78,6 +83,8 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
   backupDays.forEach(day => {
     const ref = db.collection(C.backups).doc(driver.id + '__' + day);
     if (req.status === 'BACKUP') tx.set(ref, { driverId: driver.id, date: day, note: req.note || '', setAt: stamp, setBy: email });
+    // Joe 10/17: Available on a day Driver Master has him off (<day>_available) is kept here too, kind AVAILABLE, so the board shows it.
+    else if (req.status === 'AVAILABLE' && regularOff(driver, day)) tx.set(ref, { driverId: driver.id, date: day, kind: 'AVAILABLE', note: req.note || '', setAt: stamp, setBy: email });
     else tx.delete(ref);
   });
   if (req.status === 'BACKUP') result.backup = backupDays;
