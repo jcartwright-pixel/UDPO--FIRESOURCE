@@ -40,3 +40,24 @@ test('Only today: another day is refused, and so is a load that does not load to
   assert.equal((await order(['812', '811'], DATE, () => new Date('2026-10-09T09:30:00Z'))).ok, true);
   await assert.rejects(applyAction(db(), LOADER, { action: 'reorderPlantLoads', requestId: rid(), loadDate: DATE, order: [{ runDocId: id('811'), day: 'thu' }, { runDocId: id('808'), day: 'fri' }] }, noon), /does not load on/);
 });
+
+test('Joe 10/16: a Skip (or a drag) marks the load that was moved with how and who; it stays in the app after a sheet read', async () => {
+  const out = await applyAction(db(), LOADER, { action: 'reorderPlantLoads', requestId: rid(), loadDate: DATE, order: ['808', '812', '811'].map(r => ({ runDocId: id(r), day: 'fri' })),
+    moved: { runDocId: id('811'), day: 'fri', how: 'SKIP' } }, noon);
+  assert.equal(out.ok, true);
+  const day = async (r) => (await db().collection('runs').doc(id(r)).get()).data().days.fri;
+  const m = (await day('811')).moveMark;
+  assert.deepEqual([m.how, m.by, m.via, m.station], ['SKIP', LOADER.email, 'DESK', '']);
+  assert.ok(m.savedAt);
+  assert.equal((await day('812')).moveMark, undefined, 'only the load that was moved is marked');
+  const log = (await db().collection('actions').where('action', '==', 'reorderPlantLoads').get()).docs.map(d => d.data());
+  assert.deepEqual(log[0].moved, { runDocId: id('811'), day: 'fri', how: 'SKIP' });
+  // A Plant Station tablet names its station; a drag is DRAG.
+  await applyAction(db(), LOADER, { action: 'reorderPlantLoads', requestId: rid(), loadDate: DATE, order: ['812', '808'].map(r => ({ runDocId: id(r), day: 'fri' })),
+    moved: { runDocId: id('812'), day: 'fri', how: 'drag' }, station: 'Case Loadout' }, noon);
+  assert.deepEqual([(await day('812')).moveMark.how, (await day('812')).moveMark.via, (await day('812')).moveMark.station], ['DRAG', 'TABLET', 'Case Loadout']);
+  // The next read of the sheet keeps it (app-only, no Live sheet column).
+  await runTransfer({ db: db(), reader: D.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date(DATE + 'T15:00:00Z') });
+  assert.equal((await day('811')).moveMark.how, 'SKIP');
+  await assert.rejects(applyAction(db(), LOADER, { action: 'reorderPlantLoads', requestId: rid(), loadDate: DATE, order: [{ runDocId: id('808'), day: 'fri' }], moved: { runDocId: id('811'), day: 'fri', how: 'SKIP' } }, noon), /not in the order/);
+});

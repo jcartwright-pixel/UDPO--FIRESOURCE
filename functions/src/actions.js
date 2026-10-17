@@ -177,6 +177,13 @@ function validate(input) {
       if (seen[k]) throw new SaveError('BAD_REQUEST', 'A load is listed twice');
       seen[k] = true;
     });
+    // Joe 10/16: the load a person moved (dragged, or Skip: down one place) is marked with how and who, as the plant sees it.
+    if (input.moved && typeof input.moved === 'object') {
+      const m = { runDocId: text(input.moved.runDocId), day: text(input.moved.day, 10), how: String(input.moved.how || '').toUpperCase() === 'SKIP' ? 'SKIP' : 'DRAG' };
+      if (!seen[m.runDocId + '|' + m.day]) throw new SaveError('BAD_REQUEST', 'The moved load is not in the order');
+      out.moved = m;
+    }
+    if (input.station !== undefined && text(input.station)) out.station = text(input.station).replace(/[^A-Za-z0-9 /&-]/g, '').slice(0, 40);
     return out;
   }
   if (action === 'clearConflict') {
@@ -734,7 +741,7 @@ async function applyAction(db, user, input, now, deps) {
     // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
     req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
     // Loading Rundown (Joe 10/15): who saved a load's Start / End, and whether from a Plant Station tablet (plant.js markTimes).
-    if (req.action === 'savePlantLoad') req.saver = { email, name: (person && person.name) || '', station: (user && user.station && user.station.name) || (req.plant && req.plant.station) || '' };
+    if (req.action === 'savePlantLoad' || req.action === 'reorderPlantLoads') req.saver = { email, name: (person && person.name) || '', station: (user && user.station && user.station.name) || (req.plant && req.plant.station) || req.station || '' };
 
     if (req.action === 'reorderLoads') return reorder(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'reorderPlantLoads') {

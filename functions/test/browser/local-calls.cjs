@@ -37,11 +37,12 @@ module.exports = async function localCalls(page) {
       if (name === 'garage' && data.station && !unitedDairyUser(user && { uid: user.user_id, token: user })) throw new Error('Sign in with the tablet\'s United Dairy account on the Garage Station first.');
       // index.js save: a United Dairy account, or a Plant Station signed in by its code.
       if (name === 'save') {
+        // As index.js on the local test database: a browser test can set the server's clock (testNow) to its made-up day.
         const { applyAction, checkSaves } = require('../../src/actions');
         let u = unitedDairyUser(user && { uid: user.user_id, token: user });
         if (!u && user && user.udStation) { const st = await require('../../src/stations').stationSaver(db(), user); if (st) u = { uid: user.user_id, email: 'station:' + st.key, station: st }; }
         if (!u) throw new Error('Sign in first.');
-        const result = Array.isArray(data.checkSaves) ? { allowed: await checkSaves(db(), u, data.checkSaves) } : await applyAction(db(), u, data);
+        const result = Array.isArray(data.checkSaves) ? { allowed: await checkSaves(db(), u, data.checkSaves) } : await applyAction(db(), u, data, data.testNow ? () => new Date(data.testNow) : undefined);
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
         return;
       }

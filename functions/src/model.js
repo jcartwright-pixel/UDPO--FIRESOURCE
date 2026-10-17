@@ -86,7 +86,9 @@ const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver',
   // Joe 10/13 (836 PECK): a Plant Operations Scheduler load marked Not running on Weekly Dispatch; the sheet's <day>_runs is already FALSE.
   'plantLoadOff',
   // Joe 10/15 (Loading Rundown): who recorded each loading Start / End time, from the tablet or the desk, and later changes.
-  'startMark', 'endMark', 'timeEdits']);
+  'startMark', 'endMark', 'timeEdits',
+  // Joe 10/16: who moved a load in the loading order (dragged it, or Skip moved it down one place), and how.
+  'moveMark']);
 // Joe 10/13 (Sheet conflicts, route 906): the real Live week tabs have no coverage_owner column. "Run By" lives in Route Master;
 // on Live rows it stays in the app and is never written to the sheet.
 const APP_ONLY_RUN_FIELDS = Object.freeze(['coverageOwner']);

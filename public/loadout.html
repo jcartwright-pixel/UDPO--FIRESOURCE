@@ -130,14 +130,9 @@
     let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [];
     const schedPending = {};      // Scheduler load id -> its work and trailer shown before the server has them
     const pending = {};           // row id -> fields shown before the server has them
-    /* The current app's Plant Station SKIP (PlantStation.html:263-269, Joe 10/07: "only to be able to come back to it later"):
-       it saves nothing. A load not started moves to the bottom of its group on this screen, marked SKIPPED · COME BACK, until
-       it is started. Kept on this tablet for the loadout day (sessionStorage), so going to another screen and back keeps it. */
-    const SKIP_KEY = 'udLoadoutSkipped';
-    const readSkips = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY) || '{}') || {}; } catch (e) { return {}; } };
-    const skipped = readSkips();
-    const keepSkips = () => { try { sessionStorage.setItem(SKIP_KEY, JSON.stringify(skipped)); } catch (e) { /* private window: this visit only */ } };
-    const isSkipped = (r) => !!(skipped[date] && skipped[date][r.id]) && r.state !== 'DONE' && r.state !== 'LOADING';
+    /* Joe 10/16 ("whenever they hit skip, it only can move down one position every time they hit skip"): Skip moves a load not
+       yet started down one place in the loading order, past the next load still to load, and saves it like a drag (the same
+       load_sequence_override every screen follows). The load is marked SKIPPED with who pressed it, as a dragged load is MOVED. */
     const unsubs = [];
 
     // The role, or what Administration > People & Roles allows this person (Joe 10/12: allowed but shown View only).
@@ -232,7 +227,7 @@
     const canOrder = () => canLoad() && date >= today();
     const LOAD_LIMIT = { CASE: 2, BOXING: 3 };
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
-    // A skipped load and a load already loaded do not move (no line to drag); the others move around them, which keep their places.
+    // A load already loaded does not move (no line to drag); the others move around it, which keeps its place.
     let heldMove = null;
 
     let rowDrag = null, heldDraw = false;
@@ -242,8 +237,8 @@
       if (rowDrag && rowDrag.busy()) { heldDraw = true; return; }
       const live = rowsNow(), all = withSched(live), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
-      // Skipped loads go to the bottom of their group (still open from a prior day first, then today).
-      const rows = byArea[area].map((r, i) => ({ r, i, k: (r.prior ? 0 : 2) + (isSkipped(r) ? 1 : 0) })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
+      // Still open from a prior day first, then today's loads in the loading order.
+      const rows = byArea[area].map((r, i) => ({ r, i, k: r.prior ? 0 : 2 })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
       const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · Operations';
@@ -274,7 +269,7 @@
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
-      const movable = canOrder() ? orderRows(rows).filter(r => !isSkipped(r) && r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
+      const movable = canOrder() ? orderRows(rows).filter(r => r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
       const cols = COLS[area === 'TANKER' ? area : 'normal'];
       document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
@@ -298,19 +293,21 @@
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : r.paused ? '&#10073;&#10073; Paused' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
-        const skip = isSkipped(r), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && !skip ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Skip for now and come back to it">Skip</button>' : '';
+        // Skip shows on a load not yet started that has a load still to load below it (the last one stays where it is).
+        const oi = orderIds.indexOf(r.id), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && oi >= 0 && oi < orderIds.length - 1 ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Move this load down one place">Skip</button>' : '';
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
-        const isMoved = moved.has(r.id), movedTag = isMoved ? '<span class="moved-tag" title="Moved out of the sheet\'s loading order">MOVED</span>' : '';
-        const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + (skip ? '<span class="skip-tag">SKIPPED · COME BACK</span>' : '') + movedTag;
+        const isMoved = moved.has(r.id) || P.movedBySomeone(r), note = P.moveNote(r);
+        const movedTag = isMoved ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.short ? ' · <span class="mv-who">' + escapeHtml(note.short) + '</span>' : '') + '</span>' : '';
+        const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
         // ("Started Wed 3:24 AM · forgot End?") shows on hover, so the line stays one line high.
         const long = st === 'LOADING' ? P.runningText(r.startedAt, mins) : '';
         const total = mins === null ? '' : stale && /forgot End\?$/.test(long) ? '<span class="stale" title="' + escapeHtml(long) + '">forgot End?</span>' :
           '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? long : P.minutesText(mins)) + '</span>';
-        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (skip ? ' skipped' : '') + (isMoved ? ' moved' : '');
+        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (isMoved ? ' moved' : '');
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(L.runText(r)) + movedTag + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
@@ -405,7 +402,7 @@
       keys.forEach(k => { const day = k.split('|')[1]; if (days[day]) days[day] = Object.assign({}, days[day], { loadSequenceOverride: seqShown[k].n }); });
       return Object.assign({}, run, { days });
     });
-    function saveLoadOrder(ordered) {
+    function saveLoadOrder(ordered, moved) {
       const slots = ordered.map(r => r.loadSequence).filter(v => v !== null && v !== undefined && v !== '').map(Number).sort((a, b) => a - b);
       const unique = slots.filter((v, i) => slots.indexOf(v) === i);
       const numbers = unique.length === ordered.length ? unique : ordered.map((_, i) => (i + 1) * 5);
@@ -414,7 +411,7 @@
       runs = withShownOrder(runs);
       render();
       const done = () => { Object.keys(seqShown).forEach(k => { if (seqShown[k].no === mine) delete seqShown[k]; }); };
-      orderChain = orderChain.then(() => save('reorderPlantLoads', { loadDate: date, order: ordered.map(r => ({ runDocId: r.runDocId, day: r.day })) }))
+      orderChain = orderChain.then(() => save('reorderPlantLoads', Object.assign({ loadDate: date, order: ordered.map(r => ({ runDocId: r.runDocId, day: r.day })) }, moved ? { moved } : {})))
         .then(() => { done(); showError(''); }, e => {
           // Refused: this order and any pressed after it come off; the database's order shows again.
           Object.keys(seqShown).forEach(k => { if (seqShown[k].no >= mine) delete seqShown[k]; });
@@ -423,16 +420,24 @@
         });
       return orderChain;
     }
-    function moveLoad(id, to) {
+    function moveLoad(id, to, how) {
       const list = orderRows(rowsNow().filter(r => r.area === area)), from = list.findIndex(r => r.id === id);
       if (from < 0 || to < 0 || to >= list.length || to === from) return;
       const next = list.slice();
       next.splice(to, 0, next.splice(from, 1)[0]);
-      saveLoadOrder(next);
+      saveLoadOrder(next, { runDocId: list[from].runDocId, day: list[from].day, how: how || 'DRAG' });
+    }
+    // Skip: down one place, past the next load shown with a line to drag (a loaded load between them keeps its place).
+    function skipDown(id) {
+      if (!canOrder()) return;
+      const shown = [...document.querySelectorAll('#rows tr[data-drag]')].map(tr => tr.dataset.drag), i = shown.indexOf(id);
+      if (i < 0 || i >= shown.length - 1) return;
+      const full = orderRows(rowsNow().filter(r => r.area === area));
+      moveLoad(id, full.findIndex(r => r.id === shown[i + 1]), 'SKIP');
     }
 
     // Joe 10/12 ("grab the line with the hand and drag it"): toIndex is the load's new place among the loads shown with a line
-    // to drag (not loaded, not skipped); loaded and skipped loads keep their places in the order.
+    // to drag (not loaded); loaded loads keep their places in the order.
     rowDrag = mountRowDrag({ box: document.getElementById('rows'), canDrag: canOrder, onEnd: () => { if (heldDraw) { heldDraw = false; render(); } }, onMove: (id, to, byKey) => {
       const shown = [...document.querySelectorAll('#rows tr[data-drag]')].map(tr => tr.dataset.drag), i = shown.indexOf(id), target = rowById(shown[to]);
       const full = orderRows(rowsNow().filter(r => r.area === area));
@@ -692,11 +697,10 @@
       }
       if (t.dataset.sedit) { const r = schedById(t.dataset.sedit); if (r) openSchedLoad(r.sched); return; }
       if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
-      if (t.dataset.skip) { (skipped[date] = skipped[date] || {})[t.dataset.skip] = true; keepSkips(); render(); return; }
+      if (t.dataset.skip) { skipDown(t.dataset.skip); return; }
       if (t.dataset.clock) {
         const r = rowById(t.dataset.clock), now = new Date().toISOString();
         if (!r) return;
-        if (skipped[date] && skipped[date][r.id]) { delete skipped[date][r.id]; keepSkips(); }
         if (r.state === 'LOADING') saveLoad(r, { completedAt: now }, { completedAt: now, state: 'DONE' });
         else saveLoad(r, { startedAt: now, completedAt: '' }, { startedAt: now, completedAt: '', state: 'LOADING' });
         return;
