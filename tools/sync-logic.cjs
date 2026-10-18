@@ -1,6 +1,6 @@
 // Copies the shared rule files from the server (functions/src) to the screens (public/js), so the server and the
 // screens never disagree. Review item 78 (Joe 10/13): it used to copy only logic.js while the other seven were copied
-// by hand; now it copies all eight. functions/test/unit/logic-copy.test.js fails if any copy is out of date.
+// by hand; now it copies all of them (nine since the Upload Center, Joe 10/18). functions/test/unit/logic-copy.test.js fails if any copy is out of date.
 const fs = require('fs');
 const path = require('path');
 
@@ -13,6 +13,7 @@ const SHARED_FILES = [
   'pmaint-rules.js',     // preventive maintenance
   'production-rules.js', // production
   'safety-rules.js',     // safety
+  'upload-rules.js',     // Upload Center (Joe 10/18)
 ];
 const SRC = path.join(__dirname, '..', 'functions', 'src');
 const DEST = path.join(__dirname, '..', 'public', 'js');

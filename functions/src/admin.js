@@ -442,7 +442,9 @@ async function adminCall(db, user, input, deps) {
   }
   // Email, schedules and diagnostics (admintools.js), loaded here because it builds on this file.
   const TOOLS = require('./admintools').OPS;
-  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op];
+  // The Upload Center (uploads.js, Joe 10/18): a new plant's data from one workbook.
+  const UPLOADS = require('./uploads').OPS;
+  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op] || UPLOADS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Administration step: ' + op);
   const email = await requireAdmin(db, user);
   const stamp = (d.now ? d.now() : new Date()).toISOString();
