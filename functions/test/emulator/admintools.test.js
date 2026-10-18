@@ -183,6 +183,17 @@ test('Driver Check-In Email keeps the original email; Maintenance marks those wr
   assert.deepEqual([typed.fromEmail, typed.emailId], [false, '']);
 });
 
+test('Driver Check-In Email (Joe 10/18): an email the old app already made a write-up for gets no second row', async () => {
+  await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
+  await db().collection('maintenance').doc('MAIL_mail88_posttrip').set({ record_id: 'MAIL|mail88|posttrip', kind: 'TRUCK', truck_number: '900001', issue_details: 'truck horn weak', status: 'OPEN', source_type: 'GMAIL', source_id: 'mail88' });
+  const body = ['Name (UT): ADAMS', 'Route Number: 801', 'Tractor Number: 900001', 'Post Trip: truck horn weak', 'Trailor Number: 901', 'Concerns/Issues: trailer door seal torn'].join('\n');
+  const msg = { id: 'mail88', internalDate: Date.parse('2026-10-05T15:00:00Z'), from: 'CallCenter@lauttamus.com', to: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN', body };
+  await T.checkinRun(db(), { plant: 'fac_uniontown', by: ADMIN.email, readMail: async () => [msg], now: () => new Date('2026-10-05T16:00:00Z') });
+  const mine = (await records()).filter(r => r.source_id === 'mail88').map(r => r.record_id).sort();
+  // The truck already has the old app's row; the trailer problem it never made still gets one.
+  assert.deepEqual(mine, ['MAIL|mail88|posttrip', 'MAIL|mail88|trailer']);
+});
+
 test('Driver Check-In Email (Joe 10/14): the driver\'s name finds the run when the route is said short, and old unmatched emails get their credit', async () => {
   await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
   const mail = (id, body) => ({ id, internalDate: Date.parse('2026-10-05T19:00:00Z'), from: 'Lauttamus Answering Service <CallCenter@lauttamus.com>', to: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN', body });

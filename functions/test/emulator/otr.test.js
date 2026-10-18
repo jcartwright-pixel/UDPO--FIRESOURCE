@@ -52,6 +52,10 @@ test('Over the Road: a manager adds a By Date column (Darden), counts a day in i
   await save({ op: 'route', runId: 'run_t801', include: true, destination: 'Darden Foods', deliveredBy: 'Carrier Pickup' });
   await assert.rejects(save({ op: 'column', verb: 'remove', name: 'Darden Foods' }), /picked for a run/);
   await save({ op: 'route', runId: 'run_t801', include: false, destination: 'SAL', deliveredBy: 'Carrier Pickup' });
+  // Joe 10/18: Transfer is the third kind (Month Recap's Transfers group); anything else is refused.
+  await save({ op: 'route', runId: 'run_t801', include: false, destination: 'SAL', deliveredBy: 'Transfer' });
+  assert.equal((await db().collection('otrRoutes').doc('run_t801').get()).data().deliveredBy, 'Transfer');
+  await assert.rejects(save({ op: 'route', runId: 'run_t801', include: false, destination: 'SAL', deliveredBy: 'Truck' }), /Carrier Pickup, United Dairy Delivered or Transfer/);
   await save({ op: 'day', date: '2026-10-04', destination: 'Darden Foods', runs: 2 });
   await assert.rejects(save({ op: 'column', verb: 'rename', name: 'Darden Foods', newName: 'Darden' }), /runs on the By Date tab/);
   await save({ op: 'day', date: '2026-10-04', destination: 'Darden Foods', runs: 0 });

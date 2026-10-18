@@ -304,7 +304,7 @@ function validate(input) {
       out.destination = text(out.destination, 60);
       if (out.include && !out.destination) throw new SaveError('BAD_REQUEST', 'Pick where this route goes before including it');
       out.deliveredBy = text(input.deliveredBy, 40);
-      if (out.deliveredBy && ['Carrier Pickup', 'United Dairy Delivered'].indexOf(out.deliveredBy) < 0) throw new SaveError('BAD_REQUEST', 'Delivered By must be Carrier Pickup or United Dairy Delivered');
+      if (out.deliveredBy && ['Carrier Pickup', 'United Dairy Delivered', 'Transfer'].indexOf(out.deliveredBy) < 0) throw new SaveError('BAD_REQUEST', 'Delivered By must be Carrier Pickup, United Dairy Delivered or Transfer');
     } else if (out.op === 'figure') {
       out.year = Number(input.year); out.month = Number(input.month); out.key = text(input.key, 40);
       if (!Number.isInteger(out.year) || out.year < 2000 || out.year > 2100 || !Number.isInteger(out.month) || out.month < 1 || out.month > 12) throw new SaveError('BAD_REQUEST', 'Pick a month');

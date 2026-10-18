@@ -412,10 +412,13 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
     });
     const refs = records.map(r => db.collection(C.maintenance).doc(MAINT.docId(r.record_id)));
     const snaps = refs.length ? await tx.getAll(...refs) : [];
+    // Joe 10/18 ("you're repeating the same email"): the old app already made this email's write-ups (one per answer:
+    // MAIL|<id>|posttrip, |concerns ...), so a kind it already has gets no second row.
+    const already = refs.length ? (await tx.get(db.collection(C.maintenance).where('source_id', '==', msg.id))).docs.map(d => d.data()) : [];
     const made = [];
     let review = 0;
     records.forEach((r, i) => {
-      if (snaps[i].exists) return;
+      if (snaps[i].exists || already.some(b => b.record_id !== r.record_id && String(b.kind || '').toUpperCase() === r.kind)) return;
       tx.set(refs[i], Object.assign({ createdInApp: true }, r));
       if (mode.writeBack) queueMaster(tx, db, mode, rid('mail'), 'm' + r.kind, refs[i], r.record_id, r, true, stamp, by, MAINT.LISTS[r.kind]);
       made.push(r.record_id);
