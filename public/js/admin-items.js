@@ -31,6 +31,9 @@ export const ADMIN_GROUPS = [
     ['switch', 'Go-Live Switches', 'Which screens are switched on, the write-back to the Live sheet, Mark fully live, and one button to turn on everything that is ready.', '', 'swap']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
+    // Joe 10/18: a new plant's data (Charleston, Martins Ferry) from one workbook, each person filling their own tabs; every row is
+    // checked (new, changed, problem) before anything is saved.
+    ['upload-center', 'Upload Center', "Bring in a new plant's data (Charleston, Martins Ferry) from one Excel workbook: routes, drivers, the plant, people and email. Download it, fill it in, upload it, check every row, then save.", 'uploads.html', 'swap'],
     ['machine-products', 'Product Sheet', "Every product at the plant, one line each, with a check for each machine it runs on (each machine's checks are the Product drop-down on its Quality Check). Add or edit a product, download the whole list, or upload it back.", 'products.html', 'production.webp'],
     // Joe 10/13: pick a machine (HTST #1, say) and set the products run on it; the same lists as the Product Sheet's checks.
     ['machine-setup', 'Machine Setup', "Each machine's products: pick a machine, add or remove the products run on it, and drag them into the order of its Quality Check drop-down.", 'machine-setup.html', 'production.webp'],

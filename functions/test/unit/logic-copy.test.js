@@ -11,10 +11,11 @@ test('the screens use the same dispatch rules as the server (run npm run sync-lo
   assert.equal(screens, server);
 });
 
-// Review item 78 (Joe 10/13): the sync tool copies all eight shared rule files, and every copy must match the server's.
-test('npm run sync-logic copies all eight shared rule files', () => {
+// Review item 78 (Joe 10/13): the sync tool copies every shared rule file, and every copy must match the server's. The ninth,
+// upload-rules.js, is the Upload Center's (Joe 10/18).
+test('npm run sync-logic copies all nine shared rule files', () => {
   assert.deepEqual([...SHARED_FILES].sort(), ['board-rules.js', 'logic.js', 'otr-core.js', 'plant-rules.js',
-    'pmaint-rules.js', 'production-rules.js', 'safety-rules.js', 'sc-core.js']);
+    'pmaint-rules.js', 'production-rules.js', 'safety-rules.js', 'sc-core.js', 'upload-rules.js']);
 });
 
 for (const name of SHARED_FILES) {
