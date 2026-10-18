@@ -72,7 +72,7 @@
     const pill = (s) => '<span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span>';
     const today = () => L.operatingDay(new Date());
 
-    // Joe 10/18: only United Dairy owned units at this plant (the fleet list's LEASE and LOCATION, config/fleetOwnership).
+    // Joe 10/18: only United Dairy owned trucks and this plant's trailers (the fleet list's LEASE and LOCATION, config/fleetOwnership).
     let ownership = null;
     // A work order counts on the cards and the report only when its unit is on the list (owned, this plant).
     const listedIn = (due) => { const shown = {}; due.units.forEach(u => { shown[L.fleetUnitKey(u.unit)] = true; }); return (o) => !!shown[L.fleetUnitKey(o.unit)]; };
@@ -150,7 +150,7 @@
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         put(sheet, unitGrid(due, hit));
-        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned only: leased units are left off (the lessor services them).';
+        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers: leased trucks are left off (the lessor services them).';
       } else if (view === 'work') {
         const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -334,7 +334,7 @@
         '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
         '<p class="print-sign">Reviewed by ______________________________ &nbsp;&nbsp; Date ______________</p>' +
-        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · annual inspection every ' + rules().dotMonths + ' months · United Dairy owned only, leased units are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
+        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers, leased trucks are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
       printSaved('fleet');
     }
 

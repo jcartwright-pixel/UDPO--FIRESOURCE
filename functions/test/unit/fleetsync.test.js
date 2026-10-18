@@ -130,24 +130,24 @@ test('the fleet list gives each unit its owner and branch for Fleet Service', ()
   assert.throws(() => fleetOwnership([['UD UNIT', 'LOCATION']]), /LEASE/);
 });
 
-test('Fleet Service keeps owned units at this plant and drops leased ones and other branches', () => {
+test('Fleet Service keeps owned trucks and every trailer at this plant, and drops leased trucks and other branches', () => {
   const L = require('../../src/logic');
   const own = { units: { '223876': { own: false, facilityId: 'fac_uniontown' }, 'T-95': { own: true, facilityId: 'fac_uniontown' },
-    'T-999': { own: true, facilityId: 'fac_martins_ferry' }, '688': { own: true, facilityId: 'fac_uniontown' } } };
+    'T-10318': { own: false, facilityId: 'fac_uniontown' }, 'T-10308': { own: false, facilityId: '' }, '688': { own: true, facilityId: 'fac_uniontown' },
+    '221810': { own: true, facilityId: 'fac_uniontown' }, '222860': { own: false, facilityId: 'fac_martins_ferry' } } };
   const here = (u) => L.fleetOwnedHere(u, 'fac_uniontown', own);
-  assert.equal(here({ unit: '223876', location: 'Uniontown PA Branch' }), false, 'leased on the fleet list');
-  assert.equal(here({ unit: 'T-095', location: 'Uniontown PA Branch' }), true, 'owned, matched without the leading zero');
-  assert.equal(here({ unit: 'T-999', location: 'Uniontown PA Branch' }), false, 'the fleet list has it at Martins Ferry');
-  assert.equal(here({ unit: '688' }), true);
-  // Not on the fleet list: the Equipment Master location decides, and its own lease note.
-  assert.equal(here({ unit: 'T-998', location: 'Uniontown PA Branch' }), true);
-  assert.equal(here({ unit: 'T-10212', location: 'MARIETTA OH BRANCH' }), false);
-  assert.equal(here({ unit: 'T-1', location: '' }), true);
-  assert.equal(here({ unit: 'T-2', location: 'UNKNOWN' }), true);
-  assert.equal(here({ unit: '900009', location: 'Uniontown', notes: 'External Fleet: 2022 | Lease: PENSKE' }), false);
-  // Before the fleet list has been read: leased notes and other branches still leave.
-  assert.equal(L.fleetOwnedHere({ unit: '223876', location: 'Uniontown' }, 'fac_uniontown', null), true);
-  assert.equal(L.fleetOwnedHere({ unit: 'T-999', location: 'Martins Ferry OH Branch' }, 'fac_uniontown', null), false);
+  assert.equal(here({ unit: '223876', type: 'TRUCK' }), false, 'a leased tractor');
+  assert.equal(here({ unit: 'T-10318', type: 'TRAILER' }), true, 'a leased trailer stays: Uniontown services it (Joe 10/18)');
+  assert.equal(here({ unit: 'T-10308', type: 'TRAILER' }), false, 'the fleet list has it at another branch');
+  assert.equal(here({ unit: 'T-095', type: 'TRAILER' }), true, 'owned, matched without the leading zero');
+  assert.equal(here({ unit: '688', type: 'TRUCK' }), true, 'the yard trucks stay');
+  assert.equal(here({ unit: '221810', type: 'TRUCK' }), false, 'out of service, no longer ours (Joe 10/18)');
+  // Not on the fleet list: its Equipment Master plant decides (T-999 is Uniontown's, Joe 10/18), unless its notes say leased.
+  assert.equal(here({ unit: 'T-999', type: 'TRAILER', location: 'Martins Ferry OH Branch' }), true);
+  assert.equal(here({ unit: '900009', type: 'TRUCK', notes: 'External Fleet: 2022 | Lease: PENSKE' }), false);
+  assert.equal(here({ unit: 'T-900', type: 'TRAILER', notes: 'External Fleet: 2022 | Lease: First' }), true);
+  // Before the fleet list has been read.
+  assert.equal(L.fleetOwnedHere({ unit: '223876', type: 'TRUCK' }, 'fac_uniontown', null), true);
   assert.equal(L.fleetUnitKey('t 095'), 'T-95');
   assert.equal(L.fleetUnitKey('R639'), 'R-639');
   assert.equal(L.fleetUnitKey('00688'), '688');
