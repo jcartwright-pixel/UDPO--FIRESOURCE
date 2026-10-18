@@ -383,3 +383,42 @@ test('RedZone count feed: off says so; on, each run keeps its newest count and i
   assert.ok(reads.filter(([, u]) => /\/events/.test(u)).every(([, u]) => /visibility-timeout=43200/.test(u)), 'each event is hidden for 12 hours once read');
   assert.ok(!JSON.stringify(await run('run-1')).includes('v3_token'));
 });
+
+// Joe 10/18 ("What information can we pull in at least to be valuable to us?"): the checks people typed into RedZone.
+test('RedZone check sheets: read in (from 3 days back, then from the last read), kept by their id, failed counted; only GETs', async () => {
+  await people();
+  const ORG = 'org_x', ENT = 'ent-uniontown', now = Date.parse('2026-10-18T12:00:00Z');
+  await R.redzoneCall(db(), ADMIN, { op: 'save', clientId: 'client-abc', clientSecret: SECRET, orgId: ORG, enterpriseId: ENT });
+  const calls = [];
+  const sheets = [
+    { uuid: 'cs-1', name: 'OPS - Weight Sheet', dataSheetType: 'QUALITY_CHECK', resultType: 'FAIL', completeTime: now - 3600000, placeUUID: 'loc-blow', assetName: 'Blow Molder',
+      sections: [{ name: 'Weights', items: [{ name: 'Head 1', resultType: 'FAIL', values: ['58.2'] }, { name: 'Head 2', resultType: 'PASS', values: ['61.0'] }] }] },
+    { uuid: 'cs-2', name: 'GMP Audit', dataSheetType: 'AUDIT', resultType: 'PASS', completeTime: now - 7200000, sections: [] },
+    { uuid: 'cs-3', name: 'Old', resultType: 'PASS', completeTime: now - 7200000, deactivated: true, sections: [] }
+  ];
+  const fetch = async (url, opts) => {
+    calls.push([(opts && opts.method) || 'GET', url]);
+    const reply = (status, body) => ({ ok: status < 300, status, text: async () => JSON.stringify(body) });
+    if (/oauth\/token$/.test(url)) return reply(200, { access_token: 'v3_token' });
+    if (new URL(url).pathname.endsWith('/organizations/' + ORG + '/enterprises/' + ENT + '/completed-data-sheets')) return reply(200, { items: sheets });
+    return reply(404, {});
+  };
+  await assert.rejects(R.redzoneCall(db(), DRIVER, { op: 'checks' }, { fetch }), /Only a manager or administrator/);
+  const r = await R.redzoneCall(db(), MANAGER, { op: 'checks' }, { fetch, now: () => new Date(now) });
+  assert.deepEqual([r.checks.ok, r.checks.read, r.checks.failed], [true, 2, 1]);
+  const c1 = (await db().collection('redzoneChecks').doc('cs-1').get()).data();
+  assert.deepEqual([c1.name, c1.result, c1.at, c1.placeUUID, c1.asset], ['OPS - Weight Sheet', 'FAIL', now - 3600000, 'loc-blow', 'Blow Molder']);
+  assert.deepEqual(c1.items.map(i => [i.name, i.result, i.values.join()]), [['Head 1', 'FAIL', '58.2'], ['Head 2', 'PASS', '61.0']]);
+  assert.equal((await db().collection('redzoneChecks').doc('cs-3').get()).exists, false, 'a cancelled sheet is left out');
+  const first = new URL(calls.find(([, u]) => /completed-data-sheets/.test(u))[1]);
+  assert.equal(Number(first.searchParams.get('from')), now - 3 * 86400000, 'the first read goes 3 days back');
+  // The next read starts an hour before this one.
+  calls.length = 0;
+  await R.readChecks(db(), { fetch, now: () => new Date(now + 300000) });
+  assert.equal(Number(new URL(calls.find(([, u]) => /completed-data-sheets/.test(u))[1]).searchParams.get('from')), now - 3600000);
+  assert.ok(calls.filter(([, u]) => !/oauth/.test(u)).every(([m]) => m === 'GET'), 'only GETs');
+  // A refused list is noted, not thrown.
+  const no = await R.readChecks(db(), { fetch: async (url) => ({ ok: /oauth/.test(url), status: /oauth/.test(url) ? 200 : 403, text: async () => JSON.stringify(/oauth/.test(url) ? { access_token: 't' } : { message: 'forbidden' }) }), now: () => new Date(now + 600000) });
+  assert.deepEqual([no.ok, no.status], [false, '403 forbidden']);
+  assert.equal((await db().collection('config').doc('redzone').get()).data().checks.ok, false);
+});

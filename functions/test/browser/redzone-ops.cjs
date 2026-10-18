@@ -159,6 +159,30 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     }
     results.push('Line Targets: with RedZone\'s count feed off it says so; on, today\'s Blow Mold run shows 2,700 counted against 3,000 at full speed, 90%, and Refresh from RedZone reads it now');
 
+    // Quality > RedZone Checks (Joe 10/18): what people typed into RedZone, failed first and in red.
+    {
+      const now = Date.now();
+      await db().collection('config').doc('redzone').set({ checks: { ok: true, at: new Date().toISOString(), read: 2, failed: 1 } }, { merge: true });
+      await db().collection('redzoneChecks').doc('cs-ok').set({ uuid: 'cs-ok', name: 'GMP Audit', type: 'AUDIT', result: 'PASS', at: now - 600000, placeUUID: 'loc-g', asset: '', items: [{ section: '', name: 'Floors clean', result: 'PASS', values: ['Yes'] }] });
+      await db().collection('redzoneChecks').doc('cs-bad').set({ uuid: 'cs-bad', name: 'OPS - Weight Sheet', type: 'QUALITY_CHECK', result: 'FAIL', at: now - 3600000, placeUUID: 'loc-bm', asset: 'Blow Molder',
+        items: [{ section: 'Weights', name: 'Head 1', result: 'FAIL', values: ['58.2'] }, { section: 'Weights', name: 'Head 2', result: 'PASS', values: ['61.0'] }] });
+      await db().collection('redzoneChecks').doc('cs-old').set({ uuid: 'cs-old', name: 'Too Old', result: 'PASS', at: now - 5 * 86400000, items: [] });
+      for (const w of [1536, 1920, 800]) {
+        const q = await openPage(browser, w, w === 800 ? 1200 : 960, '/quality.html?view=redzone&' + ADMIN);
+        await q.waitForSelector('#rz-checks tr td:nth-child(3)');
+        const rows = await q.$$eval('#rz-checks tr', r => r.map(x => [...x.children].map(c => c.textContent)));
+        assert.deepEqual(rows.map(r => [r[1], r[2], r[3], r[4]]), [['Blow Mold · Blow Molder', 'OPS - Weight Sheet', 'Fail', 'Head 1: 58.2 · Head 2: 61.0'], ['Gallon', 'GMP Audit', 'Pass', 'Floors clean: Yes']], 'failed first; older than 3 days left out');
+        assert.equal(await q.$eval('#rz-checks .rz-bad', e => getComputedStyle(e).color), 'rgb(198, 40, 40)', 'the failed entry is red');
+        assert.match(await q.textContent('#foot'), /2 RedZone check sheets in the last 3 days, failed first/);
+        assert.deepEqual(await small(q, '#pane-redzone'), [], 'text 16px or larger at ' + w);
+        assert.ok(await fits(q) <= 0, 'no sideways scrolling at ' + w);
+        if (w !== 800) await shot(q, 'rz-quality-checks-' + w);
+        assert.deepEqual(q.errors, []);
+        await q.close();
+      }
+    }
+    results.push('Quality > RedZone Checks (1536, 1920, 800): the Blow Mold\'s failed weight sheet first, Head 1 58.2 in red, then the Gallon GMP Audit; older than 3 days left out');
+
     // The Line Tablet: Line Stopped shows RedZone's problem types for the Blow Mold.
     const tb = await openPage(browser, 1024, 1180, '/line.html?line=' + BLOW + '&' + ADMIN);
     await tb.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');

@@ -387,6 +387,7 @@
 .quality-page table.qc-table td.detail { text-align: left; white-space: normal; }
 .quality-page .qc-res { font-weight: 800; } .quality-page .qc-res.st-running { color: #1f9d55; } .quality-page .qc-res.st-review, .quality-page .qc-res.st-changeover { color: #b45f00; }
 .quality-page .qc-res.st-down { color: #c62828; } .quality-page .qc-res.st-finished { color: #5b6b7a; }
+.quality-page .rz-bad { color: #c62828; font-weight: 800; } .quality-page .rz-warn { color: #b45f00; font-weight: 800; } .quality-page tr.rz-fail td { background: #fdecec; }
 .quality-page .qc-res + small { display: block; font-size: 16px; color: var(--muted); }
 @media (max-width: 1400px) { .quality-page .qc-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quality-page .qc-heads { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) {

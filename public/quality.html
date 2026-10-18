@@ -28,7 +28,7 @@
     </div>
     <div class="head">
       <div class="title"><span class="eyebrow">Timestamped Shift Entry</span><h1>Production Line Status &amp; Quality Control</h1></div>
-      <div class="tabs" id="panes" role="tablist" aria-label="Quality view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Quality view"><button type="button" role="tab" data-pane="current">Current</button><button type="button" role="tab" data-pane="history">24-Hour History</button><button type="button" role="tab" data-pane="redzone">RedZone Checks</button></div>
       <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
@@ -50,13 +50,20 @@
           <tbody id="history"></tbody>
         </table>
       </section>
+      <section class="sheet scroll-list qc-history" id="pane-redzone" hidden>
+        <table class="loadout qc-table">
+          <colgroup><col style="width:14%"><col style="width:16%"><col style="width:20%"><col style="width:10%"><col style="width:40%"></colgroup>
+          <thead><tr><th>Time</th><th>Line / Machine</th><th>Check Sheet</th><th>Result</th><th>What Was Entered</th></tr></thead>
+          <tbody id="rz-checks"></tbody>
+        </table>
+      </section>
       <div class="foot" id="foot"></div>
     </div>
   </div>
 
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, query, where, onSnapshot, orderBy, limit } from './js/firebase.js';
     import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
     import { walkBar } from './js/walk-bar.js';
     import { watchProducts, sizeFor, OTHER } from './js/products.js';
@@ -65,7 +72,7 @@
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
-    let pane = params.get('view') === 'history' ? 'history' : 'current', chosen = params.get('line') || '';
+    let pane = ['history', 'redzone'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'current', chosen = params.get('line') || '';
     let setupRead = false, setup = [], lineStatus = [], journal = [], products = {}, person = null, app = {}, shownFor = '', roundStart = '', form = null;
     // A check being filled in box by box shows at once, over its saved copy, until the database has caught up.
     const pending = {};
@@ -185,6 +192,7 @@
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       document.getElementById('pane-current').hidden = pane !== 'current';
       document.getElementById('pane-history').hidden = pane !== 'history';
+      document.getElementById('pane-redzone').hidden = pane !== 'redzone';
       document.getElementById('lines').innerHTML = all.map(l => '<button type="button" data-line="' + escapeHtml(l.operationId) + '" class="' + (line && l.operationId === line.operationId ? 'active' : '') + '">' +
         '<i class="qc-dot st-' + String(l.last.status || 'NONE').toLowerCase() + '" title="' + escapeHtml(RESULT[l.last.status] || 'No check yet') + '"></i><span>' + escapeHtml(l.name) + '</span>' + (isDone(l) ? '<i class="qc-done-chip">DONE</i>' : '') + '<b title="Checks in the last 24 hours">' + l.today + '</b>' + (U.isHtst(l.name) && l.last.status ? htstLine(l.last) : '') + '</button>').join('') ||
         '<p class="empty">' + (setupRead ? 'No production lines are set up for this plant.' : 'Loading the production lines…') + '</p>';
@@ -200,6 +208,7 @@
         '<td class="detail">' + escapeHtml(h.notes || '') + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No quality checks have been recorded during this operational day.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? 'Each box saves as you leave it, with the time and who entered it; the check is the line\'s status now. After Send Current Report the boxes start empty for the next round.' : 'View only.') : hist.length + ' check' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours, all production lines.';
+      drawRz();
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -342,14 +351,35 @@
       const b = e.target.closest('[data-pane]');
       if (!b) return;
       pane = b.dataset.pane;
-      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      history.replaceState(null, '', pane === 'current' ? location.pathname : '?view=' + pane);
       render();
     });
+
+    // Joe 10/18: the checks people typed into RedZone (its check sheets), read in every 5 minutes, read-only
+    // (functions/src/redzone.js readChecks). Failed first, then warnings, newest first; a failed or warned entry is red or amber.
+    let rzChecks = null, rzData = null, rzStatus = null;
+    const RZ_RESULT = { PASS: 'Pass', WARN: 'Warning', FAIL: 'Fail', MISSING: 'Missing', CANCELLED: 'Cancelled', SKIPPED: 'Skipped' };
+    function drawRz() {
+      if (pane !== 'redzone') return;
+      const where = (c) => { const loc = rzData && (rzData.locations || []).find(l => l.uuid === c.placeUUID); return [loc && loc.name, c.asset].filter(Boolean).join(' · '); };
+      const since = Date.now() - 72 * 3600000, list = (rzChecks || []).filter(c => (c.at || 0) >= since);
+      const rank = { FAIL: 0, WARN: 1 };
+      list.sort((a, b) => ((rank[a.result] ?? 2) - (rank[b.result] ?? 2)) || (b.at || 0) - (a.at || 0));
+      const item = (it) => '<span class="' + (it.result === 'FAIL' ? 'rz-bad' : it.result === 'WARN' ? 'rz-warn' : '') + '">' + escapeHtml(it.name + ': ' + (it.values.join(', ') || '—')) + '</span>';
+      document.getElementById('rz-checks').innerHTML = list.slice(0, 200).map(c => '<tr' + (c.result === 'FAIL' ? ' class="rz-fail"' : '') + '><td>' + escapeHtml(dateTimeText(new Date(c.at))) + '</td><td><b>' + escapeHtml(where(c)) + '</b></td><td>' + escapeHtml(c.name) + '</td>' +
+        '<td><span class="qc-res ' + (c.result === 'FAIL' ? 'st-down' : c.result === 'WARN' ? 'st-review' : c.result === 'PASS' ? 'st-running' : 'st-finished') + '">' + escapeHtml(RZ_RESULT[c.result] || c.result || '') + '</span></td><td class="detail">' +
+        (c.items || []).filter(it => it.values.length || it.result === 'FAIL').slice(0, 12).map(item).join(' · ') + '</td></tr>').join('') ||
+        '<tr><td colspan="5" class="empty">' + escapeHtml(rzChecks === null ? 'Loading RedZone\'s checks…' : rzStatus && rzStatus.ok === false ? 'RedZone did not give its check sheets (' + rzStatus.status + '). Administration > RedZone: check the connection.' : 'No RedZone check sheets in the last 3 days. They are read in every 5 minutes.') + '</td></tr>';
+      if (pane === 'redzone') document.getElementById('foot').textContent = list.length + ' RedZone check sheet' + (list.length === 1 ? '' : 's') + ' in the last 3 days, failed first' + (rzStatus && rzStatus.at ? ' · read ' + dateTimeText(new Date(rzStatus.at)) : '') + '. Read-only: change them in RedZone.';
+    }
 
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       watchPerson(db, user, p => { person = p; shownFor = ''; render(); }, { withEmail: true });
+      onSnapshot(query(collection(db, 'redzoneChecks'), orderBy('at', 'desc'), limit(300)), s => { rzChecks = s.docs.map(d => d.data()); drawRz(); }, () => { rzChecks = []; drawRz(); });
+      onSnapshot(doc(db, 'redzoneData', 'fac_uniontown'), s => { rzData = s.exists() ? s.data() : null; drawRz(); }, () => {});
+      onSnapshot(doc(db, 'config', 'redzone'), s => { rzStatus = s.exists() ? s.data().checks || null : null; drawRz(); }, () => {});
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; shownFor = ''; render(); });
       onSnapshot(collection(db, 'plantSetup'), s => { setup = s.docs.map(d => d.data()); setupRead = true; render(); }, fail('the production lines'));
       watchProducts(db, p => { products = p; shownFor = ''; render(); }, fail('the machine products'));

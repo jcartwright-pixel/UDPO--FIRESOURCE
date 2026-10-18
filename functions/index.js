@@ -57,7 +57,7 @@ const { safeIdPart } = require('./src/model');
 const { runFleetSync } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
-const { redzoneCall, RedzoneError, readEvents: readRedzoneEvents } = require('./src/redzone');
+const { redzoneCall, RedzoneError, readEvents: readRedzoneEvents, readChecks: readRedzoneChecks } = require('./src/redzone');
 const ADMIN = require('./src/admin');
 const { adminCall, stationRelease, AdminError } = ADMIN;
 const STATIONS = require('./src/stations');
@@ -429,6 +429,8 @@ exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeou
 // until RedZone turns the feed on it only notes that it is off.
 exports.redzoneEventsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   try { await readRedzoneEvents(db); } catch (e) { console.error('redzone events', e.message); }
+  // Joe 10/18: the checks people typed into RedZone, read the same way (read only).
+  try { await readRedzoneChecks(db); } catch (e) { console.error('redzone checks', e.message); }
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
