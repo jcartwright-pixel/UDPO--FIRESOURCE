@@ -21,6 +21,8 @@ async function openPage(browser, width, height, url) {
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
+  // The board reads Backup days from the Live weeks (last week on), so the page's clock is the fixtures' week, not today.
+  await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + url);
