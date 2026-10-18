@@ -109,3 +109,29 @@ test('yard GPS temperature: red more than 5° from the set point, old after an h
   assert.deepEqual(R.yardGps({ recording: true, unitId: '', tempF: null }, '34', now), { has: false, recording: true, noUnit: true });
   assert.equal(R.yardGps(undefined, '34', now).has, false);
 });
+
+// Joe 10/18: out of the yard it keeps reporting: Moving, or where it stopped once it has stood still more than 5 minutes.
+test('reefer on the road: Moving, a short stop still reads Moving, stopped 5 minutes shows the place, cleared when it moves', () => {
+  const { reeferTrips } = require('../../src/fleetgps');
+  const R = require('../../src/plant-rules');
+  const load = [{ trailer: 'T-701', runDocId: 'w__r1', day: 'mon', routeRun: '801', completedAt: '2026-10-18T12:00:00Z' }];
+  const unit = (place, speedMph, lastReport, address) => ({ 'T-701': { unitId: 'u1', tag: 'T-701', place, speedMph, lastReport, address: address || '' } });
+  let s = reeferTrips({}, load, unit('Loading Dock', 0, '2026-10-18T12:04:00Z'), '2026-10-18T12:05:00.000Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T12:05:00Z')), null, 'on the yard: not out yet');
+  s = reeferTrips(s, [], unit('', 54, '2026-10-18T13:00:00Z', 'I-70 E, Zanesville, OH'), '2026-10-18T13:00:00.000Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:00:00Z')).text, 'Moving');
+  s = reeferTrips(s, [], unit('', 0, '2026-10-18T13:05:00Z', 'Main St & 3rd, Zanesville, OH'), '2026-10-18T13:05:00.000Z');
+  assert.equal(s.trips['T-701'].stillSince, '2026-10-18T13:05:00Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:07:00Z')).text, 'Moving', 'a 2-minute stop (a light) still reads Moving');
+  s = reeferTrips(s, [], unit('KROGER #512', 0, '2026-10-18T13:10:00Z', '100 Maple Ave, Zanesville, OH'), '2026-10-18T13:10:00.000Z');
+  let o = R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:10:00Z'));
+  assert.deepEqual([o.stopped, o.text, o.since], [true, 'Stopped at KROGER #512', '2026-10-18T13:05:00Z'], 'stopped 5 minutes: the Fleet place (a store)');
+  s = reeferTrips(s, [], unit('', 1, '2026-10-18T13:40:00Z', '100 Maple Ave, Zanesville, OH'), '2026-10-18T13:40:00.000Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:40:00Z')).text, 'Stopped at 100 Maple Ave, Zanesville, OH', 'no place name: the address');
+  s = reeferTrips(s, [], unit('', 40, '2026-10-18T13:45:00Z', 'OH-60 N'), '2026-10-18T13:45:00.000Z');
+  assert.deepEqual([s.trips['T-701'].stillSince, R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:45:00Z')).text], ['', 'Moving'], 'moving again');
+  s = reeferTrips(s, [], unit('', null, '2026-10-18T13:50:00Z', 'OH-60 N'), '2026-10-18T13:50:00.000Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T13:50:00Z')).text, 'Out of the yard', 'no speed from the GPS: just out of the yard');
+  s = reeferTrips(s, [], unit('Uniontown Plant', 0, '2026-10-18T20:00:00Z'), '2026-10-18T20:00:00.000Z');
+  assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T20:00:00Z')), null, 'back in the yard: off the list');
+});

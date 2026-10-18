@@ -417,6 +417,7 @@ async function pull(db, options) {
 const REEFER_MAX_DAYS = 4;
 // Joe 10/18: the GPS temperatures are kept at most 6 months, then deleted (once a day, a batch at a time).
 const REEFER_KEEP_DAYS = 183;
+const REEFER_MOVING_MPH = 2;
 async function purgeReefer(db, at) {
   const cutoff = new Date(Date.parse(at) - REEFER_KEEP_DAYS * 86400000).toISOString();
   let n = 0;
@@ -454,6 +455,14 @@ function reeferTrips(prev, loaded, units, at) {
       const yard = inYard(u);
       if (!yard && !t.out) t.out = at;
       else if (yard && t.out) { t.back = at; return stop('BACK_IN_YARD'); }
+      // Joe 10/18: out of the yard, keep where it is (Fleet's place name, such as a store, or the address) and whether it moves.
+      // stillSince = the first report seen standing still (under REEFER_MOVING_MPH); cleared once it moves again.
+      if (t.out) {
+        const sp = u.speedMph === undefined ? null : u.speedMph, seen = u.lastReport || at;
+        t.where = short(u.place || u.address || ''); t.speedMph = sp; t.seenAt = seen;
+        if (sp === null || sp > REEFER_MOVING_MPH) t.stillSince = '';
+        else if (!t.stillSince) t.stillSince = seen;
+      }
     }
     if (!listed[k] && !t.out) return stop('NOT_LOADED');
     if (now - Date.parse(t.startedAt) >= REEFER_MAX_DAYS * 86400000) stop('TOO_LONG');
@@ -489,7 +498,7 @@ async function pullReefer(db, d, o, token, trucks, at) {
     const t = step.trips[k], r = readings[k], old = before[k] || {};
     if (r && r.at > (t.readingAt || '') && t.recording) {
       Object.assign(t, { tempF: r.tempF, readingAt: r.at });
-      log[safeIdPart(k + '_' + r.at.replace(/[^0-9]/g, '').slice(0, 14))] = { trailer: k, date: nyDate(r.at), at: r.at, tempF: r.tempF, routeRun: t.routeRun, tripId: t.id, tag: t.tag || '' };
+      log[safeIdPart(k + '_' + r.at.replace(/[^0-9]/g, '').slice(0, 14))] = { trailer: k, date: nyDate(r.at), at: r.at, tempF: r.tempF, routeRun: t.routeRun, tripId: t.id, tag: t.tag || '', where: t.where || '', speedMph: t.speedMph === undefined ? null : t.speedMph };
     }
     if (JSON.stringify(old) !== JSON.stringify(t)) docs[safeIdPart(k)] = Object.assign({}, t, { tempF: t.tempF === undefined ? null : t.tempF, readingAt: t.readingAt || '', updatedAt: at });
   });
@@ -727,4 +736,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, history, reeferTrips, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, reeferTrips, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };

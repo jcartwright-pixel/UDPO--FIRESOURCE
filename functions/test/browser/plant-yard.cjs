@@ -67,6 +67,12 @@ async function seed() {
   await trip('T-701', { routeRun: 'SUN VALLEY', tempF: 35.4, readingAt: ago(3) });
   await trip('T-702', { routeRun: 'JERSEY 1', tempF: 44.6, readingAt: ago(4) });
   await trip('T-704', { routeRun: 'FAIRMONT TRANSFER', unitId: '', tag: '' });
+  // Joe 10/18: two loaded trailers that have left the yard: T-705 moving; T-706 stopped 12 minutes at a store, 11° over the
+  // set point of its last yard check.
+  await trip('T-705', { routeRun: 'SUN VALLEY', tempF: 34.8, readingAt: ago(2), out: ago(90), where: 'I-70 E, Zanesville, OH', speedMph: 58, stillSince: '' });
+  await trip('T-706', { routeRun: 'JERSEY 1', tempF: 45, readingAt: ago(2), out: ago(150), where: 'KROGER #512', speedMph: 0, stillSince: ago(12) });
+  await d.collection('plantJournal').doc('YARD_CHECK_seed_706').set({ recordId: 'OP-y706', type: 'YARD_CHECK', date, status: 'COMPLETE', trailer: 'T-706', recordedAt: ago(200), recordedBy: 'yard.hand@uniteddairy.com',
+    payload: { trailer: 'T-706', temperature: '34', setPoint: '34', fuelLevel: 'FULL', notes: '', status: 'COMPLETE', run: 'JERSEY 1' } });
 }
 
 (async () => {
@@ -86,7 +92,7 @@ async function seed() {
       assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '', 'the boxes start empty');
       assert.notEqual((await page.textContent('#rows tr[data-trailer="T-702"] .yd-last')).trim(), '—', 'the last check shows in Last Check');
       // Joe 10/18: one more column, GPS Temp, after the typed temperature, set point and fuel; red when more than 5° from the set point.
-      assert.deepEqual(await page.$$eval('#pane-current thead th', t => t.map(x => (x.querySelector('.l') || x).textContent)),
+      assert.deepEqual(await page.$$eval('#pane-current .yd-table:not(.yd-road) thead th', t => t.map(x => (x.querySelector('.l') || x).textContent)),
         ['Trailer #', 'Actual Temp (°F)', 'Temp Set Point (°F)', 'Fuel Level', 'GPS Temp (°F)', 'Notes', 'Last Check', 'Next Recheck', 'Action']);
       await page.waitForFunction(() => /35\.4°/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-gps') || {}).textContent || ''));
       assert.equal((await page.textContent('#rows tr[data-trailer="T-701"] .yd-gps')).trim(), '35.4°');
@@ -95,11 +101,20 @@ async function seed() {
       assert.match(await page.getAttribute('#rows tr[data-trailer="T-702"] .yd-gps', 'title'), /10\.6° above the set point/);
       assert.equal((await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps')).trim(), '—');
       assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History'], 'no new tab');
+      // Joe 10/18: under the queue, the trailers that left the yard: route, trailer, GPS temp, Moving or where it stopped.
+      await page.waitForSelector('#road-rows tr[data-out="T-706"]');
+      assert.deepEqual(await page.$$eval('#road thead tr:last-child th', t => t.map(x => (x.querySelector('.l') || x).textContent)), ['Route', 'Trailer #', 'GPS Temp (°F)', 'Where now']);
+      const outRows = await page.$$eval('#road-rows tr', r => r.map(x => [...x.cells].map(c => c.textContent.trim())));
+      assert.deepEqual(outRows.map(r => r.slice(0, 3)), [['JERSEY 1', 'T-706', '45°'], ['SUN VALLEY', 'T-705', '34.8°']]);
+      assert.equal(outRows[1][3], 'Moving');
+      assert.match(outRows[0][3], /^Stopped at KROGER #512 · since \d{1,2}:\d{2} (AM|PM)$/);
+      assert.equal(await page.$eval('#road-rows tr[data-out="T-706"] .yd-gps', x => x.classList.contains('bad')), true, '45° against its last set point of 34 is red');
+      assert.equal(await page.$$eval('#rows tr[data-trailer]', r => r.length), 3, 'the queue itself is unchanged');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
-      assert.equal(await page.$$eval('#history tr', r => r.length), 2);
+      assert.equal(await page.$$eval('#history tr', r => r.length), 3, 'the two seeded checks and T-706\'s check before it left');
       await fits(page, 'Yard history ' + w + 'x' + h);
       await shots(page, 'yard-history', w);
       assert.deepEqual(page.errors, []);
@@ -144,7 +159,7 @@ async function seed() {
     await watcher.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-704"]') && /^3Active1Due2Checked/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
     results.push('Left Yard T-704 after "Confirm Left": gone from the other screen');
     await watcher.click('[data-pane="history"]');
-    await watcher.waitForFunction(() => document.querySelectorAll('#history tr').length === 4);
+    await watcher.waitForFunction(() => document.querySelectorAll('#history tr').length === 5);
     const top = await watcher.$$eval('#history tr', r => r.slice(0, 2).map(x => x.textContent));
     assert.match(top[0], /T-704[\s\S]*Left the yard[\s\S]*Left Yard/);
     assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
@@ -161,6 +176,11 @@ async function seed() {
     assert.match(await phone.textContent(card + ' .yd-gpsf'), /GPS °F\s*44\.6°/);
     assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone card shows the GPS temperature in red too');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-390.png'), scale: 'css' });
+    assert.match(await phone.textContent('.yd-card[data-out="T-705"]'), /SUN VALLEY[\s\S]*GPS °F\s*34\.8°[\s\S]*Where\s*Moving/);
+    assert.match(await phone.textContent('.yd-card[data-out="T-706"]'), /Where\s*Stopped at KROGER #512/);
+    assert.equal(await phone.$eval('.yd-card[data-out="T-706"] .yd-gpsf', x => x.classList.contains('bad')), true);
+    assert.equal(await phone.$$eval('.yd-card[data-out] [data-k], .yd-card[data-out] [data-left]', x => x.length), 0, 'nothing to type or press on a trailer that left');
+    if (SHOTS) { await phone.$eval('.yd-road-head', x => x.scrollIntoView()); await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-road-390.png'), scale: 'css' }); await phone.$eval('#cards', x => { x.scrollTop = 0; }); }
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);

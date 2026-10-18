@@ -389,13 +389,24 @@
   // Joe 10/18: the trailer's temperature from the GPS (Verizon Fleet, gpsReefer/<trailer>, read every 5 minutes from the time
   // the load is complete until the trailer is back in the yard), beside the yard check's typed temperature, set point and fuel.
   // Red when it is more than REEFER_OFF_BY degrees from the set point; a reading older than REEFER_STALE_MINUTES is shown as old.
-  var REEFER_OFF_BY = 5, REEFER_STALE_MINUTES = 60;
+  var REEFER_OFF_BY = 5, REEFER_STALE_MINUTES = 60, REEFER_STOP_MINUTES = 5;
   function yardGps(r, setPoint, nowMs) {
     if (!r || r.tempF === null || r.tempF === undefined || r.tempF === '') return { has: false, recording: !!(r && r.recording), noUnit: !!(r && r.recording && !r.unitId) };
     var t = Number(r.tempF), at = when(r.readingAt), age = at ? Math.max(0, Math.round((nowMs - at) / 60000)) : null, sp = text(setPoint), off = null;
     if (sp !== '' && isFinite(Number(sp))) off = Math.round((t - Number(sp)) * 10) / 10;
     return { has: true, tempF: t, readingAt: text(r.readingAt), minutesOld: age,
       stale: age !== null && age > REEFER_STALE_MINUTES, off: off, flag: off !== null && Math.abs(off) > REEFER_OFF_BY, recording: !!r.recording };
+  }
+  // Joe 10/18: once a loaded trailer has left the yard it keeps reporting until it is back: "Moving" while it moves, and
+  // where it stopped (the Fleet place name, such as a store, or else the address) once it has stood still REEFER_STOP_MINUTES.
+  // A short stop (a light, a turn) still reads Moving. null for a trailer that is not out on a GPS trip.
+  function yardOut(r, nowMs) {
+    if (!r || !r.recording || !r.out) return null;
+    var still = when(r.stillSince), mins = still ? Math.max(0, Math.round((nowMs - still) / 60000)) : 0;
+    var known = r.speedMph !== null && r.speedMph !== undefined && r.speedMph !== '';
+    var stopped = !!still && mins >= REEFER_STOP_MINUTES;
+    return { moving: known && !stopped, stopped: stopped, unknown: !known && !still, where: text(r.where), stopMinutes: stopped ? mins : 0,
+      since: stopped ? text(r.stillSince) : '', text: stopped ? 'Stopped at ' + (text(r.where) || 'an unknown place') : known || still ? 'Moving' : 'Out of the yard' };
   }
   // Minutes until a trailer can be checked again (the save's own check: that operating day's newest record of the trailer).
   function yardLockLeft(journal, date, trailer, nowMs) {
@@ -963,7 +974,7 @@
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
-    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps,
+    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,

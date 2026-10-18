@@ -53,6 +53,11 @@
           <thead><tr><th><span class="l">Trailer #</span><span class="s">Trailer</span></th><th><span class="l">Actual Temp (°F)</span><span class="s">Temp °F</span></th><th><span class="l">Temp Set Point (°F)</span><span class="s">Set °F</span></th><th><span class="l">Fuel Level</span><span class="s">Fuel</span></th><th><span class="l">GPS Temp (°F)</span><span class="s">GPS °F</span></th><th>Notes</th><th>Last Check</th><th>Next Recheck</th><th>Action</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
+        <table class="loadout yd-table yd-road" id="road" hidden>
+          <colgroup><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:62%"></colgroup>
+          <thead><tr><th colspan="4" class="yd-road-title">Left the yard: GPS until back in the yard</th></tr><tr><th>Route</th><th>Trailer #</th><th><span class="l">GPS Temp (°F)</span><span class="s">GPS °F</span></th><th>Where now</th></tr></thead>
+          <tbody id="road-rows"></tbody>
+        </table>
       </div>
       <div class="sheet scroll-list" id="pane-history" hidden>
         <table class="loadout yd-table yd-history">
@@ -103,6 +108,28 @@
       return '<td class="yd-gps' + (g.flag ? ' bad' : '') + '" title="' + escapeHtml(gpsWhy(g)) + '">' + escapeHtml(deg(g.tempF)) + '°</td>';
     }
 
+    // Joe 10/18: a loaded trailer that has left the yard keeps its GPS temperature until it is back, with Moving or where it
+    // stopped (more than U.REEFER_STOP_MINUTES). Red by the set point of its last yard check.
+    function road(hist) {
+      const sets = {};
+      hist.forEach(h => { const k = U.yardTrailer(h.trailer); if (sets[k] === undefined && String(h.setPoint || '').trim() !== '') sets[k] = h.setPoint; });
+      return Object.keys(reefer).map(k => ({ k, r: reefer[k], o: U.yardOut(reefer[k], Date.now()) })).filter(x => x.o)
+        .map(x => Object.assign(x, { g: gpsInfo(x.k, sets[x.k] || '') })).sort((a, b) => String(a.r.routeRun).localeCompare(String(b.r.routeRun)) || a.k.localeCompare(b.k));
+    }
+    const whereText = (o) => o.stopped ? o.text + ' · since ' + clock(o.since) : o.text;
+    function drawRoad(list) {
+      document.getElementById('road').hidden = !list.length;
+      document.getElementById('road-rows').innerHTML = list.map(x => '<tr data-out="' + escapeHtml(x.k) + '"><td>' + escapeHtml(x.r.routeRun || '') + '</td><td class="yd-trailer"><b>' + escapeHtml(x.k) + '</b></td>' +
+        (x.g.has ? '<td class="yd-gps' + (x.g.flag ? ' bad' : '') + '" title="' + escapeHtml(gpsWhy(x.g)) + '">' + escapeHtml(deg(x.g.tempF)) + '°</td>' : '<td class="yd-gps none">—</td>') +
+        '<td class="yd-where' + (x.o.stopped ? ' stop' : '') + '">' + escapeHtml(whereText(x.o)) + '</td></tr>').join('');
+    }
+    function roadCards(list) {
+      if (!list.length) return '';
+      return '<h3 class="yd-road-head">Left the yard</h3>' + list.map(x => '<article class="yd-card yd-out" data-out="' + escapeHtml(x.k) + '"><header><b>' + escapeHtml(x.k) + '</b><span class="yd-run">' + escapeHtml(x.r.routeRun || '') + '</span></header>' +
+        '<div class="yd-f yd-gpsf' + (x.g.flag ? ' bad' : '') + '"><span>GPS °F</span><b>' + (x.g.has ? escapeHtml(deg(x.g.tempF)) + '°' : '—') + '</b></div>' +
+        '<div class="yd-f yd-wheref' + (x.o.stopped ? ' stop' : '') + '"><span>Where</span><b>' + escapeHtml(whereText(x.o)) + '</b></div></article>').join('');
+    }
+
     function all() { return journal.concat(pending); }
     function queue() { return U.yardQueue(runs, all(), date, Date.now()); }
 
@@ -142,7 +169,9 @@
           '<td class="yd-last">' + last + '</td><td class="yd-next' + (x.minutesUntilDue === 0 ? ' overdue' : '') + '">' + escapeHtml(next) + '<small>' + escapeHtml(x.routeRun) + '</small></td>' +
           '<td class="yd-act">' + (ck ? (m ? (m.saved === 'saving' ? '<span class="yd-tick saving">Saving…</span>' : m.saved === 'error' ? '<span class="yd-tick error">Not saved</span>' : '<span class="yd-tick">&#10003; ' + escapeHtml(m.at || 'Saved') + '</span>') : '') + '<button type="button" class="yd-left" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : ' title="Trailer has left the yard">Left Yard') + '</button>' : '<span class="pill">View only</span>') + '</td></tr>';
       }).join('') || (got.runs && got.journal ? '<tr><td colspan="9" class="empty">No loaded trailers are currently due for a yard check.</td></tr>' : '<tr><td colspan="9" class="empty">Loading the trailers&hellip;</td></tr>');
-      drawCards(q, ck);
+      const out = road(hist);
+      drawRoad(out);
+      drawCards(q, ck, out);
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
         '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
@@ -165,7 +194,7 @@
       Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
     }
     const queues = {};          // trailer -> the saves of that trailer, one after the other
-    function drawCards(q, ck) {
+    function drawCards(q, ck, out) {
       const box = document.getElementById('cards');
       if (!phone()) { box.innerHTML = ''; return; }
       const list = q.rows.concat(q.locked.filter(x => mine[x.trailer])).sort((a, b) => a.departureDate.localeCompare(b.departureDate) || (a.departureTime == null ? 99999 : a.departureTime) - (b.departureTime == null ? 99999 : b.departureTime) || a.index - b.index);
@@ -183,6 +212,7 @@
           '<label class="yd-f"><span>Notes</span><input data-k="notes" enterkeyhint="done" placeholder="Optional" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></label>' +
           (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Tap again to confirm: left the yard' : '>Left Yard') + '</button>' : '') + '</article>';
       }).join('') || (got.runs && got.journal ? '<p class="yd-none">No loaded trailers are due for a yard check.</p>' : '<p class="yd-none">Loading the trailers&hellip;</p>');
+      box.innerHTML += roadCards(out || []);
     }
     // One box was left (or a fuel button tapped): save that trailer's check. The first save is the check (locked for 2 hours);
     // the next ones fill in the same check.
