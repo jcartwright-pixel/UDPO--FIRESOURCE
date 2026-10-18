@@ -32,10 +32,12 @@ export function watchIssueRecords(db, cb, onError) {
     since = want;
     ['opened', 'dated'].forEach(k => {
       if (stops[k]) stops[k]();
+      parts[k] = null; // wait for the wider read before showing counts
       const field = k === 'opened' ? 'opened_at' : 'service_date';
       stops[k] = onSnapshot(query(col, where(field, '>=', since)), take(k), onError);
     });
   }
+  widen(); // the last 120 days start at once, beside the open ones, and widen if an open one is older
   const stopOpen = onSnapshot(query(col, where('status', 'not-in', DONE)), take('open'), onError);
   const stopDone = onSnapshot(query(col, where('completed_at', '>=', dayKey(Date.now() - 32 * DAY))), take('done'), onError);
   return () => { stopOpen(); stopDone(); Object.values(stops).forEach(s => s && s()); };
