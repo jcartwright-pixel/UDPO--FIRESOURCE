@@ -137,3 +137,24 @@ test('Half gallon label readers load (test copy only): both half gallon fillers 
   assert.equal((await d.collection('productionLines').doc('ut_prod_gallon_filler').get()).exists, false, 'only the half gallon fillers');
   assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.HALF_READERS_ID], { skipped: true });
 });
+
+// Joe 10/18: Month Recap showed 0 on the live app; the history and OTR runs had only been loaded on the test copy.
+test('Over the Road history load (live waits for Joe): fills the history and OTR runs once, keeps a typed day count', async () => {
+  await clear();
+  const d = db(), data = { figures: [{ year: 2025, month: 8, key: 'gallons_sold', value: 2400000 }],
+    daily: [{ date: '2025-08-04', destination: 'SAL', runs: 3 }, { date: '2025-08-05', destination: 'Jersey', runs: 2 }], comments: [] };
+  await d.collection('otrDaily').doc('2025-08-05__Jersey').set({ date: '2025-08-05', destination: 'Jersey', runs: 4, source: 'MANUAL' });
+  assert.match((await DL.runDataLoads(d, { now: tick, data }))[DL.OTR_HISTORY_ID].skipped, /test copy only/, 'nothing on the live app yet');
+  assert.equal((await d.collection('dataLoads').doc(DL.OTR_HISTORY_ID).get()).exists, false, 'no marker on the live app');
+  assert.equal((await d.collection('otrDaily').doc('2025-08-04__SAL').get()).exists, false);
+  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.OTR_HISTORY_ID], { marked: true }, 'the test copy already has it');
+  assert.equal((await d.collection('otrDaily').doc('2025-08-04__SAL').get()).exists, false, 'nothing written on the test copy');
+  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.OTR_HISTORY_ID], { skipped: true });
+  // The load the live app runs once Joe OKs it.
+  const r = await DL.loadOtrHistory(d, { now: tick, data });
+  assert.deepEqual(r.history, { months: 1, days: 1, comments: 0 });
+  assert.ok(r.routes.set > 0, 'his OTR runs ticked');
+  assert.equal((await d.collection('otrDaily').doc('2025-08-04__SAL').get()).data().runs, 3);
+  assert.equal((await d.collection('otrDaily').doc('2025-08-04__SAL').get()).data().testEdited, false);
+  assert.equal((await d.collection('otrDaily').doc('2025-08-05__Jersey').get()).data().runs, 4, 'a typed count stays');
+});

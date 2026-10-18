@@ -71,7 +71,9 @@
     const commas = (v) => v == null || v === '' || !Number.isFinite(Number(v)) ? '' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
     // Joe 10/10: the run is the destination; the setup only says who takes it (a carrier picks it up, or United Dairy delivers).
-    const DELIVERED_BY = ['Carrier Pickup', 'United Dairy Delivered'];
+    // Joe 10/18: a third kind, Transfer (a load to another branch or plant); Month Recap groups its trips by these.
+    const DELIVERED_BY = ['Carrier Pickup', 'United Dairy Delivered', 'Transfer'];
+    const RECAP_GROUPS = [['United Dairy Delivered', 'Uniontown Delivered'], ['Transfer', 'Transfers'], ['Carrier Pickup', 'Carriers']];
     // Joe 10/13: By Date columns of his own (an outside carrier such as Darden) come after the workbook's, in the order added.
     const DESTS = () => CORE.DESTINATIONS.concat(extraCols.map(c => c.name).filter(n => CORE.DESTINATIONS.indexOf(n) < 0));
     function otrRoutes() {
@@ -112,7 +114,7 @@
       const list = otrRoutes(), live = liveCounts(list), merged = O.otrMergeDaily_(daily, live), today = L.operatingDay(new Date());
       const todayCount = live[today] || { date: today, total: 0, byDestination: {}, runs: [] };
       const byRun = {}, byDest = {};
-      list.forEach(r => { byRun[r.route + '|' + r.run] = r.deliveredBy; if (r.include && r.deliveredBy) (byDest[r.destination] = byDest[r.destination] || new Set()).add(r.deliveredBy); });
+      list.forEach(r => { byRun[r.route + '|' + r.run] = r.deliveredBy; if (r.include && r.deliveredBy) { const c = byDest[r.destination] = byDest[r.destination] || {}; c[r.deliveredBy] = (c[r.deliveredBy] || 0) + 1; } });
       const edit = canManage();
       { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Counts from the dispatch sheet'; }
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
@@ -185,17 +187,25 @@
         bar.innerHTML = '<button type="button" class="primary" id="print-sheet-otr">Print</button><span class="hint">Counted from By Date, nothing to type. Prints on one landscape page.</span><span class="spacer"></span>' + yearPick([0, -1, -2]);
         const pair = (p, i) => (i ? '<td class="gap"></td>' : '') + '<td class="' + (p[0] === 0 ? 'z' : '') + '">' + (p[0] == null ? '' : p[0]) + '</td><td class="ly">' + (p[1] == null ? '' : p[1]) + '</td>';
         const head = '<tr><th class="l" rowspan="2">Trip</th>' + r.months.map((m, i) => (i ? '<th class="gap" rowspan="2"></th>' : '') + '<th colspan="2">' + m.label + '</th>').join('') + '</tr><tr class="sub">' + r.months.map(m => '<th>' + m.y + '</th><th>' + m.py + '</th>').join('') + '</tr>';
-        const body = r.rows.map(d => '<tr><td class="l">' + escapeHtml(d.name) + (byDest[d.name] ? '<small class="otr-by">' + escapeHtml([...byDest[d.name]].join(' / ')) + '</small>' : '') + '</td>' + d.cells.map(pair).join('') + '</tr>').join('') +
+        // Joe 10/18: three groups, each under its own heading and line: Uniontown Delivered, Transfers, Carriers. A trip goes in the
+        // group most of its ticked runs are set to in OTR Routes Setup; a trip with none ticked stays with Uniontown Delivered.
+        const groupOf = (name) => { const c = byDest[name] || {}; let best = RECAP_GROUPS[0][0]; RECAP_GROUPS.forEach(g => { if ((c[g[0]] || 0) > (c[best] || 0)) best = g[0]; }); return best; };
+        const span = 1 + r.months.length * 3 - 1;
+        const body = RECAP_GROUPS.map(g => {
+          const rows = r.rows.filter(d => groupOf(d.name) === g[0]);
+          return '<tr class="grp"><td class="l" colspan="' + span + '">' + g[1] + '</td></tr>' + (rows.length ? rows.map(d => '<tr><td class="l">' + escapeHtml(d.name) + '</td>' + d.cells.map(pair).join('') + '</tr>').join('')
+            : '<tr><td class="l empty" colspan="' + span + '">No trips set to ' + escapeHtml(g[0]) + ' in OTR Routes Setup yet.</td></tr>');
+        }).join('') +
           '<tr class="tot"><td class="l">Totals</td>' + r.totals.map(pair).join('') + '</tr>' +
-          '<tr class="tot"><td class="l">Difference</td>' + r.diff.map((v, i) => (i ? '<td class="gap"></td>' : '') + '<td colspan="2" class="' + (v < 0 ? 'neg' : v > 0 ? 'pos' : '') + '">' + (v == null ? '' : v) + '</td>').join('') + '</tr>' +
-          r.extra.map(x => '<tr><td class="l">' + x.name + '</td>' + x.cells.map((p, i) => (i ? '<td class="gap"></td>' : '') + '<td>' + n0(p[0]) + '</td><td class="ly">' + n0(p[1]) + '</td>').join('') + '</tr>').join('');
+          '<tr class="tot"><td class="l">Difference</td>' + r.diff.map((v, i) => (i ? '<td class="gap"></td>' : '') + '<td colspan="2" class="' + (v < 0 ? 'neg' : v > 0 ? 'pos' : '') + '">' + (v == null ? '' : v) + '</td>').join('') + '</tr>';
         const thru = r.ytd.through ? 'Jan to ' + M[r.ytd.through - 1] + ' ' + year : 'No months yet in ' + year;
         sheet.innerHTML = '<div id="otr-sheet-print">' + cardRow([
           card('Trips ' + thru, n0(r.ytd.current), 'vs ' + n0(r.ytd.prior) + ' in ' + (year - 1), r.ytd.through ? chg(r.ytd.current - r.ytd.prior, n0, false) : null),
           card(r.latest ? r.latest.label : 'Latest month', r.latest ? n0(r.latest.current) : '–', r.latest ? 'vs ' + n0(r.latest.prior) + ' in ' + (year - 1) : '', r.latest ? chg(r.latest.current - r.latest.prior, n0, false) : null),
           card('Busiest destination ' + year, r.busiest[0] || '–', r.busiest.length > 1 ? 'then ' + r.busiest.slice(1).join(', ') : '')]) +
           '<div id="otr-report"><h2 class="otr-print-title">Over the Road Runs · Month Recap · ' + year + ' vs ' + (year - 1) + '</h2><table class="otr-sheet otr-mrecap"><colgroup><col style="width:150px">' + r.months.map((m, i) => (i ? '<col style="width:8px">' : '') + '<col><col>').join('') + '</colgroup><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></div>';
-        foot.textContent = 'Each month: ' + year + ' on the left, ' + (year - 1) + ' in gray on the right. Fuel Used, Miles Driven and Tank fills come from Recap.';
+        // Joe 10/18: no Fuel Used, Miles Driven and Tank fills rows and no note about them at the bottom (Recap has them).
+        foot.textContent = '';
         wireYear(); wirePrint();
       } else if (view === 'cpg') {
         // The Cost Per Gallon tab, from the Recap numbers, with the workbook's own signs (a saving shows positive).

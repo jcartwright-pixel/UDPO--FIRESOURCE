@@ -120,7 +120,8 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
 
 // Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
 // dataLoads/<id> marker, so it runs one time; it deletes nothing.
-exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+// The Over the Road history is about 19,000 day counts, so a run gets 5 minutes and room for the file.
+exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
   await require('./src/data-loads').runDataLoads(db);
 });
 
