@@ -1,6 +1,6 @@
 // Plant Maintenance (Joe 10/12: like the garage work orders, but for the plant's machinery): what Maintenance Center, Machinery,
 // Work Orders and PM Schedule read. The rules are pmaint-rules.js (shared with the server).
-import { collection, query, where, onSnapshot } from './firebase.js';
+import { collection, doc, query, where, onSnapshot } from './firebase.js';
 
 const R = () => window.UDPlantMaint, L = () => window.UDLogic, U = () => window.UDPlant;
 const HISTORY_DAYS = 365;
@@ -12,13 +12,42 @@ export const todayKey = (ms) => new Date(ms || Date.now()).toLocaleDateString('e
 // Joe 10/12: breakdowns are recorded on Shift Notes (fixed on the spot), requests are Shift Notes' Maintenance Requests; both are
 // read from the plant's shift log for the last year (needs plant-rules.js). A machine is DOWN while a breakdown on it is still down
 // or an open work order says its line is down.
+// Joe 10/18: opts.openOrders (Maintenance Center, PM Schedule) reads only the open work orders and, for each request still
+// waiting, its own work order (plantmaint.js woIdFor: SN_ and the entry), not every work order ever made; what those screens
+// show is the same. Machinery and Work Orders show the history, so they read them all.
 export function watchMaint(db, facilityId, cb, fail, opts) {
   const data = { setup: [], saved: [], workOrders: [], tasks: [], journal: [], read: { setup: false, machines: false, workOrders: false, tasks: false, journal: false } };
+  const openOnly = !!(opts && opts.openOrders), openWos = [], reqWos = {}, reqStops = {};
+  const woOf = (d) => Object.assign({}, d.data(), { id: d.id });
+  const normal = (w) => Object.assign(w, { status: String(w.status || 'NEW').toUpperCase() });
+  const mine = (d) => (String(d.facilityId || '').trim() || 'fac_uniontown') === facilityId;
+  const mergeWos = () => {
+    const byId = {};
+    openWos.concat(Object.values(reqWos).filter(Boolean)).forEach(w => { byId[w.id] = w; });
+    data.workOrders = Object.values(byId);
+  };
+  // The work orders of the requests still waiting (a resolved request is not listed as waiting, so its work order is not needed).
+  const watchRequests = (log) => {
+    const want = {};
+    log.forEach(r => { if (String(r.type || '').toUpperCase() === 'MAINTENANCE REQUEST' && r.status !== 'RESOLVED' && /^[A-Za-z0-9_-]+$/.test(r.entryId || '')) want[r.entryId] = true; });
+    Object.keys(reqStops).forEach(id => { if (!want[id]) { reqStops[id](); delete reqStops[id]; if (reqWos[id]) { delete reqWos[id]; mergeWos(); } } });
+    Object.keys(want).forEach(id => {
+      if (reqStops[id]) return;
+      reqStops[id] = onSnapshot(doc(db, 'plantWorkOrders', ('SN_' + id).slice(0, 200)), d => {
+        // As the whole list gives it: this plant's (facilityId the same), status NEW when blank.
+        const w = d.exists() ? woOf(d) : null;
+        reqWos[id] = w && w.facilityId === facilityId && mine(w) ? normal(w) : null;
+        mergeWos(); send();
+      }, fail);
+    });
+  };
   const send = () => {
     const all = R().machines(data.setup, data.saved, facilityId, true);
     const today = todayKey();
-    const open = data.workOrders.filter(w => R().isOpen(w)), now = Date.now();
+    const now = Date.now();
     const log = U() ? U().shiftLog(data.journal, now, 24 * HISTORY_DAYS) : [];
+    if (openOnly) watchRequests(log);
+    const open = data.workOrders.filter(w => R().isOpen(w));
     const kind = (r) => String(r.type || '').toUpperCase();
     const tie = (r) => { const m = R().findMachine(all, r.equipment); return Object.assign({}, r, { machineId: m ? m.id : '', machine: m ? m.name : r.equipment, down: U().downMinutes(r, now), today: U().downToday(r, now), recordedToday: U().opDayAt(Date.parse(r.recordedAt) || now) === U().opDayAt(now) }); };
     const breakdowns = log.filter(r => kind(r) === 'BREAKDOWN').map(tie).map(r => Object.assign(r, { stillDown: !!r.readingTime && !r.upAt && r.status !== 'RESOLVED' }));
@@ -38,12 +67,17 @@ export function watchMaint(db, facilityId, cb, fail, opts) {
     });
     cb(Object.assign({}, data, { all, machines: all.filter(m => m.status !== 'RETIRED'), tasks, today, breakdowns, requests }));
   };
-  const mine = (d) => (String(d.facilityId || '').trim() || 'fac_uniontown') === facilityId;
   const subs = [
     onSnapshot(query(collection(db, 'plantSetup'), where('type', '==', 'PRODUCTION_AREA')), s => { data.setup = s.docs.map(d => d.data()); data.read.setup = true; send(); }, fail),
     onSnapshot(query(collection(db, 'plantMachines'), where('facilityId', '==', facilityId)), s => { data.saved = s.docs.map(d => Object.assign({ id: d.id }, d.data())); data.read.machines = true; send(); }, fail),
-    onSnapshot(query(collection(db, 'plantWorkOrders'), where('facilityId', '==', facilityId)), s => {
-      data.workOrders = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })).filter(mine).map(w => Object.assign(w, { status: String(w.status || 'NEW').toUpperCase() }));
+    // Open: every writer sets status (NEW, WORKING, PARTS, DONE), so status in the open list is every open one. All plants'
+    // open ones are few, so the plant is picked here, as the facilityId read does.
+    openOnly ? onSnapshot(query(collection(db, 'plantWorkOrders'), where('status', 'in', R().OPEN)), s => {
+      openWos.length = 0;
+      s.docs.map(woOf).filter(w => w.facilityId === facilityId && mine(w)).forEach(w => openWos.push(normal(w)));
+      mergeWos(); data.read.workOrders = true; send();
+    }, fail) : onSnapshot(query(collection(db, 'plantWorkOrders'), where('facilityId', '==', facilityId)), s => {
+      data.workOrders = s.docs.map(woOf).filter(mine).map(normal);
       data.read.workOrders = true; send();
     }, fail),
     onSnapshot(query(collection(db, 'plantPmTasks'), where('facilityId', '==', facilityId)), s => { data.tasks = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); data.read.tasks = true; send(); }, fail)
@@ -53,7 +87,7 @@ export function watchMaint(db, facilityId, cb, fail, opts) {
     data.journal = s.docs.map(d => d.data()).filter(mine); data.read.journal = true; send();
   }, fail));
   const tick = setInterval(send, 60000);
-  return () => { clearInterval(tick); subs.forEach(u => u()); };
+  return () => { clearInterval(tick); subs.forEach(u => u()); Object.values(reqStops).forEach(u => u()); };
 }
 
 // The plants this person may see (Administration > People), else Uniontown.

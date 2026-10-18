@@ -501,26 +501,36 @@
     // Check-In Station (signed in with United Dairy) listens to the loads and pickups; a driver's phone (code only, no
     // account to listen with) reads again every 30 seconds while the list is open. The 2-minute read stays as the fallback,
     // and with no signal the last list is shown.
-    let boardWatch = null, boardSoon = null;
+    // Joe 10/18: it listens to just what phone.js op board reads: the operating day's loads (New York, the day turns at 6 a.m.;
+    // that week and the next) and its pickups (that day to 3 days on), again when the day turns. A change to anything else
+    // (last week's loads, later pickups) never changed the board, so it is not read.
+    let boardWatch = null, boardSoon = null, boardDay = '';
+    const opDay = () => {
+      const p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+      return new Date(Date.UTC(+p.year, +p.month - 1, +p.day - (Number(p.hour) >= 6 ? 0 : 1), 12));
+    };
     async function watchBoard() {
-      if (boardWatch || !room) return;
+      if (!room) return;
+      const day = opDay(), key = (n) => new Date(day.getTime() + n * 86400000).toISOString().slice(0, 10);
+      if (boardWatch && boardDay === key(0)) return;
+      if (boardWatch) boardWatch.forEach(u => u());
+      boardDay = key(0); boardWatch = [];
       const { db } = await start();
       const { collection, query, where, onSnapshot } = await import('./js/firebase.js');
-      const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      const day = new Date(Date.now() - 6 * 3600000), sun = new Date(day.getFullYear(), day.getMonth(), day.getDate() - day.getDay());
-      const weeks = [-7, 0, 7].map(n => iso(new Date(sun.getFullYear(), sun.getMonth(), sun.getDate() + n)));
+      const weeks = [0, 7].map(n => key(n - day.getUTCDay()));
       let first = 2;
       const changed = () => {
         if (first > 0) { first--; return; }
         clearTimeout(boardSoon);
         boardSoon = setTimeout(() => { if (!document.getElementById('step-board').hidden) readBoard(); else boardAt = 0; }, 800);
       };
-      // Review item 73 (Joe 10/13): only pickups from yesterday on (the board is today's loads), not every pickup ever made.
-      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(query(collection(db, 'pickups'), where('date', '>=', iso(new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1)))), changed, () => {})];
+      // Review item 73 (Joe 10/13): only the board's pickups, not every pickup ever made.
+      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [0, 1, 2, 3].map(key))), changed, () => {})];
     }
     function openBoard() {
       step('step-board'); readBoard(); watchBoard().catch(() => {}); clearInterval(boardTimer);
-      boardTimer = setInterval(() => { if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > (room ? 120000 : 30000)) readBoard(); }, room ? 30000 : 10000);
+      boardTimer = setInterval(() => { watchBoard().catch(() => {}); if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > (room ? 120000 : 30000)) readBoard(); }, room ? 30000 : 10000);
     }
     document.getElementById('to-board').addEventListener('click', () => { want = 'board'; openBoard(); });
     document.getElementById('board-refresh').addEventListener('click', readBoard);

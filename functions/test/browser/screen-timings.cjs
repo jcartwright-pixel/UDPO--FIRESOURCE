@@ -69,6 +69,22 @@ async function seed() {
     for (let k = 0; k < 6; k++) await put(d.collection('plantJournal').doc('PLANT_SCHEDULE_grow_' + i + '_' + k), { recordId: 'SCHED-g' + i + k, type: 'PLANT_SCHEDULE', date, status: 'SCHEDULED', payload: { pickupTime: '07:00', scheduleType: 'ROUTE' }, recordedAt: date + 'T08:00:00Z' });
     for (let k = 0; k < 20; k++) await put(d.collection('plantJournal').doc('SHIFT_REPORT_grow_' + i + '_' + k), { recordId: 'SHIFT-g' + i + k, type: 'SHIFT_REPORT', date, area: 'HANDOFF', recordedAt: date + 'T09:00:00Z', payload: { section: 'HANDOFF', values: { Entry: 'Made-up note' } } });
   }
+  // Joe 10/18 (data checkup): a year of archived dispatch weeks (the copy keeps DISPATCH WEEK HISTORY in runs), plant check-ins
+  // and plant work orders, the other collections that grow with history.
+  const real = (await d.collection('runs').where('weekStart', '==', '2026-10-04').get()).docs.map(x => x.data());
+  for (let w = 2; w <= 53 && real.length; w++) {
+    const target = L.addDays(L.weekStart(today), -7 * w), shift = L.daysBetween('2026-10-04', target);
+    for (let i = 0; i < 80; i++) {
+      const run = JSON.parse(JSON.stringify(real[i % real.length]).replace(/"(\d{4}-\d{2}-\d{2})/g, (m, k) => '"' + L.addDays(k, shift)));
+      Object.assign(run, { weekStart: target, route: String(1000 + i), runId: 'run_hist' + i, routeId: 'rte_real' + i, sourceTab: 'DISPATCH WEEK HISTORY' });
+      await put(d.collection('runs').doc(target + '__run_hist' + i), run);
+    }
+  }
+  for (let i = 0; i < 365; i++) {
+    const date = L.addDays(today, -i);
+    for (let k = 0; k < 30; k++) await put(d.collection('plantEvents').doc('grow_ev_' + i + '_' + k), { recordId: 'EV-g' + i + k, type: k % 2 ? 'DVIR' : 'ROUTE_CHECKIN', date, route: String(1000 + k), driverId: '', recordedAt: date + 'T10:00:00Z' });
+    for (let k = 0; k < 3; k++) await put(d.collection('plantWorkOrders').doc('grow_pwo_' + i + '_' + k), { facilityId: 'fac_uniontown', status: 'DONE', title: 'Made-up finished plant job', createdAt: date + 'T08:00:00Z', completedAt: date + 'T11:00:00Z' });
+  }
   await batch.commit();
 }
 

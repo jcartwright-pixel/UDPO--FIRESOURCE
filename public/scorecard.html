@@ -128,15 +128,27 @@
       return S.scMonthRange_(year, month);
     }
     // Reads only the period's GPS, again when the period changes.
+    // Joe 10/18: the dispatch days and plant check-ins too (they were every week ever kept). A run's GPS is the day it leaves,
+    // 2 days before to 1 day after its delivery day, and an alert just after midnight can go back a day, so the days from 2
+    // before the period to 2 after it are read: the scores come out the same.
     function watchGps() {
       if (!dbRef || mode === 'settings') return;
       const p = period(), key = p.start + '|' + p.end;
       if (key === gpsKey) return;
       gpsKey = key;
       if (gpsSub) gpsSub.forEach(u => u());
-      gpsDays = []; gpsAlerts = [];
+      gpsDays = []; gpsAlerts = []; runs = []; events = [];
       const range = (name) => query(collection(dbRef, name), where('date', '>=', p.start), where('date', '<=', p.end));
+      const from = S.scAddDays_(p.start, -2), to = S.scAddDays_(p.end, 2), fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.');
+      // The period's loads and check-ins show together, once both have answered, so a half-read board never shows.
+      const got = { runs: null, events: null }, put = (k) => s => {
+        got[k] = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        if (!got.runs || !got.events || gpsKey !== key) return;
+        runs = got.runs; events = got.events; render();
+      };
       gpsSub = [
+        onSnapshot(query(collection(dbRef, 'runs'), where('weekStart', '>=', L.weekStart(from)), where('weekStart', '<=', to)), put('runs'), fail('the dispatch runs')),
+        onSnapshot(query(collection(dbRef, 'plantEvents'), where('date', '>=', from), where('date', '<=', to)), put('events'), fail('the plant check-ins')),
         onSnapshot(range('gpsDays'), s => { gpsDays = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the GPS miles (' + e.message + '). Reload the page.')),
         // No alerts yet (or none readable) is the plain "No GPS alerts received yet" line, not an error.
         onSnapshot(range('gpsAlerts'), s => { gpsAlerts = s.docs.map(d => d.data()); render(); }, () => { gpsAlerts = []; render(); })
@@ -445,10 +457,8 @@
       dbRef = db;
       watchLists(user, render);
       onSnapshot(query(collection(db, 'gpsAlerts'), limit(1)), s => { alertsEver = !s.empty; render(); }, () => { alertsEver = false; render(); });
-      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings', driverIncidents: 'the accidents and complaints', scorecardExcuses: 'the excused misses' };
+      const NAMES = { drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings', driverIncidents: 'the accidents and complaints', scorecardExcuses: 'the excused misses' };
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
-      watch('runs', v => { runs = v; });
-      watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
       watch('scorecardRatings', v => { ratings = v; });

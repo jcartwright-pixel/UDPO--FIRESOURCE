@@ -183,12 +183,22 @@
       watchLists(user, render);
       const NAMES = { runs: 'the dispatch runs', gpsTrucks: 'the GPS positions', gpsDays: 'the GPS miles', gpsAlerts: 'the Verizon alerts', routes: 'Route Master' };
       const watch = (name, set, q) => onSnapshot(q || collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + NAMES[name] + ' (' + e.message + '). Check the network and reload the page.'));
-      watch('runs', v => { runs = v; });
       watch('gpsTrucks', v => { gps = v; });
-      // Today's and yesterday's miles and yard times (the collection keeps every day); yesterday is for sleepers still out.
-      watch('gpsDays', v => { days = v; }, query(collection(db, 'gpsDays'), where('date', 'in', [L.addDays(nyDate(new Date()), -1), nyDate(new Date())])));
       watch('routes', v => { routeSleeper = {}; v.forEach(r => { if (r.sleeper) routeSleeper[r.id] = true; }); });
-      watch('gpsAlerts', v => { alerts = v; }, query(collection(db, 'gpsAlerts'), where('date', '==', nyDate(new Date()))));
+      // Joe 10/18: only the days this screen uses, read again when the day changes (it was every run ever). workingToday
+      // looks at loads from 3 days ago to tomorrow, and a load delivers 0 to 6 days after it loads, so those load dates' weeks.
+      let watchedDay = '', stops = [];
+      const watchDay = () => {
+        const today = nyDate(new Date());
+        if (today === watchedDay) return;
+        watchedDay = today; stops.forEach(f => f());
+        const weeks = [...new Set([-3, -2, -1, 0, 1].flatMap(n => L.weeksForLoadDate(L.addDays(today, n))))];
+        stops = [watch('runs', v => { runs = v; }, query(collection(db, 'runs'), where('weekStart', 'in', weeks))),
+          // Today's and yesterday's miles and yard times (the collection keeps every day); yesterday is for sleepers still out.
+          watch('gpsDays', v => { days = v; }, query(collection(db, 'gpsDays'), where('date', 'in', [L.addDays(today, -1), today]))),
+          watch('gpsAlerts', v => { alerts = v; }, query(collection(db, 'gpsAlerts'), where('date', '==', today)))];
+      };
+      watchDay(); setInterval(watchDay, 60000);
     });
   </script>
 </body>
