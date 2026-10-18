@@ -163,10 +163,6 @@
   /* Yard Checks on a laptop: tighter gaps keep Refresh on the top line (it only just fitted, and wrapped on wider fonts). */
   body.yard-page .head { column-gap: 8px; }
   body.yard-page .head .hstats { gap: 4px; }
-  /* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14): under 1500 the counts go to the line below the
-     buttons, so the tabs and Refresh stay on the top line whatever the font. */
-  body.yard-page .head .hstats { order: 5; }
-  body.yard-page .head .badge-test { order: 6; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
@@ -1176,6 +1172,12 @@
    for 11-13px print) comes down and the plant headers keep one line on a 1366 laptop. */
 .plant-page .eyebrow, .plant-page .head .title .eyebrow { letter-spacing: .03em; }
 .plant-page .hstats span { letter-spacing: .02em; }
+/* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14), and on 1920 once the GPS Trailer Temps tab came
+   (Joe 10/18): up to 2000 wide the counts go to the line below the buttons, so the tabs and Refresh stay on the top line. */
+@media (max-width: 2000px) {
+  body.yard-page .head .hstats { order: 5; }
+  body.yard-page .head .badge-test { order: 6; }
+}
 @media (max-width: 1500px) {
   /* Yard Checks on a laptop: the eyebrow takes two short lines so Refresh stays on the top line. */
   body.yard-page .head .title { flex: 0 1 300px; min-width: 0; }
