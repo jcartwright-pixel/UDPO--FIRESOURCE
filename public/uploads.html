@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Upload Center · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/uploads.css">
+  <script src="js/logic.js"></script>
+  <script src="js/upload-rules.js"></script>
+</head>
+<!-- Joe 10/18: bring all of a new plant's data in (Charleston, Martins Ferry) from one workbook; each person fills their own tabs.
+     Every row is checked (New, Changed, Same, Problem, Taken off) before anything is saved. -->
+<body class="fill uploads-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Upload Center</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="up-head">
+      <div class="up-title"><h1 id="title">Upload Center</h1><p id="sub">Bring in a new plant's data from one workbook. Every row is checked before anything is saved.</p></div>
+      <div class="up-actions" id="check-actions" hidden>
+        <button type="button" class="up-btn" id="cancel">Cancel</button>
+        <button type="button" class="up-btn" id="problems">Download Problem List</button>
+        <button type="button" class="up-btn primary" id="save" disabled>Save</button>
+      </div>
+      <div class="up-plants" id="plants" role="group" aria-label="Plant"></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="notice ok" id="saved" hidden></div>
+
+    <div class="up-body" id="home">
+      <section class="up-card up-book">
+        <h2 id="book-name">Setup Workbook</h2>
+        <p>One Excel file with a tab for routes, drivers, the plant, people and email. Each person fills their own tabs. Fill what you have: an empty tab is skipped and keeps what was saved.</p>
+        <p class="up-note">No trucks or trailers: they come from the United Dairy Fleet List and are assigned in the app, like at Uniontown.</p>
+        <span class="up-pill" id="last">Nothing saved yet</span>
+        <a class="up-btn" id="download" href="templates/Plant-Setup-Workbook.xlsx" download="Setup Workbook.xlsx">Download Workbook</a>
+        <button type="button" class="up-btn primary" id="upload">Upload Workbook</button>
+        <input type="file" id="upload-file" accept=".xlsx,.xls" hidden>
+        <p class="up-note" id="where"></p>
+      </section>
+      <section class="up-card up-tabs">
+        <table class="up-table">
+          <thead><tr><th>Tab</th><th>Who fills it</th><th>Saved rows</th><th>Last saved</th></tr></thead>
+          <tbody id="tabs"><tr><td colspan="4">Loading…</td></tr></tbody>
+        </table>
+      </section>
+    </div>
+
+    <div class="up-body up-check" id="check" hidden>
+      <div class="up-bar"><span id="check-where"></span><label class="up-filter">Show <select id="filter" aria-label="Show"></select></label></div>
+      <div class="up-tiles" id="tiles"></div>
+      <div class="up-scroll">
+        <table class="up-table up-rows">
+          <thead><tr><th>Result</th><th>Tab</th><th>Row</th><th>What</th><th>What happens</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="up-note" id="check-foot">Fix the red rows in the file and upload it again. Nothing is saved until you press Save.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, showError, callServer, serverText, dateTimeText } from './js/app.js';
+
+    const U = window.UDUpload;
+    const $ = (id) => document.getElementById(id);
+    // The Excel reader the Product Sheet and Over the Road use.
+    const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
+    const STATUS = { PROBLEM: ['Problem', 'bad'], CHANGED: ['Changed', 'chg'], NEW: ['New', 'new'], OFF: ['Taken off', 'off'], SAME: ['Same as now', 'same'] };
+    const ORDER = ['PROBLEM', 'CHANGED', 'NEW', 'OFF', 'SAME'];
+    let st = null, plant = '', file = null, result = null, saving = false;
+    try { plant = sessionStorage.getItem('udUploadPlant') || ''; } catch (e) { /* no storage */ }
+    const plantName = () => ((st && st.plants || []).find(p => p.id === plant) || { name: '' }).name;
+    const stamp = (t) => t ? dateTimeText(t) : '';
+
+    function drawPlants() {
+      $('plants').innerHTML = (st.plants || []).map(p => '<button type="button" data-plant="' + p.id + '" class="' + (p.id === plant ? 'on' : '') + '" aria-pressed="' + (p.id === plant) + '">' + escapeHtml(p.name) + '</button>').join('');
+      $('plants').hidden = !!file;
+    }
+    function drawHome() {
+      const name = plantName();
+      $('title').textContent = 'Upload Center';
+      $('sub').textContent = 'Bring in a new plant\'s data from one workbook. Every row is checked before anything is saved.';
+      $('book-name').textContent = name + ' Setup Workbook';
+      $('download').setAttribute('download', name + ' Setup Workbook.xlsx');
+      const saves = Object.values(st.tabs || {}).filter(t => t.savedAt).sort((a, b) => a.savedAt < b.savedAt ? 1 : -1);
+      $('last').textContent = saves.length ? 'Last saved ' + stamp(saves[0].savedAt) + (saves[0].savedBy ? ' by ' + saves[0].savedBy : '') : 'Nothing saved yet';
+      $('last').className = 'up-pill' + (saves.length ? ' ok' : '');
+      $('where').textContent = st.live ? (st.savingOn ? 'Saves for ' + name + ' are on for the live app.' : 'Live app: an upload is checked, but saving waits for Joe\'s OK for this load.') :
+        'Practice version: saves are kept for ' + name + ' only and do not show on Uniontown\'s screens.';
+      let part = '';
+      $('tabs').innerHTML = U.SPEC.map(t => {
+        const s = (st.tabs || {})[t.key];
+        const group = t.part !== part ? '<tr class="up-group"><td colspan="4">' + escapeHtml(t.part) + '</td></tr>' : '';
+        part = t.part;
+        return group + '<tr><td><b>' + escapeHtml(t.tab) + '</b></td><td>' + escapeHtml(t.who) + '</td><td>' + (s ? s.count : '<span class="up-pill">Not loaded</span>') + '</td><td>' + escapeHtml(s ? stamp(s.savedAt) : '') + '</td></tr>';
+      }).join('');
+    }
+    function drawCheck() {
+      const r = result, t = r.totals, name = plantName();
+      $('title').textContent = 'Check ' + file.name + ' before saving';
+      $('sub').textContent = name + ' · ' + Object.keys(r.tabs).length + ' tab' + (Object.keys(r.tabs).length === 1 ? '' : 's') + ' filled' + (r.extra.length ? ' · not read: ' + r.extra.join(', ') : '');
+      $('check-where').textContent = 'Plant: ' + name + ' · Saves to: ' + (st.live ? 'the live app' : 'the practice version') + ' · An empty tab keeps what is saved';
+      $('tiles').innerHTML = ORDER.map(s => '<div class="up-tile ' + STATUS[s][1] + '"><b>' + t[s] + '</b>' + STATUS[s][0] + '</div>').join('');
+      const nothing = !Object.keys(r.tabs).length;
+      const blocked = st.live && !st.savingOn;
+      $('save').disabled = !r.ok || saving || blocked;
+      $('save').textContent = saving ? 'Saving…' : blocked ? 'Saving waits for Joe\'s OK' : nothing ? 'Nothing to save' : r.ok ? 'Save ' + Object.keys(r.tabs).length + ' Tab' + (Object.keys(r.tabs).length === 1 ? '' : 's') : 'Fix ' + t.PROBLEM + ' Problem' + (t.PROBLEM === 1 ? '' : 's') + ' First';
+      $('problems').hidden = !t.PROBLEM;
+      const want = $('filter').value || 'MAIN';
+      const all = [];
+      r.tabProblems.forEach(p => all.push({ status: 'PROBLEM', tab: p.tab, n: '', label: 'Whole tab', why: p.message }));
+      Object.values(r.tabs).forEach(tb => {
+        tb.rows.concat(tb.off).forEach(x => all.push({ status: x.status, tab: tb.tab, key: tb.key, n: x.n || '', label: x.label,
+          why: x.status === 'PROBLEM' ? x.problems.join(' · ') : x.status === 'CHANGED' ? x.changes.map(c => escapeHtml(c.col) + ' <s>' + escapeHtml(c.from || 'blank') + '</s> ' + escapeHtml(c.to || 'blank')).join(' · ') :
+            x.status === 'OFF' ? 'Not in the file: taken off the ' + tb.tab + ' list' : x.status === 'NEW' ? 'Added' : 'No change', html: x.status === 'CHANGED' }));
+        if (tb.unknown.length) all.push({ status: 'SAME', tab: tb.tab, n: '1', label: 'Headings', why: 'Not read: ' + tb.unknown.join(', ') });
+      });
+      const shown = all.filter(x => want === 'ALL' ? true : want === 'MAIN' ? x.status !== 'SAME' : x.tab === want).sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+      $('rows').innerHTML = shown.map(x => '<tr class="' + (x.status === 'PROBLEM' ? 'bad' : '') + '"><td><span class="up-res ' + STATUS[x.status][1] + '">' + STATUS[x.status][0] + '</span></td><td>' + escapeHtml(x.tab) + '</td><td>' + escapeHtml(String(x.n)) + '</td><td><b>' + escapeHtml(x.label) + '</b></td><td class="why">' + (x.html ? x.why : escapeHtml(x.why)) + '</td></tr>').join('') ||
+        '<tr><td colspan="5">' + (nothing ? 'Every tab in this file is empty. Fill the tabs you have and upload it again.' : 'Nothing new or changed. Pick Everything to see every row.') + '</td></tr>';
+    }
+    function drawFilter() {
+      const tabs = Object.values(result.tabs).map(t => t.tab);
+      $('filter').innerHTML = '<option value="MAIN">Problems and changes</option><option value="ALL">Everything</option>' + tabs.map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
+    }
+    function draw() {
+      if (!st) return;
+      drawPlants();
+      $('home').hidden = !!file; $('check').hidden = !file; $('check-actions').hidden = !file;
+      if (file) drawCheck(); else drawHome();
+    }
+
+    async function load() {
+      try { st = await callServer('admin', { op: 'uploadStatus', plant }); plant = st.plant; showError(''); }
+      catch (e) { showError(serverText(e, 'the Upload Center')); }
+      draw();
+    }
+    $('plants').addEventListener('click', e => {
+      const b = e.target.closest('button[data-plant]');
+      if (!b || b.dataset.plant === plant) return;
+      plant = b.dataset.plant;
+      try { sessionStorage.setItem('udUploadPlant', plant); } catch (err) { /* no storage */ }
+      $('saved').hidden = true; load();
+    });
+    $('upload').addEventListener('click', () => { const f = $('upload-file'); f.value = ''; f.click(); });
+    $('upload-file').addEventListener('change', async e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      $('saved').hidden = true;
+      try {
+        const X = await loadXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
+        const sheets = wb.SheetNames.map(name => ({ name, cells: X.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false }).map(r => r.map(c => String(c))) }));
+        file = { name: f.name, sheets };
+        result = U.check(U.readBook(sheets), st.saved || {});
+        drawFilter(); showError('');
+      } catch (err) { file = null; result = null; showError('That file could not be read (' + (err.message || err) + '). Upload the Setup Workbook as an Excel file.'); }
+      draw();
+    });
+    $('filter').addEventListener('change', drawCheck);
+    $('cancel').addEventListener('click', () => { file = null; result = null; showError(''); draw(); });
+    $('problems').addEventListener('click', () => {
+      const lines = [['Tab', 'Row', 'What', 'Problem']];
+      result.tabProblems.forEach(p => lines.push([p.tab, '', 'Whole tab', p.message]));
+      Object.values(result.tabs).forEach(t => t.rows.filter(x => x.status === 'PROBLEM').forEach(x => lines.push([t.tab, x.n, x.label, x.problems.join('; ')])));
+      const csv = lines.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = plantName() + ' upload problems.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+    $('save').addEventListener('click', async () => {
+      if (!result || !result.ok || saving) return;
+      saving = true; draw();
+      try {
+        st = await callServer('admin', { op: 'uploadSave', plant, fileName: file.name, sheets: file.sheets });
+        $('saved').textContent = st.message || 'Saved.'; $('saved').hidden = false;
+        file = null; result = null; showError('');
+      } catch (err) { showError(serverText(err, 'the Upload Center')); }
+      saving = false; draw();
+    });
+    requireSignIn(async () => { await start(); await load(); });
+  </script>
+</body>
+</html>
