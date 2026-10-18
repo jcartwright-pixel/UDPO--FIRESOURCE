@@ -92,3 +92,6 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 .otr-compare input { width: 22px; height: 22px; accent-color: var(--ud-blue); cursor: pointer; }
 .otr-col-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .otr-col-add label { font-weight: 700; font-size: 16px; }
+/* Joe 10/18: Month Recap's three groups (Uniontown Delivered, Transfers, Carriers), each with a heading and a line above it. */
+table.otr-mrecap tr.grp td { border-top: 3px solid var(--ud-blue); background: #eef3fa; color: var(--ud-blue); font-weight: 800; font-size: 17px; padding: 8px 10px; }
+table.otr-mrecap td.empty { color: #5b6b7d; font-style: italic; }
