@@ -56,7 +56,10 @@ async function shots(page, name, w) {
       assert.equal(keys[0], '805', 'the load being unloaded is on top');
       assert.equal(keys.length, 10, 'Needs Unloading: 12 case trailers back, 802 and 6303 already unloaded');
       assert.match(await page.textContent('#banner'), /Product returns need attention · 2 loads/);
-      assert.match(await page.textContent(row('808')), /Next: 808 · UT DSD MILK · 4:00 AM/, 'the trailer is needed next for 808, which is loading');
+      // Joe 10/18: no "Next:" line under the trailer and only the route in the Route · Run cell (no run line under it).
+      assert.doesNotMatch(await page.textContent(row('808')), /Next:/, 'no "Next:" line under the trailer');
+      assert.equal(await page.textContent(row('808') + ' td.rr'), '808', 'the Route · Run cell shows only the route');
+      assert.equal(await page.textContent(row('808') + ' td.trlcell'), 'T-953', 'the trailer cell shows only the trailer');
       await fits(page, 'Unloading & Washing ' + w + 'x' + h);
       await shots(page, 'unloading', w);
       await page.click('[data-tab="all"]');
@@ -68,7 +71,7 @@ async function shots(page, name, w) {
     }
 
     // Review items 23 and 27 (Joe 10/13): on a phone and an 800 tablet each load is a card with every box named; nothing is cut
-    // (count tiles, switches, department tiles, "Next: 808 ..."), nothing slides sideways, and there is no side-menu strip.
+    // (count tiles, switches, department tiles, the trailer), nothing slides sideways, and there is no side-menu strip.
     for (const [w, h] of [[390, 844], [800, 1280]]) {
       const page = await openPage(browser, w, h, '/unloading.html?date=' + DATE + WORKER);
       await page.waitForSelector(row('808'));
@@ -78,7 +81,7 @@ async function shots(page, name, w) {
         return {
           card: getComputedStyle(tr).display,
           labels: [...tr.children].map(td => getComputedStyle(td, '::before')).filter(b => b.display !== 'none' && b.content !== 'none' && b.content !== 'normal').map(b => b.content),
-          next: cut(tr.querySelector('small.next')),
+          next: cut(tr.querySelector('td.trlcell .trl')),
           stats: [...document.querySelectorAll('#hstats span')].filter(cut).map(s => s.textContent),
           switches: [...document.querySelectorAll('[data-mode], [data-tab]')].filter(cut).map(b => b.textContent),
           tiles: [...document.querySelectorAll('#areas .area')].filter(cut).map(a => a.textContent.slice(0, 12)),
@@ -93,7 +96,7 @@ async function shots(page, name, w) {
       assert.deepEqual(page.errors, []);
       await page.close();
     }
-    results.push('Unloading & Washing at 390 and 800: each load is a card with every box named; tiles, switches and "Next:" not cut; no side-menu strip');
+    results.push('Unloading & Washing at 390 and 800: each load is a card with every box named; tiles, switches and trailer not cut; no side-menu strip');
 
     // Two open screens: the dock works the list, the manager's screen follows.
     const watcher = await openPage(browser, 1920, 950, '/unloading.html?date=' + DATE + MANAGER);
