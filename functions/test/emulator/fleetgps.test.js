@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { db, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { gpsCall } = require('../../src/gps');
-const { pull, history } = require('../../src/fleetgps');
+const { pull, history, purgeReefer } = require('../../src/fleetgps');
 const F = require('../fixtures/fake-sheets');
 
 const ADMIN = { email: 'admin.test@uniteddairy.com' };
@@ -282,11 +282,24 @@ test('Fleet GPS: a loaded trailer\'s temperature is read every run until it is b
   assert.equal(log.slice(before).filter(l => l.startsWith('reefer ')).length, 0, 'nothing is read once it is back');
   const s = await gpsCall(d, ADMIN, { kind: 'fleet', op: 'status' }, o);
   assert.equal(s.coverage.find(c => c.key === 'reefer').label, 'Trailer temperatures (GPS)');
-  // Joe 10/18: kept at most 6 months, then deleted (checked once a day).
+  // Joe 10/18: kept at most 6 months, then deleted, by the nightly cleanup (its own schedule, not the GPS read).
   await d.collection('gpsReeferReadings').doc('T-701_20260401120000').set({ trailer: 'T-701', at: '2026-04-01T12:00:00.000Z', tempF: 35 });
-  clock.now = new Date('2026-10-14T12:00:00Z');
-  await pull(d, o);
+  const purged = await purgeReefer(d, '2026-10-14T12:00:00.000Z');
+  assert.deepEqual(purged, { deleted: 1, done: true });
   const left = (await d.collection('gpsReeferReadings').get()).docs.map(x => x.id).sort();
   assert.equal(left.indexOf('T-701_20260401120000'), -1, 'a reading over 6 months old is deleted');
   assert.equal(left.length, 2, 'this month\'s readings stay');
+});
+
+test('Fleet GPS: the 6-month cleanup runs with no GPS login at all, and goes a page at a time until nothing old is left', async () => {
+  const d = db();
+  assert.equal((await d.collection('config').doc('fleetGps').get()).exists, false, 'no GPS login saved');
+  const b = d.batch();
+  for (let i = 0; i < 25; i++) b.set(d.collection('gpsReeferReadings').doc('T-9_old' + i), { trailer: 'T-9', at: '2026-03-0' + (1 + i % 9) + 'T12:00:00.000Z', tempF: 34 });
+  b.set(d.collection('gpsReeferReadings').doc('T-9_new'), { trailer: 'T-9', at: '2026-10-01T12:00:00.000Z', tempF: 34 });
+  await b.commit();
+  assert.deepEqual(await purgeReefer(d, '2026-10-14T12:00:00.000Z', { page: 10 }), { deleted: 25, done: true }, 'three pages, not one');
+  assert.deepEqual((await d.collection('gpsReeferReadings').get()).docs.map(x => x.id), ['T-9_new']);
+  const f = (await d.collection('private').doc('gpsFleet').get()).data();
+  assert.deepEqual([f.reeferPurgedOn, f.reeferPurged, f.reeferPurgeDone], ['2026-10-14', 25, true]);
 });

@@ -415,19 +415,22 @@ async function pull(db, options) {
  *   gpsReeferReadings/<trailer>_<time>  each reading while recording (one per read at most), deleted after 6 months
  */
 const REEFER_MAX_DAYS = 4;
-// Joe 10/18: the GPS temperatures are kept at most 6 months, then deleted (once a day, a batch at a time).
+// Joe 10/18: the GPS temperatures are kept at most 6 months, then deleted. purgeReefer runs on its own nightly schedule
+// (index.js gpsReeferCleanupNightly), not inside the GPS read, so a failed or switched-off read never stops it. It deletes
+// a page at a time until a page comes back short (or the time budget is spent; the next night carries on).
 const REEFER_KEEP_DAYS = 183;
 const REEFER_MOVING_MPH = 2;
-async function purgeReefer(db, at) {
+async function purgeReefer(db, at, opts) {
   const cutoff = new Date(Date.parse(at) - REEFER_KEEP_DAYS * 86400000).toISOString();
-  let n = 0;
-  for (let i = 0; i < 10; i++) {
-    const old = await db.collection('gpsReeferReadings').where('at', '<', cutoff).limit(400).get();
-    if (old.empty) break;
-    const b = db.batch(); old.docs.forEach(x => b.delete(x.ref)); await b.commit(); n += old.size;
-    if (old.size < 400) break;
+  const page = (opts && opts.page) || 400, stopAt = Date.now() + ((opts && opts.budgetMs) || 90000);
+  let n = 0, done = false;
+  while (Date.now() < stopAt) {
+    const old = await db.collection('gpsReeferReadings').where('at', '<', cutoff).limit(page).get();
+    if (!old.empty) { const b = db.batch(); old.docs.forEach(x => b.delete(x.ref)); await b.commit(); n += old.size; }
+    if (old.size < page) { done = true; break; }
   }
-  return n;
+  await db.collection('private').doc('gpsFleet').set({ reeferPurgedOn: nyDate(at), reeferPurged: n, reeferPurgeDone: done }, { merge: true });
+  return { deleted: n, done };
 }
 // "T-101", "101" and "T 101" are the same trailer (the yard check's way of writing it).
 const trailerKey = (v) => { const c = String(v || '').toUpperCase().replace(/\s+/g, ''); const m = c.match(/^T-?(\d+)$/) || c.match(/^(\d+)$/); return m ? 'T-' + m[1] : c; };
@@ -506,8 +509,7 @@ async function pullReefer(db, d, o, token, trucks, at) {
   await writeAll(db, 'gpsReeferReadings', log);
   await tripsRef.set(step);
   const recording = Object.keys(step.trips).filter(k => step.trips[k].recording).length;
-  const day = nyDate(at), purge = d.reeferPurgedOn !== day ? await purgeReefer(db, at) : 0;
-  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: recording, reeferLast: Object.keys(log).length ? at : (d.reeferLast || ''), reeferPurgedOn: day, reeferPurged: purge }, { merge: true });
+  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: recording, reeferLast: Object.keys(log).length ? at : (d.reeferLast || '') }, { merge: true });
   return Object.keys(log).length;
 }
 
@@ -736,4 +738,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, history, reeferTrips, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, reeferTrips, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
