@@ -149,6 +149,20 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     assert.equal(await phone.isVisible('[data-pane="history"]'), false, 'no log tab on the phone');
+    // Joe 10/18: long cooler track got what fixed it but no back up time and kept counting as down. Typing what fixed it fills
+    // Back up at with the time now (it can be changed), so the breakdown's down time stops.
+    await desk.click('[data-pane="current"]');
+    await desk.selectOption('.sn-type', 'Breakdown');
+    await desk.fill('.sn-equip', 'long cooler track');
+    await desk.press('.sn-equip', 'Tab');
+    await desk.fill('.sn-entry', 'metal plate needed fixed');
+    await desk.press('.sn-entry', 'Tab');
+    assert.equal(await desk.inputValue('.sn-up'), '', 'Back up at stays blank while it is still down');
+    await desk.fill('.sn-fix', 'Maintenance welded the plate back in place');
+    await desk.press('.sn-fix', 'Tab');
+    assert.match(await desk.inputValue('.sn-up'), /^\d\d:\d\d$/, 'what fixed it fills Back up at with the time now');
+    await watcher.waitForFunction(() => /long cooler track[\s\S]*Back up at[\s\S]*Fix: Maintenance welded/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
+    results.push('Breakdown: typing what fixed it fills Back up at, so it stops counting as down');
     for (const p of [desk, watcher, phone]) assert.deepEqual(p.errors, []);
   } finally {
     await browser.close();

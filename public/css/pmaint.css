@@ -33,6 +33,8 @@
 .pm-page .pm-btn.pri { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
 .pm-page .pm-btn:disabled { opacity: .5; cursor: default; }
 .pm-page .pm-late { color: #b42318; font-weight: 800; }
+.pm-page .pm-warn, .pmc-page .pmc-item .pm-warn { color: #b45f00; font-weight: 800; }
+.pmc-page .pmc-item .pm-late { color: #b42318; }
 .pm-page .pm-muted { color: var(--muted); }
 
 /* Machinery: the list on the left, the machine picked on the right. */

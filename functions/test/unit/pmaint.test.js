@@ -69,3 +69,32 @@ test('PM tasks: next due from the day last done; late, this week (Sun-Sat), with
   assert.equal(R.pmState('2026-11-11', today), 'SOON');
   assert.equal(R.pmState('2026-11-12', today), 'LATER');
 });
+
+// Joe 10/18: long cooler track was marked Resolved with what fixed it but no back up time, so it counted on from the day before
+// (27 h). A breakdown marked Resolved with no back up time stops when it was resolved; its down time is on the day it was recorded
+// unless it is over an hour after that; Down time today counts only since 6 a.m.
+test('a breakdown marked Resolved with no back up time stops counting; today counts from 6 a.m.', () => {
+  const U = require('../../src/plant-rules');
+  const now = Date.parse('2026-10-18T00:48:00Z'); // 8:48 p.m. on 10-17
+  const entry = (id, at, p, edited) => ({ type: 'SHIFT_REPORT', recordedAt: at, editedAt: edited || at, payload: Object.assign({ entryId: id, section: 'HANDOFF' }, p) });
+  const log = U.shiftLog([
+    entry('COOLER', '2026-10-17T21:38:00Z', { readingTime: '17:40', followUpStatus: 'RESOLVED', values: { Type: 'Breakdown', Equipment: 'long cooler track', Entry: 'metal plate', Fix: 'welded' } }, '2026-10-17T21:45:00Z'),
+    entry('OPEN', '2026-10-17T21:38:00Z', { readingTime: '17:40', followUpStatus: 'OPEN', values: { Type: 'Breakdown', Entry: 'x' } }),
+    entry('YDAY', '2026-10-16T21:41:00Z', { readingTime: '17:40', followUpStatus: 'OPEN', values: { Type: 'Breakdown', Entry: 'x' } }),
+    entry('NIGHT', '2026-10-17T04:30:00Z', { readingTime: '23:50', followUpStatus: 'OPEN', values: { Type: 'Breakdown', Entry: 'x', UpAt: '00:20' } }),
+    entry('LATER', '2026-10-16T22:00:00Z', { readingTime: '18:00', followUpStatus: 'OPEN', values: { Type: 'Breakdown', Entry: 'x' } }),
+    entry('LATER-R', '2026-10-17T14:00:00Z', { followUpStatus: 'RESOLVED', values: { Type: 'REVIEW', ParentId: 'LATER', Entry: 'Marked Resolved' } })
+  ], now, 48);
+  const get = (id) => log.find(r => r.entryId === id);
+  assert.equal(get('COOLER').resolvedAt, '2026-10-17T21:45:00Z');
+  assert.equal(U.downMinutes(get('COOLER'), now), 5);
+  assert.equal(U.downToday(get('COOLER'), now), 5);
+  assert.equal(U.downMinutes(get('OPEN'), now), 188, 'still down counts from 17:40 today, not yesterday');
+  assert.equal(U.downMinutes(get('YDAY'), now), 1628);
+  assert.equal(U.downToday(get('YDAY'), now), 888, 'only since 6 a.m. today');
+  assert.equal(U.downMinutes(get('NIGHT'), now), 30, 'logged after midnight: down the evening before');
+  assert.equal(U.downToday(get('NIGHT'), now), 0);
+  assert.equal(get('LATER').resolvedAt, '2026-10-17T14:00:00Z', 'resolved by a review');
+  assert.equal(U.downMinutes(get('LATER'), now), 960);
+  assert.equal(U.downToday(get('LATER'), now), 240);
+});
