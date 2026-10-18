@@ -98,10 +98,11 @@
       renderCheck();
     }
     // Joe 10/14: "how can I tell if we're pulling all the data we want from Verizon?"
-    const UNIT = { positions: 'units', odometer: 'units', engineHours: 'trucks', trailerHours: 'trailers', miles: 'trucks', yard: 'trucks' };
+    const UNIT = { positions: 'units', odometer: 'units', engineHours: 'trucks', trailerHours: 'trailers', miles: 'trucks', yard: 'trucks', reefer: 'trailers' };
     const NOTE = {
       trailerHours: 'Comes from the reefer hours Fleet shows on T- units.',
       miles: 'Trucks that moved today.', yard: 'Left or came back to Uniontown Branch or Plant.',
+      reefer: 'Loaded trailers, from load complete until back in the yard (Yard Checks). Fleet sends no set point.',
       alert_HARSH_BRAKING: 'Set up in Fleet 10-13-26.', alert_HARSH_ACCEL: 'Set up in Fleet 10-13-26.', alert_HARSH_TURN: 'Set up in Fleet 10-13-26.',
       alert_SEATBELT: 'Needs a seatbelt alert in Fleet.', mpg: 'Coming next.', fuel: 'Needs fuel cards linked in Fleet.' };
     function renderCheck() {
@@ -120,7 +121,7 @@
         }
         const ok = r.alert ? r.week > 0 : r.today > 0;
         const count = r.alert ? r.today + ' today' : r.today.toLocaleString() + ' ' + (UNIT[r.key] || '');
-        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : NOTE[r.key] || '';
+        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : r.key === 'reefer' && s.reeferError ? 'Not read: ' + s.reeferError : NOTE[r.key] || '';
         return '<tr><td>' + mark(ok, ok ? 'ok' : 'bad') + '</td><td>' + escapeHtml(r.label) + '</td><td>' + escapeHtml(count) + '</td><td>' + (r.last ? escapeHtml(stamp(r.last)) : 'Not yet') + '</td><td>' + escapeHtml(note) + '</td></tr>';
       }).join('') || '<tr><td colspan="5" class="hint">Shows once the login is saved and the first read is done.</td></tr>';
     }

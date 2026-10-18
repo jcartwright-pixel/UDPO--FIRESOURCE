@@ -3,7 +3,8 @@
  * Browser check of Yard Checks against the local test database (npm run test:browser). Four loaded trailers wait on the
  * yard today (dated from the real clock, since the yard list follows the time of day): T-701 never checked, T-702 checked
  * 3 hours ago (due again), T-703 checked 30 minutes ago (locked for 2 hours), T-704 never checked. A plant employee records
- * a check and a Left Yard; a second open screen follows without reloading. Pictures go to SHOTS_DIR.
+ * a check and a Left Yard; a second open screen follows without reloading. Joe 10/18: each trailer's GPS temperature (gpsReefer)
+ * shows beside the typed one, red when far from the set point, and on the GPS Trailer Temps tab. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -56,9 +57,18 @@ async function seed() {
   }
   const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
   await d.collection('plantJournal').doc('YARD_CHECK_seed_702').set({ recordId: 'OP-y702', type: 'YARD_CHECK', date, status: 'COMPLETE', trailer: 'T-702', recordedAt: ago(180), recordedBy: 'yard.hand@uniteddairy.com',
-    payload: { trailer: 'T-702', temperature: '36', fuelLevel: 'FULL', notes: 'Reefer cycling', status: 'COMPLETE', run: 'JERSEY 1' } });
+    payload: { trailer: 'T-702', temperature: '36', setPoint: '34', fuelLevel: 'FULL', notes: 'Reefer cycling', status: 'COMPLETE', run: 'JERSEY 1' } });
   await d.collection('plantJournal').doc('YARD_CHECK_seed_703').set({ recordId: 'OP-y703', type: 'YARD_CHECK', date, status: 'COMPLETE', trailer: 'T-703', recordedAt: ago(30), recordedBy: 'yard.hand@uniteddairy.com',
     payload: { trailer: 'T-703', temperature: '34', fuelLevel: '3/4', notes: '', status: 'COMPLETE', run: 'SUNSHINE' } });
+  // The GPS readings the 5-minute Fleet read writes (fleetgps.js pullReefer): T-701 fine, T-702 10.6° over its set point of 34,
+  // T-704 has no GPS unit, T-799 is out on its route, T-798 came back an hour ago (recording stopped).
+  const trip = (t, extra) => d.collection('gpsReefer').doc(t).set(Object.assign({ trailer: t, id: 'x|' + t, routeRun: '', unitId: 'u' + t, tag: t, startedAt: ago(120), recording: true, out: '', back: '',
+    stoppedAt: '', stopReason: '', tempF: null, fuelPct: null, readingAt: '', updatedAt: ago(3) }, extra));
+  await trip('T-701', { routeRun: 'SUN VALLEY', tempF: 35.4, fuelPct: 82, readingAt: ago(3) });
+  await trip('T-702', { routeRun: 'JERSEY 1', tempF: 44.6, fuelPct: 40, readingAt: ago(4) });
+  await trip('T-704', { routeRun: 'FAIRMONT TRANSFER', unitId: '', tag: '' });
+  await trip('T-799', { routeRun: 'OHIO 2', out: ago(90), tempF: 36.1, fuelPct: 65, readingAt: ago(2) });
+  await trip('T-798', { routeRun: 'MARIETTA', out: ago(600), back: ago(60), recording: false, stoppedAt: ago(60), stopReason: 'BACK_IN_YARD', tempF: 38, fuelPct: 30, readingAt: ago(65) });
 }
 
 (async () => {
@@ -68,7 +78,7 @@ async function seed() {
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 864], [1366, 650], [1024, 768]]) {
       const page = await openPage(browser, w, h, '/yard.html' + MANAGER);
       await page.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 3);
       assert.deepEqual(await trailers(page), ['T-701', 'T-702', 'T-704']);
@@ -77,8 +87,25 @@ async function seed() {
       // Joe 10/10: a trailer due again starts with empty boxes; its last check is in Last Check.
       assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '', 'the boxes start empty');
       assert.notEqual((await page.textContent('#rows tr[data-trailer="T-702"] .yd-last')).trim(), '—', 'the last check shows in Last Check');
+      // Joe 10/18: the GPS temperature beside the typed one; red when more than 5° from the set point.
+      await page.waitForFunction(() => /35\.4°/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-gps') || {}).textContent || ''));
+      assert.match(await page.textContent('#rows tr[data-trailer="T-701"] .yd-gps'), /35\.4°[\s\S]*Fuel 82%/);
+      assert.equal(await page.$eval('#rows tr[data-trailer="T-701"] .yd-gps', x => x.classList.contains('bad')), false);
+      assert.equal(await page.$eval('#rows tr[data-trailer="T-702"] .yd-gps', x => x.classList.contains('bad')), true, '44.6° against a set point of 34 is red');
+      assert.match(await page.getAttribute('#rows tr[data-trailer="T-702"] .yd-gps', 'title'), /10\.6° above the set point/);
+      assert.match(await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps'), /No GPS on trailer/);
+      assert.deepEqual(await page.$$eval('#pane-current thead th', t => t.map(x => getComputedStyle(x.querySelector('.l') || x).display !== 'none' ? (x.querySelector('.l') || x).textContent : x.querySelector('.s').textContent).slice(1, 5)),
+        ['Actual Temp (°F)', 'Temp Set Point (°F)', 'Fuel Level', 'GPS Temp (°F)']);
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
+      await page.click('[data-pane="gps"]');
+      await page.waitForSelector('#pane-gps:not([hidden])');
+      assert.deepEqual(await page.$$eval('#gpsrows tr[data-trailer]', r => r.map(x => x.dataset.trailer)), ['T-701', 'T-702', 'T-704', 'T-799', 'T-798']);
+      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-799"]'), /OHIO 2[\s\S]*36\.1°[\s\S]*65%[\s\S]*On the road/);
+      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-798"]'), /Back in the yard/);
+      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-702"]'), /44\.6°[\s\S]*10\.6° above the set point[\s\S]*34/);
+      await fits(page, 'GPS Trailer Temps ' + w + 'x' + h);
+      await shots(page, 'yard-gps', w);
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
       assert.equal(await page.$$eval('#history tr', r => r.length), 2);
@@ -114,8 +141,12 @@ async function seed() {
       if (c && c.payload.fuelLevel === '1/2' && c.payload.notes === 'Reefer on, doors sealed' && c.payload.setPoint === '34') break;
       await desk.waitForTimeout(250);
     }
+    const gpsKept = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).find(x => x.createdInApp && x.payload.trailer === 'T-701');
+    assert.deepEqual([gpsKept.payload.gpsTempF, gpsKept.payload.gpsFuelPct], [35.4, 82], 'the check keeps the GPS temperature at that time');
     results.push('T-701 (35°F, set point 34, 1/2, notes) saved box by box: saved on screen in ' + shown + ' ms, off the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
-    // Left Yard asks once more.
+    // Left Yard asks once more. (The check's redraw 1.5 seconds after it is saved is let through first, so it cannot land
+    // between the press and the release of the click.)
+    await desk.waitForTimeout(1600);
     await desk.click(row('T-704') + ' [data-left]');
     assert.equal(await desk.textContent(row('T-704') + ' [data-left]'), 'Confirm Left');
     await desk.click(row('T-704') + ' [data-left]');
@@ -125,18 +156,20 @@ async function seed() {
     await watcher.waitForFunction(() => document.querySelectorAll('#history tr').length === 4);
     const top = await watcher.$$eval('#history tr', r => r.slice(0, 2).map(x => x.textContent));
     assert.match(top[0], /T-704[\s\S]*Left the yard[\s\S]*Left Yard/);
-    assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
+    assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*35\.4°[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
     results.push('24-Hour History: the Left Yard and the check on top, newest first');
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
     // The phone view (yard hands): Trailer, Temp, Set, Fuel, Notes, Action.
     // The phone (yard hands): one card per trailer, no Record button and no history; each box saves as it is left.
-    const phone = await openPage(browser, 412, 860, '/yard.html' + MANAGER);
+    const phone = await openPage(browser, 390, 844, '/yard.html' + MANAGER);
     const card = '.yd-card[data-trailer="T-702"]';
     await phone.waitForSelector(card);
     assert.equal(await phone.isVisible('#panes'), false, 'no 24-hour history on the phone');
     assert.equal(await phone.$$eval('[data-record]', b => b.filter(x => x.offsetParent).length), 0, 'no Record button on the phone');
-    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-412.png'), scale: 'css' });
+    assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone card shows the GPS temperature in red too');
+    assert.match(await phone.textContent(card + ' .yd-gpsf'), /44\.6°[\s\S]*10\.6° above the set point/);
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-390.png'), scale: 'css' });
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
@@ -151,10 +184,10 @@ async function seed() {
     assert.equal(one.length, 1, 'the three boxes fill in one check');
     assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', 'Doors sealed']);
     results.push('Phone: T-702 temp, set point, fuel and notes each saved as they were left, into one check; the card stays with "Saved"');
-    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-412.png'), scale: 'css' });
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-390.png'), scale: 'css' });
     await phone.click(card + ' [data-left]');
     assert.match(await phone.textContent(card + ' [data-left]'), /Tap again to confirm/);
-    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-confirm-412.png'), scale: 'css' });
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-confirm-390.png'), scale: 'css' });
     await phone.click(card + ' [data-left]');
     await phone.waitForFunction((c) => !document.querySelector(c), card);
     results.push('Phone: Left Yard asks once more, then the card is gone');
