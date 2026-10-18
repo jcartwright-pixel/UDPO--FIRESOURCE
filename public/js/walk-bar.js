@@ -1,6 +1,6 @@
-// Joe 10/15 (Manager Walkthrough, option 2): Yard, Coolers and Quality opened from the walkthrough (?walk=1) show a bar at the
-// top with the way back to the walkthrough, which stop this is, and the next stop (Yard, Coolers, Quality, then back).
-const STEPS = { yard: ['1 · Yard', 'temps.html?walk=1', 'Next: Coolers ›'], coolers: ['2 · Coolers', 'quality.html?walk=1', 'Next: Quality ›'], quality: ['3 · Quality', 'walkthrough.html', 'Done ✓'] };
+// Joe 10/15 (Manager Walkthrough, option 2): Yard, Coolers and Production (Joe 10/18: Quality became Production) opened from the walkthrough (?walk=1) show a bar at the
+// top with the way back to the walkthrough, which stop this is, and the next stop (Yard, Coolers, Production, then back).
+const STEPS = { yard: ['1 · Yard', 'temps.html?walk=1', 'Next: Coolers ›'], coolers: ['2 · Coolers', 'quality.html?walk=1', 'Next: Production ›'], quality: ['3 · Production', 'walkthrough.html', 'Done ✓'] };
 // Joe 10/15: the manager's phone screens are for managers only (an administrator counts as one).
 export const WALK_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER'];
 export function walkBar(step) {

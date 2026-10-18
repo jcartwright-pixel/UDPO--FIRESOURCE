@@ -150,19 +150,24 @@
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
-      // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Quality (each opens its screen with the walkthrough
+      // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Production (each opens its screen with the walkthrough
       // bar). Joe 10/15 (later): each tile carries what it can fit: every trailer, cooler and line with its reading or when it
       // is due, problems first in red; the rest under "+ N more". A past-due check puts a flashing "past due" pill on the card.
+      // Joe 10/18: each area is green when done, yellow when due (2 hours) and red when past due (3 hours), with who did its
+      // newest check and when, or "Done automatically" when nothing needs checking (no trucks in the yard, no line running).
       const W = x.walk, late = W.yard.late + W.coolers.late + W.quality.late, SHOW = 4;
       const item = (z) => '<li class="' + z.kind + '"><b>' + escapeHtml(z.name) + '</b> ' + escapeHtml(z.detail) + '</li>';
+      const STATE = { ok: 'DONE', due: 'DUE', late: 'PAST DUE' };
       const walkTile = (href, label, z, what, of) => {
-        const kind = z.out || z.late ? 'bad' : z.due ? 'warn' : 'good', items = z.items || [];
-        return '<a class="mc-tile wk-tile ' + kind + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span><b>' + z.due + (of && z.total ? '<small>of ' + z.total + '</small>' : '') + '</b>' +
-          '<i>' + escapeHtml(z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : 'all checked') + '</i>' +
+        const kind = z.state === 'late' || z.out ? 'bad' : z.state === 'due' ? 'warn' : 'good', items = z.items || [];
+        const who = z.auto ? 'Done automatically' : z.lastCheck ? 'Last ' + clock(z.lastCheck.at) + (z.lastCheck.by ? ' · ' + personName(z.lastCheck.by) : '') : 'Not checked yet';
+        return '<a class="mc-tile wk-tile ' + kind + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + ' <em class="wk-state ' + z.state + '">' + STATE[z.state] + '</em></span><b>' + z.due + (of && z.total ? '<small>of ' + z.total + '</small>' : '') + '</b>' +
+          '<i>' + escapeHtml(z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : z.auto || 'all checked') + '</i>' +
+          '<p class="wk-who">' + escapeHtml(who) + '</p>' +
           '<ul class="wk-items">' + (items.length ? items.slice(0, SHOW).map(item).join('') + (items.length > SHOW ? '<li class="more">+ ' + (items.length - SHOW) + ' more</li>' : '') : '<li class="ok">Nothing to check</li>') + '</ul></a>';
       };
-      put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Quality in walking order · the same checks as the phone app', 'walkthrough.html', [
-        walkTile('yard.html?walk=1', '1 · Yard', W.yard, 'trailers to check'), walkTile('temps.html?walk=1', '2 · Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', '3 · Quality', W.quality, 'lines due', true),
+      put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Production every 2 to 3 hours · yellow at 2 hours, red at 3 · the same checks as the phone app', 'walkthrough.html', [
+        walkTile('yard.html?walk=1', '1 · Yard', W.yard, 'trailers to check'), walkTile('temps.html?walk=1', '2 · Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', '3 · Production', W.quality, 'lines due', true),
         tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : '')]));
       if (late) grid.querySelector('[data-card="walk"] .mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + late + ' past due</span>');
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
