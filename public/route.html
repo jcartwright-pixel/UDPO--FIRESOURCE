@@ -229,7 +229,11 @@
     const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir', 'step-sched-id', 'step-sched'];
     function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
 
+    // A slower show() still waiting on the server when a newer one starts (say the 5-minute sign-out while the loads were being
+    // read again) stops there, so it never puts the signed-out driver's name or loads back.
+    let showSeq = 0;
     async function show() {
+      const seq = ++showSeq, stale = () => seq !== showSeq;
       document.getElementById('who').textContent = driverId ? driverName : '';
       document.getElementById('change').hidden = !driverId;
       if (!code) return step('step-code');
@@ -237,7 +241,9 @@
       if (want === 'board') return openBoard();
       if (want === 'schedule') return openSchedule();
       if (!driverId) {
-        const r = await call('roster'), opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
+        const r = await call('roster');
+        if (stale()) return;
+        const opt = (v, t) => '<option value="' + escapeHtml(v) + '">' + escapeHtml(t) + '</option>';
         document.getElementById('name').innerHTML = '<option value="">Pick your name</option>' + r.drivers.map(d => opt(d.id, d.name)).join('') +
           ((r.others || []).length ? '<optgroup label="Fill-in and carriers">' + r.others.map(n => opt('name:' + n, n)).join('') + '</optgroup>' : '') +
           ((r.routes || []).length ? '<optgroup label="Or choose your route">' + r.routes.map(x => opt(x.id, 'Route ' + x.name)).join('') + '</optgroup>' : '');
@@ -245,6 +251,7 @@
       }
       if (want === 'dvir') return openDvir();
       const r = await call('loads', { driverId: allRoutes ? 'skip' : driverId, date });
+      if (stale()) return;
       date = r.date; dates = r.dates; loads = r.loads; if (!allRoutes) { driverName = r.driver; store.set('driverName', driverName); }
       if (r.units) { const dl = (id, list) => { document.getElementById(id).innerHTML = list.map(u => '<option value="' + escapeHtml(u) + '">').join(''); }; units = r.units; dl('dl-trucks', units.trucks); dl('dl-trailers', units.trailers); dl('dl-jacks', units.jacks); }
       document.getElementById('who').textContent = driverName;
@@ -252,7 +259,9 @@
       const skip = driverId === 'skip' || allRoutes;
       showAllRoutes();
       // A Check-In saved on this phone with no signal shows as saved here until it is sent.
-      const onPhone = new Set((await waiting()).filter(e => e.op === 'checkIn' && !e.refused).map(e => e.input.runDocId + '|' + e.input.day));
+      const queued = await waiting();
+      if (stale()) return;
+      const onPhone = new Set(queued.filter(e => e.op === 'checkIn' && !e.refused).map(e => e.input.runDocId + '|' + e.input.day));
       const state = (l) => onPhone.has(l.runDocId + '|' + l.day) ? ['queued', 'Saved on phone'] : l.checkinCompletedAt ? ['done', 'Checked in'] : ['', 'Check In'];
       document.getElementById('loads').innerHTML = (driverId === 'skip' && loads.length ? '<p class="phone-empty">Pick your route to check in.</p>' : '') + loads.map((l, i) => '<button type="button" class="phone-load ' + state(l)[0] + '" data-i="' + i + '"><b>' + escapeHtml(l.route) + '</b> ' + escapeHtml(l.run) +
         '<small>' + escapeHtml([skip && l.driver, (l.checkinTruck || l.truck) && 'Truck ' + (l.checkinTruck || l.truck), (l.checkinTrailer || l.trailer) && 'Trailer ' + (l.checkinTrailer || l.trailer)].filter(Boolean).join(' · ')) + '</small><span>' + state(l)[1] + '</span></button>').join('') ||
