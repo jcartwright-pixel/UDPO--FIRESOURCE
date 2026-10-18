@@ -136,7 +136,7 @@
       if (stop) stop();
       data = null;
       render();
-      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read Plant Maintenance (' + e.message + '). Check the network and reload the page.'));
+      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read Plant Maintenance (' + e.message + '). Check the network and reload the page.'), { openOrders: true });
     }
     requireSignIn(async (user) => {
       ({ db } = await start());

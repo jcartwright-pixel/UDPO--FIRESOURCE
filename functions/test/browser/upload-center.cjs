@@ -55,14 +55,14 @@ async function upload(page, name, buffer) {
 const tiles = (p) => p.$$eval('#tiles .up-tile', t => t.map(x => x.innerText.replace(/\s+/g, ' ').trim()));
 
 const ROUTES = [
-  ['901', 'Load 1', 'MARTINS FERRY PRODUCT', '', '', 'Boxing', 'United Dairy', 'Charleston', 'Load Day', 'No', 'No', '10', 'Yes', 'Yes', 'Yes', 'Yes', 'Active', ''],
-  ['905', '1', 'KROGER', 'KROGER 1', '', 'Case Loadout', 'United Dairy', 'Charleston', 'Delivery Day', 'No', 'No', '20', 'Yes', 'Yes', 'Yes', 'Yes', 'Active', '']
+  ['901', 'Load 1', 'MARTINS FERRY PRODUCT', 'Product', '', '', 'Boxing', 'United Dairy', '', 'Charleston', 'Load Day', 'No', 'No', '10', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Active', ''],
+  ['905', '1', 'KROGER', '', 'KROGER 1', '', 'Case Loadout', 'United Dairy', '', 'Charleston', 'Delivery Day', 'No', 'No', '20', 'Yes', 'Yes', 'Yes', 'Yes', '', 'Active', '']
 ];
 const DAYS = [['905', 'Load 1', 'Mon', 'Yes', '3:30 AM', '4', '212', '10:30', 'Day before', ''], ['905', 'Load 1', 'Wed', 'Yes', '3:30 AM', '4', '212', '10.5', 'Day before', '']];
 const DRIVERS = [
-  ['00731', 'Sam Porter', 'Active', '304-555-0131', 'No', '6-1-12', '', '', ''],
-  ['744', 'Jo Rivers', 'Active', '', 'Yes', '9/9/2020', '', '', ''],
-  ['', 'No Id Yet', 'Active', '', '', '', '', '', '']
+  ['00731', 'Sam Porter', 'Active', '304-555-0131', 'No', '6-1-12', '', ''],
+  ['744', 'Jo Rivers', 'Active', '', 'Yes', '9/9/2020', '', ''],
+  ['', 'No Id Yet', 'Active', '', '', '', '', '']
 ];
 const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Load 2', 'Yes', '', 'Yes', '', 'Off', '']];
 
@@ -141,7 +141,7 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
       assert.match(await page.textContent('#tabs'), /Drivers\s*Dispatch\s*2/);
 
       // 3. Again with a changed phone and one driver left out: Changed (with what changed) and Taken off; Routes not in the file stay.
-      await upload(page, 'Charleston drivers.xlsx', await filled(page, { Drivers: { rows: [['731', 'Sam Porter', 'Active', '304-555-0199', 'No', '6-1-12', '', '', '']] } }));
+      await upload(page, 'Charleston drivers.xlsx', await filled(page, { Drivers: { rows: [['731', 'Sam Porter', 'Active', '304-555-0199', 'No', '6-1-12', '', '']] } }));
       assert.deepEqual(await tiles(page), ['0 Problem', '1 Changed', '0 New', '1 Taken off', '0 Same as now']);
       const chg = await page.$$eval('#rows tr', r => r.map(x => [...x.children].map(td => td.textContent)));
       assert.deepEqual(chg.map(r => [r[0], r[3], r[4]]), [['Changed', 'Sam Porter (731)', 'Employee ID 00731 731 · Cell Phone 3045550131 3045550199'], ['Taken off', 'Jo Rivers (744)', 'Not in the file: taken off the Drivers list']]);
@@ -151,7 +151,7 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
       assert.equal((await db().collection('plantUploads').doc('fac_charleston__routes').get()).data().count, 2);
 
       // 4. Never Social Security numbers, birth dates or addresses: such a tab is refused.
-      await upload(page, 'with ssn.xlsx', await filled(page, { Drivers: { head: U.BY_KEY.drivers.cols.map(c => c.h).concat(['SSN']), rows: [['731', 'Sam Porter', 'Active', '', '', '', '', '', '', '123-45-6789']] } }));
+      await upload(page, 'with ssn.xlsx', await filled(page, { Drivers: { head: U.BY_KEY.drivers.cols.map(c => c.h).concat(['SSN']), rows: [['731', 'Sam Porter', 'Active', '', '', '', '', '', '123-45-6789']] } }));
       assert.match(await page.textContent('#rows'), /Take out the SSN column\. This app never keeps Social Security numbers/);
       assert.equal(await page.isDisabled('#save'), true);
       await page.click('#cancel');
@@ -167,7 +167,7 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
     }
     // The live app: saving waits for Joe's OK for the load (nothing here turns it on).
     const UP = require('../../src/uploads');
-    const ok = { plant: 'fac_charleston', fileName: 'x.xlsx', sheets: [{ name: 'Drivers', cells: [U.BY_KEY.drivers.cols.map(c => c.h), ['9', 'A B', 'Active', '', '', '', '', '', '']] }] };
+    const ok = { plant: 'fac_charleston', fileName: 'x.xlsx', sheets: [{ name: 'Drivers', cells: [U.BY_KEY.drivers.cols.map(c => c.h), ['9', 'A B', 'Active', '', '', '', '', '']] }] };
     await assert.rejects(UP.OPS.uploadSave(db(), 'admin.test@uniteddairy.com', ok, new Date().toISOString(), { project: 'ud-distribution' }), /waits for Joe's OK/);
     const st = await UP.OPS.uploadStatus(db(), 'admin.test@uniteddairy.com', { plant: 'fac_charleston' }, '', { project: 'ud-distribution' });
     assert.equal(st.live, true); assert.equal(st.savingOn, false);

@@ -353,6 +353,17 @@ async function readAlerts(db, d, o, token, trucks, since, until, at) {
     // Joe 10/13: engine fault codes for the garage. Fleet's DTC alert sends the code as its trigger value, ": 791:2(126)".
     if (type === 'FAULT') Object.assign(docs[safeIdPart('A' + r.AlertId)], dtc(r.TriggerValue), { triggerValue: String(r.TriggerValue || '').trim() });
   });
+  // Each read overlaps the last by 10 minutes, so most alerts come back two or three times. One that is the same as the copy
+  // kept (apart from when it was read) is not rewritten, and is not sent to the garage list again (Joe 10/18: no double writes).
+  const ids = Object.keys(docs);
+  for (let i = 0; i < ids.length; i += 300) {
+    (await db.getAll(...ids.slice(i, i + 300).map(id => db.collection('gpsAlerts').doc(id)))).forEach(x => {
+      // The place is known only while the truck's report is near the alert's time; a later read keeps the one found then
+      // (before, the re-read 5 minutes later blanked it).
+      if (x.exists && !docs[x.id].place && x.data().place) docs[x.id].place = x.data().place;
+      if (x.exists && Object.keys(docs[x.id]).every(k => k === 'updatedAt' || JSON.stringify(x.data()[k]) === JSON.stringify(docs[x.id][k]))) delete docs[x.id];
+    });
+  }
   await writeAll(db, 'gpsAlerts', docs);
   // Joe 10/14 (mock-up A): each engine code from the last two days goes on the garage list as a work order (garage.js).
   const recent = Date.parse(at) - 2 * 86400000;
@@ -360,7 +371,7 @@ async function readAlerts(db, d, o, token, trucks, since, until, at) {
   if (faults.length) {
     try { await require('./garage').engineCodeOrders(db, faults, at); } catch (e) { console.error('fleetGps engine codes', e); }
   }
-  return Object.keys(docs).length;
+  return ids.length;
 }
 function nyMidnight(now) {
   const date = nyDate(now.toISOString());

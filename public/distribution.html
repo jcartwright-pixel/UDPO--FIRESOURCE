@@ -114,7 +114,14 @@
       onSnapshot(collection(db, 'drivers'), s => { data.drivers = s.docs.map(d => d.data()); render(); }, fail('the drivers'));
       onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location))); render(); }, fail('the units'));
       onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('Route Master'));
-      onSnapshot(collection(db, 'vacations'), s => { data.vacations = s.docs.map(d => d.data()); render(); }, fail('the vacation schedule'));
+      // Joe 10/18: vacations that end this week or later (every record has an end date, the start date when it is one day) and
+      // every pending one (the Pending count), not every vacation ever entered.
+      const vac = { now: null, pending: null }, vacs = (k) => s => {
+        vac[k] = s.docs; if (!vac.now || !vac.pending) return;
+        const byId = {}; vac.now.concat(vac.pending).forEach(d => { byId[d.id] = d.data(); }); data.vacations = Object.values(byId); render();
+      };
+      onSnapshot(query(collection(db, 'vacations'), where('endDate', '>=', L.weekStart(today))), vacs('now'), fail('the vacation schedule'));
+      onSnapshot(query(collection(db, 'vacations'), where('status', '==', 'PENDING')), vacs('pending'), fail('the vacation schedule'));
       // Review item 73 (Joe 10/13): days off that end this week or later (today's numbers), not every one ever entered.
       onSnapshot(query(collection(db, 'exceptions'), where('endDate', '>=', L.weekStart(today))), s => { data.exceptions = s.docs.map(d => d.data()); render(); }, fail('the days off'));
       onSnapshot(collection(db, 'gpsTrucks'), s => { data.gps = s.docs.map(d => d.data()); render(); }, fail('the GPS positions'));

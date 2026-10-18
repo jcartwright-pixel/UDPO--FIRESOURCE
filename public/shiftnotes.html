@@ -67,7 +67,6 @@
     import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
     import { nowMinutes } from './js/plant-core.js';
-    import { watchMaint } from './js/pmaint.js';
 
     // Shift Notes, option A (Joe 10/10): the kinds of entry down the left with their counts; open breakdowns carry over at the
     // top until someone marks them Resolved; the new entry below them saves box by box. Send Current Report empties the entry
@@ -90,6 +89,26 @@
     let askEntry = params.get('entry') || '';
     if (askKind) { const k = KINDS.find(x => x[0].toLowerCase() === askKind); if (k) kind = k[0]; }
     let maint = null;
+    // Joe 10/18: a request's work order is plantWorkOrders/SN_<entry> (plantmaint.js woIdFor), so only the work orders of the
+    // requests on the list are read, not every plant work order ever made. Each is kept as the whole list would have given it.
+    let woDb = null;
+    const woDocs = {}, woStops = {};
+    function watchRequestOrders() {
+      if (!woDb) return;
+      const want = {};
+      week().forEach(x => { if (isKind(x, 'Maintenance Request') && /^[A-Za-z0-9_-]+$/.test(x.entryId || '')) want[x.entryId] = true; });
+      Object.keys(woStops).forEach(id => { if (!want[id]) { woStops[id](); delete woStops[id]; delete woDocs[id]; } });
+      Object.keys(want).forEach(id => {
+        if (woStops[id]) return;
+        woStops[id] = onSnapshot(doc(woDb, 'plantWorkOrders', ('SN_' + id).slice(0, 200)), d => {
+          const w = d.exists() ? Object.assign({}, d.data(), { id: d.id }) : null;
+          // The Uniontown work orders, status as watchMaint gives it (blank is NEW).
+          woDocs[id] = w && w.facilityId === 'fac_uniontown' && w.sourceEntryId === id ? Object.assign(w, { status: String(w.status || 'NEW').toUpperCase() }) : null;
+          maint = { workOrders: Object.values(woDocs).filter(Boolean) };
+          render();
+        }, () => {});
+      });
+    }
     let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
     const pending = [];
     const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
@@ -221,6 +240,7 @@
     const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
 
     function render() {
+      watchRequestOrders();
       if (phone.matches) pane = 'current'; // phones: the entry only, no history tab
       const all = week(), rows = day(), ck = canSave(), mineId = entry && entry.mine && entry.mine.payload.entryId;
       document.getElementById('hstats').innerHTML = [['Entries 24 h', rows.length, ''], ['Needs attention', all.filter(r => r.status === 'OPEN').length, 'warn'], ['Monitor', all.filter(r => r.status === 'MONITOR').length, ''], ['Resolved', rows.filter(r => r.status === 'RESOLVED').length, 'good']]
@@ -414,8 +434,8 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       watchPerson(db, user, p => { person = p; render(); }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      // The plant's machinery (a machine named in What broke) and maintenance's work orders (what became of each request).
-      watchMaint(db, 'fac_uniontown', d => { maint = d; render(); }, () => {}, { noJournal: true });
+      // Maintenance's work orders (what became of each request), read for the requests on the list (watchRequestOrders).
+      woDb = db;
       // A new report empties the entry boxes for the next round; open items stay on the list.
       watchRound(db, (at, data) => { const first = roundStart === null; roundStart = at; lastReport = data; if (!first && entry && entry.round !== at && !unsent()) drawForm(); render(); });
       // 30 days of the log, so anything still open from earlier shifts stays on the list until it is resolved.
