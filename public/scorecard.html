@@ -57,7 +57,7 @@
     // Joe 10/13: the scorecard is driving and distribution only: no plant card (the average is the drivers'), no route cuts.
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
-    let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
+    let periodReady = false, mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
     const today = () => L.operatingDay(new Date());
     let year = Number(today().slice(0, 4)), month = Number(today().slice(5, 7)), weekStart = S.scWeekRange_(S.scAddDays_(today(), -1)).start;
     // ?month=2026-10 or ?week=2026-10-04 opens that period (links and the browser checks).
@@ -137,14 +137,14 @@
       if (key === gpsKey) return;
       gpsKey = key;
       if (gpsSub) gpsSub.forEach(u => u());
-      gpsDays = []; gpsAlerts = []; runs = []; events = [];
+      gpsDays = []; gpsAlerts = []; runs = []; events = []; periodReady = false;
       const range = (name) => query(collection(dbRef, name), where('date', '>=', p.start), where('date', '<=', p.end));
       const from = S.scAddDays_(p.start, -2), to = S.scAddDays_(p.end, 2), fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.');
       // The period's loads and check-ins show together, once both have answered, so a half-read board never shows.
       const got = { runs: null, events: null }, put = (k) => s => {
         got[k] = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
         if (!got.runs || !got.events || gpsKey !== key) return;
-        runs = got.runs; events = got.events; render();
+        runs = got.runs; events = got.events; periodReady = true; render();
       };
       gpsSub = [
         onSnapshot(query(collection(dbRef, 'runs'), where('weekStart', '>=', L.weekStart(from)), where('weekStart', '<=', to)), put('runs'), fail('the dispatch runs')),
@@ -200,6 +200,8 @@
     function paint() {
       const s = S.scSettings_(saved), edit = canManage();
       watchGps();
+      // A board is drawn only once the period's loads and check-ins are in, so it never shows a short list first.
+      if (mode !== 'settings' && !periodReady) return;
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
       { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Rewards for perfect days, points off for misses'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
