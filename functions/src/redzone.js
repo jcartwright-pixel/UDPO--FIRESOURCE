@@ -464,7 +464,12 @@ async function readChecks(db, options) {
     return { ok: false, status: failed };
   }
   const col = db.collection('redzoneChecks');
-  let batch = db.batch(), n = 0, fails = 0;
+  // Each read overlaps the last by an hour, so most sheets come back again; one that is the same as the copy kept is not
+  // rewritten (Joe 10/18: no double writes). Quality's RedZone Checks listens to these.
+  const ids = [...new Set(list.map(c => clean(c && c.uuid, 60)).filter(Boolean).map(safeIdPart))], kept = {};
+  for (let i = 0; i < ids.length; i += 300) (await db.getAll(...ids.slice(i, i + 300).map(id => col.doc(id)))).forEach(x => { if (x.exists) kept[x.id] = x.data(); });
+  const sameSheet = (a, b) => !!a && Object.keys(b).every(k => k === 'readAt' || JSON.stringify(a[k]) === JSON.stringify(b[k]));
+  let batch = db.batch(), n = 0, fails = 0, w = 0;
   for (const c of list) {
     const id = clean(c.uuid, 60);
     if (!id || c.deactivated === true) continue;
@@ -475,12 +480,15 @@ async function readChecks(db, options) {
     }));
     const result = clean(c.resultType, 20);
     if (result === 'FAIL') fails++;
-    batch.set(col.doc(safeIdPart(id)), { uuid: id, name: clean(c.name, 120), type: clean(c.dataSheetType, 30), result, ccp: c.ccp === true, at: msOf(c.completeTime) || 0,
+    const sheet = { uuid: id, name: clean(c.name, 120), type: clean(c.dataSheetType, 30), result, ccp: c.ccp === true, at: msOf(c.completeTime) || 0,
       assetUUID: clean(c.assetUUID, 60), asset: clean(c.assetName, 120), placeUUID: clean(c.placeUUID, 60), runUUID: clean(c.runUUID, 60), productTypeUUID: clean(c.productTypeUUID, 60),
-      items, facilityId: 'fac_uniontown', readAt: at });
-    if (++n % 400 === 0) { await batch.commit(); batch = db.batch(); }
+      items, facilityId: 'fac_uniontown', readAt: at };
+    n++;
+    if (sameSheet(kept[safeIdPart(id)], sheet)) continue;
+    batch.set(col.doc(safeIdPart(id)), sheet);
+    if (++w % 400 === 0) { await batch.commit(); batch = db.batch(); }
   }
-  if (n % 400) await batch.commit();
+  if (w % 400) await batch.commit();
   await ref.set({ checksReadAt: now }, { merge: true });
   const out = { ok: true, at, read: n, failed: fails };
   await status.set({ checks: out }, { merge: true });

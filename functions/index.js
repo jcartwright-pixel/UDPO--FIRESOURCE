@@ -302,8 +302,8 @@ function liveRollDeps() {
 // The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the Live workbook the
 // copy reads ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
-  const config = (await db.collection('config').doc('app').get()).data() || {};
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  const config = (await db.collection('config').doc('app').get()).data() || {};
   const target = JSON.parse(process.env.WRITEBACK_JSON);
   // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
   if (!config.writeBack || config.writeBack.enabled !== true) {

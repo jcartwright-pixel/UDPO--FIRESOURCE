@@ -416,6 +416,7 @@ test('RedZone check sheets: read in (from 3 days back, then from the last read),
   calls.length = 0;
   await R.readChecks(db(), { fetch, now: () => new Date(now + 300000) });
   assert.equal(Number(new URL(calls.find(([, u]) => /completed-data-sheets/.test(u))[1]).searchParams.get('from')), now - 3600000);
+  assert.equal((await db().collection('redzoneChecks').doc('cs-1').get()).data().readAt, c1.readAt, 'a sheet read again unchanged is not rewritten');
   assert.ok(calls.filter(([, u]) => !/oauth/.test(u)).every(([m]) => m === 'GET'), 'only GETs');
   // A refused list is noted, not thrown.
   const no = await R.readChecks(db(), { fetch: async (url) => ({ ok: /oauth/.test(url), status: /oauth/.test(url) ? 200 : 403, text: async () => JSON.stringify(/oauth/.test(url) ? { access_token: 't' } : { message: 'forbidden' }) }), now: () => new Date(now + 600000) });

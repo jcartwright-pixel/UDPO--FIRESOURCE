@@ -45,6 +45,20 @@ test('an unchanged sheet writes nothing; one changed cell rewrites one run', asy
   assert.equal((await db().collection('runs').doc('2026-10-04__run_t801').get()).data().days.mon.trailer, 'T-902');
 });
 
+test('a copy that finds the sheets unchanged rewrites no list, week or log record (Joe 10/18: no double writes)', async () => {
+  const tabs = F.fakeSheets();
+  await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  const stamps = async () => Object.fromEntries([...(await db().collection('meta').get()).docs, ...(await db().collection('weeks').get()).docs].map(d => [d.ref.path, d.data().transferredAt]));
+  const before = await stamps();
+  const again = await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  assert.deepEqual(await stamps(), before, 'no list or week record was written again');
+  const logs = (await db().collection('transfers').get()).docs;
+  assert.equal(logs.length, 2, 'the first copy keeps its own record; the quiet one updates the standing record');
+  const quiet = logs.find(d => d.id === 'no-changes').data();
+  assert.deepEqual([quiet.at, quiet.changed], [again.at, false]);
+  assert.equal(((await db().collection('config').doc('app').get()).data().lastTransfer || {}).at, again.at, 'screens still see the copy running');
+});
+
 test('a new copy of the Live workbook replaces every row, even one the app changed without writing it to the sheet', async () => {
   const tabs = F.fakeSheets();
   await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
