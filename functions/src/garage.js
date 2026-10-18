@@ -137,9 +137,18 @@ function garageJobs(orders, records, units) {
   const byUnit = {};
   (units || []).forEach(u => { byUnit[alnum(u.unit)] = u; byUnit[alnum(u.unit).replace(/^T/, '')] = byUnit[alnum(u.unit).replace(/^T/, '')] || u; });
   const jobs = mine.filter(o => String(o.status || '').toUpperCase() !== 'DONE').map(jobOf);
+  // Joe 10/18: one email can have 2 or 3 write-up copies (the old app's one per answer, the new reader's own). One report is one
+  // job: none when a copy already has a work order, was repaired or removed (L.issueRows), else only its first copy.
+  const reportOf = {}, listed = {}, byId = {};
+  (records || []).forEach(r => { byId[String(r.kind).toUpperCase() + '|' + r.record_id] = r; });
+  Object.keys(KIND_KEYS).forEach(kind => L.issueRows(records || [], kind).forEach(row => {
+    const key = kind + '|' + row.report, has = row.recordIds.some(id => linked[KIND_KEYS[kind] + '|' + id] || L.garageOff((byId[kind + '|' + id] || {}).notes));
+    row.recordIds.forEach(id => { reportOf[kind + '|' + id] = has ? '' : key; });
+  }));
   (records || []).forEach(r => {
-    const kind = String(r.kind || '').toUpperCase();
-    if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)]) return;
+    const kind = String(r.kind || '').toUpperCase(), report = reportOf[kind + '|' + r.record_id];
+    if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)] || !report || listed[report]) return;
+    listed[report] = true;
     const raw = text(rawUnit(r)), unit = kind === 'FORK_TRUCK' ? null : byUnit[alnum(raw)] || byUnit[alnum(raw).replace(/^T/, '')];
     // A leased unit's write-up goes to the lessor unless the office sent it to our garage.
     if (unit && unit.leased && !L.garageSent(r.notes)) return;

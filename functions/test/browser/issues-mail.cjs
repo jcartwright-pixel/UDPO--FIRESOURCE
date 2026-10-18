@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Browser check of Maintenance's email write-ups (review item 33, Joe 10/11): a write-up from the answering-service email
- * shows a From email tag and a View email link that opens the original email (sender, time, subject, text).
+ * shows a View link that opens the original email (sender, time, subject, text). Joe 10/18: no "From email" tag and no
+ * "View email" wording, one View link in front of what is wrong.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -41,11 +42,13 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
   try {
     const p = await openPage(browser, 1920, 1080, '/issues.html?testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('tr[data-id="MAIL_mail77_tractor"]');
-    assert.match(await p.textContent('tr[data-id="MAIL_mail77_tractor"]'), /From email/);
-    assert.equal(/From email/.test(await p.textContent('tr[data-id="APP_x_mon_tractor"]')), false);
+    assert.match(await p.textContent('tr[data-id="MAIL_mail77_tractor"] td.wrong'), /^View truck horn weak$/);
+    assert.equal(/From email|View email/.test(await p.textContent('#rows')), false);
+    // A write-up typed into the sheet (no email, no app check-in) has nothing to open.
+    assert.equal(await p.locator('tr[data-id="APP_x_mon_tractor"] [data-source]').count(), 0);
     await shot(p, 'list-1920.png');
     await shot(p, 'list-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
-    await p.click('tr[data-id="MAIL_mail77_tractor"] [data-mail]');
+    await p.click('tr[data-id="MAIL_mail77_tractor"] [data-source]');
     await p.waitForSelector('#mail-modal:not([hidden]) .mail-text');
     const shown = await p.textContent('#mail-body');
     assert.match(shown, /Lauttamus Answering Service/);
@@ -55,7 +58,7 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
     await p.click('[data-close-mail]');
     assert.equal(await p.isHidden('#mail-modal'), true);
     assert.deepEqual(p.errors, []);
-    results.push('A write-up from the answering-service email shows From email and View email opens the original email; typed ones show neither');
+    results.push('A write-up from the answering-service email shows one View link that opens the original email; typed ones have none');
   } finally {
     await browser.close();
   }
