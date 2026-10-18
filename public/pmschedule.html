@@ -168,7 +168,7 @@
       if (stop) stop();
       data = null;
       render();
-      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read the PM schedule (' + e.message + '). Check the network and reload the page.'), { noJournal: true });
+      stop = watchMaint(db, plant, d => { data = d; render(); }, e => showError('Could not read the PM schedule (' + e.message + '). Check the network and reload the page.'), { noJournal: true, openOrders: true });
     }
     requireSignIn(async (user) => {
       ({ db } = await start());

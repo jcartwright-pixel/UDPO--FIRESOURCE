@@ -129,6 +129,8 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.deepEqual(await pull(db(), o), { trucks: 2, days: 1, alerts: 3, reefer: 0 });
   assert.equal(log.slice(before).filter(l => /rest\/login|\/templates|conditions/.test(l)).length, 0);
   assert.ok(log.indexOf('alerts 2026-10-13 14:00:00 to 2026-10-13 14:15:00') >= 0, 'the next read starts 10 minutes before the last one ended');
+  assert.equal((await alert('A901')).updatedAt, '2026-10-13T14:10:00.000Z', 'an alert read again unchanged is not rewritten (Joe 10/18)');
+  assert.equal((await alert('A901')).place, 'Uniontown Yard', 'the re-read keeps the place found the first time');
   day = (await db().collection('gpsDays').doc('2026-10-13_223876').get()).data();
   assert.deepEqual([day.miles, day.firstMove, day.lastMove], [12.4, '2026-10-13T14:15:00.000Z', '2026-10-13T14:15:00.000Z']);
   assert.equal(day.since, '2026-10-13T14:10:00.000Z', 'today is counted from the first read, so Trucks Today can say so');

@@ -95,7 +95,7 @@
       const week = data.workOrders.filter(o => String(o.status).toUpperCase() === 'DONE' && L.localDay(o.completed_at) >= weekAgo);
       const due = L.fleetDue(units(), data.fleetSetup, miles(), open, rules, t);
       const hours = Math.round(week.reduce((s, x) => s + (Number(x.minutes) || 0), 0) / 6) / 10;
-      const garage = '<div class="hub-card garage" data-kind="GARAGE" data-card="fleet.html?view=work"><a class="hub-card-head" href="fleet.html?view=work"><span class="hub-wrench"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span><strong>Garage</strong><span class="hub-big"><b>' + (open.length + waiting) + '</b><small>Work orders</small></span></a>' +
+      const garage = '<div class="hub-card garage" data-kind="GARAGE" data-card="fleet.html?view=work"><a class="hub-card-head" href="fleet.html?view=work"><span class="hub-wrench"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span><strong>Garage</strong><span class="hub-big"><b>' + (open.length + waiting().length) + '</b><small>Work orders</small></span></a>' +
         '<div class="hub-tiles4">' + tile(open.filter(x => String(x.status).toUpperCase() === 'WORKING').length, 'Working now', 'fleet.html?view=work') + tile(open.filter(x => String(x.status).toUpperCase() === 'PARTS').length, 'Waiting on parts', 'fleet.html?view=work', 'warn') +
         tile(due.items.filter(i => i.status === 'OVERDUE').length, 'Overdue service', 'fleet.html', 'warn') + tile(due.items.filter(i => i.status === 'DUE_SOON').length, 'Due soon', 'fleet.html', 'warn') +
         tile(week.length, 'Finished · this week', 'fleet.html?view=work', 'good') + tile(hours.toFixed(1), 'Hours · this week', 'fleet.html?view=work') +
@@ -109,22 +109,30 @@
     }
 
     // Joe 10/14: the Garage card counts what the Garage Station lists, so the write-ups on it with no work order yet count too
-    // (garage.js officeJobs); read again whenever the work orders change and every minute.
-    let waiting = 0;
+    // (garage.js officeJobs); read every minute. Joe 10/18: no longer on every work-order change too; a write-up that a work
+    // order now points at drops off here at once, as garage.js garageJobs drops it, so the count is the same.
+    let waitingJobs = [];
+    const waiting = () => {
+      const linked = {};
+      data.workOrders.forEach(o => { if (o.work_order_id && (!o.facility_id || o.facility_id === 'fac_uniontown') && o.source_kind && o.source_id) linked[o.source_kind + '|' + o.source_id] = true; });
+      return waitingJobs.filter(j => !linked[j.writeUp]);
+    };
     async function loadWaiting() {
-      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waiting = ((r.data && r.data.jobs) || []).length; } catch (err) { /* the work orders still count */ }
+      if (document.hidden) return; // read again when the page shows
+      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waitingJobs = (r.data && r.data.jobs) || []; } catch (err) { /* the work orders still count */ }
       render();
     }
     setInterval(loadWaiting, 60000);
+    document.addEventListener('visibilitychange', loadWaiting);
 
     requireSignIn(async () => {
       const { db } = await start();
       onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
       // Joe 10/18 (screen speed): the open write-ups and the recent ones the counts need, not every write-up ever made.
       watchIssueRecords(db, r => { data.maintenance = r; render(); }, e => showError('Could not read the write-ups (' + e.message + '). Some counts may be short; check the network and reload the page.'));
-      // The open work orders and this week's finished ones (the Garage card), not every work order ever made; the write-ups
-      // waiting for a work order are read again whenever they change.
-      watchHubWorkOrders(db, L.weekStart(L.operatingDay(new Date())), r => { data.workOrders = r; render(); loadWaiting(); }, e => showError('Could not read the work orders (' + e.message + '). Some counts may be short; check the network and reload the page.'));
+      // The open work orders and this week's finished ones (the Garage card), not every work order ever made.
+      loadWaiting();
+      watchHubWorkOrders(db, L.weekStart(L.operatingDay(new Date())), r => { data.workOrders = r; render(); }, e => showError('Could not read the work orders (' + e.message + '). Some counts may be short; check the network and reload the page.'));
       Object.keys(data).filter(name => name !== 'maintenance' && name !== 'workOrders').forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });

@@ -57,7 +57,7 @@
     // Joe 10/13: the scorecard is driving and distribution only: no plant card (the average is the drivers'), no route cuts.
     forScreen('scorecard');
     const L = window.UDLogic, S = window.UDScore, CORE = S.SC_CORE;
-    let mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
+    let periodReady = false, mode = 'month', runs = [], events = [], drivers = [], exceptions = [], saved = {}, open = '';
     const today = () => L.operatingDay(new Date());
     let year = Number(today().slice(0, 4)), month = Number(today().slice(5, 7)), weekStart = S.scWeekRange_(S.scAddDays_(today(), -1)).start;
     // ?month=2026-10 or ?week=2026-10-04 opens that period (links and the browser checks).
@@ -128,15 +128,27 @@
       return S.scMonthRange_(year, month);
     }
     // Reads only the period's GPS, again when the period changes.
+    // Joe 10/18: the dispatch days and plant check-ins too (they were every week ever kept). A run's GPS is the day it leaves,
+    // 2 days before to 1 day after its delivery day, and an alert just after midnight can go back a day, so the days from 2
+    // before the period to 2 after it are read: the scores come out the same.
     function watchGps() {
       if (!dbRef || mode === 'settings') return;
       const p = period(), key = p.start + '|' + p.end;
       if (key === gpsKey) return;
       gpsKey = key;
       if (gpsSub) gpsSub.forEach(u => u());
-      gpsDays = []; gpsAlerts = [];
+      gpsDays = []; gpsAlerts = []; runs = []; events = []; periodReady = false;
       const range = (name) => query(collection(dbRef, name), where('date', '>=', p.start), where('date', '<=', p.end));
+      const from = S.scAddDays_(p.start, -2), to = S.scAddDays_(p.end, 2), fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.');
+      // The period's loads and check-ins show together, once both have answered, so a half-read board never shows.
+      const got = { runs: null, events: null }, put = (k) => s => {
+        got[k] = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        if (!got.runs || !got.events || gpsKey !== key) return;
+        runs = got.runs; events = got.events; periodReady = true; render();
+      };
       gpsSub = [
+        onSnapshot(query(collection(dbRef, 'runs'), where('weekStart', '>=', L.weekStart(from)), where('weekStart', '<=', to)), put('runs'), fail('the dispatch runs')),
+        onSnapshot(query(collection(dbRef, 'plantEvents'), where('date', '>=', from), where('date', '<=', to)), put('events'), fail('the plant check-ins')),
         onSnapshot(range('gpsDays'), s => { gpsDays = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the GPS miles (' + e.message + '). Reload the page.')),
         // No alerts yet (or none readable) is the plain "No GPS alerts received yet" line, not an error.
         onSnapshot(range('gpsAlerts'), s => { gpsAlerts = s.docs.map(d => d.data()); render(); }, () => { gpsAlerts = []; render(); })
@@ -185,9 +197,21 @@
       try { paint(); } finally { painting = false; }
       if (again) { again = false; render(); }
     }
+    // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
+    function periodLabel() { return mode === 'year' ? String(year) : mode === 'week' ? 'Week of ' + shortDate(weekStart) : CORE.MONTHS[month - 1].slice(0, 3) + ' ' + String(year).slice(-2); }
     function paint() {
       const s = S.scSettings_(saved), edit = canManage();
       watchGps();
+      // A board is drawn only once the period's loads and check-ins are in, so it never shows a short list first.
+      // Until then the old period's board comes down, so its numbers never show under the new period.
+      if (mode !== 'settings' && !periodReady) {
+        document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+        const sheet = document.getElementById('sheet');
+        if (!sheet.querySelector('.sc-loading')) { document.getElementById('kpis').innerHTML = ''; sheet.innerHTML = '<p class="hint sc-loading">Loading the scorecard…</p>'; }
+        const pl = document.querySelector('#bar .sc-period');
+        if (pl) pl.textContent = periodLabel();
+        return;
+      }
       document.querySelectorAll('.tabs [data-mode]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
       { const ml = modeLabel(edit ? '' : 'View only'); document.getElementById('sub').textContent = (ml ? ml.charAt(0) + ml.slice(1).toLowerCase() + ' · ' : '') + 'Rewards for perfect days, points off for misses'; }
       const k = document.getElementById('kpis'), bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot');
@@ -265,8 +289,7 @@
         sheet.querySelector('[data-mode-go]').onclick = () => { mode = 'month'; render(); };
         return;
       }
-      // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
-      const b = board(s), sm = b.summary, label = mode === 'year' ? String(year) : mode === 'week' ? 'Week of ' + shortDate(weekStart) : CORE.MONTHS[month - 1].slice(0, 3) + ' ' + String(year).slice(-2);
+      const b = board(s), sm = b.summary, label = periodLabel();
       const lostCount = b.unassigned.reduce((t, u) => t + u.alerts.length, 0);
       k.innerHTML = [[sm.drivers, 'Drivers graded'], [sm.average == null ? '–' : sm.average, 'Average driver score'], [sm.missedCheckins, 'Missed check-ins', sm.missedCheckins ? 'warn' : ''],
         [sm.lostCases, 'Cases lost on routes', sm.lostCases ? 'warn' : ''], [sm.speeding, 'Speeding alerts', sm.speeding ? 'warn' : ''], [sm.hardBrakes, 'Hard stops', sm.hardBrakes ? 'warn' : ''],
@@ -445,10 +468,8 @@
       dbRef = db;
       watchLists(user, render);
       onSnapshot(query(collection(db, 'gpsAlerts'), limit(1)), s => { alertsEver = !s.empty; render(); }, () => { alertsEver = false; render(); });
-      const NAMES = { runs: 'the dispatch runs', plantEvents: 'the plant check-ins', drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings', driverIncidents: 'the accidents and complaints', scorecardExcuses: 'the excused misses' };
+      const NAMES = { drivers: 'the driver list', exceptions: 'the days off', routes: 'Route Master', scorecardRatings: 'the truck cleanliness ratings', driverIncidents: 'the accidents and complaints', scorecardExcuses: 'the excused misses' };
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + (NAMES[name] || name) + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.'));
-      watch('runs', v => { runs = v; });
-      watch('plantEvents', v => { events = v; });
       watch('drivers', v => { drivers = v; });
       watch('exceptions', v => { exceptions = v; });
       watch('scorecardRatings', v => { ratings = v; });

@@ -159,19 +159,27 @@ async function runMocreoSync({ db, getSecrets, fetchFn, now = () => new Date() }
     // Secret Manager is only a fallback (Joe pastes the key in Administration), so a secret the server may not read means
     // the same to him as no key: nothing to fix on his side.
     const why = s.untested ? 'The saved MOCREO key has not passed Test Connection yet; readings are manual.' : 'No MOCREO key saved yet; readings are manual.';
-    await statusRef.set({ configured: false, lastAttempt: at, lastError: why }, { merge: true });
+    // Waiting on a key: the status changes only when the reason does, so it is not rewritten every 5 minutes.
+    const was = (await statusRef.get()).data() || {};
+    if (was.configured !== false || was.lastError !== why) await statusRef.set({ configured: false, lastAttempt: at, lastError: why }, { merge: true });
     return { ok: false, waiting: true };
   }
   try {
     const devices = await fetchDevices(fetchFn, s.key, s.asset);
     const old = await db.collection('sensors').get(), seen = new Set();
     const batch = db.batch();
+    // Joe 10/18: a sensor is written only when what MOCREO sent changed. Five plant screens listen to every sensor, so
+    // rewriting all of them every 5 minutes just to move the sync time sent every sensor to every open screen again.
+    const before = {};
+    old.docs.forEach(x => { const c = Object.assign({}, x.data()); delete c.lastSyncAt; before[x.id] = c; });
+    const same = (a, b) => !!a && Object.keys(a).length === Object.keys(b).length && Object.keys(b).every(k => JSON.stringify(a[k]) === JSON.stringify(b[k]));
     devices.forEach(d => {
       const id = safeIdPart(d.sensorId);
       seen.add(id);
-      batch.set(db.collection('sensors').doc(id), Object.assign({}, d, { returned: true, lastSyncAt: at, source: 'MOCREO' }));
+      const next = Object.assign({}, d, { returned: true, source: 'MOCREO' });
+      if (!same(before[id], next)) batch.set(db.collection('sensors').doc(id), Object.assign(next, { lastSyncAt: at }));
     });
-    old.docs.filter(x => !seen.has(x.id)).forEach(x => batch.set(x.ref, { returned: false, online: false, lastSyncAt: at }, { merge: true }));
+    old.docs.filter(x => !seen.has(x.id) && !(x.data().returned === false && x.data().online === false)).forEach(x => batch.set(x.ref, { returned: false, online: false, lastSyncAt: at }, { merge: true }));
     batch.set(statusRef, { configured: true, lastAttempt: at, lastSuccess: at, lastError: '', sensors: devices.length });
     await batch.commit();
     return { ok: true, sensors: devices.length };

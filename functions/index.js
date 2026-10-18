@@ -18,6 +18,7 @@
  *                         real one only once config/app.fleetSyncReal.enabled is on, which waits for Joe's OK)
  *   fleetSyncNow          the same from Equipment's "Sync fleet list" button, for a manager or administrator; {preview: true}
  *                         lists every change it would make and writes nothing
+ *   cleanupNightly        deletes behind-the-scenes logs older than 90 days and Shift Notes older than 6 months (cleanup.js)
  *   mailPlantReport       emails a plant report straight after Send Current Report saves it (reportmail.js; MAIL_FROM)
  *   mocreoEvery5Minutes   reads the MOCREO cooler sensors (read only) once a key is saved in Administration and tested
  *   mocreo                Administration > MOCREO & Sensors: save or replace the key (never shown again), test it, thermometer locations
@@ -40,6 +41,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
+const { runCleanup } = require('./src/cleanup');
 const { applyAction, checkSaves, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
 const FAILS = require('./src/fails');
@@ -302,8 +304,8 @@ function liveRollDeps() {
 // The write-back runs only when config/app.writeBack.enabled is true and WRITEBACK_JSON names the Live workbook the
 // copy reads ({"spreadsheetId": "..."}). One at a time, so saves reach the sheet in the order they were made.
 async function writeBackIfOn(part) {
-  const config = (await db.collection('config').doc('app').get()).data() || {};
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
+  const config = (await db.collection('config').doc('app').get()).data() || {};
   const target = JSON.parse(process.env.WRITEBACK_JSON);
   // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
   if (!config.writeBack || config.writeBack.enabled !== true) {
@@ -413,6 +415,11 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
   if (!run) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: 'nightly' });
+});
+
+// How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.
+exports.cleanupNightly = onSchedule({ schedule: '30 3 * * *', timeZone: 'America/New_York', timeoutSeconds: 540, maxInstances: 1 }, async () => {
+  await runCleanup({ db });
 });
 
 // Verizon Connect Fleet GPS (src/fleetgps.js): where each truck is now, and every 15 minutes today's miles. It reads the

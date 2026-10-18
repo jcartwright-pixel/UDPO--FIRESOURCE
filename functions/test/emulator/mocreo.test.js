@@ -49,6 +49,10 @@ test('with the secrets: each sensor is kept in °F, and the key is sent to MOCRE
   assert.deepEqual([status.configured, status.sensors, status.lastError], [true, 2, '']);
   const everything = JSON.stringify((await db().collection('sensors').get()).docs.map(d => d.data())) + JSON.stringify(status);
   assert.ok(!everything.includes(KEY), 'the key is never written to the database');
+  // Joe 10/18: the next sync with the same readings rewrites no sensor; the status still shows the sync ran.
+  await M.runMocreoSync({ db: db(), getSecrets: async () => ({ key: KEY, asset: 'A9' }), fetchFn: fakeMocreo([]), now: () => new Date('2026-10-10T17:05:00Z') });
+  assert.equal((await db().collection('sensors').doc('S1').get()).data().lastSyncAt, '2026-10-10T17:00:00.000Z', 'an unchanged sensor is not rewritten');
+  assert.equal((await db().collection('config').doc('mocreo').get()).data().lastSuccess, '2026-10-10T17:05:00.000Z');
 });
 
 test('a MOCREO error is kept in plain words without the key, and a sensor that stops answering is marked offline', async () => {

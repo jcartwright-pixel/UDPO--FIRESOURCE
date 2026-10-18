@@ -217,7 +217,13 @@ async function stationBoard(db, input, nowMs) {
   const techs = GA().activeTechs((await db.collection('garageTechs').get()).docs.map(d => d.data()));
   const setup = (await db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA').get()).docs.map(d => d.data());
   const saved = (await db.collection('plantMachines').where('facilityId', '==', facilityId).get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
-  const orders = (await db.collection('plantWorkOrders').where('facilityId', '==', facilityId).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+  // Joe 10/18 (polled every 30 seconds): the open work orders and the ones finished in the last two days (for Done today), not
+  // every work order the plant ever had. Every writer sets status (NEW, WORKING, PARTS, DONE) and completedAt is the save's ISO
+  // time, so the board is the same; the plant is picked here, as the facilityId read did.
+  const since = new Date(nowMs - 2 * 86400000).toISOString(), byId = {};
+  (await Promise.all([db.collection('plantWorkOrders').where('status', 'in', R.OPEN).get(), db.collection('plantWorkOrders').where('completedAt', '>=', since).get()]))
+    .forEach(s => s.docs.forEach(d => { if (d.data().facilityId === facilityId) byId[d.id] = Object.assign({}, d.data(), { id: d.id }); }));
+  const orders = Object.values(byId);
   const clocks = {};
   (await db.collection(CLOCKS).get()).docs.forEach(d => { const c = d.data(); if (c.techId && c.facilityId === facilityId) clocks[c.techId] = c; });
   const rank = (j) => (j.canRun ? 1 : 0) + (j.status === 'PARTS' ? 2 : 0);

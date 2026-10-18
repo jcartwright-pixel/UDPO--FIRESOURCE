@@ -376,8 +376,11 @@ function pickMailRun(candidates, route, driver) {
 async function findRun(db, route, driver, date) {
   let found = null;
   // The operating day first; the day before only when it fits better (a driver calling in after the 6 a.m. roll).
+  const weeks = {};
   for (const d of [date, L.addDays(date, -1)]) {
-    const p = L.dayPrefix(d), snap = await db.collection(C.runs).where('weekStart', '==', L.weekStart(d)).get();
+    // Both days are usually in the same week: read it once.
+    const w = L.weekStart(d);
+    const p = L.dayPrefix(d), snap = weeks[w] = weeks[w] || await db.collection(C.runs).where('weekStart', '==', w).get();
     const docs = snap.docs.filter(s => { const day = s.data().days && s.data().days[p]; return day && day.runs; });
     const best = pickMailRun(docs.map(s => ({ id: s.id, route: s.data().route, streamId: s.data().streamId, driver: s.data().days[p].driver })), route, driver);
     if (best.id && (!found || best.score > found.score)) found = { snap: docs.find(s => s.id === best.id), day: p, date: d, score: best.score };
@@ -386,6 +389,9 @@ async function findRun(db, route, driver, date) {
 }
 
 async function saveMailCheckin(db, msg, c, sender, stamp) {
+  // Each read looks back over mail it has already handled; one record read skips it before the week's runs are searched
+  // (two whole-week reads per email, every 15 minutes). The transaction below still checks again before saving.
+  if ((await db.collection('mailSeen').doc(M.safeIdPart(msg.id)).get()).exists) return { duplicate: true, made: [], review: 0 };
   const date = c.taken || L.operatingDay(new Date(Number(msg.internalDate) || Date.parse(stamp)));
   const hit = await findRun(db, c.route, c.driver, date);
   const by = 'EMAIL · ' + c.driver;
@@ -833,8 +839,10 @@ async function preflight(db, deps) {
   });
   await check('MOCREO Temperature Sensors', async () => {
     const m = (await read(db.collection(C.config).doc('mocreo'))) || {};
-    if (!m.lastSyncAt && !m.at && !m.ok) return { status: 'WARN', detail: 'No sensor reading yet (Administration > MOCREO & Sensors).' };
-    const last = m.lastSyncAt || m.at, age = minsAgo(last);
+    // The sync records its last good read as lastSuccess (mocreo.js); this check looked for fields it never writes.
+    const last = m.lastSuccess || m.lastSyncAt || m.at;
+    if (!last) return { status: 'WARN', detail: 'No sensor reading yet (Administration > MOCREO & Sensors).' };
+    const age = minsAgo(last);
     return age !== null && age > 30 ? { status: 'WARN', detail: 'Last sensor read ' + age + ' minutes ago.' } : { detail: 'Sensors read ' + (age === null ? 'recently' : age + ' minutes ago') + '.' };
   });
   await check('Email', async () => {

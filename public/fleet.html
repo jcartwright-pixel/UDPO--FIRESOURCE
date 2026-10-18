@@ -370,11 +370,20 @@
     });
     window.udBack = () => { if (view !== 'due' || search) { view = 'due'; search = ''; render(); return true; } return false; };
 
-    // The write-ups on the Garage Station with no work order yet (garage.js officeJobs); read again every minute.
+    // The write-ups on the Garage Station with no work order yet (garage.js officeJobs); read again every minute. Joe 10/18:
+    // no longer on every work-order change too; a write-up that a work order now points at drops off at once, as garage.js
+    // garageJobs drops it, so the list is the same.
+    let waitingJobs = [];
+    const unlinked = () => {
+      const linked = {};
+      rawOrders.forEach(o => { if (o.work_order_id && (!o.facility_id || o.facility_id === 'fac_uniontown') && o.source_kind && o.source_id) linked[o.source_kind + '|' + o.source_id] = true; });
+      waiting = waitingJobs.filter(j => !linked[j.writeUp]);
+    };
     async function loadWaiting() {
-      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waiting = (r.data && r.data.jobs) || []; } catch (err) { /* the work orders still show */ }
+      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waitingJobs = (r.data && r.data.jobs) || []; unlinked(); } catch (err) { /* the work orders still show */ }
     }
-    setInterval(() => loadWaiting().then(render), 60000);
+    setInterval(() => { if (!document.hidden) loadWaiting().then(render); }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadWaiting().then(render); });
 
     requireSignIn(async (user) => {
       const { db, auth } = await start();
@@ -383,7 +392,8 @@
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
       watch('gpsTrucks', v => { gps = v; });
-      watch('workOrders', v => { rawOrders = v; pick(); loadWaiting().then(render); });
+      loadWaiting().then(render);
+      watch('workOrders', v => { rawOrders = v; pick(); unlinked(); });
       watch('garageTechs', v => { rawTechs = v; pick(); });
       let stopRules = null;
       const follow = () => {

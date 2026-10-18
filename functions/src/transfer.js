@@ -468,12 +468,33 @@ async function keepAppOnlyDays(db, ops) {
   }
 }
 
+// Nothing to write for a list: no row changed and its stored fingerprints are the same (Joe 10/18: no double writes).
+function sameHashes(a, b) {
+  const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+  return ka.length === kb.length && ka.every(k => a[k] === b[k]);
+}
+
+// One copy reads each tab once: PLANT_OPERATIONS feeds four lists (Weekly's plant loads, odometers, scorecard events and the
+// plant journal), and was fetched four times a minute. Each caller gets its own rows, so a parser cannot change another's.
+function onceReader(reader) {
+  const seen = new Map();
+  return {
+    batchGet(id, ranges) {
+      if (ranges.length !== 1) return reader.batchGet(id, ranges);
+      const key = id + '|' + ranges[0];
+      if (!seen.has(key)) seen.set(key, reader.batchGet(id, ranges));
+      return seen.get(key).then(v => v.map(t => (t || []).map(r => (Array.isArray(r) ? r.slice() : r))));
+    }
+  };
+}
+
 /*
  * One transfer. reader.batchGet(spreadsheetId, [ranges]) returns one 2-D array of cell texts per range.
  * sources: { live: {spreadsheetId}, masters: {drivers: {spreadsheetId, tab}, ...} }.
  */
 async function runTransfer({ db, reader, sources, now, force, admin }) {
   const started = now ? now() : new Date();
+  reader = onceReader(reader);
   const configRef = db.collection(C.config).doc('app');
   const configSnap = await configRef.get();
   const config = configSnap.exists ? configSnap.data() : {};
@@ -528,7 +549,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const metaRef = db.collection(META).doc(kind);
     const prev = (await metaRef.get()).data() || {};
     const d = diffOps(db, masters[kind].collection, masters[kind].docs, prev.hashes || {}, force, { transferredAt: stamp }, revBase, masterHold[kind]);
-    ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+    ops.push(...d.ops);
+    if (d.ops.length || !sameHashes(prev.hashes, d.hashes)) ops.push({ ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.masters[kind] = { rows: Object.keys(masters[kind].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
   }
   summary.queues = {};
@@ -536,7 +558,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const metaRef = db.collection(META).doc(list);
     const prev = (await metaRef.get()).data() || {};
     const d = diffOps(db, QUEUE_KINDS[list].collection || C.maintenance, queues[list].docs, prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
-    ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+    ops.push(...d.ops);
+    if (d.ops.length || !sameHashes(prev.hashes, d.hashes)) ops.push({ ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
     summary.queues[list] = { rows: Object.keys(queues[list].docs).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
     const secret = QUEUE_KINDS[list].secret;
     if (secret) {
@@ -544,7 +567,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       const s = diffOps(db, secret.collection, queues[list].secrets || {}, sPrev.hashes || {}, force, { transferredAt: stamp }, revBase);
       // Only the hash goes in: no copy of the sheet's cells.
       s.ops.forEach(op => { if (op.data) op.data = { techId: op.data.id, hash: op.data.hash, transferredAt: stamp }; });
-      ops.push(...s.ops, { ref: sMeta, data: { hashes: s.hashes, transferredAt: stamp } });
+      ops.push(...s.ops);
+      if (s.ops.length || !sameHashes(sPrev.hashes, s.hashes)) ops.push({ ref: sMeta, data: { hashes: s.hashes, transferredAt: stamp } });
     }
   }
   // 2b. The plant side (plant.js): journal, pickups, wash and returns lists. A list that cannot be read is left as it was.
@@ -558,7 +582,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
       const metaRef = db.collection(META).doc(list);
       const prev = (await metaRef.get()).data() || {};
       const d = diffOps(db, specs[list].collection, read.lists[list], prev.hashes || {}, force, { transferredAt: stamp, fromSheet: true }, revBase, masterHold[list]);
-      ops.push(...d.ops, { ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
+      ops.push(...d.ops);
+    if (d.ops.length || !sameHashes(prev.hashes, d.hashes)) ops.push({ ref: metaRef, data: { hashes: d.hashes, transferredAt: stamp } });
       sum[list] = { rows: Object.keys(read.lists[list]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
     }
   }
@@ -574,27 +599,50 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const moved = !!prev.sourceTab && prev.sourceTab !== tab.tab;
     const d = diffOps(db, C.runs, tab.runs, prev.rowHashes || {}, force || moved, { transferredAt: stamp }, revBase, hold);
     if (!newSource) await keepAppOnlyDays(db, d.ops);
-    ops.push(...d.ops, { ref: weekRef, data: { weekStart: tab.weekStart, sourceTab: tab.tab, rowHashes: d.hashes, rows: Object.keys(tab.runs).length, transferredAt: stamp,
-      // Weekly's Publish record is kept by the copy.
-      publishedAt: prev.publishedAt || '', publishedBy: prev.publishedBy || '' } });
+    ops.push(...d.ops);
+    const rows = Object.keys(tab.runs).length;
+    if (d.ops.length || prev.sourceTab !== tab.tab || prev.weekStart !== tab.weekStart || prev.rows !== rows || !sameHashes(prev.rowHashes, d.hashes)) {
+      ops.push({ ref: weekRef, data: { weekStart: tab.weekStart, sourceTab: tab.tab, rowHashes: d.hashes, rows, transferredAt: stamp,
+        // Weekly's Publish record is kept by the copy.
+        publishedAt: prev.publishedAt || '', publishedBy: prev.publishedBy || '' } });
+    }
     summary.weeks[tab.weekStart] = { tab: tab.tab, rows: Object.keys(tab.runs).length, written: d.written, unchanged: d.unchanged, removed: d.removed, waitingForWriteBack: d.held };
   }
   // 2c. Weeks the current app archived (DISPATCH WEEK HISTORY), read only. A week the app already holds from a Live tab or a
   // Publish keeps what it has; only weeks never seen any other way are copied, and kept in step with the archive.
   if (sources.live.weekHistory) {
     let history = null;
-    try { history = parseHistory((await reader.batchGet(sources.live.spreadsheetId, ["'" + HISTORY_TAB + "'"]))[0]); } catch (e) { history = null; }
+    let raw = null;
+    try { raw = (await reader.batchGet(sources.live.spreadsheetId, ["'" + HISTORY_TAB + "'"]))[0]; history = parseHistory(raw); } catch (e) { history = null; }
     summary.history = {};
+    // The archive only grows, and reading every archived week's record each minute grew with it. When the tab and the live
+    // weeks are the same as last time, every archived week is already in step, so none is read or written.
+    const histRef = db.collection(META).doc('weekHistory');
+    const histHash = history ? fingerprint({ raw, weekStarts, live: config.liveWeeks || {}, source: liveSourceId }) : '';
+    const histPrev = history && !force ? ((await histRef.get()).data() || {}) : {};
+    if (history && !force && histPrev.hash === histHash) {
+      Object.keys(history).forEach(w => {
+        if (weekStarts.indexOf(w) < 0 && Object.values(config.liveWeeks || {}).indexOf(w) < 0) { const rows = Object.keys(history[w]).length; summary.history[w] = { rows, written: 0, unchanged: rows, removed: 0 }; }
+      });
+      history = {};
+    }
+    const histDone = history && Object.keys(history).length ? { ref: histRef, data: { hash: histHash, transferredAt: stamp } } : null;
     for (const w of Object.keys(history || {})) {
       if (weekStarts.indexOf(w) >= 0 || Object.values(config.liveWeeks || {}).indexOf(w) >= 0) continue;
       const weekRef = db.collection(C.weeks).doc(w), prev = (await weekRef.get()).data();
       if (prev && prev.sourceTab !== HISTORY_TAB) continue;
       const d = diffOps(db, C.runs, history[w], (prev && prev.rowHashes) || {}, force, { transferredAt: stamp }, revBase);
       if (!newSource) await keepAppOnlyDays(db, d.ops);
-      ops.push(...d.ops, { ref: weekRef, data: { weekStart: w, sourceTab: HISTORY_TAB, rowHashes: d.hashes, rows: Object.keys(history[w]).length, transferredAt: stamp,
-        publishedAt: (prev && prev.publishedAt) || '', publishedBy: (prev && prev.publishedBy) || '' } });
+      ops.push(...d.ops);
+      const rows = Object.keys(history[w]).length;
+      if (d.ops.length || !prev || prev.rows !== rows || !sameHashes(prev.rowHashes, d.hashes)) {
+        ops.push({ ref: weekRef, data: { weekStart: w, sourceTab: HISTORY_TAB, rowHashes: d.hashes, rows, transferredAt: stamp,
+          publishedAt: (prev && prev.publishedAt) || '', publishedBy: (prev && prev.publishedBy) || '' } });
+      }
       summary.history[w] = { rows: Object.keys(history[w]).length, written: d.written, unchanged: d.unchanged, removed: d.removed };
     }
+    // Last, so a copy that stops part way reads the archive again next time.
+    if (histDone) ops.push(histDone);
   }
   const warnings = [].concat(...Object.keys(masters).map(k => masters[k].warnings), ...Object.keys(queues).map(k => queues[k].warnings), ...tabKeys.map(k => live[k].warnings));
   let liveWeeks = {};
@@ -602,8 +650,11 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // Weekly's Publish moved the weeks on in the new app (weekroll.js): its weeks stand until the sheet's own weeks catch up.
   const roll = config.weekRoll;
   if (roll && roll.current && roll.previous && roll.next && roll.current > liveWeeks.current) liveWeeks = { previous: roll.previous, current: roll.current, next: roll.next };
-  const transferRef = db.collection(C.transfers).doc(stamp.replace(/[:.]/g, '-'));
-  ops.push({ ref: transferRef, data: { at: stamp, force: !!force, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
+  // A copy that changed something keeps its own record. A copy that found the sheets as they were (most minutes) updates one
+  // standing record instead, so the copy's log no longer gains 1,440 records a day; its time still shows the copy is running.
+  const changed = ops.length > 0 || !!force;
+  const transferRef = db.collection(C.transfers).doc(changed ? stamp.replace(/[:.]/g, '-') : 'no-changes');
+  ops.push({ ref: transferRef, data: { at: stamp, force: !!force, changed, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
   const lastTransfer = { at: stamp, id: transferRef.id, warningCount: warnings.length };
   // Read the switch again in a transaction: an administrator may have moved a screen while this copy was reading the sheets,
