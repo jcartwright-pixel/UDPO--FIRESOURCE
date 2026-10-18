@@ -1,8 +1,9 @@
 'use strict';
 /*
  * Browser check of the Manager Walkthrough (Joe 10/15, option 2) on the made-up plant: the managers' phone and tablet start screen
- * (Manager Walkthrough, Loading, Unloading), the walkthrough (Yard, Coolers, Quality) with its numbers and lists from the same rule
- * as Manager Center, the walkthrough bar on Coolers and Quality, and a manager signing in on a phone landing on the start screen.
+ * (Manager Walkthrough, Loading, Unloading), the walkthrough (Yard, Coolers, Production) with its numbers and lists from the same rule
+ * as Manager Center, the DONE / DUE / PAST DUE button beside each card (Joe 10/18), the walkthrough bar on Coolers and Production,
+ * and a manager signing in on a phone landing on the start screen.
  * Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -19,6 +20,17 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR || '';
 const MANAGER = 'testEmail=manager.test@uniteddairy.com';
+function nyMinutes(ms) {
+  const p = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+  return Number(p.hour) * 60 + Number(p.minute);
+}
+// The line checks seeded 200 minutes back are on today's operating day (from 6 AM) only from 9:30 AM; from 6:00 to 9:29 AM the
+// screens run on a clock pinned to 10:30 AM, so the check is the same at every hour.
+const CLOCK = (() => {
+  const real = Date.now(), m = nyMinutes(real);
+  return m >= 360 && m < 570 ? { ms: real + (630 - m) * 60000, pinned: true } : { ms: real, pinned: false };
+})();
 
 async function openPage(browser, opts, url) {
   const ctx = await browser.newContext(Object.assign({ serviceWorkers: 'block' }, opts));
@@ -26,6 +38,7 @@ async function openPage(browser, opts, url) {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
   const page = await ctx.newPage();
+  if (CLOCK.pinned) await page.clock.setFixedTime(new Date(CLOCK.ms));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + url);
@@ -41,10 +54,16 @@ async function tidy(page, what) {
 }
 
 async function seed() {
-  const at0 = Date.now(), d = db();
+  const at0 = CLOCK.ms, d = db();
   // Cooler North read 44°F (too warm) 30 minutes ago: the newest walkthrough check, by the supervisor.
   await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_wkseed').set({ recordId: 'TEMP-wkseed', type: 'PLANT_TEMPERATURE_CHECK', date: L.operatingDay(new Date(at0)), status: 'HIGH',
     recordedAt: new Date(at0 - 30 * 60000).toISOString(), recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: 44, status: 'HIGH' } });
+  // Joe 10/18: two lines running today: the Gallon Filler checked 200 minutes ago (past due at 3 hours) and HTST #1 130 minutes
+  // ago (due at 2 hours); the other three have no check today, so they are not running and need none.
+  const line = (id, op, mins) => d.collection('plantJournal').doc(id).set({ recordId: id, type: 'PRODUCTION_QUALITY', date: L.operatingDay(new Date(at0)), status: 'RUNNING',
+    recordedAt: new Date(at0 - mins * 60000).toISOString(), recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { operationId: op, product: 'Whole milk', status: 'RUNNING', qualityCheck: 'PASS' } });
+  await line('PRODUCTION_QUALITY_app_wkgal', 'ut_prod_gallon_filler', 200);
+  await line('PRODUCTION_QUALITY_app_wkhtst', 'ut_prod_htst_1', 130);
 }
 
 (async () => {
@@ -54,25 +73,32 @@ async function seed() {
   const browser = await chromium.launch();
   const results = [];
   try {
-    // The walkthrough: Coolers then Quality, big numbers; Quality's five lines were last checked days ago (past due, flashing).
+    // The walkthrough: Yard, Coolers, Production, big numbers; two lines are running, one past due (flashing).
     for (const [w, h, touch] of [[390, 844, true], [600, 960, true], [800, 1280, true], [1536, 730, false], [1920, 950, false]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && w < 700 }, '/walkthrough.html?' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Quality']);
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
       assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['yard.html?walk=1', 'temps.html?walk=1', 'quality.html?walk=1']);
-      assert.equal(await page.textContent('.wk-choice:nth-child(3) .wk-n'), '5of 5 · 5 past due');
-      assert.match(await page.textContent('.wk-choice:nth-child(2) .wk-n span'), /^1 out of range$/);
-      assert.ok(await page.$eval('.wk-choice:nth-child(3)', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Quality flashes');
+      assert.equal(await page.textContent('.wk-row:nth-child(3) .wk-choice .wk-n'), '2of 5 · 1 past due');
+      assert.match(await page.textContent('.wk-row:nth-child(2) .wk-choice .wk-n span'), /^1 out of range$/);
+      assert.ok(await page.$eval('.wk-row:nth-child(3) .wk-choice', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Production flashes');
+      // Joe 10/18: beside each card a button in its colour: Yard done (no trucks), Coolers and Production past due (red).
+      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.className + ' ' + x.getAttribute('href') + ' ' + getComputedStyle(x).backgroundColor)),
+        ['DONE wk-act ok yard.html?walk=1 rgb(31, 122, 77)', 'PAST DUE wk-act late temps.html?walk=1 rgb(198, 40, 40)', 'PAST DUE wk-act late quality.html?walk=1 rgb(198, 40, 40)']);
+      assert.ok(await page.$$eval('.wk-row', r => r.every(x => { const a = x.querySelector('.wk-choice').getBoundingClientRect(), b = x.querySelector('.wk-act').getBoundingClientRect(); return b.left >= a.right && Math.abs(b.top - a.top) < 2; })), 'each button sits beside its card');
+      // Who did each area's newest check, or done automatically.
+      assert.deepEqual(await page.$$eval('.wk-who', a => a.map(x => x.textContent.replace(/\d{1,2}:\d\d [AP]M/, 'T'))), ['Done automatically', 'Last T · Supervisor Test', 'Last T · Supervisor Test']);
       // Each stop lists what it holds, problems first in red (Joe 10/15, later).
-      assert.equal(await page.textContent('.wk-choice:nth-child(2) .wk-items li.bad'), 'Cooler North 44°F · HIGH');
-      assert.equal(await page.$$eval('.wk-choice:nth-child(3) .wk-items li.bad', l => l.length), 5);
+      assert.equal(await page.textContent('.wk-row:nth-child(2) .wk-items li.bad'), 'Cooler North 44°F · HIGH');
+      assert.deepEqual(await page.$$eval('.wk-row:nth-child(3) .wk-items li', l => l.map(x => x.className + ' ' + x.textContent.replace(/ · last .*/, ''))),
+        ['bad GALLON FILLER PAST DUE', 'warn HTST #1 DUE', 'ok BOXING NOT RUNNING', 'ok TOTES NOT RUNNING', 'ok BLOW MOLD NOT RUNNING']);
       assert.match(await page.textContent('#last'), /^Last walkthrough check: \d{1,2}:\d\d [AP]M · Supervisor Test$/);
       await tidy(page, 'Walkthrough ' + w);
       await shot(page, 'walkthrough-' + w);
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Walkthrough: Yard, Coolers, Quality with big numbers and what each holds, past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
+    results.push('Walkthrough: Yard, Coolers, Production with big numbers, what each holds and who checked it last, a DONE / DUE / PAST DUE button beside each (green, yellow, red), past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
 
     // The phone and tablet start screen: three choices.
     for (const [w, h] of [[390, 844], [800, 1280]]) {
@@ -80,7 +106,8 @@ async function seed() {
       await page.waitForSelector('.wk-choice');
       assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading']);
       assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html']);
-      assert.deepEqual(await page.$$eval('.wk-choice:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Quality']);
+      assert.deepEqual(await page.$$eval('.wk-row:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
+      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading and Unloading have none');
       assert.equal(await page.textContent('#ask'), 'What are you doing?');
       assert.equal(await page.isVisible('#full'), true);
       await tidy(page, 'Start screen ' + w);
@@ -88,9 +115,9 @@ async function seed() {
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Quality), Loading and Unloading at 390 and 800, with Open the full Operations app');
+    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Production) with its PAST DUE button, Loading and Unloading at 390 and 800, with Open the full Operations app');
 
-    // Coolers and Quality opened from the walkthrough carry its bar: back, which stop, the next stop.
+    // Coolers and Production opened from the walkthrough carry its bar: back, which stop, the next stop.
     const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
     const yd = await openPage(browser, phone, '/yard.html?walk=1&' + MANAGER);
     await yd.waitForSelector('#walk-bar');
@@ -101,14 +128,14 @@ async function seed() {
     await yd.context().close();
     const cool = await openPage(browser, phone, '/temps.html?walk=1&' + MANAGER);
     await cool.waitForSelector('#walk-bar');
-    assert.deepEqual(await cool.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Next: Quality › quality.html?walk=1']);
+    assert.deepEqual(await cool.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Next: Production › quality.html?walk=1']);
     assert.equal(await cool.textContent('#walk-bar b'), '2 · Coolers');
     await cool.waitForSelector('#rows [data-location]');
     await tidy(cool, 'Coolers with the walkthrough bar');
     await shot(cool, 'walkthrough-coolers-390');
     await cool.click('#walk-bar a.next');
     await cool.waitForSelector('#walk-bar');
-    assert.equal(await cool.textContent('#walk-bar b'), '3 · Quality');
+    assert.equal(await cool.textContent('#walk-bar b'), '3 · Production');
     assert.deepEqual(await cool.$$eval('#walk-bar a', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['‹ Walkthrough walkthrough.html', 'Done ✓ walkthrough.html']);
     await cool.waitForSelector('#fields label');
     await shot(cool, 'walkthrough-quality-390');
@@ -118,7 +145,7 @@ async function seed() {
     await plain.waitForSelector('#rows [data-location]');
     assert.equal(await plain.$('#walk-bar'), null, 'no bar when Coolers is opened from the menu');
     await plain.context().close();
-    results.push('Yard, Coolers and Quality from the walkthrough: the bar with Walkthrough, the stop and Next / Done; none from the menu');
+    results.push('Yard, Coolers and Production from the walkthrough: the bar with Walkthrough, the stop and Next / Done; none from the menu');
 
     // A manager signing in on a phone lands on the start screen; Open the full Operations app stays on the full app.
     const land = await openPage(browser, phone, '/index.html?' + MANAGER);

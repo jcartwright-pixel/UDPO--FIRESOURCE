@@ -845,9 +845,16 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
     const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
     if (left) throw new SaveError('CONFLICT', 'Trailer ' + req.trailer + ' was already checked. It can be checked again in ' + left + ' minutes.');
   }
+  // Joe 10/18: a check keeps the trailer's GPS temperature at that time (gpsReefer, while it is recorded), for the 24-Hour History.
+  let gps = null;
+  if (!req.departed) {
+    const g = await tx.get(db.collection('gpsReefer').doc(M.safeIdPart(req.trailer)));
+    const r = g.exists ? g.data() : null;
+    if (r && r.recording && r.tempF !== null && r.tempF !== undefined && Date.parse(stamp) - R.when(r.readingAt) <= R.REEFER_STALE_MINUTES * 60000) gps = { gpsTempF: r.tempF, gpsAt: r.readingAt };
+  }
   const id = 'YARD_CHECK_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   const payload = req.departed ? { route: req.routeRun, run: req.routeRun, trailer: req.trailer, notes: 'Left the yard', status: 'DEPARTED' }
-    : { route: req.routeRun, run: req.routeRun, trailer: req.trailer, temperature: req.temperature, setPoint: req.setPoint, fuelLevel: req.fuelLevel, notes: req.notes, status: 'COMPLETE' };
+    : Object.assign({ route: req.routeRun, run: req.routeRun, trailer: req.trailer, temperature: req.temperature, setPoint: req.setPoint, fuelLevel: req.fuelLevel, notes: req.notes, status: 'COMPLETE' }, gps || {});
   tx.set(journal.doc(id), { recordId: 'YARD-' + req.requestId.slice(0, 40), type: 'YARD_CHECK', date: req.date, status: payload.status, route: req.routeRun, run: req.routeRun, trailer: req.trailer,
     temperature: payload.temperature || '', notes: payload.notes, payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
   const result = { ok: true, requestId: req.requestId, trailer: req.trailer, status: payload.status, recordedAt: stamp, checkId: id,

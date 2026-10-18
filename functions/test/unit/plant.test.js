@@ -387,18 +387,21 @@ test('Loading Rundown: each Start / End keeps who saved it and from where, and a
   assert.equal(P.validateLoad({ fields: { completedAt: STAMP }, station: 'Case Loadout <b>' }, SaveError).station, 'Case Loadout b');
 });
 
-test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Complete lines skipped, each area lists what is in it, newest check is the last walkthrough', () => {
+test('Manager Walkthrough: due after 2 hours, past due after 3 hours, only running lines count, each area lists what is in it with its newest check, no trucks or no lines running is done automatically', () => {
   const now = Date.parse('2026-10-15T17:00:00Z'), ago = (m) => new Date(now - m * 60000).toISOString();
   const yard = { rows: [{ trailer: '5312', route: '905', recordedAt: ago(200), recordedBy: 'a@x' }, { trailer: '5307', route: '912', recordedAt: ago(130), recordedBy: 'a@x' }, { trailer: '5330', route: '836', recordedAt: '' }],
     locked: [{ trailer: '5320', route: '845', temperature: '33', recordedAt: ago(12), recordedBy: 'mike.a@x' }] };
   const temps = [{ location: 'Cooler North', sensorTemp: '', lastManualTemperature: 44, locked: false, lastCheckedAt: ago(300), status: 'MANUAL ONLY', lastStatus: 'HIGH' },
     { location: 'Freezer', sensorTemp: -8, locked: true, lastCheckedAt: ago(20), lastCheckedBy: 'b@x', status: 'IN RANGE' }, { location: 'Dock', sensorTemp: 36.3, locked: true, status: 'OFFLINE', lastCheckedAt: ago(10) }];
   const lines = [{ name: 'GALLON FILLER', last: { recordedAt: ago(125), status: 'RUNNING', inApp: true } }, { name: 'BOXING', last: { recordedAt: ago(5), status: 'FINISHED', inApp: true, recordedBy: 'c@x' } },
-    { name: 'TOTES', last: {} }, { name: 'BLOW MOLD', last: { recordedAt: ago(30), status: 'RUNNING', inApp: true } }];
+    { name: 'TOTES', last: {} }, { name: 'BLOW MOLD', last: { recordedAt: ago(30), status: 'RUNNING', inApp: true } }, { name: 'HTST', last: { recordedAt: ago(190), status: 'RUNNING', inApp: true, recordedBy: 'd@x' } }];
   const w = R.managerWalk(yard, temps, lines, now), pick = (z) => ({ due: z.due, late: z.late, total: z.total, out: z.out });
   assert.deepEqual(pick(w.yard), { due: 3, late: 2, total: 4, out: undefined });
   assert.deepEqual(pick(w.coolers), { due: 1, late: 1, out: 1, total: 3 });
-  assert.deepEqual(pick(w.quality), { due: 2, late: 1, total: 4, out: undefined });
+  assert.deepEqual(pick(w.quality), { due: 2, late: 1, total: 5, out: undefined });
+  // Joe 10/18: yellow from 2 hours, red from 3 hours; each area keeps who did its newest check.
+  assert.deepEqual([w.yard.state, w.coolers.state, w.quality.state], ['late', 'late', 'late']);
+  assert.deepEqual([w.yard.lastCheck, w.quality.lastCheck], [{ at: ago(12), by: 'mike.a@x' }, { at: ago(5), by: 'c@x' }]);
   assert.deepEqual(w.last, { at: ago(5), by: 'c@x' });
   // Problems first (red), then due (amber), then the ones that are fine.
   assert.deepEqual(w.yard.items.map(x => x.name + ' | ' + x.kind), ['Trailer 5312 | bad', 'Trailer 5330 | bad', 'Trailer 5307 | warn', 'Trailer 5320 | ok']);
@@ -406,11 +409,17 @@ test('Manager Walkthrough: due after 2 hours, past due 30 minutes later, Run Com
   assert.equal(w.yard.items[1].detail, 'Route 836 · PAST DUE · never checked');
   assert.match(w.yard.items[3].detail, /^Route 845 · 33°F · checked /);
   assert.deepEqual(w.coolers.items.map(x => x.name + ' | ' + x.detail + ' | ' + x.kind), ['Cooler North | 44°F · HIGH | bad', 'Dock | 36.3°F · OFFLINE | bad', 'Freezer | -8°F · OK | ok']);
-  assert.deepEqual(w.quality.items.map(x => x.name + ' | ' + x.kind), ['TOTES | bad', 'GALLON FILLER | warn', 'BOXING | ok', 'BLOW MOLD | ok']);
-  assert.equal(w.quality.items[0].detail, 'PAST DUE · never checked');
-  assert.equal(w.quality.items[2].detail, 'RUN COMPLETE');
+  assert.deepEqual(w.quality.items.map(x => x.name + ' | ' + x.kind), ['HTST | bad', 'GALLON FILLER | warn', 'BOXING | ok', 'TOTES | ok', 'BLOW MOLD | ok']);
+  assert.match(w.quality.items[0].detail, /^PAST DUE · last /);
+  assert.match(w.quality.items[1].detail, /^DUE · last /);
+  assert.deepEqual([w.quality.items[2].detail, w.quality.items[3].detail], ['RUN COMPLETE', 'NOT RUNNING']);
   const none = R.managerWalk({ rows: [], locked: [] }, [], [], now);
   assert.deepEqual([pick(none.coolers), none.yard.items, none.last], [{ due: 0, late: 0, out: 0, total: 0 }, [], null]);
+  assert.deepEqual([none.yard.state, none.yard.auto, none.quality.state, none.quality.auto], ['ok', 'No trucks in the yard', 'ok', 'No lines running']);
+  // Every line finished today: Production is done automatically; one still running is not.
+  const done = R.managerWalk({ rows: [], locked: [] }, [], [lines[1]], now);
+  assert.deepEqual([done.quality.state, done.quality.auto, done.quality.due], ['ok', 'Production finished', 0]);
+  assert.equal(R.managerWalk({ rows: [], locked: [] }, [], [lines[3]], now).quality.auto, '');
 });
 
 test('Match to MOCREO names (Joe 10/17): each cooler gets the sensor named for its place; a sensor named for another place leaves', () => {

@@ -354,7 +354,16 @@
   function yardStatus(d) { return text(payloadOf(d).status || d.status).toUpperCase(); }
   function yardOf(d) { return yardTrailer(payloadOf(d).trailer || d.trailer); }
   // The Active Yard Queue (rows: due now or never checked) and the trailers checked in the last 2 hours (locked).
-  function yardQueue(runs, journal, date, nowMs) {
+  // Joe 10/18: gps (gpsReefer by trailer, optional) says when a trailer has left: once the GPS sees this load's trailer out of
+  // the yard it is off the list. Only when the trailer has no GPS signal (no unit, or no report in REEFER_SIGNAL_MINUTES) does
+  // it go by its dispatch time, as before.
+  function yardGone(x, g, date, nowMs) {
+    var trip = !!g && text(g.id) === text(x.runDocId) + '|' + text(x.day);
+    if (trip && text(g.out)) return true;
+    var seen = g ? when(g.seenAt) : 0, signal = trip && !!text(g.unitId) && !!seen && nowMs - seen <= REEFER_SIGNAL_MINUTES * 60000;
+    return !signal && yardDeparted(x, date, nowMs);
+  }
+  function yardQueue(runs, journal, date, nowMs, gps) {
     var checks = yardChecks(journal, date), departed = {}, latest = {};
     checks.forEach(function (e) {
       var k = yardOf(e), p = payloadOf(e);
@@ -363,7 +372,7 @@
     });
     var seen = {}, rows = [], locked = [];
     yardHolds(runs, date).forEach(function (x, index) {
-      if (yardDeparted(x, date, nowMs) || seen[x.trailer] || departed[x.trailer + '|' + x.routeRun.toUpperCase()]) return;
+      if (yardGone(x, gps && gps[x.trailer], date, nowMs) || seen[x.trailer] || departed[x.trailer + '|' + x.routeRun.toUpperCase()]) return;
       seen[x.trailer] = true;
       var e = latest[x.trailer], p = payloadOf(e), at = e ? when(e.recordedAt) : 0, age = at ? Math.max(0, (nowMs - at) / 60000) : Infinity;
       var item = Object.assign({}, x, { checkId: e ? text(e.recordId) : '', recordedAt: e ? text(e.recordedAt) : '', recordedBy: e ? text(e.recordedBy) : '', temperature: text(p.temperature),
@@ -385,6 +394,28 @@
       return { recordId: text(e.recordId), recordedAt: text(e.recordedAt), trailer: yardOf(e), temperature: text(p.temperature), setPoint: text(p.setPoint), fuelLevel: text(p.fuelLevel).toUpperCase(),
         notes: text(p.notes), status: yardStatus(e) || 'RECORDED', recordedBy: text(e.recordedBy), inApp: !!e.createdInApp };
     });
+  }
+  // Joe 10/18: the trailer's temperature from the GPS (Verizon Fleet, gpsReefer/<trailer>, read every 5 minutes from the time
+  // the load is complete until the trailer is back in the yard), beside the yard check's typed temperature, set point and fuel.
+  // Red when it is more than REEFER_OFF_BY degrees from the set point; a reading older than REEFER_STALE_MINUTES is shown as old.
+  var REEFER_OFF_BY = 5, REEFER_STALE_MINUTES = 60, REEFER_STOP_MINUTES = 5, REEFER_SIGNAL_MINUTES = 60;
+  function yardGps(r, setPoint, nowMs) {
+    if (!r || r.tempF === null || r.tempF === undefined || r.tempF === '') return { has: false, recording: !!(r && r.recording), noUnit: !!(r && r.recording && !r.unitId) };
+    var t = Number(r.tempF), at = when(r.readingAt), age = at ? Math.max(0, Math.round((nowMs - at) / 60000)) : null, sp = text(setPoint), off = null;
+    if (sp !== '' && isFinite(Number(sp))) off = Math.round((t - Number(sp)) * 10) / 10;
+    return { has: true, tempF: t, readingAt: text(r.readingAt), minutesOld: age,
+      stale: age !== null && age > REEFER_STALE_MINUTES, off: off, flag: off !== null && Math.abs(off) > REEFER_OFF_BY, recording: !!r.recording };
+  }
+  // Joe 10/18: once a loaded trailer has left the yard it keeps reporting until it is back: "Moving" while it moves, and
+  // where it stopped (the Fleet place name, such as a store, or else the address) once it has stood still REEFER_STOP_MINUTES.
+  // A short stop (a light, a turn) still reads Moving. null for a trailer that is not out on a GPS trip.
+  function yardOut(r, nowMs) {
+    if (!r || !r.recording || !r.out) return null;
+    var still = when(r.stillSince), mins = still ? Math.max(0, Math.round((nowMs - still) / 60000)) : 0;
+    var known = r.speedMph !== null && r.speedMph !== undefined && r.speedMph !== '';
+    var stopped = !!still && mins >= REEFER_STOP_MINUTES;
+    return { moving: known && !stopped, stopped: stopped, unknown: !known && !still, where: text(r.where), stopMinutes: stopped ? mins : 0,
+      since: stopped ? text(r.stillSince) : '', text: stopped ? 'Stopped at ' + (text(r.where) || 'an unknown place') : known || still ? 'Moving' : 'Out of the yard' };
   }
   // Minutes until a trailer can be checked again (the save's own check: that operating day's newest record of the trailer).
   function yardLockLeft(journal, date, trailer, nowMs) {
@@ -702,22 +733,25 @@
       alerts: (rows || []).filter(tempAlert).length, lastManual: last, history: (history || []).length };
   }
   // Joe 10/15 (Manager Walkthrough, option 2): what the manager's walk still has to check, in walking order: Yard, Coolers,
-  // Quality. A check is due once its 2-hour cycle is up (or it was never checked) and past due 30 minutes after that; the
-  // newest check of the three is the last walkthrough. Joe 10/15 (later): each area also lists what is in it, problems first
+  // Production (the production line checks). Joe 10/15 (later): each area also lists what is in it, problems first
   // (items: name, detail, kind bad / warn / ok). yard = yardQueue(), temps = tempRows(), lines = qualityLines().
-  var WALK_LATE_MINUTES = 30, WALK_CYCLE_MINUTES = 120;
+  // Joe 10/18: every area is checked every 2 to 3 hours: green when done, yellow (due) from 2 hours, red (past due) from 3 hours.
+  // Production needs no check when no line is running (every line finished today, or not started today) and the Yard none
+  // when there are no trucks on it: those read done automatically. Each area shows who did its newest check and when.
+  var WALK_LATE_MINUTES = 60, WALK_CYCLE_MINUTES = 120;
   function managerWalk(yard, temps, lines, nowMs) {
     var cycle = WALK_CYCLE_MINUTES, late = function (at) { var t = when(at); return !t || (nowMs - t) / 60000 >= cycle + WALK_LATE_MINUTES; };
     var last = function (at) { return when(at) ? 'last ' + clockOf(at) : 'never checked'; };
     var rank = { bad: 0, warn: 1, ok: 2 }, sorted = function (a) { return a.map(function (x, i) { return [x, i]; }).sort(function (p, q) { return rank[p[0].kind] - rank[q[0].kind] || p[1] - q[1]; }).map(function (p) { return p[0]; }); };
+    var newest = function (list) { return list.filter(function (c) { return when(c.at); }).sort(function (a, b) { return when(b.at) - when(a.at); })[0] || null; };
     var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
-    var isDue = function (l) { var x = l.last || {}, t = when(x.recordedAt); return !lineDone(x, nowMs) && (!t || (nowMs - t) / 60000 >= cycle); };
+    // A line is running when it has a check today that is not Finished.
+    var running = function (l) { var x = l.last || {}, t = when(x.recordedAt); return !!t && !lineDone(x, nowMs) && opDayAt(t) === opDayAt(nowMs); };
+    var isDue = function (l) { var x = l.last || {}, t = when(x.recordedAt); return running(l) && (!t || (nowMs - t) / 60000 >= cycle); };
     var lineDue = (lines || []).filter(isDue);
-    var all = [];
-    yardDue.concat(yardDone).forEach(function (x) { if (x.recordedAt) all.push({ at: x.recordedAt, by: x.recordedBy }); });
-    (temps || []).forEach(function (r) { if (r.lastCheckedAt) all.push({ at: r.lastCheckedAt, by: r.lastCheckedBy }); });
-    (lines || []).forEach(function (l) { var x = l.last || {}; if (x.recordedAt && x.inApp) all.push({ at: x.recordedAt, by: x.recordedBy }); });
-    all.sort(function (a, b) { return when(b.at) - when(a.at); });
+    var yardChecks = yardDue.concat(yardDone).filter(function (x) { return x.recordedAt; }).map(function (x) { return { at: x.recordedAt, by: x.recordedBy }; });
+    var tempChecks = (temps || []).filter(function (r) { return r.lastCheckedAt; }).map(function (r) { return { at: r.lastCheckedAt, by: r.lastCheckedBy }; });
+    var lineChecks = (lines || []).filter(function (l) { var x = l.last || {}; return x.recordedAt && x.inApp; }).map(function (l) { return { at: l.last.recordedAt, by: l.last.recordedBy }; });
     var route = function (x) { return x.route ? 'Route ' + x.route : text(x.routeRun); };
     var yardItems = yardDue.map(function (x) { var l = late(x.recordedAt); return { name: 'Trailer ' + x.trailer, detail: [route(x), l ? 'PAST DUE' : 'DUE', last(x.recordedAt)].filter(Boolean).join(' · '), kind: l ? 'bad' : 'warn' }; })
       .concat(yardDone.map(function (x) { return { name: 'Trailer ' + x.trailer, detail: [route(x), (x.temperature !== '' ? x.temperature + '°F · ' : '') + 'checked ' + clockOf(x.recordedAt)].filter(Boolean).join(' · '), kind: 'ok' }; }));
@@ -730,15 +764,24 @@
     var qualityItems = (lines || []).map(function (l) {
       var x = l.last || {}, st = text(x.status).toUpperCase();
       if (lineDone(x, nowMs)) return { name: l.name, detail: 'RUN COMPLETE', kind: 'ok' };
+      if (!running(l)) return { name: l.name, detail: 'NOT RUNNING', kind: 'ok' };
       var down = st === 'DOWN' || text(x.qualityCheck).toUpperCase() === 'FAIL';
       if (isDue(l)) { var lt = late(x.recordedAt); return { name: l.name, detail: (down ? 'DOWN · ' : '') + (lt ? 'PAST DUE' : 'DUE') + ' · ' + last(x.recordedAt), kind: lt || down ? 'bad' : 'warn' }; }
       return { name: l.name, detail: (down ? 'DOWN' : 'OK') + ' · checked ' + clockOf(x.recordedAt), kind: down ? 'bad' : 'ok' };
     });
+    var area = function (o, checks, auto) {
+      o.state = o.late ? 'late' : o.due ? 'due' : 'ok';
+      o.auto = o.state === 'ok' ? auto || '' : '';
+      o.lastCheck = newest(checks);
+      return o;
+    };
+    var lateYard = yardDue.filter(function (x) { return late(x.recordedAt); }).length, lateLines = lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length;
     return {
-      yard: { due: yardDue.length, late: yardDue.filter(function (x) { return late(x.recordedAt); }).length, total: yardDue.length + yardDone.length, items: sorted(yardItems) },
-      coolers: { due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length, items: sorted(coolerItems) },
-      quality: { due: lineDue.length, late: lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length, total: (lines || []).length, items: sorted(qualityItems) },
-      last: all[0] || null };
+      yard: area({ due: yardDue.length, late: lateYard, total: yardDue.length + yardDone.length, items: sorted(yardItems) }, yardChecks, yardDue.length + yardDone.length ? '' : 'No trucks in the yard'),
+      coolers: area({ due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length, items: sorted(coolerItems) }, tempChecks, ''),
+      quality: area({ due: lineDue.length, late: lateLines, total: (lines || []).length, running: (lines || []).filter(running).length, items: sorted(qualityItems) }, lineChecks,
+        (lines || []).some(running) ? '' : (lines || []).some(function (l) { return lineDone(l.last, nowMs); }) ? 'Production finished' : 'No lines running'),
+      last: newest(yardChecks.concat(tempChecks, lineChecks)) };
   }
   function managerNotes(log) {
     var type = function (r) { return text(r.type).toUpperCase(); };
@@ -952,7 +995,7 @@
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
-    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
+    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, REEFER_SIGNAL_MINUTES: REEFER_SIGNAL_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,

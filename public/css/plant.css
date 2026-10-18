@@ -319,30 +319,39 @@
 .yard-page .yd-status { color: var(--runs-ink); font-weight: 800; white-space: nowrap; }
 .yard-page .yd-status::before { content: '● '; font-size: 16px; }
 .yard-page .yd-status.left { color: #8a4b00; }
+.yard-page .yd-gps { font-size: 18px; font-weight: 800; }
+.yard-page .yd-gps.none { color: var(--muted); font-weight: 400; }
+.yard-page .yd-gps.bad { background: #fde8e8; color: #bf2020; }
+.yard-page table.yd-road { margin-top: 18px; }
+body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
+.yard-page table.yd-road th.yd-road-title { text-align: left; font-size: 18px; background: #eef3f8; color: var(--ud-blue-dark); }
+.yard-page table.yd-road td.yd-where { text-align: left; font-size: 17px; white-space: normal; }
+.yard-page table.yd-road td.yd-where.stop { font-weight: 700; }
 @media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
-/* Phone (the yard hands): one card per trailer, each box saves as it is left, one big Left Yard button; no history. */
+/* Phone (the yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Action), each box saves as it is left; no notes, no history. */
 .yard-page .yd-cards { display: none; }
 @media (max-width: 760px) {
   .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
-  .yard-page .yd-cards { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 16px; }
-  .yard-page .yd-card { background: #fff; border: 1px solid var(--line); border-left: 6px solid #bf2020; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-  .yard-page .yd-card.done { border-left-color: var(--runs-ink); background: #f6fcf8; }
-  .yard-page .yd-card header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .yard-page .yd-card header b { font-size: 24px; color: var(--ud-blue-dark); }
-  .yard-page .yd-run { font-size: 16px; color: var(--muted); font-weight: 700; }
-  .yard-page .yd-due, .yard-page .yd-tick { margin-left: auto; font-size: 16px; font-weight: 800; color: #b45f00; }
-  .yard-page .yd-due.now { color: #bf2020; }
-  .yard-page .yd-tick { color: var(--runs-ink); }
-  .yard-page .yd-tick.saving { color: var(--muted); }
-  .yard-page .yd-tick.error { color: #bf2020; }
-  .yard-page .yd-f { display: flex; align-items: center; gap: 10px; }
-  .yard-page .yd-f > span { flex: 0 0 74px; font-size: 16px; font-weight: 800; color: var(--muted); }
-  .yard-page .yd-f input { flex: 1; min-width: 0; height: 50px; border: 1px solid #b8cadb; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 20px; color: var(--ink); background: #fff; }
-  .yard-page .yd-fuel { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .yard-page .yd-fuel button { height: 50px; border: 1px solid #b8cadb; border-radius: 10px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 17px; font-weight: 800; padding: 0; }
-  .yard-page .yd-fuel button[aria-pressed="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
-  .yard-page button.yd-leave { height: 54px; border: 2px solid #9fb3c6; border-radius: 12px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 18px; font-weight: 800; }
-  .yard-page button.yd-leave[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
+  .yard-page .yd-cards { display: block; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 8px 16px; }
+  .yard-page table.yd-ptable { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  .yard-page table.yd-ptable th { position: sticky; top: 0; z-index: 1; padding: 8px 3px; background: #eaf3fc; color: var(--ud-blue-dark); font-size: 16px; line-height: 1.15; text-align: center; border-bottom: 1px solid var(--line); }
+  .yard-page table.yd-ptable td { padding: 6px 3px; border-bottom: 1px solid #e3ebf2; text-align: center; vertical-align: middle; font-size: 16px; }
+  .yard-page table.yd-ptable tr.done td { background: #f6fcf8; }
+  .yard-page table.yd-ptable input, .yard-page table.yd-ptable select { width: 100%; min-width: 0; height: 46px; box-sizing: border-box; border: 1px solid #b8cadb; border-radius: 8px; padding: 0 4px; font: inherit; font-size: 18px; color: var(--ink); background: #fff; text-align: center; }
+  .yard-page table.yd-ptable select { padding: 0 2px; font-size: 16px; text-align: left; }
+  .yard-page .yd-ptrailer b { display: block; font-size: 18px; color: var(--ud-blue-dark); }
+  .yard-page .yd-ptrailer small { display: block; margin-top: 2px; font-size: 16px; line-height: 1.1; font-weight: 800; color: #b45f00; }
+  .yard-page .yd-ptrailer small.now, .yard-page .yd-ptrailer small.error { color: #bf2020; }
+  .yard-page .yd-ptrailer small.yd-tick { color: var(--runs-ink); }
+  .yard-page .yd-ptrailer small.saving { color: var(--muted); }
+  .yard-page td.yd-gpsf { font-size: 18px; font-weight: 800; color: var(--ink); }
+  .yard-page td.yd-gpsf.bad { background: #fde8e8; color: #bf2020; }
+  .yard-page button.yd-notesbtn { width: 100%; min-height: 46px; border: 2px solid #9fb3c6; border-radius: 8px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; padding: 2px; }
+  .yard-page button.yd-notesbtn.has { background: #eaf3fc; border-color: var(--ud-blue); }
+  .yard-page button.yd-notesbtn[aria-expanded="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+  .yard-page tr.yd-noterow td { background: #f6f9fc; text-align: left; padding: 8px; }
+  .yard-page tr.yd-noterow label span { display: block; white-space: normal; margin-bottom: 6px; font-size: 16px; font-weight: 800; color: var(--muted); }
+  .yard-page tr.yd-noterow textarea { width: 100%; box-sizing: border-box; border: 1px solid #b8cadb; border-radius: 8px; padding: 8px; font: inherit; font-size: 18px; color: var(--ink); resize: vertical; }
   .yard-page .yd-none { text-align: center; color: var(--muted); font-size: 17px; margin: 30px 0; }
 }
 
@@ -1377,3 +1386,24 @@
 .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-rows: auto; grid-auto-rows: auto; flex: none; min-height: auto; }
 .manager-page .mc-grid [data-card="walk"] .mc-tile { min-height: 0; overflow: visible; }
 .manager-page .mc-grid [data-card="walk"] .mc-tile:not(.wk-tile) { align-content: start; }
+/* Joe 10/18: each walkthrough area is green (done), yellow (due at 2 hours) or red (past due at 3 hours), with who did its newest
+   check. Manager Center: a state word by the area's name and the who line under its count. */
+.manager-page [data-card="walk"] .wk-tile { grid-template-areas: "label num" "line num" "who who" "list list"; }
+.manager-page [data-card="walk"] .wk-tile .wk-who { grid-area: who; margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page [data-card="walk"] .wk-tile.warn { background: #fff7e0; border-color: #f0d38a; }
+.manager-page [data-card="walk"] .wk-tile.good { background: #eef8f1; border-color: #b9e0c6; }
+.manager-page [data-card="walk"] .wk-tile.good b { color: #1f7a4d; }
+.wk-state { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-style: normal; font-size: 16px; font-weight: 900; letter-spacing: .02em; color: #fff; vertical-align: 1px; }
+.wk-state.ok { background: #1f7a4d; } .wk-state.due { background: #e0a100; color: #3d2a00; } .wk-state.late { background: #c62828; }
+/* Phone and tablet: the colored button beside each walkthrough card. */
+.walk-page .wk-row { display: flex; align-items: stretch; gap: 10px; }
+.walk-page .wk-row > .wk-choice { flex: 1 1 auto; min-width: 0; }
+.walk-page .wk-act { flex: none; width: 88px; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 14px; font-size: 18px; font-weight: 900; line-height: 1.15; text-decoration: none; color: #fff; padding: 8px; }
+.walk-page .wk-act.ok { background: #1f7a4d; } .walk-page .wk-act.due { background: #f2b705; color: #3d2a00; } .walk-page .wk-act.late { background: #c62828; animation: wk-flash 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .walk-page .wk-act.late { animation: none; } }
+.walk-page .wk-choice .wk-who { flex: 1 1 100%; font-size: 16px; font-weight: 700; color: var(--muted); }
+@media (max-width: 420px) { .walk-page .wk-act { width: 72px; font-size: 16px; } .walk-page .wk-row { gap: 8px; } .walk-page .wk-choice { gap: 10px; padding: 14px 12px; } }
+@media (min-width: 761px) { .walk-page .wk-act { width: 120px; font-size: 22px; } .walk-page .wk-choice .wk-who { font-size: 18px; } }
+/* Narrow phones: with the button beside the card, the big number and its line go under the name so the name and description keep
+   the card's width. */
+@media (max-width: 420px) { .walk-page .wk-row .wk-n { flex: 1 1 100%; max-width: none; flex-direction: row; align-items: baseline; justify-content: flex-start; text-align: left; gap: 10px; } }

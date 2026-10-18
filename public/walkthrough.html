@@ -33,7 +33,8 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <!-- Joe 10/15: managers only. A manager on a phone or tablet starts on three choices (view=home): Manager Walkthrough,
-         Loading and Unloading. The walkthrough is Yard, Coolers, Quality, each a big tile with what it holds, opening that screen. -->
+         Loading and Unloading. The walkthrough is Yard, Coolers, Production, each a big tile with what it holds, opening that screen,
+         and beside it a DONE / DUE / PAST DUE button in green, yellow or red (Joe 10/18). -->
     <div class="view wk-view">
       <h2 class="wk-ask" id="ask"></h2>
       <div class="wk-list" id="list" aria-live="polite"></div>
@@ -59,17 +60,21 @@
 
     // One big choice: its number, the line under it and its colour (red flashes while a check is past due). Joe 10/15 (later):
     // under it, what it holds (each trailer, cooler or line, problems first in red), as much as is useful on a phone.
-    const SHOW = 5;
-    function choice(href, num, title, desc, n, line, kind, items) {
+    // Joe 10/18: beside each walkthrough card, a button in its colour: green DONE, yellow DUE (2 hours), red PAST DUE (3 hours),
+    // and under the card who did its newest check and when ("Done automatically" when nothing needs checking).
+    const SHOW = 5, STATE = { ok: 'DONE', due: 'DUE', late: 'PAST DUE' };
+    const whoOf = (z) => z.auto ? 'Done automatically' : z.lastCheck ? 'Last ' + shortTime(Date.parse(z.lastCheck.at)) + (z.lastCheck.by ? ' · ' + personName(z.lastCheck.by) : '') : 'Not checked yet';
+    const row = (state, href, html) => '<div class="wk-row">' + html + '<a class="wk-act ' + state + '" href="' + href + '">' + STATE[state] + '</a></div>';
+    function choice(href, num, title, desc, n, line, kind, items, who) {
       const list = items ? '<ul class="wk-items">' + (items.length ? items.slice(0, SHOW).map(z => '<li class="' + z.kind + '"><b>' + escapeHtml(z.name) + '</b> ' + escapeHtml(z.detail) + '</li>').join('') +
         (items.length > SHOW ? '<li class="more">+ ' + (items.length - SHOW) + ' more</li>' : '') : '<li class="ok">Nothing to check</li>') + '</ul>' : '';
       return '<a class="wk-choice ' + kind + '" href="' + href + '">' + (num ? '<span class="wk-num">' + num + '</span>' : '') +
         '<span class="wk-t"><b>' + escapeHtml(title) + '</b><span>' + escapeHtml(desc) + '</span></span>' +
-        '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span>' + list + '</a>';
+        '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span>' + (who ? '<span class="wk-who">' + escapeHtml(who) + '</span>' : '') + list + '</a>';
     }
     // A step's tile: red when past due or out of range, amber when due, green "OK" when all checked.
     const kindOf = (z) => z.late || z.out ? 'bad' + (z.late ? ' late' : '') : z.due ? 'due' : 'good';
-    const lineOf = (z, what) => z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : 'all checked';
+    const lineOf = (z, what) => z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : z.auto || 'all checked';
 
     function render() {
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
@@ -89,20 +94,20 @@
       let html;
       if (home) {
         // Joe 10/15 (later): the manager's phone: the walkthrough (Yard, Coolers, Quality), then Loading and Unloading.
-        const walk = { due: Y.due + C.due + Q.due, late: Y.late + C.late + Q.late, out: C.out };
+        const walk = { due: Y.due + C.due + Q.due, late: Y.late + C.late + Q.late, out: C.out }, state = [Y, C, Q].some(z => z.state === 'late') ? 'late' : [Y, C, Q].some(z => z.state === 'due') ? 'due' : 'ok';
         const todays = journal.filter(d => d.date === date), loads = P.loadoutRows(data.runs, date), done = P.counts(loads);
         const uc = P.unloadCounts(P.unloadRows(data.runs, date, todays, P.returnsFor(data.runs, date, todays), loads));
-        const area = (name, z, what) => ({ name, detail: z.out ? z.out + ' out of range' + (z.late ? ' · ' + z.late + ' past due' : '') : z.late ? z.late + ' past due' : z.due ? z.due + ' ' + what : 'all checked', kind: z.out || z.late ? 'bad' : z.due ? 'warn' : 'ok' });
-        html = choice('walkthrough.html', '', 'Manager Walkthrough', 'Yard, Coolers and Quality', walk.due, walk.due ? 'due' : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk),
-          [area('Yard', Y, 'to check'), area('Coolers', C, 'to check'), area('Quality', Q, 'lines due')]) +
+        const area = (name, z, what) => ({ name, detail: z.out ? z.out + ' out of range' + (z.late ? ' · ' + z.late + ' past due' : '') : z.late ? z.late + ' past due' : z.due ? z.due + ' ' + what : z.auto || 'all checked', kind: z.out || z.late ? 'bad' : z.due ? 'warn' : 'ok' });
+        html = row(state, 'walkthrough.html', choice('walkthrough.html', '', 'Manager Walkthrough', 'Yard, Coolers and Production', walk.due, walk.due ? 'due' : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk),
+          [area('Yard', Y, 'to check'), area('Coolers', C, 'to check'), area('Production', Q, 'lines due')])) +
           choice('loadout.html', '', 'Loading', 'Loadout Center · today\'s loads', done.done, 'of ' + done.total + ' loaded', done.total && done.done === done.total ? 'good' : 'plain',
             [{ name: done.waiting + ' waiting', detail: '· ' + done.loading + ' loading' + (done.paused ? ' · ' + done.paused + ' paused' : ''), kind: 'plain' }]) +
           choice('unloading.html', '', 'Unloading', 'Trucks back in · cases and returns', uc.complete, 'of ' + uc.total + ' unloaded', uc.total && uc.complete === uc.total ? 'good' : 'plain',
             [{ name: uc.waiting + ' waiting', detail: '· ' + uc.unloading + ' unloading', kind: 'plain' }]);
       } else {
-        html = choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items) +
-          choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items) +
-          choice('quality.html?walk=1', '3', 'Quality', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q), Q.items);
+        html = row(Y.state, 'yard.html?walk=1', choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items, whoOf(Y))) +
+          row(C.state, 'temps.html?walk=1', choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items, whoOf(C))) +
+          row(Q.state, 'quality.html?walk=1', choice('quality.html?walk=1', '3', 'Production', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q), Q.items, whoOf(Q)));
       }
       document.getElementById('list').innerHTML = html;
       document.getElementById('last').textContent = W.last ? 'Last walkthrough check: ' + shortTime(Date.parse(W.last.at)) + ' · ' + personName(W.last.by) : 'No walkthrough checks yet today.';
