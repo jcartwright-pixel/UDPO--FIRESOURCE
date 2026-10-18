@@ -6,10 +6,12 @@ band showing that station's picture from Joe's approved icon library (public/img
 truck. Writes public/img/app-icon/<station>/icon-192.png, icon-512.png, icon-maskable-192.png, icon-maskable-512.png
 and apple-touch-icon.png. Run from the repository folder after changing a picture, and commit what it writes:
 
-    python3 tools/make-station-icons.py
+    python3 tools/make-station-icons.py                  (every station)
+    python3 tools/make-station-icons.py plant-managers   (only the ones named)
 
 Needs Pillow (pip install pillow). UD Routes (drivers' phones) keeps the United Dairy app icon itself.
 """
+import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw
 
@@ -18,6 +20,8 @@ STATIONS = {
     'plant-station': ['plant-building-v1-560.webp'],
     'garage-station': ['maintenance-tractor-v1-560.webp', 'maintenance-trailer-v1-560.webp'],
     'driver-station': ['distribution-truck-v1-560.webp'],
+    # Joe 10/18: the Plant Managers app (the managers' walkthrough): the yard, the cooler temperatures and production.
+    'plant-managers': ['yard-checks.webp', 'temperatures.webp', 'production.webp'],
 }
 BAND = (46, 310, 466, 449)       # the white band of icon-source.png (512 x 512), above its yellow line
 PIC = (68, 322, 444, 443)        # where the pictures go
@@ -51,6 +55,8 @@ SOURCE = Path(__file__).resolve().parent / 'icon-source'
 base = Image.open(SOURCE / 'icon-source.png').convert('RGBA')
 base_mask = Image.open(SOURCE / 'icon-source-maskable.png').convert('RGBA')
 for name, files in STATIONS.items():
+    if sys.argv[1:] and name not in sys.argv[1:]:
+        continue
     icon = base.copy()
     ImageDraw.Draw(icon).rounded_rectangle(BAND, radius=26, fill=(255, 255, 255, 255))
     icon.alpha_composite(band_picture(files), (PIC[0], PIC[1]))

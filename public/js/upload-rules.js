@@ -30,7 +30,7 @@
   // its group list (START_GROUPS with JOE_GROUPS added); routes.html LOADOUT and RUN_BY.
   var EXCEPTION_REASONS = ['SICK DAY', 'BEREAVEMENT', 'PERSONAL DAY', 'UNPAID DAY', 'VACATION', 'CALLED OFF', 'OFF', 'OTHER'];
   var VACATION_STATUSES = ['APPROVED', 'PENDING', 'DENIED', 'CANCELLED'];
-  var STATION_KINDS = ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services', 'Garage', 'Driver Room Check-In Station', "Driver's Kiosk Station"];
+  var STATION_KINDS = ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services', 'Garage', 'Driver Room Check-In Station', "Driver's Kiosk Station", 'Plant Managers'];
   var SHIFT_SIDES = [['DISTRIBUTION', 'Distribution'], ['PRODUCTION', 'Plant Production']];
   var COUNTED_BY = ['Typed by operator', 'Sensor', 'Label reader', 'Machine controller'];
   var FILL_MODES = ['Every so many minutes', 'Every so many jugs', 'Only at the start and after each product change'];

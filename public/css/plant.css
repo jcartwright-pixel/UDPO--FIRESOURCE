@@ -1407,3 +1407,18 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
 /* Narrow phones: with the button beside the card, the big number and its line go under the name so the name and description keep
    the card's width. */
 @media (max-width: 420px) { .walk-page .wk-row .wk-n { flex: 1 1 100%; max-width: none; flex-direction: row; align-items: baseline; justify-content: flex-start; text-align: left; gap: 10px; } }
+/* Joe 10/18: the Plant Managers app's code screen (the station code box, as on the station tablets). */
+.walk-page .st-code { max-width: 560px; margin: 16px auto; display: grid; gap: 14px; padding: 20px; box-sizing: border-box; width: 100%; background: #fff; border: 1px solid #c9d6e4; border-top: 6px solid #0b6eaa; border-radius: 14px; font-size: 18px; }
+.walk-page .st-code > * { min-width: 0; }
+.walk-page .st-code h2 { margin: 0; font-size: 24px; color: #0b2f55; }
+.walk-page .st-code p { margin: 0; color: #33475b; }
+.walk-page .st-code label { display: grid; gap: 6px; font-weight: 700; color: #33475b; }
+.walk-page .st-code input { width: 100%; box-sizing: border-box; font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
+.walk-page .st-code button { min-height: 58px; border: 0; border-radius: 10px; background: #0b3d6b; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
+.walk-page .st-code .st-code-msg { min-height: 1.4em; color: #b3261e; font-weight: 700; }
+/* The report pop-up on a phone (Send Report on the Plant Managers app): Close, Copy, Print and Send wrap two to a line
+   instead of running off the screen. */
+@media (max-width: 600px) {
+  .manager-page .mc-dacts { flex-wrap: wrap; }
+  .manager-page .mc-dacts .mc-btn { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: normal; height: auto; min-height: 42px; line-height: 1.15; padding: 6px 10px; }
+}

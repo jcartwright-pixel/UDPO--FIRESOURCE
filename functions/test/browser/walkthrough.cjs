@@ -15,6 +15,7 @@ const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
 const L = require('../../src/logic');
+const STATIONS = require('../../src/stations');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -66,6 +67,8 @@ async function seed() {
   await line('PRODUCTION_QUALITY_app_wkhtst', 'ut_prod_htst_1', 130);
 }
 
+const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
@@ -100,22 +103,65 @@ async function seed() {
     }
     results.push('Walkthrough: Yard, Coolers, Production with big numbers, what each holds and who checked it last, a DONE / DUE / PAST DUE button beside each (green, yellow, red), past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
 
-    // The phone and tablet start screen: three choices.
+    // The phone and tablet start screen: four choices (Joe 10/18: Send Report).
     for (const [w, h] of [[390, 844], [800, 1280]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700 }, '/walkthrough.html?view=home&' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html']);
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading', 'Send Report']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html', 'manager.html?report=1']);
+      assert.equal(await page.textContent('.wk-choice:last-child .wk-n'), 'Nonelast sent');
       assert.deepEqual(await page.$$eval('.wk-row:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
-      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading and Unloading have none');
+      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading, Unloading and Send Report have none');
       assert.equal(await page.textContent('#ask'), 'What are you doing?');
       assert.equal(await page.isVisible('#full'), true);
       await tidy(page, 'Start screen ' + w);
       await shot(page, 'walkthrough-home-' + w);
+      if (SHOTS) { await page.$eval('.wk-choice:last-child', el => el.scrollIntoView({ block: 'end' })); await page.waitForTimeout(200); await shot(page, 'walkthrough-home-bottom-' + w); }
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Production) with its PAST DUE button, Loading and Unloading at 390 and 800, with Open the full Operations app');
+    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Production) with its PAST DUE button, Loading, Unloading and Send Report at 390 and 800, with Open the full Operations app');
+
+    // Send Report opens Manager Center's report (what goes out, a note box and Send).
+    const rep = await openPage(browser, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, '/manager.html?report=1&' + MANAGER);
+    await rep.waitForSelector('#modal:not([hidden])', { timeout: 20000 });
+    await rep.waitForSelector('#send:visible', { timeout: 20000 });
+    await rep.waitForSelector('#send:enabled', { timeout: 20000 });
+    // Close, Copy, Print and Send all fit the phone (two to a line).
+    for (const b of ['#close', '#copy', '#print-report', '#send']) { const r = await rep.$eval(b, el => { const x = el.getBoundingClientRect(); return [x.left, x.right]; }); assert.ok(r[0] >= 0 && r[1] <= 390, b + ' fits the phone ' + r); assert.ok(await rep.$eval(b, el => el.scrollWidth <= el.clientWidth), b + ' shows its whole label'); }
+    await rep.waitForTimeout(400);
+    await shot(rep, 'walkthrough-send-report-390');
+    assert.deepEqual(rep.errors, []);
+    await rep.context().close();
+    results.push('Send Report: opens the Plant Update report with its Send button');
+
+    // Joe 10/18: the Plant Managers app (?app=1): installs as Plant Managers with its own icon; with no Plant Managers code yet it
+    // opens on the sign-in alone; once the plant has a code, a manager types it once and the phone remembers it.
+    const app1 = await openPage(browser, phone390(), '/walkthrough.html?view=home&app=1&' + MANAGER);
+    await app1.waitForSelector('.wk-choice');
+    assert.deepEqual([await app1.getAttribute('link[rel="manifest"]', 'href'), await app1.getAttribute('link[rel="apple-touch-icon"]', 'href'), await app1.textContent('#title'), await app1.title()],
+      ['plant-managers.webmanifest', 'img/app-icon/plant-managers/apple-touch-icon.png', 'Plant Managers', 'Plant Managers']);
+    await app1.context().close();
+    const code = (await STATIONS.stationCode(db(), 'admin.test@uniteddairy.com', { key: 'fac_uniontown_manager_managers' }, new Date().toISOString())).code;
+    const app2 = await openPage(browser, phone390(), '/walkthrough.html?view=home&app=1&' + MANAGER);
+    await app2.waitForSelector('#code-box:not([hidden]) form');
+    assert.equal(await app2.isVisible('#list'), false, 'nothing shows before the code');
+    assert.equal((await app2.textContent('#code-box button[type="submit"]')).trim(), 'Open Plant Managers');
+    assert.ok(await app2.$eval('#code-box input', el => parseFloat(getComputedStyle(el).fontSize) >= 16 && el.getBoundingClientRect().right <= 390), 'the code box fits the phone');
+    await shot(app2, 'plant-managers-code-390');
+    await app2.fill('#code-box input[name="code"]', 'WRONG1');
+    await app2.click('#code-box button[type="submit"]');
+    await app2.waitForFunction(() => /not recognized/.test(document.querySelector('.st-code-msg').textContent));
+    await app2.fill('#code-box input[name="code"]', code);
+    await app2.click('#code-box button[type="submit"]');
+    await app2.waitForSelector('.wk-choice');
+    assert.equal(await app2.isVisible('#code-box'), false);
+    await app2.reload();
+    await app2.waitForSelector('.wk-choice');
+    assert.equal(await app2.isVisible('#code-box'), false, 'the phone remembers the code');
+    assert.deepEqual(app2.errors, []);
+    await app2.context().close();
+    results.push('Plant Managers app: its own install (name and icon); no code yet opens on the sign-in; with a code, asked once and remembered');
 
     // Coolers and Production opened from the walkthrough carry its bar: back, which stop, the next stop.
     const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };

@@ -443,6 +443,8 @@ const APP_LINKS = [
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, DVIR, Check-In and My Schedule. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
   { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
+  // Joe 10/18: the Plant Managers app ("send them the link and have a code").
+  { key: 'managers', title: 'Plant Managers', label: 'Plant Managers link', path: 'walkthrough.html?view=home&app=1', who: 'ud', short: 'Managers (UD account, Manager or Administrator role), then the Plant Managers code once', opens: 'The plant managers\' app on their phone, iPad or tablet: the Manager Walkthrough (Yard, Coolers, Production), Loading, Unloading and Send Report. Send them the link; they sign in with their United Dairy account, type the Plant Managers code once (below) and add it to the home screen, where it is called Plant Managers. It is their own phone, so Sign out stays and there is no Release.', shut: 'New code (below) makes every phone ask for the new code; change their role in People & Roles.' },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
 
@@ -453,6 +455,7 @@ const GARAGE_LINKS = ['garage', 'maint'];
 // Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.
 const DRIVER_LINKS = ['driver'];
 const DRIVER_MORE = ['route'];
+const MANAGER_APP_LINKS = ['managers'];
 
 // The link cards for the given keys; tail is more of the page under the cards (Manager Links' release codes, the stations).
 export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', more = []) {
@@ -507,6 +510,7 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
 const STATION_PAGES = {
   PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Release in the bottom-right corner of the tablet and types the plant\'s manager release code (Manager Links); there is no Back, Home or Sign out on a station. Until a plant has a station code, its tablets pick their station from the list. The no-account link (above) uses the same codes while it is On.' },
   GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Release in the bottom-right corner of the tablet and types the plant\'s manager release code (Manager Links); there is no Back, Home or Sign out on a station. Until a plant has a garage code, its garage tablet opens straight away.' },
+  MANAGER: { title: 'Plant Managers code', add: '+ Add', what: 'Plant Managers code', help: 'Each plant has one Plant Managers code. A manager opens the Plant Managers link, signs in with their United Dairy account (Manager or Administrator role) and types the code once; the phone remembers it. New code makes every phone ask for the new one. Until a plant has a code, managers open the app with their sign-in alone.' },
   KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station has its own code, and a plant can have more than one. Both kinds open the Driver Station link: the TV types a Driver\'s Kiosk Station code (the rolling loadout, dispatch and weather, full screen); the drivers\' tablet types a Driver Room Check-In Station code (the drivers\' Check-In, like their phones). It keeps it after that. To move it, a manager taps Release in the bottom-right corner and types the plant\'s manager release code (Manager Links). Until a plant has a driver station code, its tablets and TVs open straight away.' }
 };
 
@@ -514,7 +518,7 @@ const STATION_PAGES = {
 function stationSection(kind) {
   const p = STATION_PAGES[kind];
   return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><details class="ap-how"><summary>How it works</summary><p>' + e(p.help) + '</p></details><div class="ap-list" id="st-list"></div>' +
-    '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="st-name" maxlength="60" placeholder="For example ' + (kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : 'Case Loadout dock 2') + '"></label>' +
+    '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="st-name" maxlength="60" placeholder="For example ' + (kind === 'MANAGER' ? 'Plant Managers' : kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : 'Case Loadout dock 2') + '"></label>' +
     '<label class="ap-field">Type<select id="st-type"></select></label><label class="ap-field">Plant<select id="st-plant"></select></label>' +
     '<div><button type="button" class="ap-btn main" id="st-add">' + p.add + '</button></div></div></div>';
 }
@@ -614,6 +618,8 @@ export async function renderStationCodes(box, ctx) {
 
 // Garage Station Codes and Driver Station Codes: the link, then the stations with their codes (drivers: then the phone link).
 export async function renderGarageCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, GARAGE_LINKS, stationSection('GARAGE')), bindStations(box, 'GARAGE')]); }
+// Joe 10/18: the Plant Managers app: its link, then each plant's Plant Managers code.
+export async function renderManagerAppCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, MANAGER_APP_LINKS, stationSection('MANAGER')), bindStations(box, 'MANAGER')]); }
 export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK'), DRIVER_MORE), bindStations(box, 'KIOSK')]); }
 
 /* ---------- Manager Report Recipients ---------- */
@@ -783,6 +789,7 @@ export const PAGES = {
   'station-codes': renderStationCodes,
   'garage-codes': renderGarageCodes,
   'driver-codes': renderDriverCodes,
+  'manager-app-codes': renderManagerAppCodes,
   'report-recipients': renderReportRecipients,
   'sent-log': renderSentLog,
   'email-senders': renderEmailSenders,
