@@ -58,3 +58,25 @@ export function watchHubWorkOrders(db, fromKey, cb, onError) {
     onSnapshot(query(col, where('status', '==', null)), take('blank'), onError)];
   return () => stops.forEach(s => s());
 }
+
+// The trailer-wash requests the plant screens need (the app's, maintenance kind WASH, or with list 'plantWash' the Live
+// sheet's WASH / CLEANING LIVE copy): every one not marked done, and the ones completed from fromKey on (Truck Washing lists
+// the week's finished washes). P.washItems and Truck Washing's done list come out the same as from every wash request ever
+// made. Done is P's DONE_WASH, in the two spellings the records use.
+const WASH_DONE = ['COMPLETE', 'COMPLETED', 'CLEANED', 'CLOSED', 'RESOLVED', 'WASHED', 'DONE', 'REMOVED', 'complete', 'done'];
+export function watchWashRequests(db, fromKey, cb, onError, list) {
+  const name = list || 'maintenance', col = collection(db, name), parts = { open: null, done: null };
+  const send = () => {
+    if (!parts.open || !parts.done) return;
+    const byId = {};
+    parts.open.concat(parts.done).forEach(r => { byId[r._id] = r; });
+    cb(Object.values(byId));
+  };
+  const take = (k) => (s) => {
+    parts[k] = s.docs.map(d => Object.assign({}, d.data(), { _list: name, _id: d.id })).filter(r => name !== 'maintenance' || String(r.kind || '').toUpperCase() === 'WASH');
+    send();
+  };
+  const from = dayKey(Date.parse(fromKey + 'T12:00:00Z') - DAY);
+  const stops = [onSnapshot(query(col, where('status', 'not-in', WASH_DONE)), take('open'), onError), onSnapshot(query(col, where('completed_at', '>=', from)), take('done'), onError)];
+  return () => stops.forEach(s => s());
+}

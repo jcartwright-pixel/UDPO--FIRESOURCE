@@ -2,6 +2,7 @@
 // each card shows (loads by depart hour, trailers to unload first, washes waiting longest, returns by reason).
 import { start, requireSignIn, showError, shortDate, escapeHtml } from './app.js';
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
+import { watchWashRequests } from './recent-records.js';
 import * as P from './plant-core.js';
 const L = window.UDLogic;
 const params = new URLSearchParams(location.search);
@@ -88,8 +89,9 @@ export function run(render) {
     onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); go(); }, fail('the loads'));
     onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); go(); }, fail('the pickups'));
     onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); go(); }, fail('the plant journal'));
-    onSnapshot(collection(db, 'plantWash'), s => { data.wash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); go(); }, fail('the wash list'));
-    onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { data.appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); go(); }, fail('the wash requests'));
+    watchWashRequests(db, L.weekStart(date), r => { data.wash = r; go(); }, fail('the wash list'), 'plantWash');
+    // Joe 10/18 (screen speed): the open wash requests and the week's finished ones, not every one ever made.
+    watchWashRequests(db, L.weekStart(date), r => { data.appWash = r; go(); }, fail('the wash requests'));
     onSnapshot(doc(db, 'config', 'app'), snap => {
       const c = snap.data() || {}, at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
       document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
