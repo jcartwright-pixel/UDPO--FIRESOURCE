@@ -60,6 +60,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { collection, doc, getDoc, onSnapshot } from './js/firebase.js';
+    import { watchIssueRecords } from './js/recent-records.js';
     forScreen('checkIns');
 
     const L = window.UDLogic;
@@ -195,7 +196,8 @@
       const { db } = await start();
       mailDb = db;
       watchLists(user, render);
-      onSnapshot(collection(db, 'maintenance'), s => { records = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the write-ups: ' + e.message));
+      // Joe 10/18 (screen speed): the open write-ups and the recent ones their counts need, not every write-up ever made.
+      watchIssueRecords(db, r => { records = r; render(); }, e => showError('Could not read the write-ups: ' + e.message));
     });
   </script>
 </body>

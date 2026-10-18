@@ -154,6 +154,29 @@ function garageJobs(orders, records, units) {
   return jobs.sort((a, b) => rank(a) - rank(b) || String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 
+/*
+ * Joe 10/18 (screen speed: "the bigger the file, I don't want it to start getting slower"): what garageJobs needs, instead of
+ * every work order and write-up ever made. garageJobs lists the work orders not done and the write-ups not done that no work
+ * order points at, so this reads: the write-ups not marked done (and every one opened in the last 120 days, in case one has no
+ * status), the work orders not done (and every one made in the last 120 days), and the work orders that point at one of those
+ * write-ups. The list is the same as reading them all.
+ */
+const RECORD_DONE = ['COMPLETE', 'COMPLETED', 'CLOSED', 'RESOLVED', 'REPAIRED', 'REMOVED', 'ADDRESSED', 'complete', 'closed', 'removed'];
+async function garageLists(db, nowMs) {
+  const since = new Date((nowMs || Date.now()) - 120 * 86400000).toISOString().slice(0, 10);
+  const M = db.collection(C.maintenance), O = db.collection(WORK_ORDERS), byId = (snaps) => {
+    const out = {};
+    snaps.forEach(s => s.docs.forEach(d => { out[d.id] = d.data(); }));
+    return Object.values(out);
+  };
+  const records = byId(await Promise.all([M.where('status', 'not-in', RECORD_DONE).get(), M.where('opened_at', '>=', since).get()]))
+    .filter(r => KIND_KEYS[String(r.kind || '').toUpperCase()]);
+  const ids = [...new Set(records.filter(realWriteUp).map(r => String(r.record_id)))], linkReads = [];
+  for (let i = 0; i < ids.length; i += 30) linkReads.push(O.where('source_id', 'in', ids.slice(i, i + 30)).get());
+  const orders = byId(await Promise.all([O.where('status', 'not-in', ['DONE', 'done', 'Done']).get(), O.where('created_at', '>=', since).get()].concat(linkReads)));
+  return { orders, records };
+}
+
 /* ---------- sign-in ---------- */
 
 async function signedInTechs(tx, db, tokens, nowMs) {
@@ -230,8 +253,7 @@ async function read(db, input, nowMs) {
     const batch = db.batch();
     renew((ref, data) => batch.update(ref, data), people, nowMs);
     await batch.commit();
-    const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
-    const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
+    const { orders, records } = await garageLists(db);
     jobs = garageJobs(orders, records, units);
   }
   return { techs, signedIn: people.map(p => ({ token: p.token, id: p.id, name: p.name })), jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES };
@@ -244,8 +266,7 @@ async function read(db, input, nowMs) {
 async function board(db, nowMs) {
   const techs = activeTechs((await db.collection(TECHS).get()).docs.map(d => d.data()));
   const units = garageUnits((await db.collection(C.equipment).get()).docs.map(d => d.data()));
-  const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
-  const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
+  const { orders, records } = await garageLists(db);
   const clocks = {};
   (await db.collection(CLOCKS).get()).docs.forEach(d => { const c = d.data(); if (c.techId) clocks[c.techId] = c; });
   const jobs = garageJobs(orders, records, units).map(j => { const c = Object.assign({}, j); delete c.driver; return c; });
@@ -514,8 +535,7 @@ async function engineCodeOrders(db, faults, stamp) {
  */
 async function officeJobs(db) {
   const units = garageUnits((await db.collection(C.equipment).get()).docs.map(d => d.data()));
-  const orders = (await db.collection(WORK_ORDERS).get()).docs.map(d => d.data());
-  const records = (await db.collection(C.maintenance).where('kind', 'in', Object.keys(KIND_KEYS)).get()).docs.map(d => d.data());
+  const { orders, records } = await garageLists(db);
   return { jobs: garageJobs(orders, records, units).filter(j => !j.id) };
 }
 
@@ -790,4 +810,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, LOGINS };
+module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };
