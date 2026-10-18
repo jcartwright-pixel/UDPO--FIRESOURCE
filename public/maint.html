@@ -53,6 +53,7 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
     import { collection, doc, onSnapshot, httpsCallable } from './js/firebase.js';
+    import { watchIssueRecords, watchHubWorkOrders } from './js/recent-records.js';
 
     // Joe 10/10: the current app's Fleet & Maintenance hub, where the maintenance side starts. Each list is read once
     // (write-ups, work orders, units, service setup, odometers) and every card is counted from that one copy.
@@ -118,9 +119,13 @@
 
     requireSignIn(async () => {
       const { db } = await start();
-      onSnapshot(collection(db, 'workOrders'), () => loadWaiting(), () => {});
       onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
-      Object.keys(data).forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
+      // Joe 10/18 (screen speed): the open write-ups and the recent ones the counts need, not every write-up ever made.
+      watchIssueRecords(db, r => { data.maintenance = r; render(); }, e => showError('Could not read the write-ups (' + e.message + '). Some counts may be short; check the network and reload the page.'));
+      // The open work orders and this week's finished ones (the Garage card), not every work order ever made; the write-ups
+      // waiting for a work order are read again whenever they change.
+      watchHubWorkOrders(db, L.weekStart(L.operatingDay(new Date())), r => { data.workOrders = r; render(); loadWaiting(); }, e => showError('Could not read the work orders (' + e.message + '). Some counts may be short; check the network and reload the page.'));
+      Object.keys(data).filter(name => name !== 'maintenance' && name !== 'workOrders').forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });
   </script>
