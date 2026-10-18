@@ -476,21 +476,36 @@
     return { entryId: text(p.entryId || d.recordId), section: text(p.section || d.area).toUpperCase(), shift: text(p.shift || d.shift).toUpperCase(), readingTime: text(p.readingTime),
       type: text(v.Type), equipment: text(v.Equipment), entry: text(v.Entry), parentId: text(v.ParentId), notes: text(p.notes !== undefined ? p.notes : d.notes),
       followUpStatus: text(p.followUpStatus || 'OPEN').toUpperCase(), recordedAt: text(d.recordedAt), recordedBy: text(d.recordedBy), inApp: !!d.createdInApp,
-      upAt: text(v.UpAt), fix: text(v.Fix), urgency: text(v.Urgency) };
+      upAt: text(v.UpAt), fix: text(v.Fix), urgency: text(v.Urgency), editedAt: text(d.editedAt) };
   }
-  // Minutes a breakdown was down: from its down time (the entry's time) to back up (same day, or the next if earlier), or to
-  // nowMs while it is still down. null without a down time.
+  // A breakdown's down span on the plant's wall clock: {start, end, open} in minutes, or null without a down time. It went down
+  // at its down time (the entry's time) on the day it was recorded, or the day before when that time is more than an hour after
+  // it was recorded (logged after midnight). It is down until back up (same day, or the next if earlier); Joe 10/18: marked
+  // Resolved with no back up time, it stops at the time it was marked resolved instead of counting on; otherwise until nowMs.
   function minutesOfDay(hhmm) { var m = /^(\d{1,2}):(\d\d)$/.exec(text(hhmm)); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
-  function downMinutes(r, nowMs) {
+  function downSpan(r, nowMs) {
     var down = minutesOfDay(r && r.readingTime);
     if (down === null) return null;
-    var up = minutesOfDay(r.upAt);
-    if (up !== null) return (up - down + 1440) % 1440;
     var at = when(r.recordedAt);
-    if (!at || !nowMs) return null;
-    var atWall = wallClock(at), downWall = atWall - atWall % 1440 + down;
-    if (downWall > atWall + 1) downWall -= 1440;
-    return Math.max(0, wallClock(nowMs) - downWall);
+    if (!at && !nowMs) return null;
+    var atWall = wallClock(at || nowMs), start = atWall - atWall % 1440 + down;
+    if (start > atWall + 60) start -= 1440;
+    var up = minutesOfDay(r.upAt);
+    if (up !== null) return { start: start, end: start + (up - down + 1440) % 1440, open: false };
+    if (text(r.status || r.followUpStatus).toUpperCase() === 'RESOLVED') {
+      var fixed = when(r.resolvedAt || r.editedAt || r.recordedAt);
+      return fixed ? { start: start, end: Math.max(start, wallClock(fixed)), open: false, noUpTime: true } : null;
+    }
+    return nowMs ? { start: start, end: Math.max(start, wallClock(nowMs)), open: true } : null;
+  }
+  // Minutes a breakdown was down (or has been so far). null without a down time.
+  function downMinutes(r, nowMs) { var s = downSpan(r, nowMs); return s ? s.end - s.start : null; }
+  // The minutes of it in today's plant day (from 6 a.m., when the day rolls, to nowMs).
+  function downToday(r, nowMs) {
+    var s = downSpan(r, nowMs);
+    if (!s || !nowMs) return 0;
+    var from = opDayAt(nowMs) * 1440 + 360, to = wallClock(nowMs);
+    return Math.max(0, Math.min(s.end, to) - Math.max(s.start, from));
   }
   // The log of the last 24 hours, newest first; each entry with its reviews (oldest first) and its status now.
   // hours: how far back (24 by default); Shift Notes and the report look back further for open items carried over.
@@ -506,8 +521,11 @@
     return parents.map(function (r) {
       var reviews = (kids[r.entryId] || []).slice().reverse();
       // A review that says when the machine was back up (and what fixed it) closes the breakdown's down time.
-      var up = reviews.filter(function (x) { return x.upAt; }).pop();
-      return Object.assign({}, r, { reviews: reviews, status: (reviews.length ? reviews[reviews.length - 1] : r).followUpStatus, upAt: up ? up.upAt : r.upAt, fix: up && up.fix ? up.fix : r.fix });
+      var up = reviews.filter(function (x) { return x.upAt; }).pop(), last = reviews.length ? reviews[reviews.length - 1] : r;
+      // When it was marked Resolved: by the last review that resolved it, else the entry's own last save.
+      var done = reviews.filter(function (x) { return x.followUpStatus === 'RESOLVED'; }).pop();
+      var resolvedAt = last.followUpStatus !== 'RESOLVED' ? '' : done ? done.recordedAt : (r.editedAt || r.recordedAt);
+      return Object.assign({}, r, { reviews: reviews, status: last.followUpStatus, upAt: up ? up.upAt : r.upAt, fix: up && up.fix ? up.fix : r.fix, resolvedAt: resolvedAt });
     });
   }
 
@@ -937,7 +955,7 @@
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
-    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
+    SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
     REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };

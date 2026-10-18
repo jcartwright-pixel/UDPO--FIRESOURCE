@@ -70,6 +70,8 @@
     const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const hm = (n) => hoursMinutesText(n, { unit: 'm', short: 'min' });
+    // A time of day on the plant's clock (20:58), as Down and back up read.
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }) : ''; };
     const who = (e) => String(e || '').split('@')[0];
     const pill = (word, c) => '<span class="pm-pill ' + c + '">' + escapeHtml(word) + '</span>';
     const WO_CLASS = { NEW: 'amber', WORKING: 'blue', PARTS: 'amber', DONE: 'green' };
@@ -84,10 +86,12 @@
       if (!data) return;
       const today = data.today, ck = canSave(), ckPm = canPm();
       const waiting = data.requests.filter(r => !r.workOrder && r.status !== 'RESOLVED');
-      const brToday = data.breakdowns.filter(b => b.stillDown || new Date(Date.parse(b.recordedAt)).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) === today);
+      // Joe 10/18: today is the plant day (from 6 a.m.). A breakdown shows while still down, when recorded today or when any of its
+      // down time is today; Down time today counts only the minutes since 6 a.m.
+      const brToday = data.breakdowns.filter(b => b.stillDown || b.recordedToday || b.today > 0);
       const open = data.workOrders.filter(w => R.isOpen(w)).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
       const due = data.tasks.filter(t => t.state === 'LATE' || t.state === 'WEEK');
-      const downToday = brToday.reduce((n, b) => n + (b.down || 0), 0);
+      const downToday = brToday.reduce((n, b) => n + (b.today || 0), 0);
       const kpi = (n, label, c) => '<div class="' + (n ? c : 'zero') + '"><b>' + n + '</b><span>' + label + '</span></div>';
       document.getElementById('kpis').innerHTML = kpi(data.machines.filter(m => m.down).length, 'Machines down', 'red') + kpi(waiting.length, 'Requests waiting', 'amber') + kpi(open.length, 'Open work orders', '') +
         kpi(open.filter(w => w.status === 'PARTS').length, 'Waiting on parts', 'amber') + kpi(due.filter(t => t.state === 'LATE').length, 'PMs overdue', 'red') + kpi(due.filter(t => t.state === 'WEEK').length, 'PMs due this week', '') +
@@ -98,8 +102,9 @@
         (ck ? '<div class="row"><button type="button" class="pm-btn pri" data-make="' + escapeHtml(r.entryId) + '"' + (doing.has(r.entryId) ? ' disabled' : '') + '>Make Work Order</button><button type="button" class="pm-btn" data-fixed="' + escapeHtml(r.entryId) + '"' + (doing.has(r.entryId) ? ' disabled' : '') + '>Already Fixed</button></div>' : '') + '</div>').join('') ||
         '<div class="pmc-empty">' + (data.read.journal ? 'No requests waiting. Shift Notes\' Maintenance Requests show here.' : 'Reading the requests…') + '</div>';
       document.getElementById('n-brk').textContent = brToday.length;
-      document.getElementById('breakdowns').innerHTML = brToday.map(b => '<div class="pmc-item ' + (b.stillDown ? 'red' : '') + '"><b>' + escapeHtml(b.machine || 'Plant') + '</b> ' + pill('Breakdown', 'red') +
-        '<p>' + escapeHtml(b.entry) + (b.fix ? ' Fix: ' + escapeHtml(b.fix) : '') + '</p><small>' + (b.readingTime ? 'Down ' + escapeHtml(b.readingTime) + ' · ' : '') + (b.stillDown ? '<b class="pm-late">still down</b>' + (b.down !== null ? ' · ' + hm(b.down) + ' so far' : '') : (b.upAt ? 'back up ' + escapeHtml(b.upAt) + ' · ' : '') + (b.down !== null ? hm(b.down) : 'resolved')) + '</small></div>').join('') ||
+      document.getElementById('breakdowns').innerHTML = brToday.map(b => '<div class="pmc-item ' + (b.stillDown ? 'red' : b.resolvedAt && !b.upAt ? 'amber' : '') + '"><b>' + escapeHtml(b.machine || 'Plant') + '</b> ' + pill('Breakdown', 'red') +
+        '<p>' + escapeHtml(b.entry) + (b.fix ? ' Fix: ' + escapeHtml(b.fix) : '') + '</p><small>' + (b.readingTime ? 'Down ' + escapeHtml(b.readingTime) + ' · ' : '') + (b.stillDown ? '<b class="pm-late">still down</b>' + (b.down !== null ? ' · ' + hm(b.down) + ' so far' : '') : (b.upAt ? 'back up ' + escapeHtml(b.upAt) + ' · ' : b.resolvedAt ? '<b class="pm-warn">no back up time</b> · marked fixed ' + escapeHtml(clock(b.resolvedAt)) + (b.down ? ' · ' : '') : '') + (b.down !== null ? (b.down || b.upAt || !b.resolvedAt ? hm(b.down) : '') : 'resolved')) +
+        (b.down && b.today < b.down ? ' · ' + (b.today ? hm(b.today) : '0 min') + ' today' : '') + '</small></div>').join('') ||
         '<div class="pmc-empty">No breakdowns recorded today.</div>';
       document.getElementById('n-wo').textContent = open.length;
       document.getElementById('orders').innerHTML = open.map(w => '<div class="pmc-item ' + (w.lineDown === 'YES' ? 'red' : w.status === 'PARTS' ? 'amber' : '') + '"><b>' + escapeHtml(w.woNumber + ' · ' + (w.machine || 'Plant')) + '</b> ' + pill(R.statusWord(w.status), WO_CLASS[w.status] || 'gray') +

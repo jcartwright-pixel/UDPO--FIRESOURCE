@@ -204,8 +204,10 @@
       if (!isKind(x, 'Breakdown') || !x.readingTime) return '';
       const id = escapeHtml(x.entryId), n = U.downMinutes(x, Date.now());
       if (x.upAt) return '<div class="sn-down up"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span><span>Back up at <b>' + escapeHtml(x.upAt) + '</b></span><span class="sn-pill green">' + hm(n) + ' down</span>' + (x.fix ? '<span>Fix: <b>' + escapeHtml(x.fix) + '</b></span>' : '') + '</div>';
-      return '<div class="sn-down"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span><span class="sn-pill red">Still down' + (n !== null ? ' · ' + hm(n) : '') + '</span>' +
-        (ck ? '<label>Back up at<input type="time" data-up="' + id + '" aria-label="Back up at"></label><input class="sn-fixbox" data-fix="' + id + '" maxlength="1000" placeholder="What fixed it (saves when you leave the box)" aria-label="What fixed it">' : '') + '</div>';
+      // Joe 10/18: marked Resolved with no back up time, it stops counting when it was resolved; the box stays to fill the time in.
+      const pill = x.status === 'RESOLVED' ? '<span class="sn-pill amber">No back up time' + (x.resolvedAt ? ' · marked fixed ' + escapeHtml(new Date(Date.parse(x.resolvedAt)).toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })) : '') + '</span>' : '<span class="sn-pill red">Still down' + (n !== null ? ' · ' + hm(n) : '') + '</span>';
+      return '<div class="sn-down"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span>' + pill +
+        (ck ? '<label>Back up at<input type="time" data-up="' + id + '" aria-label="Back up at"></label><input class="sn-fixbox" data-fix="' + id + '" maxlength="1000" placeholder="What fixed it (saves when you leave the box)" aria-label="What fixed it"' + (x.status === 'RESOLVED' && x.fix ? ' value="' + escapeHtml(x.fix) + '"' : '') + '>' : '') + '</div>';
     }
     // A maintenance request: how long it can wait, and what maintenance has done with it (its work order).
     function requestLine(x) {
@@ -351,6 +353,10 @@
         if (sendNow) { const last = document.getElementById('form-last'); last.textContent = 'Type what\'s wrong first'; last.classList.add('bad'); const x = f.querySelector('.sn-entry'); if (x) x.focus(); }
         return;
       }
+      // Joe 10/18: a breakdown with what fixed it, or marked Resolved, is back up: the Back up at box takes the time now when empty,
+      // so its down time stops (it can be changed).
+      const upBox = f.querySelector('.sn-up');
+      if (upBox && !upBox.value && v('sn-type') === 'Breakdown' && (v('sn-fix') || v('sn-follow') === 'RESOLVED')) upBox.value = clockNow();
       const values = Object.assign({ Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') }, v('sn-up') ? { UpAt: v('sn-up') } : {}, v('sn-fix') ? { Fix: v('sn-fix') } : {}, v('sn-urgency') ? { Urgency: v('sn-urgency') } : {});
       const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
       const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift });

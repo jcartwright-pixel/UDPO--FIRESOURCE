@@ -20,7 +20,7 @@ export function watchMaint(db, facilityId, cb, fail, opts) {
     const open = data.workOrders.filter(w => R().isOpen(w)), now = Date.now();
     const log = U() ? U().shiftLog(data.journal, now, 24 * HISTORY_DAYS) : [];
     const kind = (r) => String(r.type || '').toUpperCase();
-    const tie = (r) => { const m = R().findMachine(all, r.equipment); return Object.assign({}, r, { machineId: m ? m.id : '', machine: m ? m.name : r.equipment, down: U().downMinutes(r, now) }); };
+    const tie = (r) => { const m = R().findMachine(all, r.equipment); return Object.assign({}, r, { machineId: m ? m.id : '', machine: m ? m.name : r.equipment, down: U().downMinutes(r, now), today: U().downToday(r, now), recordedToday: U().opDayAt(Date.parse(r.recordedAt) || now) === U().opDayAt(now) }); };
     const breakdowns = log.filter(r => kind(r) === 'BREAKDOWN').map(tie).map(r => Object.assign(r, { stillDown: !!r.readingTime && !r.upAt && r.status !== 'RESOLVED' }));
     const requests = log.filter(r => kind(r) === 'MAINTENANCE REQUEST').map(tie).map(r => Object.assign(r, { workOrder: data.workOrders.find(w => w.sourceEntryId === r.entryId) || null }));
     const tasks = data.tasks.filter(t => t.status !== 'REMOVED').map(t => {
