@@ -66,6 +66,7 @@
   <script type="module">
     import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { watchWashRequests } from './js/recent-records.js';
     import * as P from './js/plant-core.js';
 
     const L = window.UDLogic, U = window.UDPlant;
@@ -161,6 +162,9 @@
     let db = null;
     function watch() {
       while (unsubs.length) unsubs.pop()();
+      // Joe 10/18 (screen speed): the open wash requests and the shown week's finished ones, not every one ever made.
+      unsubs.push(watchWashRequests(db, [L.weekStart(date), L.weekStart(today())].sort()[0], r => { appWash = r; got.app = true; render(); }, e => showError('Could not read the wash requests (' + e.message + '). Check the network and reload the page.')));
+      unsubs.push(watchWashRequests(db, [L.weekStart(date), L.weekStart(today())].sort()[0], r => { sheetWash = r; got.sheet = true; render(); }, e => showError('Could not read the wash list (' + e.message + '). Check the network and reload the page.'), 'plantWash'));
       unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); got.week = true; render(); }, e => showError('Could not read the washes (' + e.message + '). Check the network and reload the page.')));
     }
 
@@ -168,8 +172,6 @@
       ({ db } = await start());
       watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); got.sheet = true; render(); }, e => showError('Could not read the wash list (' + e.message + '). Check the network and reload the page.'));
-      onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); got.app = true; render(); }, e => showError('Could not read the wash requests (' + e.message + '). Check the network and reload the page.'));
       watch();
       let shown = today();
       setInterval(() => { const t = today(); if (t !== shown) { if (date === shown) setDate(t); shown = t; } }, 60000);
