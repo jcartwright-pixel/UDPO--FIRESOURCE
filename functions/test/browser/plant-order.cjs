@@ -186,7 +186,9 @@ async function keyMove(page, route, dir) {
       for (const a of ['CASE', 'TOTES', 'BOXING', 'TANKER']) {
         await pg.click('[data-area="' + a + '"]');
         await pg.waitForFunction(x => document.querySelector('[data-area="' + x + '"]').classList.contains('on') && document.querySelector('#rows tr[data-drag]'), a);
-        const lines = await pg.$$eval('#rows tr[data-row]:not(.done):not(.skipped)', g => g.map(tr => ({
+        // Read the rows in one step: $$eval finds them first and reads them after, and a redraw in between leaves them detached
+        // (no computed cursor).
+        const lines = await pg.evaluate(() => [...document.querySelectorAll('#rows tr[data-row]:not(.done):not(.skipped)')].map(tr => ({
           drag: !!tr.dataset.drag, hand: getComputedStyle(tr.children[1]).cursor, extra: !!tr.querySelector('.lo-move, .lo-grip, [data-grip]'), route: tr.children[0].textContent })));
         const today = lines.filter(l => l.drag);
         assert.ok(today.length >= 1 && today.every(l => l.hand === 'grab' && !l.extra), a + ' at ' + w + ': every load today can be dragged by its line, no arrows, no dots ' + JSON.stringify(lines));
