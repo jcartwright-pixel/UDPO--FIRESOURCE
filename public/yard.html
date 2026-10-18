@@ -28,8 +28,8 @@
     </div>
     <div class="head">
       <div class="title"><span class="eyebrow">Live Trailer Monitoring · Timestamped Checks</span><h1>Yard Checks</h1></div>
-      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button><button type="button" role="tab" data-pane="gps">GPS Trailer Temps</button></div>
-      <button type="button" class="yd-refresh" id="refresh" data-top>&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" data-top hidden>&#8635; Refresh History</button><button type="button" class="yd-refresh" id="refresh-gps" data-top hidden>&#8635; Refresh</button>
+      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <button type="button" class="yd-refresh" id="refresh" data-top>&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" data-top hidden>&#8635; Refresh History</button>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
@@ -46,31 +46,19 @@
         <div><h2>24-Hour History</h2><p>All recorded yard checks with timestamps.</p></div>
         <span class="yd-grow"></span>
       </div>
-      <div class="yd-bar" id="bar-gps" hidden>
-        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
-        <div><h2>GPS Trailer Temps</h2><p>Each trailer's temperature from the GPS, from the time its load is complete until it is back in the yard.</p></div>
-        <span class="yd-cycle"><b>Read every 5 minutes</b> · Red = more than <span id="offby">5</span>° from the set point.</span>
-      </div>
       <div class="yd-cards" id="cards" aria-label="Trailers to check"></div>
       <div class="sheet scroll-list" id="pane-current">
         <table class="loadout yd-table">
-          <colgroup><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:12%"><col style="width:16%"><col style="width:10%"><col style="width:12%"><col style="width:14%"></colgroup>
+          <colgroup><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:18%"><col style="width:10%"><col style="width:12%"><col style="width:14%"></colgroup>
           <thead><tr><th><span class="l">Trailer #</span><span class="s">Trailer</span></th><th><span class="l">Actual Temp (°F)</span><span class="s">Temp °F</span></th><th><span class="l">Temp Set Point (°F)</span><span class="s">Set °F</span></th><th><span class="l">Fuel Level</span><span class="s">Fuel</span></th><th><span class="l">GPS Temp (°F)</span><span class="s">GPS °F</span></th><th>Notes</th><th>Last Check</th><th>Next Recheck</th><th>Action</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
       <div class="sheet scroll-list" id="pane-history" hidden>
         <table class="loadout yd-table yd-history">
-          <colgroup><col style="width:14%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:22%"><col style="width:14%"></colgroup>
-          <thead><tr><th>Date / Time</th><th>Trailer #</th><th>Temp (°F)</th><th>Set Point (°F)</th><th>Fuel Level</th><th>GPS Temp (°F)</th><th>Notes</th><th>Recorded By / Status</th></tr></thead>
+          <colgroup><col style="width:15%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:28%"><col style="width:15%"></colgroup>
+          <thead><tr><th>Date / Time</th><th>Trailer #</th><th>Temp (°F)</th><th>Set Point (°F)</th><th>Fuel Level</th><th>Notes</th><th>Recorded By / Status</th></tr></thead>
           <tbody id="history"></tbody>
-        </table>
-      </div>
-      <div class="sheet scroll-list" id="pane-gps" hidden>
-        <table class="loadout yd-table yd-gpstable">
-          <colgroup><col style="width:12%"><col style="width:20%"><col style="width:18%"><col style="width:14%"><col style="width:16%"><col style="width:20%"></colgroup>
-          <thead><tr><th>Trailer #</th><th>Route</th><th>GPS Temp (°F)</th><th>Set Point (°F)</th><th>Recording Since</th><th>Where</th></tr></thead>
-          <tbody id="gpsrows"></tbody>
         </table>
       </div>
       <div class="foot" id="foot"></div>
@@ -88,8 +76,7 @@
     const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
-    const PANES = ['current', 'history', 'gps'];
-    let date = today(), pane = PANES.indexOf(params.get('view')) > 0 ? params.get('view') : 'current';
+    let date = today(), pane = params.get('view') === 'history' ? 'history' : 'current';
     let runs = [], journal = [], person = null, app = {};
     let reefer = {};           // trailer -> gpsReefer: the GPS temperature while the trailer is recorded (Joe 10/18)
     const drafts = {};          // trailer -> what was typed and not recorded yet
@@ -105,27 +92,15 @@
     const dateTime = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : String(v || ''); };
     const initials = (v) => { let s = String(v || '').trim(); if (!s) return ''; if (s.indexOf('@') >= 0) s = s.split('@')[0]; const p = s.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean); return p.length > 1 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : s.slice(0, 2).toUpperCase(); };
     const STATUS = { COMPLETE: 'Recorded', RECORDED: 'Recorded', DEPARTED: 'Left Yard' };
-    // Joe 10/18: the trailer's temperature from the GPS beside the typed one. Red = more than U.REEFER_OFF_BY degrees from
-    // the set point; grey = the newest reading is over an hour old.
+    // Joe 10/18: one more column, the trailer's temperature from the GPS (recorded from load complete until back in the yard).
+    // Red when more than U.REEFER_OFF_BY degrees from the set point; blank when there is no GPS reading.
     const deg = (n) => (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
     function gpsInfo(trailer, setPoint) { return U.yardGps(reefer[trailer], setPoint, Date.now()); }
     function gpsWhy(g) { return g.off === null ? '' : g.off === 0 ? 'On the set point' : deg(Math.abs(g.off)) + '° ' + (g.off > 0 ? 'above' : 'below') + ' the set point'; }
     function gpsCell(trailer, setPoint) {
       const g = gpsInfo(trailer, setPoint);
-      if (!g.has) return '<td class="yd-gps none">—<small>' + (g.noUnit ? 'No GPS on trailer' : 'Waiting for GPS') + '</small></td>';
-      return '<td class="yd-gps' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '" title="' + escapeHtml(gpsWhy(g) || 'No set point to compare') + '"><b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '') + '</td>';
-    }
-    // The set point of a trailer's newest yard check (the GPS does not send one).
-    function lastSetPoint(trailer) {
-      const e = all().filter(d => String(d.type || '').toUpperCase() === 'YARD_CHECK' && U.yardTrailer((d.payload || {}).trailer || d.trailer) === trailer && String((d.payload || {}).setPoint || '').trim() !== '')
-        .sort((a, b) => Date.parse(b.recordedAt || '') - Date.parse(a.recordedAt || ''))[0];
-      return e ? String(e.payload.setPoint) : '';
-    }
-    const STOPPED = { BACK_IN_YARD: 'Back in the yard', NOT_LOADED: 'Load taken off', TOO_LONG: 'Stopped after 4 days' };
-    function gpsRows() {
-      const now = Date.now();
-      return Object.values(reefer).filter(r => r.recording || now - Date.parse(r.stoppedAt || '') < 86400000)
-        .sort((a, b) => (b.recording ? 1 : 0) - (a.recording ? 1 : 0) || String(a.trailer).localeCompare(String(b.trailer), undefined, { numeric: true }));
+      if (!g.has) return '<td class="yd-gps none">—</td>';
+      return '<td class="yd-gps' + (g.flag ? ' bad' : '') + '" title="' + escapeHtml(gpsWhy(g)) + '">' + escapeHtml(deg(g.tempF)) + '°</td>';
     }
 
     function all() { return journal.concat(pending); }
@@ -148,7 +123,7 @@
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
         ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + (why || l) + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
-      PANES.forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history'; document.getElementById('refresh-gps').hidden = pane !== 'gps';
+      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
       // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list
       // while it is filled in, and a trailer due again starts with empty boxes (its last check is in Last Check).
       document.getElementById('rows').innerHTML = q.rows.concat(q.locked.filter(x => mine[x.trailer])).map(x => {
@@ -169,22 +144,11 @@
       }).join('') || (got.runs && got.journal ? '<tr><td colspan="9" class="empty">No loaded trailers are currently due for a yard check.</td></tr>' : '<tr><td colspan="9" class="empty">Loading the trailers&hellip;</td></tr>');
       drawCards(q, ck);
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
-        '<td>' + escapeHtml(h.fuelLevel) + '</td><td>' + (h.gpsTempF !== '' ? escapeHtml(deg(Number(h.gpsTempF))) + '°' : '') + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
-        '<tr><td colspan="8" class="empty">No yard checks in the last 24 hours.</td></tr>';
-      const gl = gpsRows();
-      document.getElementById('gpsrows').innerHTML = gl.map(r => {
-        const sp = lastSetPoint(r.trailer), g = U.yardGps(r, sp, Date.now());
-        const where = r.recording ? (r.out ? 'On the road' : 'In the yard') : (STOPPED[r.stopReason] || 'Stopped') + (r.stoppedAt ? ' · ' + clock(r.stoppedAt) : '');
-        return '<tr data-trailer="' + escapeHtml(r.trailer) + '"><td class="yd-trailer"><b>' + escapeHtml(r.trailer) + '</b></td><td>' + escapeHtml(r.routeRun || '') + '</td>' +
-          (g.has ? '<td class="yd-gps' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '" title="' + escapeHtml(gpsWhy(g) || 'No set point to compare') + '"><b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '') + '</td>'
-            : '<td class="yd-gps none">—<small>' + (r.recording && !r.unitId ? 'No GPS on trailer' : 'No reading yet') + '</small></td>') +
-          '<td>' + escapeHtml(sp) + '</td>' +
-          '<td>' + escapeHtml(r.startedAt ? dateTime(r.startedAt) : '') + '</td><td class="yd-where' + (r.recording ? ' on' : '') + '">' + escapeHtml(where) + '</td></tr>';
-      }).join('') || '<tr><td colspan="6" class="empty">No trailers are being recorded. A trailer starts once its load is complete.</td></tr>';
+        '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
+        '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
         ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
-        : pane === 'history' ? hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.'
-        : gl.filter(r => r.recording).length + ' trailer' + (gl.filter(r => r.recording).length === 1 ? '' : 's') + ' being recorded from the GPS. Recording starts once a load is complete and stops when the trailer is back in the yard.';
+        : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -201,11 +165,6 @@
       Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
     }
     const queues = {};          // trailer -> the saves of that trailer, one after the other
-    function gpsCard(trailer, setPoint) {
-      const g = gpsInfo(trailer, setPoint);
-      return '<div class="yd-f yd-gpsf' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '"><span>GPS °F</span>' + (g.has ? '<b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '')
-        : '<small>' + (g.noUnit ? 'No GPS on trailer' : 'Waiting for GPS') + '</small>') + '</div>';
-    }
     function drawCards(q, ck) {
       const box = document.getElementById('cards');
       if (!phone()) { box.innerHTML = ''; return; }
@@ -220,7 +179,7 @@
           '<label class="yd-f"><span>Temp °F</span><input data-k="temperature" inputmode="decimal" enterkeyhint="done" placeholder="Temp" value="' + escapeHtml(v('temperature')) + '"' + dis + '></label>' +
           '<label class="yd-f"><span>Set °F</span><input data-k="setPoint" inputmode="decimal" enterkeyhint="done" placeholder="Set point" value="' + escapeHtml(setOf(x)) + '"' + dis + '></label>' +
           '<div class="yd-f"><span>Fuel</span><div class="yd-fuel">' + ['FULL', '3/4', '1/2', 'EMPTY'].map(f => '<button type="button" data-fuel="' + f + '" aria-pressed="' + (fuel === f) + '"' + dis + '>' + (f === 'FULL' ? 'Full' : f === 'EMPTY' ? 'Empty' : f) + '</button>').join('') + '</div></div>' +
-          gpsCard(x.trailer, setOf(x)) +
+          (() => { const g = gpsInfo(x.trailer, setOf(x)); return '<div class="yd-f yd-gpsf' + (g.flag ? ' bad' : '') + '"><span>GPS °F</span><b>' + (g.has ? escapeHtml(deg(g.tempF)) + '°' : '—') + '</b></div>'; })() +
           '<label class="yd-f"><span>Notes</span><input data-k="notes" enterkeyhint="done" placeholder="Optional" maxlength="800" value="' + escapeHtml(v('notes')) + '"' + dis + '></label>' +
           (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Tap again to confirm: left the yard' : '>Left Yard') + '</button>' : '') + '</article>';
       }).join('') || (got.runs && got.journal ? '<p class="yd-none">No loaded trailers are due for a yard check.</p>' : '<p class="yd-none">Loading the trailers&hellip;</p>');
@@ -346,13 +305,11 @@
       const b = e.target.closest('[data-pane]');
       if (!b) return;
       pane = b.dataset.pane;
-      history.replaceState(null, '', pane !== 'current' ? '?view=' + pane : location.pathname);
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
       render();
     });
     document.getElementById('refresh').onclick = () => render();
     document.getElementById('refresh-history').onclick = () => render();
-    document.getElementById('refresh-gps').onclick = () => render();
-    document.getElementById('offby').textContent = U.REEFER_OFF_BY;
 
     let db = null;
     function watch() {

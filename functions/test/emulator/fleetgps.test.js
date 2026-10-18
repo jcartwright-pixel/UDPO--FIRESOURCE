@@ -282,4 +282,11 @@ test('Fleet GPS: a loaded trailer\'s temperature is read every run until it is b
   assert.equal(log.slice(before).filter(l => l.startsWith('reefer ')).length, 0, 'nothing is read once it is back');
   const s = await gpsCall(d, ADMIN, { kind: 'fleet', op: 'status' }, o);
   assert.equal(s.coverage.find(c => c.key === 'reefer').label, 'Trailer temperatures (GPS)');
+  // Joe 10/18: kept at most 6 months, then deleted (checked once a day).
+  await d.collection('gpsReeferReadings').doc('T-701_20260401120000').set({ trailer: 'T-701', at: '2026-04-01T12:00:00.000Z', tempF: 35 });
+  clock.now = new Date('2026-10-14T12:00:00Z');
+  await pull(d, o);
+  const left = (await d.collection('gpsReeferReadings').get()).docs.map(x => x.id).sort();
+  assert.equal(left.indexOf('T-701_20260401120000'), -1, 'a reading over 6 months old is deleted');
+  assert.equal(left.length, 2, 'this month\'s readings stay');
 });

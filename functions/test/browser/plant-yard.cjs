@@ -3,8 +3,8 @@
  * Browser check of Yard Checks against the local test database (npm run test:browser). Four loaded trailers wait on the
  * yard today (dated from the real clock, since the yard list follows the time of day): T-701 never checked, T-702 checked
  * 3 hours ago (due again), T-703 checked 30 minutes ago (locked for 2 hours), T-704 never checked. A plant employee records
- * a check and a Left Yard; a second open screen follows without reloading. Joe 10/18: each trailer's GPS temperature (gpsReefer)
- * shows beside the typed one, red when far from the set point, and on the GPS Trailer Temps tab. Pictures go to SHOTS_DIR.
+ * a check and a Left Yard; a second open screen follows without reloading. Joe 10/18: one more column, GPS Temp (gpsReefer),
+ * red when far from the set point; everything typed stays as it was. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -61,14 +61,12 @@ async function seed() {
   await d.collection('plantJournal').doc('YARD_CHECK_seed_703').set({ recordId: 'OP-y703', type: 'YARD_CHECK', date, status: 'COMPLETE', trailer: 'T-703', recordedAt: ago(30), recordedBy: 'yard.hand@uniteddairy.com',
     payload: { trailer: 'T-703', temperature: '34', fuelLevel: '3/4', notes: '', status: 'COMPLETE', run: 'SUNSHINE' } });
   // The GPS readings the 5-minute Fleet read writes (fleetgps.js pullReefer): T-701 fine, T-702 10.6° over its set point of 34,
-  // T-704 has no GPS unit, T-799 is out on its route, T-798 came back an hour ago (recording stopped).
+  // T-704 has no GPS unit.
   const trip = (t, extra) => d.collection('gpsReefer').doc(t).set(Object.assign({ trailer: t, id: 'x|' + t, routeRun: '', unitId: 'u' + t, tag: t, startedAt: ago(120), recording: true, out: '', back: '',
     stoppedAt: '', stopReason: '', tempF: null, readingAt: '', updatedAt: ago(3) }, extra));
   await trip('T-701', { routeRun: 'SUN VALLEY', tempF: 35.4, readingAt: ago(3) });
   await trip('T-702', { routeRun: 'JERSEY 1', tempF: 44.6, readingAt: ago(4) });
   await trip('T-704', { routeRun: 'FAIRMONT TRANSFER', unitId: '', tag: '' });
-  await trip('T-799', { routeRun: 'OHIO 2', out: ago(90), tempF: 36.1, readingAt: ago(2) });
-  await trip('T-798', { routeRun: 'MARIETTA', out: ago(600), back: ago(60), recording: false, stoppedAt: ago(60), stopReason: 'BACK_IN_YARD', tempF: 38, readingAt: ago(65) });
 }
 
 (async () => {
@@ -87,27 +85,18 @@ async function seed() {
       // Joe 10/10: a trailer due again starts with empty boxes; its last check is in Last Check.
       assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '', 'the boxes start empty');
       assert.notEqual((await page.textContent('#rows tr[data-trailer="T-702"] .yd-last')).trim(), '—', 'the last check shows in Last Check');
-      // Joe 10/18: the GPS temperature beside the typed one; red when more than 5° from the set point.
+      // Joe 10/18: one more column, GPS Temp, after the typed temperature, set point and fuel; red when more than 5° from the set point.
+      assert.deepEqual(await page.$$eval('#pane-current thead th', t => t.map(x => (x.querySelector('.l') || x).textContent)),
+        ['Trailer #', 'Actual Temp (°F)', 'Temp Set Point (°F)', 'Fuel Level', 'GPS Temp (°F)', 'Notes', 'Last Check', 'Next Recheck', 'Action']);
       await page.waitForFunction(() => /35\.4°/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-gps') || {}).textContent || ''));
-      // Joe 10/18: no GPS fuel (he gets none) and no GPS reading times on the screen.
       assert.equal((await page.textContent('#rows tr[data-trailer="T-701"] .yd-gps')).trim(), '35.4°');
       assert.equal(await page.$eval('#rows tr[data-trailer="T-701"] .yd-gps', x => x.classList.contains('bad')), false);
       assert.equal(await page.$eval('#rows tr[data-trailer="T-702"] .yd-gps', x => x.classList.contains('bad')), true, '44.6° against a set point of 34 is red');
       assert.match(await page.getAttribute('#rows tr[data-trailer="T-702"] .yd-gps', 'title'), /10\.6° above the set point/);
-      assert.match(await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps'), /No GPS on trailer/);
-      assert.deepEqual(await page.$$eval('#pane-current thead th', t => t.map(x => getComputedStyle(x.querySelector('.l') || x).display !== 'none' ? (x.querySelector('.l') || x).textContent : x.querySelector('.s').textContent).slice(1, 5)),
-        ['Actual Temp (°F)', 'Temp Set Point (°F)', 'Fuel Level', 'GPS Temp (°F)']);
+      assert.equal((await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps')).trim(), '—');
+      assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History'], 'no new tab');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
-      await page.click('[data-pane="gps"]');
-      await page.waitForSelector('#pane-gps:not([hidden])');
-      assert.deepEqual(await page.$$eval('#gpsrows tr[data-trailer]', r => r.map(x => x.dataset.trailer)), ['T-701', 'T-702', 'T-704', 'T-799', 'T-798']);
-      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-799"]'), /OHIO 2[\s\S]*36\.1°[\s\S]*On the road/);
-      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-798"]'), /Back in the yard/);
-      assert.match(await page.textContent('#gpsrows tr[data-trailer="T-702"]'), /44\.6°[\s\S]*10\.6° above the set point[\s\S]*34/);
-      assert.deepEqual(await page.$$eval('#pane-gps thead th', t => t.map(x => x.textContent)), ['Trailer #', 'Route', 'GPS Temp (°F)', 'Set Point (°F)', 'Recording Since', 'Where']);
-      await fits(page, 'GPS Trailer Temps ' + w + 'x' + h);
-      await shots(page, 'yard-gps', w);
       await page.click('[data-pane="history"]');
       await page.waitForSelector('#pane-history:not([hidden])');
       assert.equal(await page.$$eval('#history tr', r => r.length), 2);
@@ -144,7 +133,7 @@ async function seed() {
       await desk.waitForTimeout(250);
     }
     const gpsKept = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).find(x => x.createdInApp && x.payload.trailer === 'T-701');
-    assert.equal(gpsKept.payload.gpsTempF, 35.4, 'the check keeps the GPS temperature at that time');
+    assert.equal(gpsKept.payload.gpsTempF, 35.4, 'the check keeps the GPS temperature at that time (not shown)');
     results.push('T-701 (35°F, set point 34, 1/2, notes) saved box by box: saved on screen in ' + shown + ' ms, off the other screen in ' + (Date.now() - t0) + ' ms; locked for 2 hours');
     // Left Yard asks once more. (The check's redraw 1.5 seconds after it is saved is let through first, so it cannot land
     // between the press and the release of the click.)
@@ -158,7 +147,7 @@ async function seed() {
     await watcher.waitForFunction(() => document.querySelectorAll('#history tr').length === 4);
     const top = await watcher.$$eval('#history tr', r => r.slice(0, 2).map(x => x.textContent));
     assert.match(top[0], /T-704[\s\S]*Left the yard[\s\S]*Left Yard/);
-    assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*35\.4°[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
+    assert.match(top[1], /T-701[\s\S]*35[\s\S]*34[\s\S]*1\/2[\s\S]*Reefer on, doors sealed[\s\S]*Recorded/);
     results.push('24-Hour History: the Left Yard and the check on top, newest first');
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
@@ -169,8 +158,8 @@ async function seed() {
     await phone.waitForSelector(card);
     assert.equal(await phone.isVisible('#panes'), false, 'no 24-hour history on the phone');
     assert.equal(await phone.$$eval('[data-record]', b => b.filter(x => x.offsetParent).length), 0, 'no Record button on the phone');
+    assert.match(await phone.textContent(card + ' .yd-gpsf'), /GPS °F\s*44\.6°/);
     assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone card shows the GPS temperature in red too');
-    assert.match(await phone.textContent(card + ' .yd-gpsf'), /44\.6°[\s\S]*10\.6° above the set point/);
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-390.png'), scale: 'css' });
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');

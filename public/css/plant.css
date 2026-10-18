@@ -163,6 +163,10 @@
   /* Yard Checks on a laptop: tighter gaps keep Refresh on the top line (it only just fitted, and wrapped on wider fonts). */
   body.yard-page .head { column-gap: 8px; }
   body.yard-page .head .hstats { gap: 4px; }
+  /* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14): under 1500 the counts go to the line below the
+     buttons, so the tabs and Refresh stay on the top line whatever the font. */
+  body.yard-page .head .hstats { order: 5; }
+  body.yard-page .head .badge-test { order: 6; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
@@ -315,20 +319,14 @@
 .yard-page .yd-status { color: var(--runs-ink); font-weight: 800; white-space: nowrap; }
 .yard-page .yd-status::before { content: '● '; font-size: 16px; }
 .yard-page .yd-status.left { color: #8a4b00; }
-.yard-page .yd-gps { line-height: 1.2; }
-.yard-page .yd-gps b { display: block; font-size: 18px; color: var(--ink); }
-.yard-page .yd-gps small { display: block; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.yard-page .yd-gps.none { color: var(--muted); }
-.yard-page .yd-gps.bad { background: #fde8e8; }
-.yard-page .yd-gps.bad b, .yard-page .yd-gps.bad small { color: #bf2020; }
-.yard-page .yd-gps.old b { color: var(--muted); }
-.yard-page .yd-where { font-weight: 800; color: var(--muted); }
-.yard-page .yd-where.on { color: var(--runs-ink); }
+.yard-page .yd-gps { font-size: 18px; font-weight: 800; }
+.yard-page .yd-gps.none { color: var(--muted); font-weight: 400; }
+.yard-page .yd-gps.bad { background: #fde8e8; color: #bf2020; }
 @media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
 /* Phone (the yard hands): one card per trailer, each box saves as it is left, one big Left Yard button; no history. */
 .yard-page .yd-cards { display: none; }
 @media (max-width: 760px) {
-  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page #pane-gps, .yard-page .foot { display: none !important; }
+  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
   .yard-page .yd-cards { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 16px; }
   .yard-page .yd-card { background: #fff; border: 1px solid var(--line); border-left: 6px solid #bf2020; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
   .yard-page .yd-card.done { border-left-color: var(--runs-ink); background: #f6fcf8; }
@@ -348,12 +346,8 @@
   .yard-page .yd-fuel button[aria-pressed="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
   .yard-page button.yd-leave { height: 54px; border: 2px solid #9fb3c6; border-radius: 12px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 18px; font-weight: 800; }
   .yard-page button.yd-leave[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
-  .yard-page .yd-gpsf { flex-wrap: wrap; row-gap: 2px; }
   .yard-page .yd-gpsf b { font-size: 22px; color: var(--ink); }
-  .yard-page .yd-gpsf small { font-size: 16px; color: var(--muted); }
-  .yard-page .yd-gpsf.bad { background: #fde8e8; border-radius: 10px; padding: 6px 8px; margin: 0 -8px; }
-  .yard-page .yd-gpsf.bad b, .yard-page .yd-gpsf.bad small { color: #bf2020; }
-  .yard-page .yd-gpsf.old b { color: var(--muted); }
+  .yard-page .yd-gpsf.bad b { color: #bf2020; }
   .yard-page .yd-none { text-align: center; color: var(--muted); font-size: 17px; margin: 30px 0; }
 }
 
@@ -1172,12 +1166,6 @@
    for 11-13px print) comes down and the plant headers keep one line on a 1366 laptop. */
 .plant-page .eyebrow, .plant-page .head .title .eyebrow { letter-spacing: .03em; }
 .plant-page .hstats span { letter-spacing: .02em; }
-/* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14), and on 1920 once the GPS Trailer Temps tab came
-   (Joe 10/18): up to 2000 wide the counts go to the line below the buttons, so the tabs and Refresh stay on the top line. */
-@media (max-width: 2000px) {
-  body.yard-page .head .hstats { order: 5; }
-  body.yard-page .head .badge-test { order: 6; }
-}
 @media (max-width: 1500px) {
   /* Yard Checks on a laptop: the eyebrow takes two short lines so Refresh stays on the top line. */
   body.yard-page .head .title { flex: 0 1 300px; min-width: 0; }

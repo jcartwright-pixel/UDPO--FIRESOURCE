@@ -412,9 +412,22 @@ async function pull(db, options) {
  * A trip with no GPS unit, or a load taken off before the trailer left, stops when the load is no longer on the yard list;
  * any trip stops after REEFER_MAX_DAYS. State: private/gpsReeferTrips {trips: {trailer: trip}}; screens read
  *   gpsReefer/<trailer>                 the trip and the newest reading (tempF, readingAt)
- *   gpsReeferReadings/<trailer>_<time>  each reading while recording (one per read at most)
+ *   gpsReeferReadings/<trailer>_<time>  each reading while recording (one per read at most), deleted after 6 months
  */
 const REEFER_MAX_DAYS = 4;
+// Joe 10/18: the GPS temperatures are kept at most 6 months, then deleted (once a day, a batch at a time).
+const REEFER_KEEP_DAYS = 183;
+async function purgeReefer(db, at) {
+  const cutoff = new Date(Date.parse(at) - REEFER_KEEP_DAYS * 86400000).toISOString();
+  let n = 0;
+  for (let i = 0; i < 10; i++) {
+    const old = await db.collection('gpsReeferReadings').where('at', '<', cutoff).limit(400).get();
+    if (old.empty) break;
+    const b = db.batch(); old.docs.forEach(x => b.delete(x.ref)); await b.commit(); n += old.size;
+    if (old.size < 400) break;
+  }
+  return n;
+}
 // "T-101", "101" and "T 101" are the same trailer (the yard check's way of writing it).
 const trailerKey = (v) => { const c = String(v || '').toUpperCase().replace(/\s+/g, ''); const m = c.match(/^T-?(\d+)$/) || c.match(/^(\d+)$/); return m ? 'T-' + m[1] : c; };
 /** The trips after this read: loaded = the loaded trailers on the yard now [{trailer, runDocId, day, routeRun, completedAt}],
@@ -484,7 +497,8 @@ async function pullReefer(db, d, o, token, trucks, at) {
   await writeAll(db, 'gpsReeferReadings', log);
   await tripsRef.set(step);
   const recording = Object.keys(step.trips).filter(k => step.trips[k].recording).length;
-  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: recording, reeferLast: Object.keys(log).length ? at : (d.reeferLast || '') }, { merge: true });
+  const day = nyDate(at), purge = d.reeferPurgedOn !== day ? await purgeReefer(db, at) : 0;
+  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: recording, reeferLast: Object.keys(log).length ? at : (d.reeferLast || ''), reeferPurgedOn: day, reeferPurged: purge }, { merge: true });
   return Object.keys(log).length;
 }
 
@@ -713,4 +727,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, history, reeferTrips, trailerKey, REEFER_MAX_DAYS, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, reeferTrips, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
