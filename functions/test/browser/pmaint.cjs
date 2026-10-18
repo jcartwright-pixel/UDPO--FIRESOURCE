@@ -79,6 +79,11 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
   }
   // The plant floor: a breakdown fixed on the spot, one still down, and a request that can wait.
   await act(PLANT, 'saveShiftNote', { values: { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' }, readingTime: '09:42', followUpStatus: 'RESOLVED' });
+  // Joe 10/18 (long cooler track): marked Resolved with what fixed it but no back up time, its Down at a minute or two after it was
+  // first saved. It counted from the day before (27 h); now it stops when it was marked resolved and says it has no back up time.
+  const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+  const ahead = clock(Date.now() + 120000) > clock(Date.now()) ? clock(Date.now() + 120000) : clock(Date.now());
+  await act(PLANT, 'saveShiftNote', { values: { Entry: 'metal plate needed fixed', Type: 'Breakdown', Equipment: 'long cooler track', Fix: 'Maintenance had to weld plate back in place' }, readingTime: ahead, followUpStatus: 'RESOLVED' });
   const request = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Water leak under the pasteurizer', Type: 'Maintenance Request', Equipment: 'GALLON FILLER', Urgency: 'This week' }, followUpStatus: 'OPEN' });
   const boiler = await act(MANAGER, 'saveMachine', { facilityId: 'fac_uniontown', fields: { name: 'Boiler', kind: 'Utility', area: 'Utilities', make: 'Cleaver-Brooks' } });
   await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease filler bowl bearings', every: 2, unit: 'WEEKS', lastDone: '2026-09-01' } });
@@ -94,6 +99,8 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       assert.match(await page.textContent('#requests'), /GALLON FILLER[\s\S]*Water leak under the pasteurizer[\s\S]*can wait: this week/);
       assert.match(await page.textContent('#kpis'), /Requests waiting[\s\S]*PMs overdue/);
       assert.match(await page.textContent('#pms'), /Grease filler bowl bearings[\s\S]*late/);
+      assert.match(await page.textContent('#breakdowns'), /long cooler track[\s\S]*no back up time · marked fixed/);
+      assert.doesNotMatch(await page.textContent('#kpis'), /\d\d h [\s\S]*Down time today/, 'a breakdown marked fixed with no back up time does not count on as down');
       await plantInHeader(page, 'Maintenance Center ' + w);
       await footGap(page, 'Maintenance Center ' + w);
       await fits(page, 'Maintenance Center ' + w);
