@@ -1,6 +1,5 @@
 /* issues.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
-.issues-page .from-mail { font-weight: 800; white-space: nowrap; }
 .issues-page .link-btn { border: 0; background: none; padding: 0; color: var(--ud-blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .issues-page .mail-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 16px; }
 .issues-page .mail-meta dt { font-weight: 800; color: var(--ud-blue-dark); }

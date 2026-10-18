@@ -189,26 +189,95 @@
   // Equipment Issues (the current app's Maintenance screen, udpoV740MaintenanceRowsFromTable_): the write-ups on TRUCK LIVE,
   // TRAILER LIVE and FORK TRUCK LIVE. Removed rows and text that says nothing is wrong are left out; Occurrences counts the reports
   // on that unit in the 90 days up to and including this one (repaired ones too); the open list leaves out repaired rows.
+  // Joe 10/18 ("you're repeating the same email"): one report is one row. The old app made a row for each answer in an email
+  // (Write Up Defects, Post Trip, Concerns) and the new app's reader made its own row for the same email, so one email could show
+  // 2 or 3 times. Rows of one kind from the same email (or the same app check-in) are one report: one row, its problems listed
+  // once, dated when the email came in, counted once. A new email about the same problem is a new report and counts again.
   var ISSUE_DONE = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED)$/i;
   function issueUnitKey(unit) { return String(unit || '').trim().toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/^0+(?=\d)/, ''); }
+  // The report a write-up came from: the answering-service email (by its message id), the app check-in (run and day), else itself.
+  function issueReportKey(r) {
+    var type = String(r.source_type || '').toUpperCase(), id = String(r.record_id || ''), mail = /^MAIL\|([^|]+)\|/.exec(id);
+    if (type === 'GMAIL' && r.source_id) return 'MAIL|' + r.source_id;
+    if (mail) return 'MAIL|' + mail[1];
+    if (type === 'ROUTE_APP' && r.source_id) return 'APP|' + r.source_id;
+    return id;
+  }
+  // The problems in one report, each said once: pieces joined with "; ", a bare answer ("yes-no") left out, and a piece that
+  // repeats another ("YES BACK DOOR ON 826 NEEDS FIXED" after "Back Door On 826 Needs Fixed") kept once, the shorter way.
+  function issueText(texts) {
+    var kept = [], key = function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    texts.forEach(function (text) {
+      String(text || '').split(/\s*;\s*/).forEach(function (piece) {
+        piece = piece.trim();
+        if (!piece || noWriteUp(piece)) return;
+        var k = key(piece), at = -1;
+        kept.forEach(function (x, i) { var xk = key(x); if (xk.indexOf(k) >= 0 || k.indexOf(xk) >= 0) at = i; });
+        if (at < 0) kept.push(piece);
+        else if (key(piece).length < key(kept[at]).length) kept[at] = piece;
+      });
+    });
+    return kept.join('; ');
+  }
+  // True when every problem in texts is also said in one of done (the same words, or one inside the other).
+  function issueCovered(texts, done) {
+    var key = function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    var said = issueText(done).split('; ').map(key).filter(Boolean), want = issueText(texts).split('; ').map(key).filter(Boolean);
+    return said.length > 0 && want.every(function (k) { return said.some(function (d) { return d.indexOf(k) >= 0 || k.indexOf(d) >= 0; }); });
+  }
   function issueRows(records, kind, nowMs) {
     var DAY = 86400000;
-    var written = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
+    var copies = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
       var notes = String(r.notes || ''), status = String(r.status || 'OPEN').trim().toUpperCase();
       var unit = String(r.truck_number || r.trailer_number || r.unit_number || '').trim(), text = String(r.issue_details || '').trim();
       var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = garageSent(notes) ? notes.lastIndexOf('Sent to garage') : -1;
       var garage = garageAt >= 0 ? /^ (\S+) by ([^\n]*)/.exec(notes.slice(garageAt + 'Sent to garage'.length)) : null;
       var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes), lessor = /Sent to lessor (.*?) ?(\d{4}-\d\d-\d\dT\S+) by ([^\n]*)/.exec(notes);
-      var opened = Date.parse(r.opened_at || r.service_date || ''), done = Date.parse(r.completed_at || '');
-      return { id: r.id || r.record_id, recordId: r.record_id, unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
-        reported: String(r.opened_at || r.service_date || ''), openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
+      // A write-up the new app's reader made later from an older email (10/15) is dated the day the email was for, not the day it was read.
+      var day = String(r.service_date || '').slice(0, 10), late = isDateKey(day) && r.opened_at && localDay(r.opened_at) > day;
+      var reported = late ? day : String(r.opened_at || r.service_date || ''), opened = Date.parse(late ? day + 'T12:00:00Z' : reported), done = Date.parse(r.completed_at || '');
+      var type = String(r.source_type || '').toUpperCase();
+      return { id: r.id || r.record_id, recordId: r.record_id, report: issueReportKey(r), unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
+        reported: reported, openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
         emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
         toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
         done: ISSUE_DONE.test(status), occurrences: 1,
-        // From the answering-service email (Driver Check-In Email): the message id opens the stored email (mailCopies).
-        fromEmail: String(r.source_type || '').toUpperCase() === 'GMAIL', emailId: String(r.source_type || '').toUpperCase() === 'GMAIL' ? String(r.source_id || '') : '' };
-    }).filter(function (r) { return r.recordId && r.status !== 'REMOVED' && !noWriteUp(r.text); });
+        // Where it came from, for the View link: the answering-service email (its message id opens the stored copy in mailCopies)
+        // or the driver's check-in in the app (the run and day it was saved on).
+        fromEmail: type === 'GMAIL', emailId: type === 'GMAIL' ? String(r.source_id || '') : '',
+        checkinId: type === 'ROUTE_APP' && /\|/.test(String(r.source_id || '')) ? String(r.source_id) : '' };
+    }).filter(function (r) { return r.recordId; });
+    // One row per report. A copy that says nothing is wrong ("YES-NO") adds nothing. When a copy was removed or repaired and it
+    // says the same problems as the copies still open, the report is closed (the same email's other copy is not a new problem).
+    var groups = {}, order = [], removed = {};
+    copies.forEach(function (r) {
+      if (r.status === 'REMOVED') { (removed[r.report] = removed[r.report] || []).push(r.text); return; }
+      if (noWriteUp(r.text)) return;
+      if (!groups[r.report]) { groups[r.report] = []; order.push(r.report); }
+      groups[r.report].push(r);
+    });
+    var written = order.map(function (g) {
+      var list = groups[g], still = list.filter(function (r) { return !r.done; }), texts = function (l) { return l.map(function (r) { return r.text; }); };
+      if (still.length && removed[g] && issueCovered(texts(still), removed[g])) return null;
+      // Repaired: the open copies say nothing the repaired copy did not.
+      if (still.length && still.length < list.length && issueCovered(texts(still), texts(list.filter(function (r) { return r.done; })))) list = list.filter(function (r) { return r.done; });
+      else if (still.length && still.length < list.length) list = still;
+      if (list.length === 1) { list[0].text = issueText([list[0].text]) || list[0].text; list[0].recordIds = [list[0].recordId]; list[0].reviewIds = list[0].needsReview ? [list[0].recordId] : []; return list[0]; }
+      list.sort(function (a, b) { return (a.openedMs || Infinity) - (b.openedMs || Infinity); });
+      // The copy the Garage and Lessor buttons act on: one already sent, else the first.
+      var main = list.filter(function (r) { return r.atGarage || r.toLessor || r.emailed; })[0] || list[0];
+      var row = Object.assign({}, main), any = function (k) { return list.some(function (r) { return r[k]; }); }, first = function (k) { var x = list.filter(function (r) { return r[k]; })[0]; return x ? x[k] : ''; };
+      row.text = issueText(list.map(function (r) { return r.text; }));
+      row.openedMs = list[0].openedMs; row.reported = list[0].reported;
+      row.needsReview = any('needsReview'); row.unit = row.unit || first('unit'); row.unitKey = row.unitKey || first('unitKey'); row.driver = row.driver || first('driver'); row.route = row.route || first('route');
+      row.emailId = row.emailId || first('emailId'); row.fromEmail = any('fromEmail'); row.checkinId = row.checkinId || first('checkinId');
+      if (!row.reviewed) { row.reviewed = any('reviewed'); row.reviewedBy = first('reviewedBy'); }
+      // The buttons act on every copy (Reviewed on the ones that need it), so the report closes as one.
+      row.recordIds = list.map(function (r) { return r.recordId; });
+      row.reviewIds = list.filter(function (r) { return r.needsReview; }).map(function (r) { return r.recordId; });
+      return row;
+    }).filter(Boolean);
     var seen = {};
     written.slice().sort(function (a, b) { return a.openedMs - b.openedMs; }).forEach(function (r) {
       if (!r.unitKey) return;
@@ -1157,7 +1226,10 @@
     if (/^(?:nothing|none) (?:to report|wrong|noted|today|needed|at this time)$/.test(t)) return true;
     if (/^(?:n0|it ?s (?:fine|good|ok|okay)|it is (?:fine|good|ok|okay)|its (?:fine|good|ok|okay))$/.test(t)) return true;
     t = t.replace(/[^a-z0-9 ]+/g, ' ').trim();
-    return /^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t);
+    if (/^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t)) return true;
+    // Joe 10/18: the answering service writes the Pre Trip / Post Trip answers as "YES-NO" (done, nothing wrong), "yes-no",
+    // "YS" or "Y/N": only yes / no words, nothing wrong said, so no write-up. "YES-POST- AIR LEAK" says what is wrong and stays.
+    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|n|n0|no|nope|none|na)$/.test(w); });
   }
 
   // Joe 10/14 (mock-up A): which screens each person may see, ticked per plant in People & Roles. The areas are the Home
@@ -1253,7 +1325,7 @@
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows

@@ -115,7 +115,7 @@
         const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (r.route ? ' · route ' + escapeHtml(r.route) : '') +
           ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +
-          '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.fromEmail ? '<span class="pill warn from-mail" title="Added from the answering-service email, not entered in the app. Check it against the email.">From email</span> <button type="button" class="link-btn" data-mail>View email</button> ' : '') + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
+          '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.emailId || r.checkinId ? '<button type="button" class="link-btn" data-source title="' + (r.emailId ? 'See the answering-service email it came from' : 'See the driver\'s check-in in the app') + '">View</button> ' : '') + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
           '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td><td>' + reviewed + '</td>' +
           (truck ? '<td>' + (r.emailed ? tick('Emailed ' + r.emailedAt) : dash) + '</td>' : '') + '<td>' + garage + '</td><td>' + actions + '</td></tr>' + more;
       }).join('') || '<tr><td colspan="' + cols + '" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
@@ -124,12 +124,15 @@
       if (box) { box.value = typed; if (document.activeElement !== box) box.focus(); }
     }
 
-    // View email: the stored copy of the answering-service email (sender, time, subject, the text as received).
+    // Joe 10/18: one View link in What's Wrong, whichever way the write-up came in. From the answering service: the stored copy
+    // of the email (sender, time, subject, the text as received). From the app: the driver's check-in on that run and day.
     let mailDb = null;
-    async function showMail(r) {
+    async function showSource(r) {
       const body = document.getElementById('mail-body');
-      body.innerHTML = '<p>Loading the email…</p>';
+      document.getElementById('mail-title').textContent = r.emailId ? 'Answering-service email' : 'Driver check-in in the app';
+      body.innerHTML = '<p>Loading…</p>';
       document.getElementById('mail-modal').hidden = document.getElementById('mail-back').hidden = false;
+      if (!r.emailId) { showCheckin(r, body); return; }
       try {
         const snap = r.emailId ? await getDoc(doc(mailDb, 'mailCopies', r.emailId.replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, ''))) : null;
         const m = snap && snap.exists() ? snap.data() : null;
@@ -138,13 +141,35 @@
           : '<p>The original email was not kept for this write-up (it came in before the app started keeping copies). Email ID: ' + escapeHtml(r.emailId || 'none') + '.</p>';
       } catch (err) { body.innerHTML = '<p>Could not open the email: ' + escapeHtml(err.message) + '</p>'; }
     }
+    async function showCheckin(r, body) {
+      const [runId, day] = r.checkinId.split('|');
+      try {
+        const snap = await getDoc(doc(mailDb, 'runs', runId)), run = snap.exists() ? snap.data() : null, d = run && run.days && run.days[day];
+        if (!d) { body.innerHTML = '<p>The check-in is no longer on Dispatch (the week was archived). What the driver wrote: ' + escapeHtml(r.text) + '</p>'; return; }
+        const line = (label, v) => v === undefined || v === null || v === '' ? '' : '<dt>' + label + '</dt><dd>' + escapeHtml(String(v)) + '</dd>';
+        const date = L.addDays(run.weekStart, L.DAYS.indexOf(day));
+        body.innerHTML = '<dl class="mail-meta">' + line('Driver', d.driver || r.driver) + line('Route', String(run.route || '').replace(/_\d+$/, '')) + line('Day', shortDate(date)) +
+          line('Checked in', d.checkinCompletedAt ? dateTimeText(d.checkinCompletedAt) : '') + line('Truck', d.checkinTruck || d.truck) + line('Trailer', d.checkinTrailer || d.trailer) +
+          line('Pallet jack', d.palletJackUnit || d.palletJack) + line('Cases delivered', d.casesDelivered) + line('Cases returned', d.driverCaseReturn) + '</dl>' +
+          '<pre class="mail-text">' + escapeHtml([['Truck problems', d.tractorIssues], ['Trailer problems', d.trailerIssues], ['Pallet jack problems', d.palletJackIssues], ['Notes', d.checkinNotes]]
+            .filter(x => x[1]).map(x => x[0] + ': ' + x[1]).join('\n') || r.text) + '</pre>';
+      } catch (err) { body.innerHTML = '<p>Could not open the check-in: ' + escapeHtml(err.message) + '</p>'; }
+    }
     const closeMail = () => { document.getElementById('mail-modal').hidden = document.getElementById('mail-back').hidden = true; };
     document.getElementById('mail-modal').addEventListener('click', e => { if (e.target.closest('[data-close-mail]')) closeMail(); });
     document.getElementById('mail-back').addEventListener('click', closeMail);
 
-    // Each button is one save; the row changes at once and goes back if the server refuses.
+    // Each button is one save; the row changes at once and goes back if the server refuses. Joe 10/18: a row can stand for
+    // 2 or 3 copies of the same email (L.issueRows); Repaired and Remove close every copy, Reviewed marks the ones that need
+    // it, and Garage / Lessor go on the one copy (one work order, one email).
     function step(r, name, note) {
-      const doc = records.find(x => x.id === r.id), before = JSON.parse(JSON.stringify(doc)), at = new Date().toISOString(), me = lists.person && lists.person.email || 'you';
+      const ids = name === 'reviewed' ? r.reviewIds : name === 'garage' || name === 'lessor' ? [r.recordId] : r.recordIds;
+      let last = null;
+      (ids && ids.length ? ids : [r.recordId]).forEach(id => { const copy = records.find(x => x.record_id === id); if (copy) last = stepOne(copy, name, note); });
+      return last;
+    }
+    function stepOne(doc, name, note) {
+      const before = JSON.parse(JSON.stringify(doc)), at = new Date().toISOString(), me = lists.person && lists.person.email || 'you';
       const apply = () => {
         if (name === 'repaired') Object.assign(doc, { status: 'COMPLETE', completed_at: at });
         if (name === 'remove') Object.assign(doc, { status: 'REMOVED' });
@@ -152,7 +177,7 @@
         if (name === 'lessor') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
         if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
       };
-      saveOptimistic('updateIssue', { recordId: r.recordId, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
+      return saveOptimistic('updateIssue', { recordId: doc.record_id, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
         if (name !== 'lessor' || !res || !res.message) return;
         const info = document.getElementById('info');
         info.textContent = res.message;
@@ -174,7 +199,7 @@
       if (e.target.closest('[data-review]')) { step(r, 'reviewed'); return; }
       const b = e.target.closest('[data-step]');
       if (b) { step(r, b.dataset.step, b.dataset.step === 'lessor' ? L.unitLessor(lists.fleetTrucks, r.unit).lessor : ''); return; }
-      if (e.target.closest('[data-mail]')) { showMail(r); return; }
+      if (e.target.closest('[data-source]')) { showSource(r); return; }
       if (e.target.closest('[data-open]')) { openFor = openFor === r.id ? null : r.id; render(); return; }
       if (e.target.closest('[data-remove]')) { removeFor = r.id; render(); return; }
       if (e.target.closest('[data-remove-cancel]')) { removeFor = null; render(); return; }
