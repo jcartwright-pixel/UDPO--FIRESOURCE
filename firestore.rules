@@ -49,6 +49,9 @@ service cloud.firestore {
     match /gpsDays/{id} { allow read: if activeUser(); }
     // Fleet alerts (speeding, harsh braking, idling) for the Driver Scorecard; the server writes them.
     match /gpsAlerts/{id} { allow read: if activeUser(); }
+    // The trailer's GPS temperature while a loaded trailer is recorded (Yard Checks' GPS Temp column, incl. the plant station
+    // tablet; Joe 10/18). The readings behind it (gpsReeferReadings) stay server-only and are deleted after 6 months.
+    match /gpsReefer/{id} { allow read: if activeUserOrStation(); }
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }

@@ -425,6 +425,12 @@ exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeou
   if (h && h.error) console.error('fleetGps history', h.error);
 });
 
+// Joe 10/18: the GPS trailer temperatures are kept 6 months, then deleted; on its own so a failed GPS read never stops it.
+exports.gpsReeferCleanupNightly = onSchedule({ schedule: '30 3 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const r = await FLEETGPS.purgeReefer(db, new Date().toISOString(), { budgetMs: 90000 });
+  console.log('gpsReefer cleanup', JSON.stringify(r));
+});
+
 // RedZone's count feed (src/redzone.js readEvents): read only, every 5 minutes; nothing happens until RedZone is set up, and
 // until RedZone turns the feed on it only notes that it is off.
 exports.redzoneEventsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
