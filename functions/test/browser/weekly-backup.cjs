@@ -25,8 +25,6 @@ async function openPage(browser, width, height, url) {
   await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  // The board reads Backups from last week on, so the page's clock is pinned to the week the fixtures are for.
-  await page.clock.setFixedTime(new Date('2026-10-09T12:00:00Z'));
   await page.goto(HOSTING + url);
   page.errors = errors;
   return page;
