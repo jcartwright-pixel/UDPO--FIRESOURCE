@@ -56,7 +56,7 @@ const { runWriteBack } = require('./src/writeback');
 const { runMasterWriteBack } = require('./src/masterwrite');
 const { transferSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
-const { runFleetSync } = require('./src/fleetsync');
+const { runFleetSync, refreshFleetOwnership } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
 const { runMocreoSync, readSecrets, mocreoCall, appSecrets, MocreoError } = require('./src/mocreo');
 const { redzoneCall, RedzoneError, readEvents: readRedzoneEvents, readChecks: readRedzoneChecks } = require('./src/redzone');
@@ -415,6 +415,15 @@ exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'Americ
   if (!run) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: 'nightly' });
+});
+
+// Joe 10/18: who owns each unit and which branch it is at (the fleet list's LEASE and LOCATION, read only) for Fleet
+// Service's owned-units-only list. Wherever the app reads sheets; nothing is written to a sheet.
+exports.fleetOwnershipEvery30Minutes = onSchedule({ schedule: 'every 30 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  const setup = transferSetup();
+  if (!setup || process.env.DEMO_DATA === '1') return;
+  const r = await refreshFleetOwnership({ db, reader: makeSheetsReader() });
+  if (!r.ok) console.error('fleetOwnership', r.error);
 });
 
 // How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.

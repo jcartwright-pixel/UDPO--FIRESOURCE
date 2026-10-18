@@ -105,3 +105,22 @@ test('fleet sync leaves fork trucks, pallet jacks and other kinds the fleet list
     assert.equal(r[H.indexOf('source_present')], 'TRUE', u + ' is not marked off the list');
   });
 });
+
+// Joe 10/18: who owns each unit is read from the fleet list (read only) into config/fleetOwnership; a failed read keeps
+// the last good list.
+test('the fleet list owners are kept for Fleet Service, and a failed read keeps the last good list', async () => {
+  const { refreshFleetOwnership } = require('../../src/fleetsync');
+  tabs["'" + FLEET.tab + "'"] = [['UD UNIT', 'ASSET TYPE', 'LOCATION', 'LEASE'], ['900001', 'Tractor', 'UNIONTOWN', 'Idealease'], ['T-901', 'Trailer', 'UNIONTOWN', 'OWN']];
+  const before = JSON.stringify(tabs);
+  const r = await refreshFleetOwnership({ db: db(), reader: sheets, fleet: FLEET, now });
+  assert.deepEqual(r, { ok: true, count: 2 });
+  assert.equal(JSON.stringify(tabs), before, 'no sheet is changed');
+  const d = (await db().collection('config').doc('fleetOwnership').get()).data();
+  assert.deepEqual(d.units['900001'], { own: false, lease: 'Idealease', facilityId: 'fac_uniontown' });
+  assert.equal(d.at, '2026-10-11T06:00:00.000Z');
+  const bad = await refreshFleetOwnership({ db: db(), reader: { batchGet: async () => { throw new Error('403 The caller does not have permission'); } }, fleet: FLEET, now });
+  assert.deepEqual(bad, { ok: false, error: 'The fleet list is not shared with the app yet' });
+  const kept = (await db().collection('config').doc('fleetOwnership').get()).data();
+  assert.equal(kept.ok, false);
+  assert.deepEqual(kept.units['T-901'], { own: true, lease: 'OWN', facilityId: 'fac_uniontown' }, 'the last good list stays');
+});
