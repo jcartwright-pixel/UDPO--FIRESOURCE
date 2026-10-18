@@ -1386,3 +1386,24 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
 .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-rows: auto; grid-auto-rows: auto; flex: none; min-height: auto; }
 .manager-page .mc-grid [data-card="walk"] .mc-tile { min-height: 0; overflow: visible; }
 .manager-page .mc-grid [data-card="walk"] .mc-tile:not(.wk-tile) { align-content: start; }
+/* Joe 10/18: each walkthrough area is green (done), yellow (due at 2 hours) or red (past due at 3 hours), with who did its newest
+   check. Manager Center: a state word by the area's name and the who line under its count. */
+.manager-page [data-card="walk"] .wk-tile { grid-template-areas: "label num" "line num" "who who" "list list"; }
+.manager-page [data-card="walk"] .wk-tile .wk-who { grid-area: who; margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page [data-card="walk"] .wk-tile.warn { background: #fff7e0; border-color: #f0d38a; }
+.manager-page [data-card="walk"] .wk-tile.good { background: #eef8f1; border-color: #b9e0c6; }
+.manager-page [data-card="walk"] .wk-tile.good b { color: #1f7a4d; }
+.wk-state { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-style: normal; font-size: 16px; font-weight: 900; letter-spacing: .02em; color: #fff; vertical-align: 1px; }
+.wk-state.ok { background: #1f7a4d; } .wk-state.due { background: #e0a100; color: #3d2a00; } .wk-state.late { background: #c62828; }
+/* Phone and tablet: the colored button beside each walkthrough card. */
+.walk-page .wk-row { display: flex; align-items: stretch; gap: 10px; }
+.walk-page .wk-row > .wk-choice { flex: 1 1 auto; min-width: 0; }
+.walk-page .wk-act { flex: none; width: 88px; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 14px; font-size: 18px; font-weight: 900; line-height: 1.15; text-decoration: none; color: #fff; padding: 8px; }
+.walk-page .wk-act.ok { background: #1f7a4d; } .walk-page .wk-act.due { background: #f2b705; color: #3d2a00; } .walk-page .wk-act.late { background: #c62828; animation: wk-flash 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .walk-page .wk-act.late { animation: none; } }
+.walk-page .wk-choice .wk-who { flex: 1 1 100%; font-size: 16px; font-weight: 700; color: var(--muted); }
+@media (max-width: 420px) { .walk-page .wk-act { width: 72px; font-size: 16px; } .walk-page .wk-row { gap: 8px; } .walk-page .wk-choice { gap: 10px; padding: 14px 12px; } }
+@media (min-width: 761px) { .walk-page .wk-act { width: 120px; font-size: 22px; } .walk-page .wk-choice .wk-who { font-size: 18px; } }
+/* Narrow phones: with the button beside the card, the big number and its line go under the name so the name and description keep
+   the card's width. */
+@media (max-width: 420px) { .walk-page .wk-row .wk-n { flex: 1 1 100%; max-width: none; flex-direction: row; align-items: baseline; justify-content: flex-start; text-align: left; gap: 10px; } }

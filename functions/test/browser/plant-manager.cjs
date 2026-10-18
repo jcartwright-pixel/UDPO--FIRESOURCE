@@ -47,11 +47,12 @@ function nyMinutes(ms) {
   new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
   return Number(p.hour) * 60 + Number(p.minute);
 }
-// The test's clock. The four loads fit inside the operating day (2 hours before to 5 hours after now) only from 6:00 AM to 6:59 PM;
-// at any other hour the screens run on a clock pinned to 6:00 PM of the operating day, so the check is the same every hour of the night.
+// The test's clock. The four loads fit inside the operating day (2 hours before to 5 hours after now) only from 6:00 AM to 6:59 PM,
+// and the line checks seeded 200 minutes back are on today's operating day only from 9:30 AM; at any other hour the screens run on
+// a clock pinned to 6:00 PM of the operating day, so the check is the same every hour of the night.
 const CLOCK = (() => {
   const real = Date.now(), m = nyMinutes(real);
-  if (m >= 360 && m <= 1139) return { ms: real, pinned: false };
+  if (m >= 570 && m <= 1139) return { ms: real, pinned: false };
   const day = L.operatingDay(new Date(real));
   const ms = ['-04:00', '-05:00'].map(z => Date.parse(day + 'T18:00:00' + z)).find(t => nyMinutes(t) === 1080 && L.operatingDay(new Date(t)) === day);
   return { ms, pinned: true };
@@ -77,8 +78,15 @@ async function seed() {
     createdInApp: true, payload: { entryId: 'SHIFT-mcseed', section: 'HANDOFF', shift: 'FIRST SHIFT', values: { Entry: 'Infeed belt jammed twice', Type: 'Breakdown', Equipment: 'Palletizer' }, notes: '', followUpStatus: 'OPEN' } });
   await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_mcseed').set({ recordId: 'TEMP-mcseed', type: 'PLANT_TEMPERATURE_CHECK', date, status: 'HIGH', recordedAt: new Date(at0 - 30 * 60000).toISOString(),
     recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: 44, status: 'HIGH' } });
+  // Joe 10/18: two lines running today: the Gallon Filler checked 200 minutes ago (past due, red at 3 hours) and HTST #1
+  // 130 minutes ago (due, yellow at 2 hours). The other lines have no check today, so they are not running.
+  const line = (id, op, mins) => d.collection('plantJournal').doc(id).set({ recordId: id, type: 'PRODUCTION_QUALITY', date, status: 'RUNNING', recordedAt: new Date(at0 - mins * 60000).toISOString(),
+    recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { operationId: op, product: 'Whole milk', status: 'RUNNING', qualityCheck: 'PASS' } });
+  await line('PRODUCTION_QUALITY_app_mcgal', 'ut_prod_gallon_filler', 200);
+  await line('PRODUCTION_QUALITY_app_mchtst', 'ut_prod_htst_1', 130);
 }
-const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]', (c, l) => { const t = [...c.querySelectorAll('.mc-tile')].find(x => x.querySelector('span').textContent === l); return t ? t.querySelector('b').textContent + ' | ' + t.querySelector('i').textContent : ''; }, label);
+// A tile's name (the walkthrough's DONE / DUE / PAST DUE word beside it is read on its own).
+const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]', (c, l) => { const t = [...c.querySelectorAll('.mc-tile')].find(x => x.querySelector('span').firstChild.textContent.trim() === l); return t ? t.querySelector('b').textContent + ' | ' + t.querySelector('i').textContent : ''; }, label);
 
 (async () => {
   await clear();
@@ -95,23 +103,30 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
       assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
       // Joe 10/15 (Manager Walkthrough): one card in walking order instead of Quality, Cooler Temperatures and Yard Checks.
-      // The five lines' last checks are days old (past due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.
+      // Two lines are running (one past due, one due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.
       assert.deepEqual(await page.$$('[data-card="quality"], [data-card="temps"], [data-card="yard"]'), []);
-      assert.equal(await tileText(page, 'walk', '3 · Quality'), '5of 5 | 5 past due');
+      assert.equal(await tileText(page, 'walk', '3 · Production'), '2of 5 | 1 past due');
       assert.match(await tileText(page, 'walk', '2 · Coolers'), /^\d+ \| 1 out of range$/);
-      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').textContent).join() === '2 · Coolers,3 · Quality'), 'Coolers and Quality are red');
+      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').firstChild.textContent.trim()).join() === '2 · Coolers,3 · Production'), 'Coolers and Production are red');
+      // Joe 10/18: each area says DONE (green), DUE (yellow) or PAST DUE (red), and who did its newest check. No trucks on the
+      // yard: the Yard is done automatically.
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-state', a => a.map(x => x.textContent)), ['DONE', 'PAST DUE', 'PAST DUE']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile.good', a => a.map(x => getComputedStyle(x).backgroundColor)), ['rgb(238, 248, 241)']);
+      assert.equal(await page.textContent('[data-card="walk"] .wk-tile:nth-child(1) .wk-who'), 'Done automatically');
+      assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(3) .wk-who'), /^Last \d{1,2}:\d\d [AP]M · Supervisor Test$/);
       assert.match(await tileText(page, 'walk', 'Last Walkthrough'), /^\d{1,2}:\d\d [AP]M \| Supervisor Test$/);
       assert.match(await page.textContent('[data-card="walk"] .mc-pill'), /^\d+ past due$/);
-      // Joe 10/15 (later): each tile lists what it holds, problems first in red: Cooler North too warm, the five lines past due.
+      // Joe 10/15 (later): each tile lists what it holds, problems first in red: Cooler North too warm, the Gallon Filler past due,
+      // HTST #1 due, then the lines not running.
       assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(2) .wk-items li.bad'), /^Cooler North 44°F · HIGH$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile:nth-child(3) .wk-items li', l => l.map(x => x.className + ' ' + (x.className === 'more' ? x.textContent : /PAST DUE/.test(x.textContent)))), ['bad true', 'bad true', 'bad true', 'bad true', 'more + 1 more']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile:nth-child(3) .wk-items li', l => l.map(x => x.className + ' ' + (x.className === 'more' ? x.textContent : x.textContent.split(' · ')[0].replace(/^.*?(PAST DUE|DUE|NOT RUNNING)$/, '$1')))), ['bad PAST DUE', 'warn DUE', 'ok NOT RUNNING', 'ok NOT RUNNING', 'more + 1 more']);
       assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-items li', l => l.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).length), 0);
       assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html' && (await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href')))).join() ===
         'yard.html?walk=1,temps.html?walk=1,quality.html?walk=1,walkthrough.html', 'the card and its tiles open the walkthrough');
       // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
       assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
       assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.textContent)), ['1 · Yard', '2 · Coolers', '3 · Quality', 'Last Walkthrough']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.firstChild.textContent.trim())), ['1 · Yard', '2 · Coolers', '3 · Production', 'Last Walkthrough']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
       // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
       const bigSize = () => page.$eval('[data-card="walk"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
