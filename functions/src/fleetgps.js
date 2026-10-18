@@ -451,7 +451,7 @@ function reeferTrips(prev, loaded, units, at) {
     if (!t.recording) return;
     const u = units[k], stop = (why) => Object.assign(t, { recording: false, stoppedAt: at, stopReason: why });
     if (u) {
-      t.unitId = u.unitId || ''; t.tag = u.tag || '';
+      t.unitId = u.unitId || ''; t.tag = u.tag || ''; t.seenAt = u.lastReport || at;
       const yard = inYard(u);
       if (!yard && !t.out) t.out = at;
       else if (yard && t.out) { t.back = at; return stop('BACK_IN_YARD'); }
@@ -459,7 +459,7 @@ function reeferTrips(prev, loaded, units, at) {
       // stillSince = the first report seen standing still (under REEFER_MOVING_MPH); cleared once it moves again.
       if (t.out) {
         const sp = u.speedMph === undefined ? null : u.speedMph, seen = u.lastReport || at;
-        t.where = short(u.place || u.address || ''); t.speedMph = sp; t.seenAt = seen;
+        t.where = short(u.place || u.address || ''); t.speedMph = sp;
         if (sp === null || sp > REEFER_MOVING_MPH) t.stillSince = '';
         else if (!t.stillSince) t.stillSince = seen;
       }

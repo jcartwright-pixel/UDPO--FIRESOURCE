@@ -49,7 +49,7 @@ async function seed() {
   // Only these four loads: the made-up plant's own runs fall in some weeks of the real calendar (on 10/12/26 its T-902 load
   // showed on the yard too and the check failed), as plant-manager.cjs does.
   for (const r of (await d.collection('runs').get()).docs) await r.ref.delete();
-  const loads = [['701', '849', 'SUN VALLEY'], ['702', '852', 'JERSEY 1'], ['703', '855', 'SUNSHINE'], ['704', '907_1', 'FAIRMONT TRANSFER']];
+  const loads = [['701', '849', 'SUN VALLEY'], ['702', '852', 'JERSEY 1'], ['703', '855', 'SUNSHINE'], ['704', '907_1', 'FAIRMONT TRANSFER'], ['707', '860', 'HILLTOP']];
   for (const [i, [t, route, run]] of loads.entries()) {
     // Loaded today for two days from now, leaving at 10 AM tomorrow: on the yard all of today's operating day.
     await d.collection('runs').doc(week + '__yard' + t).set({ weekStart: week, sheetRow: 900 + i, route, run, routeId: 'rte_y' + t, runId: 'run_y' + t, active: true,
@@ -67,6 +67,8 @@ async function seed() {
   await trip('T-701', { routeRun: 'SUN VALLEY', tempF: 35.4, readingAt: ago(3) });
   await trip('T-702', { routeRun: 'JERSEY 1', tempF: 44.6, readingAt: ago(4) });
   await trip('T-704', { routeRun: 'FAIRMONT TRANSFER', unitId: '', tag: '' });
+  // Joe 10/18: T-707 is loaded and not past its dispatch time, but its GPS shows it gone from the yard: off the list.
+  await trip('T-707', { id: week + '__yard707|' + p, routeRun: 'HILLTOP', tempF: 35, readingAt: ago(4), seenAt: ago(4), out: ago(20), where: 'US-40 W', speedMph: 50, stillSince: '' });
   // Joe 10/18: two loaded trailers that have left the yard: T-705 moving; T-706 stopped 12 minutes at a store, 11° over the
   // set point of its last yard check.
   await trip('T-705', { routeRun: 'SUN VALLEY', tempF: 34.8, readingAt: ago(2), out: ago(90), where: 'I-70 E, Zanesville, OH', speedMph: 58, stillSince: '' });
@@ -112,9 +114,10 @@ async function seed() {
       await page.waitForSelector('#road-rows tr[data-out="T-706"]');
       assert.deepEqual(await page.$$eval('#road thead tr:last-child th', t => t.map(x => (x.querySelector('.l') || x).textContent)), ['Route', 'Trailer #', 'GPS Temp (°F)', 'Where now']);
       const outRows = await page.$$eval('#road-rows tr', r => r.map(x => [...x.cells].map(c => c.textContent.trim())));
-      assert.deepEqual(outRows.map(r => r.slice(0, 3)), [['JERSEY 1', 'T-706', '45°'], ['SUN VALLEY', 'T-705', '34.8°']]);
-      assert.equal(outRows[1][3], 'Moving');
-      assert.match(outRows[0][3], /^Stopped at KROGER #512 · since \d{1,2}:\d{2} (AM|PM)$/);
+      assert.deepEqual(outRows.map(r => r.slice(0, 3)), [['HILLTOP', 'T-707', '35°'], ['JERSEY 1', 'T-706', '45°'], ['SUN VALLEY', 'T-705', '34.8°']]);
+      assert.deepEqual([outRows[0][3], outRows[2][3]], ['Moving', 'Moving']);
+      assert.equal(await page.$('#rows tr[data-trailer="T-707"]'), null, 'the GPS shows T-707 gone: not on the yard list though its dispatch time has not come');
+      assert.match(outRows[1][3], /^Stopped at KROGER #512 · since \d{1,2}:\d{2} (AM|PM)$/);
       assert.equal(await page.$eval('#road-rows tr[data-out="T-706"] .yd-gps', x => x.classList.contains('bad')), true, '45° against its last set point of 34 is red');
       assert.equal(await page.$$eval('#rows tr[data-trailer]', r => r.length), 3, 'the queue itself is unchanged');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
@@ -173,20 +176,22 @@ async function seed() {
     results.push('24-Hour History: the Left Yard and the check on top, newest first');
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
-    // The phone (yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Action), no Record button,
+    // The phone (yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Notes), no Record button,
     // no notes and no history; each box saves as it is left.
     const phone = await openPage(browser, 390, 844, '/yard.html' + MANAGER);
     const card = '.yd-card[data-trailer="T-702"]';
     await phone.waitForSelector(card);
     assert.equal(await phone.isVisible('#panes'), false, 'no 24-hour history on the phone');
     assert.equal(await phone.$$eval('[data-record]', b => b.filter(x => x.offsetParent).length), 0, 'no Record button on the phone');
-    // Joe 10/18: the phone is a table like the old app's: Trailer, Temp, Set, a Fuel drop-down, GPS where Notes was, Action.
-    assert.deepEqual(await phone.$$eval('#cards thead th', t => t.map(x => x.textContent)), ['Trailer', 'Temp °F', 'Set °F', 'Fuel', 'GPS °F', 'Action']);
-    assert.deepEqual(await phone.$$eval('#cards tr[data-trailer]', r => r.map(x => x.dataset.trailer)), ['T-702'], 'T-701 was checked and T-704 left the yard above');
+    // Joe 10/18: the phone is a table like the old app's: Trailer, Temp, Set, a Fuel drop-down, GPS where Notes was, and a Notes
+    // button where Left Yard was (the GPS says when a trailer has left).
+    assert.deepEqual(await phone.$$eval('#cards thead th', t => t.map(x => x.textContent)), ['Trailer', 'Temp °F', 'Set °F', 'Fuel', 'GPS °F', 'Notes']);
+    assert.deepEqual(await phone.$$eval('#cards tr[data-trailer]:not(.yd-noterow)', r => r.map(x => x.dataset.trailer)), ['T-702'], 'T-701 was checked and T-704 left the yard above');
+    assert.equal(await phone.$$eval('#cards [data-left]', x => x.length), 0, 'no Left Yard on the phone');
     assert.deepEqual(await phone.$$eval(card + ' [data-k="fuelLevel"] option', o => o.map(x => x.value)), ['', 'FULL', '3/4', '1/2', 'EMPTY'], 'fuel is a drop-down that starts blank');
     assert.equal((await phone.textContent(card + ' .yd-gpsf')).trim(), '44.6°');
     assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone shows the GPS temperature in red too');
-    assert.equal(await phone.$$eval('#cards [data-k="notes"]', x => x.length), 0, 'no notes box on the phone');
+    assert.equal(await phone.$$eval('#cards [data-k="notes"]', x => x.length), 0, 'the notes box opens from the Notes button');
     assert.equal(await phone.$$eval('[data-out]', x => x.filter(e => e.offsetParent).length), 0, 'no list of trailers that left on the phone');
     assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('cards').scrollWidth <= document.getElementById('cards').clientWidth), 'no sideways scroll at 390');
     assert.ok(await phone.$$eval('#cards th, #cards td, #cards input, #cards select, #cards button', e => e.every(x => parseFloat(getComputedStyle(x).fontSize) >= 16)), 'text at least 16px');
@@ -201,15 +206,32 @@ async function seed() {
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     const one = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
     assert.equal(one.length, 1, 'the three boxes fill in one check');
-    assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', ''], 'notes are typed on the desktop');
+    assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', '']);
     results.push('Phone: T-702 temp, set point and fuel each saved as they were left, into one check; the row stays with "Saved"');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-390.png'), scale: 'css' });
-    await phone.click(card + ' [data-left]');
-    assert.match(await phone.textContent(card + ' [data-left]'), /Confirm Left/);
-    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-confirm-390.png'), scale: 'css' });
-    await phone.click(card + ' [data-left]');
-    await phone.waitForFunction((c) => !document.querySelector(c), card);
-    results.push('Phone: Left Yard asks once more, then the card is gone');
+    // Notes: the button opens a box under the row; what is typed saves into the same check when the box is left.
+    await phone.click(card + ' [data-notes]');
+    await phone.waitForSelector('#cards tr[data-note-for="T-702"] textarea');
+    assert.equal(await phone.evaluate(() => document.activeElement && document.activeElement.dataset.k), 'notes', 'the box is ready to type in');
+    await phone.fill('#cards tr[data-note-for="T-702"] textarea', 'Door seal torn on the right side');
+    if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-notes-390.png'), scale: 'css' });
+    await phone.$eval('#cards tr[data-note-for="T-702"] textarea', x => x.blur());
+    let noted = [];
+    for (let i = 0; i < 40 && !(noted[0] && noted[0].payload.notes); i++) {
+      await new Promise(r => setTimeout(r, 200));
+      noted = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
+    }
+    assert.equal(noted.length, 1, 'the note goes in the same check');
+    assert.equal(noted[0].payload.notes, 'Door seal torn on the right side');
+    await phone.click(card + ' [data-notes]');
+    await phone.waitForFunction(() => !document.querySelector('#cards tr[data-note-for]'));
+    assert.match(await phone.textContent(card + ' [data-notes]'), /Notes ✓/, 'the button shows there is a note');
+    results.push('Phone: Notes opens a box under the row; the note saves into the same check');
+    // The GPS sees T-702's trailer leave the yard: it is off the phone list by itself (no Left Yard to press).
+    const dd = L.operatingDay(new Date()), wk = L.weekStart(dd), pp = L.dayPrefix(L.addDays(dd, 2));
+    await db().collection('gpsReefer').doc('T-702').update({ id: wk + '__yard702|' + pp, out: new Date().toISOString(), seenAt: new Date().toISOString() });
+    await phone.waitForFunction((c) => !document.querySelector(c), card, { timeout: 8000 });
+    results.push('Phone: T-702 leaves the list when the GPS shows it gone');
     assert.deepEqual(phone.errors, []);
     assert.deepEqual(desk.errors, []);
     assert.deepEqual(watcher.errors, []);

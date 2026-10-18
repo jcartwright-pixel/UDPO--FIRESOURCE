@@ -125,7 +125,7 @@
     }
 
     function all() { return journal.concat(pending); }
-    function queue() { return U.yardQueue(runs, all(), date, Date.now()); }
+    function queue() { return U.yardQueue(runs, all(), date, Date.now(), reefer); }
 
     // A re-draw while someone is typing in the table waits until they leave the box.
     let waiting = false;
@@ -188,15 +188,17 @@
       Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
     }
     const queues = {};          // trailer -> the saves of that trailer, one after the other
-    // Joe 10/18: the phone is a table like the old app's phone yard check (Trailer, Temp, Set, Fuel drop-down, Action), with the
-    // GPS temperature where Notes was; no notes and no list of trailers that left (both stay on the desktop).
+    // Joe 10/18: the phone is a table like the old app's phone yard check (Trailer, Temp, Set, Fuel drop-down), with the GPS
+    // temperature where Notes was and a Notes button where Left Yard was (the GPS says when a trailer has left). The button opens
+    // a box under the row for what was wrong besides the temperature; it saves as it is left. No list of trailers that left.
+    const notesOpen = {};       // trailer -> its notes box is open on the phone
     function drawCards(q, ck) {
       const box = document.getElementById('cards');
       if (!phone()) { box.innerHTML = ''; return; }
       const list = q.rows.concat(q.locked.filter(x => mine[x.trailer])).sort((a, b) => a.departureDate.localeCompare(b.departureDate) || (a.departureTime == null ? 99999 : a.departureTime) - (b.departureTime == null ? 99999 : b.departureTime) || a.index - b.index);
       if (!list.length) { box.innerHTML = got.runs && got.journal ? '<p class="yd-none">No loaded trailers are due for a yard check.</p>' : '<p class="yd-none">Loading the trailers&hellip;</p>'; return; }
       box.innerHTML = '<table class="yd-ptable"><colgroup><col style="width:19%"><col style="width:15%"><col style="width:14%"><col style="width:18%"><col style="width:14%"><col style="width:20%"></colgroup>' +
-        '<thead><tr><th>Trailer</th><th>Temp °F</th><th>Set °F</th><th>Fuel</th><th>GPS °F</th><th>Action</th></tr></thead><tbody>' + list.map(x => {
+        '<thead><tr><th>Trailer</th><th>Temp °F</th><th>Set °F</th><th>Fuel</th><th>GPS °F</th><th>Notes</th></tr></thead><tbody>' + list.map(x => {
         const m = mine[x.trailer], d = drafts[x.trailer] || {}, v = (k) => d[k] !== undefined ? d[k] : (m || x.locked ? x[k] : '');
         const dis = ck ? '' : ' disabled', fuel = v('fuelLevel'), g = gpsInfo(x.trailer, setOf(x));
         const state = m ? (m.saved === 'saving' ? '<small class="yd-tick saving">Saving…</small>' : m.saved === 'error' ? '<small class="yd-tick error">Not saved</small>' : '<small class="yd-tick">&#10003; Saved</small>')
@@ -207,7 +209,9 @@
           '<td><input data-k="setPoint" inputmode="decimal" enterkeyhint="done" aria-label="Set point for trailer ' + escapeHtml(x.trailer) + '" value="' + escapeHtml(setOf(x)) + '"' + dis + '></td>' +
           '<td><select data-k="fuelLevel" aria-label="Fuel for trailer ' + escapeHtml(x.trailer) + '"' + dis + '>' + FUEL.map(([val, label]) => '<option value="' + val + '"' + (fuel === val ? ' selected' : '') + '>' + label + '</option>').join('') + '</select></td>' +
           '<td class="yd-gpsf' + (g.flag ? ' bad' : '') + '"' + (g.has ? ' title="' + escapeHtml(gpsWhy(g)) + '"' : '') + '>' + (g.has ? escapeHtml(deg(g.tempF)) + '°' : '—') + '</td>' +
-          '<td>' + (ck ? '<button type="button" class="yd-leave" data-left' + (armed[x.trailer] ? ' data-armed="true">Confirm Left' : '>Left Yard') + '</button>' : '') + '</td></tr>';
+          '<td><button type="button" class="yd-notesbtn' + (String(v('notes') || '').trim() ? ' has' : '') + '" data-notes aria-expanded="' + !!notesOpen[x.trailer] + '"' + dis + '>' + (String(v('notes') || '').trim() ? 'Notes &#10003;' : 'Notes') + '</button></td></tr>' +
+          (notesOpen[x.trailer] ? '<tr class="yd-card yd-noterow" data-note-for="' + escapeHtml(x.trailer) + '" data-trailer="' + escapeHtml(x.trailer) + '" data-route="' + escapeHtml(x.routeRun) + '"><td colspan="6"><label><span>Notes for ' + escapeHtml(x.trailer) + ' (anything wrong besides the temperature)</span>' +
+            '<textarea data-k="notes" rows="3" maxlength="800" aria-label="Notes for trailer ' + escapeHtml(x.trailer) + '"' + dis + '>' + escapeHtml(v('notes')) + '</textarea></label></td></tr>' : '');
       }).join('') + '</tbody></table>';
     }
     // One box was left (or a fuel button tapped): save that trailer's check. The first save is the check (locked for 2 hours);
@@ -277,10 +281,11 @@
       const b = e.target.closest('button'), c = b && b.closest('.yd-card');
       if (!b || !c) return;
       const trailer = c.dataset.trailer;
-      if (!b.hasAttribute('data-left')) return;
-      if (!armed[trailer]) { armed[trailer] = true; render(); setTimeout(() => { if (armed[trailer]) { delete armed[trailer]; render(); } }, 6000); return; }
-      delete mine[trailer];
-      send(trailer, c.dataset.route, true);
+      if (!b.hasAttribute('data-notes')) return;
+      if (notesOpen[trailer]) delete notesOpen[trailer]; else notesOpen[trailer] = true;
+      render();
+      const box = document.querySelector('#cards tr[data-note-for="' + CSS.escape(trailer) + '"] textarea');
+      if (box) box.focus();
     });
 
     const rowsEl = document.getElementById('rows');

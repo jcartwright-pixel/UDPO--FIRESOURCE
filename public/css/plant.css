@@ -346,8 +346,12 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
   .yard-page .yd-ptrailer small.saving { color: var(--muted); }
   .yard-page td.yd-gpsf { font-size: 18px; font-weight: 800; color: var(--ink); }
   .yard-page td.yd-gpsf.bad { background: #fde8e8; color: #bf2020; }
-  .yard-page button.yd-leave { width: 100%; min-height: 46px; border: 2px solid #9fb3c6; border-radius: 8px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; line-height: 1.1; padding: 2px; white-space: normal; }
-  .yard-page button.yd-leave[data-armed="true"] { background: #fff6e0; border-color: #f0a020; color: #8a4b00; }
+  .yard-page button.yd-notesbtn { width: 100%; min-height: 46px; border: 2px solid #9fb3c6; border-radius: 8px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; padding: 2px; }
+  .yard-page button.yd-notesbtn.has { background: #eaf3fc; border-color: var(--ud-blue); }
+  .yard-page button.yd-notesbtn[aria-expanded="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+  .yard-page tr.yd-noterow td { background: #f6f9fc; text-align: left; padding: 8px; }
+  .yard-page tr.yd-noterow label span { display: block; white-space: normal; margin-bottom: 6px; font-size: 16px; font-weight: 800; color: var(--muted); }
+  .yard-page tr.yd-noterow textarea { width: 100%; box-sizing: border-box; border: 1px solid #b8cadb; border-radius: 8px; padding: 8px; font: inherit; font-size: 18px; color: var(--ink); resize: vertical; }
   .yard-page .yd-none { text-align: center; color: var(--muted); font-size: 17px; margin: 30px 0; }
 }
 
