@@ -105,6 +105,16 @@ async function codeFitsPhones(p, name) {
     await twoShots(p, '2-garage-station-codes');
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
+    // Joe 10/18: the Plant Managers app: its link (a UD account with the Manager or Administrator role) and its code.
+    await open('manager-app-codes');
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['managers']);
+    assert.match(await p.$eval('.ap-link[data-link="managers"]', el => el.outerHTML), /walkthrough\.html\?view=home&(amp;)?app=1/);
+    assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Plant Managers']);
+    codes.managers = await makeCode('Plant Managers');
+    assert.ok(await noSideScroll(p));
+    await twoShots(p, '2b-plant-managers-app');
+    results.push('Plant Managers App: its own page with the Plant Managers link and its code; Create code works');
+
     await open('driver-codes');
     // Joe 10/12: like Plant Station Codes: the one Driver Station (TV loadout) link ("I shouldn't have to have a different
     // link"), its stations right under it, then the drivers' phone link.

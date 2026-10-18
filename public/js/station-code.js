@@ -37,11 +37,11 @@ export async function resolveStation(kind, storeKey, call) {
 }
 
 // The code screen inside box; resolves with the station once a right code is typed.
-export function askCode(box, { kind, storeKey, call, title, hint, message }) {
+export function askCode(box, { kind, storeKey, call, title, hint, message, label = 'Station code', button = 'Open station' }) {
   return new Promise(resolve => {
     box.innerHTML = '<form class="st-code"><h2>' + title + '</h2><p>' + hint + '</p>' +
-      '<label>Station code <input name="code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"></label>' +
-      '<button type="submit">Open station</button><p class="st-code-msg" role="status"></p></form>';
+      '<label>' + label + ' <input name="code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"></label>' +
+      '<button type="submit">' + button + '</button><p class="st-code-msg" role="status"></p></form>';
     const form = box.querySelector('form'), msg = box.querySelector('.st-code-msg');
     msg.textContent = message || '';
     form.code.focus();
