@@ -72,15 +72,15 @@ async function seed() {
   await batch.commit();
 }
 
-// Joe's real Live sheet has about 285 rows a week (LIVE CURRENT WEEK, 10/18), so REAL=1 fills last, this and next week with that
-// many loads (copies of the made-up week's loads, dates moved to the real weeks), the way the screens meet the real plant.
+// Joe's real Live sheet has about 80 runs a week (LIVE CURRENT WEEK, 10/18), so REAL=1 fills last, this and next week with that
+// many loads (REAL_RUNS to try more) (copies of the made-up week's loads, dates moved to the real weeks), the way the screens meet the real plant.
 async function realWeeks() {
   const d = db(), runs = (await d.collection('runs').where('weekStart', '==', '2026-10-04').get()).docs.map(x => x.data());
   const today = L.operatingDay(new Date()), wk = L.weekStart(today);
   let batch = d.batch(), n = 0;
   for (const target of [L.addDays(wk, -7), wk, L.addDays(wk, 7)]) {
     const shift = L.daysBetween('2026-10-04', target);
-    for (let i = 0; i < 285; i++) {
+    for (let i = 0; i < Number(process.env.REAL_RUNS || 80); i++) {
       const src = runs[i % runs.length];
       const json = JSON.stringify(src).replace(/"(\d{4}-\d{2}-\d{2})/g, (m, k) => '"' + L.addDays(k, shift));
       const run = JSON.parse(json);
@@ -103,6 +103,7 @@ async function prepare(page) {
   await cdp.send('Network.emulateNetworkConditions', LINE);
   // Every change to what the page shows (text and rows; a box shown or hidden alone is not counted) is noted, so "ready" is
   // when the screen stopped changing.
+  if (process.env.FORCECACHE) await page.addInitScript(() => { window.UD_OFFLINE = true; });
   await page.addInitScript(() => {
     window.__muts = [];
     new MutationObserver(ms => { if (ms.some(m => m.type !== 'attributes')) window.__muts.push(performance.now()); }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
@@ -116,7 +117,7 @@ async function prepare(page) {
 
 // Last change before the screen sat still for QUIET ms (screens with a running clock keep changing; their clock is ignored by
 // stopping at the first quiet gap).
-const QUIET = 1500, LIMIT = 20000;
+const QUIET = 1500, LIMIT = 10000;
 async function timeOpen(page, url) {
   const tStart = Date.now();
   const [bare, hash] = url.split('#');
