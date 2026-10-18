@@ -45,8 +45,9 @@
  * figures, By Date comments) and his OTR runs ticked in OTR Routes Setup were loaded on the test copy only (otr-seed.js), so the
  * live Month Recap, By Date and Recap showed 0. This loads the same two with the same rules: a day count or comment typed by
  * hand is kept, and a run already set in OTR Routes Setup is left as it is. On the test copy both are already there, so it only
- * leaves its marker (otrHistorySandbox loaded both there on 10/11). LIVE WAITS FOR JOE: on the live app it does nothing and leaves
- * no marker until Joe OKs it by name; then loadOtrHistory runs there.
+ * leaves its marker (otrHistorySandbox loaded both there on 10/11). On the live app (Joe 10/18: "Load the Over the Road history
+ * (otr-history-2026-10-18) into the live app.") loadOtrHistory runs. It is about 19,000 day counts, so it runs from the
+ * otrHistorySandbox job in index.js (5 minutes, 512MiB) rather than with the loads above.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -296,19 +297,23 @@ async function loadOtrHistory(db, opts) {
 }
 async function loadOtrHistoryOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
-  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
   const mark = db.collection('dataLoads').doc(OTR_HISTORY_ID);
   const m = await mark.get();
   if (m.exists && m.data().status === 'DONE') return { skipped: true };
-  // The test copy has had both since 10/11 (the otrHistorySandbox job in index.js), so here it only leaves its marker.
-  await mark.set({ status: 'DONE', doneAt: stamp, what: 'Over the Road history and OTR Routes Setup runs from his workbook (Joe 10/18)', testCopy: 'already loaded by otrHistorySandbox' });
-  return { marked: true };
+  const what = 'Over the Road history and OTR Routes Setup runs from his workbook (Joe 10/18)';
+  // The test copy has had both since 10/11 (seedOtrOnce in the same job), so there it only leaves its marker.
+  if ((o.project || projectId()) === 'ud-distribution-sandbox') { await mark.set({ status: 'DONE', doneAt: stamp, what, testCopy: 'already loaded by otrHistorySandbox' }); return { marked: true }; }
+  // Joe 10/18: "Load the Over the Road history (otr-history-2026-10-18) into the live app."
+  const out = await loadOtrHistory(db, o);
+  if (out.waiting) return out;
+  await mark.set({ status: 'DONE', doneAt: stamp, what, routes: out.routes, history: out.history });
+  return out;
 }
 
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce], [OTR_HISTORY_ID, loadOtrHistoryOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;

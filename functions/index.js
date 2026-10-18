@@ -109,10 +109,11 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   try { await SMS.postedCheck(db); } catch (e) { console.error('Schedule Texts failed: ' + (e && e.message || e)); }
 });
 
-// Sandbox only: Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js).
+// Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js): on the test
+// copy since 10/11; on the live app by the data load otr-history-2026-10-18 (Joe 10/18, src/data-loads.js).
 exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
-  if (project !== 'ud-distribution-sandbox') return;
+  if (project !== 'ud-distribution-sandbox') { await require('./src/data-loads').loadOtrHistoryOnce(db, { project }); return; }
   // Joe 10/13: his OTR runs ticked in OTR Routes Setup, from his workbook against Route Master.
   await require('./src/otr-seed').seedOtrRoutesOnce(db);
   await require('./src/otr-seed').seedOtrOnce(db);
