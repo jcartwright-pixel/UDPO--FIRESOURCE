@@ -68,8 +68,8 @@
       </div>
       <div class="sheet scroll-list" id="pane-gps" hidden>
         <table class="loadout yd-table yd-gpstable">
-          <colgroup><col style="width:10%"><col style="width:14%"><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:12%"><col style="width:18%"></colgroup>
-          <thead><tr><th>Trailer #</th><th>Route</th><th>GPS Temp (°F)</th><th>Set Point (°F)</th><th>GPS Fuel</th><th>Last GPS Reading</th><th>Recording Since</th><th>Where</th></tr></thead>
+          <colgroup><col style="width:12%"><col style="width:20%"><col style="width:18%"><col style="width:14%"><col style="width:16%"><col style="width:20%"></colgroup>
+          <thead><tr><th>Trailer #</th><th>Route</th><th>GPS Temp (°F)</th><th>Set Point (°F)</th><th>Recording Since</th><th>Where</th></tr></thead>
           <tbody id="gpsrows"></tbody>
         </table>
       </div>
@@ -110,11 +110,10 @@
     const deg = (n) => (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
     function gpsInfo(trailer, setPoint) { return U.yardGps(reefer[trailer], setPoint, Date.now()); }
     function gpsWhy(g) { return g.off === null ? '' : g.off === 0 ? 'On the set point' : deg(Math.abs(g.off)) + '° ' + (g.off > 0 ? 'above' : 'below') + ' the set point'; }
-    function gpsSub(g) { return [g.readingAt ? clock(g.readingAt) : '', g.fuelPct !== null ? 'Fuel ' + g.fuelPct + '%' : ''].filter(Boolean).join(' · '); }
     function gpsCell(trailer, setPoint) {
       const g = gpsInfo(trailer, setPoint);
       if (!g.has) return '<td class="yd-gps none">—<small>' + (g.noUnit ? 'No GPS on trailer' : 'Waiting for GPS') + '</small></td>';
-      return '<td class="yd-gps' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '" title="' + escapeHtml(gpsWhy(g) || 'No set point to compare') + '"><b>' + escapeHtml(deg(g.tempF)) + '°</b><small>' + escapeHtml(gpsSub(g)) + '</small></td>';
+      return '<td class="yd-gps' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '" title="' + escapeHtml(gpsWhy(g) || 'No set point to compare') + '"><b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '') + '</td>';
     }
     // The set point of a trailer's newest yard check (the GPS does not send one).
     function lastSetPoint(trailer) {
@@ -179,9 +178,9 @@
         return '<tr data-trailer="' + escapeHtml(r.trailer) + '"><td class="yd-trailer"><b>' + escapeHtml(r.trailer) + '</b></td><td>' + escapeHtml(r.routeRun || '') + '</td>' +
           (g.has ? '<td class="yd-gps' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '" title="' + escapeHtml(gpsWhy(g) || 'No set point to compare') + '"><b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '') + '</td>'
             : '<td class="yd-gps none">—<small>' + (r.recording && !r.unitId ? 'No GPS on trailer' : 'No reading yet') + '</small></td>') +
-          '<td>' + escapeHtml(sp) + '</td><td>' + (g.has && g.fuelPct !== null ? g.fuelPct + '%' : '') + '</td><td>' + (g.readingAt ? escapeHtml(dateTime(g.readingAt)) : '—') + '</td>' +
+          '<td>' + escapeHtml(sp) + '</td>' +
           '<td>' + escapeHtml(r.startedAt ? dateTime(r.startedAt) : '') + '</td><td class="yd-where' + (r.recording ? ' on' : '') + '">' + escapeHtml(where) + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" class="empty">No trailers are being recorded. A trailer starts once its load is complete.</td></tr>';
+      }).join('') || '<tr><td colspan="6" class="empty">No trailers are being recorded. A trailer starts once its load is complete.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
         ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
         : pane === 'history' ? hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.'
@@ -204,7 +203,7 @@
     const queues = {};          // trailer -> the saves of that trailer, one after the other
     function gpsCard(trailer, setPoint) {
       const g = gpsInfo(trailer, setPoint);
-      return '<div class="yd-f yd-gpsf' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '"><span>GPS °F</span>' + (g.has ? '<b>' + escapeHtml(deg(g.tempF)) + '°</b><small>' + escapeHtml([gpsSub(g), gpsWhy(g)].filter(Boolean).join(' · ')) + '</small>'
+      return '<div class="yd-f yd-gpsf' + (g.flag ? ' bad' : '') + (g.stale ? ' old' : '') + '"><span>GPS °F</span>' + (g.has ? '<b>' + escapeHtml(deg(g.tempF)) + '°</b>' + (g.flag ? '<small>' + escapeHtml(gpsWhy(g)) + '</small>' : '')
         : '<small>' + (g.noUnit ? 'No GPS on trailer' : 'Waiting for GPS') + '</small>') + '</div>';
     }
     function drawCards(q, ck) {

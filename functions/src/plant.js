@@ -850,7 +850,7 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (!req.departed) {
     const g = await tx.get(db.collection('gpsReefer').doc(M.safeIdPart(req.trailer)));
     const r = g.exists ? g.data() : null;
-    if (r && r.recording && r.tempF !== null && r.tempF !== undefined && Date.parse(stamp) - R.when(r.readingAt) <= R.REEFER_STALE_MINUTES * 60000) gps = { gpsTempF: r.tempF, gpsFuelPct: r.fuelPct === undefined ? null : r.fuelPct, gpsAt: r.readingAt };
+    if (r && r.recording && r.tempF !== null && r.tempF !== undefined && Date.parse(stamp) - R.when(r.readingAt) <= R.REEFER_STALE_MINUTES * 60000) gps = { gpsTempF: r.tempF, gpsAt: r.readingAt };
   }
   const id = 'YARD_CHECK_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   const payload = req.departed ? { route: req.routeRun, run: req.routeRun, trailer: req.trailer, notes: 'Left the yard', status: 'DEPARTED' }

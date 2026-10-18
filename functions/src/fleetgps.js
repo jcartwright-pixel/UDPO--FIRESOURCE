@@ -81,9 +81,9 @@ const TEMPLATES = Object.freeze({
     'Lon = Input.Lon',
     'Address = Input.Address',
     'MilesDelta(mile) = Input.OdometerDelta', ''].join('\r\n') },
-  // Joe 10/18 ("I actually get temperatures from my trailers from the GPS"): the reefer box's air temperature and the fuel
-  // level from Fleet's GPS points, for the trailers that are being recorded (loaded and complete, until back in the yard).
-  // CargoAirTemp and FuelLevel are Point diagnostics in Fleet's TDE list; Fleet has no reefer set point there.
+  // Joe 10/18 ("I actually get temperatures from my trailers from the GPS"): the reefer box's air temperature from Fleet's
+  // GPS points, for the trailers that are being recorded (loaded and complete, until back in the yard). CargoAirTemp is a
+  // Point diagnostic in Fleet's TDE list; Fleet has no reefer set point there, and Joe gets no fuel reading from the GPS.
   reefer: { name: 'UDPO_ReeferPoints', text: [
     '[Template]', 'TemplateVersion = 1.0', 'TableID = Point-2.0', 'TemplateName = UDPO_ReeferPoints', 'Intent = Retrieve', '',
     '[User]', 'Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"', '',
@@ -91,8 +91,7 @@ const TEMPLATES = Object.freeze({
     '[Output]',
     'UnitId = Input.UnitId',
     'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time',
-    'CargoTempF(Fahrenheit) = Input.CargoAirTemp',
-    'FuelPct = Input.FuelLevel', ''].join('\r\n') }
+    'CargoTempF(Fahrenheit) = Input.CargoAirTemp', ''].join('\r\n') }
 });
 // Joe's Fleet places for the Uniontown yard (10/13); 10/14 the Loading Dock, where trucks park, is the yard too (a truck
 // driving from the dock through Uniontown Branch on its way out was read as coming back).
@@ -412,7 +411,7 @@ async function pull(db, options) {
  * the first read the trailer's GPS is back in the yard (the same Fleet places as the trucks' yard times) after being seen out.
  * A trip with no GPS unit, or a load taken off before the trailer left, stops when the load is no longer on the yard list;
  * any trip stops after REEFER_MAX_DAYS. State: private/gpsReeferTrips {trips: {trailer: trip}}; screens read
- *   gpsReefer/<trailer>                 the trip and the newest reading (tempF, fuelPct, readingAt)
+ *   gpsReefer/<trailer>                 the trip and the newest reading (tempF, readingAt)
  *   gpsReeferReadings/<trailer>_<time>  each reading while recording (one per read at most)
  */
 const REEFER_MAX_DAYS = 4;
@@ -466,20 +465,20 @@ async function pullReefer(db, d, o, token, trucks, at) {
     const byUnit = {};
     open.forEach(t => { byUnit[t.unitId] = t; });
     (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(since), Until: fleetTime(now), Ids: open.map(t => t.unitId).join(',') })).forEach(r => {
-      const t = byUnit[r.UnitId], when = utcIso(r.Time), temp = num(r.CargoTempF), fuel = num(r.FuelPct);
-      if (!t || !when || (temp === null && fuel === null)) return;
+      const t = byUnit[r.UnitId], when = utcIso(r.Time), temp = num(r.CargoTempF);
+      if (!t || !when || temp === null) return;
       const best = readings[t.trailer];
-      if (!best || when > best.at) readings[t.trailer] = { at: when, tempF: round1(temp), fuelPct: fuel === null ? null : Math.round(fuel) };
+      if (!best || when > best.at) readings[t.trailer] = { at: when, tempF: round1(temp) };
     });
   }
   const docs = {}, log = {}, before = prev.trips || {};
   Object.keys(step.trips).forEach(k => {
     const t = step.trips[k], r = readings[k], old = before[k] || {};
     if (r && r.at > (t.readingAt || '') && t.recording) {
-      Object.assign(t, { tempF: r.tempF, fuelPct: r.fuelPct, readingAt: r.at });
-      log[safeIdPart(k + '_' + r.at.replace(/[^0-9]/g, '').slice(0, 14))] = { trailer: k, date: nyDate(r.at), at: r.at, tempF: r.tempF, fuelPct: r.fuelPct, routeRun: t.routeRun, tripId: t.id, tag: t.tag || '' };
+      Object.assign(t, { tempF: r.tempF, readingAt: r.at });
+      log[safeIdPart(k + '_' + r.at.replace(/[^0-9]/g, '').slice(0, 14))] = { trailer: k, date: nyDate(r.at), at: r.at, tempF: r.tempF, routeRun: t.routeRun, tripId: t.id, tag: t.tag || '' };
     }
-    if (JSON.stringify(old) !== JSON.stringify(t)) docs[safeIdPart(k)] = Object.assign({}, t, { tempF: t.tempF === undefined ? null : t.tempF, fuelPct: t.fuelPct === undefined ? null : t.fuelPct, readingAt: t.readingAt || '', updatedAt: at });
+    if (JSON.stringify(old) !== JSON.stringify(t)) docs[safeIdPart(k)] = Object.assign({}, t, { tempF: t.tempF === undefined ? null : t.tempF, readingAt: t.readingAt || '', updatedAt: at });
   });
   await writeAll(db, 'gpsReefer', docs);
   await writeAll(db, 'gpsReeferReadings', log);

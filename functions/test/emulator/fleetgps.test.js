@@ -56,7 +56,7 @@ function fleet(log, opts) {
     if (url.startsWith(BASE + '/execute?template=UDPO_ReeferPoints')) {
       const q = new URL(url).searchParams;
       log.push('reefer ' + q.get('Since') + ' to ' + q.get('Until') + ' ' + q.get('Ids'));
-      return reply(200, 'UnitId,Time,CargoTempF,FuelPct\r\n' + (opts.reefer || []).map(p => p.join(',')).join('\r\n'));
+      return reply(200, 'UnitId,Time,CargoTempF\r\n' + (opts.reefer || []).map(p => p.join(',')).join('\r\n'));
     }
     if (opts.trailerPlace !== undefined && url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
       return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
@@ -253,7 +253,7 @@ test('Fleet GPS: the history goes a part at a time and stops after three failure
 });
 
 // Joe 10/18: trailer temperatures from the GPS for Yard Checks, from the time the load is complete until back in the yard.
-test('Fleet GPS: a loaded trailer\'s temperature and fuel are read every run until it is back in the yard', async () => {
+test('Fleet GPS: a loaded trailer\'s temperature is read every run until it is back in the yard', async () => {
   const L = require('../../src/logic');
   const log = [], state = { trailerPlace: 'Loading Dock', reefer: [] }, clock = { now: new Date('2026-10-13T14:10:00Z') };
   const o = { fetch: fleet(log, state), base: BASE, now: () => clock.now, sleep: async () => {} };
@@ -261,20 +261,20 @@ test('Fleet GPS: a loaded trailer\'s temperature and fuel are read every run unt
   await d.collection('runs').doc(L.weekStart(date) + '__reefer').set({ weekStart: L.weekStart(date), sheetRow: 950, route: '849', run: 'SUN VALLEY', active: true,
     days: { [L.dayPrefix(L.addDays(date, 1))]: { runs: true, loadDate: date, deliveryDate: L.addDays(date, 1), dispatchTime: 600, trailer: '701', loadStatus: 'COMPLETE' } } });
   await gpsCall(d, ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
-  state.reefer = [['71', '2026-10-13 14:02:00', '35.44', '81.2'], ['71', '2026-10-13 14:07:00', '36.06', '80.9'], ['71', '2026-10-13 14:08:00', '', '']];
+  state.reefer = [['71', '2026-10-13 14:02:00', '35.44'], ['71', '2026-10-13 14:07:00', '36.06'], ['71', '2026-10-13 14:08:00', '']];
   let r = await pull(d, o);
   assert.equal(r.reefer, 1, r.reeferError);
   assert.ok(log.indexOf('reefer 2026-10-13 13:40:00 to 2026-10-13 14:10:00 71') >= 0, 'the first read looks back 30 minutes, for the trailer\'s unit only');
   let g = (await d.collection('gpsReefer').doc('T-701').get()).data();
-  assert.deepEqual([g.recording, g.tempF, g.fuelPct, g.readingAt, g.routeRun, g.out], [true, 36.1, 81, '2026-10-13T14:07:00.000Z', 'SUN VALLEY', '']);
+  assert.deepEqual([g.recording, g.tempF, g.readingAt, g.routeRun, g.out], [true, 36.1, '2026-10-13T14:07:00.000Z', 'SUN VALLEY', '']);
   // Out on the road: still recorded.
-  clock.now = new Date('2026-10-13T16:00:00Z'); state.trailerPlace = ''; state.reefer = [['71', '2026-10-13 15:58:00', '37.5', '70']];
+  clock.now = new Date('2026-10-13T16:00:00Z'); state.trailerPlace = ''; state.reefer = [['71', '2026-10-13 15:58:00', '37.5']];
   r = await pull(d, o);
   g = (await d.collection('gpsReefer').doc('T-701').get()).data();
   assert.deepEqual([g.recording, g.tempF, g.out], [true, 37.5, '2026-10-13T16:00:00.000Z']);
   assert.equal((await d.collection('gpsReeferReadings').where('trailer', '==', 'T-701').get()).size, 2, 'one reading kept per read');
   // Back in the yard: recording stops and Fleet is not asked again.
-  clock.now = new Date('2026-10-13T22:00:00Z'); state.trailerPlace = 'Uniontown Plant'; state.reefer = [['71', '2026-10-13 21:58:00', '39', '50']];
+  clock.now = new Date('2026-10-13T22:00:00Z'); state.trailerPlace = 'Uniontown Plant'; state.reefer = [['71', '2026-10-13 21:58:00', '39']];
   const before = log.length;
   r = await pull(d, o);
   g = (await d.collection('gpsReefer').doc('T-701').get()).data();

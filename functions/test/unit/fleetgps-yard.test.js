@@ -101,7 +101,7 @@ test('reefer recording: a load taken off before leaving stops; no GPS unit; 4-da
 test('yard GPS temperature: red more than 5° from the set point, old after an hour, nothing to compare without a set point', () => {
   const R = require('../../src/plant-rules');
   const now = Date.parse('2026-10-18T14:00:00Z');
-  const r = (tempF, min) => ({ recording: true, unitId: 'u', tempF, fuelPct: 70, readingAt: new Date(now - min * 60000).toISOString() });
+  const r = (tempF, min) => ({ recording: true, unitId: 'u', tempF, readingAt: new Date(now - min * 60000).toISOString() });
   assert.deepEqual([R.yardGps(r(36, 5), '34', now).flag, R.yardGps(r(36, 5), '34', now).off], [false, 2]);
   assert.deepEqual([R.yardGps(r(39.5, 5), '34', now).flag, R.yardGps(r(28, 5), '34', now).flag], [true, true]);
   assert.equal(R.yardGps(r(50, 5), '', now).flag, false);

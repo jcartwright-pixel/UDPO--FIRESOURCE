@@ -384,7 +384,7 @@
       var p = payloadOf(e);
       return { recordId: text(e.recordId), recordedAt: text(e.recordedAt), trailer: yardOf(e), temperature: text(p.temperature), setPoint: text(p.setPoint), fuelLevel: text(p.fuelLevel).toUpperCase(),
         notes: text(p.notes), status: yardStatus(e) || 'RECORDED', recordedBy: text(e.recordedBy), inApp: !!e.createdInApp,
-        gpsTempF: p.gpsTempF === null || p.gpsTempF === undefined ? '' : text(p.gpsTempF), gpsFuelPct: p.gpsFuelPct === null || p.gpsFuelPct === undefined ? '' : text(p.gpsFuelPct), gpsAt: text(p.gpsAt) };
+        gpsTempF: p.gpsTempF === null || p.gpsTempF === undefined ? '' : text(p.gpsTempF), gpsAt: text(p.gpsAt) };
     });
   }
   // Joe 10/18: the trailer's temperature from the GPS (Verizon Fleet, gpsReefer/<trailer>, read every 5 minutes from the time
@@ -395,7 +395,7 @@
     if (!r || r.tempF === null || r.tempF === undefined || r.tempF === '') return { has: false, recording: !!(r && r.recording), noUnit: !!(r && r.recording && !r.unitId) };
     var t = Number(r.tempF), at = when(r.readingAt), age = at ? Math.max(0, Math.round((nowMs - at) / 60000)) : null, sp = text(setPoint), off = null;
     if (sp !== '' && isFinite(Number(sp))) off = Math.round((t - Number(sp)) * 10) / 10;
-    return { has: true, tempF: t, fuelPct: r.fuelPct === null || r.fuelPct === undefined || r.fuelPct === '' ? null : Number(r.fuelPct), readingAt: text(r.readingAt), minutesOld: age,
+    return { has: true, tempF: t, readingAt: text(r.readingAt), minutesOld: age,
       stale: age !== null && age > REEFER_STALE_MINUTES, off: off, flag: off !== null && Math.abs(off) > REEFER_OFF_BY, recording: !!r.recording };
   }
   // Minutes until a trailer can be checked again (the save's own check: that operating day's newest record of the trailer).
