@@ -18,6 +18,7 @@
 'use strict';
 
 const { assertSandboxTarget, assertMasterTarget, columnLetter } = require('./writeback');
+const L = require('./logic');
 
 // Joe's master fleet list (Google Sheet "United Dairy fleet list"). Read only.
 const FLEET_LIST = Object.freeze({ spreadsheetId: '1fASsuj4EYl38yJJb-XlLi0D5nxcmGwE6MBWtRTTP3xc', tab: 'Complete 2025 List of Units' });
@@ -162,4 +163,40 @@ async function runFleetSync({ db, reader, sheets, target, fleet, by, now, dryRun
   }
 }
 
-module.exports = { FLEET_LIST, fleetUnits, planFleetSync, runFleetSync, unitKey };
+/*
+ * Joe 10/18: Fleet Service shows only United Dairy owned units at the plant ("no leased vehicles, basically"). Who owns each
+ * unit and where it is come from the fleet list's LEASE and LOCATION columns; this keeps them in config/fleetOwnership
+ * ({at, ok, units: {key: {own, lease, facilityId}}}) for the screen. The fleet list is only read, and nothing is written
+ * to any sheet, so it runs on live too (every half hour). A failed read keeps the last good list and notes the error.
+ */
+function fleetOwnership(values) {
+  const hi = (values || []).findIndex(r => (r || []).some(c => up(c) === 'UD UNIT'));
+  if (hi < 0) throw new Error('The fleet list has no header row with UD UNIT');
+  const col = {};
+  values[hi].forEach((c, i) => { if (up(c) && !(up(c) in col)) col[up(c)] = i; });
+  if (!('LEASE' in col) || !('LOCATION' in col)) throw new Error('The fleet list has no LEASE or LOCATION column');
+  const units = {};
+  values.slice(hi + 1).forEach(r => {
+    const g = (k) => String(r[col[k]] === undefined || r[col[k]] === null ? '' : r[col[k]]).trim();
+    const unit = g('UD UNIT');
+    if (!unit) return;
+    units[L.fleetUnitKey(unit)] = { own: /^(OWN|OWNED)?$/i.test(g('LEASE')), lease: g('LEASE'), facilityId: facilityOf(g('LOCATION')) };
+  });
+  return units;
+}
+async function refreshFleetOwnership({ db, reader, fleet, now }) {
+  const at = (now ? now() : new Date()).toISOString(), source = fleet || FLEET_LIST, ref = db.collection('config').doc('fleetOwnership');
+  try {
+    const [values] = await reader.batchGet(source.spreadsheetId, ["'" + source.tab + "'"]);
+    const units = fleetOwnership(values);
+    await ref.set({ ok: true, at, units, count: Object.keys(units).length, error: '' });
+    return { ok: true, count: Object.keys(units).length };
+  } catch (error) {
+    const message = String(error && error.message || error);
+    const why = /403|permission|caller does not have/i.test(message) ? 'The fleet list is not shared with the app yet' : message;
+    await ref.set({ ok: false, failedAt: at, error: why }, { merge: true });
+    return { ok: false, error: why };
+  }
+}
+
+module.exports = { FLEET_LIST, fleetUnits, planFleetSync, runFleetSync, unitKey, fleetOwnership, refreshFleetOwnership };

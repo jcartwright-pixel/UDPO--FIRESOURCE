@@ -72,10 +72,14 @@
     const pill = (s) => '<span class="pill ' + s[1] + '">' + escapeHtml(s[0]) + '</span>';
     const today = () => L.operatingDay(new Date());
 
+    // Joe 10/18: only United Dairy owned trucks and this plant's trailers (the fleet list's LEASE and LOCATION, config/fleetOwnership).
+    let ownership = null;
+    // A work order counts on the cards and the report only when its unit is on the list (owned, this plant).
+    const listedIn = (due) => { const shown = {}; due.units.forEach(u => { shown[L.fleetUnitKey(u.unit)] = true; }); return (o) => !!shown[L.fleetUnitKey(o.unit)]; };
     function units() {
       const seen = {};
       return equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && ours(e) &&
-        e.sourcePresent !== false && !L.unitLeased(e) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
+        e.sourcePresent !== false && L.fleetOwnedHere(e, plant.id, ownership) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true))
         .sort((a, b) => (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
     }
@@ -139,13 +143,14 @@
       document.querySelectorAll('.tabs [data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       const bar = document.getElementById('bar'), sheet = document.getElementById('sheet'), foot = document.getElementById('foot'), k = document.getElementById('kpis');
       const q = search.toUpperCase(), hit = (u) => !q || String(u).toUpperCase().indexOf(q) >= 0;
+      const listed = listedIn(due);
       if (view === 'due') {
         k.innerHTML = kpis([[late, 'Overdue', late ? 'warn' : ''], [soon, 'Due soon', soon ? 'warn' : ''], [due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length, 'Annual inspections this month'],
-          [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().length, 'At the garage'], [done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
+          [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().filter(listed).length, 'At the garage'], [done().filter(o => listed(o) && L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         put(sheet, unitGrid(due, hit));
-        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · leased tractors: the lessor handles service.';
+        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers: leased trucks are left off (the lessor services them).';
       } else if (view === 'work') {
         const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -316,12 +321,12 @@
         (i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (i.now !== '' && i.now != null ? num(i.now) : '') + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
       const dated = (key) => due.items.filter(i => i.key === key && i.dueAt && i.dueAt <= in90).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
       const plateNo = plateOf;
-      const work = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
+      const listed = listedIn(due), work = done().filter(o => listed(o) && L.localDay(o.completed_at) >= weekAgo);
       // The current app's report: four numbers, overdue and due soon, what is at the garage, DOT and plates for the next 90 days,
       // the week's work with the signed tick, and a footer (FleetService.html:155-167).
       box.innerHTML = '<h2>Fleet Service &amp; Compliance Report · ' + shortDate(t) + '</h2>' +
         '<p class="print-tiles"><b>' + late.length + '</b> overdue · <b>' + soon.length + '</b> due soon · <b>' + due.items.filter(i => i.key === 'DOT' && String(i.dueAt).slice(0, 7) === month).length + '</b> annual inspections this month · <b>' +
-          due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length + '</b> plates expiring in 30 days · <b>' + open().length + '</b> at the garage · <b>' + done().filter(o => L.localDay(o.completed_at).slice(0, 7) === month).length + '</b> finished this month</p>' +
+          due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length + '</b> plates expiring in 30 days · <b>' + open().filter(listed).length + '</b> at the garage · <b>' + done().filter(o => listed(o) && L.localDay(o.completed_at).slice(0, 7) === month).length + '</b> finished this month</p>' +
         '<p><b>Overdue and due soon</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(late.concat(soon))) +
         '<p><b>At the garage</b></p>' + tbl(['Unit', 'Type', 'What', 'Due at', 'Now', 'Left', 'Status'], dueRows(due.items.filter(i => i.status === 'AT_GARAGE'))) +
         '<p><b>Annual inspections · next 90 days</b></p>' + tbl(['Unit', 'Type', 'Annual inspection due', 'Left', 'Status'], dated('DOT').map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + when(i.dueAt) + '</td><td>' + escapeHtml(i.left) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('')) +
@@ -329,7 +334,7 @@
         '<p><b>Work done · this week (Sun-Sat)</b></p>' + tbl(['Date', 'Unit', 'Job', 'What they fixed', 'Tech', 'Hours', 'Signed'], work.map(x => '<tr><td>' + when(x.completed_at) + '</td><td>' + escapeHtml(x.unit) + '</td><td>' + escapeHtml(x.problem || '') + '</td><td>' + escapeHtml(fixedText(x)) +
           '</td><td>' + escapeHtml(x.techs || '') + '</td><td>' + (x.minutes ? Math.round(x.minutes / 6) / 10 : '') + '</td><td>' + (x.safe === 'YES' && x.signed_by ? '&#10003;' : '') + '</td></tr>').join('')) +
         '<p class="print-sign">Reviewed by ______________________________ &nbsp;&nbsp; Date ______________</p>' +
-        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · annual inspection every ' + rules().dotMonths + ' months · leased tractors are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
+        '<p class="print-foot">United Dairy · ' + escapeHtml(plant.name) + ' · ' + due.units.length + ' trucks and trailers · PM every ' + num(rules().truckMiles) + ' miles · reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours · annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers, leased trucks are serviced by the lessor · printed ' + new Date().toLocaleString() + '</p>';
       printSaved('fleet');
     }
 
@@ -389,6 +394,7 @@
       const { db, auth } = await start();
       const watch = (name, set) => onSnapshot(collection(db, name), s => { set(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the ' + (READ_NAMES[name] || 'garage list') + ' (' + e.message + '). Check the network and reload the page.'));
       watch('equipment', v => { equipment = v; });
+      onSnapshot(doc(db, 'config', 'fleetOwnership'), d => { const o = d.exists() ? d.data() : null; ownership = o && o.units ? o : null; render(); }, () => {});
       watch('fleetSetup', v => { setup = v; });
       watch('odometers', v => { odometers = v; });
       watch('gpsTrucks', v => { gps = v; });
