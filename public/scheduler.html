@@ -151,6 +151,7 @@
       if (view === 'history' && lane !== 'RECEIVING') view = 'month';
       document.getElementById('v-history').hidden = lane !== 'RECEIVING';
       document.querySelector('.sc-ctrl .stepper').hidden = view === 'history';
+      watchLoads();
       const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
       document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
       document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
@@ -543,14 +544,29 @@
         '<div class="legend"><span><i style="background:#0b5596"></i>Uniontown truck</span><span><i style="background:#15803d"></i>Branch</span><span><i style="background:#7e3fbf"></i>Carrier</span></div>' + inner + '</body></html>');
     }
 
+    // Joe 10/18 (screen speed): each lane's loads from a week before the shown month, week or day on (the month's calendar
+    // starts on the Sunday before its first day), not every load ever made, so the screen does not slow down as the schedule
+    // grows. Receiving History reads every load. A load is one record (the server keeps one per load), so a load moved to
+    // another day is still never shown twice. Read again only when the shown range leaves what is read.
+    let loadsFrom = null, loadsUnsubs = [];
+    function watchLoads() {
+      if (!db) return;
+      const want = view === 'history' ? '' : L.addDays(L.weekStart(range().start), -7);
+      if (loadsFrom !== null && (loadsFrom === '' || (want && want >= loadsFrom && L.daysBetween(loadsFrom, want) <= 62))) return;
+      loadsFrom = want;
+      loadsUnsubs.splice(0).forEach(u => u());
+      seen.SHIPPING = seen.RECEIVING = false;
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      ['SHIPPING', 'RECEIVING'].forEach(l => loadsUnsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE[l]), ...(want ? [where('date', '>=', want)] : [])),
+        s => { loads[l] = s.docs.map(d => d.data()); seen[l] = true; render(); }, fail(l === 'SHIPPING' ? 'the Shipping schedule' : 'the Receiving schedule'))));
+    }
+
     requireSignIn(async (user) => {
       ({ db } = await start());
       watchPerson(db, user, p => { person = p; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
-      // Every load of each lane (the journal keeps scheduler records), so a load moved to another day is never shown twice.
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { loads.SHIPPING = s.docs.map(d => d.data()); seen.SHIPPING = true; render(); }, fail('the Shipping schedule'));
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.RECEIVING)), s => { loads.RECEIVING = s.docs.map(d => d.data()); seen.RECEIVING = true; render(); }, fail('the Receiving schedule'));
+      watchLoads();
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); if (!modal.hidden && modal.querySelector('.sc-suptable')) openSuppliers(); }, fail('the suppliers'));
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, fail('Route Master'));
       render();

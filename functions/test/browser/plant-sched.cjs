@@ -226,6 +226,21 @@ async function shots(page, name, w) {
     assert.equal(await desk.textContent('#f-error'), 'All of these are already on the list.');
     await watcher.waitForFunction(() => /Liquid B\.I\.B/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
     results.push('Add a List (Joe\'s 20 receiving suppliers): added in his spelling and order, one already on the list skipped, pasting again adds nothing; on the other screen');
+    // Joe 10/18 (screen speed): the screen reads only the loads near the month, week or day it shows, not every load ever made;
+    // stepping back to an old month still shows that month's loads, and a load from long ago does not show in October.
+    await db().collection('plantJournal').doc('PLANT_SCHEDULE_app_old1').set({ recordId: 'SCHED-old1', type: 'PLANT_SCHEDULE', date: '2026-05-12', status: 'SCHEDULED', routeId: 'rte_c892', runId: 'run_c892',
+      route: '892', run: 'GARBER', createdInApp: true, recordedAt: '2026-05-01T12:00:00Z', payload: { pickupTime: '07:00', scheduleType: 'ROUTE', product: 'Old May load' } });
+    await desk.keyboard.press('Escape');
+    await desk.click('[data-lane="SHIPPING"]');
+    await desk.click('[data-view="month"]');
+    await desk.waitForFunction(() => /Oct 26/.test(document.getElementById('range').textContent));
+    assert.ok(!(await desk.textContent('#body')).includes('Old May load'), 'the May load is not in October');
+    for (let i = 0; i < 5; i++) { const before = await desk.textContent('#range'); await desk.click('#prev'); await desk.waitForFunction((b) => document.getElementById('range').textContent !== b, before); }
+    assert.match(await desk.textContent('#range'), /May 26/);
+    await desk.click('[data-day="2026-05-12"]');
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-dayrow').length === 1, null, { timeout: 8000 });
+    assert.match(await desk.textContent('.sc-dayrow'), /Garber[\s\S]*Old May load/);
+    results.push('Old month (May): stepping back five months still shows its load; the screen reads only the loads near what it shows');
   } finally {
     await browser.close();
   }

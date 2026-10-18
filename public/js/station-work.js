@@ -7,6 +7,7 @@
  */
 import { save, escapeHtml, shortDate, showError, allowedSaves, maySave } from './app.js';
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
+import { watchWashRequests } from './recent-records.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
 import { listenForScans, scanWithCamera, cameraReads, beep } from './scan-input.js';
@@ -814,8 +815,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
     ];
   }
   always = [onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); }, () => {}),
-  onSnapshot(collection(db, 'plantWash'), s => { sheetWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'plantWash', _id: d.id })); render(); }, () => {}),
-  onSnapshot(query(collection(db, 'maintenance'), where('kind', '==', 'WASH')), s => { appWash = s.docs.map(d => Object.assign({}, d.data(), { _list: 'maintenance', _id: d.id })); render(); }, () => {}),
+  watchWashRequests(db, L.weekStart(today()), r => { sheetWash = r; render(); }, () => {}, 'plantWash'),
+  // Joe 10/18 (screen speed): the open wash requests and the week's finished ones, not every one ever made.
+  watchWashRequests(db, L.weekStart(today()), r => { appWash = r; render(); }, () => {}),
   watchProducts(db, lists => {
     const seen = {};
     Object.keys(lists).forEach(k => (lists[k] || []).forEach(x => { const n = String(x.name || '').trim(); if (n && !seen[n]) seen[n] = { name: n, sku: String(x.sku || '').trim() }; }));
