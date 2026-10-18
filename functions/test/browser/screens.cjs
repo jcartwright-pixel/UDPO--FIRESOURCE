@@ -283,7 +283,8 @@ async function noScroll(page) {
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
     assert.equal(await wkEdit.$('#tab-board'), null, 'no tab buttons');
     await wkEdit.$eval('.side-flyouts a[href="weekly.html#board"]', a => { a.href = 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com#board'; a.click(); });
-    await wkEdit.waitForFunction(() => document.body.dataset.view === 'board' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
+    // The link reloads the page: while the new page has no body yet, keep waiting instead of failing on it.
+    await wkEdit.waitForFunction(() => !!document.body && document.body.dataset.view === 'board' && !!document.getElementById('board-panel') && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
     await wkEdit.waitForSelector('#board-rows tr[data-driver="drv_test_casey"]');
     const boardNames = await wkEdit.$$eval('#board-rows tr[data-driver] td:first-child', tds => tds.map(td => td.textContent));
     assert.deepEqual(boardNames, ['BROOK, SAM', 'ADAMS, PAT', 'CASEY, LEE'], 'relief first, then seniority');
