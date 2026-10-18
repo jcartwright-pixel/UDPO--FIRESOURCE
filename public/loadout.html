@@ -753,6 +753,9 @@
       unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = withShownOrder(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the loads: ' + e.message)));
       const days = [-1, 0, 1, 2].map(n => L.addDays(date, n));
       unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', days)), s => { pickups = s.docs.map(d => d.data()); render(); if (puRow && !document.getElementById('pu-modal').hidden) drawPickups(); }, e => showError('Could not read the pickups: ' + e.message)));
+      // Joe 10/18 (screen speed): the Shipping schedule's entries from 14 days before the shown day on, as the Plant Station
+      // reads them (review item 73), not every entry ever made, so the screen does not slow down as the schedule grows.
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING), where('date', '>=', L.addDays(date, -14))), s => { schedDocs = s.docs.map(d => d.data()); render(); }, () => { schedDocs = []; }));
     }
 
     // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
@@ -785,7 +788,6 @@
         if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad', 'savePlantSchedule']).then(a => { allowed = a; render(); }); }
       });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
-      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING)), s => { schedDocs = s.docs.map(d => d.data()); render(); }, () => { schedDocs = []; });
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));
