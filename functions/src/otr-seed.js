@@ -32,7 +32,7 @@ async function seedOtrOnce(db, opts) {
   (await db.collection('otrComments').where('source', '==', 'MANUAL').get()).forEach(d => typedNotes.add(d.id));
   const months = {};
   data.figures.forEach(f => { const k = f.year + '-' + f.month; (months[k] = months[k] || { year: f.year, month: f.month })[f.key] = f.value; });
-  const meta = { source: 'IMPORT', updatedAt: now, updatedBy: 'otr-history-import', testEdited: true };
+  const meta = { source: 'IMPORT', updatedAt: now, updatedBy: 'otr-history-import', testEdited: o.testEdited !== false };
   const w = db.bulkWriter();
   let nm = 0, nd = 0, nc = 0;
   Object.values(months).forEach(m => { nm++; w.set(db.collection('otrMonthly').doc(m.year + '-' + String(m.month).padStart(2, '0')), Object.assign({}, m, meta), { merge: true }); });

@@ -39,6 +39,13 @@
  * line shows WRONG LABEL and 3 quiet minutes is a stop. A line already set to anything but Typed by operator keeps its setting.
  * It waits (tries again next run) until both lines are set up. TEST COPY ONLY: on the live app the scanners are not wired to a
  * line PC yet, so it does nothing and leaves no marker until Joe OKs it by name.
+ *
+ * otr-history-2026-10-18 (Joe 10/18, "this screen is not getting filled out, and I thought it was already done once"): the Over
+ * the Road history from his OTR Trips 2026 workbook and the August accounting package (day counts 9-30-16 to 8-31-26, monthly
+ * figures, By Date comments) and his OTR runs ticked in OTR Routes Setup were loaded on the test copy only (otr-seed.js), so the
+ * live Month Recap, By Date and Recap showed 0. This loads the same two with the same rules: a day count or comment typed by
+ * hand is kept, and a run already set in OTR Routes Setup is left as it is. On the test copy both are already there, so it only
+ * leaves its marker. LIVE WAITS FOR JOE: on the live app it does nothing and leaves no marker until Joe OKs it by name.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -276,13 +283,29 @@ async function loadHalfGallonReadersOnce(db, opts) {
   });
 }
 
+const OTR_HISTORY_ID = 'otr-history-2026-10-18';
+async function loadOtrHistoryOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  const mark = db.collection('dataLoads').doc(OTR_HISTORY_ID);
+  const m = await mark.get();
+  if (m.exists && m.data().status === 'DONE') return { skipped: true };
+  const OTR = require('./otr-seed');
+  const routes = await OTR.seedOtrRoutesOnce(db, o);
+  const history = await OTR.seedOtrOnce(db, Object.assign({}, o, { testEdited: true }));
+  // Another run is still writing the history (it holds its marker for 10 minutes): this one tries again next time.
+  if (history.skipped && ((await db.collection('otrSeed').doc(OTR.SEED_ID).get()).data() || {}).status !== 'DONE') return { waiting: 'history still loading' };
+  await mark.set({ status: 'DONE', doneAt: stamp, what: 'Over the Road history and OTR Routes Setup runs from his workbook (Joe 10/18)', routes, history });
+  return { routes, history };
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce], [OTR_HISTORY_ID, loadOtrHistoryOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, OTR_HISTORY_ID };
