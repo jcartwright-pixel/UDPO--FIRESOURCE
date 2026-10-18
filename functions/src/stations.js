@@ -6,6 +6,8 @@
  *   PLANT   Plant Station tablets (plant-station.html): Case Loadout, Case Unloading, Tote, Boxing, Yard Services
  *   GARAGE  Garage Station tablets (garage-station.html)
  *   KIOSK   Driver Room kiosks and TVs (driver-station.html); a plant may have its own kiosk too
+ *   MANAGER The Plant Managers app (walkthrough.html?view=home&app=1, Joe 10/18): a manager signed in with a United Dairy
+ *           account (Manager or Administrator) types the plant's Plant Managers code once on their phone or tablet
  *
  * Kept in private/stations (server only). A code is shown to administrators (like the release codes) and checked by its
  * salted hash; a new code changes the station's version, so every tablet on the old code asks again. Until a kind has a
@@ -35,13 +37,19 @@ const KINDS = Object.freeze({
   GARAGE: { label: 'Garage Station', types: { GARAGE: 'Garage' } },
   // Joe 10/12: "Driver Room Check-In Station" (the drivers' tablet) and "Driver's Kiosk Station" (the TV: rolling loadout,
   // dispatch and weather).
-  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In Station', TV: "Driver's Kiosk Station" } }
+  KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In Station', TV: "Driver's Kiosk Station" } },
+  // Joe 10/18: the Plant Managers app ("send them the link and have a code").
+  MANAGER: { label: 'Plant Managers', types: { MANAGERS: 'Plant Managers' } }
 });
 // What each plant starts with: the current app's five stations, its garage, and the Driver Room tablet and TV.
 const STARTERS = [
   ['PLANT', 'CASE', 'Case Loadout'], ['PLANT', 'CASE_UNLOADING', 'Case Unloading'], ['PLANT', 'TOTES', 'Tote Loadout'], ['PLANT', 'BOXING', 'Boxing Loadout'],
-  ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room Check-In Station'], ['KIOSK', 'TV', "Driver's Kiosk Station"]
+  ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room Check-In Station'], ['KIOSK', 'TV', "Driver's Kiosk Station"],
+  ['MANAGER', 'MANAGERS', 'Plant Managers']
 ];
+// Kinds added after a plant's list was first saved: each plant gets its starter until the list has one of that kind
+// (Remove takes the code off, so the starter coming back has no code and the app opens as before).
+const LATER_KINDS = ['MANAGER'];
 const MAX_FAILS_PER_MINUTE = 30;
 // The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing
 // and returns (the screens the Plant Station opens). Nothing else.
@@ -62,7 +70,14 @@ const fail = (code, message) => { throw new StationError(code, message); };
 // Joe 10/12: the Driver Room's two starter stations kept their first names in a saved list; they show Joe's names now.
 const RENAMED = { 'DRIVER|Driver Room kiosk': 'Driver Room Check-In Station', 'TV|Driver Room TV': "Driver's Kiosk Station" };
 function listOf(d) {
-  if (d && d.list) { Object.values(d.list).forEach(s => { if (s.kind === 'KIOSK' && RENAMED[s.type + '|' + s.name]) s.name = RENAMED[s.type + '|' + s.name]; }); return d.list; }
+  if (d && d.list) {
+    Object.values(d.list).forEach(s => { if (s.kind === 'KIOSK' && RENAMED[s.type + '|' + s.name]) s.name = RENAMED[s.type + '|' + s.name]; });
+    plants().forEach(p => STARTERS.filter(([kind]) => LATER_KINDS.indexOf(kind) >= 0).forEach(([kind, type, name]) => {
+      const key = (p.id + '_' + kind + '_' + type).toLowerCase();
+      if (!Object.values(d.list).some(s => s.kind === kind && s.facilityId === p.id)) d.list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(d.list).length };
+    }));
+    return d.list;
+  }
   const list = {};
   plants().forEach(p => STARTERS.forEach(([kind, type, name]) => { const key = (p.id + '_' + kind + '_' + type).toLowerCase(); list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(list).length }; }));
   return list;

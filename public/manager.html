@@ -214,6 +214,8 @@
       // Both Send buttons (the card's and the pop-up's), so either works again after a send.
       ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
+      // Joe 10/18: Send Report on the Plant Managers app opens this report (what goes out, a note box and Send) once it is ready.
+      if (openOnLoad && ready() && report && person) { openOnLoad = false; openReport(); }
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -254,6 +256,7 @@
     window.udBack = () => { if (document.getElementById('modal').hidden) return false; document.getElementById('close').click(); return true; };
     document.getElementById('note').addEventListener('input', e => { note = e.target.value; });
     const loaded = { runs: false, journal: false }, ready = () => loaded.runs && loaded.journal;
+    let openOnLoad = new URLSearchParams(location.search).get('report') === '1';
     async function send(btn) {
       if (!report || btn.disabled || !ready()) return;
       document.getElementById('send-error').hidden = true;

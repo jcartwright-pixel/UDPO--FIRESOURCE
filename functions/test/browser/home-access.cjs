@@ -151,7 +151,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/15: Schedule Texts added under Connections & Keys.
     // Joe 10/16: Connections & Keys > RedZone back (the RedZone API, read only).
     // Joe 10/18: Upload Center added under Plant Setup (a new plant's data from one workbook).
-    assert.equal(all, 38, 'every item from the current app\'s Administration is in the menu');
+    // Joe 10/18: Plant Managers App added under Links & Codes (the Plant Managers link and its code).
+    assert.equal(all, 39, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -174,7 +175,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
-    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes']);
+    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes', 'Plant Managers App']);
     await adm.fill('#find', '');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);

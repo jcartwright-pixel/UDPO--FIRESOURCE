@@ -95,7 +95,8 @@ test('installed from a station link, the station opens full screen in its own wi
 // box truck for the Driver Station (Driver Room Check-In tablet and the TV). UD Routes keeps the United Dairy icon.
 test('each station app has its own icon in every size, different from the others', () => {
   const sets = { 'plant-station.webmanifest': 'plant-station', 'plant-station-noaccount.webmanifest': 'plant-station',
-    'garage-station.webmanifest': 'garage-station', 'driver-station.webmanifest': 'driver-station' };
+    'garage-station.webmanifest': 'garage-station', 'driver-station.webmanifest': 'driver-station',
+    'plant-managers.webmanifest': 'plant-managers' };
   const seen = {};
   for (const [file, dir] of Object.entries(sets)) {
     const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, file), 'utf8'));
@@ -113,4 +114,16 @@ test('each station app has its own icon in every size, different from the others
   const main = fs.readFileSync(path.join(PUBLIC, 'img/app-icon/icon-512.png')).toString('base64');
   const all = Object.values(seen).concat(main);
   assert.equal(new Set(all).size, all.length, 'every station icon differs from the others and from UD Operations');
+});
+
+// Joe 10/18 21:51: the manager walkthrough installs as its own "Plant Managers" app. The Plant Managers link
+// (walkthrough.html?view=home&app=1) swaps in its own manifest and iPad icon, so it installs with its own icon.
+test('the Plant Managers link installs as its own app with its own icon', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'plant-managers.webmanifest'), 'utf8'));
+  assert.equal(m.short_name, 'Plant Managers');
+  assert.equal(m.start_url, '/walkthrough.html?view=home&app=1');
+  assert.equal(m.display, 'standalone');
+  const html = fs.readFileSync(path.join(PUBLIC, 'walkthrough.html'), 'utf8');
+  assert.match(html, /plant-managers\.webmanifest/);
+  assert.match(html, /img\/app-icon\/plant-managers\/apple-touch-icon\.png/);
 });

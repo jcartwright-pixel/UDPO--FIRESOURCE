@@ -7,6 +7,9 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <!-- Joe 10/18: opened from the Plant Managers link (?app=1), adding it to the home screen installs "Plant Managers" with its
+       own icon, opening on the managers' start screen. -->
+  <script>if (new URLSearchParams(location.search).get('app') === '1') { document.querySelector('link[rel="manifest"]').href = 'plant-managers.webmanifest'; document.querySelector('link[rel="apple-touch-icon"]').href = 'img/app-icon/plant-managers/apple-touch-icon.png'; document.write('<meta name="apple-mobile-web-app-title" content="Plant Managers"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'); }</script>
   <title>Manager Walkthrough · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
@@ -36,6 +39,7 @@
          Loading and Unloading. The walkthrough is Yard, Coolers, Production, each a big tile with what it holds, opening that screen,
          and beside it a DONE / DUE / PAST DUE button in green, yellow or red (Joe 10/18). -->
     <div class="view wk-view">
+      <div id="code-box" hidden></div>
       <h2 class="wk-ask" id="ask"></h2>
       <div class="wk-list" id="list" aria-live="polite"></div>
       <p class="wk-last" id="last"></p>
@@ -45,16 +49,23 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, shortTime, watchPerson } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, shortTime, watchPerson, callServer } from './js/app.js';
+    import { watchRound } from './js/autosave.js';
+    import { resolveStation, askCode } from './js/station-code.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { WALK_ROLES } from './js/walk-bar.js';
 
     const L = window.UDLogic, U = window.UDPlant;
-    const home = new URLSearchParams(location.search).get('view') === 'home';
+    const params = new URLSearchParams(location.search), home = params.get('view') === 'home';
+    // Joe 10/18: the Plant Managers app (Administration > Links & Codes > Plant Managers App): the manager's sign-in, then the
+    // plant's Plant Managers code once (the phone remembers it). The app keeps itself across the screens it opens.
+    try { if (params.get('app') === '1') sessionStorage.setItem('udPlantManagers', '1'); } catch (e) { /* private window */ }
+    const appMode = (() => { try { return params.get('app') === '1' || sessionStorage.getItem('udPlantManagers') === '1'; } catch (e) { return params.get('app') === '1'; } })();
+    let codeOk = !appMode;
     const today = () => L.operatingDay(new Date());
     let date = today(), app = {}, person = null;
-    const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [] }, loaded = { runs: false, journal: false };
+    const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [], lastReport: '' }, loaded = { runs: false, journal: false };
     // The person who made a check, from their sign-in (mike.adams@… reads Mike Adams).
     const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 
@@ -83,8 +94,8 @@
       // Joe 10/15: for managers only; anyone else is told so and sees none of it.
       const manager = !person || L.hasRole(person, WALK_ROLES);
       document.getElementById('not-manager').hidden = manager;
-      ['list', 'last', 'ask'].forEach(id => { document.getElementById(id).hidden = !manager; });
-      if (!manager || !loaded.runs || !loaded.journal) return;
+      ['list', 'last', 'ask'].forEach(id => { document.getElementById(id).hidden = !manager || !codeOk; });
+      if (!manager || !codeOk || !loaded.runs || !loaded.journal) return;
       const now = Date.now(), journal = data.journal;
       const yard = U.yardQueue(data.runs, journal, date, now);
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
@@ -103,7 +114,11 @@
           choice('loadout.html', '', 'Loading', 'Loadout Center · today\'s loads', done.done, 'of ' + done.total + ' loaded', done.total && done.done === done.total ? 'good' : 'plain',
             [{ name: done.waiting + ' waiting', detail: '· ' + done.loading + ' loading' + (done.paused ? ' · ' + done.paused + ' paused' : ''), kind: 'plain' }]) +
           choice('unloading.html', '', 'Unloading', 'Trucks back in · cases and returns', uc.complete, 'of ' + uc.total + ' unloaded', uc.total && uc.complete === uc.total ? 'good' : 'plain',
-            [{ name: uc.waiting + ' waiting', detail: '· ' + uc.unloading + ' unloading', kind: 'plain' }]);
+            [{ name: uc.waiting + ' waiting', detail: '· ' + uc.unloading + ' unloading', kind: 'plain' }]) +
+          // Joe 10/18: Send Report: the Plant Update email Manager Center's Send Current Report sends, to the Plant Managers group.
+          // It opens that report (what goes out, a note box and Send), so the manager sees it before it goes.
+          choice('manager.html?report=1', '', 'Send Report', 'Plant Update email to the Plant Managers group', data.lastReport ? shortTime(Date.parse(data.lastReport)) : 'None', 'last sent', 'plain',
+            [{ name: 'Tap to see the report and send it', detail: '', kind: 'plain' }]);
       } else {
         html = row(Y.state, 'yard.html?walk=1', choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items, whoOf(Y))) +
           row(C.state, 'temps.html?walk=1', choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items, whoOf(C))) +
@@ -113,17 +128,38 @@
       document.getElementById('last').textContent = W.last ? 'Last walkthrough check: ' + shortTime(Date.parse(W.last.at)) + ' · ' + personName(W.last.by) : 'No walkthrough checks yet today.';
     }
 
-    document.getElementById('title').textContent = home ? 'Operations' : 'Manager Walkthrough';
+    document.getElementById('title').textContent = home ? (appMode ? 'Plant Managers' : 'Operations') : 'Manager Walkthrough';
     document.getElementById('ask').textContent = home ? 'What are you doing?' : 'Walk in this order';
     document.getElementById('full').hidden = !home;
-    if (home) document.title = 'Manager · Operations';
+    if (home) document.title = appMode ? 'Plant Managers' : 'Manager · Operations';
+
+    // The Plant Managers code (Administration > Links & Codes > Plant Managers App), asked once on this phone.
+    let gating = false;
+    async function gate() {
+      if (gating || codeOk) return;
+      gating = true;
+      const box = document.getElementById('code-box'), call = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
+      try {
+        const r = await resolveStation('MANAGER', 'udPlantManagersCode', call);
+        if (r.needCode) {
+          box.hidden = false;
+          await askCode(box, { kind: 'MANAGER', storeKey: 'udPlantManagersCode', call, title: 'Enter the Plant Managers code', label: 'Plant Managers code', button: 'Open Plant Managers',
+            hint: 'Type the Plant Managers code from Administration > Links &amp; Codes > Plant Managers App. This phone remembers it after this.', message: r.message });
+          box.hidden = true;
+        }
+        codeOk = true;
+        render();
+      } catch (e) { showError('Could not check the Plant Managers code: ' + e.message); }
+      finally { gating = false; }
+    }
 
     requireSignIn(async (user) => {
       const { db } = await start();
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       let timer = null;
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
-      watchPerson(db, user, p => { person = p || { roles: [] }; later(); }, { withEmail: true });
+      watchPerson(db, user, p => { person = p || { roles: [] }; later(); if (appMode && !codeOk && L.hasRole(person, WALK_ROLES)) gate(); }, { withEmail: true });
+      watchRound(db, at => { data.lastReport = at; later(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
