@@ -69,10 +69,9 @@ const t = (min) => new Date(Date.parse(AT) - min * 60000).toISOString();
       const out = Object.fromEntries(await page.$$eval('.tt-board > tbody > tr', a => a.map(r => [r.cells[0].textContent, r.cells[8].textContent])));
       assert.equal(out['Pat Smith'], '9 h 20 mstill out', 'still out: from the yard leave until now');
       assert.equal(counts.filter(c => c[0] === 'Pat Smith').length, 1, 'two runs on one truck: one line');
-      // innerText needs the board laid out; on a slow runner it can be read just before, so wait for it (still 8 s to fail).
-      await page.waitForFunction(() => { const r = Array.from(document.querySelectorAll('.tt-board > tbody > tr')).find(x => x.cells[0].textContent === 'Pat Smith'); return r && r.cells[6].innerText === '4:00 AM\n3:00 PM'; }, null, { timeout: 8000 })
-        .catch(() => {});
-      assert.equal(await page.$$eval('.tt-board > tbody > tr', a => a.find(r => r.cells[0].textContent === 'Pat Smith').cells[6].innerText), '4:00 AM\n3:00 PM', 'both dispatch times');
+      // Both dispatch times, one per line: read the <br>-separated lines from the cell's markup, since innerText
+      // reads joined whenever the row is not laid out at that instant (seen on the CI runner).
+      assert.deepEqual(await page.$$eval('.tt-board > tbody > tr', a => a.find(r => r.cells[0].textContent === 'Pat Smith').cells[6].innerHTML.split(/<br\s*\/?>/i)), ['4:00 AM', '3:00 PM'], 'both dispatch times');
       assert.equal(await page.$eval('#kpis div b', b => b.textContent), '3', 'Dispatched today counts Pat once');
       assert.equal(out['Lee Jones'], '4 h 0 mback 1:00 PM', 'back: from the yard leave until the return');
       assert.equal(out['Sam Hill'], '20 h 0 msince yesterday', 'sleeper: counts from yesterday\'s yard leave, across midnight');
