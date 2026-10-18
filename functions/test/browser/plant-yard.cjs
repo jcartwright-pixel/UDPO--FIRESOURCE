@@ -82,6 +82,13 @@ async function seed() {
   const browser = await chromium.launch();
   const results = [];
   try {
+    if (SHOTS) {
+      // The phone picture with every trailer still due (the phone part below runs after the desktop has checked some).
+      const p0 = await openPage(browser, 390, 844, '/yard.html' + MANAGER);
+      await p0.waitForFunction(() => document.querySelectorAll('#cards tr[data-trailer]').length === 3 && /44\.6/.test(document.getElementById('cards').textContent));
+      await p0.screenshot({ path: path.join(SHOTS, 'yard-phone-all-390.png'), scale: 'css' });
+      await p0.close();
+    }
     for (const [w, h] of [[1920, 950], [1536, 864], [1366, 650], [1024, 768]]) {
       const page = await openPage(browser, w, h, '/yard.html' + MANAGER);
       await page.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 3);
@@ -166,38 +173,39 @@ async function seed() {
     results.push('24-Hour History: the Left Yard and the check on top, newest first');
     const saved = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp);
     assert.deepEqual(saved.map(x => x.payload.trailer + ' ' + x.payload.status).sort(), ['T-701 COMPLETE', 'T-704 DEPARTED']);
-    // The phone view (yard hands): Trailer, Temp, Set, Fuel, Notes, Action.
-    // The phone (yard hands): one card per trailer, no Record button and no history; each box saves as it is left.
+    // The phone (yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Action), no Record button,
+    // no notes and no history; each box saves as it is left.
     const phone = await openPage(browser, 390, 844, '/yard.html' + MANAGER);
     const card = '.yd-card[data-trailer="T-702"]';
     await phone.waitForSelector(card);
     assert.equal(await phone.isVisible('#panes'), false, 'no 24-hour history on the phone');
     assert.equal(await phone.$$eval('[data-record]', b => b.filter(x => x.offsetParent).length), 0, 'no Record button on the phone');
-    assert.match(await phone.textContent(card + ' .yd-gpsf'), /GPS °F\s*44\.6°/);
-    assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone card shows the GPS temperature in red too');
+    // Joe 10/18: the phone is a table like the old app's: Trailer, Temp, Set, a Fuel drop-down, GPS where Notes was, Action.
+    assert.deepEqual(await phone.$$eval('#cards thead th', t => t.map(x => x.textContent)), ['Trailer', 'Temp °F', 'Set °F', 'Fuel', 'GPS °F', 'Action']);
+    assert.deepEqual(await phone.$$eval('#cards tr[data-trailer]', r => r.map(x => x.dataset.trailer)), ['T-702'], 'T-701 was checked and T-704 left the yard above');
+    assert.deepEqual(await phone.$$eval(card + ' [data-k="fuelLevel"] option', o => o.map(x => x.value)), ['', 'FULL', '3/4', '1/2', 'EMPTY'], 'fuel is a drop-down that starts blank');
+    assert.equal((await phone.textContent(card + ' .yd-gpsf')).trim(), '44.6°');
+    assert.equal(await phone.$eval(card + ' .yd-gpsf', x => x.classList.contains('bad')), true, 'the phone shows the GPS temperature in red too');
+    assert.equal(await phone.$$eval('#cards [data-k="notes"]', x => x.length), 0, 'no notes box on the phone');
+    assert.equal(await phone.$$eval('[data-out]', x => x.filter(e => e.offsetParent).length), 0, 'no list of trailers that left on the phone');
+    assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('cards').scrollWidth <= document.getElementById('cards').clientWidth), 'no sideways scroll at 390');
+    assert.ok(await phone.$$eval('#cards th, #cards td, #cards input, #cards select, #cards button', e => e.every(x => parseFloat(getComputedStyle(x).fontSize) >= 16)), 'text at least 16px');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-390.png'), scale: 'css' });
-    assert.match(await phone.textContent('.yd-card[data-out="T-705"]'), /SUN VALLEY[\s\S]*GPS °F\s*34\.8°[\s\S]*Where\s*Moving/);
-    assert.match(await phone.textContent('.yd-card[data-out="T-706"]'), /Where\s*Stopped at KROGER #512/);
-    assert.equal(await phone.$eval('.yd-card[data-out="T-706"] .yd-gpsf', x => x.classList.contains('bad')), true);
-    assert.equal(await phone.$$eval('.yd-card[data-out] [data-k], .yd-card[data-out] [data-left]', x => x.length), 0, 'nothing to type or press on a trailer that left');
-    if (SHOTS) { await phone.$eval('.yd-road-head', x => x.scrollIntoView()); await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-road-390.png'), scale: 'css' }); await phone.$eval('#cards', x => { x.scrollTop = 0; }); }
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     await phone.fill(card + ' [data-k="setPoint"]', '33');
     await phone.press(card + ' [data-k="setPoint"]', 'Enter');
-    await phone.click(card + ' [data-fuel="3/4"]');
-    await phone.fill(card + ' [data-k="notes"]', 'Doors sealed');
-    await phone.press(card + ' [data-k="notes"]', 'Enter');
+    await phone.selectOption(card + ' [data-k="fuelLevel"]', '3/4');
     await new Promise(r => setTimeout(r, 1500));
     await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     const one = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
     assert.equal(one.length, 1, 'the three boxes fill in one check');
-    assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', 'Doors sealed']);
-    results.push('Phone: T-702 temp, set point, fuel and notes each saved as they were left, into one check; the card stays with "Saved"');
+    assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', ''], 'notes are typed on the desktop');
+    results.push('Phone: T-702 temp, set point and fuel each saved as they were left, into one check; the row stays with "Saved"');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-390.png'), scale: 'css' });
     await phone.click(card + ' [data-left]');
-    assert.match(await phone.textContent(card + ' [data-left]'), /Tap again to confirm/);
+    assert.match(await phone.textContent(card + ' [data-left]'), /Confirm Left/);
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-confirm-390.png'), scale: 'css' });
     await phone.click(card + ' [data-left]');
     await phone.waitForFunction((c) => !document.querySelector(c), card);
