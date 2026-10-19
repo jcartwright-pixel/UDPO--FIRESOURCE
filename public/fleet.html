@@ -58,6 +58,7 @@
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
     const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours', workOrders: 'work orders', garageTechs: 'technician list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
+    let editing = null;
     let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
     // Joe 10/13: Fleet Service follows the plant you are in (the plant home you came through, as the plant pages do; Uniontown
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
@@ -103,7 +104,7 @@
     function boxText(i) {
       if (!i) return { big: '—', small: 'Not tracked', s: 'NA' };
       const days = typeof i.left === 'string' ? parseInt(i.left, 10) : null;
-      if (i.status === 'SET_UP') return { big: 'Needs start date', small: i.key === 'PM' ? 'type the last PM miles' : 'type the last date', s: 'SET_UP' };
+      if (i.status === 'SET_UP') return { big: 'Needs start date', small: (canEdit() ? 'Click to ' : '') + (i.key === 'PM' ? 'type the last PM miles' : 'type the last date'), s: 'SET_UP' };
       if (i.status === 'NO_MILES') return { big: 'No miles yet', small: 'from the daily inspection', s: 'NO_MILES' };
       if (i.status === 'AT_GARAGE') return { big: 'At garage', small: i.jobId || '', s: 'AT_GARAGE' };
       if (i.key === 'PM') { const left = Number(i.left); return { big: left < 0 ? 'Over ' + num(-left) + ' mi' : num(left) + ' mi left', small: 'due at ' + num(i.dueAt) + ' mi', s: i.status }; }
@@ -120,7 +121,9 @@
       const gpsRead = {}; due.units.forEach(u => { gpsRead[u.unit] = (u.type === 'TRUCK' ? u.milesSource : u.hoursSource) === 'GPS'; });
       const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') + (gpsRead[r.unit] ? '<small>GPS</small>' : '') : ''; };
       const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
-      const box = (i) => { const x = boxText(i); return '<td class="gc ' + x.s + '" title="' + escapeHtml(tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
+      const box = (i, r, key) => { const x = boxText(i), edit = i && key && canEdit() && i.status !== 'AT_GARAGE';
+        return '<td class="gc ' + x.s + (edit ? ' fs-cell' : '') + '"' + (edit ? ' data-cell="' + key + '" data-unit="' + escapeHtml(r.unit) + '" data-type="' + r.type + '" tabindex="0"' : '') +
+          ' title="' + escapeHtml(edit ? 'Click to type the last date' + (tip(i) ? '\n' + tip(i) : '') : tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
       // Send to Garage (managers): the PM / reefer service and DOT inspection due or overdue become Garage Station jobs. Plates never go.
       const sendable = (r) => ['PM', 'DOT'].map(k => r.c[k]).filter(i => i && (i.status === 'OVERDUE' || i.status === 'DUE_SOON' || i.status === 'NO_MILES'));
       const send = (r) => r.worst === 'AT_GARAGE' ? '<small>at garage</small>' : !sendable(r).length ? '' : '<button type="button" class="edit" data-send="' + escapeHtml(r.unit) + '" data-type="' + r.type + '" data-keys="' + sendable(r).map(i => i.key).join(',') + '" title="Put ' + escapeHtml(sendable(r).map(i => i.what).join(' and ')) + ' on the Garage Station">Send to Garage</button>';
@@ -130,7 +133,7 @@
       return '<div class="fs-legend"><em>' + need + ' of ' + rows.length + ' units need something</em></div>' +
         table(garageCol ? [9, 7, 17, 17, 17, 10, 10, 13] : [10, 8, 20, 20, 18, 12, 12], ['Unit', 'Type', 'PM / Reefer', 'Annual Inspection', 'Plates', 'Miles / hours now', 'Status'].concat(garageCol ? ['Garage'] : []),
           rows.map(r => '<tr data-unit="' + escapeHtml(r.unit) + '" data-worst="' + r.worst + '"><td class="strong">' + escapeHtml(r.unit) + '</td><td>' + (r.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td>' +
-            box(r.c.PM) + box(r.c.DOT) + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td>' + (garageCol ? '<td>' + send(r) + '</td>' : '') + '</tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
+            box(r.c.PM, r, 'PM') + box(r.c.DOT, r, 'DOT') + box(r.c.PLATE) + '<td>' + now(r) + '</td><td>' + pill(STATUS[r.worst]) + '</td>' + (garageCol ? '<td>' + send(r) + '</td>' : '') + '</tr>').join(''), due.units.length ? 'No unit matches.' : 'No units yet.').replace('<table class="issues">', '<table class="issues fs-grid">');
     }
 
     // A data update that changes nothing on the list leaves it as it is (no redraw: the same lines stay, a hovered or clicked one too).
@@ -149,7 +152,7 @@
           [due.items.filter(i => i.key === 'PLATE' && i.dueAt && L.daysBetween(t, i.dueAt) <= 30).length, 'Plates expiring · 30 days'], [open().filter(listed).length, 'At the garage'], [done().filter(o => listed(o) && L.localDay(o.completed_at).slice(0, 7) === month).length, 'Done this month', 'good']]);
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
-        put(sheet, unitGrid(due, hit));
+        if (!editing) put(sheet, unitGrid(due, hit));
         foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers: leased trucks are left off (the lessor services them).';
       } else if (view === 'work') {
         const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
@@ -338,9 +341,53 @@
       printSaved('fleet');
     }
 
+    // Joe 10/19 ("I tried to start the date in here and nothing was working"): on Due, a manager clicks PM / Reefer or Annual
+    // Inspection and types the last service right in the cell. Each box saves on its own when it changes (no Save button),
+    // the same save as Fleet Service Setup's Edit; the last annual inspection date becomes the next one due by the rule.
+    function openCell(td) {
+      if (editing && editing.td === td) return;
+      const unit = td.dataset.unit, key = td.dataset.cell, type = td.dataset.type;
+      // Moving from one box to another: the list is drawn again first, so find this box in it.
+      if (editing) { closeCell(); td = [...document.querySelectorAll('#sheet td.fs-cell')].find(x => x.dataset.unit === unit && x.dataset.cell === key); if (!td) return; }
+      const due = L.fleetDue(units(), setup, miles(), open(), savedRules, today());
+      const u = due.units.find(x => x.unit === unit); if (!u) return;
+      const months = L.fleetRule(rules(), type, 'dotMonths'), v = (x) => x == null ? '' : escapeHtml(String(x));
+      const field = (label, f, val, kind) => '<label>' + label + '<input data-f="' + f + '" ' + (kind === 'date' ? 'type="date"' : 'inputmode="numeric"') + ' value="' + v(val) + '"></label>';
+      td.innerHTML = '<div class="fs-cell-edit">' + (key === 'DOT' ? field('Last annual inspection', 'dot_last', u.dotDue ? L.addMonths(u.dotDue, -months) : '', 'date')
+        : field(type === 'TRUCK' ? 'Last PM date' : 'Last reefer service', 'last_service_date', u.lastServiceDate, 'date') +
+          (type === 'TRUCK' ? field('Last PM miles', 'last_service_miles', u.lastServiceMiles) : field('Reefer hours then', 'last_service_hours', u.lastServiceHours))) +
+        '<small class="fs-cell-saved" aria-live="polite"></small></div>';
+      editing = { td, unit, key, type, months };
+      td.classList.add('editing');
+      td.querySelector('input').focus();
+    }
+    function closeCell() { if (!editing) return; editing = null; document.getElementById('sheet').shown = null; render(); }
+    async function saveCell(input) {
+      const ed = editing; if (!ed) return;
+      const val = input.value.trim();
+      // A date box fires while its year is still being typed; only a whole date (or a cleared box) saves.
+      if (input.type === 'date' && val && Number(val.slice(0, 4)) < 2000) return;
+      const note = ed.td.querySelector('.fs-cell-saved'), fields = {};
+      if (input.dataset.f === 'dot_last') fields.dot_due = val ? L.addMonths(val, ed.months) : '';
+      else fields[input.dataset.f] = val.replace(/,/g, '');
+      note.textContent = 'Saving...'; note.className = 'fs-cell-saved'; showError('');
+      try { await save('saveFleetUnit', { unit: ed.unit, unitType: ed.type, fields, facilityId: plant.id }); note.textContent = 'Saved'; note.className = 'fs-cell-saved ok'; }
+      catch (err) { note.textContent = err.message; note.className = 'fs-cell-saved bad'; }
+    }
+    document.getElementById('sheet').addEventListener('change', e => { const i = e.target.closest('[data-f]'); if (i && editing) saveCell(i); });
+    document.getElementById('sheet').addEventListener('keydown', e => {
+      const td = e.target.closest('td.fs-cell');
+      if (td && !editing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCell(td); return; }
+      if (editing && e.key === 'Escape') closeCell();
+      if (editing && e.key === 'Enter' && e.target.matches('[data-f]')) { e.target.blur(); const all = [...editing.td.querySelectorAll('[data-f]')], next = all[all.indexOf(e.target) + 1]; if (next) next.focus(); else closeCell(); }
+    });
+    // A click anywhere outside the cell being typed in closes it (what changed is already saved).
+    document.addEventListener('mousedown', e => { if (editing && !editing.td.contains(e.target) && !e.target.closest('#sheet td.fs-cell')) setTimeout(closeCell, 0); }, true);
+
     document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { view = b.dataset.view; search = ''; render(); } });
     document.getElementById('sheet').addEventListener('click', async e => {
       const ed = e.target.closest('[data-edit]'); if (ed) { openUnit(ed.dataset.edit); return; }
+      const cell = e.target.closest('td.fs-cell'); if (cell && view === 'due') { openCell(cell); return; }
       const ob = e.target.closest('[data-ours]');
       if (ob) {
         showError('');

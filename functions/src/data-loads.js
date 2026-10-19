@@ -40,6 +40,15 @@
  * It waits (tries again next run) until both lines are set up. TEST COPY ONLY: on the live app the scanners are not wired to a
  * line PC yet, so it does nothing and leaves no marker until Joe OKs it by name.
  *
+ * fleet-service-start-2026-04-01 (Joe 10/19, "no trailers have been serviced ... put in a start date for all of them as 4/1/2026.
+ * And then we'll just start that off with the base"): every unit on Uniontown's Fleet Service Due list (the owned trucks and our
+ * trailers, as the screen lists them; a unit with Track due dates = No is left out) gets 4-1-26 as its last PM / reefer service
+ * date and as its last annual inspection (the next one due by the rule: 4-1-27 at 12 months), written the way Fleet Service
+ * Setup's Save writes them (garage.js saveFleetUnit). A date already typed is kept. Truck PM miles stay as they are: the app has
+ * no GPS miles from 4-1-26, so a truck with no last PM miles still asks for them. Plates are not touched. The marker lists every
+ * unit and field it set, for undoing by hand. TEST COPY ONLY: on the live app it does nothing and leaves no marker until Joe OKs
+ * it by name.
+ *
  * otr-history-2026-10-18 (Joe 10/18, "this screen is not getting filled out, and I thought it was already done once"): the Over
  * the Road history from his OTR Trips 2026 workbook and the August accounting package (day counts 9-30-16 to 8-31-26, monthly
  * figures, By Date comments) and his OTR runs ticked in OTR Routes Setup were loaded on the test copy only (otr-seed.js), so the
@@ -221,6 +230,39 @@ async function loadFleetStartMilesOnce(db, opts) {
   });
 }
 
+const FLEET_START_ID = 'fleet-service-start-2026-04-01';
+const FLEET_START_DATE = '2026-04-01';
+async function loadFleetServiceStartOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  const mark = db.collection('dataLoads').doc(FLEET_START_ID);
+  return db.runTransaction(async tx => {
+    const m = await tx.get(mark);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const [equipment, setup, owned, rulesDoc] = await Promise.all([tx.get(db.collection('equipment')), tx.get(db.collection('fleetSetup')),
+      tx.get(db.collection('config').doc('fleetOwnership')), tx.get(db.collection('config').doc('fleetRules'))]);
+    const ownership = owned.exists ? owned.data() : null, rules = Object.assign({}, L.FLEET_RULES, rulesDoc.exists ? rulesDoc.data() : {});
+    const setupBy = {}; setup.docs.forEach(d => { setupBy[String(d.data().unit || d.id).toUpperCase()] = { ref: d.ref, data: d.data() }; });
+    // The units Fleet Service lists at Uniontown (fleet.html units()): owned trucks and our trailers.
+    const units = GARAGE.garageUnits(equipment.docs.map(d => d.data()).filter(e => L.fleetOwnedHere(e, 'fac_uniontown', ownership)));
+    const set = [], kept = [], notTracked = [];
+    units.forEach(u => {
+      const have = setupBy[u.unit], s = have ? have.data : {};
+      if (String(s.track || '').trim() && !L.yes(s.track)) { notTracked.push(u.unit); return; }
+      const fields = {};
+      if (blank(s.last_service_date)) fields.last_service_date = FLEET_START_DATE;
+      if (blank(s.dot_due)) fields.dot_due = L.addMonths(FLEET_START_DATE, L.fleetRule(rules, u.type, 'dotMonths'));
+      if (!Object.keys(fields).length) { kept.push(u.unit); return; }
+      const change = Object.assign({}, fields, { updated_at: stamp, updated_by: BY, testEdited: true, editedAt: stamp, dataLoad: FLEET_START_ID });
+      if (have) tx.update(have.ref, change);
+      else tx.set(db.collection('fleetSetup').doc(docId(u.unit)), Object.assign({ unit: u.unit, unit_type: u.type, facility_id: 'fac_uniontown', createdInApp: true }, change));
+      set.push(Object.assign({ unit: u.unit }, fields));
+    });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Fleet Service start date 4-1-26 for PM / reefer service and annual inspection (Joe 10/19)', set, kept, notTracked });
+    return { set: set.length, kept: kept.length, notTracked: notTracked.length };
+  });
+}
+
 const GARAGE_ORDERS_ID = 'garage-work-orders-2026-10-14';
 const CLOSED = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED|REMOVED)$/i;
 async function loadGarageOrdersOnce(db, opts) {
@@ -313,10 +355,10 @@ async function loadOtrHistoryOnce(db, opts) {
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [FLEET_START_ID, loadFleetServiceStartOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadFleetServiceStartOnce, FLEET_START_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID };
