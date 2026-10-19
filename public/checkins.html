@@ -9,7 +9,15 @@
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
   <title>Driver Check-ins · Operations</title>
   <link rel="stylesheet" href="css/app.css">
-  <style>.popover .close.secondary { background: #fff; color: var(--ud-blue); border: 1px solid var(--ud-blue); } #rows tr.editable:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: -3px; }</style>
+  <style>.popover .close.secondary { background: #fff; color: var(--ud-blue); border: 1px solid var(--ud-blue); } #rows tr.editable:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: -3px; }
+    /* Joe 10/19: what the driver wrote shows in full, on the list and in the pop-up. */
+    #rows td.said { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; padding: 4px 6px; }
+    #rows td.said .said-notes { display: block; color: var(--ink, #1f2a37); }
+    .popover.ci-pop { grid-template-columns: auto min(480px, calc(100vw - 230px)); max-height: calc(100vh - 16px); overflow-y: auto; }
+    .popover.ci-pop textarea.grow { height: auto; min-height: 32px; max-height: 9em; padding: 4px 6px; line-height: 1.3; overflow-y: auto; }
+    .popover.ci-pop textarea.notes { min-height: 54px; }
+    .popover.ci-pop .ci-more { color: var(--pickup); line-height: 1.3; }
+    @media (max-width: 640px) { .popover.ci-pop { grid-template-columns: 1fr; left: 8px !important; right: 8px; z-index: 400; } .popover.ci-pop label, .popover.ci-pop .ci-label { margin-top: 4px; } }</style>
   <script src="js/logic.js"></script>
 </head>
 <body>
@@ -98,8 +106,10 @@
           '<td class="' + (driver ? '' : 'empty') + '">' + escapeHtml(driver) + '</td>' +
           '<td>' + escapeHtml(r.truck) + '</td><td>' + escapeHtml(r.trailer) + '</td>' +
           '<td>' + escapeHtml(show(r.casesOut)) + '</td><td>' + escapeHtml(show(r.casesDelivered)) + '</td><td>' + escapeHtml(show(r.driverCaseReturn)) + '</td>' +
-          '<td class="' + (refused ? 'issue' : 'empty') + '" title="' + escapeHtml(refused) + '">' + escapeHtml(refused) + '</td>' +
-          '<td class="' + (r.issues.length ? 'issue' : 'empty') + '" title="' + escapeHtml(r.issues.join('; ')) + '">' + escapeHtml(r.issues.join('; ')) + '</td>' +
+          '<td class="said ' + (refused ? 'issue' : 'empty') + '">' + escapeHtml(refused) + '</td>' +
+          // Joe 10/19: everything the driver wrote shows here in full, the notes too (notes are not counted as a problem).
+          '<td class="said ' + (r.issues.length ? 'issue' : r.checkinNotes ? '' : 'empty') + '">' + escapeHtml(r.issues.join('; ')) +
+          (r.checkinNotes ? '<span class="said-notes">Notes: ' + escapeHtml(r.checkinNotes) + '</span>' : '') + '</td>' +
           '<td class="' + (r.checkedIn ? 'ok' : 'empty') + '">' + escapeHtml(at && !isNaN(at) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : r.checkedIn ? 'Yes' : 'Not yet') + '</td></tr>';
       }).join('') || (!loaded ? '<tr><td colspan="11" class="empty">Loading the check-ins&hellip;</td></tr>' : '<tr><td colspan="11" class="empty">No deliveries on this day in the copied Live weeks.</td></tr>');
       const done = rows.filter(r => r.checkedIn).length;
@@ -123,27 +133,40 @@
       const row = rows[Number(tr.dataset.index)];
       const run = runs.find(x => x.id === row.runDocId), d = run.days[row.day];
       popover = document.createElement('div');
-      popover.className = 'popover';
-      const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '"' + (type ? ' type="' + type + '" min="0" step="1" inputmode="numeric" pattern="[0-9]*"' : ' maxlength="300"') + ' value="' + escapeHtml(show(value)) + '">';
-      popover.innerHTML = '<b style="grid-column:1/3">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.dayName(date) + ' ' + shortDate(date)) + '</b>' +
+      popover.className = 'popover ci-pop';
+      const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '" type="' + type + '" min="0" step="1" inputmode="numeric" pattern="[0-9]*" value="' + escapeHtml(show(value)) + '">';
+      // Joe 10/19: a write-up box grows to show every word (nothing cut off); Enter still saves, as in a one-line box.
+      const said = (name, label, value, max) => '<label for="ci-' + name + '">' + label + '</label><textarea class="grow" rows="1" id="ci-' + name + '" name="' + name + '" maxlength="' + (max || 300) + '">' + escapeHtml(show(value)) + '</textarea>';
+      const more = Array.isArray(d.moreTrailers) ? d.moreTrailers.filter(m => m && (m.issues || m.needsCleaned)) : [];
+      popover.innerHTML = '<b style="grid-column:1/-1">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.dayName(date) + ' ' + shortDate(date)) + '</b>' +
         input('casesDelivered', 'Cases delivered', d.casesDelivered, 'number') +
         input('driverCaseReturn', 'Cases returned', d.driverCaseReturn, 'number') +
-        input('refusedReturned', 'Refused / returned', d.refusedReturned) +
-        input('refusedReturnedSource', 'Which store', d.refusedReturnedSource) +
-        input('tractorIssues', 'Truck problem', d.tractorIssues) +
-        input('trailerIssues', 'Trailer problem', d.trailerIssues) +
-        input('palletJackIssues', 'Jack problem', d.palletJackIssues) +
+        said('refusedReturned', 'Refused / returned', d.refusedReturned, 200) +
+        said('refusedReturnedSource', 'Which store', d.refusedReturnedSource, 200) +
+        said('overageShortageDetails', 'Over / short', d.overageShortageDetails || (L.yes(d.overageShortage) ? 'yes' : '')) +
+        said('loadingProblem', 'Loaded wrong', d.loadedCorrectly === 'NO' ? d.loadingProblem || 'yes' : '') +
+        said('tractorIssues', 'Truck problem', d.tractorIssues) +
+        said('trailerIssues', 'Trailer problem', d.trailerIssues) +
+        more.map((m, i) => '<span class="ci-label">Trailer ' + (i + 2) + ' (' + escapeHtml(m.trailer || '') + ')</span><span class="ci-more">' + escapeHtml([m.issues, m.needsCleaned ? 'Needs cleaned' : ''].filter(Boolean).join('; ')) + '</span>').join('') +
+        said('palletJackIssues', 'Jack problem', d.palletJackIssues) +
         '<label for="ci-clean">Trailer needs cleaned</label><span class="check-row"><input type="checkbox" id="ci-clean"' + (L.yes(d.trailerNeedsCleaned) ? ' checked' : '') + '></span>' +
-        '<label for="ci-notes">Notes</label><textarea id="ci-notes" maxlength="500">' + escapeHtml(d.checkinNotes || '') + '</textarea>' +
-        '<span class="ci-buttons" style="grid-column:1/3;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="close secondary" data-cancel>Cancel</button><button type="button" class="close" data-save>Save check-in</button></span>';
+        '<label for="ci-notes">Notes</label><textarea class="grow notes" id="ci-notes" maxlength="500">' + escapeHtml(d.checkinNotes || '') + '</textarea>' +
+        '<span class="ci-buttons" style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="close secondary" data-cancel>Cancel</button><button type="button" class="close" data-save>Save check-in</button></span>';
       document.body.appendChild(popover);
+      const grow = (el) => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; };
+      const place = () => {
+        const box = tr.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
+        popover.style.left = Math.max(8, (window.innerWidth - w) / 2) + 'px';
+        popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
+      };
+      popover.querySelectorAll('textarea.grow').forEach(el => { grow(el); el.addEventListener('input', () => { grow(el); place(); }); });
       const box = tr.getBoundingClientRect(), w = popover.offsetWidth, h = popover.offsetHeight;
       popover.style.left = Math.max(8, (window.innerWidth - w) / 2) + 'px';
       popover.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, box.bottom + 4)) + 'px';
       // Esc or Cancel closes without saving (a tablet has no Esc key); Enter in a box (not Notes) saves.
       popover.addEventListener('keydown', ev => {
         if (ev.key === 'Escape') closePopover();
-        else if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); popover.querySelector('[data-save]').click(); }
+        else if (ev.key === 'Enter' && !ev.shiftKey && (ev.target.tagName === 'INPUT' || (ev.target.classList.contains('grow') && !ev.target.classList.contains('notes')))) { ev.preventDefault(); popover.querySelector('[data-save]').click(); }
       });
       popover.querySelector('[data-cancel]').addEventListener('click', closePopover);
       popover.querySelector('input').focus();
@@ -154,12 +177,14 @@
           casesDelivered: num('casesDelivered'), driverCaseReturn: num('driverCaseReturn'), refusedReturned: get('refusedReturned'),
           refusedReturnedSource: get('refusedReturnedSource'), tractorIssues: get('tractorIssues'), trailerIssues: get('trailerIssues'),
           palletJackIssues: get('palletJackIssues'), trailerNeedsCleaned: popover.querySelector('#ci-clean').checked,
+          overageShortageDetails: get('overageShortageDetails'), loadingProblem: get('loadingProblem'), loadedCorrectly: d.loadedCorrectly === 'NO' ? '' : d.loadedCorrectly || '',
           checkinNotes: popover.querySelector('#ci-notes').value.trim()
         };
         const before = Object.assign({}, d);
         closePopover();
         saveOptimistic('saveCheckIn', Object.assign({ runDocId: row.runDocId, day: row.day, expectedRev: run.rev }, fields),
-          () => Object.assign(d, fields, { trailerNeedsCleaned: fields.trailerNeedsCleaned ? 'TRUE' : '', checkinCompletedAt: new Date().toISOString() }),
+          () => Object.assign(d, fields, { trailerNeedsCleaned: fields.trailerNeedsCleaned ? 'TRUE' : '', overageShortage: fields.overageShortageDetails ? 'TRUE' : '',
+            loadedCorrectly: fields.loadingProblem ? 'NO' : fields.loadedCorrectly, checkinCompletedAt: new Date().toISOString() }),
           () => { run.days[row.day] = before; }, render);
       });
     });
