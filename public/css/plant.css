@@ -1422,3 +1422,20 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
   .manager-page .mc-dacts { flex-wrap: wrap; }
   .manager-page .mc-dacts .mc-btn { flex: 1 1 calc(50% - 4px); min-width: 0; white-space: normal; height: auto; min-height: 42px; line-height: 1.15; padding: 6px 10px; }
 }
+/* Joe 10/19: on his laptop (1536 wide) the whole Manager Center fits with no scrolling. The top rows are only as tall as their
+   tiles need (they still grow into spare room), the tiles' big numbers and padding are a little smaller, and the report preview
+   is a little tighter; the walkthrough card keeps its size. */
+@media (min-width: 1501px) {
+  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr) auto; }
+  .manager-page .mc-grid > .mc-card:not([data-card="walk"]) { padding: 8px 14px 10px; gap: 4px; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tiles { min-height: min-content; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile { padding: 4px 12px; row-gap: 0; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile span { font-size: 17px; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile b,
+  .manager-page .mc-grid .mc-card[data-card="notes"] .mc-tile b, .manager-page .mc-grid .mc-card[data-card="notes"] .mc-tile.bad b { font-size: 34px; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile b small { font-size: 18px; }
+  .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile i { font-size: 17px; }
+  .manager-page .mc-grid > .mc-report { contain: size; }
+  .manager-page .mc-report .mc-preview { gap: 6px; padding: 8px 12px; }
+  .manager-page .mc-report .mc-pvnote { padding-top: 6px; }
+}

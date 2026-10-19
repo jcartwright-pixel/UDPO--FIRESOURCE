@@ -96,7 +96,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
   const browser = await chromium.launch();
   const results = [];
   try {
-    for (const [w, h] of [[1920, 950], [1536, 730], [1366, 650]]) {
+    for (const [w, h] of [[1920, 950], [1536, 886], [1536, 730], [1366, 650]]) {
       const page = await openPage(browser, w, h, '/manager.html' + MANAGER);
       await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
       const behind = seed.behind;
@@ -145,7 +145,13 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual(await page.$$eval('.mc-tile > span', sp => sp.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.getClientRects().length > 1 || x.offsetHeight > 26).map(x => x.textContent)), []);
       assert.deepEqual(await page.$$eval('.mc-rt i', i => i.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), []);
       if (w === 1920) await fits(page, 'Manager Center ' + w + 'x' + h);
-      await shots(page, 'manager', w);
+      // Joe 10/19: on his laptop (1920 screen at 125%, a 1536 x 886 window) and at 1920 every card, the Manager Walkthrough row
+      // included, shows with no scrolling.
+      if (h >= 886) {
+        const g = await page.$eval('#grid', x => ({ scroll: x.scrollHeight, inner: x.clientHeight, walkBottom: Math.round(x.querySelector('[data-card="walk"]').getBoundingClientRect().bottom), gridBottom: Math.round(x.getBoundingClientRect().bottom) }));
+        assert.ok(g.scroll <= g.inner + 1 && g.walkBottom <= g.gridBottom + 1, 'Manager Center ' + w + 'x' + h + ' shows every card with no scrolling: ' + JSON.stringify(g));
+      }
+      await shots(page, 'manager', w === 1536 && h === 886 ? '1536x886' : w);
       // The Manager Walkthrough card at the bottom of the cards (scrolled to it where the screen is short).
       if (SHOTS) { await page.$eval('#grid', g => { g.scrollTop = g.scrollHeight; }); await page.screenshot({ path: path.join(SHOTS, 'manager-walk-card-' + w + '.png'), scale: 'css' }); }
       assert.deepEqual(page.errors, []);
