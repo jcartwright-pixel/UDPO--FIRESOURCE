@@ -61,9 +61,9 @@ const rows = (p) => p.$$eval('#sheet tbody tr', trs => trs.map(t => t.querySelec
       await p.waitForFunction(() => /900001/.test(document.getElementById('sheet').textContent), null, { timeout: 15000 });
       await p.waitForTimeout(1200);
       if (BEFORE) { await shot(p, 'before-due-' + w + '.png'); await p.close(); continue; }
-      assert.deepEqual(await rows(p), ['900001', '900002', 'T-901', 'T-902', 'T-999', 'T-10318'], 'owned trucks and the Uniontown trailers');
-      assert.match(await p.textContent('#sheet'), /6 of 6 units need something/);
-      assert.match(await p.textContent('#foot'), /^6 trucks and trailers at Uniontown .*leased trucks are left off/);
+      assert.deepEqual(await rows(p), ['900001', '900002', 'T-901', 'T-902', 'T-999', 'T-10308', 'T-10318'], 'owned trucks and the Uniontown trailers (T-10308 is ours, Joe 10/19)');
+      assert.match(await p.textContent('#sheet'), /7 of 7 units need something/);
+      assert.match(await p.textContent('#foot'), /^7 trucks and trailers at Uniontown .*leased trucks are left off/);
       assert.match(await p.textContent('#kpis'), /0\s*At the garage/, 'the leased tractor\'s job is not counted');
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth + 1), 'no sideways scroll at ' + w);
       await shot(p, 'after-due-' + w + '.png');
@@ -75,9 +75,9 @@ const rows = (p) => p.$$eval('#sheet tbody tr', trs => trs.map(t => t.querySelec
         await p.evaluate(() => { window.print = () => {}; });
         await p.click('#fs-print');
         const report = await p.textContent('#print');
-        assert.match(report, /6 trucks and trailers/);
+        assert.match(report, /7 trucks and trailers/);
         assert.match(report, /0 at the garage/);
-        assert.doesNotMatch(report, /123885|221810|T-10308/);
+        assert.doesNotMatch(report, /123885|221810/);
         // Work Orders still lists the leased tractor's job (only the Due screen is owned-only).
         await p.click('[role="tab"][data-view="work"]');
         await p.waitForFunction(() => /123885/.test(document.getElementById('sheet').textContent), null, { timeout: 15000 });
