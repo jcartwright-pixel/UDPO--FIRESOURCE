@@ -60,7 +60,7 @@ function fleet(log, opts) {
     }
     if (opts.trailerPlace !== undefined && url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
       return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
-        + '71,T-701,2026-10-13 14:06:00,40.1,-81.3,"Route 8, Akron OH",' + opts.trailerPlace + ',0,False,,,,True\r\n');
+        + '71,' + (opts.trailerTag || 'T-701') + ',2026-10-13 14:06:00,40.1,-81.3,"Route 8, Akron OH",' + opts.trailerPlace + ',0,False,,,,True\r\n');
     }
     if (url.startsWith(BASE + '/execute?template=UDPO_TrucksNow')) {
       if (opts.many) return reply(200, 'UnitId,Tag,LastReport,Lat,Lon,Address,Place,SpeedMph,IgnitionOn,OdometerMiles,EngineHours,Driver,Active\r\n'
@@ -266,7 +266,7 @@ test('Fleet GPS: a loaded trailer\'s temperature is read every run until it is b
   state.reefer = [['71', '2026-10-13 14:02:00', '35.44'], ['71', '2026-10-13 14:07:00', '36.06'], ['71', '2026-10-13 14:08:00', '']];
   let r = await pull(d, o);
   assert.equal(r.reefer, 1, r.reeferError);
-  assert.ok(log.indexOf('reefer 2026-10-13 13:40:00 to 2026-10-13 14:10:00 71') >= 0, 'the first read looks back 30 minutes, for the trailer\'s unit only');
+  assert.ok(log.indexOf('reefer 2026-10-13 11:10:00 to 2026-10-13 14:10:00 71') >= 0, 'the first read looks back 3 hours (trailers report seldom), for the trailer\'s unit only');
   let g = (await d.collection('gpsReefer').doc('T-701').get()).data();
   assert.deepEqual([g.recording, g.tempF, g.readingAt, g.routeRun, g.out], [true, 36.1, '2026-10-13T14:07:00.000Z', 'SUN VALLEY', '']);
   // Out on the road: still recorded.
@@ -304,4 +304,24 @@ test('Fleet GPS: the 6-month cleanup runs with no GPS login at all, and goes a p
   assert.deepEqual((await d.collection('gpsReeferReadings').get()).docs.map(x => x.id), ['T-9_new']);
   const f = (await d.collection('private').doc('gpsFleet').get()).data();
   assert.deepEqual([f.reeferPurgedOn, f.reeferPurged, f.reeferPurgeDone], ['2026-10-14', 25, true]);
+});
+
+// Joe 10/19: loaded trailers showed no GPS temperature on live. Fleet's trailer tags aren't always "T-701", and a trailer's
+// unit can go well over 30 minutes between reports.
+test('Fleet GPS: a trailer tagged "TRL 701" in Fleet is matched, a reading 2 hours old is shown, and GPS Setup says which trailers get none', async () => {
+  const L = require('../../src/logic');
+  const log = [], state = { trailerPlace: 'Loading Dock', trailerTag: 'TRL 701', reefer: [['71', '2026-10-13 12:15:00', '34.2']] };
+  const o = { fetch: fleet(log, state), base: BASE, now: NOW, sleep: async () => {} };
+  const date = L.operatingDay(NOW()), d = db(), p = L.dayPrefix(L.addDays(date, 1));
+  const day = (trailer) => ({ [p]: { runs: true, loadDate: date, deliveryDate: L.addDays(date, 1), dispatchTime: 600, trailer, loadStatus: 'COMPLETE' } });
+  await d.collection('runs').doc(L.weekStart(date) + '__r701').set({ weekStart: L.weekStart(date), sheetRow: 950, route: '849', run: 'SUN VALLEY', active: true, days: day('701') });
+  await d.collection('runs').doc(L.weekStart(date) + '__r777').set({ weekStart: L.weekStart(date), sheetRow: 951, route: '850', run: 'HILLTOP', active: true, days: day('777') });
+  await gpsCall(d, ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  const r = await pull(d, o);
+  assert.equal(r.reefer, 1, r.reeferError);
+  const g = (await d.collection('gpsReefer').doc('T-701').get()).data();
+  assert.deepEqual([g.unitId, g.tag, g.tempF, g.readingAt], ['71', 'TRL 701', 34.2, '2026-10-13T12:15:00.000Z']);
+  const s = await gpsCall(d, ADMIN, { kind: 'fleet', op: 'status' }, o);
+  assert.ok(s.reeferNoUnit.includes('T-777') && !s.reeferNoUnit.includes('T-701'), 'T-777 has no unit in Fleet: ' + s.reeferNoUnit);
+  assert.deepEqual(s.reeferNoTemp, [], 'T-701 sent a temperature');
 });
