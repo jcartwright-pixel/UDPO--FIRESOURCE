@@ -29,6 +29,25 @@ async function openPage(browser, width, height, url) {
   return page;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
+// Joe 10/19: every Work Actions button, the red X included, shows whole inside the table, with no sideways scroll. The last
+// button keeps 12px spare so Windows' slightly wider letters still fit.
+async function buttonsFit(p, label) {
+  const bad = await p.evaluate(() => {
+    const sheet = document.querySelector('table.issues').closest('.sheet') || document.querySelector('table.issues').parentElement;
+    const edge = Math.min(sheet.getBoundingClientRect().right, document.querySelector('table.issues').getBoundingClientRect().right);
+    const out = [];
+    if (sheet.scrollWidth > sheet.clientWidth + 1) out.push('the list scrolls sideways');
+    document.querySelectorAll('#rows tr[data-id]').forEach(tr => {
+      const cell = tr.lastElementChild.getBoundingClientRect();
+      tr.querySelectorAll('.work-acts button').forEach(b => {
+        const r = b.getBoundingClientRect();
+        if (r.right > Math.min(cell.right, edge) - 12) out.push(tr.dataset.id + ' ' + b.textContent.trim() + ' ends at ' + Math.round(r.right) + ' past ' + Math.round(Math.min(cell.right, edge)));
+      });
+    });
+    return out;
+  });
+  assert.deepEqual(bad, [], label);
+}
 
 (async () => {
   await clear();
@@ -50,6 +69,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     MAIL_m6_trailer: mail('m6', 'T-941', 'JEREMY PRASTER', 'yes-no', 6, 'TRAILER'),
     MAIL_m7_pallet: mail('m7', '331', 'Mark Zidek', 'RIGHT FORK NOT AS HIGH AS LEFT ONE', 7, 'FORK_TRUCK'),
     MAIL_m8_pallet: mail('m8', '326', 'JEREMY PRASTER', 'Y/N', 8, 'FORK_TRUCK'),
+    MAIL_m10_trailer: mail('m10', 'T-826', 'Rogie Barrow', '826-back Door Busted Cables Snapped Will Not Open', 10, 'TRAILER'),
     // The same email twice: the old app's copy (one per answer) and the new reader's copy read again a day later.
     MAIL_m9_concerns: Object.assign(mail('m9', '225061', 'Charles Howsare', 'store 2318- she was yelling and threatening to refuse the order', 30), { record_id: 'MAIL|m9|concerns' }),
     MAIL_m9_tractor: mail('m9', '225061', 'Charles Howsare', 'store 2318- she was yelling and threatening to refuse the order; yes-no', 9),
@@ -67,6 +87,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
       const p = await openPage(browser, width, width === 1536 ? 864 : 1080, '/issues.html?testEmail=manager.test@uniteddairy.com');
       await p.waitForSelector('tr[data-id="MAIL_m2_tractor"]');
       await shot(p, 'trucks-' + width + '.png');
+      await buttonsFit(p, 'Trucks at ' + width);
       const list = await p.textContent('#rows');
       for (const id of ['MAIL_m1_tractor', 'MAIL_m3_tractor', 'MAIL_m4_tractor']) assert.equal(await p.locator('tr[data-id="' + id + '"]').count(), 0, id + ' says nothing is wrong');
       // One email is one row, dated when the email came in.
@@ -92,19 +113,22 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
         assert.match(shown, /410/);
         await shot(p, 'view-checkin-1536.png');
         await p.click('[data-close-mail]');
-        await p.click('[data-kind="TRAILER"]');
-        await p.waitForSelector('#rows tr');
-        assert.equal(await p.locator('tr[data-id="MAIL_m6_trailer"]').count(), 0);
-        await shot(p, 'trailers-1536.png');
-        await p.click('[data-kind="FORK_TRUCK"]');
-        await p.waitForSelector('tr[data-id="MAIL_m7_pallet"]');
-        assert.equal(await p.locator('tr[data-id="MAIL_m8_pallet"]').count(), 0);
-        await shot(p, 'forks-1536.png');
       }
+      await p.click('[data-kind="TRAILER"]');
+      await p.waitForSelector('tr[data-id="MAIL_m10_trailer"]');
+      assert.equal(await p.locator('tr[data-id="MAIL_m6_trailer"]').count(), 0);
+      await shot(p, 'trailers-' + width + '.png');
+      await buttonsFit(p, 'Trailers at ' + width);
+      await p.click('[data-kind="FORK_TRUCK"]');
+      await p.waitForSelector('tr[data-id="MAIL_m7_pallet"]');
+      assert.equal(await p.locator('tr[data-id="MAIL_m8_pallet"]').count(), 0);
+      await shot(p, 'forks-' + width + '.png');
+      await buttonsFit(p, 'Fork Truck at ' + width);
       assert.deepEqual(p.errors, []);
       await p.close();
     }
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS and Y/N make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
+    results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {
     await browser.close();
