@@ -129,7 +129,7 @@
     const weekKind = () => (!live.previous ? 'live' : week < live.previous ? 'old' : live.next && week > live.next ? 'future' : 'live');
     function previewRuns() {
       if (!routeList) return [];
-      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers));
+      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers), routeList, plantLoads);
       return routeList.slice().sort((a, b) => (a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder) - (b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }))
         .map(r => Object.assign(L.buildWeekRun(r, week, ctx), { id: week + '__' + r.id, rev: 0 }));
     }

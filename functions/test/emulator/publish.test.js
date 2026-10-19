@@ -146,3 +146,20 @@ test('weeks the current app archived (DISPATCH WEEK HISTORY) are copied in read 
   const again = await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources, now: () => new Date('2026-10-09T12:06:00Z') });
   assert.equal(again.summary.history['2026-09-20'].written, 0);
 });
+
+test('Joe 10/19: Publish builds a branch box load with every day not running; the dispatcher adds it as it comes in', async () => {
+  await db().collection('routes').doc('run_t801').update({ loadType: 'Boxing', coverageType: 'BRANCH', displayDaily: true, displayWeekly: true });
+  await db().collection('routes').doc('run_t802').update({ loadType: 'Boxing', coverageType: 'BRANCH', displayDaily: true, displayWeekly: true });
+  // Joe 10/19: "if it is put on the plant schedule, that it is running": 802 is already on the Scheduler for Tuesday 10-20.
+  await db().collection('plantLoads').doc('SCHED-box-802').set({ runId: 'run_t802', route: '802', date: '2026-10-20', status: 'SCHEDULED', pickupTime: '05:30' });
+  await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT);
+  const built = await week('2026-10-18'), box = runOf(built, 'run_t801');
+  assert.deepEqual(L.DAYS.filter(p => box.days[p].runs), [], 'Route Master runs it Monday and Tuesday; it starts as not running');
+  assert.deepEqual(L.DAYS.filter(p => runOf(built, 'run_t802').days[p].runs), ['tue'], 'the box load on the Scheduler runs that day');
+  assert.equal(runOf(built, 'run_t802').days.tue.driver, 'CASEY, LEE', 'and gets its standard driver');
+  assert.deepEqual([box.days.mon.driver, box.days.mon.truck, box.days.mon.trailer], ['', '', '']);
+  assert.deepEqual(L.DAYS.filter(p => runOf(built, 'run_t810').days[p].runs).length > 0, true, 'other runs keep their Route Master days');
+  const on = await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: box.id, day: 'mon', runs: true }, AT);
+  assert.equal(on.ok, true);
+  assert.equal(runOf(await week('2026-10-18'), 'run_t801').days.mon.runs, true);
+});
