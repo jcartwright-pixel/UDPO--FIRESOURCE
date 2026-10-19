@@ -325,7 +325,7 @@ function parseLiveTab(tabName, values, lookups) {
     run.weeklyShowMaster = routeMaster && (routeMaster.displayWeekly === true || routeMaster.displayWeekly === false) ? routeMaster.displayWeekly : null;
     // Where the Live row leaves a show flag or the load type blank, the current app reads Route Master's (udpoV780ResolveDisplayBase_).
     run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
-      loadType: routeMaster.loadType || '' } : { daily: null, mobile: null, loadType: '' };
+      loadType: routeMaster.loadType || '', leavesOn: routeMaster.departureDay || '' } : { daily: null, mobile: null, loadType: '', leavesOn: '' };
     run.days = {};
     const offWithDriver = [];
     L.DAYS.forEach(prefix => {
@@ -344,9 +344,10 @@ function parseLiveTab(tabName, values, lookups) {
       run.days[prefix] = day;
     });
     run.cells = cellsOf(r.row, index);
-    // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run. The days off
-    // with a driver are too, so only those rows (read as running before Joe 10/13) are rewritten once.
-    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster].concat(offWithDriver.length ? ['offWithDriver=' + offWithDriver.join('-')] : [])));
+    // Route Master's order, Weekly setting and Departure Day (Joe 10/19, when the plant counts a load behind) are part of the
+    // fingerprint, so a Route Master change rewrites the run. The days off with a driver are too, so only those rows (read as
+    // running before Joe 10/13) are rewritten once.
+    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster, 'leavesOn=' + run.masterShow.leavesOn].concat(offWithDriver.length ? ['offWithDriver=' + offWithDriver.join('-')] : [])));
     runs[M.runDocId(weekStart, key)] = run;
   });
   return { tab: tabName, weekStart, runs, warnings };

@@ -75,7 +75,23 @@ async function openPage(browser, url, when) {
       await later.waitForFunction(() => /3 routes behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
       assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
       results.push('Sunday 6:40 PM none is behind; Monday 12:46 AM 844 and 950 (left Sunday evening) and 971 (46 minutes past 12:00 AM Monday) are');
-      for (const p of [early, lo, later]) assert.deepEqual(p.errors, []);
+      // Joe 10/19 ("look into the route setup"): the Route Editor's Departure Day decides. Tuesday 10/20's loads made Monday:
+      // Jersey (Load Day, 1:00 PM) leaves Monday; 901 (7:00 AM), 907 (9:00 AM) and 827 (1:00 AM) are Delivery Day, Tuesday.
+      // 2:57 PM Monday: only Jersey is behind, on Manager Center and the Loadout Center.
+      const tue = [['852', 'JERSEY LOAD 1', 780, 'Load Day'], ['901', 'PRODUCT 1', 420, 'Delivery Day'], ['907', 'FAIRMONT TRANSFER', 540, 'Delivery Day'], ['827', 'UT WALMART', 60, 'Delivery Day']];
+      for (const [i, [route, run, time, leavesOn]] of tue.entries()) {
+        await d.collection('runs').doc('2026-10-18__tue' + route).set({ weekStart: '2026-10-18', sheetRow: 950 + i, route, run, routeId: 'rte_t' + route, runId: 'run_t' + route, active: true, loadType: 'CASE LOADOUT',
+          masterShow: { daily: true, mobile: null, loadType: 'Case Loadout', leavesOn },
+          days: { tue: { runs: true, loadDayOffset: -1, loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: '2026-10-20', dispatchTime: time, loadSequence: i + 1 } } });
+      }
+      const monday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-19T18:57:00Z');
+      await monday.waitForFunction(() => /1 route behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      assert.match(await monday.textContent('body'), /852[\s\S]*BEHIND/);
+      const lo2 = await openPage(browser, '/loadout.html?' + MANAGER, '2026-10-19T18:57:00Z');
+      await lo2.waitForSelector('#rows tr[data-row]');
+      await lo2.waitForFunction(() => /Behind 1\b/.test(document.getElementById('strip').textContent), null, { timeout: 8000 });
+      results.push('Monday 2:57 PM: Jersey (Load Day) is behind; 901, 907 and 827 (Delivery Day) leave Tuesday and are not');
+      for (const p of [early, lo, later, monday, lo2]) assert.deepEqual(p.errors, []);
     }
   } finally {
     await browser.close();

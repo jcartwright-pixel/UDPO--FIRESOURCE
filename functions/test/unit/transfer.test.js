@@ -126,3 +126,13 @@ test('plant loads: only Plant Route loads (not Carrier, deleted or other journal
   assert.deepEqual([d.runId, d.date, d.pickupTime, d.trailer, d.poNumber], ['run_t801', '2026-10-08', '7:00 AM', 'T-902', '4411']);
   assert.deepEqual(p.warnings, []);
 });
+
+test('each run carries its route\'s Departure Day, and changing it in Route Master rewrites the run (Joe 10/19)', () => {
+  const tabs = F.fakeSheets(), m = masters();
+  const before = T.parseLiveTab('LIVE CURRENT WEEK', tabs["'LIVE CURRENT WEEK'"], T.lookupsFrom(m)).runs['2026-10-04__run_t801'];
+  m.routes.docs.run_t801.departureDay = 'Load Day';
+  const after = T.parseLiveTab('LIVE CURRENT WEEK', tabs["'LIVE CURRENT WEEK'"], T.lookupsFrom(m)).runs['2026-10-04__run_t801'];
+  assert.equal(after.masterShow.leavesOn, 'Load Day');
+  assert.notEqual(after.fingerprint, before.fingerprint);
+  assert.equal(L.buildWeekRun({ id: 'run_x', departureDay: 'Load Day', days: {} }, '2026-10-18', { slots: {}, exceptions: [], driversById: {}, findUnit: () => null, booked: {} }).masterShow.leavesOn, 'Load Day');
+});

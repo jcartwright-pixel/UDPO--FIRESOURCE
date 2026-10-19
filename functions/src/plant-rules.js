@@ -327,15 +327,19 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
-  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its departure date on the
-  // Live sheet (blank = the delivery date) at its dispatch time, never the load day. Saturday's loadout for Monday leaves Monday.
-  // Joe 10/19: the day rolls at 6 a.m., as on Yard Checks. A load made before its departure date leaves in the operating day
-  // before that date: a dispatch time from 6 a.m. on is that day before (Tuesday's 1:00 PM Jersey leaves Monday at 1:00 PM),
-  // a time before 6 a.m. is after midnight, on the departure date itself.
+  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its dispatch time on the
+  // day the Route Editor's Departure Day names (Route Master departure_day, Joe 10/19): "Load Day" is the delivery date plus
+  // the day's load-day offset (Tuesday's Jersey, -1, leaves Monday at 1:00 PM), "Delivery Day" the delivery date itself (the
+  // Live sheet's departure date). The day rolls at 6 a.m., so a Load Day time before 6 a.m. is after midnight, the next morning.
+  // A run with no Departure Day keeps the 6 a.m. guess: a load made before its departure date leaves the day before from 6 a.m. on.
+  function leavesOnOf(v) { var s = text(v).toUpperCase(); return /LOAD/.test(s) ? 'LOAD DAY' : /DELIVER/.test(s) ? 'DELIVERY DAY' : ''; }
   function departWall(x) {
-    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate);
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate), on = leavesOnOf(x.leavesOn);
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-    return (load !== null && load < departDay && Number(t) >= 360 ? departDay - 1 : departDay) * 1440 + Number(t);
+    t = Number(t);
+    if (on === 'LOAD DAY') return ((load === null ? departDay : load) + (t < 360 ? 1 : 0)) * 1440 + t;
+    if (on === 'DELIVERY DAY') return departDay * 1440 + t;
+    return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
   }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
@@ -806,7 +810,7 @@
     REPORT_AREAS.forEach(function (a) { areas[a] = { area: a, left: 0, total: 0 }; });
     (input.loads || []).forEach(function (r) {
       if (!areas[r.area]) return;
-      var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
+      var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
@@ -1017,5 +1021,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
-    REPORT_BEHIND: REPORT_BEHIND, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
+    REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

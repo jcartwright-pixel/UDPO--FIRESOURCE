@@ -1247,7 +1247,7 @@
       routeStatus: route.routeStatus || '', active: flag(route.active), displayDaily: flag(route.displayDaily), displayWeekly: flag(route.displayWeekly),
       displayPlant: flag(route.displayPlant), displayMobileRoute: flag(route.displayMobile),
       weekOrder: route.weekOrder === undefined ? null : route.weekOrder, weeklyShowMaster: flag(route.displayWeekly),
-      masterShow: { daily: route.displayDaily === undefined ? null : route.displayDaily, mobile: route.displayMobile === undefined ? null : route.displayMobile, loadType: route.loadType || '' },
+      masterShow: { daily: route.displayDaily === undefined ? null : route.displayDaily, mobile: route.displayMobile === undefined ? null : route.displayMobile, loadType: route.loadType || '', leavesOn: route.departureDay || '' },
       days: buildRunDays(route, week, ctx)
     };
   }
