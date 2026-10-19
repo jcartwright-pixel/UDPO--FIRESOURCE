@@ -77,8 +77,8 @@ async function openPage(browser, width, height, url, mobile) {
         const field = (n) => n === 'checkinNotes' ? document.getElementById('ci-notes') : document.querySelector('.popover [name="' + n + '"]');
         return {
           inside: box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight,
-          // Nothing (the side menu) covers the pop-up's labels.
-          covered: [...document.querySelectorAll('.popover label')].filter(l => { const r = l.getBoundingClientRect(), at = document.elementFromPoint(r.left + 4, r.top + r.height / 2); return at && !at.closest('.popover'); }).map(l => l.textContent),
+          // Nothing (the side menu) covers the pop-up's labels (on a phone the pop-up scrolls, so each is brought into view first).
+          covered: [...document.querySelectorAll('.popover label')].filter(l => { l.scrollIntoView({ block: 'nearest' }); const r = l.getBoundingClientRect(), at = document.elementFromPoint(r.left + 4, r.top + r.height / 2); return at && !at.closest('.popover'); }).map(l => l.textContent),
           cut: names.filter(n => { const el = field(n); return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1; }),
           values: names.map(n => field(n).value),
           small: [...document.querySelectorAll('.popover label, .popover input, .popover textarea, .popover button, .popover b')].filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).map(x => x.outerHTML.slice(0, 60))
