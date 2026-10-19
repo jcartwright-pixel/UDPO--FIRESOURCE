@@ -946,20 +946,33 @@
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is already counted from each load's own departure day.
+    // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
+    var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+    var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
     var untilOf = function (x) { return x.minutesUntil === null || x.minutesUntil === undefined ? 1e9 : x.minutesUntil; };
-    var loaded = (r.loaded || []).slice().sort(function (a, b) { return byDay(a, b) || (a.doneMs || 9e15) - (b.doneMs || 9e15) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
-    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byDay(a, b) || untilOf(a) - untilOf(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return x.late ? { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', bg: '#fde8e6', fg: RED }; });
+    var loaded = (r.loaded || []).slice().sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || (a.doneMs || 9e15) - (b.doneMs || 9e15) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || untilOf(a) - untilOf(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', bg: '#fde8e6', fg: RED }; });
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
     var H = [];
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
-    if (loaded.length) { H.push(head('Loaded (' + loaded.length + ')', null, GREEN)); H.push(grid(loaded)); }
-    if (notLoaded.length) { H.push(head('Not loaded (' + notLoaded.length + ')', null, RED)); H.push(grid(notLoaded)); }
+    // Joe 10/19: one group per load type (Case, Box, Tote, Tanker), each with its own Loaded then Not loaded list and a dark
+    // line between types. A type with no loads, or a list with none, is left out.
+    var firstGroup = true;
+    GROUP_ORDER.concat(['']).forEach(function (g) {
+      var inGroup = function (x) { return g ? x.area === g : !GROUP_NAME[x.area]; }, ld = loaded.filter(inGroup), nl = notLoaded.filter(inGroup);
+      if (!ld.length && !nl.length) return;
+      if (g) H.push('<tr><td style="padding:' + (firstGroup ? '8px' : '18px') + ' 14px 0">' + (firstGroup ? '' : '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>') +
+        '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[g]) + ' (' + (ld.length + nl.length) + ')</div></td></tr>');
+      firstGroup = false;
+      if (ld.length) { H.push(head('Loaded (' + ld.length + ')', null, GREEN)); H.push(grid(ld)); }
+      if (nl.length) { H.push(head('Not loaded (' + nl.length + ')', null, RED)); H.push(grid(nl)); }
+    });
     if (!loaded.length && !notLoaded.length) H.push(plain('No loads on the dispatch sheet for this day.'));
     var pickups = r.pickups || [], down = r.down || [], lines = r.lines || [], temps = r.temperatures || [];
     H.push(head('Pickups open', pickups.length, pickups.length ? RED : null));
