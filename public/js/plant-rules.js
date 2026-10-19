@@ -327,17 +327,16 @@
     return out;
   }
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
-  // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its dispatch time on the
-  // day the Route Editor's Departure Day names (Route Master departure_day, Joe 10/19): "Load Day" is the delivery date plus
-  // the day's load-day offset (Tuesday's Jersey, -1, leaves Monday at 1:00 PM), "Delivery Day" the delivery date itself (the
-  // Live sheet's departure date). The day rolls at 6 a.m., so a Load Day time before 6 a.m. is after midnight, the next morning.
-  // A run with no Departure Day keeps the 6 a.m. guess: a load made before its departure date leaves the day before from 6 a.m. on.
+  // When a route leaves, on the plant's wall clock: the dispatch's own rule (Joe 10/19, the current app's
+  // desktopRouteConfigRunDaySettingsV0321_ LOAD_DAY_SAME_TIME / DELIVERY_DAY_SAME_TIME): the route's Departure Day (Route Master
+  // departure_day) picks the date, Load Day = the load date (Tuesday's Jersey, -1, leaves Monday), Delivery Day = the delivery
+  // date, at the dispatch time on that date. Only a run copied before the runs carried it keeps the 6 a.m. guess.
   function leavesOnOf(v) { var s = text(v).toUpperCase(); return /LOAD/.test(s) ? 'LOAD DAY' : /DELIVER/.test(s) ? 'DELIVERY DAY' : ''; }
   function departWall(x) {
     var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate), on = leavesOnOf(x.leavesOn);
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
     t = Number(t);
-    if (on === 'LOAD DAY') return ((load === null ? departDay : load) + (t < 360 ? 1 : 0)) * 1440 + t;
+    if (on === 'LOAD DAY') return (load === null ? departDay : load) * 1440 + t;
     if (on === 'DELIVERY DAY') return departDay * 1440 + t;
     return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
   }

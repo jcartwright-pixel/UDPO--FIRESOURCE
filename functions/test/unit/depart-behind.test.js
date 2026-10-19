@@ -40,7 +40,7 @@ test('Departure Day from the route setup decides the day a load leaves', () => {
   assert.equal(R.departWall(tue('901', 420, 'Delivery Day')), day('2026-10-20') + 420, '901, Delivery Day: Tuesday 7:00 AM');
   assert.equal(R.departWall(tue('907', 540, 'Delivery Day')), day('2026-10-20') + 540, '907, Delivery Day: Tuesday 9:00 AM');
   assert.equal(R.departWall(tue('827', 60, 'Delivery Day')), day('2026-10-20') + 60, '827, Delivery Day: Tuesday 1:00 AM');
-  assert.equal(R.departWall(tue('9', 120, 'Load Day')), day('2026-10-20') + 120, 'Load Day before 6 a.m. is after midnight (the day rolls at 6 a.m.)');
+  assert.equal(R.departWall(tue('9', 120, 'Load Day')), day('2026-10-19') + 120, 'Load Day: the load date at the dispatch time, as dispatch reads it');
   assert.equal(R.departWall(tue('901', 420, '')), day('2026-10-19') + 420, 'no Departure Day: the 6 a.m. guess');
   const loads = [tue('852', 780, 'Load Day'), tue('901', 420, 'Delivery Day'), tue('907', 540, 'Delivery Day'), tue('827', 60, 'Delivery Day')];
   assert.deepEqual(R.plantReport({ loads }, at('2026-10-19T18:57:00Z')).behind.map(x => x.route), ['852'], 'Monday 2:57 PM: only Jersey is behind');

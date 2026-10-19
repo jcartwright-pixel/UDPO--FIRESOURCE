@@ -67,7 +67,7 @@ const MASTER_KINDS = Object.freeze({
       L.DAYS.forEach(p => {
         days[p] = {
           active: L.yes(get(p + '_active')), dispatchTime: L.minutesOfDay(get(p + '_dispatch_time')), loadOrder: L.number(get(p + '_load_order')),
-          miles: L.number(get(p + '_miles')), hours: get(p + '_expected_route_hours'), loadDayOffset: L.number(get(p + '_load_day_offset')),
+          miles: L.number(get(p + '_miles')), hours: get(p + '_expected_route_hours'), loadDayOffset: L.dayOffset(get(p + '_load_day_offset')),
           forklift: get(p + '_forklift_default'), tractor: get(p + '_tractor_default'), trailer: get(p + '_trailer_default'), notes: get(p + '_notes')
         };
       });
@@ -325,7 +325,7 @@ function parseLiveTab(tabName, values, lookups) {
     run.weeklyShowMaster = routeMaster && (routeMaster.displayWeekly === true || routeMaster.displayWeekly === false) ? routeMaster.displayWeekly : null;
     // Where the Live row leaves a show flag or the load type blank, the current app reads Route Master's (udpoV780ResolveDisplayBase_).
     run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
-      loadType: routeMaster.loadType || '', leavesOn: routeMaster.departureDay || '' } : { daily: null, mobile: null, loadType: '', leavesOn: '' };
+      loadType: routeMaster.loadType || '', leavesOn: L.leavesOn(routeMaster) } : { daily: null, mobile: null, loadType: '', leavesOn: '' };
     run.days = {};
     const offWithDriver = [];
     L.DAYS.forEach(prefix => {
@@ -411,7 +411,7 @@ function parseHistory(values) {
     if (run.days[p].runs && !runsDay) return;
     const time = M.convert('time', get(row, 'departure_time'));
     Object.assign(run.days[p], { runs: runsDay, loadSequence: L.number(get(row, 'load_sequence')), deliveryDate: L.dateKey(get(row, 'delivery_date')) || L.addDays(run.weekStart, L.DAYS.indexOf(p)),
-      loadDate: L.dateKey(get(row, 'load_date')) || null, loadDayOffset: L.number(get(row, 'load_day_offset')), departureDate: L.dateKey(get(row, 'departure_date')) || null,
+      loadDate: L.dateKey(get(row, 'load_date')) || null, loadDayOffset: L.dayOffset(get(row, 'load_day_offset')), departureDate: L.dateKey(get(row, 'departure_date')) || null,
       dispatchTime: time, startTime: time, routeHours: L.number(get(row, 'route_hours')), miles: L.number(get(row, 'miles')), driverId: get(row, 'driver_id'), driver: get(row, 'driver'),
       truckId: get(row, 'truck_id'), truck: get(row, 'truck'), trailerId: get(row, 'trailer_id'), trailer: get(row, 'trailer'), palletJack: get(row, 'pallet_jack'), driverNotes: get(row, 'driver_notes') });
     run.history.push(row.map(cellText).join('|'));

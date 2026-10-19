@@ -120,7 +120,7 @@ function addLiveRun(tx, db, mode, req, stamp, email, m, live, week, today, resul
   // A run with no day left to run that week (a new run with no days ticked yet) gets its Live row from the save that ticks one.
   if (!L.DAYS.some(p => { const want = (m.days || {})[p] || {}; return want.active && loadDay(week, p, Number.isFinite(want.loadDayOffset) ? want.loadDayOffset : null) >= today; })) return;
   const run = { weekStart: week, sourceTab: live.tabs[week], sheetRow: null, addedFromRouteMaster: true, weekOrder: m.weekOrder === undefined ? null : m.weekOrder,
-    weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '', leavesOn: m.departureDay || '' },
+    weeklyShowMaster: typeof m.displayWeekly === 'boolean' ? m.displayWeekly : null, masterShow: { daily: m.displayDaily === undefined ? null : m.displayDaily, mobile: m.displayMobile === undefined ? null : m.displayMobile, loadType: m.loadType || '', leavesOn: L.leavesOn(m) },
     days: {}, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp };
   M.RUN_FIELDS.forEach(([f, , kind]) => { run[f] = kind === 'flag' ? null : ''; });
   Object.assign(run, { facilityId: m.facilityId || '', streamId: m.streamId || '', routeId: m.routeId || '', route: m.route || '', routeName: m.routeName || '', runId: m.id, run: m.run || '',

@@ -155,7 +155,7 @@ export function departWall(row) {
   const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), load = dayNumber(row.loadDate), on = leavesOnOf(row.leavesOn);
   if (departDay === null || row.dispatchTime === null || row.dispatchTime === undefined || row.dispatchTime === '' || !isFinite(Number(row.dispatchTime))) return null;
   const t = Number(row.dispatchTime);
-  if (on === 'LOAD DAY') return ((load === null ? departDay : load) + (t < 360 ? 1 : 0)) * 1440 + t;
+  if (on === 'LOAD DAY') return (load === null ? departDay : load) * 1440 + t;
   if (on === 'DELIVERY DAY') return departDay * 1440 + t;
   return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
 }
