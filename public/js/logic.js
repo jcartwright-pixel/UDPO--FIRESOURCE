@@ -1141,6 +1141,17 @@
     });
     return slot;
   }
+  /*
+   * Joe 10/19 ("set all of those box loads predetermined to doesn't run and then we add them as they go"): a branch's box loads
+   * (Load Type Boxes on a BRANCH run on Route Master: ALDI - Charleston Load 1 to 6, Fairmont - Saxonburg Load 1 to 6, the
+   * Marietta Box Load) only run when an order comes in. A week built from Route Master (Publish, a run added by Update Live
+   * Sheets, Weekly's look past Next) starts them as not running, whatever days Route Master has ticked, and the dispatcher turns
+   * each one on when it comes in. Reset Week and Update Live Sheets leave a box load's days as the dispatcher set them.
+   */
+  function boxLoadRun(route) {
+    var t = String((route && route.loadType) || '').trim().toUpperCase();
+    return (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') && String((route && route.coverageType) || '').trim().toUpperCase() === 'BRANCH';
+  }
   function resetWeekPlan(run, route, slots, exceptions) {
     if (!route || ROUTE_OFF.indexOf(String(route.routeStatus || 'ACTIVE').toUpperCase()) >= 0 || !masterActive(route)) return null;
     var plan = {};
@@ -1203,7 +1214,7 @@
     DAYS.forEach(function (p, i) {
       var rd = (route.days && route.days[p]) || {}, date = addDays(week, i);
       var offset = rd.loadDayOffset === null || rd.loadDayOffset === undefined || rd.loadDayOffset === '' ? -1 : Number(rd.loadDayOffset);
-      var day = { runs: !!rd.active, loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
+      var day = { runs: !!rd.active && !boxLoadRun(route), loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
         deliveryDate: date, dispatchDate: date, departureDate: date, loadDate: addDays(date, offset),
         dispatchTime: rd.dispatchTime === undefined ? null : rd.dispatchTime, startTime: rd.dispatchTime === undefined ? null : rd.dispatchTime,
         routeHours: routeHours(rd.hours), miles: rd.miles === undefined ? null : rd.miles,
@@ -1335,7 +1346,7 @@
     SCREEN_AREAS: SCREEN_AREAS, SCREEN_KEYS: SCREEN_KEYS, SCREEN_JOBS: SCREEN_JOBS, pageName: pageName, pageGated: pageGated, screenLimited: screenLimited, screensFor: screensFor,
     areaAllowed: areaAllowed, pageAllowed: pageAllowed,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
-    plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan,
+    plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,

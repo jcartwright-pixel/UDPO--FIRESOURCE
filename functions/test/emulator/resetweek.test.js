@@ -5,6 +5,7 @@ const { db, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { applyAction } = require('../../src/actions');
 const F = require('../fixtures/fake-sheets');
+const A = require('../../src/admin');
 
 const MANAGER = { email: 'manager.test@uniteddairy.com' };
 const DISPATCHER = { email: 'dispatch.test@uniteddairy.com' };
@@ -49,4 +50,21 @@ test('Reset Week leaves a driver who is off that day off the run and shows who i
   assert.equal(r801.days.mon.intendedDriver, 'ADAMS, PAT');
   assert.equal(r801.days.mon.driverExceptionStatus, 'VACATION');
   await assert.rejects(applyAction(db(), MANAGER, { action: 'resetWeek', requestId: rid(), weekStart: '2026-11-01' }), /not one of the copied Live weeks/);
+});
+
+test('Joe 10/19: Reset Week and Update Live Sheets leave a branch box load as the dispatcher set it', async () => {
+  const week = '2026-10-04';
+  await db().collection('routes').doc('run_t801').update({ loadType: 'Boxing', coverageType: 'BRANCH' });
+  const r801 = (await db().collection('runs').where('weekStart', '==', week).where('runId', '==', 'run_t801').get()).docs[0];
+  // Added by hand on a day Route Master does not run it, and taken off a day Route Master does.
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: r801.id, day: 'wed', runs: true });
+  await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: r801.id, day: 'tue', runs: false });
+  const set = await run(r801.id);
+  await applyAction(db(), MANAGER, { action: 'resetWeek', requestId: rid(), weekStart: week });
+  const after = await run(r801.id);
+  assert.equal(after.rev, set.rev, 'Reset Week does not touch the box load');
+  assert.deepEqual([after.days.mon.runs, after.days.tue.runs, after.days.wed.runs], [set.days.mon.runs, false, true]);
+  const live = await A.adminCall(db(), { email: 'admin.test@uniteddairy.com' }, { op: 'updateLive', apply: true }, { now: () => new Date('2026-10-04T12:00:00Z') });
+  assert.ok(!live.changes.some(c => c.runDocId === r801.id), 'Update Live Sheets does not touch the box load');
+  assert.equal((await run(r801.id)).rev, set.rev);
 });

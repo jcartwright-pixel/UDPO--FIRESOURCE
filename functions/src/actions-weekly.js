@@ -95,7 +95,8 @@ async function resetWeek(tx, db, req, email, stamp, logRef, mode) {
   let part = 0;
   runSnaps.forEach(snap => {
     const run = snap.data(), plan = L.resetWeekPlan(run, routes[run.runId], slots, exceptions);
-    if (!plan) return;
+    // Joe 10/19: a branch's box loads are turned on by hand as they come in, so Reset Week leaves them as they are.
+    if (!plan || L.boxLoadRun(routes[run.runId])) return;
     const update = {};
     L.DAYS.forEach(p => {
       const was = (run.days && run.days[p]) || {}, want = plan[p], after = {};

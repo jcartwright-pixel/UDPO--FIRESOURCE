@@ -287,3 +287,21 @@ test('Run / Destination text: 6301_1 reads Load 1, a blank run reads the route n
   assert.equal(L.runText({ route: '970', run: '970', routeName: 'ALDI' }), 'ALDI');
   assert.equal(L.runText({ route: '901_1', run: 'PRODUCT 1', routeName: 'MF' }), 'PRODUCT 1');
 });
+
+test('Joe 10/19: a branch box load starts the week as not running; every other run keeps Route Master days', () => {
+  const days = { mon: { active: true, dispatchTime: 1260, tractor: '900001', trailer: 'T-901' }, tue: { active: true, dispatchTime: 1260 }, wed: { active: false } };
+  const box = { id: 'run_950_2', route: '950', run: 'ALDI - CHARLESTON LOAD 1', loadType: 'Boxing', coverageType: 'BRANCH', days };
+  const ctx = L.weekBuildContext([], [], [{ id: 'veh_900001', unit: '900001', type: 'TRUCK', status: 'ACTIVE' }, { id: 'veh_t_901', unit: 'T-901', type: 'TRAILER', status: 'ACTIVE' }]);
+  assert.equal(L.boxLoadRun(box), true);
+  const built = L.buildWeekRun(box, '2026-10-18', ctx);
+  assert.deepEqual(L.DAYS.filter(p => built.days[p].runs), [], 'none of its days run until the dispatcher adds it');
+  assert.equal(built.days.mon.dispatchTime, 1260, 'its depart time is kept for when it is turned on');
+  assert.equal(built.days.mon.truck, '', 'no truck is booked for a day it does not run');
+  // A box load that is not a branch's (Costco, USDA, an outside carrier) and a branch's case transfer keep their days.
+  [{ loadType: 'Boxing', coverageType: 'UNITED DAIRY' }, { loadType: 'Boxing', coverageType: 'OUTSIDE CARRIER' }, { loadType: 'Case Loadout', coverageType: 'BRANCH' }].forEach(f => {
+    const r = Object.assign({ id: 'run_x', route: '9', days }, f);
+    assert.equal(L.boxLoadRun(r), false);
+    assert.deepEqual(L.DAYS.filter(p => L.buildWeekRun(r, '2026-10-18', L.weekBuildContext([], [], [])).days[p].runs), ['mon', 'tue']);
+  });
+  assert.equal(L.boxLoadRun({ loadType: ' box loadout ', coverageType: 'branch' }), true);
+});

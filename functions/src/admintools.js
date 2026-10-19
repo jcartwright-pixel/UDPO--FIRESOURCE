@@ -918,7 +918,8 @@ async function updateLive(db, email, input, stamp, deps) {
     runSnaps.forEach(snap => {
       const run = snap.data(), route = routes[run.runId];
       const plan = L.resetWeekPlan(run, route, slots, exceptions);
-      if (!plan) return;
+      // Joe 10/19: a branch's box loads are turned on by hand as they come in, so Update Live Sheets leaves them as they are.
+      if (!plan || L.boxLoadRun(route)) return;
       const update = {};
       L.DAYS.forEach((p, i) => {
         const was = (run.days && run.days[p]) || {}, date = L.addDays(run.weekStart, i), load = was.loadDate || L.addDays(date, Number((route.days[p] || {}).loadDayOffset) || 0);
