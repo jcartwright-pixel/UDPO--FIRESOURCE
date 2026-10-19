@@ -692,3 +692,6 @@ body.ds-tv .ds-score { grid-row: 2; grid-column: 1 / 3; }
 .sw-chips i.tt { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; }
 .sw-card.road { opacity: .6; border-left-color: #9fb3c8; }
 .sw-panel-head i.sw-need { font-style: normal; display: inline-block; margin-right: 6px; padding: 3px 10px; border-radius: 8px; background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; font-weight: 800; }
+/* Joe 10/19: Over and Short are two parts of the over / shortage box. */
+.phone-card .ci-os-box .ci-os-head { align-self: end; padding-bottom: 8px; font-size: 18px; color: #8a1f1f; }
+.phone-card .ci-os-box hr { border: 0; border-top: 1px solid #f0c7c7; margin: 2px 0; }

@@ -137,13 +137,16 @@
       const input = (name, label, value, type) => '<label for="ci-' + name + '">' + label + '</label><input id="ci-' + name + '" name="' + name + '" type="' + type + '" min="0" step="1" inputmode="numeric" pattern="[0-9]*" value="' + escapeHtml(show(value)) + '">';
       // Joe 10/19: a write-up box grows to show every word (nothing cut off); Enter still saves, as in a one-line box.
       const said = (name, label, value, max) => '<label for="ci-' + name + '">' + label + '</label><textarea class="grow" rows="1" id="ci-' + name + '" name="' + name + '" maxlength="' + (max || 300) + '">' + escapeHtml(show(value)) + '</textarea>';
+      const os = L.splitOverShort(d.overageShortageDetails);
       const more = Array.isArray(d.moreTrailers) ? d.moreTrailers.filter(m => m && (m.issues || m.needsCleaned)) : [];
       popover.innerHTML = '<b style="grid-column:1/-1">' + escapeHtml(row.route + ' ' + row.run + ', ' + L.dayName(date) + ' ' + shortDate(date)) + '</b>' +
         input('casesDelivered', 'Cases delivered', d.casesDelivered, 'number') +
         input('driverCaseReturn', 'Cases returned', d.driverCaseReturn, 'number') +
         said('refusedReturned', 'Refused / returned', d.refusedReturned, 200) +
         said('refusedReturnedSource', 'Which store', d.refusedReturnedSource, 200) +
-        said('overageShortageDetails', 'Over / short', d.overageShortageDetails || (L.yes(d.overageShortage) ? 'yes' : '')) +
+        // Joe 10/19: an Over box and a Short box (both go in the one Live column; see UDLogic.splitOverShort).
+        said('overDetails', 'Over', os.over, 140) +
+        said('shortDetails', 'Short', [os.short, os.other].filter(Boolean).join('; ') || (!os.over && L.yes(d.overageShortage) ? 'yes' : ''), 140) +
         said('loadingProblem', 'Loaded wrong', d.loadedCorrectly === 'NO' ? d.loadingProblem || 'yes' : '') +
         said('tractorIssues', 'Truck problem', d.tractorIssues) +
         said('trailerIssues', 'Trailer problem', d.trailerIssues) +
@@ -177,7 +180,7 @@
           casesDelivered: num('casesDelivered'), driverCaseReturn: num('driverCaseReturn'), refusedReturned: get('refusedReturned'),
           refusedReturnedSource: get('refusedReturnedSource'), tractorIssues: get('tractorIssues'), trailerIssues: get('trailerIssues'),
           palletJackIssues: get('palletJackIssues'), trailerNeedsCleaned: popover.querySelector('#ci-clean').checked,
-          overageShortageDetails: get('overageShortageDetails'), loadingProblem: get('loadingProblem'), loadedCorrectly: d.loadedCorrectly === 'NO' ? '' : d.loadedCorrectly || '',
+          overageShortageDetails: L.joinOverShort(get('overDetails'), get('shortDetails')), loadingProblem: get('loadingProblem'), loadedCorrectly: d.loadedCorrectly === 'NO' ? '' : d.loadedCorrectly || '',
           checkinNotes: popover.querySelector('#ci-notes').value.trim()
         };
         const before = Object.assign({}, d);

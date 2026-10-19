@@ -2,7 +2,7 @@
 /*
  * Browser check of Joe's 10/19 ask on Driver Check-ins ("the problem in this pop-up, it gets kind of cut off"): with long
  * write-ups like his 808 ("Driver Side Mirror Gone, Thermoking Not Running Properly"), the pop-up shows every word of Refused /
- * returned, Which store, Over / short, Loaded wrong, Truck, Trailer and Jack problem and the Notes, with no box cut off or scrolling inside, the pop-up stays
+ * returned, Which store, Over, Short, Loaded wrong, Truck, Trailer and Jack problem and the Notes, with no box cut off or scrolling inside, the pop-up stays
  * inside the window (1536x790, 1920x950, tablet 1024 and phone 390), text is 16px or larger, and an edited long problem saves.
  * The Driver Check-ins list shows everything the driver wrote in full too: the shortage, the problems and the notes.
  * SHOTS_DIR=<folder> saves pictures; BEFORE=1 only takes the pictures (for the screen as it was).
@@ -28,7 +28,8 @@ const LONG = {
   tractorIssues: 'Driver Side Mirror Gone, Thermoking Not Running Properly',
   trailerIssues: 'Back door seal torn on the curb side, floor board loose near the front',
   palletJackIssues: "Pallet jack wouldn't run at first stop, was too cold; as soon as it warmed up it ran fine",
-  overageShortageDetails: 'SHORT 2 cs · 16 choc. Quarts · Store: Delmont Walmart',
+  overDetails: '1 cs 2% gallon · Store: Delmont Walmart',
+  shortDetails: '2 cs · 16 choc. Quarts · Store: Delmont Walmart',
   loadingProblem: '1 case French onion dip 12oz was on the wrong pallet',
   checkinNotes: 'Called the store manager at Youngwood about the dip; he will hold the credit until Wednesday'
 };
@@ -52,7 +53,7 @@ async function openPage(browser, width, height, url, mobile) {
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
   const wk = L.weekStart(DATE), p = L.dayPrefix(DATE), id = wk + '__run_x808';
   await db().collection('runs').doc(id).set({ weekStart: wk, route: '808', run: 'DSD', routeId: 'rte_x808', runId: 'run_x808', rev: 0,
-    days: { [p]: Object.assign({ runs: true, driverId: 'drv_x808', driver: 'BARROW, ROGIE', truck: '223880', trailer: 'T-946', casesOut: 416, casesDelivered: 410, driverCaseReturn: 294, overageShortage: 'TRUE', loadedCorrectly: 'NO' }, LONG) } });
+    days: { [p]: Object.assign({ runs: true, driverId: 'drv_x808', driver: 'BARROW, ROGIE', truck: '223880', trailer: 'T-946', casesOut: 416, casesDelivered: 410, driverCaseReturn: 294, overageShortage: 'TRUE', overageShortageDetails: L.joinOverShort(LONG.overDetails, LONG.shortDetails), loadedCorrectly: 'NO' }, LONG) } });
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -63,7 +64,7 @@ async function openPage(browser, width, height, url, mobile) {
       if (!BEFORE) {
         const list = await pg.$$eval('#rows tr[data-index="0"] td', tds => tds.map(td => ({ text: td.textContent, cut: td.classList.contains('said') && td.scrollWidth > td.clientWidth + 1 || td.scrollHeight > td.clientHeight + 1 })));
         const all = list.map(c => c.text).join(' | ');
-        for (const said of [LONG.tractorIssues, LONG.trailerIssues, LONG.palletJackIssues, LONG.overageShortageDetails, LONG.loadingProblem, LONG.checkinNotes, LONG.refusedReturned]) assert.ok(all.includes(said), 'the list shows: ' + said);
+        for (const said of [LONG.tractorIssues, LONG.trailerIssues, LONG.palletJackIssues, 'Over: ' + LONG.overDetails, 'Short: ' + LONG.shortDetails, LONG.loadingProblem, LONG.checkinNotes, LONG.refusedReturned]) assert.ok(all.includes(said), 'the list shows: ' + said);
         assert.deepEqual(list.filter(c => c.cut).map(c => c.text), [], 'nothing the driver wrote is cut off on the list at ' + w + 'x' + h);
         assert.equal(await pg.textContent('#n-issues'), '1', 'notes do not change the With issues count');
       }
@@ -90,7 +91,7 @@ async function openPage(browser, width, height, url, mobile) {
       assert.ok(m.inside, 'the pop-up stays inside the ' + w + 'x' + h + ' window');
       assert.deepEqual(m.covered, [], 'nothing covers the pop-up at ' + w + 'x' + h);
       assert.deepEqual(m.small, [], 'pop-up text is 16px or larger');
-      for (const label of ['Cases delivered', 'Cases returned', 'Refused / returned', 'Which store', 'Over / short', 'Loaded wrong', 'Truck problem', 'Trailer problem', 'Jack problem', 'Trailer needs cleaned', 'Notes']) {
+      for (const label of ['Cases delivered', 'Cases returned', 'Refused / returned', 'Which store', 'Over', 'Short', 'Loaded wrong', 'Truck problem', 'Trailer problem', 'Jack problem', 'Trailer needs cleaned', 'Notes']) {
         assert.ok(await pg.isVisible('.popover label:text-is("' + label + '")'), label + ' is still there');
       }
       if (w === 1536) {
@@ -104,7 +105,7 @@ async function openPage(browser, width, height, url, mobile) {
         for (let i = 0; i < 50 && (await saved()) !== more; i++) await pg.waitForTimeout(100);
         assert.equal(await saved(), more, 'the long truck problem saved whole');
         const day = (await db().collection('runs').doc(id).get()).data().days[p];
-        assert.equal(day.overageShortageDetails, LONG.overageShortageDetails, 'the shortage is kept');
+        assert.equal(day.overageShortageDetails, 'OVER ' + LONG.overDetails + '; SHORT ' + LONG.shortDetails, 'the over and the short are kept');
         assert.equal(day.loadingProblem, LONG.loadingProblem, 'what was loaded wrong is kept');
         assert.equal(day.loadedCorrectly, 'NO');
         assert.equal(day.checkinNotes, LONG.checkinNotes, 'the notes are kept');

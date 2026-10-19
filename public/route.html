@@ -106,11 +106,17 @@
         <div class="ci-loaded-box" hidden><input name="loadingProblem" aria-label="What was loaded wrong" placeholder="What was wrong? e.g. 2 cs 2% gal missing" maxlength="300" data-voice></div></div>
       <div class="ci-os wide">
         <label class="check"><input type="checkbox" name="overageShortage"> Overage / shortage</label>
+        <!-- Joe 10/19: a spot for what was over and a spot for what was short; fill one or both. -->
         <div class="ci-os-box" hidden>
-          <div class="ci-seg" role="radiogroup" aria-label="Over or short"><label><input type="radio" name="osKind" value="SHORT" checked><span>Short</span></label><label><input type="radio" name="osKind" value="OVER"><span>Over</span></label></div>
-          <label>Cases<input name="osCases" inputmode="numeric" pattern="[0-9]*" maxlength="5"></label>
-          <label class="ci-wide">Product<input name="osProduct" maxlength="120" placeholder="e.g. 2% gallon" data-voice></label>
-          <label class="ci-wide">Which store<input name="osStore" maxlength="120" data-voice></label>
+          <b class="ci-os-head">Over</b>
+          <label>Cases<input name="overCases" inputmode="numeric" pattern="[0-9]*" maxlength="5"></label>
+          <label class="ci-wide">Product<input name="overProduct" maxlength="120" placeholder="e.g. 2% gallon" data-voice></label>
+          <label class="ci-wide">Which store<input name="overStore" maxlength="120" data-voice></label>
+          <hr class="ci-wide">
+          <b class="ci-os-head">Short</b>
+          <label>Cases<input name="shortCases" inputmode="numeric" pattern="[0-9]*" maxlength="5"></label>
+          <label class="ci-wide">Product<input name="shortProduct" maxlength="120" placeholder="e.g. 16 oz chocolate" data-voice></label>
+          <label class="ci-wide">Which store<input name="shortStore" maxlength="120" data-voice></label>
         </div>
       </div>
       <!-- Joe 10/13 (as the old Check-In): a checkbox in front of each issue; the write-up box stays. Typing ticks it. -->
@@ -285,13 +291,17 @@
       ciMore.innerHTML = '';
       (l.moreTrailers && l.moreTrailers.length ? l.moreTrailers : t.slice(1, 4).map(x => ({ trailer: x }))).forEach(m => addCiTrailer(m));
       ciLayout();
-      // Over / short: "SHORT 2 cs · 2% gallon · Store: ..." is taken apart again.
-      const os = /^(OVER|SHORT)\b(?:\s+(\d+)\s*cs)?(?:\s*·\s*(?!Store:)([^·]*?))?(?:\s*·\s*Store:\s*(.*))?$/i.exec(l.overageShortageDetails || '');
+      // Over / short: "OVER 2 cs · 2% gallon · Store: ...; SHORT 1 cs · ..." is taken apart again. Text written before
+      // with no OVER / SHORT in front goes in Short's product, as it was.
+      const os = osSplit(l.overageShortageDetails);
       f.elements.overageShortage.checked = !!l.overageShortage;
-      f.querySelector('[name=osKind][value="' + (os ? os[1].toUpperCase() : 'SHORT') + '"]').checked = true;
-      f.elements.osCases.value = os && os[2] || '';
-      f.elements.osProduct.value = os ? os[3] || '' : l.overageShortageDetails || '';
-      f.elements.osStore.value = os && os[4] || '';
+      ['over', 'short'].forEach(k => {
+        const bits = (os[k] === 'yes' ? '' : os[k]).split(/\s*·\s*/).filter(Boolean);
+        const cases = /^(\d+)\s*cs$/i.exec(bits[0] || ''), store = bits.find(b => /^Store:/i.test(b));
+        f.elements[k + 'Cases'].value = cases ? cases[1] : '';
+        f.elements[k + 'Product'].value = bits.filter((b, i) => !(i === 0 && cases) && b !== store).join(' · ') || (k === 'short' ? os.other : '');
+        f.elements[k + 'Store'].value = store ? store.replace(/^Store:\s*/i, '') : '';
+      });
       osShow();
       issuesShow();
     }
@@ -326,11 +336,24 @@
       if (list) el.value = findUnit(el.value, list);
     });
     function osShow() { ciForm.querySelector('.ci-os-box').hidden = !ciForm.elements.overageShortage.checked; }
-    ciForm.elements.overageShortage.addEventListener('change', () => { osShow(); if (!ciForm.elements.overageShortage.checked) ['osCases', 'osProduct', 'osStore'].forEach(k => { ciForm.elements[k].value = ''; }); });
+    const osNames = ['overCases', 'overProduct', 'overStore', 'shortCases', 'shortProduct', 'shortStore'];
+    ciForm.elements.overageShortage.addEventListener('change', () => { osShow(); if (!ciForm.elements.overageShortage.checked) osNames.forEach(k => { ciForm.elements[k].value = ''; }); });
+    // The same split as UDLogic.splitOverShort (logic.js), which this page does not load.
+    function osSplit(text) {
+      const out = { over: '', short: '', other: '' };
+      String(text || '').trim().split(/;\s*(?=(?:OVER|SHORT)\b)/i).forEach(part => {
+        part = part.trim();
+        if (!part) return;
+        const m = /^(OVER|SHORT)\b\s*(.*)$/i.exec(part), key = m ? m[1].toLowerCase() : 'other', said = m ? m[2].trim() || 'yes' : part;
+        out[key] = out[key] ? out[key] + '; ' + said : said;
+      });
+      return out;
+    }
     function osText() {
-      const f = ciForm, cases = f.elements.osCases.value.trim(), product = f.elements.osProduct.value.trim(), storeName = f.elements.osStore.value.trim();
+      const f = ciForm, v = (n) => f.elements[n].value.trim();
       if (!f.elements.overageShortage.checked) return '';
-      return [f.querySelector('[name=osKind]:checked').value + (cases ? ' ' + cases + ' cs' : ''), product, storeName && 'Store: ' + storeName].filter(Boolean).join(' · ');
+      const part = (k) => [v(k + 'Cases') && v(k + 'Cases') + ' cs', v(k + 'Product'), v(k + 'Store') && 'Store: ' + v(k + 'Store')].filter(Boolean).join(' · ');
+      return [part('over') && 'OVER ' + part('over'), part('short') && 'SHORT ' + part('short')].filter(Boolean).join('; ');
     }
     addSpeak(ciForm);
     // Joe 10/13: each issue's checkbox goes with its write-up: typing (or Speak) ticks it, unticking empties it, and a ticked
