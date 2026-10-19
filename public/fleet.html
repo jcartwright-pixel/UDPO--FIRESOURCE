@@ -104,10 +104,10 @@
     function boxText(i) {
       if (!i) return { big: '—', small: 'Not tracked', s: 'NA' };
       const days = typeof i.left === 'string' ? parseInt(i.left, 10) : null;
-      if (i.status === 'SET_UP') return { big: 'Needs start date', small: (canEdit() ? 'Click to ' : '') + (i.key === 'PM' ? 'type the last PM miles' : 'type the last date'), s: 'SET_UP' };
+      if (i.status === 'SET_UP') return { big: 'Needs start date', small: (canEdit() ? 'Click to ' : '') + (i.key === 'PM' && !i.byDays ? 'type the last PM miles' : 'type the last date'), s: 'SET_UP' };
       if (i.status === 'NO_MILES') return { big: 'No miles yet', small: 'from the daily inspection', s: 'NO_MILES' };
       if (i.status === 'AT_GARAGE') return { big: 'At garage', small: i.jobId || '', s: 'AT_GARAGE' };
-      if (i.key === 'PM') { const left = Number(i.left); return { big: left < 0 ? 'Over ' + num(-left) + ' mi' : num(left) + ' mi left', small: 'due at ' + num(i.dueAt) + ' mi', s: i.status }; }
+      if (i.key === 'PM' && !i.byDays) { const left = Number(i.left); return { big: left < 0 ? 'Over ' + num(-left) + ' mi' : num(left) + ' mi left', small: 'due at ' + num(i.dueAt) + ' mi', s: i.status }; }
       return { big: days < 0 ? 'Overdue ' + md(i.dueAt) : (i.status === 'OK' ? md(i.dueAt) : 'Due ' + md(i.dueAt)), small: days < 0 ? Math.abs(days) + ' days late' : days + ' days', s: i.status };
     }
     function unitGrid(due, hit) {
@@ -120,7 +120,7 @@
       // Joe 10/13: a reading from Verizon Connect Fleet says GPS under it; otherwise it is the driver's DVIR (or typed hours).
       const gpsRead = {}; due.units.forEach(u => { gpsRead[u.unit] = (u.type === 'TRUCK' ? u.milesSource : u.hoursSource) === 'GPS'; });
       const now = (r) => { const i = r.c.PM; return i && i.now !== '' && i.now !== undefined && i.now !== null ? num(i.now) + (r.type === 'TRUCK' ? ' mi' : ' hrs') + (gpsRead[r.unit] ? '<small>GPS</small>' : '') : ''; };
-      const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
+      const tip = (i) => !i ? '' : [i.what, 'Due ' + (i.key === 'PM' && !i.byDays ? num(i.dueAt) + (i.dueAt !== '' ? ' mi' : '') : when(i.dueAt)), i.now !== '' && i.now !== undefined ? 'Now ' + num(i.now) : '', (i.byDays ? 'By days, no GPS' : ''), 'Left ' + (typeof i.left === 'number' ? num(i.left) + ' mi' : i.left), 'Last done ' + when(i.last), (STATUS[i.status] || [''])[0]].filter(Boolean).join(' · ');
       const box = (i, r, key) => { const x = boxText(i), edit = i && key && canEdit() && i.status !== 'AT_GARAGE';
         return '<td class="gc ' + x.s + (edit ? ' fs-cell' : '') + '"' + (edit ? ' data-cell="' + key + '" data-unit="' + escapeHtml(r.unit) + '" data-type="' + r.type + '" tabindex="0"' : '') +
           ' title="' + escapeHtml(edit ? 'Click to type the last date' + (tip(i) ? '\n' + tip(i) : '') : tip(i)) + '"><b>' + escapeHtml(x.big) + '</b><small>' + escapeHtml(x.small) + '</small></td>'; };
@@ -153,7 +153,7 @@
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
           '<button type="button" id="fs-print" class="primary">Print Fleet Service Report</button><a class="button" href="garage-station.html">Garage Station</a>';
         if (!editing) put(sheet, unitGrid(due, hit));
-        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles, reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers: leased trucks are left off (the lessor services them).';
+        foot.textContent = due.units.length + ' trucks and trailers at ' + escapeHtml(plant.name) + ' · ' + due.items.filter(i => i.status === 'OK').length + ' items OK · PM every ' + num(rules().truckMiles) + ' miles (yard trucks ' + Object.keys(L.FLEET_BY_DAYS).join(' and ') + ' every ' + rules().truckDaysMonths + ' months), reefer every ' + rules().trailerMonths + ' months or ' + num(rules().trailerHours) + ' hours, annual inspection every ' + rules().dotMonths + ' months · United Dairy owned trucks and our trailers: leased trucks are left off (the lessor services them).';
       } else if (view === 'work') {
         const o = jobs().sort((a, b) => jobRank(a) - jobRank(b) || String(a.created_at || '').localeCompare(String(b.created_at || ''))), mins = week.reduce((s, x) => s + (Number(x.minutes) || 0), 0);
         k.innerHTML = kpis([[o.length, 'Open work orders'], [o.filter(x => x.status === 'WORKING').length, 'Working now'], [o.filter(x => x.status === 'PARTS').length, 'Waiting on parts', 'warn'],
@@ -199,7 +199,7 @@
         const typePick = '<label class="fs-type">Rules for<select id="rule-type" aria-label="Rules for trucks or trailers"><option value="TRUCK"' + (ruleType === 'TRUCK' ? ' selected' : '') + '>Trucks</option><option value="TRAILER"' + (ruleType === 'TRAILER' ? ' selected' : '') + '>Trailers</option></select></label>';
         const ruleList = ruleType === 'TRAILER'
           ? rule('trailerMonths', 'Reefer service every', 'months') + rule('trailerHours', '... or every', 'reefer hours') + rule('trailerWarnDays', 'Warn reefer service', 'days ahead') + rule('dotMonths', 'Annual inspection every', 'months') + rule('dotWarnDays', 'Warn annual inspection', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead')
-          : rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('dotMonths', 'Annual inspection every', 'months') + rule('dotWarnDays', 'Warn annual inspection', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead');
+          : rule('truckMiles', 'Truck PM every', 'miles') + rule('truckWarnMiles', 'Warn this many miles ahead', 'miles') + rule('truckDaysMonths', 'Yard trucks with no GPS (' + Object.keys(L.FLEET_BY_DAYS).join(', ') + '): PM every', 'months') + rule('dotMonths', 'Annual inspection every', 'months') + rule('dotWarnDays', 'Warn annual inspection', 'days ahead') + rule('plateWarnDays', 'Warn plates', 'days ahead');
         // Joe 10/13: "Ours" ticks whether a unit is in our service tracking (the unit's Track due dates); unticked units stay
         // listed but leave the Due list. One click saves it.
         const ours = (u) => '<input type="checkbox" class="fs-ours" data-ours="' + escapeHtml(u.unit) + '" data-type="' + u.type + '" aria-label="' + escapeHtml(u.unit) + ' is ours"' + (u.tracked ? ' checked' : '') + (boss ? '' : ' disabled') + '>';
@@ -265,7 +265,7 @@
         (model ? row('Unit', escapeHtml(model.split('|').slice(0, 3).join(' ').trim())) : '') +
         (u.type === 'TRUCK' ? row('Miles now', u.miles != null ? num(u.miles) + ' <small>' + (u.milesSource === 'GPS' ? 'GPS ' : 'DVIR ') + when(u.milesDate) + '</small>' : '') : row('Reefer hours now', u.currentHours != null ? num(u.currentHours) + (u.hoursSource === 'GPS' ? ' <small>GPS ' + when(u.hoursDate) + '</small>' : '') : '')) +
         row('Last ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), when(u.lastServiceDate) + (u.lastServiceMiles != null ? ' · ' + num(u.lastServiceMiles) + ' mi' : u.lastServiceHours != null ? ' · ' + num(u.lastServiceHours) + ' hrs' : '')) +
-        row('Next ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), pm && pm.dueAt !== '' ? (pm.key === 'PM' ? num(pm.dueAt) + ' mi' : when(pm.dueAt)) + ' ' + pill(STATUS[pm.status]) : pm ? pill(STATUS[pm.status]) : '') +
+        row('Next ' + (u.type === 'TRUCK' ? 'PM' : 'reefer service'), pm && pm.dueAt !== '' ? (pm.key === 'PM' && !pm.byDays ? num(pm.dueAt) + ' mi' : when(pm.dueAt)) + ' ' + pill(STATUS[pm.status]) : pm ? pill(STATUS[pm.status]) : '') +
         row('Next annual inspection', dot && dot.dueAt ? when(dot.dueAt) + ' ' + pill(STATUS[dot.status]) : '') + row('Plate expires', when(u.plateExpires)) + (plateOf(u.unit) ? row('Plate', escapeHtml(plateOf(u.unit))) : '') + row('Lease', lease ? escapeHtml(lease.trim()) : 'Owned') +
         row('Open work orders', open().filter(x => String(x.unit).toUpperCase() === String(u.unit).toUpperCase()).length) + row('Jobs · 12 months', jobs.length) +
         row('Mechanic hours · 12 months', Math.round(jobs.reduce((a, x) => a + (Number(x.minutes) || 0), 0) / 6) / 10) + '</tbody></table>' +
@@ -321,7 +321,7 @@
       const tbl = (head, body) => '<table><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr>' + (body || '<tr><td colspan="' + head.length + '">Nothing</td></tr>') + '</table>';
       const kind = (i) => i.type === 'TRAILER' ? 'Trailer' : 'Truck';
       const dueRows = (list) => list.map(i => '<tr><td>' + escapeHtml(i.unit) + '</td><td>' + kind(i) + '</td><td>' + escapeHtml(i.what) + '</td><td>' +
-        (i.key === 'PM' ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (i.now !== '' && i.now != null ? num(i.now) : '') + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
+        (i.key === 'PM' && !i.byDays ? num(i.dueAt) + ' mi' : when(i.dueAt)) + '</td><td>' + (i.now !== '' && i.now != null ? num(i.now) : '') + '</td><td>' + (typeof i.left === 'number' ? num(i.left) + ' mi' : escapeHtml(i.left)) + '</td><td>' + STATUS[i.status][0] + '</td></tr>').join('');
       const dated = (key) => due.items.filter(i => i.key === key && i.dueAt && i.dueAt <= in90).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
       const plateNo = plateOf;
       const listed = listedIn(due), work = done().filter(o => listed(o) && L.localDay(o.completed_at) >= weekAgo);
@@ -355,7 +355,7 @@
       const field = (label, f, val, kind) => '<label>' + label + '<input data-f="' + f + '" ' + (kind === 'date' ? 'type="date"' : 'inputmode="numeric"') + ' value="' + v(val) + '"></label>';
       td.innerHTML = '<div class="fs-cell-edit">' + (key === 'DOT' ? field('Last annual inspection', 'dot_last', u.dotDue ? L.addMonths(u.dotDue, -months) : '', 'date')
         : field(type === 'TRUCK' ? 'Last PM date' : 'Last reefer service', 'last_service_date', u.lastServiceDate, 'date') +
-          (type === 'TRUCK' ? field('Last PM miles', 'last_service_miles', u.lastServiceMiles) : field('Reefer hours then', 'last_service_hours', u.lastServiceHours))) +
+          (u.byDays ? '' : type === 'TRUCK' ? field('Last PM miles', 'last_service_miles', u.lastServiceMiles) : field('Reefer hours then', 'last_service_hours', u.lastServiceHours))) +
         '<small class="fs-cell-saved" aria-live="polite"></small></div>';
       editing = { td, unit, key, type, months };
       td.classList.add('editing');

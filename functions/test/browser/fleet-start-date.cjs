@@ -40,6 +40,9 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date() });
+  // Yard truck 688 (no GPS, Joe 10/19: goes by days), copied from one of the plant's own trucks.
+  const road = (await db().collection('equipment').get()).docs.find(d => L.fleetKind(d.data().type) === 'TRUCK' && !L.unitLeased(d.data()));
+  await db().collection('equipment').doc('eq_truck_688').set(Object.assign({}, road.data(), { unit: '688', id: 'eq_truck_688', notes: '' }));
   await db().collection('users').doc('dispatch.test@uniteddairy.com').set({ name: 'Test Dispatcher', status: 'ACTIVE', roles: ['DISPATCHER'], facilities: ['fac_uniontown'], cells: { id: 'usr_disp', version: '1' } }, { merge: true });
   const browser = await chromium.launch();
   const results = [];
@@ -49,7 +52,7 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
     await p.waitForTimeout(800);
     if (BEFORE) { await shot(p, 'before-due-1536.png'); return; }
     // A trailer and a truck that need a start date.
-    const pick = (type) => p.$$eval('#sheet tr[data-unit]', (rows, type) => rows.filter(r => r.children[1].textContent === type && /Needs start date/.test(r.children[2].textContent)).map(r => r.dataset.unit)[0], type);
+    const pick = (type) => p.$$eval('#sheet tr[data-unit]', (rows, type) => rows.filter(r => r.children[1].textContent === type && r.dataset.unit !== '688' && /Needs start date/.test(r.children[2].textContent)).map(r => r.dataset.unit)[0], type);
     const trailer = await pick('Trailer'), truck = await pick('Truck');
     assert.ok(trailer && truck, 'a trailer and a truck need a start date');
     assert.match(await cellText(p, trailer, 'PM'), /Needs start date\s*Click to type the last date/);
@@ -92,6 +95,20 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
     for (let i = 0; i < 20 && (await setupOf(truck)).last_service_miles !== '412000'; i++) await p.waitForTimeout(250);
     assert.deepEqual([(await setupOf(truck)).last_service_date, (await setupOf(truck)).last_service_miles], ['2026-04-01', '412000']);
     await p.waitForFunction((u) => !/Needs start date/.test(document.querySelector('#sheet tr[data-unit="' + u + '"] td[data-cell="PM"]').textContent), truck, { timeout: 10000 });
+
+    // Yard truck 688 goes by days: its box asks only for the date and shows the due date, never miles.
+    assert.match(await cellText(p, '688', 'PM'), /Needs start date\s*Click to type the last date/);
+    await p.click('#sheet tr[data-unit="688"] td[data-cell="PM"]');
+    await p.waitForSelector(box + ' input[data-f="last_service_date"]');
+    assert.equal(await p.$$eval(box + ' input[data-f="last_service_miles"]', x => x.length), 0, 'no miles box for a yard truck');
+    await p.fill(box + ' input[data-f="last_service_date"]', '2026-04-01');
+    await p.press(box + ' input[data-f="last_service_date"]', 'Enter');
+    await p.waitForFunction(() => !document.querySelector('#sheet td.editing'), null, { timeout: 10000 });
+    for (let i = 0; i < 20 && (await setupOf('688')).last_service_date !== '2026-04-01'; i++) await p.waitForTimeout(250);
+    assert.equal((await setupOf('688')).last_service_date, '2026-04-01');
+    const due688 = L.addMonths('2026-04-01', L.FLEET_RULES.truckDaysMonths), md = due688.replace(/^\d\d(\d\d)-0?(\d+)-0?(\d+)$/, '$2-$3-$1');
+    await p.waitForFunction(([u, t]) => document.querySelector('#sheet tr[data-unit="' + u + '"] td[data-cell="PM"]').textContent.indexOf(t) >= 0, ['688', md], { timeout: 10000 });
+    assert.doesNotMatch(await cellText(p, '688', 'PM'), /mi\b|miles/);
     assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth + 1), 'no sideways scroll');
     await shot(p, 'after-due-1536.png');
     assert.deepEqual(p.errors, []);
@@ -111,10 +128,12 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
     await q.waitForTimeout(800);
     const left = await q.$$eval('#sheet tr[data-unit]', rows => rows.filter(r => r.children[1].textContent === 'Trailer').map(r => r.children[2].textContent + r.children[3].textContent).filter(t => /Needs start date/.test(t)));
     assert.deepEqual(left, [], 'every trailer has its reefer service and annual inspection dates');
+    assert.doesNotMatch(await cellText(q, '688', 'PM'), /Needs start date|miles/, 'yard truck 688 goes by its 4-1-26 date');
     await shot(q, 'after-start-load-1536.png');
     await q.close();
     results.push('fleet-service-start-2026-04-01 on the test copy: every trailer shows its reefer service and annual inspection due from 4-1-26');
     results.push('Fleet Service Due: a manager clicks PM / Reefer or Annual Inspection, types the last date (and miles or hours) and each box saves on its own; the row shows the new due date (1536x790)');
+    results.push('Yard truck 688 (no GPS) goes by days: the PM box asks only for the date and shows the due date');
     results.push('A dispatcher reads the same list with no boxes to type in');
   } finally {
     await browser.close();

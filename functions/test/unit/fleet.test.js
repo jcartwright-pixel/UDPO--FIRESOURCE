@@ -128,3 +128,16 @@ test('GPS readings: the newer of the DVIR and GPS odometers is miles now; a trai
   assert.deepEqual([row('T-2894').currentHours, row('T-2894').hoursSource], [700, ''], 'zero hours from Fleet keep the typed hours');
   assert.equal(L.latestReadings([], [])['X'], undefined);
 });
+
+test('Yard trucks 688 and 9737 (no GPS, Joe 10/19) go by days: PM every truckDaysMonths from the last date, never miles', () => {
+  const yard = [{ unit: '688', type: 'TRUCK' }, { unit: '9737', type: 'TRUCK' }, { unit: '223893', type: 'TRUCK' }];
+  const setup = [{ unit: '688', last_service_date: '2026-04-01' }, { unit: '223893', last_service_date: '2026-04-01' }];
+  const { units: rows, items } = L.fleetDue(yard, setup, {}, [], null, today);
+  const pm = (u) => items.find(i => i.unit === u && i.key === 'PM');
+  assert.deepEqual([pm('688').status, pm('688').dueAt, pm('688').left, pm('688').byDays], ['OVERDUE', '2026-08-01', '-70 days', true]);
+  assert.deepEqual([pm('9737').status, pm('9737').byDays], ['SET_UP', true], 'no date yet asks for the date, not miles');
+  assert.deepEqual([pm('223893').status, pm('223893').byDays], ['SET_UP', false], 'a road truck still needs its PM miles');
+  assert.equal(rows.find(r => r.unit === '688').byDays, true);
+  assert.equal(L.fleetDue(yard, [{ unit: '688', last_service_date: '2026-07-01' }], {}, [], { truckDaysMonths: 6 }, today).items.find(i => i.unit === '688' && i.key === 'PM').status, 'OK', 'the months come from the rules');
+  assert.equal(L.fleetDue(yard, [{ unit: '688', last_service_date: '2026-06-20' }], {}, [], null, today).items.find(i => i.unit === '688' && i.key === 'PM').status, 'DUE_SOON', 'warned 14 days ahead');
+});
