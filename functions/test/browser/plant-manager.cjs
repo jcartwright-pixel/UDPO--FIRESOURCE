@@ -112,8 +112,11 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       // yard: the Yard is done automatically.
       assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-state', a => a.map(x => x.textContent)), ['DONE', 'PAST DUE', 'PAST DUE']);
       // Read once the card has stopped redrawing (a tile caught mid-redraw has no style yet).
-      await page.waitForFunction(() => [...document.querySelectorAll('[data-card="walk"] .wk-tile.good')].every(x => x.isConnected && getComputedStyle(x).backgroundColor), null, { timeout: 5000 });
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile.good', a => a.map(x => getComputedStyle(x).backgroundColor)), ['rgb(238, 248, 241)']);
+      // The card can redraw again between a wait and the read, so read until the colors settle (up to 5 seconds).
+      const goodColors = () => page.$$eval('[data-card="walk"] .wk-tile.good', a => a.map(x => getComputedStyle(x).backgroundColor));
+      let good = await goodColors();
+      for (let i = 0; i < 20 && JSON.stringify(good) !== JSON.stringify(['rgb(238, 248, 241)']); i++) { await page.waitForTimeout(250); good = await goodColors(); }
+      assert.deepEqual(good, ['rgb(238, 248, 241)']);
       assert.equal(await page.textContent('[data-card="walk"] .wk-tile:nth-child(1) .wk-who'), 'Done automatically');
       assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(3) .wk-who'), /^Last \d{1,2}:\d\d [AP]M · Supervisor Test$/);
       assert.match(await tileText(page, 'walk', 'Last Walkthrough'), /^\d{1,2}:\d\d [AP]M \| Supervisor Test$/);
