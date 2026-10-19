@@ -304,4 +304,11 @@ test('Joe 10/19: a branch box load starts the week as not running; every other r
     assert.deepEqual(L.DAYS.filter(p => L.buildWeekRun(r, '2026-10-18', L.weekBuildContext([], [], [])).days[p].runs), ['mon', 'tue']);
   });
   assert.equal(L.boxLoadRun({ loadType: ' box loadout ', coverageType: 'branch' }), true);
+  // Joe 10/19: "doesn't run" is only the default; a box load already on the Plant Scheduler for a day is built running that day.
+  // Three Charleston loads on Tuesday 10-20 booked on Load 1 are Load 1, 2 and 3 (plantByRun), so Loads 2 and 3 run that day too.
+  const loads = [1, 2, 3].map(n => ({ id: 'run_950_' + (n + 1), route: '950', run: 'ALDI - CHARLESTON LOAD ' + n, loadType: 'Boxing', coverageType: 'BRANCH', days }));
+  const plan = [{ runId: 'run_950_2', date: '2026-10-20', pickupTime: '05:30' }, { runId: 'run_950_2', date: '2026-10-20', pickupTime: '08:00' }, { runId: 'run_950_2', date: '2026-10-19', pickupTime: '06:00' }];
+  const pctx = L.weekBuildContext([], [], [], loads, plan);
+  const ran = loads.map(r => L.DAYS.filter(p => L.buildWeekRun(r, '2026-10-18', pctx).days[p].runs));
+  assert.deepEqual(ran, [['mon', 'tue'], ['tue'], []]);
 });

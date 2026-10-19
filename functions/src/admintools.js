@@ -903,7 +903,8 @@ async function updateLive(db, email, input, stamp, deps) {
     const live = ((await tx.get(db.collection(C.config).doc('app'))).data() || {}).liveWeeks || {};
     const week = live.current && live.next ? live.current : L.weekStart(today), nextWeek = live.current && live.next ? live.next : L.addDays(week, 7);
     const runSnaps = (await tx.get(db.collection(C.runs).where('weekStart', 'in', [week, nextWeek]))).docs;
-    const [routeSnap, driverSnap, exSnap, equipSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)), tx.get(db.collection(C.exceptions).where('endDate', '>=', week)), tx.get(db.collection(C.equipment))]);
+    const [routeSnap, driverSnap, exSnap, equipSnap, plantSnap] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)), tx.get(db.collection(C.exceptions).where('endDate', '>=', week)), tx.get(db.collection(C.equipment)),
+      tx.get(db.collection(C.plantLoads).where('date', '>=', week))]);
     const routes = {};
     routeSnap.docs.forEach(x => { const r = x.data(); if (r.id) routes[r.id] = r; });
     const equip = equipSnap.docs.map(x => x.data()), unit = (v, type) => {
@@ -948,7 +949,7 @@ async function updateLive(db, email, input, stamp, deps) {
     // week (weekroll.js), with the days still to load. With the write-back on they are only listed: the sheet copy has no row for them.
     const byWeek = { [week]: [], [nextWeek]: [] };
     runSnaps.forEach(x => byWeek[x.data().weekStart].push(x.data()));
-    const masters = { routes, drivers: driverSnap.docs.map(x => x.data()), exceptions, equipment: equip };
+    const masters = { routes, drivers: driverSnap.docs.map(x => x.data()), exceptions, equipment: equip, plantLoads: plantSnap.docs.map(x => x.data()) };
     const add = ROLL.missingRuns(routes, byWeek, w => { const c = ROLL.contextOf(masters); byWeek[w].forEach(r => ROLL.bookExisting(c, r)); return c; }, stamp, email, today);
     const missing = Object.keys(add).map(id => ({ runDocId: id, week: add[id].weekStart, runId: add[id].runId, route: add[id].route, run: add[id].run || add[id].routeName || '' }));
     const adding = !mode.writeBack;

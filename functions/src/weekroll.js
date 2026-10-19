@@ -42,15 +42,17 @@ function runDoc(route, week, ctx, stamp, email, fromDate) {
   return Object.assign(run, { sourceTab: BUILT_TAB, sheetRow: null, cells: {}, builtInApp: true, builtAt: stamp, builtBy: email, transferredAt: stamp, rev: Date.parse(stamp) });
 }
 
-// Route Master, Driver Master, days off from `fromDate` on, and Equipment Master, read inside the transaction.
+// Route Master, Driver Master, days off from `fromDate` on, Equipment Master and the Scheduler's Plant Route loads from `fromDate`
+// on, read inside the transaction.
 async function readMasters(tx, db, fromDate) {
-  const [r, d, x, e] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)),
-    tx.get(db.collection(C.exceptions).where('endDate', '>=', fromDate)), tx.get(db.collection(C.equipment))]);
+  const [r, d, x, e, pl] = await Promise.all([tx.get(db.collection(C.routes)), tx.get(db.collection(C.drivers)),
+    tx.get(db.collection(C.exceptions).where('endDate', '>=', fromDate)), tx.get(db.collection(C.equipment)), tx.get(db.collection(C.plantLoads).where('date', '>=', fromDate))]);
   const routes = {};
   r.docs.forEach(s => { const v = s.data(); routes[v.id || s.id] = Object.assign({}, v, { id: v.id || s.id }); });
-  return { routes, drivers: d.docs.map(s => s.data()), exceptions: x.docs.map(s => s.data()), equipment: e.docs.map(s => s.data()) };
+  return { routes, drivers: d.docs.map(s => s.data()), exceptions: x.docs.map(s => s.data()), equipment: e.docs.map(s => s.data()), plantLoads: pl.docs.map(s => s.data()) };
 }
-const contextOf = (m) => L.weekBuildContext(m.drivers, m.exceptions, m.equipment);
+// The Plant Scheduler's loads go in too: a branch box load already scheduled for a day is built running that day (Joe 10/19).
+const contextOf = (m) => L.weekBuildContext(m.drivers, m.exceptions, m.equipment, Object.values(m.routes), m.plantLoads);
 
 // Routes in Weekly order, so the first run on the board gets a shared default unit first.
 function routeOrder(routes) {
