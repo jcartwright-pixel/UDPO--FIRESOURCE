@@ -126,11 +126,13 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // Codes; the Driver Station and the drivers' phone link (with its Route Distribution code) go to Driver Station Codes.
     await open('app-links', '.ap-link');
     // Review item 54 (Joe 10/13): no Phone Screens card; it only listed the same links again.
-    // Joe 10/18: each card named for what it is: Plant Operations (the full app), the Plant Managers App, the Garage Station.
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'managers', 'garage', 'personal']);
-    assert.deepEqual(await p.$$eval('.ap-link h4', h => h.map(x => x.textContent)), ['Plant Operations', 'Phone link', 'Plant Managers App', 'Garage Station', 'Personal phone links']);
+    // Joe 10/18: each card named for what it is: Plant Operations (the full app), the Plant Managers App, the Distribution Manager (routes and trucks).
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['company', 'phone', 'managers', 'distribution', 'personal']);
+    assert.deepEqual(await p.$$eval('.ap-link h4', h => h.map(x => x.textContent)), ['Plant Operations', 'Phone link', 'Plant Managers App', 'Distribution Manager', 'Personal phone links']);
     assert.match(await p.$eval('.ap-link[data-link="managers"]', el => el.outerHTML), /walkthrough\.html\?view=home&(amp;)?app=1/);
     assert.equal(await p.$$eval('.ap-link[data-link="managers"] .ap-btn', b => b.length), 3, 'Copy Link, Print QR and Launch');
+    assert.match(await p.$eval('.ap-link[data-link="distribution"]', el => el.outerHTML), /distribution\.html/);
+    assert.equal(await p.$$eval('.ap-link[data-link="distribution"] .ap-btn', b => b.length), 3, 'Copy Link, Print QR and Launch');
     // Joe 10/12: Launch opens the screen in a new window, so Administration stays where it was.
     assert.deepEqual(await p.$$eval('.ap-link a.ap-btn', a => [...new Set(a.map(x => x.target))]), ['_blank']);
     await shot(p, 'app-links-1920.png');
