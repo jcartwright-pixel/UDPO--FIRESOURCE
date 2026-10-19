@@ -329,10 +329,13 @@
   // The trailer left at its dispatch time (trailerHasDeparted, 7.0.276).
   // When a route leaves, on the plant's wall clock (the current app's Send Current Report, 217_V7271): its departure date on the
   // Live sheet (blank = the delivery date) at its dispatch time, never the load day. Saturday's loadout for Monday leaves Monday.
+  // Joe 10/19: the day rolls at 6 a.m., as on Yard Checks. A load made before its departure date leaves in the operating day
+  // before that date: a dispatch time from 6 a.m. on is that day before (Tuesday's 1:00 PM Jersey leaves Monday at 1:00 PM),
+  // a time before 6 a.m. is after midnight, on the departure date itself.
   function departWall(x) {
-    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime;
+    var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate);
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-    return departDay * 1440 + Number(t);
+    return (load !== null && load < departDay && Number(t) >= 360 ? departDay - 1 : departDay) * 1440 + Number(t);
   }
   function yardDeparted(x, date, nowMs) {
     var departDay = dayNum(x.departureDate), opDay = dayNum(date);
@@ -945,7 +948,7 @@
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
-    // loads go out Sunday and which (Jersey) not until Monday. Late is already counted from each load's own departure day.
+    // loads go out Sunday and which (Jersey) not until Monday. Late is counted from when each load leaves (departWall).
     // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
     var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
     var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };

@@ -139,8 +139,8 @@ export function isBehind(row, today, now) {
   return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
 }
 // Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
-// plant-rules.js departWall: the departure date (blank = delivery date) at the dispatch time (this file is also used on screens that
-// do not load plant-rules.js).
+// plant-rules.js departWall: the departure date (blank = delivery date) at the dispatch time, a load made earlier leaving in the
+// operating day before (6 a.m. on = the day before, Joe 10/19) (this file is also used on screens that do not load plant-rules.js).
 const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 export function wallNowMinutes(now) {
   const parts = {};
@@ -149,9 +149,9 @@ export function wallNowMinutes(now) {
   return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
 export function departWall(row) {
-  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), t = row.dispatchTime;
+  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), t = row.dispatchTime, load = dayNumber(row.loadDate);
   if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-  return departDay * 1440 + Number(t);
+  return (load !== null && load < departDay && Number(t) >= 360 ? departDay - 1 : departDay) * 1440 + Number(t);
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }
