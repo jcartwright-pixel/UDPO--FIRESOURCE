@@ -95,7 +95,7 @@
       const q = search.toUpperCase();
       const shown = rows.filter(r => match(r, filter) && (!q || [r.unit, r.driver, r.text, r.route].join(' ').toUpperCase().indexOf(q) >= 0));
       document.getElementById('cols').innerHTML = truck
-        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:24%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:28%">'
+        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:21%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:31%">'
         : '<col style="width:7%"><col style="width:8%"><col style="width:36%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:28%">';
       document.getElementById('head').innerHTML = '<tr><th>' + KINDS[i][2] + '</th>' + (truck ? '<th>Driver</th>' : '') + '<th>Date Reported</th><th>What\'s Wrong</th><th>Report Count</th><th>Reviewed</th>' + (truck ? '<th>Emailed</th>' : '') + '<th>Garage</th><th>Work Actions</th></tr>';
       const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
