@@ -278,7 +278,8 @@
       // Joe 10/12: a load not yet loaded is dragged up or down by its line (no arrows, no grab dots).
       const routeCell = (r) => '<td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';
       const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
-      // Joe 10/15: a load dragged out of the sheet's order is shaded light green with a MOVED tag (dragging stays allowed).
+      // Joe 10/15: a load dragged out of the sheet's order gets a green MOVED tag (dragging stays allowed). Joe 10/19: only the
+      // tag is green, not the whole line, and it is one word on one line; who moved it and when show on hover.
       const moved = P.movedIds(rows.filter(r => !r.sched));
       let html = '', lastPrior = null;
       rows.forEach(r => {
@@ -299,7 +300,7 @@
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
         const isMoved = moved.has(r.id) || P.movedBySomeone(r), note = P.moveNote(r);
-        const movedTag = isMoved ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.short ? ' · <span class="mv-who">' + escapeHtml(note.short) + '</span>' : '') + '</span>' : '';
+        const movedTag = isMoved ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started
