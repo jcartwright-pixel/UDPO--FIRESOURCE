@@ -931,14 +931,10 @@
     function grid(list) {
       var th = function (t, al) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + GREY + '">' + t + '</td>'; };
       var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:3px solid #ffffff">' + t + '</td>'; };
-      var last = null, lastGroup = null, groupCount = {};
-      list.forEach(function (x) { groupCount[x.area] = (groupCount[x.area] || 0) + 1; });
+      var last = null;
       return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + th('Done', 1) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
         var sep = '';
-        // Joe 10/19: Case, Box, Tote, Tanker each under their own name, with a dark line between them.
-        if (GROUP_NAME[x.area] && x.area !== lastGroup) { sep = '<tr><td colspan="4" style="padding:' + (lastGroup ? '10px' : '2px') + ' 0 0">' + (lastGroup ? '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>' : '') + '<div style="' + F + 'padding:8px 8px 4px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[x.area]) + ' (' + groupCount[x.area] + ')</div></td></tr>'; last = null; }
-        lastGroup = x.area;
-        if (splitDays && x.day !== last) { last = x.day; sep += '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + INK + ';border-bottom:2px solid ' + INK + '">' + e(deliversLabel(x.day)) + '</td></tr>'; }
+        if (splitDays && x.day !== last) { last = x.day; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + INK + ';border-bottom:2px solid ' + INK + '">' + e(deliversLabel(x.day)) + '</td></tr>'; }
         return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
@@ -950,7 +946,7 @@
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is already counted from each load's own departure day.
-    // Joe 10/19: inside Loaded and Not loaded, the loads go Case, then Box, then Tote, then Tanker (each group keeps the order below).
+    // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
     var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
     var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
@@ -965,8 +961,18 @@
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
-    if (loaded.length) { H.push(head('Loaded (' + loaded.length + ')', null, GREEN)); H.push(grid(loaded)); }
-    if (notLoaded.length) { H.push(head('Not loaded (' + notLoaded.length + ')', null, RED)); H.push(grid(notLoaded)); }
+    // Joe 10/19: one group per load type (Case, Box, Tote, Tanker), each with its own Loaded then Not loaded list and a dark
+    // line between types. A type with no loads, or a list with none, is left out.
+    var firstGroup = true;
+    GROUP_ORDER.concat(['']).forEach(function (g) {
+      var inGroup = function (x) { return g ? x.area === g : !GROUP_NAME[x.area]; }, ld = loaded.filter(inGroup), nl = notLoaded.filter(inGroup);
+      if (!ld.length && !nl.length) return;
+      if (g) H.push('<tr><td style="padding:' + (firstGroup ? '8px' : '18px') + ' 14px 0">' + (firstGroup ? '' : '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>') +
+        '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[g]) + ' (' + (ld.length + nl.length) + ')</div></td></tr>');
+      firstGroup = false;
+      if (ld.length) { H.push(head('Loaded (' + ld.length + ')', null, GREEN)); H.push(grid(ld)); }
+      if (nl.length) { H.push(head('Not loaded (' + nl.length + ')', null, RED)); H.push(grid(nl)); }
+    });
     if (!loaded.length && !notLoaded.length) H.push(plain('No loads on the dispatch sheet for this day.'));
     var pickups = r.pickups || [], down = r.down || [], lines = r.lines || [], temps = r.temperatures || [];
     H.push(head('Pickups open', pickups.length, pickups.length ? RED : null));

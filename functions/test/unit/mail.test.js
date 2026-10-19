@@ -117,7 +117,7 @@ test('report email: routes split by delivery day, loaded in finish order, a blan
   assert.doesNotMatch(one, /Delivers/, 'no separator when every load delivers the same day');
 });
 
-test('report email: loads grouped Case, Box, Tote, Tanker with a line between groups (Joe 10/19)', () => {
+test('report email: loads grouped by type, Case then Box, Tote, Tanker, each with Loaded then Not loaded (Joe 10/19)', () => {
   const now = Date.parse('2026-10-19T14:00:00Z');
   const L = (route, run, area, state, disp, done) => ({ route, run, routeName: '', area, state, dispatchTime: disp, loadDate: '2026-10-19', deliveryDate: '2026-10-19', departureDate: '2026-10-19', loadSequence: 1, completedAt: done || '', truck: '', trailer: '' });
   const r = R.plantReport({ loads: [
@@ -129,10 +129,9 @@ test('report email: loads grouped Case, Box, Tote, Tanker with a line between gr
     L('951', 'UT SKIM TANKER', 'TANKER', 'WAITING', '12:00'),
     L('845', 'UT DSD', 'CASE', 'WAITING', '14:00')], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
   const html = R.reportHtml(r, '');
-  const loaded = html.slice(html.indexOf('Loaded (5)'), html.indexOf('Not loaded'));
-  assert.match(loaded, /Case \(2\)[\s\S]*>801<[\s\S]*>827<[\s\S]*Box \(1\)[\s\S]*>6301<[\s\S]*Tote \(1\)[\s\S]*>912<[\s\S]*Tanker \(1\)[\s\S]*>950</, 'Case, Box, Tote, Tanker; finish order kept inside a group');
-  assert.equal((loaded.match(/"height:3px/g) || []).length, 3, 'a line between each of the four groups');
-  const notLoaded = html.slice(html.indexOf('Not loaded'));
-  assert.match(notLoaded, /Case \(1\)[\s\S]*>845<[\s\S]*Tanker \(1\)[\s\S]*>951</);
-  assert.doesNotMatch(notLoaded, /Box \(|Tote \(/, 'a group with no loads is left out');
+  assert.match(html, /Case \(3\)[\s\S]*Loaded \(2\)[\s\S]*>801<[\s\S]*>827<[\s\S]*Not loaded \(1\)[\s\S]*>845<[\s\S]*Box \(1\)[\s\S]*Loaded \(1\)[\s\S]*>6301<[\s\S]*Tote \(1\)[\s\S]*Loaded \(1\)[\s\S]*>912<[\s\S]*Tanker \(2\)[\s\S]*Loaded \(1\)[\s\S]*>950<[\s\S]*Not loaded \(1\)[\s\S]*>951</,
+    'Case, Box, Tote, Tanker; Loaded then Not loaded inside each; finish order kept');
+  assert.equal((html.match(/"height:3px/g) || []).length, 3, 'a line between each of the four types');
+  const box = html.slice(html.indexOf('Box (1)'), html.indexOf('Tote (1)'));
+  assert.doesNotMatch(box, /Not loaded/, 'a list with no loads is left out');
 });
