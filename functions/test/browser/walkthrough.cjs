@@ -107,16 +107,17 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     for (const [w, h] of [[390, 844], [800, 1280]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700 }, '/walkthrough.html?view=home&' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading', 'Send Report']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html', 'manager.html?report=1']);
-      assert.equal(await page.textContent('.wk-choice:last-child .wk-n'), 'Nonelast sent');
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading', 'Send Report', 'Trailer Assignment']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html', 'manager.html?report=1', 'trailers.html']);
+      assert.equal(await page.textContent('.wk-choice[href="manager.html?report=1"] .wk-n'), 'Nonelast sent');
+      assert.match(await page.textContent('.wk-choice[href="trailers.html"] .wk-n'), /^\d+of \d+ assigned$/);
       assert.deepEqual(await page.$$eval('.wk-row:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
-      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading, Unloading and Send Report have none');
+      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading, Unloading, Send Report and Trailer Assignment have none');
       assert.equal(await page.textContent('#ask'), 'What are you doing?');
       assert.equal(await page.isVisible('#full'), true);
       await tidy(page, 'Start screen ' + w);
       await shot(page, 'walkthrough-home-' + w);
-      if (SHOTS) { await page.$eval('.wk-choice:last-child', el => el.scrollIntoView({ block: 'end' })); await page.waitForTimeout(200); await shot(page, 'walkthrough-home-bottom-' + w); }
+      if (SHOTS) { await page.$eval('.wk-choice[href="trailers.html"]', el => el.scrollIntoView({ block: 'end' })); await page.waitForTimeout(200); await shot(page, 'walkthrough-home-bottom-' + w); }
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }

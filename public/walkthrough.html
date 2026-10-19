@@ -107,6 +107,7 @@
         // Joe 10/15 (later): the manager's phone: the walkthrough (Yard, Coolers, Quality), then Loading and Unloading.
         const walk = { due: Y.due + C.due + Q.due, late: Y.late + C.late + Q.late, out: C.out }, state = [Y, C, Q].some(z => z.state === 'late') ? 'late' : [Y, C, Q].some(z => z.state === 'due') ? 'due' : 'ok';
         const todays = journal.filter(d => d.date === date), loads = P.loadoutRows(data.runs, date), done = P.counts(loads);
+        const open = loads.filter(r => r.state !== 'DONE'), noTrailer = open.filter(r => !String(r.trailer || '').trim()).length;
         const uc = P.unloadCounts(P.unloadRows(data.runs, date, todays, P.returnsFor(data.runs, date, todays), loads));
         const area = (name, z, what) => ({ name, detail: z.out ? z.out + ' out of range' + (z.late ? ' · ' + z.late + ' past due' : '') : z.late ? z.late + ' past due' : z.due ? z.due + ' ' + what : z.auto || 'all checked', kind: z.out || z.late ? 'bad' : z.due ? 'warn' : 'ok' });
         html = row(state, 'walkthrough.html', choice('walkthrough.html', '', 'Manager Walkthrough', 'Yard, Coolers and Production', walk.due, walk.due ? 'due' : walk.out ? walk.out + ' out of range' : 'all checked', kindOf(walk),
@@ -118,7 +119,10 @@
           // Joe 10/18: Send Report: the Plant Update email Manager Center's Send Current Report sends, to the Plant Managers group.
           // It opens that report (what goes out, a note box and Send), so the manager sees it before it goes.
           choice('manager.html?report=1', '', 'Send Report', 'Plant Update email to the Plant Managers group', data.lastReport ? shortTime(Date.parse(data.lastReport)) : 'None', 'last sent', 'plain',
-            [{ name: 'Tap to see the report and send it', detail: '', kind: 'plain' }]);
+            [{ name: 'Tap to see the report and send it', detail: '', kind: 'plain' }]) +
+          // Joe 10/19: Trailer Assignment: the Trailer Assignments screen (which trailer goes on each load still to go).
+          choice('trailers.html', '', 'Trailer Assignment', 'Which trailer goes on each load', open.length - noTrailer, 'of ' + open.length + ' assigned', open.length && !noTrailer ? 'good' : 'plain',
+            [{ name: noTrailer + ' need a trailer', detail: '', kind: noTrailer ? 'warn' : 'plain' }]);
       } else {
         html = row(Y.state, 'yard.html?walk=1', choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items, whoOf(Y))) +
           row(C.state, 'temps.html?walk=1', choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items, whoOf(C))) +
