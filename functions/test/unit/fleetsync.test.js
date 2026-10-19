@@ -133,12 +133,14 @@ test('the fleet list gives each unit its owner and branch for Fleet Service', ()
 test('Fleet Service keeps owned trucks and every trailer at this plant, and drops leased trucks and other branches', () => {
   const L = require('../../src/logic');
   const own = { units: { '223876': { own: false, facilityId: 'fac_uniontown' }, 'T-95': { own: true, facilityId: 'fac_uniontown' },
-    'T-10318': { own: false, facilityId: 'fac_uniontown' }, 'T-10308': { own: false, facilityId: '' }, '688': { own: true, facilityId: 'fac_uniontown' },
+    'T-10318': { own: false, facilityId: 'fac_uniontown' }, 'T-10308': { own: false, facilityId: '' }, 'T-555': { own: true, facilityId: '' }, '688': { own: true, facilityId: 'fac_uniontown' },
     '221810': { own: true, facilityId: 'fac_uniontown' }, '222860': { own: false, facilityId: 'fac_martins_ferry' } } };
   const here = (u) => L.fleetOwnedHere(u, 'fac_uniontown', own);
   assert.equal(here({ unit: '223876', type: 'TRUCK' }), false, 'a leased tractor');
   assert.equal(here({ unit: 'T-10318', type: 'TRAILER' }), true, 'a leased trailer stays: Uniontown services it (Joe 10/18)');
-  assert.equal(here({ unit: 'T-10308', type: 'TRAILER' }), false, 'the fleet list has it at another branch');
+  assert.equal(here({ unit: 'T-555', type: 'TRAILER' }), false, 'the fleet list has it at another branch');
+  assert.equal(here({ unit: 'T-10308', type: 'TRAILER' }), true, 'Joe 10/19: ours, though the fleet list says Marietta');
+  assert.equal(L.fleetOwnedHere({ unit: 'T-10308', type: 'TRAILER' }, 'fac_charleston', own), false, 'and only at Uniontown');
   assert.equal(here({ unit: 'T-095', type: 'TRAILER' }), true, 'owned, matched without the leading zero');
   assert.equal(here({ unit: '688', type: 'TRUCK' }), true, 'the yard trucks stay');
   assert.equal(here({ unit: '221810', type: 'TRUCK' }), false, 'out of service, no longer ours (Joe 10/18)');

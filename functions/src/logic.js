@@ -664,6 +664,8 @@
   // is this plant, leased or not (Joe: "Those I want you to include, we're in charge of that"). A unit not on the list stays
   // (its Equipment Master plant decides) unless its own notes say it is leased. FLEET_OFF: units Joe took off by name.
   var FLEET_OFF = { '221810': 'Joe 10/18: out of service, no longer available to us' };
+  // FLEET_ON: units Joe said are a plant's own even though the fleet list puts them elsewhere.
+  var FLEET_ON = { 'T-10308': { plant: 'fac_uniontown', why: 'Joe 10/19: ours (fleet list says Marietta)' } };
   function fleetUnitKey(u) {
     var s = String(u === null || u === undefined ? '' : u).trim().toUpperCase().replace(/\s+/g, ''), m = s.match(/^([A-Z]+)-?0*(\d+)$/), n = s.match(/^0*(\d+)$/);
     return m ? m[1] + '-' + m[2] : n ? n[1] : s;
@@ -675,6 +677,7 @@
   function fleetOwnedHere(unit, plantId, ownership) {
     var key = fleetUnitKey(unit && unit.unit), trailer = fleetKind(unit && unit.type) === 'TRAILER';
     if (FLEET_OFF[key]) return false;
+    if (FLEET_ON[key]) return FLEET_ON[key].plant === plantId;
     if (!trailer && unitLeased(unit)) return false;
     var list = ownership && ownership.units, rec = list ? list[key] : null;
     if (rec) return (trailer || rec.own === true) && rec.facilityId === plantId;
@@ -1343,7 +1346,7 @@
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
