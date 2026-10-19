@@ -51,6 +51,8 @@ async function note(id, at, values, status) {
     assert.equal(mc.lines.length, 2);
     assert.match(mc.lines.join(' | '), /Needs attention.*Handoff · Cooler 2 door \| Needs attention.*Handoff · Dock 6/);
     assert.deepEqual(mc.tiles, ['Breakdowns=0 still open', 'Handoffs=2 red open', 'Carryover=2 from earlier shifts']);
+    // Read once the card has stopped redrawing (a number caught mid-redraw has no style yet).
+    await page.waitForFunction(() => { const b = document.querySelector('[data-card="notes"] .mc-tile b'); return b && b.isConnected && getComputedStyle(b).fontSize; }, null, { timeout: 5000 });
     assert.ok(await page.$eval('[data-card="notes"] .mc-tile b', b => parseFloat(getComputedStyle(b).fontSize) >= 30), 'bigger numbers on the Shift Notes card');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'shift-keep-manager-1536.png') });
     results.push('Manager Center: the Shift Notes card is red with "2 need review", lists both handoff notes, Handoffs 2 open in red, 2 carried over from earlier shifts');
