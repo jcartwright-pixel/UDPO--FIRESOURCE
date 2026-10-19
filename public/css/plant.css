@@ -528,6 +528,7 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
 .temp-page .tp-act .tp-pill.due { background: #fff3df; color: #b45f00; border: 1px solid #f1c98a; }
 .temp-page .tp-act .tp-pill.locked { background: #eef2f6; color: #4c5d6e; }
 .temp-page .tp-act .tp-pill.saved { background: #e6f6ec; color: var(--runs-ink); }
+.temp-page .tp-act .tp-pill.ok { background: #e6f6ec; color: var(--runs-ink); }
 .temp-page .tp-btn { min-width: 118px; height: 40px; border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; padding: 0 14px; cursor: pointer; white-space: nowrap; }
 .temp-page .tp-btn.on { background: var(--ud-blue); color: #fff; }
 .temp-page .tp-btn.alert { border-color: #c62828; color: #c62828; }
