@@ -234,7 +234,8 @@ async function shots(page, name, w) {
       await page.click('#add-save');
       await page.waitForFunction(() => /4Returns7Cases2Refused2Pending/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
       assert.match(await page.textContent('#rows'), /Added at plant/);
-      assert.ok(await page.isHidden('#add-bar'), 'the form closes once the return is added');
+      // The counts come from the live update, which can land before the save call returns and closes the form.
+      assert.ok(await page.waitForFunction(() => document.getElementById('add-bar').hidden, null, { timeout: 8000 }).then(() => true, () => false), 'the form closes once the return is added');
       await fits(page, 'Product Returns with + Add Return 1280x800');
       await shots(page, 'returns-added-tablet', 1280);
       await page.click('button.rta');
