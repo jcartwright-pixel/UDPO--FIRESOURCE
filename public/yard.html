@@ -73,6 +73,7 @@
   <script type="module">
     import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, dateTimeText, goLiveNote, shortTime, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { watchLoads } from './js/recent-records.js';
     import { savedText, watchRound } from './js/autosave.js';
     import { walkBar } from './js/walk-bar.js';
 
@@ -188,6 +189,7 @@
       Object.keys(mine).forEach(t => { const m = mine[t]; if (m.first && m.saved !== 'saving' && Date.now() - m.first >= LOCK_MS) { delete mine[t]; delete drafts[t]; } });
     }
     const queues = {};          // trailer -> the saves of that trailer, one after the other
+    const waitingSave = {};     // trailer -> a save is waiting behind the one on its way (it sends every box left meanwhile)
     // Joe 10/18: the phone is a table like the old app's phone yard check (Trailer, Temp, Set, Fuel drop-down), with the GPS
     // temperature where Notes was and a Notes button where Left Yard was (the GPS says when a trailer has left). The button opens
     // a box under the row for what was wrong besides the temperature; it saves as it is left. No list of trailers that left.
@@ -270,7 +272,11 @@
         if (mineRec) setTimeout(() => { const i = pending.indexOf(mineRec); if (i >= 0) pending.splice(i, 1); render(); }, 1500);
         render();
       };
-      queues[trailer] = (queues[trailer] || Promise.resolve()).then(run);
+      // Joe 10/19 (yard saves slow): boxes left while a save is on its way wait for one more save, which sends them all
+      // (it reads the boxes when it starts), instead of one save per box one after the other.
+      if (waitingSave[trailer]) return;
+      waitingSave[trailer] = true;
+      queues[trailer] = (queues[trailer] || Promise.resolve()).then(() => { delete waitingSave[trailer]; return run(); });
     }
     const cardsEl = document.getElementById('cards');
     cardsEl.addEventListener('input', e => { const c = e.target.closest('.yd-card'), k = e.target.dataset.k; if (c && k) (drafts[c.dataset.trailer] = drafts[c.dataset.trailer] || {})[k] = e.target.value; });
@@ -344,9 +350,8 @@
     let db = null;
     function watch() {
       while (unsubs.length) unsubs.pop()();
-      // The loads of the week before, this week and the week after (the current app's three Live weeks), and two days of checks.
-      const weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); got.runs = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
+      // The loads loaded, waiting or leaving yesterday and today (Joe 10/19: not three weeks of whole runs), and two days of checks.
+      unsubs.push(watchLoads(db, [L.addDays(date, -1), date], r => { runs = r; got.runs = true; render(); }, e => showError('Could not read the loads (' + e.message + '). Check the network and reload the page.')));
       unsubs.push(onSnapshot(collection(db, 'gpsReefer'), s => { reefer = {}; s.docs.forEach(d => { const r = d.data(); reefer[U.yardTrailer(r.trailer || d.id)] = r; }); render(); }, () => {}));
       unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { journal = s.docs.map(d => d.data()); got.journal = true; render(); }, e => showError('Could not read the yard checks (' + e.message + '). Check the network and reload the page.')));
     }
