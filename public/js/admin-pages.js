@@ -434,8 +434,8 @@ export async function renderAccessCodes(box) {
 
 // Joe 10/12: each link reads at a glance (name, who can open it, the buttons); the rest is under "How it works".
 const APP_LINKS = [
-  { key: 'company', title: 'United Dairy Operations', label: 'Company link', path: 'index.html', who: 'ud', short: 'Anyone with a UD account; their role decides what they see', opens: 'Every screen their role allows.', shut: 'Remove them in People & Roles.' },
-  { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', short: 'Anyone with a UD account', opens: 'The phone screens for managers, supervisors and plant staff.', shut: 'Remove them in People & Roles.' },
+  { key: 'company', title: 'Plant Operations', label: 'Plant Operations link', path: 'index.html', who: 'ud', short: 'The full Operations app on a computer: anyone with a UD account; their role decides what they see', opens: 'The full Operations app (what the office and dispatch use): every screen their role allows.', shut: 'Remove them in People & Roles.' },
+  { key: 'phone', title: 'Phone link', label: 'Phone link', path: 'index.html', who: 'ud', short: 'The full Operations app on a phone: anyone with a UD account', opens: 'The phone screens for managers, supervisors and plant staff.', shut: 'Remove them in People & Roles.' },
   { key: 'manager', title: 'Manager Web App', label: 'Manager link', path: 'manager.html', who: 'ud', short: 'Managers (UD account)', opens: 'The manager screens. Company Google sign-in, no code.', shut: 'Change their role in People & Roles.' },
   { key: 'plant', title: 'Plant Station', label: 'Tablet link', path: 'plant-station.html', who: 'ud', short: 'A tablet with a UD account, then the station\'s code', opens: 'One link for every plant station. The tablet types its station\'s code (Stations, below), opens that station and keeps it. Moving it to another station needs the plant\'s manager release code.', shut: 'New code or Remove on the station, below.' },
   { key: 'public', title: 'Plant Station with no UD account', label: 'No-account tablet link', path: 'plant-station.html?noaccount=1', who: 'code', short: 'A tablet or phone with only its station\'s code, while it is On', opens: 'The same Plant Station on a tablet or phone with no United Dairy account (as the old app\'s public Plant Station). The tablet types its station\'s code (Stations, below) and opens only that station: loading, pickups, unloading, washing and returns, nothing else. It leaves only through Release in the bottom-right corner and the manager release code.', shut: 'Turn Off (press twice) shuts every no-account tablet out at once; tablets with a UD account keep working. New code or Remove on a station shuts out the tablets on its old code.', noacct: true },
@@ -444,12 +444,15 @@ const APP_LINKS = [
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, DVIR, Check-In and My Schedule. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
   { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
   // Joe 10/18: the Plant Managers app ("send them the link and have a code").
-  { key: 'managers', title: 'Plant Managers', label: 'Plant Managers link', path: 'walkthrough.html?view=home&app=1', who: 'ud', short: 'Managers (UD account, Manager or Administrator role), then the Plant Managers code once', opens: 'The plant managers\' app on their phone, iPad or tablet: the Manager Walkthrough (Yard, Coolers, Production), Loading, Unloading and Send Report. Send them the link; they sign in with their United Dairy account, type the Plant Managers code once (below) and add it to the home screen, where it is called Plant Managers. It is their own phone, so Sign out stays and there is no Release.', shut: 'New code (below) makes every phone ask for the new code; change their role in People & Roles.' },
+  { key: 'managers', title: 'Plant Managers App', label: 'Plant Managers link', path: 'walkthrough.html?view=home&app=1', who: 'ud', short: 'The plant managers\' own app on their phone or tablet: UD account (Manager or Administrator role), then the Plant Managers code once (Plant Managers App page)', opens: 'The plant managers\' app on their phone, iPad or tablet: the Manager Walkthrough (Yard, Coolers, Production), Loading, Unloading and Send Report. Send them the link; they sign in with their United Dairy account, type the Plant Managers code once (below) and add it to the home screen, where it is called Plant Managers. It is their own phone, so Sign out stays and there is no Release.', shut: 'New code (below) makes every phone ask for the new code; change their role in People & Roles.' },
+  { key: 'distribution', title: 'Distribution Manager', label: 'Distribution Manager link', path: 'distribution.html', who: 'ud', short: 'The distribution manager (routes, trucks and drivers): UD account; opens Route Distribution in the full app', opens: 'Route Distribution, the distribution side of the full Operations app: dispatch, routes, trucks and drivers. Their role decides what they can change.', shut: 'Change their role in People & Roles.' },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
 
 // Review item 54 (Joe 10/13): no Phone Screens card; it only listed these same links again.
-const MANAGER_LINKS = ['company', 'phone', 'manager', 'personal'];
+// Joe 10/18: Plant Operations (the full app), the phone link, the Plant Managers App and the Distribution Manager (routes and trucks),
+// each named for what it is. The Garage Station keeps its own page (Garage Station Codes).
+const MANAGER_LINKS = ['company', 'phone', 'managers', 'distribution', 'personal'];
 const PLANT_LINKS = ['plant', 'public'];
 const GARAGE_LINKS = ['garage', 'maint'];
 // Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.
@@ -460,7 +463,8 @@ const MANAGER_APP_LINKS = ['managers'];
 // The link cards for the given keys; tail is more of the page under the cards (Manager Links' release codes, the stations).
 export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', more = []) {
   let data = null;
-  const pick = (list) => APP_LINKS.filter(l => list.indexOf(l.key) >= 0);
+  // In the page's own order (Manager Links: the Plant Managers App, then the Distribution Manager).
+  const pick = (list) => list.map(k => APP_LINKS.find(l => l.key === k)).filter(Boolean);
   // more: link cards under the tail (Driver Station Codes: the drivers' phone link below the stations).
   const first = pick(keys), after = pick(more), links = first.concat(after);
   const sandbox = /sandbox|localhost|127\.0\.0\.1/.test(location.hostname);
