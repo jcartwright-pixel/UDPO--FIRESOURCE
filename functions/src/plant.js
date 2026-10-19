@@ -225,7 +225,13 @@ function validateLoad(input, SaveError) {
 // Joe 10/12: how many loads one loadout may load at the same time. A paused load does not count; starting or resuming one
 // past the limit is refused, so two tablets cannot get around it. Joe 10/13: a manager on the Loadout Center may go past it.
 const LOADING_LIMIT = Object.freeze({ CASE: 2, BOXING: 3 });
-const runAreaOf = (run) => areaOf(text(run && run.loadType) || (run && run.masterShow && run.masterShow.loadType) || '');
+// Joe 10/19 (800 Specials): the day's own load type (Daily Dispatch > Edit) wins for that day.
+// A Route Editor change to None reaches the week's days as NONE: not loaded at the plant that day.
+const runAreaOf = (run, prefix) => {
+  const dayType = text(prefix && run && run.days && run.days[prefix] && run.days[prefix].loadType).toUpperCase();
+  if (dayType === 'NONE') return '';
+  return areaOf(dayType) || areaOf(text(run && run.loadType) || (run && run.masterShow && run.masterShow.loadType) || '');
+};
 // A day block is loading now: started (or marked Loading), not paused, not done.
 function dayLoadingNow(day) {
   const s = text(day && day.loadStatus).toUpperCase();
@@ -240,8 +246,8 @@ async function loadingNow(tx, db, area, stamp, except) {
   const runs = (await tx.get(db.collection('runs').where('weekStart', 'in', weeks))).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
   let n = 0;
   runs.forEach(run => {
-    if (runAreaOf(run) !== area || text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
-    dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => { if (run.id + '|' + b.prefix !== except && dayLoadingNow(run.days[b.prefix])) n++; }));
+    if (text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
+    dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => { if (runAreaOf(run, b.prefix) === area && run.id + '|' + b.prefix !== except && dayLoadingNow(run.days[b.prefix])) n++; }));
   });
   if (area === 'BOXING') {
     const ships = R.scheduleEntries((await tx.get(db.collection('plantJournal').where('type', '==', R.LOAD_TYPE.SHIPPING))).docs.map(d => d.data()), 'SHIPPING');
@@ -297,7 +303,8 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   if (status) after.loadStatus = status;
   // Starting or resuming a load (it was not loading and now is): the area's limit.
   const nowLoading = dayLoadingNow(Object.assign({}, day, after));
-  if (nowLoading && !wasLoading && LOADING_LIMIT[runAreaOf(run)] && !(f.overLimit && req.manager)) overLimit(runAreaOf(run), await loadingNow(tx, db, runAreaOf(run), stamp, run.id + '|' + req.day), SaveError);
+  const area = runAreaOf(run, req.day);
+  if (nowLoading && !wasLoading && LOADING_LIMIT[area] && !(f.overLimit && req.manager)) overLimit(area, await loadingNow(tx, db, area, stamp, run.id + '|' + req.day), SaveError);
   if (f.truck !== undefined || f.trailer !== undefined) {
     const equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
     [['truck', 'TRUCK', 'truckId'], ['trailer', 'TRAILER', 'trailerId']].forEach(([k, type, idField]) => {

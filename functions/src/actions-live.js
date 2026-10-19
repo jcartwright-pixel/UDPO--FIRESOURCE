@@ -7,6 +7,7 @@
 const L = require('./logic');
 const M = require('./model');
 const { queueCells, dayCells, TIME_FIELDS } = require('./actions-common');
+const R = require('./plant-rules');
 
 const C = M.COLLECTIONS;
 
@@ -100,6 +101,12 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       if (want.dispatchTime !== null && want.dispatchTime !== undefined) {
         if (!byHand(run, p, 'dispatch_time_override') && day.dispatchTime !== want.dispatchTime) ch.dispatchTime = want.dispatchTime;
         if (!byHand(run, p, 'start_time_override') && day.startTime !== want.dispatchTime) ch.startTime = want.dispatchTime;
+      }
+      // Joe 10/19 (800 Specials): a Loadout Type changed in the Route Editor moves the days not loaded yet to that loadout (the day's own
+      // type, kept in the app); a day whose type was picked by hand on Daily Dispatch keeps it.
+      if (req && req.fields && typeof req.fields.loadType === 'string' && !day.loadTypeByHand) {
+        const type = R.loadArea(m.loadType) || 'NONE';
+        if (String(day.loadType || '') !== type) ch.loadType = type;
       }
       const hours = hoursNumber(want.hours);
       if (hours !== null && !byHand(run, p, 'route_hours_override') && day.routeHours !== hours) ch.routeHours = hours;
