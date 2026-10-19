@@ -931,10 +931,14 @@
     function grid(list) {
       var th = function (t, al) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + GREY + '">' + t + '</td>'; };
       var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:3px solid #ffffff">' + t + '</td>'; };
-      var last = null;
+      var last = null, lastGroup = null, groupCount = {};
+      list.forEach(function (x) { groupCount[x.area] = (groupCount[x.area] || 0) + 1; });
       return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + th('Done', 1) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
         var sep = '';
-        if (splitDays && x.day !== last) { last = x.day; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + INK + ';border-bottom:2px solid ' + INK + '">' + e(deliversLabel(x.day)) + '</td></tr>'; }
+        // Joe 10/19: Case, Box, Tote, Tanker each under their own name, with a dark line between them.
+        if (GROUP_NAME[x.area] && x.area !== lastGroup) { sep = '<tr><td colspan="4" style="padding:' + (lastGroup ? '10px' : '2px') + ' 0 0">' + (lastGroup ? '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>' : '') + '<div style="' + F + 'padding:8px 8px 4px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[x.area]) + ' (' + groupCount[x.area] + ')</div></td></tr>'; last = null; }
+        lastGroup = x.area;
+        if (splitDays && x.day !== last) { last = x.day; sep += '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + INK + ';border-bottom:2px solid ' + INK + '">' + e(deliversLabel(x.day)) + '</td></tr>'; }
         return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
@@ -946,12 +950,15 @@
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is already counted from each load's own departure day.
+    // Joe 10/19: inside Loaded and Not loaded, the loads go Case, then Box, then Tote, then Tanker (each group keeps the order below).
+    var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+    var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
     var untilOf = function (x) { return x.minutesUntil === null || x.minutesUntil === undefined ? 1e9 : x.minutesUntil; };
-    var loaded = (r.loaded || []).slice().sort(function (a, b) { return byDay(a, b) || (a.doneMs || 9e15) - (b.doneMs || 9e15) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
-    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byDay(a, b) || untilOf(a) - untilOf(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return x.late ? { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', bg: '#fde8e6', fg: RED }; });
+    var loaded = (r.loaded || []).slice().sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || (a.doneMs || 9e15) - (b.doneMs || 9e15) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
+    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || untilOf(a) - untilOf(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', bg: '#fde8e6', fg: RED }; });
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
     var H = [];

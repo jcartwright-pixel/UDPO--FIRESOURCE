@@ -116,3 +116,23 @@ test('report email: routes split by delivery day, loaded in finish order, a blan
   const one = R.reportHtml(R.plantReport({ loads: [L('827', 'UT WALMART', '', 'DONE', '02:00', '2026-10-18', 1, '2026-10-17T16:00:00Z')], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now), '');
   assert.doesNotMatch(one, /Delivers/, 'no separator when every load delivers the same day');
 });
+
+test('report email: loads grouped Case, Box, Tote, Tanker with a line between groups (Joe 10/19)', () => {
+  const now = Date.parse('2026-10-19T14:00:00Z');
+  const L = (route, run, area, state, disp, done) => ({ route, run, routeName: '', area, state, dispatchTime: disp, loadDate: '2026-10-19', deliveryDate: '2026-10-19', departureDate: '2026-10-19', loadSequence: 1, completedAt: done || '', truck: '', trailer: '' });
+  const r = R.plantReport({ loads: [
+    L('950', 'UT RAW TANKER', 'TANKER', 'DONE', '06:30', '2026-10-19T10:30:00Z'),
+    L('912', 'UT KTI TOTES', 'TOTES', 'DONE', '06:00', '2026-10-19T10:10:00Z'),
+    L('6301_1', 'UT CHARLESTON LOAD 1', 'BOXING', 'DONE', '05:00', '2026-10-19T09:05:00Z'),
+    L('827', 'UT WALMART', 'CASE', 'DONE', '05:30', '2026-10-19T09:40:00Z'),
+    L('801', 'UT DSD MILK', 'CASE', 'DONE', '04:00', '2026-10-19T08:30:00Z'),
+    L('951', 'UT SKIM TANKER', 'TANKER', 'WAITING', '12:00'),
+    L('845', 'UT DSD', 'CASE', 'WAITING', '14:00')], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
+  const html = R.reportHtml(r, '');
+  const loaded = html.slice(html.indexOf('Loaded (5)'), html.indexOf('Not loaded'));
+  assert.match(loaded, /Case \(2\)[\s\S]*>801<[\s\S]*>827<[\s\S]*Box \(1\)[\s\S]*>6301<[\s\S]*Tote \(1\)[\s\S]*>912<[\s\S]*Tanker \(1\)[\s\S]*>950</, 'Case, Box, Tote, Tanker; finish order kept inside a group');
+  assert.equal((loaded.match(/"height:3px/g) || []).length, 3, 'a line between each of the four groups');
+  const notLoaded = html.slice(html.indexOf('Not loaded'));
+  assert.match(notLoaded, /Case \(1\)[\s\S]*>845<[\s\S]*Tanker \(1\)[\s\S]*>951</);
+  assert.doesNotMatch(notLoaded, /Box \(|Tote \(/, 'a group with no loads is left out');
+});
