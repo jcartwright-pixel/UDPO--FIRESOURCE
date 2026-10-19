@@ -607,24 +607,57 @@ async function requireSaver(tx, db, user, roles, action, plantId) {
 }
 
 // The driver's own truck on a day he is put on (current app 7.0.267, udpoV7267DriverOwnTruck_). after gets truckId / truck when it
-// goes on; warnings says why it did not. A truck on another load that day with a different driver stays where it is.
+// goes on; warnings says why it did not. Joe 10/19 (Kemp's 223882 on 845 with Peffer, Yoder's 123891 left on 901 with no driver):
+// his own truck follows him off another load that day unless someone picked it there by hand. That load gets its own driver's truck
+// when that is free, otherwise its truck is left blank so it shows as needing one. Returns the other loads' changes, written after
+// every read (a transaction reads first).
 async function ownTruckFor(tx, db, run, runDocId, p, day, after, warnings) {
   const d = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(after.driverId)));
   const own = d.exists && d.data().defaultTruckId;
-  if (!own || String(day.truckId || '').toUpperCase() === String(own).toUpperCase()) return;
+  if (!own || String(day.truckId || '').toUpperCase() === String(own).toUpperCase()) return [];
   const name = d.data().name || after.driver;
   const unit = await tx.get(db.collection(C.equipment).doc(M.safeIdPart(own)));
-  if (!unit.exists) { warnings.push(name + "'s truck " + own + ' is not in Equipment Master; the route\'s truck was kept.'); return; }
+  if (!unit.exists) { warnings.push(name + "'s truck " + own + ' is not in Equipment Master; the route\'s truck was kept.'); return []; }
   const truck = unit.data();
-  if (L.unitOff(truck)) { warnings.push(name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.'); return; }
+  if (L.unitOff(truck)) { warnings.push(name + "'s truck " + truck.unit + ' is ' + L.unitOffWhy(truck) + '; the route\'s truck was kept.'); return []; }
+  const moves = await takeOwnTruck(tx, db, run, runDocId, p, after.driverId, truck);
+  if (!moves) return [];
+  if (moves.held) { warnings.push(name + "'s truck " + truck.unit + ' was picked by hand for route ' + moves.held.route + ' ' + (moves.held.run || '') + ' that day; the route\'s truck was kept.'); return []; }
+  after.truckId = truck.id; after.truck = truck.unit;
+  return moves;
+}
+
+const sameUnit = (od, truck) => String(od.truckId || '').toUpperCase() === String(truck.id).toUpperCase() || (!!truck.unit && od.truck === truck.unit);
+
+// Takes a driver's own truck off the other loads that day that hold it (his own other loads keep it). { held: run } when one of them
+// had it picked by hand; otherwise the list of { snap, run, change } to write, each load getting its own driver's truck when free.
+async function takeOwnTruck(tx, db, run, runDocId, p, driverId, truck) {
   const week = await tx.get(db.collection(C.runs).where('weekStart', '==', run.weekStart));
-  const other = week.docs.find(s => {
+  const holders = week.docs.filter(s => {
     if (s.id === runDocId) return false;
     const od = (s.data().days || {})[p] || {};
-    return od.runs && od.driverId !== after.driverId && (String(od.truckId || '').toUpperCase() === String(truck.id).toUpperCase() || (!!truck.unit && od.truck === truck.unit));
+    return od.runs && od.driverId !== driverId && sameUnit(od, truck);
   });
-  if (other) { warnings.push(name + "'s truck " + truck.unit + ' is already on route ' + other.data().route + ' ' + (other.data().run || '') + ' that day; the route\'s truck was kept.'); return; }
-  after.truckId = truck.id; after.truck = truck.unit;
+  const held = holders.find(s => L.yes(((s.data().days || {})[p] || {}).equipmentOverride));
+  if (held) return { held: held.data() };
+  const taken = new Set([String(truck.id).toUpperCase()]), moves = [];
+  for (const s of holders) {
+    const od = s.data().days[p], change = { truckId: '', truck: '' };
+    if (od.driverId) {
+      const ds = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(od.driverId)));
+      const theirs = ds.exists && ds.data().defaultTruckId;
+      const us = theirs ? await tx.get(db.collection(C.equipment).doc(M.safeIdPart(theirs))) : null;
+      const t = us && us.exists ? us.data() : null;
+      const busy = t && (taken.has(String(t.id).toUpperCase()) || week.docs.some(o => {
+        if (o.id === s.id || o.id === runDocId) return false;
+        const x = (o.data().days || {})[p] || {};
+        return x.runs && x.driverId !== od.driverId && sameUnit(x, t);
+      }));
+      if (t && !L.unitOff(t) && !busy) { change.truckId = t.id; change.truck = t.unit; taken.add(String(t.id).toUpperCase()); }
+    }
+    moves.push({ snap: s, run: s.data(), change });
+  }
+  return moves;
 }
 
 async function resolveAssignment(tx, db, req, stamp, run) {
@@ -825,7 +858,25 @@ async function applyAction(db, user, input, now, deps) {
     // Joe 10/12 (Joel Jacobs on 901_1 with no truck): a driver put on a day, from Daily or Weekly, takes his own truck (Driver Master's
     // assigned truck) unless it is not usable or another driver has it that day; his own other loads that day keep it too.
     const warnings = [];
-    if (req.action === 'assignDriver' && after.driverId && day.runs) await ownTruckFor(tx, db, run, req.runDocId, req.day, day, after, warnings);
+    let moves = [];
+    if (req.action === 'assignDriver' && day.runs) {
+      // Joe 10/19 (Yoder taken off 901, his 123891 left there): a driver taken off a load takes his own truck off it too, unless it
+      // was picked there by hand; the new driver's own truck goes on in its place when he has one.
+      if (after.driverId) moves = await ownTruckFor(tx, db, run, req.runDocId, req.day, day, after, warnings);
+      if (after.truckId === undefined && day.driverId && day.driverId !== after.driverId && day.truckId && !L.yes(day.equipmentOverride)) {
+        const ownOf = async (id) => { const s = id ? await tx.get(db.collection(C.drivers).doc(M.safeIdPart(id))) : null; return s && s.exists ? String(s.data().defaultTruckId || '').toUpperCase() : ''; };
+        const truck = String(day.truckId).toUpperCase();
+        if (await ownOf(day.driverId) === truck && await ownOf(after.driverId) !== truck) { after.truckId = ''; after.truck = ''; }
+      }
+    }
+    // Joe 10/19 (891 typed on 800 said "ON 901"): the driver's own truck picked by hand comes off the other loads holding it that day.
+    if (req.action === 'assignTruck' && day.runs && day.driverId && after.truckId) {
+      const ds = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(day.driverId)));
+      if (ds.exists && String(ds.data().defaultTruckId || '').toUpperCase() === String(after.truckId).toUpperCase()) {
+        const m = await takeOwnTruck(tx, db, run, req.runDocId, req.day, day.driverId, { id: after.truckId, unit: after.truck });
+        if (m && !m.held) moves = m;
+      }
+    }
     // A check-in's problems also go to the maintenance queues (read now; written below with the check-in).
     const writeMaint = req.action === 'saveCheckIn'
       ? await MAINT.prepareMaintenance(tx, db, run, req.runDocId, req.day, L.addDays(run.weekStart, L.DAYS.indexOf(req.day)), Object.assign({}, day, after), { by: email, driver: day.driver || '' }, stamp) : null;
@@ -846,8 +897,16 @@ async function applyAction(db, user, input, now, deps) {
     update['days.' + req.day + '.updatedBy'] = email;
     tx.update(runRef, update);
     if (mode.writeBack) queueSheetCells(tx, db, req.requestId, '', run, req.runDocId, req.day, Object.assign({}, after, marks), stamp, email);
+    moves.forEach((m, i) => {
+      const u = { rev: (m.run.rev || 0) + 1, testEdited: true, editedAt: stamp };
+      Object.keys(m.change).forEach(k => { u['days.' + req.day + '.' + k] = m.change[k]; });
+      u['days.' + req.day + '.updatedAt'] = stamp;
+      u['days.' + req.day + '.updatedBy'] = email;
+      tx.update(m.snap.ref, u);
+      if (mode.writeBack) queueSheetCells(tx, db, req.requestId, 'own' + i, m.run, m.snap.id, req.day, m.change, stamp, email);
+    });
     if (mode.writeBack && req.action === 'savePlantLoad') queueLoadoutHistory(tx, db, req, run, Object.assign({}, day, after), after, stamp, email);
-    const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }] };
+    const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }].concat(moves.map(m => ({ runDocId: m.snap.id, rev: (m.run.rev || 0) + 1 }))) };
     if (warnings.length) result.warnings = warnings;
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });

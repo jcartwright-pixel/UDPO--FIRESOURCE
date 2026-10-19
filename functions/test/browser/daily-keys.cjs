@@ -201,6 +201,35 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-carrier-1920.png') });
     results.push('picking BROOK, SAM brought his own truck 900003; picking Carrier took the truck off and Truck shows N/A');
 
+    // Joe 10/19 (Yoder taken off 901 MF JUG and put on 800 Specials): taking a driver off a load takes his own truck off it at once,
+    // and putting him on another load brings it there with no Unavailable box.
+    await db().collection('runs').doc('2026-10-04__run_t801').update({ 'days.tue.driverId': 'drv_test_brook', 'days.tue.driver': 'BROOK, SAM', 'days.tue.truckId': 'veh_truck_900003', 'days.tue.truck': '900003', 'days.tue.equipmentOverride': '' });
+    await p.waitForFunction((s) => document.querySelector(s).children[5].textContent === '900003', R801, { timeout: 8000 });
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'own-truck-1-before-1920.png') });
+    await p.click(R801 + ' td[data-edit="driver"]');
+    await p.keyboard.press('Delete');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === '' && document.querySelector(s).children[5].textContent === '', R801, { timeout: 8000 });
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('brook');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'BROOK, SAM' && document.querySelector(s).children[5].textContent === '900003', R802, { timeout: 8000 });
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'own-truck-2-moved-1920.png') });
+    results.push('BROOK, SAM taken off 801 took his 900003 off it; put on 802 his 900003 came with him');
+    // His truck left on a load with no driver (as on the live sheet now): typing it on his load is not Unavailable and moves it.
+    await db().collection('runs').doc('2026-10-04__run_t801').update({ 'days.tue.truckId': 'veh_truck_900003', 'days.tue.truck': '900003' });
+    await db().collection('runs').doc('2026-10-04__run_t802').update({ 'days.tue.truckId': '', 'days.tue.truck': '' });
+    await p.waitForFunction((s) => document.querySelector(s).children[5].textContent === '', R802, { timeout: 8000 });
+    await p.click(R802 + ' td[data-edit="truck"]');
+    await p.keyboard.type('003');
+    await p.waitForSelector('.cell-pop');
+    const pop = await p.textContent('.cell-pop');
+    assert.ok(!/cannot be used now|ON 801/.test(pop), 'his own truck is offered, not Unavailable: ' + pop);
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'own-truck-3-typed-1920.png') });
+    await p.keyboard.press('Enter');
+    await p.waitForFunction(([a, b]) => document.querySelector(b).children[5].textContent === '900003' && document.querySelector(a).children[5].textContent === '', [R801, R802], { timeout: 8000 });
+    results.push('his 900003 left on 801 with no driver: typing 003 on his 802 offered it (no Unavailable) and moved it off 801');
+
     // Joe 10/12: the Edit box lists the drivers (Regular by seniority, then Relief), and a driver picked there brings his own
     // truck into the box and the row.
     await db().collection('drivers').doc('drv_test_casey').update({ defaultTruckId: 'veh_truck_900003' });

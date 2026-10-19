@@ -376,7 +376,7 @@
           loadSequence: effectiveSequence(day),
           dispatchTime: day.dispatchTime, startTime: day.startTime, routeHours: day.routeHours, miles: day.miles,
           driverId: day.driverId, driver: day.driver, intendedDriverId: day.intendedDriverId || '', intendedDriver: day.intendedDriver || '', driverExceptionStatus: day.driverExceptionStatus || '',
-          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer,
+          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer, equipmentOverride: day.equipmentOverride || '',
           forkliftId: day.forkliftId, palletJack: day.palletJack,
           casesOut: day.casesOut, pickup: day.pickup, driverNotes: day.driverNotes,
           plantStatus: day.completeTime ? 'COMPLETE' : day.plantStartedAt ? 'LOADING' : (day.loadStatus || day.status || ''),
