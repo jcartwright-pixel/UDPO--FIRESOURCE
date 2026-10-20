@@ -130,6 +130,62 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await p.waitForFunction((s) => document.querySelector(s).value === '', cell(second, 'tue'), { timeout: 5000 });
     assert.equal(await stored(second, 'tue', 'dispatchTime', null), null, 'the cut block is cleared and saved');
     results.push('Ctrl+X copied the block and cleared it');
+
+    // Joe 10/20: a time typed or pasted any way turns into a real time; something that is not a time keeps the old time.
+    await p.fill(cell(first, 'sat'), '530p');
+    await p.keyboard.press('Tab');
+    await p.waitForFunction((s) => document.querySelector(s).value === '5:30 PM', cell(first, 'sat'), { timeout: 5000 });
+    assert.equal(await stored(first, 'sat', 'dispatchTime', 1050), 1050, '530p saved as 5:30 PM');
+    await p.click(cell(first, 'sun'));
+    await clip(p, 'paste', '5\t1730');
+    await p.waitForFunction((s) => document.querySelector(s).value === '5:00 AM', cell(first, 'sun'), { timeout: 5000 });
+    await p.waitForFunction((s) => document.querySelector(s).value === '5:30 PM', cell(first, 'mon'), { timeout: 5000 });
+    assert.equal(await stored(first, 'mon', 'dispatchTime', 1050), 1050, 'pasted 1730 saved as 5:30 PM');
+    await p.fill(cell(first, 'sat'), 'later');
+    await p.keyboard.press('Tab');
+    await p.waitForSelector('tr[data-id="' + first + '"] td .cell-note', { timeout: 5000 });
+    assert.equal(await p.inputValue(cell(first, 'sat')), '5:30 PM', 'not a time: the old time stays');
+    assert.equal(await stored(first, 'sat', 'dispatchTime', 1050), 1050, 'not a time: nothing saved');
+    results.push('Typed 530p and pasted 5 / 1730 became 5:30 PM, 5:00 AM and 5:30 PM; "later" kept the old time with a red note');
+    // Joe 10/20: an up / down clicker on a start time moves it 15 minutes a click and saves; it shows on the box under the mouse.
+    const btn = (run, d, dir) => 'tr[data-id="' + run + '"] td:has(' + cell(run, d).split(' ')[1] + ') .step-btn[data-step="' + dir + '"]';
+    await p.mouse.move(5, 5);
+    assert.equal(await p.$eval(btn(first, 'sun', 15), x => getComputedStyle(x.parentNode).display), 'none', 'the clicker hides until the box is pointed at');
+    await p.hover(cell(first, 'sun'));
+    await p.click(btn(first, 'sun', -15));
+    await p.click(btn(first, 'sun', -15));
+    assert.equal(await p.inputValue(cell(first, 'sun')), '4:30 AM', 'two clicks down: 30 minutes earlier');
+    assert.equal(await stored(first, 'sun', 'dispatchTime', 270), 270, 'the clicked time saved');
+    await p.hover(cell(first, 'mon'));
+    await p.click(btn(first, 'mon', 15));
+    await p.waitForFunction((s) => document.querySelector(s).value === '5:45 PM', cell(first, 'mon'), { timeout: 5000 });
+    assert.equal(await stored(first, 'mon', 'dispatchTime', 1065), 1065, 'one click up: 15 minutes later, saved');
+    results.push('The up / down clicker moved 5:00 AM to 4:30 AM and 5:30 PM to 5:45 PM, and saved each');
+    await shot(p, 'routes-clicker-1920.png');
+    // Joe 10/20: the same time all the way across a row - click the first box, Shift+click the last, type, Enter.
+    await p.click(cell(second, 'sun'));
+    await p.click(cell(second, 'sat'), { modifiers: ['Shift'] });
+    assert.equal(await p.$$eval('input.cell.picked', x => x.length), 7, 'Shift+click marks the whole row');
+    await p.keyboard.type('7a');
+    await p.keyboard.press('Enter');
+    for (const d of ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']) await p.waitForFunction((s) => document.querySelector(s).value === '7:00 AM', cell(second, d), { timeout: 5000 });
+    assert.equal(await stored(second, 'sat', 'dispatchTime', 420), 420, 'the row fill saved');
+    results.push('Click, Shift+click across the row, type 7a, Enter: all seven days became 7:00 AM and saved');
+    // Pressing and dragging across boxes marks them too.
+    const centre = async (d) => { const b = await p.$eval(cell(second, d), x => { const r = x.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }); return b; };
+    const [sx, sy] = await centre('sun'), [wx, wy] = await centre('wed');
+    await p.mouse.move(sx, sy); await p.mouse.down(); await p.mouse.move(wx, wy, { steps: 6 }); await p.mouse.up();
+    assert.equal(await p.$$eval('input.cell.picked', x => x.length), 4, 'dragging Sun to Wed marks four boxes');
+    await p.keyboard.type('8:30');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).value === '8:30 AM', cell(second, 'wed'), { timeout: 5000 });
+    assert.equal(await stored(second, 'wed', 'dispatchTime', 510), 510, 'the dragged block fill saved');
+    assert.equal(await p.inputValue(cell(second, 'thu')), '7:00 AM', 'boxes outside the block are left alone');
+    results.push('Dragging across Sun to Wed marked four boxes and 8:30 filled them');
+    // Every cell is a box all the time (not only the one being typed in), like a spreadsheet.
+    const edge = await p.$eval(cell(second, 'sun'), x => { const c = getComputedStyle(x); return [c.borderTopStyle, c.borderTopWidth, c.borderTopColor]; });
+    assert.deepEqual(edge.slice(0, 2), ['solid', '1px'], 'boxes have a border');
+    assert.notEqual(edge[2], 'rgba(0, 0, 0, 0)', 'the border shows without clicking');
     assert.equal(await p.$eval(cell(first, 'mon'), x => getComputedStyle(x).fontSize), '16px');
     assert.ok(await fits(p), 'Start Times fits 1920x1080');
 
