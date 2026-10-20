@@ -804,6 +804,7 @@
   function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
   function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
   function lateText(minutes) { var m = Math.abs(minutes), h = Math.floor(m / 60), t = h ? h + ' h ' + (m % 60) + ' min' : m + ' min'; return minutes <= 0 ? t + ' late' : 'departs in ' + t; }
+  function leftFrom(key) { var n = dayNum(key); return n === null ? 'last night' : dayShort(n * 1440) + ' ' + dateShort(key); }
   function statusWord(s) { return s === 'WAITING' ? 'NOT LOADED' : s === 'DONE' ? 'COMPLETE' : s; }
   // Every part of the report from what the screens already show: loads (the Loadout Center's rows), open pickups, the shift log,
   // the production lines with their last checks, the temperature rows.
@@ -818,7 +819,11 @@
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
-      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+      // Joe 10/20: a load left over from last night that leaves before this shift ends missed its shift, so it is behind even
+      // before its dispatch time (a Saturday loadout for Monday still waits for Monday, Joe 10/11).
+      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); }
+      else if (r.prior && (leaves === null || leaves <= (Math.floor((now - 360) / 1440) + 1) * 1440 + 360)) { item.late = 'left over from ' + leftFrom(r.loadDate); out.behind.push(item); }
+      else out.nextUp.push(item);
     });
     var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
     out.behind.sort(byDepart);
@@ -927,15 +932,18 @@
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) });
       var loadDay = dayNum(r.loadDate), shiftEnd = loadDay === null ? null : (loadDay + 1) * 1440 + FORECAST.shiftEnd;
       return { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), loadDate: text(r.loadDate), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), status: r.state,
-        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior };
+        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior, paused: !!r.paused };
     };
     // Loads loading now finish their own time after they started (at least 5 minutes from now); the rest follow them, one
-    // after another in loading order.
-    open.filter(function (r) { return r.state === 'LOADING'; }).forEach(function (r) {
+    // after another in loading order: last night's left-over loads first (Joe 10/20: the plant carries straight on through the
+    // 6 a.m. roll), then today's. A paused load is not loading, so it waits its turn and takes its whole time again.
+    var loadingNow = function (r) { return r.state === 'LOADING' && !r.paused; };
+    open = open.filter(loadingNow).concat(open.filter(function (r) { return !loadingNow(r) && r.prior; }), open.filter(function (r) { return !loadingNow(r) && !r.prior; }));
+    open.filter(loadingNow).forEach(function (r) {
       var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
       x.start = s ? s.start : now; x.est = Math.max(x.start + x.minutes, now + 5); cursor = Math.max(cursor, x.est); out.push(x);
     });
-    open.filter(function (r) { return r.state !== 'LOADING'; }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = cursor + x.minutes; cursor = x.est; out.push(x); });
+    open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = cursor + x.minutes; cursor = x.est; out.push(x); });
     out.forEach(function (x) {
       var dispatchLate = x.leaves !== null && x.est > x.leaves, shiftLate = x.shiftEnd !== null && x.est > x.shiftEnd;
       var deadline = x.leaves === null ? x.shiftEnd : x.shiftEnd === null ? x.leaves : Math.min(x.leaves, x.shiftEnd);

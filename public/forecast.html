@@ -38,7 +38,7 @@
         <section class="fc-card fc-loads">
           <h2 id="loads-title">Loads still to load</h2>
           <div class="fc-scroll" id="loads"></div>
-          <div class="fc-legend"><span><i class="ok"></i>Est. loading, on time</span><span><i class="late"></i>Est. loading, late</span><span><i class="dep"></i>Dispatch</span><span><i class="now"></i>Now</span></div>
+          <div class="fc-legend"><span><i class="ok"></i>Est. loading, on time</span><span><i class="late"></i>Est. loading, late</span><span><i class="dep"></i>Dispatch</span><span><i class="now"></i>Now</span><span><i class="left"></i>Left over from last night</span></div>
         </section>
         <section class="fc-card fc-times">
           <h2>Loads due by each time</h2>
@@ -101,8 +101,9 @@
         ticks.filter(m => m - t0 >= 30 && t1 - m >= 45).map(m => '<i style="left:' + x(m) + '">' + hour(m) + '</i>').join('') + '</span></div>';
       const rows = f.loads.map(z => {
         const k = z.late ? 'late' : '', dep = z.leaves === null ? '–' : e(when(z.leaves, z.depart, z.departDay));
-        return '<div class="fc-row ' + k + (z.status === 'LOADING' ? ' loading' : '') + '"><b>' + e(U.routeNumber(z.route)) + '</b>' +
-          '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' ? ' <em class="fc-pill">Loading</em>' : '') + (z.priorDay ? ' <em class="fc-pill">From yesterday</em>' : '') +
+        // Joe 10/20: last night's left-over loads carry straight on, first in line, marked at the left edge.
+        return '<div class="fc-row ' + k + (z.status === 'LOADING' && !z.paused ? ' loading' : '') + (z.priorDay ? ' left' : '') + '"' + (z.priorDay ? ' title="Left over from last night"' : '') + '><b>' + e(U.routeNumber(z.route)) + '</b>' +
+          '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' && !z.paused ? ' <em class="fc-pill">Loading</em>' : '') + (z.paused ? ' <em class="fc-pill">Paused</em>' : '') +
           (z.late ? '<small class="fc-why-sm">Late: ' + e(z.reason) + ' by ' + span(z.lateBy) + '</small>' : '') +
 '</span>' +
           '<span class="num">' + (z.noCases ? '–' : n(z.cases)) + '</span><span>' + dep + '</span>' +

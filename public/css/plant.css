@@ -1480,6 +1480,7 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
 .forecast-page .fc-row.late { background: #fde8e8; color: #c62828; }
 .forecast-page .fc-row.late .fc-est { color: #fff; background: #c62828; border-radius: 6px; padding: 1px 6px; justify-self: start; }
 .forecast-page .fc-row.loading { background: #fff8e6; }
+.forecast-page .fc-row.left > b { box-shadow: inset 6px 0 0 #e8a317; padding-left: 14px; }
 .forecast-page .fc-line { position: relative; height: 26px; margin-right: 22px; }
 .forecast-page .fc-head .fc-line i { position: absolute; top: 6px; transform: translateX(-50%); font-style: normal; font-size: 16px; white-space: nowrap; }
 .forecast-page .fc-line s { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #dfe6ee; }
@@ -1495,6 +1496,7 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
 .forecast-page .fc-legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 16px; padding-top: 6px; }
 .forecast-page .fc-legend i { display: inline-block; width: 18px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .forecast-page .fc-legend i.dep, .forecast-page .fc-legend i.now { width: 4px; }
+.forecast-page .fc-legend i.left { width: 6px; background: #e8a317; }
 .forecast-page .fc-done { padding: 6px 8px; color: var(--muted); font-size: 16px; }
 .forecast-page .fc-empty { color: var(--muted); font-size: 16px; }
 .forecast-page .fc-t { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }

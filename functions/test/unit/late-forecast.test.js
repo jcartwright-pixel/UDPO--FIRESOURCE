@@ -151,3 +151,26 @@ test('Send Test to Me goes only to the sender on live; the forecast box reaches 
   assert.match(everyone.sent.text, /LATE FORECAST/);
   assert.equal(RM.recipients(Object.assign({}, base, { testOnly: true }), env).copy, true);
 });
+
+// Joe 10/20 (6:08 AM): "we still have leftover from last night before we even start today... we got to just have a
+// continuation of the plant status."
+test('after the 6 a.m. roll, last night\'s open loads are behind and are loaded first; a paused load waits its turn', () => {
+  const at = Date.parse('2026-10-20T10:10:00Z'), WED = '2026-10-21';
+  const left = (route, cases, dispatch, extra) => Object.assign(wait(route, '', cases, dispatch, { leavesOn: 'Delivery Day', prior: true }), extra || {});
+  const today = (route, cases, dispatch, extra) => Object.assign({ id: route, route, run: '', area: 'CASE', state: 'WAITING', loadDate: TUE, deliveryDate: WED, departureDate: WED, dispatchTime: dispatch, quantity: cases, leavesOn: 'Delivery Day', prior: false }, extra || {});
+  const loads = [today('855', 600, H(8), { deliveryDate: TUE, departureDate: TUE, leavesOn: 'Load Day' }), left('971', 812, H(2)),
+    left('901', 853, H(7), { state: 'LOADING', paused: true, startedAt: '2026-10-20T08:39:00Z' }), left('909', 1067, H(6)), today('852', 1150, H(13), { leavesOn: 'Load Day' })];
+  const r = R.plantReport({ loads }, at);
+  assert.deepEqual(r.behind.map(x => x.route).sort(), ['901', '909', '971']);
+  assert.equal(r.behind.find(x => x.route === '909').late, 'left over from Mon 10-19-26', 'not yet past its dispatch, but left over');
+  assert.match(r.behind.find(x => x.route === '971').late, /h \d+ min late$/, 'past its dispatch: how late');
+  assert.deepEqual(r.nextUp.map(x => x.route), ['855', '852']);
+  const ahead = R.plantReport({ loads: [left('950', 668, H(16), { deliveryDate: WED, departureDate: WED })] }, at);
+  assert.deepEqual([ahead.behind.length, ahead.nextUp.length], [0, 1], 'left over but leaving after this shift (a Saturday loadout for Monday): not behind yet');
+  const f = R.loadForecast({ date: TUE, loads }, at);
+  assert.deepEqual(f.loads.map(x => x.route), ['971', '901', '909', '855', '852'], 'left-over loads first, in their order, then today\'s');
+  assert.equal(f.loads[1].start, f.loads[0].est, 'the paused load is not loading: it follows the one before it');
+  assert.ok(f.loads[3].start >= f.loads[2].est, 'today\'s first load starts after the last left-over one');
+  assert.equal(f.loads[3].late, true);
+  assert.equal(f.loads[3].reason, 'misses dispatch');
+});
