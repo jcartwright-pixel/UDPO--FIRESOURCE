@@ -713,6 +713,9 @@
         lastManualTemperature: last ? last.manualTemperature : '', lastStatus: last ? last.status : '', lastNotes: last ? last.notes : '', lastDocId: last ? last.docId : '', locked: left > 0, minutesUntilDue: left });
     });
   }
+  // Joe 10/19: a location whose sensor reads in range needs no manual check; it counts as checked by the sensor. Low, High,
+  // Offline, Stale and Manual only locations stay due until someone enters a manual reading (which locks it for 2 hours).
+  function tempChecked(r) { return !!(r && (r.locked || r.status === 'IN RANGE')); }
   function tempHistory(journal, nowMs) {
     return tempReadings(journal).filter(function (r) { var t = when(r.recordedAt); return !t || t >= nowMs - 86400000; });
   }
@@ -750,7 +753,7 @@
     var last = function (at) { return when(at) ? 'last ' + clockOf(at) : 'never checked'; };
     var rank = { bad: 0, warn: 1, ok: 2 }, sorted = function (a) { return a.map(function (x, i) { return [x, i]; }).sort(function (p, q) { return rank[p[0].kind] - rank[q[0].kind] || p[1] - q[1]; }).map(function (p) { return p[0]; }); };
     var newest = function (list) { return list.filter(function (c) { return when(c.at); }).sort(function (a, b) { return when(b.at) - when(a.at); })[0] || null; };
-    var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), tempDue = (temps || []).filter(function (r) { return !r.locked; });
+    var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), tempDue = (temps || []).filter(function (r) { return !tempChecked(r); });
     // A line is running when it has a check today that is not Finished.
     var running = function (l) { var x = l.last || {}, t = when(x.recordedAt); return !!t && !lineDone(x, nowMs) && opDayAt(t) === opDayAt(nowMs); };
     var isDue = function (l) { var x = l.last || {}, t = when(x.recordedAt); return running(l) && (!t || (nowMs - t) / 60000 >= cycle); };
@@ -764,7 +767,7 @@
     var coolerItems = (temps || []).map(function (r) {
       var reading = r.sensorTemp !== '' && r.sensorTemp !== undefined ? r.sensorTemp : r.lastManualTemperature, read = reading !== '' && reading !== undefined && reading !== null ? reading + '°F' : '';
       var sensorBad = ['HIGH', 'LOW', 'OFFLINE', 'STALE', 'SENSOR ERROR'].indexOf(r.status) >= 0, manualBad = r.lastStatus === 'HIGH' || r.lastStatus === 'LOW';
-      var word = sensorBad ? r.status : manualBad ? r.lastStatus : !r.locked ? (late(r.lastCheckedAt) ? 'PAST DUE' : 'DUE') : 'OK';
+      var word = sensorBad ? r.status : manualBad ? r.lastStatus : !tempChecked(r) ? (late(r.lastCheckedAt) ? 'PAST DUE' : 'DUE') : 'OK';
       return { name: r.location, detail: [read, word].filter(Boolean).join(' · '), kind: sensorBad || manualBad || word === 'PAST DUE' ? 'bad' : word === 'DUE' ? 'warn' : 'ok' };
     });
     var qualityItems = (lines || []).map(function (l) {
@@ -1147,7 +1150,7 @@
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
-    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
+    TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempChecked: tempChecked, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
     REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

@@ -206,10 +206,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
       const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + (skip ? btn('SKIP', 'skip', r.id, 'warn') : '') + btn('START LOADING', 'start', r.id, 'primary') + '</span>'
         : r.paused ? '<span class="sw-quick">' + btn('RESUME', 'resume', r.id, 'primary') + '</span>' : '') : '';
       const by = box ? hauler(r, carried.some(x => sameRun(r, x))) : '';
-      html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (moved ? ' skipped' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
+      html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
         '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
-        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + (moved.short ? ' · <span class="mv-who">' + escapeHtml(moved.short) + '</span>' : '') + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
+        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
       if (isOpen) {
         const dis = !ck || done;
         html += '<div class="sw-body"><div class="sw-fields">' + field(r.id, 'quantity', unit.label, qty(r.quantity), { mode: 'numeric', disabled: dis }) + field(r.id, 'truck', 'Truck', r.truck, { disabled: dis }) +

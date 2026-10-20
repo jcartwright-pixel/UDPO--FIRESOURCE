@@ -125,20 +125,22 @@ async function keyMove(page, route, dir) {
     await waitOrder(loader, ['801', '802', '805', '808', '812', '811']);
     await waitOrder(watcher, ['801', '802', '805', '808', '812', '811']);
     assert.equal(await loader.evaluate(() => String(window.getSelection())), '', 'dragging a line by its words does not select them');
-    // Joe 10/15: the load dragged out of the sheet's order (811, not 812 which it passed) is shaded light green with a MOVED tag,
-    // on the other open screen too, and it looks different from a Done line.
+    // Joe 10/15: the load dragged out of the sheet's order (811, not 812 which it passed) gets a green MOVED tag, on the other
+    // open screen too. Joe 10/19: only the tag is green; the line itself is not shaded (it looks like any other line).
     await loader.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
     await watcher.waitForFunction(() => [...document.querySelectorAll('#rows tr.moved td:first-child')].map(t => t.textContent).join() === '811');
-    // The line can turn green (sheet order) a moment before the record of who moved it arrives; wait for the name, then check it.
-    await loader.waitForFunction(() => { const t = document.querySelector('#rows tr.moved .moved-tag'); return t && /^MOVED · \S/.test(t.textContent); }, null, { timeout: 5000 }).catch(() => {});
+    // The tag can show a moment before the record of who moved it arrives; wait for the name on hover, then check it.
+    await loader.waitForFunction(() => { const t = document.querySelector('#rows tr.moved .moved-tag'); return t && / by \S/.test(t.title); }, null, { timeout: 5000 }).catch(() => {});
     const look = await loader.evaluate(() => {
-      const bg = (sel) => getComputedStyle(document.querySelector(sel).children[1]).backgroundColor;
-      const tag = document.querySelector('#rows tr.moved .moved-tag');
-      return { moved: bg('#rows tr.moved'), done: bg('#rows tr.done:not(.moved)'), plain: bg('#rows tr[data-drag]:not(.moved):not(.done)'), tag: tag && tag.textContent, size: tag && parseFloat(getComputedStyle(tag).fontSize) };
+      const bg = (sel) => getComputedStyle(document.querySelector(sel).children[2]).backgroundColor;
+      const tag = document.querySelector('#rows tr.moved .moved-tag'), box = tag && tag.getBoundingClientRect();
+      return { moved: bg('#rows tr.moved'), tag: tag && tag.textContent, title: tag && tag.title,
+        tagBg: tag && getComputedStyle(tag).backgroundColor, oneLine: box && box.height <= parseFloat(getComputedStyle(tag).lineHeight) + 8, size: tag && parseFloat(getComputedStyle(tag).fontSize) };
     });
-    assert.ok(look.moved !== look.done && look.moved !== look.plain && /^rgb\(\d+, \d+, \d+\)$/.test(look.moved), 'a moved line has its own green, not the Done one ' + JSON.stringify(look));
-    // Joe 10/16: the tag also says who moved it ("MOVED · <name>"; the full name and time on hover).
-    assert.deepEqual([/^MOVED · \S/.test(look.tag), look.size >= 16], [true, true], 'a MOVED tag naming who moved it, at 16px or more ' + JSON.stringify(look));
+    assert.ok(['rgba(0, 0, 0, 0)', 'rgb(255, 255, 255)'].includes(look.moved), 'a moved line is not shaded (no green on the line) ' + JSON.stringify(look));
+    assert.equal(look.tagBg, 'rgb(46, 125, 67)', 'the MOVED tag itself is green ' + JSON.stringify(look));
+    // Joe 10/19: the tag is just MOVED on one line; who moved it and when show on hover (Joe 10/16 asked to see who).
+    assert.deepEqual([look.tag, / by \S.* at /.test(look.title), look.oneLine, look.size >= 16], ['MOVED', true, true, true], 'a one-line MOVED tag, who on hover, at 16px or more ' + JSON.stringify(look));
     if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, '3b-loadout-moved-1920.png'), scale: 'css' });
     results.push('Loaded loads (801, 802, 805) do not move; 808 is the first line that can be dragged; the hand shows over a line');
     results.push('Mouse: 811 dragged below 812 by its Driver cell (the whole line grabs); no text selected; the other open screen shows it');
@@ -169,7 +171,7 @@ async function keyMove(page, route, dir) {
     await tablet.click(row('812') + ' button.skip');
     await waitOrder(tablet, ['801', '802', '805', '6302', '815', '808', '811', '812']);
     await waitOrder(watcher, ['801', '802', '805', '6302', '815', '808', '811', '812']);
-    await tablet.waitForFunction(r => /^SKIPPED · \S/.test((document.querySelector(r + ' .moved-tag') || {}).textContent || ''), row('812'));
+    await tablet.waitForFunction(r => { const t = document.querySelector(r + ' .moved-tag'); return !!t && t.textContent === 'SKIPPED' && / by \S/.test(t.title); }, row('812'));
     assert.ok(await tablet.$(row('812') + '[data-drag]'), 'a skipped load can still be dragged');
     assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell');
     // Review item 59: a finger holds 808 by its Depart cell (not Route or Run) and slides it.

@@ -113,7 +113,7 @@
       const phone = phoneQuery.matches, ck = canSave(), now = Date.now(), rows = U.tempRows(U.withTempLocations(setup, appLocs), all(), now, sensors), hist = U.tempHistory(all(), now), list = rows.filter(shown);
       if (phone) pane = 'current';
       const alerts = rows.filter(alertOf).length;
-      document.getElementById('hstats').innerHTML = [['Locations', rows.length, ''], ['Checked 2 h', rows.filter(r => r.locked).length, 'good'], ['Due', rows.filter(r => !r.locked).length, ''], ['Alerts', alerts, alerts ? 'warn' : '']]
+      document.getElementById('hstats').innerHTML = [['Locations', rows.length, ''], ['Checked 2 h', rows.filter(U.tempChecked).length, 'good'], ['Due', rows.filter(r => !U.tempChecked(r)).length, ''], ['Alerts', alerts, alerts ? 'warn' : '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       document.getElementById('pane-current').hidden = pane !== 'current';
@@ -127,6 +127,8 @@
         const cur = roundReading(r), d = drafts[r.locationId] || (cur ? { manualTemperature: String(r.lastManualTemperature), notes: r.lastNotes } : {}), dis = ck && (!r.locked || cur) ? '' : ' disabled';
         const last = !cur && r.lastCheckedAt ? '<small class="as-last">Last: ' + escapeHtml(r.lastManualTemperature) + '°F · ' + escapeHtml(clockOf(r.lastCheckedAt)) + (r.lastCheckedBy ? ' · ' + escapeHtml(initials(r.lastCheckedBy)) : '') + '</small>' : '';
         const note = notes[r.locationId] || '';
+        // Joe 10/19: an in-range sensor is the check, so the location reads checked by the sensor at its reading time.
+        const bySensor = !r.locked && U.tempChecked(r);
         const detail = r.lastStatus === 'HIGH' || r.lastStatus === 'LOW' ? '<small class="tp-detail bad">Last manual ' + escapeHtml(r.lastManualTemperature) + '°F ' + r.lastStatus + '</small>' : '';
         const limits = r.lowLimit !== '' || r.highLimit !== '' ? '<small>' + escapeHtml([r.lowLimit !== '' ? r.lowLimit + '°' : '', r.highLimit !== '' ? r.highLimit + '°F' : ''].filter(Boolean).join(' – ')) + '</small>' : '';
         return '<tr data-location="' + escapeHtml(r.locationId) + '"><td class="tp-name"><b>' + escapeHtml(r.location) + '</b>' + limits + '</td>' +
@@ -137,10 +139,10 @@
           '<td>' + (r.batteryLevel === '' ? '—' : escapeHtml(r.batteryLevel) + '%') + '</td>' +
           '<td class="tp-last">' + readAt(r.sensorLastReadingAt) + '</td>' +
           '<td><input class="tp-notes" aria-label="Notes for ' + escapeHtml(r.location) + '" placeholder="' + (phone ? 'Notes' : 'Add notes (optional)…') + '" maxlength="800" value="' + escapeHtml(d.notes || '') + '"' + dis + '></td>' +
-          '<td class="tp-last">' + (r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
-          '<td>' + escapeHtml(initials(r.lastCheckedBy) || '—') + '</td>' +
+          '<td class="tp-last">' + (bySensor ? readAt(r.sensorLastReadingAt) : r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
+          '<td>' + (bySensor ? 'Sensor' : escapeHtml(initials(r.lastCheckedBy) || '—')) + '</td>' +
           // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
-          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
+          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : bySensor ? '<small class="as-note tp-pill ok" title="The sensor reads in range, so no manual check is needed">OK</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
       }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : (setupSeen ? 'No temperature locations are set up for this plant.' : 'Loading the temperature locations&hellip;')) + '</td></tr>';
       // Review item 24 (Joe 10/13): on a small tablet each location is a card (as on Yard Checks), every column named on the card.
       const heads = [...document.querySelectorAll('#pane-current thead th')].map(th => th.textContent);
@@ -151,7 +153,7 @@
         '<td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + '</td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No temperature checks recorded in the last 24 hours.</td></tr>';
       document.getElementById('foot').textContent = pane === 'current'
-        ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. After Send Current Report the boxes start empty for the next round. ' + sensorWords() : 'View only.')
+        ? list.length + ' shown. ' + (ck ? 'Each reading saves as you leave its box, with the time and who entered it, and locks the location for 2 hours. A location whose sensor reads in range counts as checked; Low, High, Offline and Manual only locations need a manual reading. After Send Current Report the boxes start empty for the next round. ' + sensorWords() : 'View only.')
         : hist.length + ' reading' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       // Joe 10/10: when MOCREO was last read (the footer has the details).
       document.getElementById('sensor-at').textContent = 'Last Sensor Update: ' + (mocreo.configured && mocreo.lastSuccess ? clock(mocreo.lastSuccess) : '—');
