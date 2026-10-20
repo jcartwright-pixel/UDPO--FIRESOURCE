@@ -141,6 +141,8 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       // (they stay until resolved, not only since the last report).
       assert.deepEqual([await tileText(page, 'notes', 'Breakdowns'), await tileText(page, 'notes', 'Handoffs'), await tileText(page, 'notes', 'Carryover')],
         ['1 | still open', '0 | open', '0 | from earlier shifts']);
+      // The loads reach Manager Center through runDays (a trigger on each run), so wait for all four before reading the chips.
+      await page.waitForFunction(() => /of 4 To load/.test(document.getElementById('pv-chips').textContent), null, { timeout: 20000 });
       assert.match(await page.textContent('#pv-chips'), new RegExp(behind + ' Behind[\\s\\S]*3 of 4 To load[\\s\\S]*1 Pickups[\\s\\S]*1 Breakdowns[\\s\\S]*0 Lines down[\\s\\S]*1 Temps out'));
       // Review item 30 (Joe 10/13): the buttons are words only (no 📊 ✉ ✎), a tile label is one 16px line, and a route behind
       // shows its whole BEHIND line.
