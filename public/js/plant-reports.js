@@ -41,7 +41,7 @@ export function wallNow(ms) {
 }
 // When the load leaves, on the wall clock: the route's departure moment (plant-rules departWall), not the load day.
 export function departAt(row) {
-  return U.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, dispatchTime: departMinutes(row.dispatchTime) });
+  return U.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: departMinutes(row.dispatchTime) });
 }
 export function clockText(wall) { return wall === null || wall === undefined ? '' : L.timeText(((wall % 1440) + 1440) % 1440); }
 export function minutesText(m) {
