@@ -108,7 +108,7 @@ const DEFAULTS = Object.freeze({
 // The right each save needs (actions.js action name -> right).
 const ACTION_RIGHT = Object.freeze({
   assignDriver: 'dispatch.write', assignTruck: 'dispatch.write', assignTrailer: 'dispatch.write', setDriverNote: 'dispatch.write', setRuns: 'dispatch.write',
-  setDispatchTime: 'dispatch.write', setJack: 'dispatch.write', moveRun: 'dispatch.write', setUnitDown: 'fleet.status.write', setUnitUp: 'fleet.status.write',
+  setDispatchTime: 'dispatch.write', setJack: 'dispatch.write', setLoadType: 'dispatch.write', moveRun: 'dispatch.write', setUnitDown: 'fleet.status.write', setUnitUp: 'fleet.status.write',
   reorderLoads: 'dispatch.override', reorderWeek: 'dispatch.override', clearConflict: 'dispatch.write', saveCheckIn: 'dispatch.write', setDriverTruck: 'drivers.write', setDriverAvailable: 'drivers.status.write',
   setDriverRelief: 'drivers.write', setDriverPhone: 'drivers.write', saveDriver: 'drivers.write', removeDrivers: 'drivers.write', saveDriverException: 'drivers.status.write', saveVacation: 'vacations.write',
   publishWeek: 'dispatch.publish', resetWeek: 'dispatch.publish', saveRoute: 'routes.write', reorderRouteDay: 'routes.write', updateIssue: 'issues.write',
@@ -166,7 +166,7 @@ function saveAllowed(person, action, roleOk, templates, exceptions) {
 // ticks: Administration's own setup pages (Products, Shifts, Location Areas) and the code-signed Plant Station.
 const ACTION_SCREENS = Object.freeze({
   assignDriver: ['daily', 'weekly'], assignTruck: ['daily', 'weekly'], assignTrailer: ['daily', 'weekly'], setDriverNote: ['daily', 'weekly'],
-  setRuns: ['daily', 'weekly', 'routeWeek'], setDispatchTime: ['daily'], setJack: ['daily'], moveRun: ['daily'], setUnitDown: ['daily', 'equipment'], setUnitUp: ['daily', 'equipment'],
+  setRuns: ['daily', 'weekly', 'routeWeek'], setDispatchTime: ['daily'], setJack: ['daily'], setLoadType: ['daily'], moveRun: ['daily'], setUnitDown: ['daily', 'equipment'], setUnitUp: ['daily', 'equipment'],
   reorderLoads: ['daily', 'weekly'], reorderWeek: ['daily', 'weekly'], clearConflict: ['conflicts'], saveCheckIn: ['checkins'],
   setDriverTruck: ['drivers'], setDriverAvailable: ['drivers'], setDriverRelief: ['drivers'], setDriverPhone: ['drivers'], saveDriver: ['drivers'], removeDrivers: ['drivers'], addDriverIncident: ['drivers'],
   saveDriverException: ['daily', 'weekly'], saveVacation: ['vacations'], publishWeek: ['weekly'], resetWeek: ['weekly'], saveRoute: ['routes', 'otr', 'rOtr'],

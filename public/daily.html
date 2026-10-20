@@ -124,6 +124,7 @@
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
     import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, withUnsaved, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
+    import { runArea } from './js/plant-core.js';
     forScreen('dailyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
@@ -339,6 +340,11 @@
     }
     const setTime = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setDispatchTime', { time: text }, d => { d.dispatchTime = text ? L.minutesOfDay(text) : null; }, render);
     const setJack = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setJack', { jack: text }, d => { d.palletJack = text.toUpperCase(); }, render);
+    // Joe 10/19 (800 Specials: "could be totes, could be cases, could be anything"): the day's load type picks the loadout it goes to
+    // (Loadout Center, Manager Center and the shift report email follow it). It starts as the route's Loadout Type in the Route Editor.
+    const LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
+    const loadTypeOf = (row) => { const run = runs.find(x => x.id === row.runDocId); return run ? runArea(run, row.day) : ''; };
+    const setLoadType = (row, type) => saveRunChange(getRuns, row.runDocId, row.day, 'setLoadType', { loadType: type }, d => { d.loadType = type; d.loadTypeByHand = !!type; }, render);
 
     const body = document.getElementById('rows');
     body.addEventListener('click', e => {
@@ -450,6 +456,8 @@
         '<label>Truck' + select('truck', row.truckId) + '</label><label>Trailer' + select('trailer', row.trailerId) + '</label>' +
         '<label>Dispatch time<input data-field="time" value="' + escapeHtml(departText(row)) + '"' + (row.off ? ' disabled' : '') + '></label>' +
         '<label>Jack no.<input data-field="jack" value="' + escapeHtml(show(row.palletJack)) + '"' + (row.off ? ' disabled' : '') + '></label>' +
+        '<label>Load type (which loadout)<select data-field="loadType"' + (row.off ? ' disabled' : '') + '>' + (loadTypeOf(row) ? '' : '<option value="" selected>None</option>') +
+          LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (loadTypeOf(row) === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label>' +
         '<label>Move to another day<select data-move' + (row.off ? ' disabled' : '') + '>' + moveChoices(row) + '</select></label>' +
         '<div class="move-act"><button type="button" class="primary" data-move-run disabled>Move Route</button><span>Driver, truck and trailer come off when it moves.</span></div>' +
         '<label class="wide">Driver notes<textarea data-field="note" maxlength="500"' + (row.off ? ' disabled' : '') + '>' + escapeHtml(show(row.driverNotes)) + '</textarea></label>' +
@@ -475,6 +483,7 @@
           if (f === 'runs') return setRuns(row, node.value === 'true');
           if (f === 'time') return setTime(row, node.value.trim());
           if (f === 'jack') return setJack(row, node.value.trim());
+          if (f === 'loadType') return setLoadType(row, node.value);
           if (f === 'note') return saveAssignment(getRuns, row.runDocId, row.day, 'note', node.value.trim(), render);
           if (f === 'driver') return pickDriver(row, node.value);
           saveAssignment(getRuns, row.runDocId, row.day, f, { id: node.value, text: pickText(f, node.value) }, render, ovr[row.id]);
