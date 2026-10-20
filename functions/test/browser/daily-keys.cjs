@@ -157,6 +157,8 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     // Carriers, then Unavailable with the reason.
     const heads = await p.$$eval('.cell-pop h6', n => n.map(x => x.textContent));
     assert.deepEqual(heads.map(h => h.split(' \u00b7 ')[0]), ['REGULAR DRIVERS', 'RELIEF DRIVERS', 'OTHER CVG / CARRIERS', 'UNAVAILABLE'], heads.join(' | '));
+    // Joe 10/19: the empty choice at the top reads NEEDS DRIVER (as on Weekly), not (none).
+    assert.equal(names[0], '\u2014 NEEDS DRIVER \u2014');
     assert.deepEqual(await p.$$eval('.cell-pop [data-i]', n => n.slice(1, 3).map(x => x.textContent)), ['CASEY, LEE', 'BROOK, SAM']);
     const off = await p.$$eval('.cell-pop [data-i].off', n => n.map(x => x.textContent));
     assert.ok(off.includes('ADAMS, PATOn 801') && off.some(t => /^DUNN, ROBININACTIVE/.test(t)), 'unavailable: ' + off.join(' | '));
@@ -166,6 +168,22 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.click('.cell-pop [data-i]:has-text("CASEY, LEE")');
     await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE', R802);
     results.push('a double-click opened the whole driver list grouped Regular (seniority order), Relief, Other CVG, Unavailable (ADAMS "On 801", DUNN INACTIVE, greyed and not pickable); clicking CASEY, LEE saved it');
+
+    // Joe 10/19: typing "needs" finds NEEDS DRIVER; Enter takes the driver off and the load counts as needing a driver.
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('needs');
+    await p.waitForSelector('.cell-pop [data-i].active');
+    assert.equal(await p.textContent('.cell-pop [data-i].active'), '\u2014 NEEDS DRIVER \u2014');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === '' && document.querySelector(s).children[3].classList.contains('missing'), R802, { timeout: 8000 });
+    await p.waitForFunction(() => /need a driver/.test(document.getElementById('count').textContent), null, { timeout: 8000 });
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-needs-driver-1920.png') });
+    await p.click(R802 + ' td[data-edit="driver"]');
+    await p.keyboard.type('casey');
+    await p.waitForSelector('.cell-pop [data-i].active');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE', R802, { timeout: 8000 });
+    results.push('typing "needs" in Driver highlighted NEEDS DRIVER; Enter took the driver off, the cell shows as needing a driver and the count says so');
 
     // Time: typing on the selected cell starts over; Enter saves and moves down; Tab from Jack goes to Notes.
     await p.click(R801 + ' td[data-edit="driver"]');
@@ -208,6 +226,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.click(R802 + ' button:has-text("Edit")');
     await p.waitForSelector('#edit-modal select[data-field="driver"]');
     assert.deepEqual(await p.$$eval('#edit-modal select[data-field="driver"] optgroup', g => g.map(x => x.label)).then(l => l.slice(0, 2)), ['Regular Drivers \u2014 Seniority Order', 'Relief Drivers']);
+    assert.equal(await p.textContent('#edit-modal select[data-field="driver"] option[value=""]'), '\u2014 NEEDS DRIVER \u2014');
     await p.selectOption('#edit-modal select[data-field="driver"]', 'drv_test_casey');
     await p.waitForFunction(() => { const t = document.querySelector('#edit-modal select[data-field="truck"]'); return t && t.selectedOptions[0] && t.selectedOptions[0].textContent.startsWith('900003'); }, null, { timeout: 8000 });
     await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE' && document.querySelector(s).children[5].textContent === '900003', R802, { timeout: 8000 });

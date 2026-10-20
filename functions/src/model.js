@@ -54,7 +54,7 @@ const DAY_FIELDS = Object.freeze([
   ['loadSequenceOverride', 'load_sequence_override', 'number'],
   ['dispatchId', 'dispatch_id', 'text'], ['dispatchDate', 'dispatch_date', 'date'],
   ['deliveryDate', 'delivery_date', 'date'], ['loadDate', 'load_date', 'date'],
-  ['loadDayOffset', 'load_day_offset', 'number'], ['departureDate', 'departure_date', 'date'],
+  ['loadDayOffset', 'load_day_offset', 'offset'], ['departureDate', 'departure_date', 'date'],
   ['startTime', 'start_time', 'time'], ['routeHours', 'route_hours', 'number'],
   ['dispatchTime', 'dispatch_time', 'time'],
   ['driverId', 'driver_id', 'text'], ['driver', 'driver', 'text'],
@@ -103,6 +103,7 @@ function convert(kind, raw) {
     case 'yes': return L.yes(raw);
     case 'flag': return L.optionalYes(raw);
     case 'number': return L.number(raw);
+    case 'offset': return L.dayOffset(raw);
     case 'date': return L.dateKey(raw) || null;
     case 'time': return L.minutesOfDay(raw);
     default: return text;

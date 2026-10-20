@@ -52,12 +52,15 @@ export function loadState(day) {
   return 'WAITING';
 }
 
+// The route's Departure Day (Route Master departure_day, copied onto each week's run): LOAD DAY, DELIVERY DAY or blank.
+export function leavesOnOf(v) { const s = String(v || '').trim().toUpperCase(); return /LOAD/.test(s) ? 'LOAD DAY' : /DELIVER/.test(s) ? 'DELIVERY DAY' : ''; }
+
 function rowFor(run, block, loadDate, prior) {
   const day = run.days[block.prefix];
   return {
     id: run.id + '|' + block.prefix, runDocId: run.id, day: block.prefix, weekStart: run.weekStart, rev: run.rev || 0,
     route: run.route || '', run: run.run || '', routeName: run.routeName || '', streamId: run.streamId || '', routeRunType: run.routeRunType || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
-    loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, prior, loadSequence: L.effectiveSequence(day),
+    loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, leavesOn: leavesOnOf(run.masterShow && run.masterShow.leavesOn), prior, loadSequence: L.effectiveSequence(day),
     baseSequence: day.loadSequence == null ? null : day.loadSequence,
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '', moveMark: day.moveMark || null,
@@ -139,8 +142,8 @@ export function isBehind(row, today, now) {
   return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
 }
 // Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
-// plant-rules.js departWall: the departure date (blank = delivery date) at the dispatch time (this file is also used on screens that
-// do not load plant-rules.js).
+// plant-rules.js departWall: the dispatch time on the route's Departure Day (Load Day = the load date, Delivery Day = the
+// departure date, Joe 10/19), the 6 a.m. guess where the route has none (this file is also used on screens that do not load plant-rules.js).
 const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 export function wallNowMinutes(now) {
   const parts = {};
@@ -149,9 +152,12 @@ export function wallNowMinutes(now) {
   return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
 export function departWall(row) {
-  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), t = row.dispatchTime;
-  if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
-  return departDay * 1440 + Number(t);
+  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), load = dayNumber(row.loadDate), on = leavesOnOf(row.leavesOn);
+  if (departDay === null || row.dispatchTime === null || row.dispatchTime === undefined || row.dispatchTime === '' || !isFinite(Number(row.dispatchTime))) return null;
+  const t = Number(row.dispatchTime);
+  if (on === 'LOAD DAY') return (load === null ? departDay : load) * 1440 + t;
+  if (on === 'DELIVERY DAY') return departDay * 1440 + t;
+  return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }
