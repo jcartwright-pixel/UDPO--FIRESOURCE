@@ -43,6 +43,19 @@ test('times read as minutes after midnight', () => {
   assert.equal(L.timeText(810), '1:30 PM');
 });
 
+test('a time typed any way in the Route Editor turns into a real time (Joe 10/20)', () => {
+  const t = (x, was) => { const m = L.typedTime(x, was); return m === null ? null : L.timeText(m); };
+  [['5', '5:00 AM'], ['530', '5:30 AM'], ['0530', '5:30 AM'], ['5:30', '5:30 AM'], ['5a', '5:00 AM'], ['5p', '5:00 PM'], ['5:30pm', '5:30 PM'],
+    ['5:30 p.m.', '5:30 PM'], ['5 PM', '5:00 PM'], ['17:30', '5:30 PM'], ['1730', '5:30 PM'], ['4:00:00 AM', '4:00 AM'], ['12p', '12:00 PM'], ['0', '12:00 AM']]
+    .forEach(([typed, want]) => assert.equal(t(typed), want, typed));
+  // No AM / PM: a box that held a PM time keeps PM; written as 24 hours (0530, 17:30) it is exact.
+  assert.equal(t('5', 900), '5:00 PM');
+  assert.equal(t('5:30', 900), '5:30 PM');
+  assert.equal(t('0530', 900), '5:30 AM');
+  assert.equal(t('5a', 900), '5:00 AM');
+  ['', 'later', '2400', '13pm', '5:75', '12345', '5:3'].forEach(x => assert.equal(L.typedTime(x), null, x));
+});
+
 function run(id, week, days, extra) {
   return Object.assign({ id, weekStart: week, route: id, run: 'R', routeStatus: 'ACTIVE', active: true, displayDaily: true, displayWeekly: true, days }, extra || {});
 }

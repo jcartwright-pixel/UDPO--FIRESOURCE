@@ -79,3 +79,19 @@ table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
   .routes-page #seq-day { height: 30px; }
   .routes-page #hidden-box { max-width: 170px; }
 }
+/* Joe 10/20: every typed cell is a box all the time, like a spreadsheet cell, so it is plain where to click, copy and paste. */
+table.routes td:has(> input.cell) { position: relative; padding: 3px 4px; }
+table.routes input.cell { border-color: #9fb3c8; border-radius: 4px; background: #fff; }
+table.routes td.norun input.cell { background: #f8fafc; }
+table.routes input.cell[readonly] { border-color: var(--line); }
+table.routes input.cell:not([readonly]):hover { border-color: var(--ud-blue); }
+/* Something typed that is not a time: a short red note covers the box for a few seconds, then the old time shows again. */
+table.routes input.cell.bad { border-color: var(--error-ink); background: var(--error-bg); }
+table.routes .cell-note { position: absolute; inset: 3px 4px; z-index: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: var(--error-ink); color: #fff; font-size: 16px; font-weight: 700; pointer-events: none; overflow: hidden; white-space: nowrap; }
+/* The up / down clicker on a start time: shows on the box the mouse is over or the box being typed in, so the grid stays plain. */
+table.routes td .step { position: absolute; top: 4px; bottom: 4px; right: 6px; z-index: 1; display: none; flex-direction: column; gap: 1px; }
+table.routes td:hover .step, table.routes td:focus-within .step { display: flex; }
+table.routes .step-btn { flex: 1; width: 28px; padding: 0; border: 1px solid #9fb3c8; border-radius: 3px; background: var(--band); color: var(--ud-blue); font-size: 12px; line-height: 1; cursor: pointer; }
+table.routes .step-btn:hover { background: var(--ud-blue); color: #fff; }
+table.routes td:has(.cell-note) .step { display: none; }
+@media (max-width: 700px) { table.routes td .step { display: none !important; } }

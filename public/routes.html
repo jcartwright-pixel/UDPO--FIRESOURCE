@@ -86,7 +86,7 @@
     // The old Route Editor's grid keys (RouteManagement.html bindGrid), spelled out under every grid.
     const KEYS = 'Arrows move; Shift+arrows or Shift+click mark a block; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste it; one value pasted or typed with Ctrl+Enter fills the whole block; Ctrl+D fills down; Delete clears the block; Esc puts the box back.';
     const GRID = {
-      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time like 5 AM or 5:30 PM, Enter or Tab. ' + KEYS, ph: 'h:mm AM' },
+      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time any way (5, 530, 5:30p, 17:30) and it turns into a time like 5:30 PM. Enter or Tab. ' + KEYS, ph: 'h:mm AM' },
       miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). ' + KEYS, ph: 'miles' },
       hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). ' + KEYS, ph: 'h:mm' },
       offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before). ' + KEYS, ph: '0' },
@@ -189,8 +189,10 @@
     function gridView(g, list, edit) {
       return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
         list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + DAYS.map((p, di) => {
-          const on = !!day(r, p).active;
-          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(cellValue(r, p, g.field)) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '></td>';
+          const on = !!day(r, p).active, value = cellValue(r, p, g.field);
+          // Joe 10/20: an up / down clicker on each start time (15 minutes a click; hold to keep going).
+          const step = g.field === 'dispatchTime' && edit && value ? '<span class="step"><button type="button" class="step-btn" data-step="15" tabindex="-1" aria-label="15 minutes later" title="15 minutes later">&#9650;</button><button type="button" class="step-btn" data-step="-15" tabindex="-1" aria-label="15 minutes earlier" title="15 minutes earlier">&#9660;</button></span>' : '';
+          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(value) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '>' + step + '</td>';
         }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="9" class="empty">No runs to show.</td></tr></tbody>');
     }
     function daysView(list, edit) {
@@ -343,8 +345,31 @@
       const done = () => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); };
       return saveOptimistic('saveRoute', { runId: r.id, fields: fields || {}, days: days || {} }, () => apply(r), () => { done(); Object.keys(r).forEach(k => delete r[k]); Object.assign(r, before); }, renderSoon).then(x => { done(); return x; });
     }
+    // Joe 10/20: whatever is typed or pasted in a time box turns into a real time (5, 530, 5:30p, 1730 -> 5:00 AM style).
+    // Something that is not a time puts the box's old time back with a short red note, so nothing odd is saved.
+    function tidyTime(input, r, p) {
+      const raw = input.value.trim();
+      if (raw === '') return true;
+      const m = L.typedTime(raw, day(r, p).dispatchTime);
+      if (m === null) { input.value = cellValue(r, p, 'dispatchTime'); notTime(input, raw); return false; }
+      input.value = L.timeText(m);
+      return true;
+    }
+    function notTime(input, raw) {
+      const td = input.closest('td');
+      td.querySelectorAll('.cell-note').forEach(x => x.remove());
+      input.classList.add('bad');
+      const note = document.createElement('span');
+      note.className = 'cell-note';
+      note.setAttribute('role', 'alert');
+      note.textContent = 'Not a time';
+      input.title = '"' + raw + '" is not a time; the old time was kept.';
+      td.appendChild(note);
+      setTimeout(() => { note.remove(); input.classList.remove('bad'); input.removeAttribute('title'); }, 4000);
+    }
     function saveCell(input) {
       const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day, field = GRID[view].field;
+      if (field === 'dispatchTime' && !tidyTime(input, r, p)) return;
       if (input.value.trim() === cellValue(r, p, field)) return;
       const value = input.value.trim();
       saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
@@ -356,6 +381,30 @@
         : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
     }
     const table = document.getElementById('table');
+    // The up / down clicker: each click moves the time 15 minutes (past midnight wraps round); holding repeats. The box shows
+    // each step at once and saves once the clicking stops, like a typed change.
+    let stepTimer = null, stepSave = null;
+    function stepTime(input, by) {
+      const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day;
+      const m = r ? L.typedTime(input.value, day(r, p).dispatchTime) : null;
+      if (m === null) return;
+      input.value = L.timeText((m + by + 1440) % 1440);
+      clearTimeout(stepSave);
+      stepSave = setTimeout(() => saveCell(input), 700);
+    }
+    const stopStep = () => { clearTimeout(stepTimer); clearInterval(stepTimer); stepTimer = null; };
+    table.addEventListener('pointerdown', e => {
+      const b = e.target.closest('.step-btn');
+      if (!b) return;
+      e.preventDefault();
+      const input = b.closest('td').querySelector('input.cell'), by = Number(b.dataset.step);
+      if (document.activeElement !== input) moveTo(input);
+      stepTime(input, by);
+      stopStep();
+      stepTimer = setTimeout(() => { stepTimer = setInterval(() => stepTime(input, by), 120); }, 400);
+    });
+    ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, stopStep));
+    table.addEventListener('pointerout', e => { if (e.target.closest('.step-btn')) stopStep(); });
     // A Route Master update that arrived while a box was being typed in is drawn once the box is left (after its own save).
     table.addEventListener('keydown', e => {
       if (!e.target.matches('input.nm')) return;
@@ -367,7 +416,9 @@
       if (e.target.matches('input.cell')) return saveCell(e.target);
       if (e.target.matches('input.nm')) return saveName(routes.find(x => x.id === e.target.closest('tr').dataset.id), e.target.dataset.name, e.target.value);
       if (e.target.matches('input.dcell')) {
-        const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field, value = e.target.value.trim();
+        const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field;
+        if (field === 'dispatchTime' && !tidyTime(e.target, r, p)) return;
+        const value = e.target.value.trim();
         if (value === cellValue(r, p, field)) return;
         return saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
       }
@@ -419,7 +470,8 @@
       cells.forEach(x => {
         if (x.readOnly) return;
         const id = x.closest('tr').dataset.id, r = routes.find(y => y.id === id);
-        if (!r || x.value.trim() === cellValue(r, x.dataset.day, field)) return;
+        if (!r || (field === 'dispatchTime' && !tidyTime(x, r, x.dataset.day))) return;
+        if (x.value.trim() === cellValue(r, x.dataset.day, field)) return;
         (perRun[id] = perRun[id] || []).push(x);
       });
       Object.keys(perRun).forEach(id => {

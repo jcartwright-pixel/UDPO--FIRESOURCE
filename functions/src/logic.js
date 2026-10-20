@@ -143,6 +143,24 @@
     return ((h % 12) || 12) + ':' + pad(m) + ' ' + ampm;
   }
 
+  // A time typed (or pasted) into a Route Editor box, the way people type it (Joe 10/20): 5, 530, 0530, 5:30, 5a, 5p, 5:30pm,
+  // 5:30 p.m., 17:30, 1730, 4:00:00 AM. Returns minutes after midnight, or null when it is not a time. With no AM / PM and an
+  // hour from 1 to 12 it is AM, unless the box held a PM time (wasMinutes, minutes after midnight) - then it stays PM.
+  function typedTime(text, wasMinutes) {
+    var t = String(text == null ? '' : text).trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, '');
+    var m = t.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?(a|p|am|pm)?$/) || t.match(/^(\d{1,2})(\d{2})(a|p|am|pm)?$/);
+    if (!m) return null;
+    var h = +m[1], min = m[2] === undefined ? 0 : +m[2], ap = m[3] ? m[3].charAt(0) : '';
+    if (min > 59 || h > 23) return null;
+    if (ap) {
+      if (h < 1 || h > 12) return null;
+      return (h % 12 + (ap === 'p' ? 12 : 0)) * 60 + min;
+    }
+    if (h === 0 || h > 12 || /^0\d/.test(t)) return h * 60 + min;
+    var pm = typeof wasMinutes === 'number' && wasMinutes >= 720;
+    return (h % 12 + (pm ? 12 : 0)) * 60 + min;
+  }
+
   // Daily Dispatch and the drivers' phone, as the current app reads a Live row (udpoV780VisibleBase_): the run must be ACTIVE, the
   // Live row's flag decides, a blank flag takes Route Master's, and blank in both is hidden. A run copied before Route Master's
   // flags were kept on it (no masterShow) keeps the old reading: only a FALSE hides it.
@@ -1429,7 +1447,7 @@
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
