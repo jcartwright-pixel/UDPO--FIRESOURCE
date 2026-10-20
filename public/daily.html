@@ -264,7 +264,7 @@
           cell(runName(r), 'strong') +
           '<td><button type="button" class="toggle' + (r.off ? '' : ' on') + '" data-runs' + (edit ? '' : ' disabled') + ' aria-pressed="' + !r.off + '" title="Click to change whether this run runs">' + (r.off ? 'NO RUN' : 'RUNS') + '</button></td>' +
           (!driver && needs && cover[r.id]
-            ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
+            ? cell('', 'missing offcover', live && 'driver').replace('<td ', '<td data-cover="' + escapeHtml(coverLabel(cover[r.id])) + '" data-off-who="' + escapeHtml(String(cover[r.id].name || '').toUpperCase()) + '" data-off-why="' + escapeHtml(String(cover[r.id].reason || 'OFF').toUpperCase()) + '" ').replace('title=""', 'title="' + escapeHtml(coverLabel(cover[r.id]) + ': needs a driver') + '"')
             : cell(driver, driver || !needs ? '' : 'missing', live && 'driver')) +
           '<td><input type="checkbox" class="ovr" data-ovr aria-label="Override" title="Override: choose a driver or unit that is off or down"' + (ovr[r.id] ? ' checked' : '') + (live ? '' : ' disabled') + '></td>' +
           unitCell(r, 'truck', live, needs) + unitCell(r, 'trailer', live, needs) +

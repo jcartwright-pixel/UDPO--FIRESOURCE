@@ -9,7 +9,7 @@
 .wk-summary .legend i.assigned { background: #f4f8fb; }
 .wk-summary .legend i.relief { background: #dff4f1; }
 .wk-summary .legend i.needs { background: #ffd32e; border-color: #e1ae00; }
-.wk-summary .legend i.vacation-needs { background: #f5c6c8; border-color: #ee3e3e; }
+.wk-summary .legend i.vacation-needs { background: #c81e1e; border-color: #8f1010; }
 .wk-summary .legend i.plant { background: #ffd32e; border: 2px dashed #c2410c; }
 .wk-summary .legend i.conflict { background: #f4f8fb; border-color: #ef4545; }
 .wk-summary .legend i.off { background: #171c20; border-color: #171c20; }
@@ -66,3 +66,11 @@
 .wk-note { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; }
 .wk-note.warn { background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; }
 .wk-note.good { background: #e3f4e8; color: #1d5b2f; border: 1px solid #a9d8b6; }
+/* Joe 10/20 ("Donnie Rugg is off, but it's not pronounced good enough that it needs to be covered"): a run whose driver is off
+   is solid red with NEEDS DRIVER in bold white, and who is off and why on the lines under it, at 16px, until a driver is picked. */
+.weekly-page #routes-sheet td.day.c-vacation-needs { height: auto; padding-top: 6px; padding-bottom: 6px; color: #fff; white-space: normal; }
+.weekly-page #routes-sheet td.day.c-vacation-needs::before { background: #c81e1e !important; border: 2px solid #8f1010 !important; }
+.weekly-page #routes-sheet td.day.c-vacation-needs .nm { color: #fff; font-size: 16px; font-weight: 900; letter-spacing: .03em; }
+.weekly-page #routes-sheet td.day.c-vacation-needs .off-who, .weekly-page #routes-sheet td.day.c-vacation-needs .off-why { display: block; color: #fff; font-size: 16px; font-weight: 700; line-height: 1.1; white-space: normal; }
+.weekly-page #routes-sheet td.day.c-vacation-needs .off-why { font-weight: 600; opacity: .92; }
+.weekly-page #routes-sheet td.day.c-vacation-needs.editable::after { color: #fff; }

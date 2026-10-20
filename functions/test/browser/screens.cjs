@@ -295,6 +295,12 @@ async function noScroll(page) {
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-board-1920.png') });
     await wkEdit.evaluate(() => { document.getElementById('wk-scroll').scrollTop = 0; });
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].classList.contains('c-vacation-needs') && /CASEY/.test(tr.children[3].textContent)), null, { timeout: 5000 });
+    // Joe 10/20: a run whose driver is off reads NEEDS DRIVER in white on solid red, with who is off and why, all at 16px.
+    const offLook = await wkEdit.$eval('#rows td.c-vacation-needs', td => ({ text: td.innerText.split('\n'), bg: getComputedStyle(td, '::before').backgroundColor, color: getComputedStyle(td.querySelector('.nm')).color, sizes: [...td.querySelectorAll('.nm, .off-who, .off-why')].map(e => parseFloat(getComputedStyle(e).fontSize)) }));
+    assert.deepEqual(offLook.text, ['NEEDS DRIVER', 'CASEY, LEE', 'VACATION'], 'driver-off cell: NEEDS DRIVER, then who is off and why');
+    assert.equal(offLook.bg, 'rgb(200, 30, 30)', 'driver-off cell is solid red');
+    assert.equal(offLook.color, 'rgb(255, 255, 255)', 'NEEDS DRIVER is white');
+    assert.ok(offLook.sizes.every(n => n >= 16), 'driver-off cell text is at least 16px: ' + offLook.sizes);
     await wkEdit.click('#publish');
     await wkEdit.waitForFunction(() => /Published .* by dispatch\.test$/.test(document.getElementById('published').textContent), null, { timeout: 5000 });
     // Reset Week (managers): the dispatcher's button is off; a manager's second click rebuilds the week from the masters.
