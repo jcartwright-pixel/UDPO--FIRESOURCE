@@ -356,6 +356,19 @@ test('Send Current Report with email set up: the report is SENDING, with the rep
   } finally { delete process.env.MAIL_FROM; }
 });
 
+// Joe 10/20: the forecast in the next report says how much time was made up or lost since the shift's earlier report.
+test('Send Current Report: the forecast keeps the earlier report\'s time and how far behind it was', async () => {
+  const report = (asOf, lateBy) => ({ dayLabel: 'Today', behind: [], loaded: [], nextUp: [], totalLoads: 0, leftToLoad: 0, pickups: [], down: [], lines: [], temperatures: [],
+    forecast: { asOf, late: 1, loads: [{ late: true, lateBy }] } });
+  const send = (asOf, lateBy) => applyAction(db(), DISPATCHER, { action: 'sendPlantReport', requestId: rid(), subject: 'Plant Update ' + asOf, text: 'ROUTES BEHIND (0)', note: '', report: report(asOf, lateBy) });
+  const kept = async (res) => JSON.parse((await db().collection('plantReports').doc(res.reportId).get()).data().reportJson).forecast;
+  const first = await send('8:42 AM', 858);
+  const second = await send('10:42 AM', 778);
+  assert.deepEqual((await kept(second)).before, { asOf: '8:42 AM', behind: 860 });
+  assert.match(R.forecastSummary(await kept(second)).changeText, /^Made up 1 hr 20 min since the 8:42 AM report$/);
+  assert.ok(!(await kept(first)).before || (await kept(first)).before.asOf !== '10:42 AM', 'an earlier report never compares with a later one');
+});
+
 // Joe 10/15 (Loading Rundown): each Start / End keeps who saved it and whether from a Plant Station tablet or the desk; a change
 // keeps the old time; the next copy from the sheets keeps all of it (app-only fields).
 test('Loading Rundown: the tablet and the desk are told apart, a changed time is kept, and the copy keeps them', async () => {

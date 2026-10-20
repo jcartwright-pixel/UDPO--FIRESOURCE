@@ -1066,8 +1066,24 @@ function validateReport(input, SaveError) {
 async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const id = 'REPORT_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
   const mailOn = !!String(process.env.MAIL_FROM || '').trim();
-  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, reportJson: req.reportJson, testOnly: !!req.testOnly, status: mailOn ? 'SENDING' : 'HELD', emailed: false,
-    date: L.operatingDay(new Date(stamp)), at: stamp, by: email, mode: mode.mode };
+  const date = L.operatingDay(new Date(stamp));
+  // Joe 10/20: the forecast says how much time was made up or lost since the shift's earlier report (the last one sent
+  // today with a forecast, kept here with this report so the email and Shift Reports both show it).
+  let reportJson = req.reportJson;
+  try {
+    const r = reportJson ? JSON.parse(reportJson) : null;
+    if (r && r.forecast) {
+      const earlier = (await tx.get(db.collection('plantReports').where('date', '==', date))).docs.map(x => x.data())
+        .filter(x => x.mode === mode.mode && x.reportJson && String(x.at) < stamp).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      for (const x of earlier) {
+        let f = null;
+        try { f = JSON.parse(x.reportJson).forecast; } catch (e) { f = null; }
+        if (f && f.asOf) { r.forecast.before = { asOf: f.asOf, behind: R.forecastBehind(f) }; reportJson = JSON.stringify(r); break; }
+      }
+    }
+  } catch (e) { reportJson = req.reportJson; }
+  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, reportJson, testOnly: !!req.testOnly, status: mailOn ? 'SENDING' : 'HELD', emailed: false,
+    date, at: stamp, by: email, mode: mode.mode };
   tx.set(db.collection('plantReports').doc(id), record);
   const result = { ok: true, requestId: req.requestId, reportId: id, sent: false, sending: mailOn, subject: req.subject,
     message: mailOn ? (req.testOnly ? 'Sending the test to you only…' : 'Report saved. Sending the email…') : 'Report saved. Email is not set up in Operations yet, so it was not emailed' + (req.testOnly ? '.' : ' to ' + req.groupName + '.') };

@@ -239,8 +239,9 @@
       const loaded = r.loaded.map(z => tile(z, 'ok')), notLoaded = r.behind.map(z => tile(z, 'behind', 'BEHIND')).concat(r.nextUp.map(z => tile(z, 'no')));
       document.getElementById('rp-body').innerHTML =
         '<div class="mc-banner ' + (r.behind.length ? 'bad' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
-        (r.forecast ? sect('Late forecast (estimated) at ' + r.forecast.asOf, r.forecast.late ? r.forecast.late + ' late' : 'on time', r.forecast.late ? 'bad' : '',
-          U.forecastLateText(r.forecast).map(t => row('Late', t, 'bad')).concat([
+        // Joe 10/20: how far behind, not the list of every late load.
+        (r.forecast ? sect('Late forecast (estimated) at ' + r.forecast.asOf, r.forecast.late ? r.forecast.late + ' potentially late' : 'on time', r.forecast.late ? 'bad' : '',
+          (r.forecast.late ? [row('Behind', U.forecastSummary(r.forecast).behindText, 'bad')] : []).concat([
             row('Due by ' + r.forecast.dueByText, r.forecast.due.loads + ' loads · ' + r.forecast.due.cases.toLocaleString('en-US') + ' cases' + (r.forecast.due.loads ? ' · est. done ' + r.forecast.due.doneText : ''), r.forecast.due.late ? 'bad' : ''),
             row('All loads done', r.forecast.loads.length ? 'est. ' + r.forecast.allDoneText + ' · ' + r.forecast.casesLeft.toLocaleString('en-US') + ' cases left' : 'nothing left to load', r.forecast.late ? 'bad' : '')]), '') : '') +
         '<section><h3>Routes<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em></h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +

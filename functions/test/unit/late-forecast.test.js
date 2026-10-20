@@ -123,7 +123,12 @@ test('the email and the report carry the forecast', () => {
   assert.equal(r.forecast, forecast);
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
   assert.match(html, /Forecast at 7:00 PM \(estimated\)/i);
-  assert.match(html, new RegExp(forecast.late + ' loads? late'));
+  assert.match(html, new RegExp(forecast.late + ' loads? potentially late'));
+  // Joe 10/20: "I don't need this great big long recap up here": how far behind, not a line for every late load.
+  assert.ok(forecast.behind > 0 && forecast.behind % 5 === 0);
+  assert.match(html, new RegExp('About ' + R.forecastSummary(forecast).behindText.replace(/^About /, '')));
+  assert.doesNotMatch(html, /est\. [0-9:]+ [AP]M, (leaves|past the)/);
+  assert.match(r.text, /About .* behind/);
   assert.match(html, /Due by 5:00 AM/);
   assert.match(html, /Est\. Done/);
   assert.match(html, /past the 6:00 AM shift end/);
@@ -178,4 +183,42 @@ test('after the 6 a.m. roll, last night\'s open loads are behind and are loaded 
   assert.ok(f.loads[3].start >= f.loads[2].est, 'today\'s first load starts after the last left-over one');
   assert.equal(f.loads[3].late, true);
   assert.equal(f.loads[3].reason, 'misses dispatch');
+});
+
+// Joe 10/20: "on the next report, made up, you know, so many hours" - compared with the shift's earlier report.
+test('the forecast says how far behind it is and what was made up or lost since the earlier report', () => {
+  const f = { asOf: '10:42 AM', late: 2, loads: [{ late: true, lateBy: 61 }, { late: true, lateBy: 778 }, { late: false, lateBy: 0 }] };
+  assert.equal(R.forecastBehind(f), 780);
+  assert.equal(R.forecastSummary(f).behindText, 'About 13 hr behind');
+  assert.equal(R.forecastSummary(f).changeText, '', 'the first report of the shift has nothing to compare with');
+  assert.equal(R.forecastSummary(Object.assign({}, f, { before: { asOf: '8:42 AM', behind: 860 } })).changeText, 'Made up 1 hr 20 min since the 8:42 AM report');
+  assert.equal(R.forecastSummary(Object.assign({}, f, { before: { asOf: '8:42 AM', behind: 740 } })).changeText, 'Lost 40 min since the 8:42 AM report');
+  assert.equal(R.forecastSummary(Object.assign({}, f, { before: { asOf: '8:42 AM', behind: 780 } })).changeText, 'No change since the 8:42 AM report');
+  const caught = { asOf: '2:00 PM', late: 0, loads: [], before: { asOf: '12:00 PM', behind: 45 } };
+  assert.equal(R.forecastSummary(caught).behindText, '');
+  assert.equal(R.forecastSummary(caught).changeText, 'Made up 45 min since the 12:00 PM report');
+  const html = R.reportHtml({ dayLabel: 'Tue', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [], totalLoads: 0, leftToLoad: 0,
+    forecast: Object.assign({ due: { loads: 0, cases: 0, late: 0 }, dueByText: '5:00 AM', allDoneText: '', casesLeft: 0, byTime: [] }, f, { before: { asOf: '8:42 AM', behind: 860 } }) }, '');
+  assert.match(html, /2 loads potentially late/);
+  assert.match(html, /About 13 hr behind/);
+  assert.match(html, /Made up 1 hr 20 min since the 8:42 AM report/);
+});
+
+// Joe 10/20 (10:42 AM report: every load 1 hr 40 min): a load with no case count yet is sized from its own route's past
+// nights, not from the few big loads counted so far tonight.
+test('a load with no case count is sized from its own route, and "1,150" reads as 1,150 cases', () => {
+  const at = (h, m) => new Date(Date.UTC(2026, 9, 13, h + 4, m)).toISOString();
+  const past = { date: '2026-10-13', loads: [
+    { id: 'p1', area: 'CASE', route: '808', run: 'DSD', quantity: '400', state: 'DONE', completedAt: at(20, 0) },
+    { id: 'p2', area: 'CASE', route: '907_1', run: 'FAIRMONT TRANSFER', quantity: '1,200', state: 'DONE', completedAt: at(21, 0) },
+    { id: 'p3', area: 'CASE', route: '822', run: 'DSD', quantity: 380, state: 'DONE', completedAt: at(22, 0) }] };
+  const now = Date.UTC(2026, 9, 20, 14, 42);
+  const loads = [
+    { id: 't1', area: 'CASE', route: '907_1', run: 'FAIRMONT TRANSFER', quantity: '1,200', state: 'NOT_STARTED', loadDate: '2026-10-20', deliveryDate: '2026-10-21', dispatchTime: '8:00 PM' },
+    { id: 't2', area: 'CASE', route: '808', run: 'DSD', quantity: '', state: 'NOT_STARTED', loadDate: '2026-10-20', deliveryDate: '2026-10-21', dispatchTime: '4:00 AM' }];
+  const f = R.loadForecast({ date: '2026-10-20', loads, history: [past] }, now);
+  const t1 = f.loads.find(x => x.id === 't1'), t2 = f.loads.find(x => x.id === 't2');
+  assert.equal(t1.cases, 1200);
+  assert.equal(t2.cases, 0);
+  assert.ok(t2.minutes < t1.minutes / 2, '808 is sized as its usual 400 cases, not as tonight\'s 1,200-case transfer');
 });
