@@ -51,9 +51,12 @@ async function openPage(browser, width, height, url, touch) {
   // Fleet: T-953 left the yard at 1:00 AM and came back at 9:42 AM; T-955 left at 2:00 AM and is still out.
   await d.collection('gpsDays').doc('2026-10-08__T953').set({ tag: 'T-953', date: '2026-10-08', yardOut: '2026-10-08T05:00:00Z', yardIn: '2026-10-08T13:42:00Z' });
   await d.collection('gpsDays').doc('2026-10-08__T955').set({ tag: 'T-955', date: '2026-10-08', yardOut: '2026-10-08T06:00:00Z' });
-  // When each trailer is next needed: its Friday load (loaded today), unless that load is already loaded.
+  // When each trailer is next needed: its Friday load (loaded today), unless that load is already loaded. A load made the day
+  // before leaves in the operating day before (the day rolls at 6 a.m., Joe 10/19): 6 a.m. on is Thursday, earlier is Friday.
   const nextDepart = {};
-  (await d.collection('runs').get()).docs.forEach(doc => { const f = (doc.data().days || {}).fri; if (f && f.trailer && f.loadStatus !== 'COMPLETE' && f.dispatchTime != null) nextDepart[f.trailer] = Number(f.dispatchTime); });
+  (await d.collection('runs').get()).docs.forEach(doc => { const f = (doc.data().days || {}).fri; if (f && f.trailer && f.loadStatus !== 'COMPLETE' && f.dispatchTime != null) {
+    const t = Number(f.dispatchTime), early = f.loadDate && f.deliveryDate && String(f.loadDate) < String(f.departureDate || f.deliveryDate);
+    nextDepart[f.trailer] = early && t >= 360 ? t - 1440 : t; } });
 
   const browser = await chromium.launch();
   const results = [];

@@ -18,8 +18,8 @@ const tonightDone = [done('849', '05:30', '06:47', 900), done('906', '10:35', '1
 const tonightLeft = [
   wait('845', 'I/W BALTIMORE', 316, H(21), { departureDate: MON, leavesOn: 'Load Day' }), wait('950_1', 'CHARLESTON', 668, H(16), { leavesOn: 'Delivery Day' }),
   wait('971', 'PAINTSVILLE', 812, H(2)), wait('813', 'DSD', 477, H(1, 30)), wait('803', 'DSD', 503, H(4)), wait('812', 'DSD', 450, H(5)), wait('822', 'DSD', 350, H(4, 30)),
-  wait('808', 'DSD', 516, H(4)), wait('8303_1', 'WALMART', 996, H(5, 30)), wait('825', 'DSD', 252, H(5)), wait('805', 'DSD', 115, H(5)), wait('901_1', 'PRODUCT 1', 853, H(7)),
-  wait('909_1', 'MARIETTA LOAD 1', 1067, H(21), { leavesOn: 'Delivery Day' }), wait('907_1', 'FAIRMONT', 1073, H(9))];
+  wait('808', 'DSD', 516, H(4)), wait('8303_1', 'WALMART', 996, H(5, 30)), wait('825', 'DSD', 252, H(5)), wait('805', 'DSD', 115, H(5)), wait('901_1', 'PRODUCT 1', 853, H(7), { leavesOn: 'Delivery Day' }),
+  wait('909_1', 'MARIETTA LOAD 1', 1067, H(21), { leavesOn: 'Delivery Day' }), wait('907_1', 'FAIRMONT', 1073, H(9), { leavesOn: 'Delivery Day' })];
 const night = (date, rate) => ({ date, loads: [{ area: 'CASE', state: 'DONE', quantity: rate, startedAt: date + 'T20:00:00-04:00', completedAt: date + 'T21:00:00-04:00' }] });
 
 test('a night\'s pace: cases over the time any load was loading, bad times left out', () => {
