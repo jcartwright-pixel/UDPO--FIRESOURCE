@@ -104,6 +104,25 @@
     var n = Number(String(value).replace(/,/g, '').trim());
     return isFinite(n) ? n : null;
   }
+  // A load-day offset, 0 to -6, rounded and kept in that range as the current app's dispatch does
+  // (desktopRouteConfigNormalizeLoadDayOffsetV0323_). Joe 10/19: a Route Master cell formatted as a date shows 0 as 12/30/1899
+  // (the sheet's day 0), -1 as 12/29/1899, and so on; that is the number, not a blank.
+  function dayOffset(value) {
+    var n = number(value);
+    if (n !== null) return Math.max(-6, Math.min(0, Math.round(n)));
+    var t = String(value === null || value === undefined ? '' : value).trim(), m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s|$)/), y = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]|$)/);
+    var ms = m ? Date.UTC(+m[3], +m[1] - 1, +m[2]) : y ? Date.UTC(+y[1], +y[2] - 1, +y[3]) : NaN;
+    var days = Math.round((ms - Date.UTC(1899, 11, 30)) / 86400000);
+    return isFinite(days) && days <= 0 && days >= -6 ? days : null;
+  }
+  // When a route leaves (Route Master departure_day), as the current app's dispatch reads it (desktopRouteConfigNormalizeDepartureDayV0321_):
+  // Load Day or Delivery Day; a blank one is Load Day for a sleeper route, else Delivery Day.
+  function leavesOn(route) {
+    var raw = String((route && route.departureDay) || '').trim().toUpperCase();
+    if (raw === 'LOAD DAY' || raw === 'LOAD') return 'Load Day';
+    if (raw === 'DELIVERY DAY' || raw === 'DELIVERY') return 'Delivery Day';
+    return route && route.sleeper ? 'Load Day' : 'Delivery Day';
+  }
 
   // Times come as 4:00:00 AM, 16:30, or a fraction of a day. Returns minutes after midnight, or null.
   function minutesOfDay(value) {
@@ -376,7 +395,7 @@
           loadSequence: effectiveSequence(day),
           dispatchTime: day.dispatchTime, startTime: day.startTime, routeHours: day.routeHours, miles: day.miles,
           driverId: day.driverId, driver: day.driver, intendedDriverId: day.intendedDriverId || '', intendedDriver: day.intendedDriver || '', driverExceptionStatus: day.driverExceptionStatus || '',
-          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer,
+          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer, equipmentOverride: day.equipmentOverride || '',
           forkliftId: day.forkliftId, palletJack: day.palletJack,
           casesOut: day.casesOut, pickup: day.pickup, driverNotes: day.driverNotes,
           plantStatus: day.completeTime ? 'COMPLETE' : day.plantStartedAt ? 'LOADING' : (day.loadStatus || day.status || ''),
@@ -782,6 +801,23 @@
     return !row.driver && (!coverage || coverage === 'UNITED DAIRY');
   }
 
+  // Joe 10/19: a driver can be over on one product and short on another. Both go in the one Live column
+  // (overage_shortage_details) as "OVER 2 cs · 1% milk · Store: ...; SHORT 3 cs · ..."; this takes it apart again.
+  // Text written before (no OVER / SHORT in front) comes back as other.
+  function splitOverShort(text) {
+    var out = { over: '', short: '', other: '' };
+    String(text || '').trim().split(/;\s*(?=(?:OVER|SHORT)\b)/i).forEach(function (part) {
+      part = part.trim();
+      if (!part) return;
+      var m = /^(OVER|SHORT)\b\s*(.*)$/i.exec(part), key = m ? m[1].toLowerCase() : 'other', said = m ? m[2].trim() || 'yes' : part;
+      out[key] = out[key] ? out[key] + '; ' + said : said;
+    });
+    return out;
+  }
+  function joinOverShort(over, short) {
+    return [over && 'OVER ' + String(over).trim(), short && 'SHORT ' + String(short).trim()].filter(Boolean).join('; ');
+  }
+
   // Driver check-ins for one DELIVERY date: every run delivering that day, in route order, with what the driver
   // reported (the same Live columns the current phone check-in writes).
   function checkinRows(runs, deliveryDate) {
@@ -797,7 +833,10 @@
       more.forEach(function (m, i) { if (m && m.issues) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + '): ' + m.issues); if (m && m.needsCleaned) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + ') needs cleaned'); });
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
-      if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
+      var os = splitOverShort(d.overageShortageDetails);
+      if (os.over) issues.push('Over: ' + os.over);
+      if (os.short) issues.push('Short: ' + os.short);
+      if (os.other || (!os.over && !os.short && yes(d.overageShortage))) issues.push('Over/short: ' + (os.other || 'yes'));
       if (d.loadedCorrectly === 'NO') issues.push('Loaded wrong: ' + (d.loadingProblem || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
@@ -1247,7 +1286,7 @@
       routeStatus: route.routeStatus || '', active: flag(route.active), displayDaily: flag(route.displayDaily), displayWeekly: flag(route.displayWeekly),
       displayPlant: flag(route.displayPlant), displayMobileRoute: flag(route.displayMobile),
       weekOrder: route.weekOrder === undefined ? null : route.weekOrder, weeklyShowMaster: flag(route.displayWeekly),
-      masterShow: { daily: route.displayDaily === undefined ? null : route.displayDaily, mobile: route.displayMobile === undefined ? null : route.displayMobile, loadType: route.loadType || '' },
+      masterShow: { daily: route.displayDaily === undefined ? null : route.displayDaily, mobile: route.displayMobile === undefined ? null : route.displayMobile, loadType: route.loadType || '', leavesOn: leavesOn(route) },
       days: buildRunDays(route, week, ctx)
     };
   }
@@ -1360,13 +1399,13 @@
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
-    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
+    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, minutesOfDay: minutesOfDay, timeText: timeText,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows

@@ -68,7 +68,7 @@ const MASTER_KINDS = Object.freeze({
       L.DAYS.forEach(p => {
         days[p] = {
           active: L.yes(get(p + '_active')), dispatchTime: L.minutesOfDay(get(p + '_dispatch_time')), loadOrder: L.number(get(p + '_load_order')),
-          miles: L.number(get(p + '_miles')), hours: get(p + '_expected_route_hours'), loadDayOffset: L.number(get(p + '_load_day_offset')),
+          miles: L.number(get(p + '_miles')), hours: get(p + '_expected_route_hours'), loadDayOffset: L.dayOffset(get(p + '_load_day_offset')),
           forklift: get(p + '_forklift_default'), tractor: get(p + '_tractor_default'), trailer: get(p + '_trailer_default'), notes: get(p + '_notes')
         };
       });
@@ -326,7 +326,7 @@ function parseLiveTab(tabName, values, lookups) {
     run.weeklyShowMaster = routeMaster && (routeMaster.displayWeekly === true || routeMaster.displayWeekly === false) ? routeMaster.displayWeekly : null;
     // Where the Live row leaves a show flag or the load type blank, the current app reads Route Master's (udpoV780ResolveDisplayBase_).
     run.masterShow = routeMaster ? { daily: routeMaster.displayDaily === undefined ? null : routeMaster.displayDaily, mobile: routeMaster.displayMobile === undefined ? null : routeMaster.displayMobile,
-      loadType: routeMaster.loadType || '' } : { daily: null, mobile: null, loadType: '' };
+      loadType: routeMaster.loadType || '', leavesOn: L.leavesOn(routeMaster) } : { daily: null, mobile: null, loadType: '', leavesOn: '' };
     run.days = {};
     const offWithDriver = [];
     L.DAYS.forEach(prefix => {
@@ -345,9 +345,10 @@ function parseLiveTab(tabName, values, lookups) {
       run.days[prefix] = day;
     });
     run.cells = cellsOf(r.row, index);
-    // Route Master's order and Weekly setting are part of the fingerprint, so a Route Master change rewrites the run. The days off
-    // with a driver are too, so only those rows (read as running before Joe 10/13) are rewritten once.
-    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster].concat(offWithDriver.length ? ['offWithDriver=' + offWithDriver.join('-')] : [])));
+    // Route Master's order, Weekly setting and Departure Day (Joe 10/19, when the plant counts a load behind) are part of the
+    // fingerprint, so a Route Master change rewrites the run. The days off with a driver are too, so only those rows (read as
+    // running before Joe 10/13) are rewritten once.
+    run.fingerprint = fingerprint(r.row.map(cellText).concat(['weekOrder=' + run.weekOrder, 'weeklyShow=' + run.weeklyShowMaster, 'leavesOn=' + run.masterShow.leavesOn].concat(offWithDriver.length ? ['offWithDriver=' + offWithDriver.join('-')] : [])));
     runs[M.runDocId(weekStart, key)] = run;
   });
   return { tab: tabName, weekStart, runs, warnings };
@@ -411,7 +412,7 @@ function parseHistory(values) {
     if (run.days[p].runs && !runsDay) return;
     const time = M.convert('time', get(row, 'departure_time'));
     Object.assign(run.days[p], { runs: runsDay, loadSequence: L.number(get(row, 'load_sequence')), deliveryDate: L.dateKey(get(row, 'delivery_date')) || L.addDays(run.weekStart, L.DAYS.indexOf(p)),
-      loadDate: L.dateKey(get(row, 'load_date')) || null, loadDayOffset: L.number(get(row, 'load_day_offset')), departureDate: L.dateKey(get(row, 'departure_date')) || null,
+      loadDate: L.dateKey(get(row, 'load_date')) || null, loadDayOffset: L.dayOffset(get(row, 'load_day_offset')), departureDate: L.dateKey(get(row, 'departure_date')) || null,
       dispatchTime: time, startTime: time, routeHours: L.number(get(row, 'route_hours')), miles: L.number(get(row, 'miles')), driverId: get(row, 'driver_id'), driver: get(row, 'driver'),
       truckId: get(row, 'truck_id'), truck: get(row, 'truck'), trailerId: get(row, 'trailer_id'), trailer: get(row, 'trailer'), palletJack: get(row, 'pallet_jack'), driverNotes: get(row, 'driver_notes') });
     run.history.push(row.map(cellText).join('|'));

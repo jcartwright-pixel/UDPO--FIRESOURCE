@@ -48,7 +48,7 @@ test('over / short, a corrected truck, the jack and two trailers: saved for the 
   const row = L.checkinRows(runs, '2026-10-06').find(r => r.route === '801');
   assert.equal(row.truck, '900001');
   assert.equal(row.trailer, 'T-902 / T-901');
-  assert.deepEqual(row.issues, ['Truck: Check engine light', 'Trailer 1: Door seal', 'Trailer 2 (T-901): Light out', 'Trailer 2 (T-901) needs cleaned', 'Over/short: SHORT 2 cs · 2% gallon · Store: Giant Eagle']);
+  assert.deepEqual(row.issues, ['Truck: Check engine light', 'Trailer 1: Door seal', 'Trailer 2 (T-901): Light out', 'Trailer 2 (T-901) needs cleaned', 'Short: 2 cs · 2% gallon · Store: Giant Eagle']);
   const m = await maint();
   const truck = m.find(r => r.kind === 'TRUCK');
   assert.equal(truck.truck_number, '900001');
