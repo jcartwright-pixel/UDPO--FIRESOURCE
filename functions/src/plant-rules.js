@@ -1187,7 +1187,7 @@
         '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
-    // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
+    // Joe 10/17: loaded routes in the order they finished loading; not loaded routes in load order (Joe 10/20). Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is counted from when each load leaves (departWall).
     // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
@@ -1199,6 +1199,8 @@
       .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
     // Joe 10/19 (Late Forecast): with a forecast, a load not loaded shows its Est. Done (green, or red with a warning sign when late).
     var fc = r.forecast, fcBy = {}; (fc ? fc.loads : []).forEach(function (x) { fcBy[x.id] = x; });
+    // Joe 10/20 (3:09 PM report): not loaded routes follow the plant's load order (Daily Case Loadout, where a load is dragged up
+    // or down), not dispatch time, so Est. Done runs in order down the list and moves when the plant moves a load.
     // Joe 10/20: after the 6 a.m. roll, like the Loadout Center: what is left over from the day before first, then today's
     // loads, each in loading order (the forecast's order), instead of by delivery day.
     var fcAt = {}; (fc ? fc.loads : []).forEach(function (x, i) { fcAt[x.id] = i; });
@@ -1206,7 +1208,7 @@
     var todayKey = (r.behind || []).concat(r.nextUp || [], r.loaded || []).filter(function (x) { return !x.priorDay && x.loadDate; }).map(function (x) { return x.loadDate; })[0] || '';
     var todayLabel = todayKey ? leftFrom(todayKey) : '';
     var loadOrder = function (a, b) { var x = fcAt[a.id], y = fcAt[b.id]; return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y) || a.loadSequence - b.loadSequence || untilOf(a) - untilOf(b); };
-    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || untilOf(a) - untilOf(b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || loadOrder(a, b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
       .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: PLAIN, fg: INK }; });
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
