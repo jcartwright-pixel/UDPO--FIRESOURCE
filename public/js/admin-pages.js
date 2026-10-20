@@ -677,6 +677,8 @@ const STATUS = { SENT: ['Sent', 'good'], BLOCKED: ['Stopped (off)', 'bad'], FAIL
 export async function renderSentLog(box) {
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="sl-reload">Refresh</button><span id="sl-switch-wrap" style="display:flex;gap:8px;align-items:center"></span></div>' +
     '<div class="ap-msg" hidden></div><p class="ap-note">Every email the Operations app sent, stopped, held, or failed. Newest first. On the sandbox an email goes only to the person who pressed the button.</p>' +
+    // Joe 10/19 (Late Forecast): who gets the forecast box in the plant report email. Only me = only a Send Test to Me email.
+    '<div class="ap-bar" id="sl-forecast"></div>' +
     '<div class="ap-scroll"><table class="ap-t"><thead><tr><th>When</th><th>Status</th><th>What</th><th>To</th><th>Subject</th></tr></thead><tbody id="sl-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   async function load() {
@@ -687,6 +689,11 @@ export async function renderSentLog(box) {
       $('#sl-switch-wrap').innerHTML = (s.sending ? '<button type="button" class="ap-btn warn" id="sl-off">Turn off</button>' : '<button type="button" class="ap-btn main" id="sl-on">Turn on</button>') +
         '<span class="' + (s.sending ? 'ap-chip good' : 'ap-chip bad') + '">' + (s.sending ? 'Sending is ON' : 'Sending is OFF') + '</span><span class="ap-help">' +
         (s.sending ? (s.changedBy ? 'Turned on by ' + e(s.changedBy) + ' ' + e(when(s.changedAt)) : '') : 'Nothing is emailed, and each attempt is logged as stopped.') + '</span>';
+      $('#sl-forecast').innerHTML = '<b>Forecast in the plant report email</b>' +
+        '<button type="button" class="ap-btn' + (s.forecastEveryone ? '' : ' main') + '" id="sl-fc-me" aria-pressed="' + !s.forecastEveryone + '">Only me</button>' +
+        '<button type="button" class="ap-btn' + (s.forecastEveryone ? ' main' : '') + '" id="sl-fc-all" aria-pressed="' + !!s.forecastEveryone + '">Everyone</button>' +
+        '<span class="ap-help">' + (s.forecastEveryone ? 'The forecast box goes in every plant report email.' : 'The forecast box goes only in a Send Test to Me email (Manager Center > the report > Send Test to Me).') +
+        (s.forecastChangedBy ? ' Changed by ' + e(s.forecastChangedBy) + ' ' + e(when(s.forecastChangedAt)) : '') + '</span>';
       $('#sl-rows').innerHTML = data.emails.map(m => {
         const st = STATUS[m.status] || [m.status, ''];
         return '<tr><td>' + e(when(m.at)) + '</td><td><span class="ap-chip ' + st[1] + '">' + e(st[0]) + '</span></td><td><b>' + e(m.label || m.kind) + '</b><small>' + e([m.kind, m.detail, m.by, m.from ? 'from ' + m.from : ''].filter(Boolean).join(' · ')) + '</small></td>' +
@@ -700,6 +707,7 @@ export async function renderSentLog(box) {
     if (!b) return;
     if (b.id === 'sl-reload') load();
     if (b.id === 'sl-off') busy(box, b, async () => { const out = await call('setSending', { on: false }); await load(); say(box, out.message, 'good'); });
+    if (b.id === 'sl-fc-me' || b.id === 'sl-fc-all') busy(box, b, async () => { const out = await call('setForecastEmail', { everyone: b.id === 'sl-fc-all' }); await load(); say(box, out.message, 'good'); });
     if (b.id === 'sl-on') twice(b, 'Press again to turn on', () => busy(box, b, async () => { const out = await call('setSending', { on: true }); await load(); say(box, out.message, 'good'); }));
   });
   await load();

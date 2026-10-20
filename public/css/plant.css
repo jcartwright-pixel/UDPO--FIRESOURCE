@@ -1439,3 +1439,92 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
   .manager-page .mc-report .mc-preview { gap: 6px; padding: 8px 12px; }
   .manager-page .mc-report .mc-pvnote { padding-top: 6px; }
 }
+
+/* Joe 10/19 (Late Forecast, option t): a tile on Manager Center's Plant Distribution Departments card. The short tiles
+   (Returns, Washing) give room so every tile keeps its whole wording on one line. */
+.manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: 1.3fr 1.35fr 0.7fr 0.9fr 1.2fr; gap: 6px; }
+.manager-page .mc-card[data-card="dept"] .mc-tile { padding: 6px 8px; }
+@media (min-width: 761px) { .manager-page .mc-card[data-card="dept"] .mc-tile i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+.manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].good { background: #e7f6ec; border-color: #a8dcb8; }
+.manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].bad { background: #fde8e8; border-color: #efb4b4; }
+.manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].good i { color: var(--ink); }
+@media (max-width: 760px) { .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* The Late Forecast screen: four numbers on top, the loads with their Est. Done and time line, the loads due by each time. */
+.forecast-page .head { align-items: center; }
+.forecast-page .fc-pick { margin-left: auto; display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--muted); font-size: 16px; }
+.forecast-page .fc-pick select { font: inherit; font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.forecast-page .view { padding: 0 16px 10px; gap: 8px; }
+.forecast-page .fc-band { display: grid; grid-template-columns: 1.1fr 1.1fr 1fr 1.5fr; gap: 8px; flex: none; }
+.forecast-page .fc-tile { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.forecast-page .fc-tile span { font-size: 16px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.forecast-page .fc-tile b { font-size: 26px; font-weight: 900; color: var(--ud-blue-dark); white-space: nowrap; }
+.forecast-page .fc-tile b small { font-size: 16px; color: var(--muted); }
+.forecast-page .fc-tile > small { font-size: 16px; color: var(--muted); }
+.forecast-page .fc-tile em { font-style: normal; font-weight: 800; color: var(--ink); }
+.forecast-page .fc-tile.bad { background: #fde8e8; border-color: #efb4b4; box-shadow: inset 5px 0 0 #c62828; }
+.forecast-page .fc-tile.bad span, .forecast-page .fc-tile.bad b, .forecast-page .fc-tile.bad > small, .forecast-page .fc-tile.bad em { color: #c62828; }
+.forecast-page .fc-tile.good { background: #e7f6ec; border-color: #a8dcb8; box-shadow: inset 5px 0 0 #1d7a3e; }
+.forecast-page .fc-tile.good b { color: #1d7a3e; }
+.forecast-page .fc-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 10px; }
+.forecast-page .fc-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-height: 0; display: flex; flex-direction: column; }
+.forecast-page .fc-card h2 { margin: 0 0 4px; font-size: 20px; color: var(--ud-blue-dark); }
+.forecast-page .fc-scroll { flex: 1; min-height: 0; overflow: auto; }
+.forecast-page .fc-row { display: grid; grid-template-columns: 64px minmax(130px, 1fr) 70px 112px 132px minmax(240px, 2.2fr); align-items: center; column-gap: 8px; min-height: 28px; border-bottom: 1px solid #e3eaf1; font-size: 16px; }
+.forecast-page .fc-row .num { text-align: right; }
+.forecast-page .fc-row.fc-head { position: sticky; top: 0; z-index: 2; background: var(--ud-blue); color: #fff; font-weight: 800; text-transform: uppercase; min-height: 34px; border-radius: 6px 6px 0 0; padding-top: 0; }
+.forecast-page .fc-row.fc-head > span:first-child { padding-left: 8px; }
+.forecast-page .fc-row > b { padding-left: 8px; }
+.forecast-page .fc-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forecast-page .fc-run small.fc-why-sm { display: none; }
+.forecast-page .fc-run small { display: block; line-height: 1.1; color: #c62828; font-weight: 800; font-size: 16px; white-space: normal; }
+.forecast-page .fc-pill { font-style: normal; font-size: 16px; padding: 0 8px; border-radius: 999px; background: #ffe9b0; color: #7a4b00; }
+.forecast-page .fc-est { font-weight: 800; color: #1d7a3e; white-space: nowrap; }
+.forecast-page .fc-row.late { background: #fde8e8; color: #c62828; }
+.forecast-page .fc-row.late .fc-est { color: #fff; background: #c62828; border-radius: 6px; padding: 1px 6px; justify-self: start; }
+.forecast-page .fc-row.loading { background: #fff8e6; }
+.forecast-page .fc-line { position: relative; height: 26px; margin-right: 22px; }
+.forecast-page .fc-head .fc-line i { position: absolute; top: 6px; transform: translateX(-50%); font-style: normal; font-size: 16px; white-space: nowrap; }
+.forecast-page .fc-line s { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #dfe6ee; }
+.forecast-page .fc-line u { position: absolute; top: 5px; height: 16px; border-radius: 4px; min-width: 3px; }
+.forecast-page .fc-line u.ok, .forecast-page .fc-legend i.ok { background: #8fb8de; }
+.forecast-page .fc-line u.late, .forecast-page .fc-legend i.late { background: #e46a6a; }
+.forecast-page .fc-line em { position: absolute; top: 1px; width: 4px; height: 24px; margin-left: -2px; border-radius: 2px; }
+.forecast-page .fc-line em.dep, .forecast-page .fc-legend i.dep { background: var(--ink); }
+.forecast-page .fc-line em.dep.late { background: #c62828; }
+.forecast-page .fc-line .fc-why { position: absolute; top: 2px; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c62828; background: #fde8e8; padding: 0 4px; font-size: 16px; font-weight: 800; }
+.forecast-page .fc-line em.far { left: auto; right: -18px; width: auto; height: auto; top: 1px; font-style: normal; color: var(--ink); font-size: 18px; }
+.forecast-page .fc-line em.now, .forecast-page .fc-legend i.now { background: #5b2a86; width: 3px; }
+.forecast-page .fc-legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 16px; padding-top: 6px; }
+.forecast-page .fc-legend i { display: inline-block; width: 18px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.forecast-page .fc-legend i.dep, .forecast-page .fc-legend i.now { width: 4px; }
+.forecast-page .fc-done { padding: 6px 8px; color: var(--muted); font-size: 16px; }
+.forecast-page .fc-empty { color: var(--muted); font-size: 16px; }
+.forecast-page .fc-t { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }
+.forecast-page .fc-t th { position: sticky; top: 0; background: #fff; color: var(--muted); text-transform: uppercase; text-align: left; padding: 4px 6px; border-bottom: 2px solid var(--line); }
+.forecast-page .fc-card .fc-t td { padding: 3px 6px; border-bottom: 1px solid #e3eaf1; white-space: nowrap; }
+.forecast-page .fc-t .num { text-align: right; }
+.forecast-page .fc-t td:first-child { font-weight: 800; }
+.forecast-page .fc-t td:last-child { color: #1d7a3e; font-weight: 800; }
+.forecast-page .fc-t tr.bad td { background: #fde8e8; color: #c62828; }
+.forecast-page .fc-how { margin: 6px 0 0; color: var(--muted); font-size: 16px; }
+@media (max-width: 1300px) { .forecast-page .fc-run { white-space: normal; } .forecast-page .fc-grid { grid-template-columns: 1fr; } .forecast-page .fc-band { grid-template-columns: 1fr 1fr; } body.fill.forecast-page #screen:not([hidden]) { height: auto; min-height: 100vh; } .forecast-page .fc-scroll { overflow: visible; } }
+@media (max-width: 760px) {
+  .forecast-page .view { padding: 0 8px 10px; }
+  .forecast-page .head { flex-wrap: wrap; }
+  .forecast-page .fc-pick { margin-left: 0; }
+  .forecast-page .fc-band { grid-template-columns: 1fr; }
+  .forecast-page .fc-tile b { font-size: 24px; white-space: normal; }
+  .forecast-page .fc-row { grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "route run est" "route dep cases"; row-gap: 0; padding: 6px 0; }
+  .forecast-page .fc-row > b { grid-area: route; }
+  .forecast-page .fc-row .fc-run { grid-area: run; white-space: normal; }
+  .forecast-page .fc-row .fc-est { grid-area: est; justify-self: end; }
+  .forecast-page .fc-row > span:nth-child(4) { grid-area: dep; color: var(--muted); }
+  .forecast-page .fc-row > span:nth-child(4)::before { content: "Depart "; }
+  .forecast-page .fc-row .num { grid-area: cases; color: var(--muted); }
+  .forecast-page .fc-row .num::after { content: " cases"; }
+  .forecast-page .fc-row .fc-line, .forecast-page .fc-legend { display: none; }
+  .forecast-page .fc-run small.fc-why-sm { display: block; }
+  .forecast-page .fc-row.fc-head { display: none; }
+  .forecast-page .fc-row.late .fc-est { justify-self: end; }
+}

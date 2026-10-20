@@ -32,7 +32,10 @@ async function emailSettings(db) {
   const d = (await db.collection('private').doc('emailSettings').get()).data() || {};
   const senders = {};
   Object.keys(d.senders || {}).forEach(k => { const v = d.senders[k] || {}; senders[k] = { address: ourAddress(v.address), name: String(v.name || '').slice(0, 80), changedAt: v.changedAt || '', changedBy: v.changedBy || '' }; });
-  return { sending: d.sending !== false, changedAt: d.changedAt || '', changedBy: d.changedBy || '', senders, fromWho: d.fromWho === 'PLANT' ? 'PLANT' : 'PERSON' };
+  return { sending: d.sending !== false, changedAt: d.changedAt || '', changedBy: d.changedBy || '', senders, fromWho: d.fromWho === 'PLANT' ? 'PLANT' : 'PERSON',
+    // Joe 10/19 (Late Forecast): the forecast box goes in the report email to the groups only once it is switched to Everyone;
+    // until then only a test sent to oneself carries it.
+    forecastEveryone: d.forecastEveryone === true, forecastChangedAt: d.forecastChangedAt || '', forecastChangedBy: d.forecastChangedBy || '' };
 }
 
 // The person who pressed Send, as { email, name }, or null (no one pressed it, or not a United Dairy address).

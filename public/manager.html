@@ -66,7 +66,7 @@
   <div class="mc-modal" id="modal" hidden>
     <div class="mc-dialog" role="dialog" aria-modal="true" aria-labelledby="rp-subject">
       <div class="mc-dhead"><div><span class="eyebrow">Send Current Report · To: Plant Managers group</span><h2 id="rp-subject"></h2></div>
-        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">Copy</button><button type="button" class="mc-btn" id="print-report">Print</button><button type="button" class="mc-btn send" id="send">Send Current Report</button></div></div>
+        <div class="mc-dacts"><button type="button" class="mc-btn" id="close">Close</button><button type="button" class="mc-btn" id="copy">Copy</button><button type="button" class="mc-btn" id="print-report">Print</button><button type="button" class="mc-btn" id="send-test" title="Emails this report only to you, to see it before everybody does">Send Test to Me</button><button type="button" class="mc-btn send" id="send">Send Current Report</button></div></div>
       <div class="notice error" id="send-error" role="alert" hidden></div>
       <label class="mc-note">Note at the top of the email (optional)<textarea id="note" maxlength="1500" placeholder="Add a note to this report…"></textarea></label>
       <div class="mc-report-body" id="rp-body"></div>
@@ -82,12 +82,13 @@
     import { cardClicks } from './js/cards.js';
     import { watchProduction, lineView, shiftText } from './js/production.js';
     import { plantFor } from './js/pmaint.js';
+    import { readForecastNights } from './js/forecast.js';
     cardClicks(document.getElementById('grid'));
 
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
-    const data = { sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
+    const data = { history: [], sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null, prod = null, stopProd = null;
     // Joe 10/14 follow-on (end-of-shift production report): each line's shift from the line tablets rides on the Current Report.
     const lineOutput = () => {
@@ -129,14 +130,16 @@
       // The report carries open breakdowns over from earlier shifts (30 days of the log, Joe 10/15: nothing open drops off);
       // the tile counts the last 24 hours.
       const log = U.shiftLog(journal, now), N = U.managerNotes(log), week = U.shiftLog(data.shift, now, NOTE_DAYS * 24);
+      // Joe 10/19 (Late Forecast): Est. Done for each case load still to load, on the tile and in the report.
+      const forecast = U.loadForecast({ date, loads, history: data.history }, now);
       const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
-      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '' }, now);
+      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '', forecast }, now);
       const S = U.shiftReport(week, data.roundStart);
       // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
       const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
       const walk = U.managerWalk(yard, temps, lines, now);
-      return { done, returns, uc, wash, repeat, ship, recv, N, S, wait, walk };
+      return { done, returns, uc, wash, repeat, ship, recv, N, S, wait, walk, forecast };
     }
 
     function render() {
@@ -150,7 +153,10 @@
         tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + x.done.loading + ' loading', pct(x.done.done, x.done.total)),
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
-        tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash')]));
+        tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash'),
+        // Joe 10/19 (option t): the Late Forecast tile opens the Late Forecast screen.
+        x.forecast.late ? tile('forecast.html', 'Late Forecast', x.forecast.late, 'late', 'All done est. ' + x.forecast.allDoneText, null, 'bad')
+          : tile('forecast.html', 'Late Forecast', 'On time', '', x.forecast.loads.length ? 'All done est. ' + x.forecast.allDoneText : 'nothing left to load', null, 'good')]));
       // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Production (each opens its screen with the walkthrough
       // bar). Joe 10/15 (later): each tile carries what it can fit: every trailer, cooler and line with its reading or when it
       // is due, problems first in red; the rest under "+ N more". A past-due check puts a flashing "past due" pill on the card.
@@ -209,10 +215,10 @@
         (tempsOut.length ? part('Temperatures out', tempsOut.length, tempsOut.map(t => line(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + t.status, 'bad'))) : '');
       document.getElementById('pv-list').innerHTML = '<span class="mc-pvh">Routes<em>' + escapeHtml((r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded') + '</em></span>' +
         (brief || '<span class="mc-pvnone">Nothing needs attention right now.</span>') + '<span class="mc-pvnone">Tap to see the full report.</span>';
-      ['send-card', 'send'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
+      ['send-card', 'send', 'send-test'].forEach(id => { document.getElementById(id).hidden = !canSend(); });
       // Not before the loads and the journal are read, or the email would say "0 of 0 loaded".
       // Both Send buttons (the card's and the pop-up's), so either works again after a send.
-      ['send-card', 'send'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
+      ['send-card', 'send', 'send-test'].forEach(id => { const sb = document.getElementById(id); if (sb.textContent !== 'Sending…') { sb.disabled = !ready(); sb.title = ready() ? '' : 'Loading the plant\'s data…'; } });
       if (!document.getElementById('modal').hidden) drawReport();
       // Joe 10/18: Send Report on the Plant Managers app opens this report (what goes out, a note box and Send) once it is ready.
       if (openOnLoad && ready() && report && person) { openOnLoad = false; openReport(); }
@@ -233,6 +239,11 @@
       const loaded = r.loaded.map(z => tile(z, 'ok')), notLoaded = r.behind.map(z => tile(z, 'behind', 'BEHIND')).concat(r.nextUp.map(z => tile(z, 'no')));
       document.getElementById('rp-body').innerHTML =
         '<div class="mc-banner ' + (r.behind.length ? 'bad' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
+        (r.forecast ? sect('Late forecast (estimated) at ' + r.forecast.asOf, r.forecast.late ? r.forecast.late + ' late' : 'on time', r.forecast.late ? 'bad' : '',
+          U.forecastLateText(r.forecast).map(t => row('Late', t, 'bad')).concat([
+            row('Due by ' + r.forecast.dueByText, r.forecast.due.loads + ' loads · ' + r.forecast.due.cases.toLocaleString('en-US') + ' cases' + (r.forecast.due.loads ? ' · est. done ' + r.forecast.due.doneText : ''), r.forecast.due.late ? 'bad' : ''),
+            row('All loads done', r.forecast.loads.length ? 'est. ' + r.forecast.allDoneText + ' · ' + r.forecast.casesLeft.toLocaleString('en-US') + ' cases left' : 'nothing left to load', r.forecast.late ? 'bad' : ''),
+            row('Pace', r.forecast.rate.toLocaleString('en-US') + ' cases an hour · ' + r.forecast.paceText)]), '') : '') +
         '<section><h3>Routes<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em></h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +
         (notLoaded.length ? '<h4 class="bad">Not loaded (' + notLoaded.length + ')</h4><div class="mc-routes">' + notLoaded.join('') + '</div>' : '') + (r.totalLoads ? '' : '<p>No loads on the dispatch sheet for this day.</p>') + '</section>' +
         sect('Routes behind', r.behind.length, r.behind.length ? 'bad' : '', r.behind.map(z => row(U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.startedAt ? ' since ' + z.startedAt : '') + ' · ' + z.late + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : ''), 'bad')), 'No route is more than ' + r.behindMinutes + ' minutes past its depart time.') +
@@ -257,15 +268,17 @@
     document.getElementById('note').addEventListener('input', e => { note = e.target.value; });
     const loaded = { runs: false, journal: false }, ready = () => loaded.runs && loaded.journal;
     let openOnLoad = new URLSearchParams(location.search).get('report') === '1';
-    async function send(btn) {
+    async function send(btn, testOnly) {
       if (!report || btn.disabled || !ready()) return;
       document.getElementById('send-error').hidden = true;
       const label = btn.innerHTML, ok = document.getElementById('saved');
       btn.disabled = true; btn.textContent = 'Sending…';
       try {
-        const res = await save('sendPlantReport', { subject: report.subject, text: (note.trim() ? 'NOTE: ' + note.trim() + '\n\n' : '') + report.text, note: note.trim(), groupName: 'Plant Managers', report });
+        const res = await save('sendPlantReport', { subject: report.subject, text: (note.trim() ? 'NOTE: ' + note.trim() + '\n\n' : '') + report.text, note: note.trim(), groupName: 'Plant Managers', report, testOnly: !!testOnly });
         ok.textContent = res && res.message || 'Report saved.'; ok.hidden = false;
-        note = ''; document.getElementById('note').value = ''; document.getElementById('modal').hidden = true;
+        // A test keeps the note, to send for real after looking at the email.
+        if (!testOnly) { note = ''; document.getElementById('note').value = ''; }
+        document.getElementById('modal').hidden = true;
         showError('');
         if (res && res.sending && res.reportId && fsdb) followEmail(res.reportId, ok);
         else setTimeout(() => { ok.hidden = true; }, 8000);
@@ -286,7 +299,7 @@
         const to = (r.sentTo || []).join(', ');
         if (r.status === 'SENT') {
           ok.className = 'notice ok';
-          ok.textContent = r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the Operations app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
+          ok.textContent = r.testOnly ? 'Test emailed to you only (' + to + '). Nobody else got it.' : r.testCopy ? 'Report emailed to you only (' + to + '), as a test. The Plant Managers group will get it once the Operations app runs the plant.' : 'Report emailed to ' + (r.groupName || 'Plant Managers') + ' (' + to + ').';
         } else {
           ok.className = 'notice error';
           ok.textContent = 'Report saved but not emailed. ' + (r.reason || '');
@@ -296,6 +309,7 @@
     }
     document.getElementById('send-card').onclick = (e) => send(e.currentTarget);
     document.getElementById('send').onclick = (e) => send(e.currentTarget);
+    document.getElementById('send-test').onclick = (e) => send(e.currentTarget, true);
     // Copy and Print, as the current app's report: the email's words on the clipboard, or the email itself on paper.
     const reportNote = () => (document.getElementById('note').value || '').trim();
     document.getElementById('copy').onclick = async (e) => {
@@ -331,6 +345,10 @@
       const unsubs = [];
       const watch = () => {
         date = today();
+        // The same weekday's earlier nights, read once a day for the Late Forecast.
+        data.history = [];
+        const forDate = date;
+        readForecastNights(db, date).then(h => { if (date === forDate) { data.history = h; later(); } }, () => {});
         unsubs.splice(0).forEach(u => u());
         loaded.runs = loaded.journal = false;
         const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
