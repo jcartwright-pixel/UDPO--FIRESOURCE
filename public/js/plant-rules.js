@@ -929,10 +929,11 @@
   // Pace = cases an hour while loading. It compares the same weekday (last Monday night against this Monday night, up to 4
   // weeks back) with tonight's finished loads; tonight counts for more while there are few past nights, and the past nights use
   // the slowest one, a cushion for a slow night. A time under 15 minutes or over 3 hours is left out (a missed Start or End).
-  // One load = about 37 minutes to set up plus 1 minute for every 47 cases at the plant's usual 868 cases an hour (fitted to
-  // Loadout History 10-5 to 10-18: bigger loads go faster per case, Joe 10/19), stretched or shrunk by the pace.
-  var FORECAST = { setup: 36.6, perCase: 0.0213, usualRate: 868, minMinutes: 15, maxMinutes: 180, shiftEnd: 360, dueBy: 300, historyWeight: 1.5, weeksBack: 4 };
-  function forecastMinutes(cases, rate) { return (FORECAST.setup + FORECAST.perCase * cases) * FORECAST.usualRate / rate; }
+  // Joe 10/20 ("a rule of thumb is 1,000 cases takes 1 hour"): a load's standard time is 1 hour for every 1,000 cases (never
+  // under 15 minutes), stretched or shrunk by the pace.
+  var FORECAST = { perCase: 0.06, minLoad: 15, usualRate: 1000, minMinutes: 15, maxMinutes: 180, shiftEnd: 360, dueBy: 300, historyWeight: 1.5, weeksBack: 4 };
+  function plainMinutes(cases) { return Math.max(FORECAST.minLoad, FORECAST.perCase * cases); }
+  function forecastMinutes(cases, rate) { return plainMinutes(cases) * FORECAST.usualRate / rate; }
   // When a load was started and finished on the plant's wall clock. A start written as a time only takes the finish's day.
   function loadSpan(r) {
     var end = wallMinutes(r.completedAt), start = wallMinutes(r.startedAt);
@@ -940,21 +941,23 @@
     if (start === null) { var t = clockMinutes(r.startedAt); if (t === null) return null; start = Math.floor(end / 1440) * 1440 + t; if (start > end) start -= 1440; }
     return { start: start, end: end };
   }
-  // A night's pace: the cases of its well-timed case loads over the time any of them was loading (two loads at once count once).
+  // A night's pace. Joe 10/20 ("no way we would be done at midnight"; "the more routes we have, the longer it's going to
+  // take"): measured from one load's End to the next load's End, so the time between loads (trailer changes, waiting on
+  // product) counts, not only the minutes a load was being loaded. Start times are not used, so a load whose Start and End
+  // were pressed together (1 or 5 minutes, Joe 10/20) cannot make the night look fast. A gap over 3 hours (a break or nothing
+  // to load) is left out. Given as cases an hour: the standard (1,000) stretched by how much longer the night ran.
   function nightPace(loads) {
-    var spans = [], cases = 0;
-    (loads || []).forEach(function (r) {
-      if (r.area !== 'CASE' || r.state !== 'DONE') return;
-      var c = Number(r.quantity), s = loadSpan(r);
-      if (!s || !(c > 0) || s.end - s.start < FORECAST.minMinutes || s.end - s.start > FORECAST.maxMinutes) return;
-      spans.push(s); cases += c;
+    var list = (loads || []).filter(function (r) { return r.area === 'CASE' && r.state === 'DONE' && wallMinutes(r.completedAt) !== null; })
+      .map(function (r) { return { r: r, end: wallMinutes(r.completedAt) }; }).sort(function (a, b) { return a.end - b.end; });
+    var real = 0, std = 0, n = 0, cases = 0;
+    list.forEach(function (x, i) {
+      if (!i) return;
+      var gap = x.end - list[i - 1].end, c = Number(x.r.quantity) > 0 ? Number(x.r.quantity) : 0;
+      if (gap > FORECAST.maxMinutes) return;
+      real += gap; std += plainMinutes(c || 600); n++; cases += c;
     });
-    if (!spans.length) return null;
-    spans.sort(function (a, b) { return a.start - b.start; });
-    var busy = 0, from = spans[0].start, to = spans[0].end;
-    spans.slice(1).forEach(function (s) { if (s.start > to) { busy += to - from; from = s.start; to = s.end; } else to = Math.max(to, s.end); });
-    busy += to - from;
-    return { rate: Math.round(cases / (busy / 60)), loads: spans.length, cases: cases };
+    if (!n || real < FORECAST.minMinutes) return null;
+    return { rate: Math.round(FORECAST.usualRate * std / real), loads: n, cases: cases };
   }
   // The same weekday's earlier operating days to compare with (date - 7, - 14, …).
   function forecastNights(date) { var n = dayNum(date), out = []; for (var w = 1; w <= FORECAST.weeksBack && n !== null; w++) out.push(dayKey(n - 7 * w)); return out; }
@@ -964,7 +967,8 @@
   // dueBy (minutes after midnight, 5:00 AM unless changed).
   function loadForecast(input, nowMs) {
     var now = wallClock(nowMs), date = text(input.date), dueBy = input.dueBy === undefined || input.dueBy === null || input.dueBy === '' ? FORECAST.dueBy : Number(input.dueBy);
-    var loads = (input.loads || []).filter(function (r) { return r.area === 'CASE'; }), tonight = nightPace(loads.filter(function (r) { return !r.prior; }));
+    var loads = (input.loads || []).filter(function (r) { return r.area === 'CASE'; });
+    var tonight = nightPace(loads.filter(function (r) { return !r.prior; }));
     var nights = (input.history || []).map(function (h) { var p = nightPace(h.loads); return p ? { date: text(h.date), label: dayShort(dayNum(h.date) * 1440) + ' ' + dateShort(h.date), rate: p.rate, loads: p.loads } : null; })
       .filter(Boolean).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
     var slow = nights.length ? nights.reduce(function (a, b) { return b.rate < a.rate ? b : a; }) : null, weight = 0, rate, from;
@@ -986,12 +990,14 @@
     // after another in loading order: last night's left-over loads first (Joe 10/20: the plant carries straight on through the
     // 6 a.m. roll), then today's. A paused load is not loading, so it waits its turn and takes its whole time again.
     var loadingNow = function (r) { return r.state === 'LOADING' && !r.paused; };
+    // Joe 10/20: every Est. Done is rounded up to the next 5 minutes.
+    var up5 = function (m) { return Math.ceil(m / 5) * 5; };
     open = open.filter(loadingNow).concat(open.filter(function (r) { return !loadingNow(r) && r.prior; }), open.filter(function (r) { return !loadingNow(r) && !r.prior; }));
     open.filter(loadingNow).forEach(function (r) {
       var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
-      x.start = s ? s.start : now; x.est = Math.max(x.start + x.minutes, now + 5); cursor = Math.max(cursor, x.est); out.push(x);
+      x.start = s ? s.start : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
     });
-    open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = cursor + x.minutes; cursor = x.est; out.push(x); });
+    open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
     out.forEach(function (x) {
       var dispatchLate = x.leaves !== null && x.est > x.leaves, shiftLate = x.shiftEnd !== null && x.est > x.shiftEnd;
       var deadline = x.leaves === null ? x.shiftEnd : x.shiftEnd === null ? x.leaves : Math.min(x.leaves, x.shiftEnd);
@@ -1090,6 +1096,8 @@
   function reportHtml(r, note) {
     function e(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', GREY = '#5b6775', INK = '#1c2733';
+    // Joe 10/20: red only for a load that is behind; a load not loaded yet but on time has no shading.
+    var PLAIN = '#ffffff';
     function head(title, count, color) { return '<tr><td style="' + F + 'padding:16px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (color || GREY) + '">' + e(title) + (count !== null && count !== undefined ? '<span style="float:right;color:' + (color || INK) + '">' + e(count) + '</span>' : '') + '</td></tr>'; }
     function pill(t, bg, fg) { return '<span style="display:inline-block;font-size:12px;font-weight:800;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + fg + '">' + e(t) + '</span>'; }
     // Joe 10/15: one column on a phone. Each item is one full-width row: its name on the left and its one status on the right,
@@ -1107,7 +1115,7 @@
       var cut = v.slice(0, 12), sp = cut.lastIndexOf(' '); return (sp > 0 && cut.length - sp - 1 < 4 ? cut.slice(0, sp) : cut).trim(); }
     function grid(list, doneHead) {
       var th = function (t, al) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + GREY + '">' + t + '</td>'; };
-      var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:3px solid #ffffff">' + t + '</td>'; };
+      var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:' + (x.bg === PLAIN ? '1px solid #e3e7ec' : '3px solid #ffffff') + '">' + t + '</td>'; };
       var last = null;
       return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + (doneHead ? '<td align="right" style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + INK + '">' + doneHead + '</td>' : th('Done', 1)) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
         var sep = '';
@@ -1156,7 +1164,7 @@
     var todayLabel = todayKey ? leftFrom(todayKey) : '';
     var loadOrder = function (a, b) { var x = fcAt[a.id], y = fcAt[b.id]; return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y) || a.loadSequence - b.loadSequence || untilOf(a) - untilOf(b); };
     var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || untilOf(a) - untilOf(b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: '#fde8e6', fg: RED }; });
+      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: PLAIN, fg: INK }; });
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
     var H = [];
@@ -1174,7 +1182,7 @@
         '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[g]) + ' (' + (ld.length + nl.length) + ')</div></td></tr>');
       firstGroup = false;
       if (ld.length) { H.push(head('Loaded (' + ld.length + ')', null, GREEN)); H.push(grid(ld)); }
-      if (nl.length) { H.push(head('Not loaded (' + nl.length + ')', null, RED)); H.push(grid(nl, nl.some(function (x) { return x.est; }) ? 'Est. Done' : '')); }
+      if (nl.length) { H.push(head('Not loaded (' + nl.length + ')', null, nl.some(function (x) { return x.word; }) ? RED : GREY)); H.push(grid(nl, nl.some(function (x) { return x.est; }) ? 'Est. Done' : '')); }
     });
     if (!loaded.length && !notLoaded.length) H.push(plain('No loads on the dispatch sheet for this day.'));
     var pickups = r.pickups || [], down = r.down || [], lines = r.lines || [], temps = r.temperatures || [];

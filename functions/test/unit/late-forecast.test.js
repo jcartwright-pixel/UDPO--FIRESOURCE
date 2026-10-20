@@ -20,18 +20,22 @@ const tonightLeft = [
   wait('971', 'PAINTSVILLE', 812, H(2)), wait('813', 'DSD', 477, H(1, 30)), wait('803', 'DSD', 503, H(4)), wait('812', 'DSD', 450, H(5)), wait('822', 'DSD', 350, H(4, 30)),
   wait('808', 'DSD', 516, H(4)), wait('8303_1', 'WALMART', 996, H(5, 30)), wait('825', 'DSD', 252, H(5)), wait('805', 'DSD', 115, H(5)), wait('901_1', 'PRODUCT 1', 853, H(7), { leavesOn: 'Delivery Day' }),
   wait('909_1', 'MARIETTA LOAD 1', 1067, H(21), { leavesOn: 'Delivery Day' }), wait('907_1', 'FAIRMONT', 1073, H(9), { leavesOn: 'Delivery Day' })];
-const night = (date, rate) => ({ date, loads: [{ area: 'CASE', state: 'DONE', quantity: rate, startedAt: date + 'T20:00:00-04:00', completedAt: date + 'T21:00:00-04:00' }] });
+// A past night where a load of `rate` cases was done an hour after the one before it: `rate` cases an hour.
+const night = (date, rate) => ({ date, loads: [{ area: 'CASE', state: 'DONE', quantity: 500, completedAt: date + 'T20:00:00-04:00' }, { area: 'CASE', state: 'DONE', quantity: rate, completedAt: date + 'T21:00:00-04:00' }] });
+const up5 = (m) => Math.ceil(m / 5) * 5;
 
-test('a night\'s pace: cases over the time any load was loading, bad times left out', () => {
+// Joe 10/20: "no way we would be done at midnight"; "1,000 cases takes 1 hour"; a 1- or 5-minute time is a mistake.
+test('a night\'s pace: from one load\'s End to the next, against 1,000 cases an hour; long gaps left out', () => {
+  // Tonight's Ends: 6:47, 11:22, 1:49, 3:02, 4:00, 5:50, 6:57. The 4 h 35 min before 906 is left out (over 3 hours).
   const p = R.nightPace(tonightDone);
-  // 980's 0-minute time is left out; 848 loaded inside 852's time, so that time counts once (409 minutes in all).
-  assert.equal(p.loads, 6);
-  assert.equal(p.cases, 900 + 863 + 892 + 1150 + 1017 + 887);
-  assert.equal(p.rate, Math.round(5709 / (409 / 60)));
-  assert.equal(R.nightPace([done('1', '01:00', '04:30', 900)]), null, 'over 3 hours is left out');
-  assert.equal(R.nightPace([done('1', '01:00', '01:10', 900)]), null, 'under 15 minutes is left out');
-  assert.equal(R.nightPace([done('1', '01:00', '02:00', 900, { area: 'TOTES' })]), null, 'case loads only');
-  assert.equal(R.nightPace([done('1', '01:00', '02:00', 900, { startedAt: '13:00', completedAt: iso(MON, '14:00') })]).rate, 900, 'a start written as a time only takes the finish\'s day');
+  assert.equal(p.loads, 5);
+  assert.equal(p.cases, 820 + 892 + 1150 + 1017 + 887);
+  assert.equal(p.rate, Math.round(1000 * (0.06 * p.cases) / (147 + 73 + 58 + 110 + 67)), 'the time between loads counts');
+  assert.ok(p.rate < 1000, 'tonight ran slower than 1,000 cases an hour');
+  assert.equal(R.nightPace(night('2026-10-12', 1000).loads).rate, 1000);
+  assert.equal(R.nightPace([done('1', '01:00', '02:00', 900)]), null, 'one load alone has nothing to measure from');
+  assert.equal(R.nightPace([done('1', null, '01:00', 900), done('2', null, '05:00', 900)]), null, 'over 3 hours is left out');
+  assert.equal(R.nightPace([done('1', null, '01:00', 900), done('2', null, '02:00', 900, { area: 'TOTES' })]), null, 'case loads only');
 });
 
 test('the same weekday is compared: Monday nights 1 to 4 weeks back', () => {
@@ -43,10 +47,10 @@ test('tonight blends with the slowest past night, and counts for more while ther
   const t = R.nightPace(tonightDone);
   assert.equal(f.from, 'both');
   assert.equal(f.slow, 'Mon 10-5-26');
-  const w = 6 / (6 + 1.5 * 2);
+  const w = 5 / (5 + 1.5 * 2);
   assert.equal(f.rate, Math.round(w * t.rate + (1 - w) * 744));
   assert.ok(w > 0.5, 'tonight weighs more than the past nights while there are only two');
-  assert.match(f.paceText, /^Mon 10-5-26, Mon 10-12-26 \+ tonight \(6 loads\), slow-night cushion$/);
+  assert.match(f.paceText, /^Mon 10-5-26, Mon 10-12-26 \+ tonight \(5 loads\), slow-night cushion$/);
   const more = R.loadForecast({ date: MON, loads: tonightDone, history: [1, 2, 3, 4].map(n => night('2026-09-' + (10 + n), 800)) }, NOW);
   assert.ok(more.weight < f.weight, 'more past nights, less weight on tonight');
   assert.equal(R.loadForecast({ date: MON, loads: tonightDone, history: [] }, NOW).from, 'tonight');
@@ -61,8 +65,9 @@ test('loads follow each other in loading order; late = after dispatch or after t
   const now = R.wallClock(NOW);
   assert.equal(by['845'].start, now);
   f.loads.slice(1).forEach((x, i) => assert.equal(x.start, f.loads[i].est, x.route + ' starts when the one before is done'));
-  // Bigger loads take longer, but less than in proportion (setup time).
-  assert.ok(by['907_1'].minutes > by['805'].minutes && by['907_1'].minutes / by['805'].minutes < 1073 / 115);
+  // Bigger loads take longer; even a small one takes at least 15 minutes at the standard.
+  assert.ok(by['907_1'].minutes > by['805'].minutes && by['805'].minutes >= Math.round(15 * 1000 / f.rate) - 1);
+  f.loads.forEach(x => assert.equal(x.est % 5, 0, x.route + ' Est. Done is rounded up to 5 minutes'));
   assert.equal(by['845'].late, false);
   assert.equal(by['950_1'].late, false, 'Charleston leaves Tuesday 4 PM (Delivery Day) and is done tonight');
   const shiftEnd = R.wallClock(Date.parse('2026-10-20T10:00:00Z'));
@@ -100,16 +105,16 @@ test('a load being loaded finishes its own time after it started; the line waits
   const f = R.loadForecast({ date: MON, loads: [wait('3', '', 600, H(4)), loading], history: [] }, NOW);
   const by = Object.fromEntries(f.loads.map(x => [x.route, x]));
   const start = R.wallClock(Date.parse(iso(MON, '18:30')));
-  assert.equal(by['2'].est, Math.max(start + by['2'].minutes, R.wallClock(NOW) + 5));
+  assert.equal(by['2'].est, up5(Math.max(start + by['2'].minutes, R.wallClock(NOW) + 5)));
   assert.equal(by['3'].start, by['2'].est);
   const stuck = R.loadForecast({ date: MON, loads: [Object.assign({}, loading, { startedAt: iso(MON, '12:00') })] }, NOW);
-  assert.equal(stuck.loads[0].est, R.wallClock(NOW) + 5, 'a load running long is done no sooner than 5 minutes from now');
+  assert.equal(stuck.loads[0].est, up5(R.wallClock(NOW) + 5), 'a load running long is done no sooner than 5 minutes from now');
 });
 
 test('a load with no cases counted takes the night\'s usual load', () => {
   const f = R.loadForecast({ date: MON, loads: [wait('4', '', '', H(4)), wait('5', '', 400, H(4)), wait('6', '', 800, H(4))] }, NOW);
   assert.equal(f.loads[0].noCases, true);
-  assert.equal(f.loads[0].minutes, Math.round((R.FORECAST.setup + R.FORECAST.perCase * 600) * R.FORECAST.usualRate / f.rate));
+  assert.equal(f.loads[0].minutes, Math.round(R.FORECAST.perCase * 600 * R.FORECAST.usualRate / f.rate));
 });
 
 test('the email and the report carry the forecast', () => {

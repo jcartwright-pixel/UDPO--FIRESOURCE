@@ -64,12 +64,17 @@ async function openPage(browser, url, w, h, opts) {
     await d.collection('runs').doc('2026-10-18__t' + route).set({ weekStart: '2026-10-18', sheetRow: row++, route, run, routeId: 'rte_t' + route, runId: 'run_t' + route, active: true, loadType: 'Case Loadout',
       masterShow: { leavesOn }, days: { [key]: { runs: true, loadDayOffset: offset, loadDate: key === 'tue' ? '1970-01-01' : '2026-10-20', deliveryDate: delivery, departureDate: delivery, dispatchTime: time, loadSequence: seq, casesOut: cases } } });
   }
-  // The two Tuesdays before: 4 one-hour loads each.
-  for (const [week, load, delivery, rate] of [['2026-10-11', '2026-10-13', '2026-10-14', 760], ['2026-10-04', '2026-10-06', '2026-10-07', 720]]) {
-    for (let i = 0; i < 4; i++) {
-      const s = new Date(Date.parse(load + 'T18:00:00-04:00') + i * 3600000);
+  // The two Tuesdays before: ten loads each, finished as on the real Monday 10-19 night (the minutes from one load's End to
+  // the next, Joe 10/20: the time between loads counts). Their Starts were pressed with their Ends (as a third are), which
+  // no longer matters.
+  const GAPS = [73, 58, 110, 67, 45, 91, 65, 39, 52, 52], CASES = [892, 1150, 1017, 887, 252, 477, 316, 503, 516, 996];
+  for (const [week, load, delivery] of [['2026-10-11', '2026-10-13', '2026-10-14'], ['2026-10-04', '2026-10-06', '2026-10-07']]) {
+    let end = Date.parse(load + 'T16:00:00-04:00');
+    for (let i = 0; i < GAPS.length; i++) {
+      end += GAPS[i] * 60000;
+      const at = new Date(end).toISOString();
       await d.collection('runs').doc(week + '__h' + i).set({ weekStart: week, sheetRow: 50 + i, route: '7' + i, run: 'DSD', routeId: 'rte_h' + i, runId: 'run_h' + i, active: true, loadType: 'Case Loadout',
-        days: { wed: { runs: true, loadDayOffset: -1, loadDate: load, deliveryDate: delivery, departureDate: delivery, dispatchTime: 240, loadSequence: 10 + i, casesOut: rate, plantStartedAt: s.toISOString(), completeTime: new Date(s.getTime() + 3600000).toISOString(), loadStatus: 'COMPLETE' } } });
+        days: { wed: { runs: true, loadDayOffset: -1, loadDate: load, deliveryDate: delivery, departureDate: delivery, dispatchTime: 240, loadSequence: 10 + i, casesOut: CASES[i], plantStartedAt: at, completeTime: at, loadStatus: 'COMPLETE' } } });
     }
   }
   const browser = await chromium.launch();
@@ -117,12 +122,18 @@ async function openPage(browser, url, w, h, opts) {
     await shot(fc, 'carryover-forecast-1536');
     const order = await fc.$$eval('.fc-row:not(.fc-head)', rows => rows.map(r => r.querySelector('b').textContent));
     assert.deepEqual(order, ['971', '901', '909', '907', '855', '856', '852', '849', '813']);
+    assert.deepEqual(await fc.$$eval('.fc-why', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent)), [], 'every late reason shows whole');
+    assert.deepEqual(await fc.$$eval('.fc-row:not(.fc-head) .fc-est', els => els.map(e => e.textContent).filter(t => !/:\d[05] [AP]M/.test(t))), [], 'every Est. Done is on a 5-minute mark');
     assert.match(await fc.$eval('.fc-row:nth-of-type(6)', r => r.className + ' ' + r.textContent).catch(() => ''), /.*/);
     assert.deepEqual(fc.errors, []);
     if (SHOTS) {
       const em = await browser.newPage({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2 });
       await em.goto('file://' + path.join(SHOTS, 'carryover-email.html'));
       await em.screenshot({ path: path.join(SHOTS, 'carryover-email-phone.png'), fullPage: true });
+      // Joe 10/20 ("maybe just a real, real slight yellow"): the same email with a very faint yellow on loads not loaded yet.
+      fs.writeFileSync(path.join(SHOTS, 'carryover-email-yellow.html'), fs.readFileSync(path.join(SHOTS, 'carryover-email.html'), 'utf8').replace(/background:#ffffff;white-space:nowrap;border-bottom:1px solid #e3e7ec/g, 'background:#fffcec;white-space:nowrap;border-bottom:1px solid #f3ead0'));
+      await em.goto('file://' + path.join(SHOTS, 'carryover-email-yellow.html'));
+      await em.screenshot({ path: path.join(SHOTS, 'carryover-email-yellow-phone.png'), fullPage: true });
     }
     console.log('carryover: ok');
   } finally { await browser.close(); }
