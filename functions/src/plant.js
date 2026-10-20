@@ -266,6 +266,10 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   // Ended Up Not Running. Joe 10/13: "No route equals no driver": the day's driver, truck and trailer come off it (that day only)
   // and are free for other loads; the notes keep what they were.
   if (f.runs === false) {
+    // Joe 10/20 (844 Ohio Processor lost JACOBS, JOEL and showed PLANT LOAD on Weekly): dispatch wins on the driver and truck,
+    // so a load dispatch has a driver on is only taken off by dispatch (Daily Dispatch > Not running), never from the plant.
+    const who = L.dispatchDriver(day);
+    if (who) throw new SaveError('NOT_ALLOWED', 'Dispatch has ' + who + ' on this load, so only dispatch can mark it not running. Ask dispatch to change it on Daily Dispatch.');
     const was = [['driver', text(day.driver) || text(day.driverId)], ['truck', text(day.truck) || text(day.truckId)], ['trailer', text(day.trailer) || text(day.trailerId)]].filter(x => x[1]);
     if (!was.length) return { runs: false };
     const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });

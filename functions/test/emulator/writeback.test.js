@@ -182,17 +182,19 @@ test('plant loading: a LOADOUT HISTORY tab with other headers is never written o
 
 // Joe 10/13 (852 JERSEY LOAD 2 on the Loadout Center came back after Ended Up Not Running): the copy reads a day that still holds
 // a driver as running, so turning a day off (Loadout Center or Daily) takes the driver off too, and it stays off after the copy.
-for (const [name, save] of [
-  ['the Loadout Center\'s Ended Up Not Running', () => ({ action: 'savePlantLoad', fields: { runs: false } })],
-  ['Daily\'s not running', () => ({ action: 'setRuns', runs: false })]
+// Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck, so the Loadout Center's press is for a load with no
+// driver; a load dispatch has a driver on is refused there (next test) and only Daily turns it off.
+for (const [name, save, driver] of [
+  ['the Loadout Center\'s Ended Up Not Running', () => ({ action: 'savePlantLoad', fields: { runs: false } }), false],
+  ['Daily\'s not running', () => ({ action: 'setRuns', runs: false }), true]
 ]) {
   test(name + ' stays off after the write-back and the next copy of the sheet', async () => {
     const RUN = '2026-10-04__run_t802';
-    await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
+    if (driver) await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
     await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: 'veh_trailer_t_901' }, tick);
     await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
     await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
-    assert.equal((await db().collection('runs').doc(RUN).get()).data().days.tue.driver, 'ADAMS, PAT');
+    assert.equal((await db().collection('runs').doc(RUN).get()).data().days.tue.trailer, 'T-901');
     await applyAction(db(), DISPATCHER, Object.assign({ requestId: rid(), runDocId: RUN, day: 'tue' }, save()), tick);
     assert.equal((await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick })).conflicts, 0);
     assert.equal(cellOf('run_t802', 'tue_runs'), 'FALSE');
@@ -201,10 +203,19 @@ for (const [name, save] of [
     await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
     const day = (await db().collection('runs').doc(RUN).get()).data().days.tue;
     assert.equal(day.runs, false, 'it does not come back');
-    if (save().action === 'savePlantLoad') assert.match(day.plantNotes || '', /Ended up not running .*\(driver was ADAMS, PAT, (truck was \S+, )?trailer was T-901\)/);
+    if (save().action === 'savePlantLoad') assert.match(day.plantNotes || '', /Ended up not running .*\((truck was \S+, )?trailer was T-901\)/);
     assert.deepEqual([day.driver, day.truck, day.trailer], ['', '', ''], 'the driver, truck and trailer are free that day');
   });
 }
+
+test('the Loadout Center cannot end a load dispatch has a driver on: the driver, truck and day stay (Joe 10/20, 844)', async () => {
+  const RUN = '2026-10-04__run_t802';
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
+  const before = (await db().collection('runs').doc(RUN).get()).data().days.tue;
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'savePlantLoad', requestId: rid(), runDocId: RUN, day: 'tue', fields: { runs: false } }, tick), /Dispatch has ADAMS, PAT on this load/);
+  const day = (await db().collection('runs').doc(RUN).get()).data().days.tue;
+  assert.deepEqual([day.runs, day.driver, day.driverId, day.truck], [before.runs, 'ADAMS, PAT', 'drv_test_adams', before.truck]);
+});
 
 // Review item 64 (Joe 10/13): the on-save pass and the every-minute pass can run at the same time.
 test('two write-back passes at once: each save is claimed by one pass only and written once', async () => {

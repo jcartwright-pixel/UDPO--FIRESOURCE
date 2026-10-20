@@ -1033,7 +1033,8 @@
     var d = row.days[prefix], who = String(d.driver || '').trim().toUpperCase();
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
     // Joe 10/13 (836 PECK): a plant load marked Not running on Weekly (plantLoadOff) is off like any other day.
-    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) && d.plantLoadOff !== true ? 'plant' : 'off';
+    // Joe 10/20 (844 Ohio Processor): a day dispatch has a driver on never shows PLANT LOAD; the driver shows instead.
+    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) && d.plantLoadOff !== true && !dispatchDriver(d) ? 'plant' : 'off';
     if (coveredRoute(row)) return 'coverage';
     // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
     if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';
@@ -1045,9 +1046,22 @@
   }
 
   // The Plant Route loads for one run on one day (plant scheduler copy), or null.
+  // Joe 10/20 (844 Ohio Processor: "the dispatch sheet overrides the time, driver and truck"): the driver dispatch has on a day
+  // (a driver, Carrier or another CVG), or '' when there is none. OPEN is a day still waiting for one.
+  function dispatchDriver(day) {
+    var who = String((day && day.driver) || '').trim();
+    return who && who.toUpperCase() !== 'OPEN' ? who : (day && day.driverId ? String(day.driverId) : '');
+  }
   function plantFor(ctx, row, prefix) {
     var list = ctx && ctx.plant ? ctx.plant[row.runId + '|' + row.days[prefix].date] : null;
     return list && list.length ? list : null;
+  }
+  // Joe 10/20 ("the trailer number should have already been in here for Garber, Ventura, Ohio Processor"): the trailer the plant
+  // put on a run's Plant Scheduler load that day (plantByRun's list), or ''. Dispatch wins on time, driver and truck, not the
+  // trailer, so Daily Dispatch shows it when the day has no trailer of its own.
+  function plantTrailer(list) {
+    var hit = (list || []).filter(function (e) { return e && String(e.trailer || '').trim(); })[0];
+    return hit ? String(hit.trailer).trim().toUpperCase() : '';
   }
   function plantTitle(list) {
     return 'Plant scheduler: ' + list.map(function (e) {
@@ -1431,7 +1445,7 @@
   return {
     SCREEN_AREAS: SCREEN_AREAS, SCREEN_KEYS: SCREEN_KEYS, SCREEN_JOBS: SCREEN_JOBS, pageName: pageName, pageGated: pageGated, screenLimited: screenLimited, screensFor: screensFor,
     areaAllowed: areaAllowed, pageAllowed: pageAllowed,
-    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
+    noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,

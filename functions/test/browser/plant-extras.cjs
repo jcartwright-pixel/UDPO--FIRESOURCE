@@ -2,7 +2,7 @@
 /*
  * Browser check of the plant items from the screen review (7-10), on the made-up plant day:
  *   Loadout: the two-press "Ended Up Not Running" never stays armed for the
- *   next load. Unloading: the mode buttons say which is on. Quality: the first box picked on a line saves and
+ *   next load, and is greyed on a load dispatch has a driver on (Joe 10/20). Unloading: the mode buttons say which is on. Quality: the first box picked on a line saves and
  *   says Saved even when the new check arrives before the save answers. Manager Center: Send waits for the plant's data.
  *   Pictures go to SHOTS_DIR.
  */
@@ -47,8 +47,19 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
   const browser = await chromium.launch();
   const results = [];
   try {
+    // Joe 10/20 (844 Ohio Processor): only a load with no driver can be ended from the plant, so 811 and 815 have none here.
+    for (const r of ['811', '815']) await db().collection('runs').doc('2026-10-04__run_p' + r).update({ 'days.fri.driver': '', 'days.fri.driverId': '' });
     const page = await openPage(browser, 1920, 1080, '/loadout.html?date=' + DATE + '&' + MANAGER);
     await page.waitForSelector(row('811') + ' button.edit-row');
+
+    // Joe 10/20: a load dispatch has a driver on: the button is greyed and says only dispatch can mark it not running.
+    await page.click(row('812') + ' button.edit-row');
+    assert.equal(await page.isDisabled('#edit-notrunning'), true);
+    assert.match(await page.textContent('#edit-notrunning-why'), /^Dispatch has \S.* on this load\. Only dispatch can mark it not running\.$/);
+    assert.equal(await page.isVisible('#edit-notrunning-why'), true);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'extras-notrunning-driver-1920.png'), scale: 'css' });
+    await page.click('#edit-modal [data-close]');
+    results.push('Loadout: a load dispatch has a driver on cannot be marked Ended Up Not Running at the plant, and the box says why');
 
     // Ended Up Not Running: pressed once, then Cancel; the next load's box starts unarmed.
     await page.click(row('811') + ' button.edit-row');
@@ -57,6 +68,7 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
     await page.click('#edit-modal [data-close]');
     await page.click(row('815') + ' button.edit-row');
     assert.equal(await page.textContent('#edit-notrunning'), 'Ended Up Not Running');
+    assert.equal(await page.isVisible('#edit-notrunning-why'), false, 'no driver: no note, the button works');
     await page.click('#edit-modal [data-close]');
     results.push('Loadout: "Ended Up Not Running" pressed once then Cancel does not stay armed for the next load');
     assert.deepEqual(page.errors, []);
