@@ -114,6 +114,22 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       const list = await rows(p), last = list[list.length - 1];
       assert.equal(await p.$(row(last) + ' button.skip'), null, 'the last load to load has no Skip');
       if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'loadout-after-skip-' + w + '.png') });
+      if (w === 1920) {
+        // Joe 10/20: once the skipped load is Done its SKIPPED tag comes off, here and on the Plant Station tablet.
+        await p.click(row('811') + ' button.clock');
+        await p.waitForSelector(row('811') + ' button.clock.end', { timeout: 8000 });
+        await p.click(row('811') + ' button.clock');
+        await p.waitForSelector(row('811') + '.done', { timeout: 8000 });
+        assert.equal(await p.$(row('811') + ' .moved-tag'), null, 'a Done load shows no SKIPPED tag');
+        await other.waitForSelector(row('811') + '.done', { timeout: 8000 });
+        assert.equal(await other.$(row('811') + ' .moved-tag'), null, 'nor on the other open screen');
+        const t = await openPage(browser, { viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: true }, '/plant-station.html?' + MANAGER + '&station=CASE');
+        await t.waitForSelector(card('811') + '.done', { timeout: 8000 });
+        assert.equal(await t.$(card('811') + ' .sw-flag.skip'), null, 'the tablet card of the complete load has no SKIPPED flag');
+        assert.deepEqual(t.errors, []);
+        await t.close();
+        results.push('Daily Case Loadout and Plant Station tablet: once the skipped load is Done, its SKIPPED tag is gone');
+      }
       assert.deepEqual(p.errors, []);
       await p.close();
       await other.close();
