@@ -200,7 +200,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (!r.prior && lastPrior === true) html += '<p class="sw-group">Today</p>';
       lastPrior = r.prior;
       const items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length, st = r.state, skip = !!below[r.id];
-      const moved = P.movedBySomeone(r) ? P.moveNote(r) : null;
+      // Joe 10/20: once a skipped load is complete its SKIPPED flag comes off (a MOVED flag stays).
+      const note = P.movedBySomeone(r) ? P.moveNote(r) : null, moved = note && !(st === 'DONE' && note.word === 'SKIPPED') ? note : null;
       const going = st === 'LOADING' && !r.paused, isOpen = going ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
       const status = done ? badge('COMPLETE', 'done') : r.paused ? badge('PAUSED', 'paused') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
       const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + (skip ? btn('SKIP', 'skip', r.id, 'warn') : '') + btn('START LOADING', 'start', r.id, 'primary') + '</span>'
