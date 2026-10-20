@@ -773,6 +773,9 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   // Reads: the record now (an edit or delete), the customer or supplier list, and the trailers when one was typed.
   const had = req.id ? R.newestRecords((await tx.get(journal.where('recordId', '==', req.id))).docs.map(d => d.data()), [type])[req.id] : null;
   if (req.id && (!had || (had.type !== type))) throw new SaveError('NOT_FOUND', 'That load is no longer on the ' + (req.lane === 'RECEIVING' ? 'Receiving' : 'Shipping') + ' schedule.');
+  // Joe 10/20: a load deleted on the Scheduler stays deleted. A screen still showing it (a loadout line not yet refreshed) cannot
+  // bring it back with Save Load or Start; deleting it again is fine.
+  if (had && String(had.status || '').toUpperCase() === 'DELETED' && req.op !== 'remove') throw new SaveError('CONFLICT', 'That load was deleted from the Scheduler. The screen was refreshed.');
   if (req.op === 'progress') return progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError);
   let choices = [], equipment = [];
   if (req.op === 'save') {

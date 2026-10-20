@@ -118,6 +118,10 @@ test('Scheduler: the copy brings the loads; Add, Edit and Delete Load; Plant Rou
   await schedule({ lane: 'SHIPPING', op: 'remove', id: 'SCHED-w2', date: '2026-10-06' });
   assert.equal((await lanes('SHIPPING')).some(e => e.id === 'SCHED-w2'), false);
   assert.equal((await db().collection('plantLoads').doc('SCHED-w2').get()).exists, false);
+  // Joe 10/20: a deleted load stays deleted: a screen still showing it cannot bring it back with Save Load or Start.
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'save', id: 'SCHED-w2', date: '2026-10-06', fields: { routeId: 'rte_c6302', runId: 'run_c6302', route: '6302', run: 'UT WALMART', pickupTime: '04:00' } }), /deleted from the Scheduler/);
+  await assert.rejects(schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-w2', date: '2026-10-06', step: 'start' }), /deleted from the Scheduler/);
+  assert.equal((await lanes('SHIPPING')).some(e => e.id === 'SCHED-w2'), false);
   // A Receiving load is not on Shipping, and a Shipping one cannot be deleted from Receiving.
   await assert.rejects(schedule({ lane: 'RECEIVING', op: 'remove', id: 'SCHED-a1', date: '2026-10-09' }), /no longer on the Receiving schedule/);
   // A run not shown to the plant is refused.

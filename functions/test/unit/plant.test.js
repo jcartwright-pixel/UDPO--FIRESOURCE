@@ -457,3 +457,19 @@ test('Match to MOCREO names (Joe 10/17): each cooler gets the sensor named for i
   assert.deepEqual(one.changes, []);
   assert.deepEqual(R.placeWords('Main Center'), R.placeWords('Cooler Middle'));
 });
+
+// Joe 10/20: "Confirm this load" before a Scheduler load is saved: the load and delivery days, and a warning when the load
+// day has passed or is not the run's usual load day (Route Master's offset for the delivery weekday; blank = the day before).
+test('scheduleCheck: the Peck load saved on the wrong load day is flagged', () => {
+  const routes = [{ runId: 'run_peck', routeName: 'Peck', run: 'PECK', days: { thu: { loadDayOffset: -1 }, mon: { loadDayOffset: -2 } } }];
+  const wrong = R.scheduleCheck({ lane: 'SHIPPING', runId: 'run_peck', date: '2026-10-22', loadDate: '2026-10-19' }, routes, '2026-10-20');
+  assert.deepEqual([wrong.loadText, wrong.deliveryText, wrong.usualLoadDate], ['Monday 10-19-26', 'Thursday 10-22-26', '2026-10-21']);
+  assert.deepEqual(wrong.warnings, ['The load date, Monday 10-19-26, has already passed.', 'Peck usually loads Wednesday 10-21-26 for a Thursday delivery.']);
+  assert.deepEqual(R.scheduleCheck({ lane: 'SHIPPING', runId: 'run_peck', date: '2026-10-22', loadDate: '2026-10-21' }, routes, '2026-10-20').warnings, []);
+  // Monday's offset is -2 (loaded Saturday); a blank load date is the delivery day.
+  assert.equal(R.scheduleCheck({ lane: 'SHIPPING', runId: 'run_peck', date: '2026-10-26', loadDate: '2026-10-24' }, routes, '2026-10-20').warnings.length, 0);
+  assert.deepEqual(R.scheduleCheck({ lane: 'SHIPPING', runId: 'run_peck', date: '2026-10-22' }, routes, '2026-10-20').warnings, ['Peck usually loads Wednesday 10-21-26 for a Thursday delivery.']);
+  // A run not on Route Master, and Receiving, only get the past-day check.
+  assert.deepEqual(R.scheduleCheck({ lane: 'RECEIVING', runId: 'run_peck', date: '2026-10-22', loadDate: '2026-10-19' }, routes, '2026-10-20').warnings, ['The load date, Monday 10-19-26, has already passed.']);
+  assert.deepEqual(R.scheduleCheck({ lane: 'SHIPPING', runId: 'x', date: '2026-10-22', loadDate: '2026-10-22' }, routes, '2026-10-20').warnings, []);
+});

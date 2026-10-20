@@ -82,7 +82,7 @@ async function shots(page, name, w) {
       await page.click('[data-view="week"]');
       await page.waitForSelector('.sc-weekgrid');
       assert.deepEqual(await page.$$eval('.sc-count span', s => s.map(x => x.textContent)), ['SUN 10-4', 'MON 10-5', 'TUE 10-6', 'WED 10-7', 'THU 10-8', 'FRI 10-9', 'SAT 10-10']);
-      assert.deepEqual(await page.$$eval('.sc-who strong', s => s.map(x => x.textContent)), ['Sun Valley', 'Garber Farms', 'Aldi Charleston', 'Fairmont', 'Walmart DC']);
+      assert.deepEqual(await page.$$eval('.sc-who strong', s => s.map(x => x.textContent)), ['Aldi Charleston', 'Fairmont', 'Garber Farms', 'Sun Valley', 'Walmart DC'], 'Joe 10/20: the customers in alphabetical order');
       assert.deepEqual([...new Set(await page.$$eval('.sc-load', els => els.map(e => (e.className.match(/by-(\w+)/) || [])[1])))].sort(), ['branch', 'carrier', 'ut'], 'the week colors each load by who delivers it');
       await fits(page, 'Scheduler week ' + w + 'x' + h);
       await shots(page, 'sched-week', w);
@@ -121,14 +121,39 @@ async function shots(page, name, w) {
     await desk.click('.sc-weekgrid > .sc-col:last-child .sc-add');
     await desk.waitForSelector('#f-route');
     await desk.selectOption('#f-route', { label: '892 · GARBER · Garber Farms' });
+    // Joe 10/20: the time starts as Route Master's time for Garber's Saturday.
+    assert.equal(await desk.inputValue('#f-time'), '05:15', 'the Route Master time');
+    assert.equal(await desk.textContent('#f-time-note'), 'Route Master time');
+    await desk.fill('#f-time', '');
     await desk.click('#f-save');
     assert.match(await desk.textContent('#f-error'), /pickup time/, 'the box says what is missing');
     await desk.fill('#f-time', '05:45');
     await desk.fill('#f-trailer', '961');
     await desk.fill('#f-cases', '300');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-add-1920.png'), scale: 'css' });
-    const t0 = Date.now();
+    // Joe 10/20: Save Load first shows "Confirm this load". A load date that has passed, or is not the run's usual load day,
+    // is in red; Go back keeps what was typed; nothing is saved until Confirm.
+    const saturday = await desk.inputValue('#f-date');
+    await desk.fill('#f-load', '2026-10-05');
     await desk.click('#f-save');
+    await desk.waitForSelector('#f-confirm');
+    const box = await desk.textContent('#modal');
+    assert.match(box, /Confirm this load[\s\S]*892 · GARBER[\s\S]*United Dairy Delivery[\s\S]*Monday 10-05-26[\s\S]*Saturday 10-10-26[\s\S]*5:45 AM[\s\S]*300/, 'the box shows what will be saved');
+    assert.deepEqual(await desk.$$eval('.sched-warn', w => w.map(e => e.textContent)), ['⚠ The load date, Monday 10-05-26, has already passed.', '⚠ Garber Farms usually loads Friday 10-09-26 for a Saturday delivery.']);
+    assert.ok(await desk.$eval('.sched-confirm dd.big', e => parseFloat(getComputedStyle(e).fontSize) >= 16));
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-confirm-warn-1920.png'), scale: 'css' });
+    assert.equal((await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.filter(d => d.data().run === 'GARBER' && d.data().date === saturday).length, 0, 'nothing saved before Confirm');
+    await desk.click('#f-back');
+    await desk.waitForSelector('#f-load');
+    assert.deepEqual([await desk.inputValue('#f-load'), await desk.inputValue('#f-time'), await desk.inputValue('#f-cases')], ['2026-10-05', '05:45', '300'], 'Go back keeps what was typed');
+    await desk.fill('#f-load', '2026-10-09');
+    await desk.click('#f-save');
+    await desk.waitForSelector('#f-confirm');
+    assert.equal(await desk.$$eval('.sched-warn', w => w.length), 0, 'the usual load day: no warning');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-confirm-1920.png'), scale: 'css' });
+    results.push('Save Load: "Confirm this load" first; a passed or unusual load day in red; Go back keeps the entries; nothing saved before Confirm');
+    const t0 = Date.now();
+    await desk.click('#f-confirm');
     await desk.waitForFunction(() => /Garber Farms/.test(document.querySelector('.sc-weekgrid > .sc-col:last-child').textContent));
     const shown = Date.now() - t0;
     await watcher.waitForFunction(() => /Garber Farms[\s\S]*5:45 AM · T-961/.test(document.querySelector('.sc-weekgrid > .sc-col:last-child').textContent), null, { timeout: 8000 });
@@ -143,6 +168,25 @@ async function shots(page, name, w) {
     await desk.click('#f-save');
     await watcher.waitForFunction(() => /2:30 PM · PO 4471-B/.test(document.getElementById('body').textContent), null, { timeout: 8000 });
     results.push('Edit Load (Sun Valley carrier): blank PO refused in the box; 2:30 PM and PO 4471-B on the other screen');
+    // Joe 10/20: once the Live week has Garber's Thursday with a dispatch time, the Scheduler shows that time (the dispatch sheet
+    // always wins over the Scheduler's own 7:00 AM).
+    const thu = () => desk.textContent('.sc-weekgrid > .sc-col:nth-child(12)');
+    assert.match(await thu(), /Garber Farms Load 1\s*7:00 AM/);
+    await db().collection('runDays').doc('2026-10-04__run_c892__thu').set({ runDocId: '2026-10-04__run_c892', runId: 'run_c892', route: '892', run: 'GARBER', weekStart: '2026-10-04', day: 'thu',
+      dates: ['2026-10-07', '2026-10-08'], days: { thu: { runs: true, dispatchTime: 330, deliveryDate: '2026-10-08' } } });
+    await desk.waitForFunction(() => /Garber Farms Load 1\s*5:30 AM/.test(document.querySelector('.sc-weekgrid > .sc-col:nth-child(12)').textContent), null, { timeout: 8000 });
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-dispatch-time-1920.png'), scale: 'css' });
+    // The ＋ beside a customer: Add Load for that customer on today, with the dispatch sheet's time.
+    await desk.click('.sc-who:has(strong:text-is("Garber Farms")) .sc-plus');
+    await desk.waitForSelector('#f-route');
+    assert.equal(await desk.$eval('#f-route', s => s.selectedOptions[0].textContent), '892 · GARBER · Garber Farms');
+    assert.deepEqual([await desk.inputValue('#f-date'), await desk.inputValue('#f-time'), await desk.textContent('#f-time-note')], ['2026-10-08', '05:30', 'From the dispatch sheet']);
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-plus-1920.png'), scale: 'css' });
+    await desk.click('#f-save');
+    await desk.waitForSelector('#f-confirm');
+    await desk.click('#f-back');
+    await desk.click('#modal [data-close]');
+    results.push('Dispatch time: Garber Thursday shows the dispatch sheet time 5:30 AM, not the Scheduler 7:00 AM; the customer ＋ opens Add Load for today with that time, through Confirm');
     // Delete the Walmart Tuesday load after the confirm box.
     await desk.click('.sc-weekgrid > .sc-col:nth-child(10) .sc-load');
     await desk.click('#f-delete');
