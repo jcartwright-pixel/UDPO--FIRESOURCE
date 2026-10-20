@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Behind is measured from when a route leaves, not from the loadout day (Joe 10/11). Saturday 10/10's loadout carries Monday
- * 10/12's routes; at 12:27 AM Sunday none of them is behind (they leave Monday). Manager Center's report
+ * 10/12's routes; at 12:27 AM Sunday none of them is behind (the evening ones leave Sunday evening, the rest after midnight, Joe 10/19). Manager Center's report
  * preview and the Loadout Center's Behind count agree. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -63,17 +63,35 @@ async function openPage(browser, url, when) {
       if (SHOTS) await lo.screenshot({ path: path.join(SHOTS, SHOT_NAME + '-loadout-1920.png'), scale: 'css' });
       assert.match(await lo.textContent('#strip'), /Behind 0/);
       results.push('12:27 AM Sunday: the Saturday loadout for Monday is on time on Manager Center and the Loadout Center');
-      // 7:00 PM Sunday: still none (they leave Monday). 12:40 AM Monday: 971 (12:00 AM Monday) is behind; 880 (2:00 AM) is not yet.
-      const sunday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T23:00:00Z');
+      // Joe 10/19: the day rolls at 6 a.m., so 844 (6:00 PM) and 950 (11:00 PM) leave Sunday evening and 971 (12:00 AM) and
+      // 880 (2:00 AM) after midnight Monday. 6:40 PM Sunday: none is behind yet (844 is 40 minutes past). 12:46 AM Monday: 844,
+      // 950 and 971 are behind; 880 is not yet.
+      const sunday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T22:40:00Z');
       await sunday.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
       await sunday.waitForTimeout(1500);
       assert.match(await sunday.textContent('#pv-subject'), /All routes on time/);
       await sunday.close();
       const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:46:10Z');
-      await later.waitForFunction(() => /1 route behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      await later.waitForFunction(() => /3 routes behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
       assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
-      results.push('Sunday 7:00 PM none is behind; Monday 12:46 AM only 971 (46 minutes past; 45 is not behind) (departs 12:00 AM Monday) is');
-      for (const p of [early, lo, later]) assert.deepEqual(p.errors, []);
+      results.push('Sunday 6:40 PM none is behind; Monday 12:46 AM 844 and 950 (left Sunday evening) and 971 (46 minutes past 12:00 AM Monday) are');
+      // Joe 10/19 ("look into the route setup"): the Route Editor's Departure Day decides. Tuesday 10/20's loads made Monday:
+      // Jersey (Load Day, 1:00 PM) leaves Monday; 901 (7:00 AM), 907 (9:00 AM) and 827 (1:00 AM) are Delivery Day, Tuesday.
+      // 2:57 PM Monday: only Jersey is behind, on Manager Center and the Loadout Center.
+      const tue = [['852', 'JERSEY LOAD 1', 780, 'Load Day'], ['901', 'PRODUCT 1', 420, 'Delivery Day'], ['907', 'FAIRMONT TRANSFER', 540, 'Delivery Day'], ['827', 'UT WALMART', 60, 'Delivery Day']];
+      for (const [i, [route, run, time, leavesOn]] of tue.entries()) {
+        await d.collection('runs').doc('2026-10-18__tue' + route).set({ weekStart: '2026-10-18', sheetRow: 950 + i, route, run, routeId: 'rte_t' + route, runId: 'run_t' + route, active: true, loadType: 'CASE LOADOUT',
+          masterShow: { daily: true, mobile: null, loadType: 'Case Loadout', leavesOn },
+          days: { tue: { runs: true, loadDayOffset: -1, loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: '2026-10-20', dispatchTime: time, loadSequence: i + 1 } } });
+      }
+      const monday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-19T18:57:00Z');
+      await monday.waitForFunction(() => /1 route behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      assert.match(await monday.textContent('body'), /852[\s\S]*BEHIND/);
+      const lo2 = await openPage(browser, '/loadout.html?' + MANAGER, '2026-10-19T18:57:00Z');
+      await lo2.waitForSelector('#rows tr[data-row]');
+      await lo2.waitForFunction(() => /Behind 1\b/.test(document.getElementById('strip').textContent), null, { timeout: 8000 });
+      results.push('Monday 2:57 PM: Jersey (Load Day) is behind; 901, 907 and 827 (Delivery Day) leave Tuesday and are not');
+      for (const p of [early, lo, later, monday, lo2]) assert.deepEqual(p.errors, []);
     }
   } finally {
     await browser.close();
