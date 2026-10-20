@@ -310,8 +310,16 @@
     }
     // Joe 10/12: without OVR the truck and trailer lists offer only free units. A unit on another load that day, down, or
     // on the road over this load's time is left out; OVR shows every unit with why it is normally left out.
+    // Joe 10/19 (891 on 800 said "ON 901" after Yoder came off 901): the line's driver's own truck is free for him unless another
+    // load had it picked by hand; the save takes it off the other load (actions.js takeOwnTruck).
+    function ownTruckOf(row) {
+      const d = row.driverId && lists.allDrivers.find(x => x.id === row.driverId);
+      return d && d.defaultTruckId ? String(d.defaultTruckId).toUpperCase() : '';
+    }
     function unitBlocks(kind, row) {
-      const day = dayRowsFor(row), out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
+      const own = kind === 'truck' ? ownTruckOf(row) : '';
+      const day = dayRowsFor(row).filter(r => r === row || !own || String(r.truckId || '').toUpperCase() !== own || L.yes(r.equipmentOverride));
+      const out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
       // Joe 10/12: a driver on two loads that day keeps his truck on both, so his own other loads do not block it.
       day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]] && !(kind === 'truck' && r.driverId && r.driverId === row.driverId)) out[r[key]] = 'ON ' + routeNo(r); });
       return Object.assign(out, L.unitConflicts(day, row, kind, rmHours));

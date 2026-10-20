@@ -128,7 +128,7 @@ test('Down Trucks: a unit already down but still on loads (the current app put i
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', clearOnly: true }, () => new Date('2026-10-06T16:00:00Z')), /not on the down list/);
 });
 
-test("a driver put on a day takes his own truck, also when his other load that day has it; another driver's truck or a down one stays (Joe 10/12, Joel Jacobs)", async () => {
+test("a driver put on a day takes his own truck, also when his other load that day has it; a hand-picked or down one stays (Joe 10/12, Joel Jacobs; Joe 10/19, Kemp and Yoder)", async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
   const T1 = '2026-10-04__run_t801';
   await db().collection('drivers').doc('drv_test_adams').update({ defaultTruckId: 'veh_truck_900001' });
@@ -138,12 +138,41 @@ test("a driver put on a day takes his own truck, also when his other load that d
   const out = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' });
   assert.equal(out.warnings, undefined);
   assert.deepEqual([(await run()).days.tue.truckId, (await run()).days.tue.truck], ['veh_truck_900001', '900001']);
-  // Another driver has it that day: the route's truck stays and the save says why.
+  // Joe 10/19 (Kemp's 223882 on 845 with Peffer): another driver's load that has it only as the route's truck gives it up; that load
+  // gets its own driver's truck when it is free (BROOK's 900002 here), and the Live sheet gets both loads' trucks.
+  await db().collection('drivers').doc('drv_test_brook').update({ defaultTruckId: 'veh_truck_900002' });
   await db().collection('runs').doc(T1).update({ 'days.wed.runs': true, 'days.wed.driverId': 'drv_test_brook', 'days.wed.driver': 'BROOK', 'days.wed.truckId': 'veh_truck_900001', 'days.wed.truck': '900001' });
-  await db().collection('runs').doc(RUN).update({ 'days.wed.runs': true, 'days.wed.truckId': 'veh_truck_900002', 'days.wed.truck': '900002' });
-  const kept = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'wed', driverId: 'drv_test_adams' });
-  assert.match(kept.warnings.join(' '), /truck 900001 is already on route 801/);
-  assert.equal((await run()).days.wed.truckId, 'veh_truck_900002');
+  await db().collection('runs').doc(RUN).update({ 'days.wed.runs': true, 'days.wed.truckId': '', 'days.wed.truck': '' });
+  const moved = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'wed', driverId: 'drv_test_adams' });
+  assert.equal(moved.warnings, undefined);
+  assert.equal((await run()).days.wed.truckId, 'veh_truck_900001');
+  assert.deepEqual([(await run(T1)).days.wed.truckId, (await run(T1)).days.wed.truck], ['veh_truck_900002', '900002']);
+  assert.equal(moved.runs.length, 2, 'both loads are in the answer so the screen updates both');
+  await runWriteBack({ db: db(), sheets: F.fakeWritableSheets(tabs), target: { spreadsheetId: 'fake-live' }, now: tick });
+  const v = tabs["'LIVE CURRENT WEEK'"], h = v[5], rowOf = (id) => v.find((x, i) => i > 5 && x[h.indexOf('run_id')] === id);
+  assert.equal(rowOf('run_t802')[h.indexOf('wed_truck')], '900001');
+  assert.equal(rowOf('run_t801')[h.indexOf('wed_truck')], '900002');
+  // Picked there by hand (equipment override): it stays, and the save says why.
+  await db().collection('runs').doc(T1).update({ 'days.fri.runs': true, 'days.fri.driverId': 'drv_test_brook', 'days.fri.driver': 'BROOK', 'days.fri.truckId': 'veh_truck_900001', 'days.fri.truck': '900001', 'days.fri.equipmentOverride': 'TRUE' });
+  await db().collection('runs').doc(RUN).update({ 'days.fri.runs': true, 'days.fri.truckId': '', 'days.fri.truck': '' });
+  const kept = await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'fri', driverId: 'drv_test_adams' });
+  assert.match(kept.warnings.join(' '), /truck 900001 was picked by hand for route 801/);
+  assert.equal((await run()).days.fri.truckId, '');
+  assert.equal((await run(T1)).days.fri.truckId, 'veh_truck_900001');
+  // Joe 10/19 (Yoder taken off 901, then put on 800): taking a driver off a load takes his own truck off it, so it is free at once,
+  // and putting him on another load brings it there.
+  await db().collection('runs').doc(T1).update({ 'days.sat.runs': true, 'days.sat.driverId': 'drv_test_adams', 'days.sat.driver': 'ADAMS', 'days.sat.truckId': 'veh_truck_900001', 'days.sat.truck': '900001', 'days.sat.equipmentOverride': '' });
+  await db().collection('runs').doc(RUN).update({ 'days.sat.runs': true, 'days.sat.driverId': '', 'days.sat.driver': '', 'days.sat.truckId': '', 'days.sat.truck': '' });
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: T1, day: 'sat', driverId: '' });
+  assert.deepEqual([(await run(T1)).days.sat.driver, (await run(T1)).days.sat.truckId], ['', '']);
+  await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'sat', driverId: 'drv_test_adams' });
+  assert.equal((await run()).days.sat.truckId, 'veh_truck_900001');
+  // Left on a load with no driver (as before this fix), it still comes over; and typing it by hand on his load takes it too.
+  await db().collection('runs').doc(T1).update({ 'days.sun.runs': true, 'days.sun.driverId': '', 'days.sun.driver': '', 'days.sun.truckId': 'veh_truck_900001', 'days.sun.truck': '900001' });
+  await db().collection('runs').doc(RUN).update({ 'days.sun.runs': true, 'days.sun.driverId': 'drv_test_adams', 'days.sun.driver': 'ADAMS', 'days.sun.truckId': '', 'days.sun.truck': '' });
+  await applyAction(db(), DISPATCHER, { action: 'assignTruck', requestId: rid(), runDocId: RUN, day: 'sun', equipmentId: 'veh_truck_900001' });
+  assert.equal((await run()).days.sun.truckId, 'veh_truck_900001');
+  assert.equal((await run(T1)).days.sun.truckId, '', 'the load with no driver gave it up');
   // A down truck stays off.
   await db().collection('equipment').doc('veh_truck_900001').update({ status: 'DOWN' });
   await db().collection('runs').doc(T1).update({ 'days.thu.runs': false });
