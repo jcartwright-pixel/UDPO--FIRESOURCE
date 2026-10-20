@@ -39,7 +39,12 @@ function shownForPlant(run) {
   const status = String(run.routeStatus || 'ACTIVE').trim().toUpperCase();
   return status === 'ACTIVE' && run.active !== false;
 }
-export function runArea(run) {
+// Joe 10/19 (800 Specials): a day can have its own load type (Daily Dispatch > Edit > Load type), which wins for that day.
+export function runArea(run, prefix) {
+  // A Route Editor change to None reaches the week's days as NONE: not loaded at the plant that day.
+  const day = prefix && run.days && run.days[prefix], dayRaw = String((day && day.loadType) || '').trim().toUpperCase();
+  if (dayRaw === 'NONE') return '';
+  if (areaOf(dayRaw)) return areaOf(dayRaw);
   const own = String(run.loadType || '').trim();
   return areaOf(own || (run.masterShow && run.masterShow.loadType) || '');
 }
@@ -59,7 +64,7 @@ function rowFor(run, block, loadDate, prior) {
   const day = run.days[block.prefix];
   return {
     id: run.id + '|' + block.prefix, runDocId: run.id, day: block.prefix, weekStart: run.weekStart, rev: run.rev || 0,
-    route: run.route || '', run: run.run || '', routeName: run.routeName || '', streamId: run.streamId || '', routeRunType: run.routeRunType || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run),
+    route: run.route || '', run: run.run || '', routeName: run.routeName || '', streamId: run.streamId || '', routeRunType: run.routeRunType || '', routeId: run.routeId || '', runId: run.runId || '', area: runArea(run, block.prefix),
     loadDate, deliveryDate: block.deliveryDate, departureDate: day.departureDate || block.deliveryDate, leavesOn: leavesOnOf(run.masterShow && run.masterShow.leavesOn), prior, loadSequence: L.effectiveSequence(day),
     baseSequence: day.loadSequence == null ? null : day.loadSequence,
     driver: day.driver || '', truck: day.truck || '', trailer: day.trailer || '', dispatchTime: day.dispatchTime,
@@ -120,9 +125,9 @@ export function loadoutRows(runs, date, plantStart) {
   const out = [], yesterday = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
   const carry = !start || yesterday >= start;
   (runs || []).forEach(run => {
-    if (!shownForPlant(run) || !runArea(run)) return;
-    L.loadBlocksFor(run, date).forEach(b => out.push(rowFor(run, b, date, false)));
-    if (carry) L.loadBlocksFor(run, yesterday).forEach(b => { const r = rowFor(run, b, yesterday, true); if (r.state !== 'DONE') out.push(r); });
+    if (!shownForPlant(run)) return;
+    L.loadBlocksFor(run, date).forEach(b => { if (runArea(run, b.prefix)) out.push(rowFor(run, b, date, false)); });
+    if (carry) L.loadBlocksFor(run, yesterday).forEach(b => { const r = runArea(run, b.prefix) && rowFor(run, b, yesterday, true); if (r && r.state !== 'DONE') out.push(r); });
   });
   return out.sort(byLoad);
 }
@@ -345,7 +350,7 @@ export function washesForRow(row, items) {
 export function unloadRows(runs, date, journal, returns, loads) {
   const prefix = L.dayPrefix(date), week = L.weekStart(date), unloads = U.latestUnloads(journal, date), done = U.washesDone(journal), rows = [];
   (runs || []).forEach(run => {
-    const area = runArea(run), d = run.weekStart === week && run.days && run.days[prefix];
+    const area = runArea(run, run.weekStart === week ? prefix : ''), d = run.weekStart === week && run.days && run.days[prefix];
     if (!area || !shownForPlant(run) || !d || !d.runs) return;
     const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};
     const trailer = u.trailer !== undefined && u.trailer !== '' ? u.trailer : run.dropAndHook ? '' : txt(d.trailer);

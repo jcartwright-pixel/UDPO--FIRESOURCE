@@ -49,6 +49,8 @@ const ACTIONS = Object.freeze({
   setRuns: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setDispatchTime: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setJack: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
+  // Joe 10/19 (800 Specials): the day's load type, so the load goes to the right loadout.
+  setLoadType: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   moveRun: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setUnitDown: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
   setUnitUp: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
@@ -561,6 +563,10 @@ function validate(input) {
     if (t && out.time === null) throw new SaveError('BAD_REQUEST', 'Depart time must look like 4:30 AM or 16:30');
   }
   if (action === 'setJack') out.jack = text(input.jack, 40).toUpperCase();
+  if (action === 'setLoadType') {
+    out.loadType = PLANT.areaOf(input.loadType);
+    if (text(input.loadType) && !out.loadType) throw new SaveError('BAD_REQUEST', 'Load type must be Case, Totes, Boxes or Tanker');
+  }
   if (action === 'moveRun') {
     if (!L.isDateKey(input.toDate)) throw new SaveError('BAD_REQUEST', 'Pick the day to move to');
     out.toDate = input.toDate;
@@ -724,6 +730,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   }
   if (req.action === 'setDispatchTime') return { dispatchTime: req.time };
   if (req.action === 'setJack') return { palletJack: req.jack };
+  // Blank goes back to the route's own type (Route Editor's Loadout Type).
+  if (req.action === 'setLoadType') return { loadType: req.loadType, loadTypeByHand: !!req.loadType };
   if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
   if (req.action === 'savePlantLoad') return PLANT.loadValues(tx, db, req, (run.days && run.days[req.day]) || {}, stamp, SaveError, run);
   return { driverNotes: req.note };
