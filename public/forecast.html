@@ -111,7 +111,7 @@
           '<span class="fc-line">' + ticks.map(m => '<s style="left:' + x(m) + '"></s>').join('') +
           '<u class="' + (z.late ? 'late' : 'ok') + '" style="left:' + x(z.start) + ';width:calc(' + x(z.est) + ' - ' + x(z.start) + ')"></u>' +
           // Why it is late, beside its bar (before it when the bar is far right), so the row stays one line.
-          (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 45 ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.reason === 'misses dispatch' ? 'misses dispatch' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
+          (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 100 - parseFloat(x(z.est)) ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" data-short="' + span(z.lateBy) + ' late" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.reason === 'misses dispatch' ? 'misses dispatch' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
           (z.leaves !== null && z.leaves >= t0 && z.leaves <= t1 ? '<em class="dep' + (z.late && z.reason === 'misses dispatch' ? ' late' : '') + '" style="left:' + x(z.leaves) + '"></em>' : '') +
           (z.leaves !== null && z.leaves > t1 ? '<em class="far" title="Dispatch ' + dep + '">&#9656;</em>' : '') +
           '<em class="now" style="left:' + x(today) + '"></em></span></div>';
@@ -119,6 +119,8 @@
       const doneLine = doneCase.length ? '<div class="fc-done">&#10003; ' + doneCase.length + ' load' + (doneCase.length === 1 ? '' : 's') + ' done today · ' + n(doneCase.reduce((a, r) => a + (Number(r.quantity) || 0), 0)) + ' cases</div>' : '';
       document.getElementById('loads-title').textContent = 'Loads still to load (' + f.loads.length + ') · in loading order';
       document.getElementById('loads').innerHTML = f.loads.length ? head + rows + doneLine : '<p class="fc-empty">Every case load for today is done.</p>' + doneLine;
+      // A late reason with no room beside its bar keeps only how late it is (the whole reason is on hover).
+      document.querySelectorAll('#loads .fc-why').forEach(b => { if (b.scrollWidth > b.clientWidth + 1) b.textContent = b.dataset.short; });
 
       document.getElementById('times').innerHTML = f.byTime.length ? '<table class="fc-t"><thead><tr><th>Due by</th><th class="num">Loads</th><th class="num">Cases</th><th></th></tr></thead><tbody>' +
         f.byTime.map(t => '<tr class="' + (t.late ? 'bad' : '') + '"><td>' + e(when(t.at, t.time, t.day)).replace(/ /g, '&nbsp;') + '</td><td class="num">' + t.loads + '</td><td class="num">' + n(t.cases) + '</td><td>' + (t.late ? t.late + ' late' : 'On time') + '</td></tr>').join('') +

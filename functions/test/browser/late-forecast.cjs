@@ -93,9 +93,10 @@ async function openPage(browser, url, w, h, opts) {
     await mc.waitForFunction(() => /9 loads\s*3,791 cases/.test(document.getElementById('band').textContent));
     // Joe 10/20: nobody sees how the forecast is worked out (no pace, cases an hour, past nights or minutes a load).
     assert.doesNotMatch(await mc.evaluate(() => document.body.innerText), /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26|minutes a load|47 cases/i);
-    const late = await mc.$$eval('.fc-row.late', rows => rows.map(r => r.querySelector('b').textContent + ' ' + r.querySelector('.fc-why').textContent));
+    // The label beside the bar can be cut to "4 h 10 min late" when there is no room; its hover keeps the reason.
+    const late = await mc.$$eval('.fc-row.late', rows => rows.map(r => r.querySelector('b').textContent + ' ' + r.querySelector('.fc-why').title));
     assert.deepEqual(late.map(t => t.split(' ')[0]), ['909', '907']);
-    late.forEach(t => assert.match(t, /past 6 AM shift end · /));
+    late.forEach(t => assert.match(t, / late: past the 6:00 AM shift end$/));
     assert.match(await mc.textContent('#band'), /2 loads late[\s\S]*Due by 5:00 AM\s*9 loads\s*3,791 cases/);
     assert.equal(await mc.$$eval('.fc-row:not(.fc-head)', r => r.length), 14);
     assert.deepEqual(await mc.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [1536, 790], 'fits without scrolling');
