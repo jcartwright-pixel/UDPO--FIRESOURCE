@@ -121,9 +121,11 @@ const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDat
 
 // Every load for the plant on `date` (all areas), plus yesterday's loads that are not done yet, unless the plant was started
 // fresh after yesterday (Administration > Start Plant Fresh From Today, udpoV780PlantLoadingRows_ UDPO_PLANT_START_DATE).
+// Joe 10/20 ("this is the next day, but it is showing that truck is getting loaded"): a day that has not started yet (after
+// today's operating day, which rolls at 6 a.m.) carries nothing over: today's open loads are still today's, not left over.
 export function loadoutRows(runs, date, plantStart) {
   const out = [], yesterday = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
-  const carry = !start || yesterday >= start;
+  const carry = (!start || yesterday >= start) && date <= L.operatingDay(new Date());
   (runs || []).forEach(run => {
     if (!shownForPlant(run)) return;
     L.loadBlocksFor(run, date).forEach(b => { if (runArea(run, b.prefix)) out.push(rowFor(run, b, date, false)); });
