@@ -468,7 +468,6 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-card.done { border-left-color: #2e8a5a; background: #e9f6ee; }
 .sw-card.ret { border-left-color: #b42318; }
 .sw-card.wash { border-left-color: #0b8da5; background: #f3fbfd; }
-.sw-card.skipped { border-left-color: #bd7400; }
 .sw-head { padding: 12px 16px; min-height: 64px; cursor: pointer; font-size: 19px; color: #0b2f55; }
 .sw-head .route, .sw-head .run { font-size: 20px; }
 .sw-head .truck, .sw-head .trailer { font-weight: 700; }
@@ -489,10 +488,8 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-badge.wash { background: #e0f5f9; color: #0b6b80; }
 .sw-flag { font-style: normal; font-size: 16px; font-weight: 800; padding: 3px 9px; border-radius: 8px; white-space: nowrap; }
 .sw-flag.pu { background: #b42318; color: #fff; }
-.sw-flag.skip { background: #fff4db; color: #8a4b00; border: 1px solid #e8b04a; }
-/* Joe 10/16: SKIPPED · who; on a narrow phone the name goes under it instead of off the screen. */
-.sw-flag.skip { white-space: normal; max-width: 100%; }
-.sw-flag.skip .mv-who { white-space: nowrap; }
+/* Joe 10/19: the same green MOVED / SKIPPED tag as the Daily Loadout, one word on one line (who moved it on hover). */
+.sw-flag.skip { background: #2e7d43; color: #fff; letter-spacing: .03em; }
 .sw-flag.wait { background: #eef2f6; color: #33475b; border: 2px dashed #6b7f93; margin-left: 6px; }
 .sw-quick { display: flex; gap: 8px; justify-content: flex-end; }
 .sw-chev { color: #5b6b7c; font-size: 16px; text-align: center; }
