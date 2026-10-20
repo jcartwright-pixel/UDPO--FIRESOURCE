@@ -88,6 +88,8 @@
       <label>Load Date<input id="s-load" type="date"></label>
       <label>Delivery Date<input id="s-date" type="date"></label>
       <label>Pickup Time<input id="s-time" type="time"></label>
+      <label class="s-times">Start Time<input id="s-start" autocomplete="off" maxlength="12" placeholder="Not started"></label>
+      <label class="s-times">End Time<input id="s-end" autocomplete="off" maxlength="12" placeholder="Not loaded"></label>
       <label>Trailer<input id="s-trailer" list="lo-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer"></label>
       <label>PO Number<input id="s-po" maxlength="40" placeholder="Needed for a carrier load"></label>
       <label>Cases<input id="s-cases" inputmode="numeric" maxlength="6" placeholder="Optional"></label>
@@ -635,6 +637,11 @@
       document.getElementById('s-kind').innerHTML = (kind ? '' : '<option value=""></option>') + R.LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + t + '</option>').join('');
       put('s-type', x ? x.scheduleType : 'ROUTE'); put('s-load', x ? (x.loadDate || x.date) : date); put('s-date', x ? x.date : L.addDays(date, 1));
       put('s-time', x ? x.pickupTime : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
+      // Joe 10/20 ("in case the plant forgot"): a load already on the schedule shows its Start and End times to type or fix.
+      document.querySelectorAll('#sched-form .s-times').forEach(b => { b.hidden = !x; });
+      put('s-start', x && x.work && x.work.startedAt ? P.clock(x.work.startedAt) : ''); put('s-end', x && x.work && x.work.completedAt ? P.clock(x.work.completedAt) : '');
+      document.getElementById('s-hint').textContent = 'It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).' +
+        (x ? ' Type a Start or End time if the plant forgot to press it; a time before 6 AM is the night after the load date.' : '');
       document.getElementById('s-error').hidden = true;
       const del = document.getElementById('s-delete');
       del.hidden = !x || !canSched(); del.dataset.armed = ''; del.textContent = 'Delete Load';
@@ -644,6 +651,30 @@
     }
     // Joe 10/20: a new load's time starts as the run's time for the delivery day (the dispatch sheet's, else Route Master's),
     // and follows a change of run or day until a time is typed.
+    // A typed Start or End time as the saved time: a box left as it was keeps the saved time; a time before 6 AM is the night
+    // after the load date (the plant's day runs 6 AM to 6 AM). null = not a time.
+    const minutesOf = (stamp) => { const m = /T(\d{2}):(\d{2})$/.exec(P.stampToLocal(stamp)); return m ? Number(m[1]) * 60 + Number(m[2]) : undefined; };
+    function typedStamp(typed, was, guess, day) {
+      const t = String(typed || '').trim();
+      if (!t) return '';
+      if (was && t === P.clock(was)) return was;
+      const mins = L.typedTime(t, guess);
+      if (mins === null) return null;
+      const pad = (n) => String(n).padStart(2, '0');
+      return P.localToStamp((mins < 360 ? L.addDays(day, 1) : day) + 'T' + pad(Math.floor(mins / 60)) + ':' + pad(mins % 60));
+    }
+    function schedTimes(x) {
+      const w = (x && x.work) || {}, day = x.loadDate || x.date, pick = /^(\d{2}):(\d{2})$/.exec(x.pickupTime || '');
+      const startedAt = typedStamp(document.getElementById('s-start').value, w.startedAt, w.startedAt ? minutesOf(w.startedAt) : pick ? Number(pick[1]) * 60 + Number(pick[2]) : undefined, day);
+      if (startedAt === null) return { error: 'Start Time: type a time, like 5:30 PM.' };
+      const completedAt = typedStamp(document.getElementById('s-end').value, w.completedAt, w.completedAt ? minutesOf(w.completedAt) : startedAt ? minutesOf(startedAt) : undefined, day);
+      if (completedAt === null) return { error: 'End Time: type a time, like 5:30 PM.' };
+      if (completedAt && !startedAt) return { error: 'Type the Start Time too.' };
+      if (completedAt && completedAt < startedAt) return { error: 'End Time cannot be before Start Time.' };
+      const soon = new Date(Date.now() + 5 * 60000).toISOString();
+      if ((startedAt && startedAt > soon) || (completedAt && completedAt > soon)) return { error: 'That time has not come yet. Check the time.' };
+      return { startedAt, completedAt, changed: startedAt !== (w.startedAt || '') || completedAt !== (w.completedAt || '') };
+    }
     let schedFilled = '';
     function fillSchedTime() {
       const t = document.getElementById('s-time'), c = schedOptions[Number(document.getElementById('s-route').value)];
@@ -672,18 +703,20 @@
       if (f.scheduleType === 'CARRIER' && !f.poNumber) return schedError('A carrier load needs its PO number.');
       if (f.cases && !/^[0-9]{1,6}$/.test(f.cases)) return schedError('Cases must be a whole number.');
       if (f.loadDate && f.loadDate > key) return schedError('The load date cannot be after the delivery date.');
+      const times = x ? schedTimes(x) : null;
+      if (times && times.error) return schedError(times.error);
       // Joe 10/20: a new load, or one whose load or delivery date changed, is confirmed first; nothing is saved until Confirm.
       if (!x || (x.loadDate || x.date) !== (f.loadDate || key) || x.date !== key) {
         const ck = R.scheduleCheck({ lane: 'SHIPPING', runId: c.runId, run: c.run, date: key, loadDate: f.loadDate }, routeDocs, today());
         document.getElementById('sc-confirm-body').innerHTML = P.scheduleConfirmBody(ck, Object.assign({ lane: 'SHIPPING', who: [c.route, c.run, c.name].filter(Boolean).join(' · ') }, f));
         document.getElementById('sc-confirm-error').hidden = true;
-        schedConfirming = { x, f, key };
+        schedConfirming = { x, f, key, times };
         document.getElementById('sched-modal').hidden = true;
         openModal('sched-confirm-modal');
         document.getElementById('sc-confirm').focus();
         return;
       }
-      commitSched(x, f, key, document.getElementById('s-save'), schedError);
+      commitSched(x, f, key, document.getElementById('s-save'), schedError, times);
     };
     let schedConfirming = null;
     // Joe 10/20: Delete Load on a Scheduler line (press twice). It comes off this screen at once and off the Scheduler and every
@@ -697,11 +730,16 @@
       save('savePlantSchedule', { lane: 'SHIPPING', op: 'remove', id: x.id, date: x.date })
         .catch(e => { delete schedGone[x.id]; render(); showError('Delete Load: ' + (e.message || e)); });
     };
-    async function commitSched(x, f, key, b, fail) {
+    async function commitSched(x, f, key, b, fail, times) {
       b.disabled = true; fail('');
       try {
         await save('savePlantSchedule', { lane: 'SHIPPING', op: 'save', id: x ? x.id : '', date: key, fields: f });
         closeModals(); showError('');
+        // The typed times go the way Start and End do (shown at once, put back if refused), so the tablets show them too.
+        if (times && times.changed) {
+          const r = schedById('sch:' + x.id) || { sched: x, route: x.route, run: R.loadNumberName(x.run || x.route, x.loadNo) };
+          saveSched(r, 'times', { startedAt: times.startedAt, completedAt: times.completedAt }, { state: times.completedAt ? 'COMPLETE' : times.startedAt ? (x.work && x.work.state === 'PAUSED' ? 'PAUSED' : 'WORKING') : 'WAITING', startedAt: times.startedAt, completedAt: times.completedAt });
+        }
       } catch (e) {
         fail('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
       } finally { b.disabled = false; }
@@ -712,7 +750,7 @@
       const k = schedConfirming;
       if (!k) return;
       const failHere = (t) => { const e = document.getElementById('sc-confirm-error'); e.textContent = t; e.hidden = !t; };
-      commitSched(k.x, k.f, k.key, document.getElementById('sc-confirm'), failHere);
+      commitSched(k.x, k.f, k.key, document.getElementById('sc-confirm'), failHere, k.times);
     };
     document.getElementById('sched-form').addEventListener('input', () => schedError(''));
     document.getElementById('sched-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA') { ev.preventDefault(); document.getElementById('s-save').click(); } });

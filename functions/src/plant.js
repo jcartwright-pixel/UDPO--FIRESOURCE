@@ -670,10 +670,18 @@ function validateSchedule(input, SaveError) {
   if (out.op === 'progress') {
     if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load');
     out.step = text(input.step);
-    if (['start', 'save', 'pause', 'complete'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be start, save, pause or complete');
+    if (['start', 'save', 'pause', 'complete', 'times'].indexOf(out.step) < 0) throw new SaveError('BAD_REQUEST', 'step must be start, save, pause, complete or times');
     if (out.step === 'pause') { out.pauseReason = text(input.pauseReason).slice(0, 300); if (!out.pauseReason) throw new SaveError('BAD_REQUEST', 'A pause reason is required.'); }
     const f = input.fields || {};
     out.work = {};
+    // Joe 10/20 ("in case the plant forgot"): Edit Load on Daily Box Loadout types or fixes the Start and End times.
+    if (out.step === 'times') {
+      const when = (v, name) => { const t = text(v); if (!t) return ''; const ms = Date.parse(t); if (!isFinite(ms)) throw new SaveError('BAD_REQUEST', 'Check the ' + name + '.'); return new Date(ms).toISOString(); };
+      out.startedAt = when(f.startedAt, 'Start Time'); out.completedAt = when(f.completedAt, 'End Time');
+      if (out.completedAt && !out.startedAt) throw new SaveError('BAD_REQUEST', 'Type the Start Time too.');
+      if (out.completedAt && out.completedAt < out.startedAt) throw new SaveError('BAD_REQUEST', 'End Time cannot be before Start Time.');
+      return out;
+    }
     if (f.count !== undefined) { const c = text(f.count); if (c && !/^[0-9]{1,6}$/.test(c)) throw new SaveError('BAD_REQUEST', (out.lane === 'RECEIVING' ? 'Cases / pallets' : 'Boxes') + ' must be a whole number.'); out.work.count = c; }
     if (f.temperature !== undefined) { const t = text(f.temperature); if (t && !/^-?[0-9]{1,3}(\.[0-9])?$/.test(t)) throw new SaveError('BAD_REQUEST', 'Check the temperature.'); out.work.temperature = t; }
     if (f.notes !== undefined) out.work.notes = text(f.notes).slice(0, 1200);
@@ -710,6 +718,7 @@ function validateSchedule(input, SaveError) {
 async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError) {
   if (!had) throw new SaveError('NOT_FOUND', 'That load is no longer on the schedule.');
   const before = R.scheduleEntries([had], req.lane)[0] || null, was = (had.payload && had.payload.work) || {};
+  if (req.step === 'times') return scheduleTimes(tx, db, req, had, before, was, type, email, stamp, logRef, mode, SaveError);
   if (was.state === 'COMPLETE') throw new SaveError('CONFLICT', 'That load is already ' + (req.lane === 'RECEIVING' ? 'received' : 'complete') + '.');
   // Joe 10/12: a Shipping load started or resumed counts toward Boxing's limit (paused ones do not).
   const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : (req.step === 'save' && was.state === 'PAUSED') ? 'PAUSED' : 'WORKING';
@@ -728,6 +737,27 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   tx.set(db.collection('plantJournal').doc(appScheduleId(type, req.id)), rec);
   const after = R.scheduleEntries([rec], req.lane)[0];
   const result = { ok: true, requestId: req.requestId, id: req.id, state: work.state, date: rec.date };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, step: req.step, scheduleId: req.id, before, after, result });
+  return result;
+}
+
+// Typed Start and End times (a load already loaded can be fixed too). An End Time marks it loaded, the same as pressing End;
+// a Start Time alone marks it loading; both cleared puts it back to waiting. A typed fix does not count toward Boxing's limit.
+async function scheduleTimes(tx, db, req, had, before, was, type, email, stamp, logRef, mode, SaveError) {
+  const soon = new Date(Date.parse(stamp) + 5 * 60000).toISOString();
+  if ((req.startedAt && req.startedAt > soon) || (req.completedAt && req.completedAt > soon)) throw new SaveError('BAD_REQUEST', 'That time has not come yet. Check the time.');
+  const state = req.completedAt ? 'COMPLETE' : req.startedAt ? (was.state === 'PAUSED' ? 'PAUSED' : 'WORKING') : 'WAITING';
+  // A time left as it was keeps who pressed it.
+  const same = (a, b) => !!a && !!b && Date.parse(a) === Date.parse(b);
+  const startedAt = same(req.startedAt, was.startedAt) ? was.startedAt : req.startedAt, completedAt = same(req.completedAt, was.completedAt) ? was.completedAt : req.completedAt;
+  const work = Object.assign({}, was, { state, startedAt, completedAt,
+    startedBy: startedAt ? (startedAt === was.startedAt && was.startedBy) || email : '', completedBy: completedAt ? (completedAt === was.completedAt && was.completedBy) || email : '' });
+  const payload = Object.assign({}, had.payload || {}, { work });
+  const rec = Object.assign({}, had, { payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+  delete rec.sheetRow; delete rec.cells;
+  tx.set(db.collection('plantJournal').doc(appScheduleId(type, req.id)), rec);
+  const after = R.scheduleEntries([rec], req.lane)[0];
+  const result = { ok: true, requestId: req.requestId, id: req.id, state, date: rec.date };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, step: req.step, scheduleId: req.id, before, after, result });
   return result;
 }
@@ -803,6 +833,8 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit; }
     const payload = { pickupTime: req.pickupTime, loadDate: req.loadDate, trailer, scheduleType: req.scheduleType, carrier: req.scheduleType === 'CARRIER', poNumber: req.poNumber,
       cases: req.cases, product: req.product, notes: req.notes };
+    // Save Load keeps what the station did on the load (its Start, End, count): changing the load's boxes does not start it over.
+    if (had && had.payload && had.payload.work) payload.work = had.payload.work;
     if (req.lane === 'SHIPPING' && req.loadType) payload.loadType = req.loadType;
     rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
       area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
