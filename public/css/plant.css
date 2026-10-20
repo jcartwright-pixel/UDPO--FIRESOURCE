@@ -1444,7 +1444,7 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
    (Returns, Washing) give room so every tile keeps its whole wording on one line. */
 .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: 1.3fr 1.35fr 0.7fr 0.9fr 1.2fr; gap: 6px; }
 .manager-page .mc-card[data-card="dept"] .mc-tile { padding: 6px 8px; }
-@media (min-width: 761px) { .manager-page .mc-card[data-card="dept"] .mc-tile i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+/* Joe 10/19: tiles show their whole wording, so a long line wraps instead of being cut (fonts differ from screen to screen). */
 .manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].good { background: #e7f6ec; border-color: #a8dcb8; }
 .manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].bad { background: #fde8e8; border-color: #efb4b4; }
 .manager-page .mc-card[data-card="dept"] .mc-tile[href="forecast.html"].good i { color: var(--ink); }
