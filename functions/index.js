@@ -38,7 +38,7 @@
 const admin = require('firebase-admin');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { runCleanup } = require('./src/cleanup');
@@ -67,6 +67,7 @@ const { StationError } = STATIONS;
 const TOOLS = require('./src/admintools');
 const READER = require('./src/reader');
 const L = require('./src/logic');
+const RUNDAYS = require('./src/rundays');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'us-east4', maxInstances: 5 });
@@ -386,6 +387,10 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
     if (!event.data) return null;
     return mailReport(event.data.ref, event.data.data());
   });
+}
+// Joe 10/19 (screen speed): each run's one-day load records follow every change to the run (src/rundays.js).
+if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
+  exports.runDaysOnRunWrite = onDocumentWritten({ document: 'runs/{runId}', timeoutSeconds: 60 }, (event) => RUNDAYS.syncRun(db, event.params.runId));
 }
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
 

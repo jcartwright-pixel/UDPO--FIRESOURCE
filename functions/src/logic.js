@@ -1317,7 +1317,23 @@
     if (/^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t)) return true;
     // Joe 10/18: the answering service writes the Pre Trip / Post Trip answers as "YES-NO" (done, nothing wrong), "yes-no",
     // "YS" or "Y/N": only yes / no words, nothing wrong said, so no write-up. "YES-POST- AIR LEAK" says what is wrong and stays.
-    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|n|n0|no|nope|none|na)$/.test(w); });
+    // Joe 10/19: a mistyped "yes" (UYES, YESS, TES, YRS) is still only a yes, so no write-up either: one slip of a key from
+    // "yes" (a letter added, dropped, swapped or changed) counts as yes. "eyes" is a real word and is left alone.
+    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|yesno|n|n0|no|nope|none|na)$/.test(w) || (w !== 'eyes' && oneSlipFrom(w, 'yes')); });
+  }
+
+  // True when a and b differ by one key: one letter added, dropped or changed, or two side-by-side letters swapped.
+  function oneSlipFrom(a, b) {
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    if (a.length === b.length) {
+      var diff = [];
+      for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) diff.push(i);
+      return diff.length === 1 || (diff.length === 2 && diff[1] === diff[0] + 1 && a[diff[0]] === b[diff[1]] && a[diff[1]] === b[diff[0]]);
+    }
+    var long = a.length > b.length ? a : b, short = a.length > b.length ? b : a;
+    for (var j = 0; j < long.length; j++) if (long.slice(0, j) + long.slice(j + 1) === short) return true;
+    return false;
   }
 
   // Joe 10/14 (mock-up A): which screens each person may see, ticked per plant in People & Roles. The areas are the Home

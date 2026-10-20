@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const L = require('./logic');
 const M = require('./model');
 const PLANT = require('./plant');
+const RUNDAYS = require('./rundays');
 
 const C = M.COLLECTIONS;
 const META = 'meta';
@@ -665,6 +666,9 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
     const anyNew = Object.keys(current).some(k => current[k] === 'new');
     tx.set(configRef, { mode: anyNew ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, current), liveWeeks, lastTransfer, liveSourceId }, { merge: true });
   });
+  // Joe 10/19 (screen speed): the Live weeks' one-day load records (rundays.js), filled in once and again when the weeks move.
+  // The trigger on each run keeps them in step after that; a failure here never stops the copy.
+  try { await RUNDAYS.ensureWeeks(db, Object.values(liveWeeks)); } catch (e) { console.error('Run day records not filled in: ' + (e && e.message || e)); }
   return { at: stamp, liveWeeks, summary, warnings };
 }
 
