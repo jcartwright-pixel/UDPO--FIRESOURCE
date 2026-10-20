@@ -24,8 +24,9 @@ const T = (h, m) => h * 60 + (m || 0);
 // paused ("No product").
 const PRIOR = [['971', 'PAINTSVILLE TRANSFER', 50, T(2), 812], ['901_1', 'PRODUCT 1', 60, T(7), 853, '2026-10-20T08:39:00Z', 'PAUSED'],
   ['909_1', 'MARIETTA LOAD 1', 70, T(6), 1067], ['907_1', 'FAIRMONT TRANSFER', 80, T(8), 1073], ['803', 'DSD', 40, T(4), 503, '2026-10-20T03:00:00Z', 'COMPLETE']];
-// Today's (loaded Tue 10-20): Save-A-Lot leaves the day it is loaded; the rest deliver Wednesday.
-const TODAY = [['855', 'SAVE-A-LOT 1', 10, T(8), 600, 'tue', 0, 'LOAD DAY'], ['856', 'SAVE-A-LOT 2', 20, T(15), 600, 'tue', 0, 'LOAD DAY'],
+// Today's (loaded Tue 10-20): Save-A-Lot leaves the day it is loaded; the rest deliver Wednesday. Joe 10/20: as on the Live
+// sheet, Save-A-Lot's load date reads 1-1-70 and Save-A-Lot 2 has no cases or trailer yet; both still show everywhere.
+const TODAY = [['855', 'SAVE-A-LOT 1', 10, T(8), 600, 'tue', 0, 'LOAD DAY'], ['856', 'SAVE-A-LOT 2', 20, T(15), null, 'tue', 0, 'LOAD DAY'],
   ['852', 'JERSEY LOAD 1', 30, T(13), 1150, 'wed', -1, 'LOAD DAY'], ['849', 'SUN VALLEY', 40, T(15), 900, 'wed', -1, 'DELIVERY DAY'], ['813', 'DSD', 50, T(1, 30), 477, 'wed', -1, 'DELIVERY DAY']];
 
 async function openPage(browser, url, w, h, opts) {
@@ -61,7 +62,7 @@ async function openPage(browser, url, w, h, opts) {
   for (const [route, run, seq, time, cases, key, offset, leavesOn] of TODAY) {
     const delivery = key === 'tue' ? '2026-10-20' : '2026-10-21';
     await d.collection('runs').doc('2026-10-18__t' + route).set({ weekStart: '2026-10-18', sheetRow: row++, route, run, routeId: 'rte_t' + route, runId: 'run_t' + route, active: true, loadType: 'Case Loadout',
-      masterShow: { leavesOn }, days: { [key]: { runs: true, loadDayOffset: offset, loadDate: '2026-10-20', deliveryDate: delivery, departureDate: delivery, dispatchTime: time, loadSequence: seq, casesOut: cases } } });
+      masterShow: { leavesOn }, days: { [key]: { runs: true, loadDayOffset: offset, loadDate: key === 'tue' ? '1970-01-01' : '2026-10-20', deliveryDate: delivery, departureDate: delivery, dispatchTime: time, loadSequence: seq, casesOut: cases } } });
   }
   // The two Tuesdays before: 4 one-hour loads each.
   for (const [week, load, delivery, rate] of [['2026-10-11', '2026-10-13', '2026-10-14', 760], ['2026-10-04', '2026-10-06', '2026-10-07', 720]]) {
@@ -103,7 +104,11 @@ async function openPage(browser, url, w, h, opts) {
     assert.ok(first.start >= lastPrior, 'today starts after last night\'s leftovers');
     assert.equal(first.late, true, 'Save-A-Lot 855 (8:00 AM) cannot leave on time behind four left-over loads');
     assert.equal(first.reason, 'misses dispatch');
-    fs.writeFileSync(path.join(SHOTS || require('os').tmpdir(), 'carryover-email.html'), R.reportHtml(rep, ''));
+    // Joe 10/20: the email lists what is left over from yesterday first, then today's loads (Save-A-Lot included), in loading order.
+    const html = R.reportHtml(rep, ''), plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    assert.match(plainText, /Left over from Mon 10-19-26 971 [\s\S]*901 [\s\S]*909 [\s\S]*907 [\s\S]*Today Tue 10-20-26 855 Save-A-Lot 1 [\s\S]*856 Save-A-Lot 2 [\s\S]*852 [\s\S]*849 [\s\S]*813 /);
+    assert.doesNotMatch(plainText, /Delivers /);
+    fs.writeFileSync(path.join(SHOTS || require('os').tmpdir(), 'carryover-email.html'), html);
     assert.deepEqual(mc.errors, []);
 
     // The Late Forecast screen: the same order and lates.
