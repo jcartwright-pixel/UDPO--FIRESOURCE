@@ -474,3 +474,15 @@ test('scheduleCheck: the Peck load saved on the wrong load day is flagged', () =
   assert.deepEqual(R.scheduleCheck({ lane: 'RECEIVING', runId: 'run_peck', date: '2026-10-22', loadDate: '2026-10-19' }, routes, '2026-10-20').warnings, ['The load date, Monday 10-19-26, has already passed.']);
   assert.deepEqual(R.scheduleCheck({ lane: 'SHIPPING', runId: 'x', date: '2026-10-22', loadDate: '2026-10-22' }, routes, '2026-10-20').warnings, []);
 });
+
+test('withDispatchTimes: the trailer Daily Dispatch has on the run and day shows; else the Scheduler trailer; carriers keep theirs', () => {
+  const runs = [{ runId: 'run_peck', weekStart: '2026-10-18', days: { thu: { dispatchTime: 330, trailer: 'T-1188' } } },
+    { runId: 'run_jersey', weekStart: '2026-10-18', days: { thu: { dispatchTime: 780 } } }];
+  const [peck, jersey, carrier, old] = R.withDispatchTimes([{ runId: 'run_peck', date: '2026-10-22', trailer: 'T-961', pickupTime: '07:00' },
+    { runId: 'run_jersey', date: '2026-10-22', trailer: 'T-50' }, { runId: 'run_peck', date: '2026-10-22', scheduleType: 'CARRIER', trailer: 'ABC1' },
+    { runId: 'run_peck', date: '2026-10-15' }], runs);
+  assert.deepEqual([peck.dispatchTrailer, peck.trailer, peck.pickupTime, R.loadTrailer(peck)], ['T-1188', 'T-961', '05:30', 'T-1188']);
+  assert.deepEqual([jersey.dispatchTrailer, R.loadTrailer(jersey), jersey.pickupTime], [undefined, 'T-50', '13:00']);
+  assert.equal(R.loadTrailer(carrier), 'ABC1');
+  assert.equal(R.loadTrailer(old), '');
+});

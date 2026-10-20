@@ -273,7 +273,7 @@
 .sched-page .sc-err { margin: 10px 0 0; }
 .sched-page .sc-holnote { margin: -6px 0 10px; font-weight: 800; color: #8a4b00; }
 .sched-page .sc-daylist { max-height: 55vh; overflow: auto; }
-.sched-page .sc-dayhead, .sched-page .sc-dayrow { display: grid; grid-template-columns: 2.2fr 1fr 1.6fr .8fr auto; gap: 10px; align-items: center; padding: 6px 4px; }
+.sched-page .sc-dayhead, .sched-page .sc-dayrow { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1.6fr .8fr auto; gap: 10px; align-items: center; padding: 6px 4px; }
 .sched-page .sc-dayhead { font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
 .sched-page .sc-dayrow { border-bottom: 1px solid #edf2f7; font-size: 16px; }
 .sched-page .sc-dayrow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1534,4 +1534,14 @@ body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
   .forecast-page .fc-run small.fc-why-sm { display: block; }
   .forecast-page .fc-row.fc-head { display: none; }
   .forecast-page .fc-row.late .fc-est { justify-self: end; }
+}
+/* Joe 10/20: the day pop-up has a Trailer column, so it gets the room for it. */
+.sched-page .sc-modal:has(.sc-daylist) { width: min(900px, calc(100vw - 32px)); }
+/* On a phone each load takes two lines: the run and its button, then time, trailer, product and cases. */
+@media (max-width: 600px) {
+  .sched-page .sc-dayhead, .sched-page .sc-dayrow { grid-template-columns: auto auto minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; }
+  .sched-page .sc-dayhead { letter-spacing: 0; }
+  .sched-page .sc-dayhead > :first-child, .sched-page .sc-dayrow > :first-child { grid-row: 1; grid-column: 1 / 4; }
+  .sched-page .sc-dayrow .trl { padding: 2px 6px; }
+  .sched-page .sc-dayhead > :last-child, .sched-page .sc-dayrow > :last-child { grid-row: 1; grid-column: 4; justify-self: end; }
 }

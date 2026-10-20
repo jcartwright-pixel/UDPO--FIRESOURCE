@@ -173,7 +173,7 @@ async function shots(page, name, w) {
     const thu = () => desk.textContent('.sc-weekgrid > .sc-col:nth-child(12)');
     assert.match(await thu(), /Garber Farms Load 1\s*7:00 AM/);
     await db().collection('runDays').doc('2026-10-04__run_c892__thu').set({ runDocId: '2026-10-04__run_c892', runId: 'run_c892', route: '892', run: 'GARBER', weekStart: '2026-10-04', day: 'thu',
-      dates: ['2026-10-07', '2026-10-08'], days: { thu: { runs: true, dispatchTime: 330, deliveryDate: '2026-10-08' } } });
+      dates: ['2026-10-07', '2026-10-08'], days: { thu: { runs: true, dispatchTime: 330, deliveryDate: '2026-10-08', trailer: 'T-1188' } } });
     await desk.waitForFunction(() => /Garber Farms Load 1\s*5:30 AM/.test(document.querySelector('.sc-weekgrid > .sc-col:nth-child(12)').textContent), null, { timeout: 8000 });
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-dispatch-time-1920.png'), scale: 'css' });
     // The ＋ beside a customer: Add Load for that customer on today, with the dispatch sheet's time.
@@ -241,6 +241,21 @@ async function shots(page, name, w) {
     await desk.waitForSelector('.sc-dayrow');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-daybox-1920.png'), scale: 'css' });
     assert.equal(await desk.$$eval('.sc-dayrow', r => r.length), 3);
+    // Joe 10/20 ("I want to be able to see the trailer also"): the day box has a Trailer column, the trailer Daily Dispatch has
+    // on that run and day (Garber's Thursday T-1188), else the Scheduler's own, else a dash; it fits with no sideways scrolling.
+    assert.deepEqual(await desk.$$eval('.sc-dayhead span', s => s.map(x => x.textContent)), ['Run', 'Time', 'Trailer', 'Product', 'Cases', '']);
+    const trailerCol = () => desk.$$eval('.sc-dayrow', r => r.map(x => x.querySelector('.run').textContent + ':' + x.querySelector('.sc-trl').textContent));
+    assert.deepEqual((await trailerCol()).find(t => /^Garber/.test(t)), 'Garber Farms Load 1:T-1188');
+    assert.ok((await trailerCol()).every(t => /:(T-\d+|TBA|—)$/.test(t)), 'every load shows a trailer or a dash: ' + (await trailerCol()).join(', '));
+    for (const [w, h] of [[1536, 790], [1920, 950], [390, 844]]) {
+      await desk.setViewportSize({ width: w, height: h });
+      const box = await desk.evaluate(() => { const l = document.querySelector('.sc-daylist'), m = document.getElementById('modal'), t = document.querySelector('.sc-dayrow .sc-trl');
+        return { list: l.scrollWidth <= l.clientWidth, modal: m.scrollWidth <= m.clientWidth, font: parseFloat(getComputedStyle(t).fontSize), seen: t.getBoundingClientRect().width > 20 }; });
+      assert.deepEqual(box, { list: true, modal: true, font: 16, seen: true }, 'the day box with Trailer fits at ' + w + 'x' + h);
+      if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-daybox-trailer-' + w + '.png'), scale: 'css' });
+    }
+    await desk.setViewportSize({ width: 1920, height: 950 });
+    results.push('Day box: a Trailer column (Garber Thursday T-1188 from the dispatch sheet), fits at 1536, 1920 and phone width');
     assert.deepEqual(desk.errors, []);
     assert.deepEqual(watcher.errors, []);
     const log = await db().collection('actions').where('action', '==', 'savePlantSchedule').get();
