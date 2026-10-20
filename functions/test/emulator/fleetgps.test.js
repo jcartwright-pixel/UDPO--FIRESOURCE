@@ -21,9 +21,21 @@ const reply = (status, body) => ({ status, text: async () => body });
 // it is sent and answers our two by name with CSV.
 function fleet(log, opts) {
   opts = opts || {};
-  const saved = [];
-  return async (url, init) => {
+  const saved = [], pending = {};
+  const go = async (url, init) => {
     log.push((init.method || 'GET') + ' ' + url.replace(/auth=[^&]+/, 'auth=*'));
+    // Verizon's asynchronous mode (GPS points): 202 with a link, then 202 {Status} with no link while it works, then the rows.
+    const wait = /^\/result\/(\d+)/.exec(url.slice(BASE.length));
+    if (wait) { const p = pending[wait[1]]; if (p.polls++ < 1) return reply(202, JSON.stringify({ Status: 'Retrieving' })); return p.answer; }
+    if (/\/execute\?template=UDPO_(UnitDayPoints|ReeferPoints)/.test(url)) {
+      assert.match(url, /&PollingMode=Async/, 'GPS points run in asynchronous mode');
+      const id = String(Object.keys(pending).length + 1);
+      pending[id] = { polls: 0, answer: await answer(url, init) };
+      return reply(202, JSON.stringify({ ResultUrl: BASE + '/result/' + id }));
+    }
+    return answer(url, init);
+  };
+  const answer = async (url, init) => {
     if (url === BASE + '/rest/login') {
       if (opts.postMissing) return reply(405, '');
       const b = JSON.parse(init.body);
@@ -73,6 +85,7 @@ function fleet(log, opts) {
     }
     return reply(404, '');
   };
+  return go;
 }
 const NOW = () => new Date('2026-10-13T14:10:00Z');
 
@@ -99,7 +112,7 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.equal(log.filter(l => l.startsWith('POST ' + BASE + '/templates')).length, 1, 'the template is saved once');
 
   s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'pull' }, o);
-  assert.deepEqual(s.pulled, { trucks: 2, days: 1, alerts: 3, reefer: 0 });
+  assert.deepEqual(s.pulled, { trucks: 2, days: 1, alerts: 3, reefer: 0, temps: 0 });
   // Joe 10/13 (scorecard): Fleet's alerts since New York midnight, each with its unit's tag and kind.
   assert.ok(log.indexOf('alerts 2026-10-13 04:00:00 to 2026-10-13 14:10:00') >= 0, 'the first read starts at New York midnight');
   assert.ok(log.indexOf('conditions C1,C2,C3') >= 0, 'the condition names are asked for once');
@@ -126,7 +139,7 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   // Five minutes later the truck has moved 12.4 miles; the saved key is used again and the template is not sent again.
   const before = log.length;
   clock.now = new Date('2026-10-13T14:15:00Z'); state.odo = { a: 412358, at: '2026-10-13 14:14:00' };
-  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 1, alerts: 3, reefer: 0 });
+  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 1, alerts: 3, reefer: 0 }, 'the all-trailers temperature read waits 15 minutes');
   assert.equal(log.slice(before).filter(l => /rest\/login|\/templates|conditions/.test(l)).length, 0);
   assert.ok(log.indexOf('alerts 2026-10-13 14:00:00 to 2026-10-13 14:15:00') >= 0, 'the next read starts 10 minutes before the last one ended');
   assert.equal((await alert('A901')).updatedAt, '2026-10-13T14:10:00.000Z', 'an alert read again unchanged is not rewritten (Joe 10/18)');
@@ -135,7 +148,7 @@ test('Fleet GPS: managers only, the login never comes back, Test says plainly wh
   assert.deepEqual([day.miles, day.firstMove, day.lastMove], [12.4, '2026-10-13T14:15:00.000Z', '2026-10-13T14:15:00.000Z']);
   assert.equal(day.since, '2026-10-13T14:10:00.000Z', 'today is counted from the first read, so Trucks Today can say so');
   // No new report: nothing is written.
-  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 0, alerts: 3, reefer: 0 });
+  assert.deepEqual(await pull(db(), o), { trucks: 2, days: 0, alerts: 3, reefer: 0 }, 'the all-trailers temperature read waits 15 minutes');
   // A new New York day starts again from that day's first reading.
   clock.now = new Date('2026-10-14T11:00:00Z'); state.odo = { a: 412400, at: '2026-10-14 10:59:00' };
   await pull(db(), o);
@@ -281,7 +294,8 @@ test('Fleet GPS: a loaded trailer\'s temperature is read every run until it is b
   r = await pull(d, o);
   g = (await d.collection('gpsReefer').doc('T-701').get()).data();
   assert.deepEqual([g.recording, g.stopReason, g.tempF], [false, 'BACK_IN_YARD', 37.5]);
-  assert.equal(log.slice(before).filter(l => l.startsWith('reefer ')).length, 0, 'nothing is read once it is back');
+  // Joe 10/20: the one read left is the every-15-minutes temperature of every trailer (Trucks Today), not this recording.
+  assert.equal(log.slice(before).filter(l => l.startsWith('reefer ')).length, 1, 'nothing is read for the recording once it is back');
   const s = await gpsCall(d, ADMIN, { kind: 'fleet', op: 'status' }, o);
   assert.equal(s.coverage.find(c => c.key === 'reefer').label, 'Trailer temperatures (GPS)');
   // Joe 10/18: kept at most 6 months, then deleted, by the nightly cleanup (its own schedule, not the GPS read).
@@ -324,4 +338,73 @@ test('Fleet GPS: a trailer tagged "TRL 701" in Fleet is matched, a reading 2 hou
   const s = await gpsCall(d, ADMIN, { kind: 'fleet', op: 'status' }, o);
   assert.ok(s.reeferNoUnit.includes('T-777') && !s.reeferNoUnit.includes('T-701'), 'T-777 has no unit in Fleet: ' + s.reeferNoUnit);
   assert.deepEqual(s.reeferNoTemp, [], 'T-701 sent a temperature');
+});
+
+test('Fleet GPS temps (Joe 10/20): every trailer\'s newest cargo temperature in one record, asked for in Verizon\'s asynchronous mode; a Verizon error leads with its reference', async () => {
+  const log = [], o = { fetch: fleet(log, { reefer: [['12', '2026-10-13 13:50:00', '35.04'], ['12', '2026-10-13 14:05:00', '36.2'], ['11', '2026-10-13 14:05:00', '50']] }), base: BASE, now: NOW, sleep: async () => {} };
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  const r = await pull(db(), o);
+  assert.equal(r.temps, 1, r.tempsError);
+  assert.ok(log.indexOf('reefer 2026-10-13 11:10:00 to 2026-10-13 14:10:00 12') >= 0, 'trailer units only (T-635), 3 hours back');
+  assert.ok(log.some(l => l.startsWith('GET ' + BASE + '/result/')), 'waits on the asynchronous answer');
+  assert.deepEqual((await db().collection('gpsTemps').doc('now').get()).data().units, { 'T-635': { tempF: 36.2, at: '2026-10-13T14:05:00.000Z' } });
+
+  const VERIZON_500 = '{ "errorInfo":[{ "errorCode":"5","errorText":"Internal server error.","errorParameters":[{ "parameter":"ExecutionId","value":"bb05c771-3dc1-4c32-93e0-e2a428e00000"}]}]}';
+  const later = () => new Date('2026-10-13T14:40:00Z');
+  const bad = Object.assign({}, o, { now: later, fetch: async (url, init) => /ReeferPoints/.test(url) ? reply(500, VERIZON_500) : fleet([], {})(url, init) });
+  const b = await pull(db(), bad);
+  assert.match(b.tempsError, /^Verizon Fleet answered 500 when running UDPO_ReeferPoints \(Verizon reference bb05c771-3dc1-4c32-93e0-e2a428e00000\)/);
+  const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, bad);
+  assert.match(s.tempsError, /Verizon reference bb05c771/);
+  assert.equal((await db().collection('gpsTemps').doc('now').get()).data().units['T-635'].tempF, 36.2, 'an error keeps the last reading');
+});
+
+test('Fleet GPS "Ask Verizon for everything" (Joe 10/20): read-only reports for one unit, every answer shown as Fleet sent it, errors included', async () => {
+  const log = [], base = fleet(log, {}), saved = {};
+  const VERIZON_500 = '{ "errorInfo":[{ "errorCode":"5","errorText":"Internal server error.","errorParameters":[{ "parameter":"ExecutionId","value":"aaaa1111-0000-0000-0000-000000000001"}]}]}';
+  const fetch = async (url, init) => {
+    const path = url.slice(BASE.length).replace(/[?&]auth=[^&]+/, '');
+    // Fleet's own template list: a name saved twice is an update of the same report (POST /templates/<id>), never a second copy.
+    if (/^\/templates/.test(path) && /Probe/.test(String(init.body || ''))) {
+      const name = /TemplateName = (\w+)/.exec(init.body)[1], id = /^\/templates\/(\d+)/.exec(path);
+      assert.ok(!saved[name] || (id && id[1] === saved[name].id), 'an existing report is updated, not saved again: ' + name);
+      saved[name] = { id: saved[name] ? saved[name].id : String(100 + Object.keys(saved).length), text: init.body };
+      return reply(200, JSON.stringify({ name, templateId: saved[name].id }));
+    }
+    if (path === '/templates' && (init.method || 'GET') === 'GET') {
+      const r = await base(url, init), list = JSON.parse(await r.text());
+      return reply(200, JSON.stringify({ templates: list.concat(Object.keys(saved).map(n => ({ name: n, templateId: Number(saved[n].id) }))) }));
+    }
+    if (/template=UDPO_ProbeColumns/.test(url)) return reply(200, 'TableId,Name,Description,DataType,IsDiagnostic,IsReadable\r\nPoint-2.0,CargoAirTemp,Air temperature inside the cargo container,Temperature,True,True\r\nPoint-2.0,Lat,,Angle,False,True\r\nUnit-1.0,Custom.ReeferTemp,,Text,False,True\r\nAlert-1.0,Temp,,Text,False,True\r\n');
+    if (/template=UDPO_ProbeAttributes/.test(url)) return reply(200, 'Id,Name,Type,IsGlobal\r\n1,Reefer Temp,Number,False\r\n2,Door,Boolean,False\r\n');
+    if (/template=UDPO_ProbeUnit/.test(url)) { log.push('unit ' + new URL(url).searchParams.get('Ids')); return reply(200, 'UnitId,Tag,DeviceType,AssetType,LastReport,LastDiagnostic,EngineHours,Notes,F_Custom_ReeferTemp\r\n12,T-635,TrailerTracker,Trailer,2026-10-13 14:06:00,2026-10-13 14:06:00,812,,34\r\n'); }
+    if (/template=UDPO_ProbePoints/.test(url)) { assert.match(url, /PollingMode=Async/); return reply(500, VERIZON_500); }
+    if (/template=UDPO_ProbeTemps/.test(url)) return reply(200, 'UnitId,Time,F_CargoAirTemp\r\n12,2026-10-13 14:00:00,\r\n12,2026-10-13 14:05:00,2.5\r\n');
+    return base(url, init);
+  };
+  const o = { fetch, base: BASE, now: NOW, sleep: async () => {} };
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  await pull(db(), o);
+  await assert.rejects(gpsCall(db(), DISPATCHER, { kind: 'fleet', op: 'probe', tag: 'T-635' }, o), /Only a manager or administrator/);
+  const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 't 635' }, o), p = s.probe;
+  assert.equal(p.tag, 't 635');
+  assert.deepEqual(p.steps.map(x => x.ok), [true, true, true, false, true]);
+  assert.match(p.steps[0].note, /^4 fields in all; 3 for GPS points and units; 2 with one of those words; 1 custom unit fields\.$/);
+  assert.deepEqual(p.steps[0].rows.map(r => r.Name), ['CargoAirTemp', 'Custom.ReeferTemp']);
+  assert.deepEqual(p.steps[1].rows.map(r => r.Name), ['Reefer Temp'], 'Joe\'s "Reefer Temp"');
+  assert.equal(p.steps[2].rows[0].F_Custom_ReeferTemp, '34');
+  assert.ok(log.indexOf('unit 12') >= 0, 'asks for this unit only');
+  assert.match(saved.UDPO_ProbeUnit.text, /F_Custom_ReeferTemp = Input\.Custom\.ReeferTemp/);
+  assert.match(p.steps[3].note, /answered 500 when running UDPO_ProbePoints \(Verizon reference aaaa1111-0000-0000-0000-000000000001\)/);
+  assert.match(p.steps[3].error, /Internal server error/);
+  assert.match(saved.UDPO_ProbeTemps.text, /F_CargoAirTemp\(C\) = Input\.CargoAirTemp/);
+  assert.match(saved.UDPO_ProbeTemps.text, /TableID = Point-2\.0/);
+  assert.equal(p.steps[4].note, '2 GPS points; 1 with a value in one of these fields.');
+  assert.deepEqual(p.steps[4].rows, [{ UnitId: '12', Time: '2026-10-13 14:05:00', F_CargoAirTemp: '2.5' }]);
+  // Kept for the page, and asked again it updates the same reports.
+  assert.equal((await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o)).probe.steps.length, 5);
+  await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 'T-635' }, o);
+  await assert.rejects(gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: '' }, o), /Type a Fleet unit number/);
+  const none = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 'T-999' }, o);
+  assert.match(none.probe.steps[2].note, /has no unit T-999/);
 });

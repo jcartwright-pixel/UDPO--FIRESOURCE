@@ -60,7 +60,14 @@
           <thead><tr><th></th><th>Data</th><th>Today</th><th>Last seen</th><th>Notes</th></tr></thead><tbody id="check"></tbody></table>
       </section>
       <section class="gps-card wide">
-        <h2>4. What the app reads from Fleet</h2>
+        <h2>4. Ask Verizon for everything</h2>
+        <p class="hint">Type one Fleet unit, like a trailer you know has a reefer temperature, and press Ask Verizon. The app asks Fleet for every field it has with temperature, reefer, cargo or sensor in the name, then for that unit's record and its GPS points, and shows exactly what Fleet answers. It only reads; nothing in Fleet changes.</p>
+        <div class="gps-ask"><label>Fleet unit<input id="p-tag" autocomplete="off"></label><div class="gps-buttons"><button type="button" class="primary" id="probe">Ask Verizon</button></div></div>
+        <p class="hint" id="probe-when"></p>
+        <div id="probe-out"></div>
+      </section>
+      <section class="gps-card wide">
+        <h2>5. What the app reads from Fleet</h2>
         <ol class="gps-steps">
           <li>Where each truck is now: last report time, place, speed, ignition on or off, and the driver Fleet shows.</li>
           <li>Each truck's odometer and engine hours, and the miles it drove today with its first and last movement.</li>
@@ -96,6 +103,19 @@
         : h.stopped ? 'This week\'s history stopped: ' + h.error + ' Save the login again to try once more.'
         : 'Reading this week\'s history (' + dayRange(h.days) + '): ' + h.done + ' of ' + h.total + ' parts done' + (h.error ? '. Last try failed: ' + h.error : '') + '. It goes on every 5 minutes.';
       renderCheck();
+      renderProbe();
+    }
+    // Joe 10/20 ("try to ask for everything and see what it returns. No matter what."): each answer as Fleet sent it.
+    function renderProbe() {
+      const p = s.probe;
+      $('probe-when').textContent = p ? 'Last asked ' + stamp(p.at) + ' for ' + p.tag + (p.by ? ' by ' + p.by : '') + '.' : '';
+      $('probe-out').innerHTML = !p ? '' : p.steps.map(x => {
+        const rows = x.rows || [], cols = rows.length ? Object.keys(rows[0]) : [];
+        return '<div class="gps-probe"><div class="gps-probe-head"><span class="gps-mark ' + (x.ok ? 'ok' : 'bad') + '">' + (x.ok ? '✓' : '✗') + '</span><b>' + escapeHtml(x.label) + '</b></div>' +
+          '<p>' + escapeHtml(x.note || '') + '</p>' + (x.error && x.error !== x.note ? '<pre>' + escapeHtml(x.error) + '</pre>' : '') +
+          (rows.length ? '<div class="gps-probe-rows"><table><thead><tr>' + cols.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr></thead><tbody>' +
+            rows.map(r => '<tr>' + cols.map(c => '<td>' + escapeHtml(r[c] == null ? '' : String(r[c])) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '') + '</div>';
+      }).join('');
     }
     // Joe 10/14: "how can I tell if we're pulling all the data we want from Verizon?"
     const UNIT = { positions: 'units', odometer: 'units', engineHours: 'trucks', trailerHours: 'trailers', miles: 'trucks', yard: 'trucks', reefer: 'trailers' };
@@ -121,20 +141,22 @@
         }
         const ok = r.alert ? r.week > 0 : r.today > 0;
         const count = r.alert ? r.today + ' today' : r.today.toLocaleString() + ' ' + (UNIT[r.key] || '');
-        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : r.key === 'reefer' && s.reeferError ? 'Not read: ' + s.reeferError : r.key === 'reefer' ? reeferNote(s) : NOTE[r.key] || '';
+        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : r.key === 'reefer' ? (s.reeferError ? 'Not read: ' + s.reeferError : reeferNote(s)) + allTrailers(s) : NOTE[r.key] || '';
         return '<tr><td>' + mark(ok, ok ? 'ok' : 'bad') + '</td><td>' + escapeHtml(r.label) + '</td><td>' + escapeHtml(count) + '</td><td>' + (r.last ? escapeHtml(stamp(r.last)) : 'Not yet') + '</td><td>' + escapeHtml(note) + '</td></tr>';
       }).join('') || '<tr><td colspan="5" class="hint">Shows once the login is saved and the first read is done.</td></tr>';
     }
     // Joe 10/19: which loaded trailers get no GPS temperature, and why.
     const reeferNote = (s) => [NOTE.reefer || '', (s.reeferNoUnit || []).length ? 'No GPS unit in Fleet for: ' + s.reeferNoUnit.join(', ') + '.' : '',
       (s.reeferNoTemp || []).length ? 'GPS unit sends no temperature: ' + s.reeferNoTemp.join(', ') + '.' : ''].filter(Boolean).join(' ');
+    // Joe 10/20: every trailer's temperature for Trucks Today, read every 15 minutes.
+    const allTrailers = (s) => s.tempsError ? ' All trailers (Trucks Today): not read: ' + s.tempsError : s.tempsAt ? ' All trailers (Trucks Today): ' + s.tempsWith + ' of ' + s.tempsTrailers + ' with a temperature, read ' + stamp(s.tempsAt) + '.' : '';
     const dayRange = (days) => days && days.length ? shortDay(days[0]) + ' to ' + shortDay(days[days.length - 1]) : '';
     const shortDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
     // The count is kept by the read; a count from an earlier New York day means none yet today.
     const alertsToday = (s) => s.alertsDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped
     // part way. A server that stopped says so, names the step, and the line under the buttons is read again.
-    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read' };
+    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read', probe: 'asking Verizon' };
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
@@ -173,6 +195,13 @@
       const r = await call({ op: 'pull' }, $('pull'));
       if (r && r.pulled && r.pulled.error) { $('result').hidden = false; $('result').className = 'gps-result bad'; $('result').innerHTML = '<b>FAILED</b> ' + escapeHtml(r.pulled.error); }
     };
+    $('probe').onclick = async () => {
+      if (!$('p-tag').value.trim()) { showError('Type a Fleet unit first, like T-933.'); return; }
+      $('probe-when').textContent = 'Asking Verizon. This can take up to 2 minutes...';
+      await call({ op: 'probe', tag: $('p-tag').value }, $('probe'));
+      renderProbe();
+    };
+    $('p-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('probe').click(); } });
     // Enter in a login box saves it.
     ['f-fleet', 'f-user', 'f-pass'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
     requireSignIn(async () => { await start(); await call({ op: 'status' }); });

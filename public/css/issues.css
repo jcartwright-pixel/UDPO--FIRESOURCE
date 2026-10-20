@@ -78,3 +78,8 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
 .trucks-page .tt-none { color: var(--muted); padding: 6px 10px; text-align: left; }
 /* Joe 10/19: the View button in Work Actions lines its word up with the other buttons (it shared the page's .view panel style). */
 .work-acts .see { display: inline-flex; align-items: center; justify-content: center; }
+/* Joe 10/20: All Fleet Units rows tighter: one line each (place and address together), less padding. */
+.trucks-page table.tt-units td { height: 34px; padding-top: 4px; padding-bottom: 4px; line-height: 1.25; white-space: nowrap; }
+.trucks-page table.tt-units td.tt-where { text-align: left; }
+.trucks-page table.tt-units .tt-muted { color: var(--muted); white-space: nowrap; }
+.trucks-page table.tt-units td small { display: inline; }
