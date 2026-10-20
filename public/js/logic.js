@@ -561,9 +561,9 @@
   /*
    * Fleet Service due list (the current app's udpoV7276DueItems_). units: [{unit, type TRUCK|TRAILER}]; setup: FLEET SERVICE SETUP rows;
    * miles: {unit: {miles, date}} from the daily inspections; openJobs: open work orders [{unit, service_key, work_order_id}].
-   * Trucks: PM every truckMiles. Trailers: reefer every trailerMonths or trailerHours. Everyone: DOT yearly, plate expiry.
+   * Trucks: PM every truckMiles (FLEET_BY_DAYS trucks every truckDaysMonths, warned trailerWarnDays ahead). Trailers: reefer every trailerMonths or trailerHours. Everyone: DOT yearly, plate expiry.
    */
-  var FLEET_RULES = { truckMiles: 15000, truckWarnMiles: 1000, trailerMonths: 4, trailerHours: 1200, trailerWarnDays: 14, dotMonths: 12, dotWarnDays: 30, plateWarnDays: 30 };
+  var FLEET_RULES = { truckMiles: 15000, truckWarnMiles: 1000, truckDaysMonths: 4, trailerMonths: 4, trailerHours: 1200, trailerWarnDays: 14, dotMonths: 12, dotWarnDays: 30, plateWarnDays: 30 };
   function fleetNumber(v) { var s = String(v == null ? '' : v).replace(/[, ]+/g, '').trim(); if (s === '') return null; var n = Number(s); return isFinite(n) ? n : null; }
   function addMonths(key, months) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || '')); if (!m) return '';
@@ -685,6 +685,8 @@
   var FLEET_OFF = { '221810': 'Joe 10/18: out of service, no longer available to us' };
   // FLEET_ON: units Joe said are a plant's own even though the fleet list puts them elsewhere.
   var FLEET_ON = { 'T-10308': { plant: 'fac_uniontown', why: 'Joe 10/19: ours (fleet list says Marietta)' } };
+  // FLEET_BY_DAYS: trucks with no GPS whose PM goes by the date (every truckDaysMonths), not miles.
+  var FLEET_BY_DAYS = { '688': 'Joe 10/19: yard truck, no GPS, goes by days', '9737': 'Joe 10/19: yard truck, no GPS, goes by days' };
   function fleetUnitKey(u) {
     var s = String(u === null || u === undefined ? '' : u).trim().toUpperCase().replace(/\s+/g, ''), m = s.match(/^([A-Z]+)-?0*(\d+)$/), n = s.match(/^0*(\d+)$/);
     return m ? m[1] + '-' + m[2] : n ? n[1] : s;
@@ -746,14 +748,20 @@
         milesSource: odo ? odo.source || '' : '', lastServiceDate: dateKey(s.last_service_date), lastServiceMiles: fleetNumber(s.last_service_miles), lastServiceHours: fleetNumber(s.last_service_hours),
         // A typed "reefer hours now" stands until Fleet reports the trailer's hours.
         currentHours: gpsHours != null ? gpsHours : fleetNumber(s.current_hours), hoursSource: gpsHours != null ? 'GPS' : '', hoursDate: gpsHours != null ? read.hoursDate : '',
-        dotDue: dateKey(s.dot_due), plateExpires: dateKey(s.plate_expires), notes: String(s.notes || '') };
+        dotDue: dateKey(s.dot_due), plateExpires: dateKey(s.plate_expires), notes: String(s.notes || ''), byDays: u.type === 'TRUCK' && !!FLEET_BY_DAYS[fleetUnitKey(u.unit)] };
       out.push(row);
       if (!tracked) return;
       function push(key, what, dueAt, now, left, status, last) {
         var job = openBy[String(u.unit).toUpperCase() + '|' + key];
-        items.push({ unit: u.unit, type: u.type, key: key, what: what, dueAt: dueAt, now: now, left: left, status: job ? 'AT_GARAGE' : status, last: last || '', jobId: job ? job.work_order_id : '' });
+        items.push({ unit: u.unit, type: u.type, key: key, what: what, dueAt: dueAt, now: now, left: left, status: job ? 'AT_GARAGE' : status, last: last || '', jobId: job ? job.work_order_id : '', byDays: key === 'PM' && row.byDays });
       }
-      if (u.type === 'TRUCK') {
+      if (u.type === 'TRUCK' && row.byDays) {
+        if (!row.lastServiceDate) push('PM', 'PM service', '', '', '', 'SET_UP', '');
+        else {
+          var pmDue = addMonths(row.lastServiceDate, rules.truckDaysMonths), pmLeft = daysBetween(today, pmDue);
+          push('PM', 'PM service', pmDue, '', pmLeft + ' days', pmLeft < 0 ? 'OVERDUE' : pmLeft <= rules.trailerWarnDays ? 'DUE_SOON' : 'OK', row.lastServiceDate);
+        }
+      } else if (u.type === 'TRUCK') {
         if (row.lastServiceMiles == null) push('PM', 'PM service', '', row.miles != null ? row.miles : '', '', 'SET_UP', row.lastServiceDate);
         else {
           var dueMiles = row.lastServiceMiles + rules.truckMiles, leftMiles = row.miles == null ? null : dueMiles - row.miles;
@@ -1417,7 +1425,7 @@
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

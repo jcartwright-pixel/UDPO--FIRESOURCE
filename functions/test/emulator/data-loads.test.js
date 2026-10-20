@@ -89,17 +89,49 @@ test('Fleet Service starting miles load once from the GPS odometers: a typed num
   const gps = (tag, odometerMiles, engineHours) => d.collection('gpsTrucks').doc(tag).set({ tag, odometerMiles, engineHours, lastReport: stamp });
   await gps('223893', 114720.6, 9000); await gps('223894', 120000, 0); await gps('T-2893', null, 1950.4); await gps('223896', 5000, 0);
   assert.match((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID].skipped, /test copy only/, 'nothing on the live app');
-  assert.equal((await d.collection('fleetSetup').doc('223893').get()).exists, false, 'the live app is not touched');
+  // (The start date load, which runs in the same job on the test copy, may already have given these units a date.)
+  assert.equal(((await d.collection('fleetSetup').doc('223893').get()).data() || {}).last_service_miles, undefined, 'the live app is not touched');
   const r = (await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID];
   assert.deepEqual(r, { set: 2, kept: 1, noReading: 1 });
   assert.equal((await d.collection('fleetSetup').doc('223893').get()).data().last_service_miles, '114721');
   assert.equal((await d.collection('fleetSetup').doc('223894').get()).data().last_service_miles, '100000', 'a typed number stays');
   assert.equal((await d.collection('fleetSetup').doc('T-2893').get()).data().last_service_hours, '1950', 'a trailer gets its reefer hours');
-  assert.equal((await d.collection('fleetSetup').doc('223895').get()).exists, false, 'no Fleet reading, left blank');
+  assert.equal(((await d.collection('fleetSetup').doc('223895').get()).data() || {}).last_service_miles, undefined, 'no Fleet reading, left blank');
   assert.equal((await d.collection('fleetSetup').doc('223896').get()).exists, false, 'another plant\'s truck is not touched');
   const mark = (await d.collection('dataLoads').doc(DL.FLEET_MILES_ID).get()).data();
   assert.deepEqual(mark.set.map(x => x.unit), ['223893', 'T-2893']);
   assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID], { skipped: true });
+});
+
+test('Fleet Service start date load (test copy only): 4-1-26 as last service and last annual inspection on every listed unit, once; typed dates stay', async () => {
+  await clear();
+  const d = db(), SB = { now: tick, project: 'ud-distribution-sandbox' };
+  const unit = (id, u, type, extra) => d.collection('equipment').doc(id).set(Object.assign({ unit: u, type, status: 'ACTIVE', facilityId: 'fac_uniontown' }, extra || {}));
+  await unit('veh_1', '688', 'TRUCK'); await unit('veh_2', 'T-529', 'TRAILER'); await unit('veh_3', 'T-10318', 'TRAILER'); await unit('veh_4', '223876', 'TRUCK');
+  await unit('veh_5', 'T-530', 'TRAILER'); await unit('veh_6', 'T-531', 'TRAILER'); await unit('veh_7', '900100', 'TRUCK', { facilityId: 'fac_charleston' });
+  // The fleet list: 223876 is a leased tractor (off the list), T-10318 a leased trailer (ours, kept).
+  await d.collection('config').doc('fleetOwnership').set({ ok: true, units: { '223876': { own: false, facilityId: 'fac_uniontown' }, 'T-10318': { own: false, facilityId: 'fac_uniontown' } } });
+  await d.collection('fleetSetup').doc('T-530').set({ unit: 'T-530', last_service_date: '2026-09-15', last_service_hours: '27000' });
+  await d.collection('fleetSetup').doc('T-531').set({ unit: 'T-531', track: 'NO' });
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_START_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.equal((await d.collection('fleetSetup').doc('688').get()).exists, false, 'the live app is not touched');
+  assert.equal((await d.collection('dataLoads').doc(DL.FLEET_START_ID).get()).exists, false, 'and no marker there');
+  assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_START_ID], { set: 4, kept: 0, notTracked: 1 });
+  const s = async (id) => (await d.collection('fleetSetup').doc(id).get()).data() || {};
+  assert.deepEqual([(await s('688')).last_service_date, (await s('688')).dot_due, (await s('688')).last_service_miles], ['2026-04-01', '2027-04-01', undefined], 'a truck\'s PM miles stay blank');
+  assert.deepEqual([(await s('T-529')).last_service_date, (await s('T-529')).dot_due], ['2026-04-01', '2027-04-01']);
+  assert.equal((await s('T-10318')).last_service_date, '2026-04-01', 'a leased trailer is ours');
+  assert.deepEqual([(await s('T-530')).last_service_date, (await s('T-530')).last_service_hours, (await s('T-530')).dot_due], ['2026-09-15', '27000', '2027-04-01'], 'a typed date stays');
+  assert.equal((await s('T-531')).last_service_date, undefined, 'Track due dates = No is left out');
+  assert.equal((await d.collection('fleetSetup').doc('223876').get()).exists, false, 'a leased tractor is not touched');
+  assert.equal((await d.collection('fleetSetup').doc('900100').get()).exists, false, 'another plant\'s truck is not touched');
+  // The Due list from 10-8-26: the reefer service (every 4 months) came due 8-1-26; the annual inspection is due 4-1-27.
+  const L = require('../../src/logic');
+  const due = L.fleetDue([{ unit: 'T-529', type: 'TRAILER' }], [await s('T-529')], {}, [], null, '2026-10-08');
+  assert.deepEqual(due.items.map(i => i.key + ' ' + i.status + ' ' + i.dueAt), ['REEFER OVERDUE 2026-08-01', 'DOT OK 2027-04-01']);
+  const mark = (await d.collection('dataLoads').doc(DL.FLEET_START_ID).get()).data();
+  assert.deepEqual(mark.set.map(x => x.unit), ['688', 'T-529', 'T-530', 'T-10318']);
+  assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_START_ID], { skipped: true });
 });
 
 test('Garage work orders load (test copy only): each open write-up already sent to the garage gets one work order, once', async () => {

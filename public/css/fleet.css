@@ -60,3 +60,13 @@ table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
 .fleet-page .head .tabs { grid-auto-columns: auto; }
 .fleet-page .head .tabs button { padding: 0 16px; }
 .fleet-page .head .title { min-width: 400px; }
+/* Joe 10/19: a manager types the last service right in the PM / Reefer or Annual Inspection box on Due. */
+table.fs-grid td.fs-cell { cursor: pointer; }
+table.fs-grid td.fs-cell:hover, table.fs-grid td.fs-cell:focus { background: #eef5fc; outline: 2px solid #9cc3e8; outline-offset: -2px; }
+table.fs-grid td.fs-cell.editing { background: #fff; cursor: default; outline: 2px solid var(--ud-blue); outline-offset: -2px; }
+.fs-cell-edit { display: flex; flex-direction: column; gap: 4px; }
+.fs-cell-edit label { display: flex; flex-direction: column; font-size: 16px; font-weight: 700; color: #415264; gap: 2px; }
+.fs-cell-edit input { font-size: 16px; padding: 4px 6px; min-height: 36px; width: 100%; box-sizing: border-box; }
+.fs-cell-edit .fs-cell-saved { font-size: 16px; min-height: 20px; }
+.fs-cell-edit .fs-cell-saved.ok { color: #1d7a3e; }
+.fs-cell-edit .fs-cell-saved.bad { color: #c62828; }

@@ -643,7 +643,7 @@ function validateSend(input, out) {
  */
 const RULES_DOC = 'fleetRules';
 const rulesDocFor = (facilityId) => !facilityId || facilityId === FACILITY ? RULES_DOC : RULES_DOC + '_' + facilityId;
-const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
+const RULE_LIMITS = { truckMiles: [1000, 100000], truckWarnMiles: [0, 20000], truckDaysMonths: [1, 24], trailerMonths: [1, 24], trailerHours: [50, 10000], trailerWarnDays: [0, 120],
   dotMonths: [1, 24], dotWarnDays: [0, 180], plateWarnDays: [0, 180],
   // Trailers' own DOT and plate rules (Joe 10/13); blank = the trucks'.
   trailerDotMonths: [1, 24], trailerDotWarnDays: [0, 180], trailerPlateWarnDays: [0, 180] };

@@ -66,7 +66,9 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       await t.click(card('811') + ' [data-act="skip"]');
       await t.waitForFunction(() => { const c = [...document.querySelectorAll('#work .sw-card[data-sw]')].map(x => x.dataset.sw.replace(/^2026-10-04__run_p|\|.*$/g, '')); return c.indexOf('811') === c.indexOf('812') + 1; }, null, { timeout: 8000 });
       await t.waitForFunction(s => / by \S/.test((document.querySelector(s + ' .sw-flag.skip') || {}).title || ''), card('811'), { timeout: 8000 });
-      const flag = await t.$eval(card('811') + ' .sw-flag.skip', f => ({ text: f.textContent, size: parseFloat(getComputedStyle(f).fontSize), title: f.title, bg: getComputedStyle(f).backgroundColor, fits: f.getBoundingClientRect().right <= window.innerWidth }));
+      // Read the flag in one step once it is drawn and styled (a flag caught mid-redraw is detached and has no style).
+      const read = (s) => { const f = document.querySelector(s + ' .sw-flag.skip'); return f && f.isConnected && getComputedStyle(f).backgroundColor ? { text: f.textContent, size: parseFloat(getComputedStyle(f).fontSize), title: f.title, bg: getComputedStyle(f).backgroundColor, fits: f.getBoundingClientRect().right <= window.innerWidth } : null; };
+      const flag = await (await t.waitForFunction(read, card('811'), { timeout: 8000 })).jsonValue();
       // Joe 10/19: the same green one-word tag as the Daily Loadout; who pressed it shows on hover.
       assert.ok(flag.text === 'SKIPPED' && flag.bg === 'rgb(46, 125, 67)' && flag.size >= 16 && flag.fits && /Skipped down one place by .*Case Loadout tablet/.test(flag.title), 'a green SKIPPED flag, who on hover, 16px, on screen ' + JSON.stringify(flag));
       assert.ok(await t.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at ' + w);
