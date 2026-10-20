@@ -69,6 +69,8 @@ async function buttonsFit(p, label) {
     MAIL_m6_trailer: mail('m6', 'T-941', 'JEREMY PRASTER', 'yes-no', 6, 'TRAILER'),
     MAIL_m7_pallet: mail('m7', '331', 'Mark Zidek', 'RIGHT FORK NOT AS HIGH AS LEFT ONE', 7, 'FORK_TRUCK'),
     MAIL_m8_pallet: mail('m8', '326', 'JEREMY PRASTER', 'Y/N', 8, 'FORK_TRUCK'),
+    // Joe 10/19: "UYES" is a mistyped yes (post trip done, nothing wrong), so no row.
+    MAIL_m11_tractor: mail('m11', '123885', 'Chad Herman', 'UYES', 0.5),
     MAIL_m10_trailer: mail('m10', 'T-826', 'Rogie Barrow', '826-back Door Busted Cables Snapped Will Not Open', 10, 'TRAILER'),
     // The same email twice: the old app's copy (one per answer) and the new reader's copy read again a day later.
     MAIL_m9_concerns: Object.assign(mail('m9', '225061', 'Charles Howsare', 'store 2318- she was yelling and threatening to refuse the order', 30), { record_id: 'MAIL|m9|concerns' }),
@@ -89,7 +91,7 @@ async function buttonsFit(p, label) {
       await shot(p, 'trucks-' + width + '.png');
       await buttonsFit(p, 'Trucks at ' + width);
       const list = await p.textContent('#rows');
-      for (const id of ['MAIL_m1_tractor', 'MAIL_m3_tractor', 'MAIL_m4_tractor']) assert.equal(await p.locator('tr[data-id="' + id + '"]').count(), 0, id + ' says nothing is wrong');
+      for (const id of ['MAIL_m1_tractor', 'MAIL_m3_tractor', 'MAIL_m4_tractor', 'MAIL_m11_tractor']) assert.equal(await p.locator('tr[data-id="' + id + '"]').count(), 0, id + ' says nothing is wrong');
       // One email is one row, dated when the email came in.
       assert.equal(await p.locator('tr[data-id^="MAIL_m9_"]').count(), 1);
       assert.match(await p.textContent('tr[data-id^="MAIL_m9_"] td.wrong'), /^View store 2318- she was yelling and threatening to refuse the order$/);
@@ -127,7 +129,7 @@ async function buttonsFit(p, label) {
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    results.push('Pre / Post Trip answers like YES-NO, yes-no, YS and Y/N make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
+    results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {
