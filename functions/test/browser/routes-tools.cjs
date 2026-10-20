@@ -162,6 +162,26 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.equal(await stored(first, 'mon', 'dispatchTime', 1065), 1065, 'one click up: 15 minutes later, saved');
     results.push('The up / down clicker moved 5:00 AM to 4:30 AM and 5:30 PM to 5:45 PM, and saved each');
     await shot(p, 'routes-clicker-1920.png');
+    // Joe 10/20: the same time all the way across a row - click the first box, Shift+click the last, type, Enter.
+    await p.click(cell(second, 'sun'));
+    await p.click(cell(second, 'sat'), { modifiers: ['Shift'] });
+    assert.equal(await p.$$eval('input.cell.picked', x => x.length), 7, 'Shift+click marks the whole row');
+    await p.keyboard.type('7a');
+    await p.keyboard.press('Enter');
+    for (const d of ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']) await p.waitForFunction((s) => document.querySelector(s).value === '7:00 AM', cell(second, d), { timeout: 5000 });
+    assert.equal(await stored(second, 'sat', 'dispatchTime', 420), 420, 'the row fill saved');
+    results.push('Click, Shift+click across the row, type 7a, Enter: all seven days became 7:00 AM and saved');
+    // Pressing and dragging across boxes marks them too.
+    const centre = async (d) => { const b = await p.$eval(cell(second, d), x => { const r = x.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }); return b; };
+    const [sx, sy] = await centre('sun'), [wx, wy] = await centre('wed');
+    await p.mouse.move(sx, sy); await p.mouse.down(); await p.mouse.move(wx, wy, { steps: 6 }); await p.mouse.up();
+    assert.equal(await p.$$eval('input.cell.picked', x => x.length), 4, 'dragging Sun to Wed marks four boxes');
+    await p.keyboard.type('8:30');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((s) => document.querySelector(s).value === '8:30 AM', cell(second, 'wed'), { timeout: 5000 });
+    assert.equal(await stored(second, 'wed', 'dispatchTime', 510), 510, 'the dragged block fill saved');
+    assert.equal(await p.inputValue(cell(second, 'thu')), '7:00 AM', 'boxes outside the block are left alone');
+    results.push('Dragging across Sun to Wed marked four boxes and 8:30 filled them');
     // Every cell is a box all the time (not only the one being typed in), like a spreadsheet.
     const edge = await p.$eval(cell(second, 'sun'), x => { const c = getComputedStyle(x); return [c.borderTopStyle, c.borderTopWidth, c.borderTopColor]; });
     assert.deepEqual(edge.slice(0, 2), ['solid', '1px'], 'boxes have a border');

@@ -85,8 +85,10 @@ table.routes input.cell { border-color: #9fb3c8; border-radius: 4px; background:
 table.routes td.norun input.cell { background: #f8fafc; }
 table.routes input.cell[readonly] { border-color: var(--line); }
 table.routes input.cell:not([readonly]):hover { border-color: var(--ud-blue); }
+/* Marked boxes (Shift+click or drag) show blue on every day, including days the run does not run. */
+table.routes td input.cell.picked { background: #dce8f8; border-color: #7fa3d1; }
 /* Something typed that is not a time: a short red note covers the box for a few seconds, then the old time shows again. */
-table.routes input.cell.bad { border-color: var(--error-ink); background: var(--error-bg); }
+table.routes td input.cell.bad { border-color: var(--error-ink); background: var(--error-bg); }
 table.routes .cell-note { position: absolute; inset: 3px 4px; z-index: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; background: var(--error-ink); color: #fff; font-size: 16px; font-weight: 700; pointer-events: none; overflow: hidden; white-space: nowrap; }
 /* The up / down clicker on a start time: shows on the box the mouse is over or the box being typed in, so the grid stays plain. */
 table.routes td .step { position: absolute; top: 4px; bottom: 4px; right: 6px; z-index: 1; display: none; flex-direction: column; gap: 1px; }

@@ -84,9 +84,10 @@
     const LOADOUT = ['None', 'Case Loadout', 'Tote', 'Boxing', 'Tanker'];
     const RUN_BY = ['Uniontown', 'Fairmont', 'Marietta', 'Charleston', 'Martins Ferry', 'Carrier', 'Anyone'];
     // The old Route Editor's grid keys (RouteManagement.html bindGrid), spelled out under every grid.
-    const KEYS = 'Arrows move; Shift+arrows or Shift+click mark a block; Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste it; one value pasted or typed with Ctrl+Enter fills the whole block; Ctrl+D fills down; Delete clears the block; Esc puts the box back.';
+    // Joe 10/20: in plain words, the way that works - click a box, Shift+click or drag to the last box, type, Enter fills them all.
+    const KEYS = 'Same value in many boxes: click the first box, Shift+click (or drag) to the last, type it and press Enter. Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste; Delete clears the marked boxes; Ctrl+D copies the top row down; arrows move; Esc puts a box back.';
     const GRID = {
-      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time any way (5, 530, 5:30p, 17:30) and it turns into a time like 5:30 PM. Enter or Tab. ' + KEYS, ph: 'h:mm AM' },
+      times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time any way (5, 530, 5:30p, 17:30); it turns into a time like 5:30 PM. ' + KEYS, ph: 'h:mm AM' },
       miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). ' + KEYS, ph: 'miles' },
       hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). ' + KEYS, ph: 'h:mm' },
       offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before). ' + KEYS, ph: '0' },
@@ -181,7 +182,7 @@
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
       const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');
       sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - (footer ? footer.offsetHeight : 0) - 8) + 'px';
-      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) { keepBlock = true; again.focus(); keepBlock = false; } }
+      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) { keepBlock = true; again.focus(); keepBlock = false; if (multi()) again.select(); } }
     }
 
     const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
@@ -480,7 +481,16 @@
         saveRun(r, null, days, run => Object.keys(days).forEach(p => { run.days[p] = Object.assign({}, run.days[p], { [field]: shown(field, days[p][field]) }); }));
       });
     }
-    function fillBlock(value) { const cells = blockCells().filter(x => !x.readOnly); cells.forEach(x => { x.value = value; }); saveCells(cells); }
+    // A time is read once, in the box it was typed in, so every box in the block gets the very same time.
+    function fillBlock(value, from) {
+      if (value && GRID[view].field === 'dispatchTime') {
+        const r = from && routes.find(x => x.id === from.closest('tr').dataset.id);
+        const m = L.typedTime(value, r ? day(r, from.dataset.day).dispatchTime : null);
+        if (m === null) { if (from && r) { from.value = value; tidyTime(from, r, from.dataset.day); } return; }
+        value = L.timeText(m);
+      }
+      const cells = blockCells().filter(x => !x.readOnly); cells.forEach(x => { x.value = value; }); saveCells(cells);
+    }
     function moveTo(x) { if (!x) return false; anchor = posOf(x); block = null; markBlock(); keepBlock = true; x.focus(); keepBlock = false; x.select(); return true; }
     table.addEventListener('focusin', e => {
       const input = e.target.closest('input.cell');
@@ -504,7 +514,8 @@
         }
         return;
       }
-      if (mod && k === 'Enter' && multi()) { e.preventDefault(); fillBlock(input.value.trim()); return; }
+      // Enter (or Ctrl+Enter) with boxes marked puts what was typed in every marked box; the boxes stay marked.
+      if (k === 'Enter' && !e.shiftKey && !e.altKey && multi()) { e.preventDefault(); fillBlock(input.value.trim(), input); input.select(); return; }
       if ((k === 'Delete' || k === 'Backspace') && multi()) { e.preventDefault(); fillBlock(''); return; }
       if (e.shiftKey && !mod && /^Arrow(Up|Down|Left|Right)$/.test(k)) {
         const at = block && anchor ? { r: block.r1 === anchor.r ? block.r2 : block.r1, c: block.c1 === anchor.c ? block.c2 : block.c1 } : p;
@@ -522,12 +533,35 @@
       // Enter on the last row leaves the box so it saves.
       if (k === 'Enter') { e.preventDefault(); input.blur(); }
     });
+    // Like a sheet (Joe 10/20): one click picks the whole box, so typing replaces it (double-click puts the cursor in the
+    // text); Shift+click marks a block from the box you are in; pressing and dragging across boxes marks one too.
+    let dragging = false;
     table.addEventListener('mousedown', e => {
       const input = e.target.closest('input.cell');
-      if (!input) return;
-      if (e.shiftKey && anchor) { e.preventDefault(); stretch(posOf(input)); }
-      else { anchor = posOf(input); block = null; markBlock(); }
+      if (!input || e.button !== 0) return;
+      e.preventDefault();
+      if (e.detail > 1) return;
+      if (e.shiftKey && anchor) { stretch(posOf(input)); const a = cellAt(anchor.r, anchor.c); if (a) a.select(); return; }
+      moveTo(input);
+      dragging = true;
     });
+    table.addEventListener('dblclick', e => {
+      const input = e.target.closest('input.cell');
+      if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    });
+    // Read the box under the pointer (a box being typed in keeps the mouse to itself while text is dragged over).
+    window.addEventListener('mousemove', e => {
+      if (!dragging || !anchor || !(e.buttons & 1)) return;
+      const under = document.elementFromPoint(e.clientX, e.clientY), input = under && under.closest && under.closest('#table input.cell');
+      if (!input) return;
+      const at = posOf(input);
+      if (at.r === anchor.r && at.c === anchor.c && !block) return;
+      stretch(at);
+      const a = cellAt(anchor.r, anchor.c);
+      if (a && document.activeElement !== a) { keepBlock = true; a.focus(); keepBlock = false; }
+      if (a) a.select();
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
     table.addEventListener('copy', e => {
       if (!multi() || !e.target.closest('input.cell')) return;
       e.clipboardData.setData('text/plain', blockText());
@@ -545,7 +579,7 @@
       const text = (e.clipboardData && e.clipboardData.getData('text/plain') || '').replace(/\r/g, '').replace(/\n$/, '');
       if (!/[\t\n]/.test(text)) {
         // One value: into a marked block it fills every box (block fill); into one box it is taken as typed.
-        if (multi()) { e.preventDefault(); fillBlock(text.trim()); }
+        if (multi()) { e.preventDefault(); fillBlock(text.trim(), input); }
         return;
       }
       e.preventDefault();
