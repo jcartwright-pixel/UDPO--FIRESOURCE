@@ -50,7 +50,8 @@ export function rankChoices(choices, typed, unit) {
   return choices.map((c, i) => {
     const k = String(c.key || c.label).toUpperCase(), l = String(c.label).toUpperCase();
     let rank = k === q ? 0 : unit && k.slice(-q.length) === q ? 1 : k.indexOf(q) === 0 ? 2 : (' ' + k.replace(/[,.\-]/g, ' ')).indexOf(' ' + q) >= 0 ? 3 : k.indexOf(q) >= 0 ? 4 : l.indexOf(q) >= 0 ? 5 : 9;
-    if (!c.value) rank = 9; // "(none)" only by Delete / Backspace
+    // "(none)" only by Delete / Backspace; the driver list's NEEDS DRIVER also by typing it, after any driver that matches.
+    if (!c.value) rank = c.find && rank < 9 ? 8 : 9;
     return { c, i, rank };
   }).filter(x => x.rank < 9).sort((a, b) => a.rank - b.rank || a.i - b.i).map(x => x.c);
 }
