@@ -155,10 +155,9 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await shot(phone, 'phone-checkin-390.png');
     const plain = await phone.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     await phone.check('#step-form [name=overageShortage]');
-    await phone.check('#step-form [name=osKind][value=SHORT]', { force: true });
-    await phone.fill('#step-form [name=osCases]', '2');
-    await phone.fill('#step-form [name=osProduct]', '2% gallon');
-    await phone.fill('#step-form [name=osStore]', 'Giant Eagle');
+    await phone.fill('#step-form [name=shortCases]', '2');
+    await phone.fill('#step-form [name=shortProduct]', '2% gallon');
+    await phone.fill('#step-form [name=shortStore]', 'Giant Eagle');
     await phone.fill('#step-form [name=truck]', '01');
     await phone.press('#step-form [name=truck]', 'Tab');
     assert.equal(await phone.inputValue('#step-form [name=truck]'), '900001', 'a short number finds the truck');

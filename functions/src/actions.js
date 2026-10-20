@@ -574,6 +574,15 @@ function validate(input) {
       tractorIssues: text(input.tractorIssues, 300), trailerIssues: text(input.trailerIssues, 300), palletJackIssues: text(input.palletJackIssues, 300),
       trailerNeedsCleaned: input.trailerNeedsCleaned === true ? 'TRUE' : '', checkinNotes: text(input.checkinNotes, 500)
     };
+    // Joe 10/19: the desktop pop-up shows and fixes the driver's over / short and what was loaded wrong, as the phone sends them.
+    if (input.overageShortageDetails !== undefined) {
+      out.checkIn.overageShortageDetails = text(input.overageShortageDetails, 300);
+      out.checkIn.overageShortage = out.checkIn.overageShortageDetails ? 'TRUE' : '';
+    }
+    if (input.loadingProblem !== undefined) {
+      out.checkIn.loadingProblem = text(input.loadingProblem, 300);
+      out.checkIn.loadedCorrectly = out.checkIn.loadingProblem ? 'NO' : String(input.loadedCorrectly || '').toUpperCase() === 'YES' ? 'YES' : '';
+    }
   }
   return out;
 }

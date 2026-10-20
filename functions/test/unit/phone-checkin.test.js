@@ -18,7 +18,7 @@ test('saved to the home screen from the driver page, "UD Routes" opens the drive
 });
 
 test('the Check-In asks for over / short, the units, the jack and drop-and-hook trailers; Who is driving has Skip', () => {
-  ['name="overageShortage"', 'name="osKind"', 'name="osCases"', 'name="osProduct"', 'name="truck"', 'name="trailer"', 'name="palletJack"', 'id="ci-add"', 'id="skip"', 'Who is driving?']
+  ['name="overageShortage"', 'name="overCases"', 'name="overProduct"', 'name="shortCases"', 'name="shortProduct"', 'name="truck"', 'name="trailer"', 'name="palletJack"', 'id="ci-add"', 'id="skip"', 'Who is driving?']
     .forEach(s => assert.ok(route.includes(s), s));
 });
 
