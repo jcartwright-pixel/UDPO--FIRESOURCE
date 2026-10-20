@@ -160,6 +160,8 @@ export function pickChoices(kind, current, busy, opts) {
   return [{ value: '', label: '(none)', key: '', group: 'none' }].concat(list.map(item('list')), kind === 'driver' ? cvgOptions().map(item('cvg')) : [], left);
 }
 
+export const NEEDS_DRIVER = '\u2014 NEEDS DRIVER \u2014';
+
 /*
  * Daily's driver list (Joe 10/12): Regular drivers in seniority order, then a separate Relief drivers section, names only
  * (no seniority dates or Relief tags); then Other CVG / Carriers; then Unavailable with the reason (off, called off,
@@ -178,7 +180,8 @@ export function driverChoices(current, busy, opts) {
     else regular.push(Object.assign(c, { group: 'regular', head: 'REGULAR DRIVERS' }));
   });
   const cvg = cvgOptions().map(o => ({ value: o.id, label: o.text, key: o.text, group: 'cvg', head: 'OTHER CVG / CARRIERS' }));
-  const out = [{ value: '', label: '(none)', key: '', group: 'none' }].concat(regular, relief, cvg, blocked);
+  // Joe 10/19 ("it should pop up needed driver"): the empty choice reads NEEDS DRIVER, as on Weekly and the old app.
+  const out = [{ value: '', label: NEEDS_DRIVER, key: 'NEEDS DRIVER', group: 'none', find: true }].concat(regular, relief, cvg, blocked);
   const counts = {};
   out.forEach(c => { if (c.head) counts[c.head] = (counts[c.head] || 0) + 1; });
   out.forEach(c => { if (c.head) c.head += ' \u00b7 ' + counts[c.head]; });
@@ -197,7 +200,7 @@ export function driverOptionsHtml(current, busy, opts) {
   });
   const label = { 'REGULAR DRIVERS': 'Regular Drivers \u2014 Seniority Order', 'RELIEF DRIVERS': 'Relief Drivers', 'OTHER CVG / CARRIERS': 'Other CVG / Carriers', UNAVAILABLE: 'Unavailable' };
   const opt = (c) => '<option value="' + escapeHtml(c.value) + '"' + (c.value === current ? ' selected' : '') + (c.blocked ? ' disabled' : '') + '>' + escapeHtml(c.label + (c.reason ? '  [' + c.reason + ']' : '')) + '</option>';
-  return '<option value="">(none)</option>' + groups.map(g => '<optgroup label="' + escapeHtml(label[g.head] || g.head) + '">' + g.items.map(opt).join('') + '</optgroup>').join('');
+  return '<option value="">' + escapeHtml(NEEDS_DRIVER) + '</option>' + groups.map(g => '<optgroup label="' + escapeHtml(label[g.head] || g.head) + '">' + g.items.map(opt).join('') + '</optgroup>').join('');
 }
 
 // Operational Assignments that are active, as driver choices (the current app's "Other CVG / Carriers").

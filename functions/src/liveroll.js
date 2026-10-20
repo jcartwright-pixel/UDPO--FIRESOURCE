@@ -110,7 +110,7 @@ function seedValue(key, cells, week, built) {
   if (BASE_ALIASES[key]) return masterFirst(cells, BASE_ALIASES[key]);
   if (!day) return '';
   const p = day[1], field = day[2], i = L.DAYS.indexOf(p);
-  const raw = masterFirst(cells, [p + '_load_day_offset']), n = Number(raw), offset = isFinite(n) ? n : -1;
+  const raw = masterFirst(cells, [p + '_load_day_offset']), n = String(raw).trim() === '' ? 0 : L.dayOffset(raw), offset = n === null ? -1 : n;
   const delivery = L.addDays(week, i), load = L.addDays(delivery, offset);
   if (field === 'delivery_date' || field === 'dispatch_date' || field === 'departure_date') return delivery;
   if (field === 'delivery_day' || field === 'departure_day') return L.DAY_NAMES[i];

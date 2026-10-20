@@ -121,10 +121,13 @@
         }
         const ok = r.alert ? r.week > 0 : r.today > 0;
         const count = r.alert ? r.today + ' today' : r.today.toLocaleString() + ' ' + (UNIT[r.key] || '');
-        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : r.key === 'reefer' && s.reeferError ? 'Not read: ' + s.reeferError : NOTE[r.key] || '';
+        const note = r.alert ? (r.week ? r.week + ' this week.' : 'None this week. ') + (r.week ? '' : NOTE[r.key] || '') : r.key === 'reefer' && s.reeferError ? 'Not read: ' + s.reeferError : r.key === 'reefer' ? reeferNote(s) : NOTE[r.key] || '';
         return '<tr><td>' + mark(ok, ok ? 'ok' : 'bad') + '</td><td>' + escapeHtml(r.label) + '</td><td>' + escapeHtml(count) + '</td><td>' + (r.last ? escapeHtml(stamp(r.last)) : 'Not yet') + '</td><td>' + escapeHtml(note) + '</td></tr>';
       }).join('') || '<tr><td colspan="5" class="hint">Shows once the login is saved and the first read is done.</td></tr>';
     }
+    // Joe 10/19: which loaded trailers get no GPS temperature, and why.
+    const reeferNote = (s) => [NOTE.reefer || '', (s.reeferNoUnit || []).length ? 'No GPS unit in Fleet for: ' + s.reeferNoUnit.join(', ') + '.' : '',
+      (s.reeferNoTemp || []).length ? 'GPS unit sends no temperature: ' + s.reeferNoTemp.join(', ') + '.' : ''].filter(Boolean).join(' ');
     const dayRange = (days) => days && days.length ? shortDay(days[0]) + ' to ' + shortDay(days[days.length - 1]) : '';
     const shortDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
     // The count is kept by the read; a count from an earlier New York day means none yet today.

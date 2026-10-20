@@ -425,7 +425,7 @@ async function pull(db, options) {
  *   gpsReefer/<trailer>                 the trip and the newest reading (tempF, readingAt)
  *   gpsReeferReadings/<trailer>_<time>  each reading while recording (one per read at most), deleted after 6 months
  */
-const REEFER_MAX_DAYS = 4;
+const REEFER_MAX_DAYS = 4, REEFER_LOOKBACK_HOURS = 3;
 // Joe 10/18: the GPS temperatures are kept at most 6 months, then deleted. purgeReefer runs on its own nightly schedule
 // (index.js gpsReeferCleanupNightly), not inside the GPS read, so a failed or switched-off read never stops it. It deletes
 // a page at a time until a page comes back short (or the time budget is spent; the next night carries on).
@@ -445,6 +445,33 @@ async function purgeReefer(db, at, opts) {
 }
 // "T-101", "101" and "T 101" are the same trailer (the yard check's way of writing it).
 const trailerKey = (v) => { const c = String(v || '').toUpperCase().replace(/\s+/g, ''); const m = c.match(/^T-?(\d+)$/) || c.match(/^(\d+)$/); return m ? 'T-' + m[1] : c; };
+// Joe 10/19: Fleet's tags for trailers aren't always "T-864". The trailer number is matched in the tag however it is written:
+// T-864, T864, TRL 864, Trailer 864, 864T, 864 Reefer. A bare "864" counts only when no truck on the loads has that number,
+// and only when no tag with a trailer word matches. Several units for one trailer: the one that reported last.
+const TRAILER_WORDS = '(?:T|TR|TRL|TRLR|TRAILER|RF|REEFER)';
+const TAG_BEFORE = new RegExp('^' + TRAILER_WORDS + '-?0*(\\d+)$'), TAG_AFTER = new RegExp('^0*(\\d+)-?' + TRAILER_WORDS + '$');
+function trailerUnits(trucks, trailers, truckNumbers) {
+  const want = {}, strong = {}, plain = {}, busy = {};
+  (trailers || []).forEach(x => { const m = trailerKey(x).match(/^T-0*(\d+)$/); if (m) want[m[1]] = trailerKey(x); });
+  (truckNumbers || []).forEach(n => { const m = String(n || '').replace(/\D/g, '').replace(/^0+/, ''); if (m) busy[m] = true; });
+  const later = (a, b) => !a || String(b.lastReport || '') > String(a.lastReport || '');
+  Object.keys(trucks || {}).forEach(k => {
+    const t = trucks[k], tag = String(t.tag || '').toUpperCase().replace(/[\s#_.]+/g, '');
+    let m = tag.match(TAG_BEFORE) || tag.match(TAG_AFTER);
+    if (m && want[m[1]]) { if (later(strong[m[1]], t)) strong[m[1]] = t; return; }
+    m = tag.match(/^0*(\d+)$/);
+    if (m && want[m[1]] && !busy[m[1]] && later(plain[m[1]], t)) plain[m[1]] = t;
+  });
+  const out = {};
+  Object.keys(want).forEach(n => { const t = strong[n] || plain[n]; if (t) out[want[n]] = t; });
+  return out;
+}
+// The truck numbers on the loads (a bare-number GPS tag that is one of these is a truck, not a trailer).
+function runTrucks(runs) {
+  const out = [];
+  (runs || []).forEach(r => Object.keys(r.days || {}).forEach(p => { const x = r.days[p] || {}; if (x.truck || x.truckId) out.push(x.truck || x.truckId); }));
+  return out;
+}
 /** The trips after this read: loaded = the loaded trailers on the yard now [{trailer, runDocId, day, routeRun, completedAt}],
  * units = the GPS units by trailer {trailer: {unitId, tag, place}}. Pure, for the tests. */
 function reeferTrips(prev, loaded, units, at) {
@@ -489,15 +516,16 @@ async function pullReefer(db, d, o, token, trucks, at) {
   const L = require('./logic'), R = require('./plant-rules');
   const date = L.operatingDay(new Date(at)), weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
   const runs = (await db.collection('runs').where('weekStart', 'in', weeks).get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
-  const units = {};
-  Object.keys(trucks).forEach(k => { const t = trucks[k]; if (/^T-?\d+$/i.test(String(t.tag || '').replace(/\s+/g, ''))) units[trailerKey(t.tag)] = t; });
+  const holds = R.yardHolds(runs, date), units = trailerUnits(trucks, holds.map(x => x.trailer), runTrucks(runs));
   const prev = (await tripsRef.get()).data() || {};
-  const step = reeferTrips(prev, R.yardHolds(runs, date), units, at);
+  const step = reeferTrips(prev, holds, units, at);
   const open = Object.keys(step.trips).map(k => step.trips[k]).filter(t => t.recording && t.unitId);
   const readings = {};
   if (open.length) {
     if (!d.reeferTemplatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.reefer]); await ref.set({ reeferTemplatesReady: true }, { merge: true }); }
-    const now = new Date(at), since = new Date(Math.max(now - 30 * 60000, d.reeferUntil ? Date.parse(d.reeferUntil) - 10 * 60000 : 0));
+    // Joe 10/19: trailers' GPS units send far less often than every 5 minutes (a parked trailer can go an hour or more), so the
+    // read goes back to each trailer's last reading, or REEFER_LOOKBACK_HOURS for one with none yet, not just 30 minutes.
+    const now = new Date(at), since = new Date(Math.min(...open.map(t => t.readingAt ? Date.parse(t.readingAt) - 10 * 60000 : now - REEFER_LOOKBACK_HOURS * 3600000)));
     const byUnit = {};
     open.forEach(t => { byUnit[t.unitId] = t; });
     (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(since), Until: fleetTime(now), Ids: open.map(t => t.unitId).join(',') })).forEach(r => {
@@ -519,8 +547,11 @@ async function pullReefer(db, d, o, token, trucks, at) {
   await writeAll(db, 'gpsReefer', docs);
   await writeAll(db, 'gpsReeferReadings', log);
   await tripsRef.set(step);
-  const recording = Object.keys(step.trips).filter(k => step.trips[k].recording).length;
-  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: recording, reeferLast: Object.keys(log).length ? at : (d.reeferLast || '') }, { merge: true });
+  const rec = Object.keys(step.trips).map(k => step.trips[k]).filter(t => t.recording);
+  // For GPS Setup: the loaded trailers Fleet has no unit for (its tag doesn't carry the trailer number), and the ones whose
+  // unit has sent no temperature (no reefer sensor wired to the GPS, or not reporting).
+  const noUnit = rec.filter(t => !t.unitId).map(t => t.trailer).sort(), noTemp = rec.filter(t => t.unitId && t.tempF === undefined).map(t => t.trailer + ' (' + (t.tag || t.unitId) + ')').sort();
+  await ref.set({ reeferUntil: open.length ? at : (d.reeferUntil || ''), reeferError: '', reeferRecording: rec.length, reeferLast: Object.keys(log).length ? at : (d.reeferLast || ''), reeferNoUnit: noUnit, reeferNoTemp: noTemp }, { merge: true });
   return Object.keys(log).length;
 }
 
@@ -695,7 +726,7 @@ function withDefaults(options) {
 
 const status = (d, h) => ({ history: h ? { done: h.done || 0, total: h.total || 0, days: h.days || [], finishedAt: h.finishedAt || '', error: h.error || '', stopped: (h.tries || 0) >= HISTORY_TRIES } : null, kind: 'fleet', fleet: d.fleet || '', hasUser: !!d.user, hasPassword: !!d.password, lastTest: d.lastTest || null,
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', lastPull: d.lastPull || '', lastPullError: d.lastPullError || '', lastPullTrucks: d.lastPullTrucks || 0,
-  alertsDate: d.alertsDate || '', alertsToday: d.alertsToday || 0, alertsError: d.alertsError || '', reeferError: d.reeferError || '' });
+  alertsDate: d.alertsDate || '', alertsToday: d.alertsToday || 0, alertsError: d.alertsError || '', reeferError: d.reeferError || '', reeferNoUnit: d.reeferNoUnit || [], reeferNoTemp: d.reeferNoTemp || [] });
 
 /* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull. The caller has
  * already checked the person is a manager or administrator. */
@@ -749,4 +780,4 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { fleetCall, pull, history, reeferTrips, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };

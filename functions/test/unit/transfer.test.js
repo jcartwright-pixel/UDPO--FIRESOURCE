@@ -126,3 +126,29 @@ test('plant loads: only Plant Route loads (not Carrier, deleted or other journal
   assert.deepEqual([d.runId, d.date, d.pickupTime, d.trailer, d.poNumber], ['run_t801', '2026-10-08', '7:00 AM', 'T-902', '4411']);
   assert.deepEqual(p.warnings, []);
 });
+
+test('each run carries its route\'s Departure Day, and changing it in Route Master rewrites the run (Joe 10/19)', () => {
+  const tabs = F.fakeSheets(), m = masters();
+  const before = T.parseLiveTab('LIVE CURRENT WEEK', tabs["'LIVE CURRENT WEEK'"], T.lookupsFrom(m)).runs['2026-10-04__run_t801'];
+  m.routes.docs.run_t801.departureDay = 'Load Day';
+  const after = T.parseLiveTab('LIVE CURRENT WEEK', tabs["'LIVE CURRENT WEEK'"], T.lookupsFrom(m)).runs['2026-10-04__run_t801'];
+  assert.equal(after.masterShow.leavesOn, 'Load Day');
+  assert.notEqual(after.fingerprint, before.fingerprint);
+  assert.equal(L.buildWeekRun({ id: 'run_x', departureDay: 'Load Day', days: {} }, '2026-10-18', { slots: {}, exceptions: [], driversById: {}, findUnit: () => null, booked: {} }).masterShow.leavesOn, 'Load Day');
+});
+
+test('a load-day offset shown as a date (12/30/1899 = 0, 12/29/1899 = -1) is that number, not blank (Joe 10/19, Save-A-Lot)', () => {
+  assert.equal(L.dayOffset('12/30/1899'), 0);
+  assert.equal(L.dayOffset('12/29/1899'), -1);
+  assert.equal(L.dayOffset('1899-12-30'), 0);
+  assert.equal(L.dayOffset('-1'), -1);
+  assert.equal(L.dayOffset(''), null);
+  assert.equal(L.dayOffset('10/19/2026'), null);
+  assert.equal(L.dayOffset('0.7916666667'), 0, 'a time pasted into the Live sheet offset reads 0, as the current app rounds it');
+  assert.equal(L.dayOffset('-9'), -6);
+  assert.equal(L.leavesOn({ departureDay: '' }), 'Delivery Day');
+  assert.equal(L.leavesOn({ departureDay: '', sleeper: true }), 'Load Day');
+  assert.equal(L.leavesOn({ departureDay: 'load day' }), 'Load Day');
+  const M = require('../../src/model');
+  assert.equal(M.convert('offset', '12/30/1899'), 0);
+});

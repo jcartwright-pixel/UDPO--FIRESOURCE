@@ -153,3 +153,18 @@ test('yard list: off when the GPS sees this load out; kept past dispatch while t
   assert.equal(R.yardQueue(runs, [], '2026-10-19', after).rows.length, 0, 'without GPS: gone at dispatch time, as before');
   assert.equal(R.yardQueue(runs, [], '2026-10-19', after, { 'T-701': g({ seenAt: '2026-10-19T14:55:00Z' }) }).rows.length, 1, 'the GPS still sees it in the yard');
 });
+
+// Joe 10/19: the trailer number is found in Fleet's tag however it is written; a bare number only when no truck has it.
+test('trailer GPS units: T-864, TRL 888, Trailer 0901, 920 Reefer and a bare 905 all match; a bare truck number does not', () => {
+  const { trailerUnits, runTrucks } = require('../../src/fleetgps');
+  const trucks = {
+    a: { tag: 'T-864', unitId: '1' }, b: { tag: 'TRL 888', unitId: '2' }, c: { tag: 'Trailer 0901', unitId: '3' }, d: { tag: '920 Reefer', unitId: '4' },
+    e: { tag: '905', unitId: '5' }, f: { tag: '844', unitId: '6' }, g: { tag: '864', unitId: '7', lastReport: '2026-10-19T12:00:00Z' },
+    h: { tag: 'T864', unitId: '8', lastReport: '2026-10-19T13:00:00Z' }, i: { tag: '123456', unitId: '9' } };
+  const runs = [{ days: { mon: { truck: '844', trailer: '844' }, tue: { truckId: '0905' } } }];
+  assert.deepEqual(runTrucks(runs), ['844', '0905']);
+  const out = trailerUnits(trucks, ['T-864', 'T-888', 'T-901', 'T-920', 'T-905', 'T-844', 'T-999'], runTrucks(runs));
+  assert.deepEqual(Object.keys(out).sort(), ['T-864', 'T-888', 'T-901', 'T-920']);
+  assert.deepEqual([out['T-864'].unitId, out['T-888'].unitId, out['T-901'].unitId, out['T-920'].unitId], ['8', '2', '3', '4'], 'a trailer word wins over a bare number; of two, the newest report');
+  assert.deepEqual(Object.keys(trailerUnits({ e: { tag: '905', unitId: '5' } }, ['T-905'], [])), ['T-905'], 'a bare number when no truck has it');
+});
