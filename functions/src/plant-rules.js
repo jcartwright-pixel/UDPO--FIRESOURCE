@@ -997,7 +997,6 @@
       forecastLateText(f).forEach(function (t) { L.push('  ' + t); });
       L.push('  Due by ' + f.dueByText + ': ' + f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases' + (f.due.loads ? ', est. done ' + f.due.doneText : ''));
       if (f.loads.length) L.push('  All loads done: est. ' + f.allDoneText + ' · ' + f.casesLeft.toLocaleString('en-US') + ' cases left');
-      L.push('  Pace ' + f.rate.toLocaleString('en-US') + ' cases an hour (' + f.paceText + ')');
       L.push('');
     }
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
@@ -1064,7 +1063,8 @@
     function shortName(v) { v = text(v); return v.length > 16 ? v.replace(/\bGALLON\b/g, 'GAL').replace(/\bGallon\b/g, 'Gal') : v; }
     function shortShift(v) { return text(v).replace(/^First\b/i, '1st').replace(/^Second\b/i, '2nd').replace(/^Third\b/i, '3rd').replace(/:00\b/g, '').replace(/ to /g, '-'); }
     // Joe 10/19 (Late Forecast): a box under the banner: how many loads will be late and why, the loads due by 5:00 AM with
-    // when they will be done, when every load will be done, the cases left and the pace (estimated, so it says so).
+    // when they will be done, when every load will be done and the cases left (estimated, so it says so). Joe 10/20: no pace,
+    // cases an hour or which nights it came from: the group does not see how the forecast is worked out.
     function forecastBox(f) {
       var bad = f.late > 0, line = function (a, b, k) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + INK + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + a + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + b + '</td></tr>'; };
       var lateList = forecastLateText(f), dueWord = f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases';
@@ -1075,7 +1075,7 @@
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:6px">' +
         line('Due by ' + e(f.dueByText) + ': ' + e(dueWord), f.due.loads ? 'est. ' + e(f.due.doneText) : '&ndash;', f.due.late > 0) +
         (f.loads.length ? line('All loads done', 'est. ' + e(f.allDoneText), bad) + line('Cases left', e(f.casesLeft.toLocaleString('en-US')), false) : line('All loads done', 'nothing left', false)) +
-        line('Pace (' + e(f.paceText) + ')', e(f.rate.toLocaleString('en-US')) + ' cases/hr', false) + '</table></div></td></tr>';
+        '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by

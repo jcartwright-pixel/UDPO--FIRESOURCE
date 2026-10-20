@@ -85,8 +85,8 @@
         tile(f.late ? 'bad' : 'good', 'Forecast at ' + e(f.asOf), f.late ? '&#9888; ' + f.late + ' load' + (f.late === 1 ? '' : 's') + ' late' : '&#10003; On time',
           f.late ? e(lateList.map(x => U.routeNumber(x.route)).join(', ')) + (lateList.every(x => x.reason === lateList[0].reason) ? ' · ' + e(lateList[0].reason) : '') : f.loads.length ? 'every load done before it leaves and by 6:00 AM' : 'nothing left to load') +
         tile(f.due.late ? 'bad' : '', 'Due by ' + e(f.dueByText), f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's'), n(f.due.cases) + ' cases' + (f.due.loads ? ' · est. done <em>' + e(when(f.due.done, f.due.doneText, f.due.doneDay)) + '</em>' : '') + (f.due.late ? ' · ' + f.due.late + ' late' : '')) +
-        tile(f.late ? 'bad' : '', 'All loads done', f.loads.length ? 'est. ' + e(when(f.allDone, f.allDoneText, f.allDoneDay)) : 'Done', f.loads.length + ' load' + (f.loads.length === 1 ? '' : 's') + ' · ' + n(f.casesLeft) + ' cases left') +
-        tile('', 'Pace', n(f.rate) + ' <small>cases an hour</small>', e(f.paceText));
+        tile(f.late ? 'bad' : '', 'All loads done', f.loads.length ? 'est. ' + e(when(f.allDone, f.allDoneText, f.allDoneDay)) : 'Done', f.loads.length + ' load' + (f.loads.length === 1 ? '' : 's') + ' · ' + n(f.casesLeft) + ' cases left');
+      // Joe 10/20: no pace tile; nobody sees how the forecast is worked out.
 
       // The loads, each with its Est. Done and a bar on tonight's time line (its est. loading time against its dispatch).
       // The line runs from now to an hour after the last load is done (at least to the 6:00 AM shift end); a dispatch later than
@@ -122,7 +122,7 @@
       document.getElementById('times').innerHTML = f.byTime.length ? '<table class="fc-t"><thead><tr><th>Due by</th><th class="num">Loads</th><th class="num">Cases</th><th></th></tr></thead><tbody>' +
         f.byTime.map(t => '<tr class="' + (t.late ? 'bad' : '') + '"><td>' + e(when(t.at, t.time, t.day)).replace(/ /g, '&nbsp;') + '</td><td class="num">' + t.loads + '</td><td class="num">' + n(t.cases) + '</td><td>' + (t.late ? t.late + ' late' : 'On time') + '</td></tr>').join('') +
         '</tbody></table>' : '<p class="fc-empty">Nothing left to load.</p>';
-      document.getElementById('how').textContent = 'Estimated: about 37 minutes a load plus 1 minute for every 47 cases, at the pace above. Late = done after its dispatch time or after the 6:00 AM shift end. Updates when a load starts or ends.';
+      document.getElementById('how').textContent = 'Estimated. Late = done after its dispatch time or after the 6:00 AM shift end. Updates when a load starts or ends.';
     }
 
     requireSignIn(async () => {

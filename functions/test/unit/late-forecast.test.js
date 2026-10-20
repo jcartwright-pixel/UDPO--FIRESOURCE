@@ -124,6 +124,8 @@ test('the email and the report carry the forecast', () => {
   assert.match(html, /past the 6:00 AM shift end/);
   assert.match(r.text, /^LATE FORECAST \(ESTIMATED\)/m);
   assert.match(r.text, /Due by 5:00 AM: 9 loads/);
+  // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
+  [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
   assert.doesNotMatch(none, /Est\. Done|Forecast at/, 'a report without a forecast reads as before');
 });
