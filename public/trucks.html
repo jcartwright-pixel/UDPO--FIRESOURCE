@@ -43,13 +43,16 @@
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { watchLists, lists } from './js/edit.js';
-    import { collection, onSnapshot, query, where } from './js/firebase.js';
+    import { collection, doc, onSnapshot, query, where } from './js/firebase.js';
     import { NO_SIGNAL_MINUTES, unitKey, gpsIndex, truckState, workingToday } from './js/gps-state.js';
 
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
     const L = window.UDLogic;
-    let mode = 'today', runs = [], gps = [], days = [], alerts = [], routeSleeper = {};
+    let mode = 'today', runs = [], gps = [], days = [], alerts = [], routeSleeper = {}, temps = {};
+    // Equipment Master location ("CHARLESTON") or plant (fac_martins_ferry), written as a name: Charleston, Martins Ferry.
+    const nameCase = (s) => String(s || '').replace(/_/g, ' ').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+    const homeOf = (e) => nameCase(e.location) || nameCase(String(e.facilityId || '').replace(/^fac_/, ''));
     const opened = new Set(); // Alerts drop-downs left open, by Daily Dispatch line (kept through the 1-minute redraw)
     // Where each unit is now: js/gps-state.js (shared with the Route Distribution home's Manager card).
     const key = unitKey, index = () => gpsIndex(gps), state = truckState;
@@ -156,21 +159,33 @@
         foot.textContent = 'In yard = at the Fleet place Uniontown Branch, Uniontown Plant or Loading Dock · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · a driver with two runs on one truck is one line with both dispatch times · Time out = from the first yard leave until back, or until now; a sleeper route counts from the day it left · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
         return;
       }
-      // All Fleet units, matched to our Equipment Master trucks and trailers (Uniontown).
-      const ours = {}; (lists.fleetTrucks || []).forEach(e => { ours[key(e.unit)] = 'Truck'; }); (lists.fleetTrailers || []).forEach(e => { ours[key(e.unit)] = 'Trailer'; });
+      // All Fleet units, matched to Equipment Master's trucks and trailers at every plant (Joe 10/20: Charleston's and Martins
+      // Ferry's read "not in Equipment" when only Uniontown's were matched). A trailer written "935" in Equipment Master is
+      // Fleet's T-935. Location = the unit's Equipment Master location (else its plant).
+      const ours = {};
+      (lists.equipmentAll || []).forEach(e => {
+        const type = e.type === 'TRUCK' ? 'Truck' : e.type === 'TRAILER' ? 'Trailer' : '';
+        if (!type) return;
+        const k = key(e.unit), v = { type, where: homeOf(e) };
+        if (k && !ours[k]) ours[k] = v;
+        if (type === 'Trailer' && /^\d+$/.test(k) && !ours['T' + k]) ours['T' + k] = v;
+      });
       const units = gps.slice().sort((a, b) => String(a.tag).localeCompare(String(b.tag), undefined, { numeric: true }))
-        .map(t => ({ t, ours: ours[key(t.tag)] || '', s: state(t, t.tag), d: dayBy[key(t.tag)] }));
+        .map(t => { const o = ours[key(t.tag)] || null; return { t, ours: o ? o.type : '', where: o ? o.where : '', s: state(t, t.tag), d: dayBy[key(t.tag)], temp: (temps[t.tag] || temps[key(t.tag)] || null) }; });
       const matched = units.filter(u => u.ours).length;
       kpis.innerHTML = [['Fleet units', units.length], ['Our trucks', units.filter(u => u.ours === 'Truck').length], ['Our trailers', units.filter(u => u.ours === 'Trailer').length],
         ['Other units', units.length - matched], ['Reported today', units.filter(u => u.t.lastReport && nyDate(new Date(u.t.lastReport)) === today).length], ['No signal', units.filter(u => u.s[0] === 'nosignal').length]]
         .map(k => '<div><b>' + k[1] + '</b><span>' + k[0] + '</span></div>').join('');
-      sheet.innerHTML = '<table class="issues tt-board"><colgroup><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:30%"><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>' +
-        '<thead><tr><th>Fleet unit</th><th>Ours</th><th>Status</th><th>Where now</th><th>Last report</th><th>Miles today</th><th>Odometer</th><th>Engine hours</th></tr></thead><tbody>' +
-        units.map(u => '<tr class="tt-' + u.s[0] + '"><td class="strong">' + escapeHtml(u.t.tag) + '</td><td>' + (u.ours || '<small>not in Equipment</small>') + '</td><td>' + pill(u.s) + '</td><td>' + placeCell(u.t) + '</td>' +
-          '<td>' + (u.t.lastReport ? (nyDate(new Date(u.t.lastReport)) === today ? clock(u.t.lastReport) : shortDate(nyDate(new Date(u.t.lastReport)))) + '<small>' + ago(u.t.lastReport) + '</small>' : '') + '</td>' +
+      // Joe 10/20: the trailer's temperature from the GPS in place of Last report; rows one line where they fit.
+      const tempCell = (x) => !x || x.tempF === null || x.tempF === undefined ? '' : '<span title="' + escapeHtml('GPS reading ' + clock(x.at) + ', ' + ago(x.at)) + '">' + escapeHtml(String(Math.round(x.tempF * 10) / 10)) + '°</span>';
+      const whereLine = (t) => { const a = address(t.address); return escapeHtml(t.place && a ? t.place + ' · ' + a : t.place || a); };
+      sheet.innerHTML = '<table class="issues tt-board tt-units"><colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:9%"><col style="width:30%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:7%"></colgroup>' +
+        '<thead><tr><th>Fleet unit</th><th>Location</th><th>Ours</th><th>Status</th><th>Where now</th><th>Temp (°F)</th><th>Miles today</th><th>Odometer</th><th>Engine hours</th></tr></thead><tbody>' +
+        units.map(u => '<tr class="tt-' + u.s[0] + '"><td class="strong">' + escapeHtml(u.t.tag) + '</td><td>' + escapeHtml(u.where) + '</td><td>' + (u.ours || '<span class="tt-muted">not in Equipment</span>') + '</td><td>' + pill(u.s) + '</td>' +
+          '<td class="tt-where" title="' + escapeHtml(u.t.lastReport ? 'Last report ' + ago(u.t.lastReport) : '') + '">' + whereLine(u.t) + '</td><td>' + tempCell(u.temp) + '</td>' +
           '<td>' + milesCell(u.d) + '</td><td>' + (u.t.odometerMiles != null ? Math.round(u.t.odometerMiles).toLocaleString() : '') + '</td><td>' + (u.t.engineHours != null ? Math.round(u.t.engineHours).toLocaleString() : '') + '</td></tr>').join('') +
         '</tbody></table>';
-      foot.textContent = 'Every unit Verizon Connect Fleet shows, all plants. Ours = the same number in Equipment Master (Uniontown); trailers are named T- plus the number in both.';
+      foot.textContent = 'Every unit Verizon Connect Fleet shows, all plants. Location is the plant Equipment Master lists. Temp is the trailer\'s GPS temperature when Fleet sends one. Hold the mouse on Where now for the last report.';
     }
 
     document.getElementById('sheet').addEventListener('click', e => { const b = e.target.closest('[data-open]'); if (!b) return; const k = b.dataset.open; if (opened.has(k)) opened.delete(k); else opened.add(k); render(); });
@@ -184,6 +199,8 @@
       const NAMES = { runs: 'the dispatch runs', gpsTrucks: 'the GPS positions', gpsDays: 'the GPS miles', gpsAlerts: 'the Verizon alerts', routes: 'Route Master' };
       const watch = (name, set, q) => onSnapshot(q || collection(db, name), s => { set(s.docs.map(d => Object.assign({ id: d.id }, d.data()))); render(); }, e => showError('Could not read ' + NAMES[name] + ' (' + e.message + '). Check the network and reload the page.'));
       watch('gpsTrucks', v => { gps = v; });
+      // Joe 10/20: the trailers' GPS temperatures (functions/src/fleetgps.js pullTemps), one record for every trailer.
+      onSnapshot(doc(db, 'gpsTemps', 'now'), s => { temps = (s.exists() && s.data().units) || {}; render(); }, () => {});
       watch('routes', v => { routeSleeper = {}; v.forEach(r => { if (r.sleeper) routeSleeper[r.id] = true; }); });
       // Joe 10/18: only the days this screen uses, read again when the day changes (it was every run ever). workingToday
       // looks at loads from 3 days ago to tomorrow, and a load delivers 0 to 6 days after it loads, so those load dates' weeks.

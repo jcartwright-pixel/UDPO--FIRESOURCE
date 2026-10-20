@@ -615,6 +615,19 @@ body.side-folded .sidemenu .side-sec-btn { justify-content: center; padding: 11p
 .gps-page .gps-mark.bad { background: var(--pill-red-bg); color: var(--pill-red-ink); }
 .gps-page .gps-mark.wait { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 .gps-page .gps-mark.none { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
+.gps-page .gps-card { min-width: 0; }
+@media (max-width: 800px) { .gps-page .gps-grid { grid-template-columns: minmax(0, 1fr); } .gps-page .gps-card.wide { grid-column: 1; } }
+.gps-page .gps-ask { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.gps-page .gps-ask label { flex: 0 1 260px; min-width: 0; }
+.gps-page .gps-ask input { width: 100%; box-sizing: border-box; }
+.gps-page .gps-probe { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 6px; font-size: 16px; }
+.gps-page .gps-probe-head { display: flex; gap: 10px; align-items: center; }
+.gps-page .gps-probe p { margin: 0; }
+.gps-page .gps-probe pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; background: #f5f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.gps-page .gps-probe-rows { overflow-x: auto; max-width: 100%; }
+.gps-page .gps-probe-rows table { border-collapse: collapse; font-size: 16px; width: max-content; min-width: 100%; }
+.gps-page .gps-probe-rows th { position: sticky; top: 0; background: #fff; text-align: left; color: var(--muted); font-weight: 800; padding: 4px 8px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+.gps-page .gps-probe-rows td { padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; height: auto; }
 .gps-page .gps-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; font-size: 16px; }
 /* RedZone (Joe 10/11): the same cards, text at 16px. */
 .redzone-page .hint, .redzone-page .gps-steps { font-size: 16px; }

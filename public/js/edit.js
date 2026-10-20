@@ -43,7 +43,7 @@ async function save(action, fields) {
 }
 export function savesPending() { return pending; }
 window.addEventListener('beforeunload', e => { if (pending) { e.preventDefault(); e.returnValue = 'A change is still saving. Leave anyway?'; } });
-export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], exceptions: [], backups: [], ops: L.opsAssignments([]), person: null, app: {} };
+export const lists = { drivers: [], trucks: [], trailers: [], allDrivers: [], allTrucks: [], allTrailers: [], fleetTrucks: [], fleetTrailers: [], equipmentAll: [], exceptions: [], backups: [], ops: L.opsAssignments([]), person: null, app: {} };
 
 // The screen's key in the per-screen switch (L.SCREENS); each page sets it once.
 let screenKey = 'dailyDispatch';
@@ -60,7 +60,9 @@ export async function watchLists(user, onChange) {
   });
   onSnapshot(collection(db, 'equipment'), snap => {
     // Only Uniontown's units (Equipment Master facility_id), like the current app's pickers; Charleston and Martins Ferry units are left out.
-    const all = snap.docs.map(d => d.data()).filter(e => !e.facilityId || e.facilityId === HOME_FACILITY);
+    // Every plant's units too (Trucks Today's All Fleet Units says which are ours and where each belongs, Joe 10/20).
+    lists.equipmentAll = snap.docs.map(d => d.data());
+    const all = lists.equipmentAll.filter(e => !e.facilityId || e.facilityId === HOME_FACILITY);
     const byUnit = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     lists.fleetTrucks = all.filter(e => e.type === 'TRUCK').sort(byUnit);
     lists.fleetTrailers = all.filter(e => e.type === 'TRAILER').sort(byUnit);
