@@ -117,6 +117,24 @@ test('report email: routes split by delivery day, loaded in finish order, a blan
   assert.doesNotMatch(one, /Delivers/, 'no separator when every load delivers the same day');
 });
 
+// Joe 10/20 (3:09 PM report): "it should be sorted by our load order", so moving a load on Daily Case Loadout moves it in the email.
+test('report email: not loaded routes follow the load order, not dispatch time, with a behind load where the plant has it', () => {
+  const now = Date.parse('2026-10-20T19:09:00Z'); // Tuesday 3:09 PM at the plant
+  const L = (route, run, disp, seq) => ({ id: 'r' + route, route, run, routeName: '', area: 'CASE', state: 'WAITING', dispatchTime: disp, loadDate: '2026-10-20', deliveryDate: '2026-10-21', departureDate: '2026-10-21', loadSequence: seq, completedAt: '', truck: '', trailer: '' });
+  const loads = [L('854', 'CREAMOLAND', '02:00', 1), L('852_2', 'UT JERSEY LOAD 2', '13:00', 2), L('6303', 'UT WALMART', '01:00', 3), L('824', 'UT DSD MILK', '01:00', 4)];
+  loads[1].loadDate = '2026-10-20'; loads[1].deliveryDate = '2026-10-21'; loads[1].departureDate = '2026-10-20';
+  const r = R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
+  const f = R.loadForecast({ date: '2026-10-20', loads, history: [] }, now);
+  const html = R.reportHtml(Object.assign({}, r, { forecast: f }), '');
+  const order = [...html.matchAll(/font-size:16px;font-weight:800;color:[^"]*">(\d+)<\/td>/g)].map(m => m[1]);
+  assert.deepEqual(order, ['854', '852', '6303', '824'], 'Creamoland is loaded first because the plant put it first, though 6303 and 824 leave earlier');
+  const est = [...html.matchAll(/>(\d{1,2}:\d\d [AP]M)(?: &#9888;)?<\/span>/g)].map(m => m[1]);
+  assert.equal(est.length, 3, 'every load not behind shows its Est. Done');
+  const mins = t => { const [h, m] = t.split(/[: ]/); return (Number(h) % 12 + (/PM/.test(t) ? 12 : 0)) * 60 + Number(m); };
+  const run = est.map(mins).map(m => m < 15 * 60 ? m + 1440 : m);
+  assert.deepEqual(run, run.slice().sort((a, b) => a - b), 'Est. Done runs in order down the list');
+});
+
 test('report email: loads grouped by type, Case then Box, Tote, Tanker, each with Loaded then Not loaded (Joe 10/19)', () => {
   const now = Date.parse('2026-10-19T14:00:00Z');
   const L = (route, run, area, state, disp, done) => ({ route, run, routeName: '', area, state, dispatchTime: disp, loadDate: '2026-10-19', deliveryDate: '2026-10-19', departureDate: '2026-10-19', loadSequence: 1, completedAt: done || '', truck: '', trailer: '' });
