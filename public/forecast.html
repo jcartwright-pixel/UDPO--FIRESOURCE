@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Late Forecast · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+</head>
+<body class="fill plant-page forecast-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Late Forecast</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Plant Distribution</span><h1>Late Forecast</h1></div>
+      <div class="dayname" id="dayname"></div>
+      <label class="fc-pick">Due by <select id="due-by" aria-label="Loads due by"></select></label>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="fc-band" id="band"></div>
+      <div class="fc-grid">
+        <section class="fc-card fc-loads">
+          <h2 id="loads-title">Loads still to load</h2>
+          <div class="fc-scroll" id="loads"></div>
+          <div class="fc-legend"><span><i class="ok"></i>Est. loading, on time</span><span><i class="late"></i>Est. loading, late</span><span><i class="dep"></i>Dispatch</span><span><i class="now"></i>Now</span></div>
+        </section>
+        <section class="fc-card fc-times">
+          <h2>Loads due by each time</h2>
+          <div class="fc-scroll" id="times"></div>
+          <p class="fc-how" id="how"></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { collection, query, where, onSnapshot } from './js/firebase.js';
+    import * as P from './js/plant-core.js';
+    import { readForecastNights } from './js/forecast.js';
+
+    // Joe 10/19 (Late Forecast, option t): will the plant be late? Every case load still to load with its Est. Done, taken in the
+    // plant's loading order at the plant's pace; red when it will be done after it leaves or after the 6 a.m. shift end, with
+    // the reason. It updates on every load start and finish (the loads are watched) and every minute. Read only: nothing is saved.
+    const L = window.UDLogic, U = window.UDPlant;
+    const today = () => L.operatingDay(new Date());
+    const DUE_CHOICES = [120, 180, 240, 270, 300, 330, 360];
+    let date = today(), runs = [], history = [], loaded = false;
+    let dueBy = 300;
+    try { const v = Number(localStorage.getItem('udForecastDueBy')); if (DUE_CHOICES.indexOf(v) >= 0) dueBy = v; } catch (e) { /* 5:00 AM */ }
+    const pick = document.getElementById('due-by');
+    pick.innerHTML = DUE_CHOICES.map(m => '<option value="' + m + '"' + (m === dueBy ? ' selected' : '') + '>' + minutes(m) + '</option>').join('');
+    pick.onchange = () => { dueBy = Number(pick.value); try { localStorage.setItem('udForecastDueBy', String(dueBy)); } catch (e) { /* this visit only */ } render(); };
+    function minutes(m) { const h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + String(mm).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); }
+    const n = (v) => Number(v || 0).toLocaleString('en-US');
+    const e = escapeHtml;
+    const span = (m) => { m = Math.max(0, Math.round(m)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+
+    function render() {
+      document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
+      if (!loaded) return;
+      const now = Date.now(), all = P.loadoutRows(runs, date), f = U.loadForecast({ date, loads: all, history, dueBy }, now);
+      const today = U.wallClock(now), sameDay = (m) => Math.floor(m / 1440) === Math.floor(today / 1440);
+      const when = (m, text, day) => (sameDay(m) ? '' : day + ' ') + text;
+      const doneCase = all.filter(r => r.area === 'CASE' && r.state === 'DONE');
+      const lateList = f.loads.filter(x => x.late);
+      const tile = (k, label, big, small) => '<div class="fc-tile ' + k + '"><span>' + label + '</span><b>' + big + '</b><small>' + small + '</small></div>';
+      document.getElementById('band').innerHTML =
+        tile(f.late ? 'bad' : 'good', 'Forecast at ' + e(f.asOf), f.late ? '&#9888; ' + f.late + ' load' + (f.late === 1 ? '' : 's') + ' late' : '&#10003; On time',
+          f.late ? e(lateList.map(x => U.routeNumber(x.route)).join(', ')) + (lateList.every(x => x.reason === lateList[0].reason) ? ' · ' + e(lateList[0].reason) : '') : f.loads.length ? 'every load done before it leaves and by 6:00 AM' : 'nothing left to load') +
+        tile(f.due.late ? 'bad' : '', 'Due by ' + e(f.dueByText), f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's'), n(f.due.cases) + ' cases' + (f.due.loads ? ' · est. done <em>' + e(when(f.due.done, f.due.doneText, f.due.doneDay)) + '</em>' : '') + (f.due.late ? ' · ' + f.due.late + ' late' : '')) +
+        tile(f.late ? 'bad' : '', 'All loads done', f.loads.length ? 'est. ' + e(when(f.allDone, f.allDoneText, f.allDoneDay)) : 'Done', f.loads.length + ' load' + (f.loads.length === 1 ? '' : 's') + ' · ' + n(f.casesLeft) + ' cases left') +
+        tile('', 'Pace', n(f.rate) + ' <small>cases an hour</small>', e(f.paceText));
+
+      // The loads, each with its Est. Done and a bar on tonight's time line (its est. loading time against its dispatch).
+      // The line runs from now to an hour after the last load is done (at least to the 6:00 AM shift end); a dispatch later than
+      // that shows as an arrow at the right end.
+      const shiftEnd = f.loads.length ? Math.max(...f.loads.map(z => z.shiftEnd || 0)) : today + 360;
+      const t0 = Math.floor(Math.min(today, ...f.loads.map(z => z.start)) / 60) * 60, t1 = Math.ceil(Math.max(today + 360, shiftEnd + 60, ...f.loads.map(z => z.est + 60)) / 60) * 60;
+      const step = t1 - t0 <= 720 ? 120 : t1 - t0 <= 1440 ? 240 : 360;
+      const x = (m) => (100 * (Math.min(Math.max(m, t0), t1) - t0) / (t1 - t0)).toFixed(2) + '%';
+      const ticks = []; for (let m = Math.ceil(t0 / step) * step; m < t1; m += step) ticks.push(m);
+      const hour = (m) => { const h = Math.floor(((m % 1440) + 1440) % 1440 / 60); return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM'); };
+      const head = '<div class="fc-row fc-head"><span>Route</span><span>Run</span><span class="num">Cases</span><span>Depart</span><span>Est. Done</span><span class="fc-line">' +
+        ticks.filter(m => m - t0 >= 30 && t1 - m >= 45).map(m => '<i style="left:' + x(m) + '">' + hour(m) + '</i>').join('') + '</span></div>';
+      const rows = f.loads.map(z => {
+        const k = z.late ? 'late' : '', dep = z.leaves === null ? '–' : e(when(z.leaves, z.depart, z.departDay));
+        return '<div class="fc-row ' + k + (z.status === 'LOADING' ? ' loading' : '') + '"><b>' + e(U.routeNumber(z.route)) + '</b>' +
+          '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' ? ' <em class="fc-pill">Loading</em>' : '') + (z.priorDay ? ' <em class="fc-pill">From yesterday</em>' : '') +
+          (z.late ? '<small class="fc-why-sm">Late: ' + e(z.reason) + ' by ' + span(z.lateBy) + '</small>' : '') +
+'</span>' +
+          '<span class="num">' + (z.noCases ? '–' : n(z.cases)) + '</span><span>' + dep + '</span>' +
+          '<span class="fc-est">' + e(when(z.est, z.estText, z.estDay)) + (z.late ? ' &#9888;' : '') + '</span>' +
+          '<span class="fc-line">' + ticks.map(m => '<s style="left:' + x(m) + '"></s>').join('') +
+          '<u class="' + (z.late ? 'late' : 'ok') + '" style="left:' + x(z.start) + ';width:calc(' + x(z.est) + ' - ' + x(z.start) + ')"></u>' +
+          // Why it is late, beside its bar (before it when the bar is far right), so the row stays one line.
+          (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 45 ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.reason === 'misses dispatch' ? 'misses dispatch' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
+          (z.leaves !== null && z.leaves >= t0 && z.leaves <= t1 ? '<em class="dep' + (z.late && z.reason === 'misses dispatch' ? ' late' : '') + '" style="left:' + x(z.leaves) + '"></em>' : '') +
+          (z.leaves !== null && z.leaves > t1 ? '<em class="far" title="Dispatch ' + dep + '">&#9656;</em>' : '') +
+          '<em class="now" style="left:' + x(today) + '"></em></span></div>';
+      }).join('');
+      const doneLine = doneCase.length ? '<div class="fc-done">&#10003; ' + doneCase.length + ' load' + (doneCase.length === 1 ? '' : 's') + ' done today · ' + n(doneCase.reduce((a, r) => a + (Number(r.quantity) || 0), 0)) + ' cases</div>' : '';
+      document.getElementById('loads-title').textContent = 'Loads still to load (' + f.loads.length + ') · in loading order';
+      document.getElementById('loads').innerHTML = f.loads.length ? head + rows + doneLine : '<p class="fc-empty">Every case load for today is done.</p>' + doneLine;
+
+      document.getElementById('times').innerHTML = f.byTime.length ? '<table class="fc-t"><thead><tr><th>Due by</th><th class="num">Loads</th><th class="num">Cases</th><th></th></tr></thead><tbody>' +
+        f.byTime.map(t => '<tr class="' + (t.late ? 'bad' : '') + '"><td>' + e(when(t.at, t.time, t.day)).replace(/ /g, '&nbsp;') + '</td><td class="num">' + t.loads + '</td><td class="num">' + n(t.cases) + '</td><td>' + (t.late ? t.late + ' late' : 'On time') + '</td></tr>').join('') +
+        '</tbody></table>' : '<p class="fc-empty">Nothing left to load.</p>';
+      document.getElementById('how').textContent = 'Estimated: about 37 minutes a load plus 1 minute for every 47 cases, at the pace above. Late = done after its dispatch time or after the 6:00 AM shift end. Updates when a load starts or ends.';
+    }
+
+    requireSignIn(async () => {
+      const { db } = await start();
+      const unsubs = [];
+      const watch = () => {
+        date = today(); loaded = false; history = [];
+        unsubs.splice(0).forEach(u => u());
+        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
+        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded = true; render(); },
+          err => showError('Could not read the loads: ' + err.message)));
+        const forDate = date;
+        readForecastNights(db, date).then(h => { if (date === forDate) { history = h; render(); } }, err => showError('Could not read the past nights (the forecast uses tonight only): ' + err.message));
+      };
+      watch();
+      // The estimate moves with the clock; the day rolls at 6 AM.
+      setInterval(() => { if (today() !== date) watch(); else render(); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>

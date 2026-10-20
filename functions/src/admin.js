@@ -10,7 +10,7 @@
  *   Driver Station Codes  appLinks, routeCodeNew, routeCodeOnOff                       config/routePhone (phone.js)
  *   Manager Links         releaseCodes, releaseCodeNew                                 private/releaseCodes
  *   Report Recipients     reportGroups, saveReportGroup                                reportGroups/{id}
- *   Sent Email Log        sentLog, setSending                                          sentEmails, private/emailSettings
+ *   Sent Email Log        sentLog, setSending, setForecastEmail                        sentEmails, private/emailSettings
  *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, fromWho)
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
  * The email, schedule and diagnostics items are in admintools.js.
@@ -350,6 +350,13 @@ async function setSending(db, email, input, stamp) {
   await db.collection('private').doc('emailSettings').set({ sending: input.on, changedAt: stamp, changedBy: email }, { merge: true });
   return { ok: true, message: input.on ? 'Sending is on.' : 'Sending is off.' };
 }
+// Joe 10/19 (Late Forecast): who gets the forecast box in the plant report email: only a test sent to oneself (the start),
+// or everyone the report goes to.
+async function setForecastEmail(db, email, input, stamp) {
+  if (typeof input.everyone !== 'boolean') fail('BAD_REQUEST', 'everyone must be true or false');
+  await db.collection('private').doc('emailSettings').set({ forecastEveryone: input.everyone, forecastChangedAt: stamp, forecastChangedBy: email }, { merge: true });
+  return { ok: true, message: input.everyone ? 'The forecast now goes in the report email to everyone.' : 'The forecast now goes only in a test sent to yourself.' };
+}
 
 /* ---------- Email Senders ---------- */
 
@@ -423,7 +430,7 @@ const OPS = {
   appLinks: (db) => appLinks(db), routeCodeNew: (db, email, input, stamp) => routeCodeNew(db, email, stamp), routeCodeOnOff,
   releaseCodes: (db) => releaseCodes(db), releaseCodeNew,
   reportGroups: (db, email, input) => reportGroups(db, input), saveReportGroup,
-  sentLog: (db) => sentLog(db), setSending,
+  sentLog: (db) => sentLog(db), setSending, setForecastEmail,
   emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
   repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem,
   // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
