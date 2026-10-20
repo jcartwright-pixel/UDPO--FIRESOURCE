@@ -100,8 +100,14 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     const t = await temps.$$eval('#rows [data-location]', r => r.map(x => x.textContent.replace(/\s+/g, ' ')));
     assert.match(t.join(' | '), /Cooler North[\s\S]*36\.4[\s\S]*\|[\s\S]*Freezer 2[\s\S]*2\.1[\s\S]*HIGH/);
     assert.ok(!/Cooler Middle/.test(t.join(' ')), 'a cooler turned off is not on Cooler Temperatures');
+    // Joe 10/19: a sensor reading in range needs no manual check; a HIGH one stays Due until someone enters a reading.
+    const act = await temps.$$eval('#rows [data-location]', r => r.map(x => [x.children[0].querySelector('b').textContent, x.children[9].textContent, x.children[10].textContent]));
+    assert.deepEqual(act, [['Cooler North', 'Sensor', 'OK'], ['Freezer 2', '—', 'Due']]);
+    assert.deepEqual(await temps.$$eval('#hstats div', d => d.map(x => x.textContent)), ['2Locations', '1Checked 2 h', '1Due', '1Alerts']);
+    assert.equal(await temps.$eval('#rows [data-location="ut_temp_cooler_north"] .tp-manual', i => i.disabled), false, 'the manual box still takes a reading');
     if (SHOTS) await temps.screenshot({ path: path.join(SHOTS, 'mocreo-temps-1920.png'), scale: 'css' });
-    results.push('Cooler Temperatures: Cooler North 36.4°F from its sensor, Freezer 2 2.1°F HIGH, Cooler Middle left off');
+    if (SHOTS) { await temps.setViewportSize({ width: 1536, height: 864 }); await temps.screenshot({ path: path.join(SHOTS, 'mocreo-temps-1536.png'), scale: 'css' }); await temps.setViewportSize({ width: 1920, height: 1080 }); }
+    results.push('Cooler Temperatures: Cooler North 36.4°F from its sensor counts as checked by the sensor, Freezer 2 2.1°F HIGH is Due, Cooler Middle left off');
     // Joe 10/17: "I named the sensors ... on the MOCREO website and we need to match them up." Match to MOCREO Names shows the
     // pairs first and saves only on Save Matches: Cooler North goes from sensor A to "Main North", Cooler Middle gets
     // "Main Center", and Freezer 2, whose sensor is named for no cooler here, is left to pick by hand.

@@ -6,8 +6,8 @@ const L = require('../../src/logic');
 const G = require('../../src/garage');
 
 test('a Pre Trip / Post Trip answer that only says yes or no is not a write-up', () => {
-  for (const v of ['YES-NO', 'yes-no', 'YS', 'Y/N', 'Yes/No', 'yes - none', 'YE S', 'Ytes', 'NO']) assert.equal(L.noWriteUp(v), true, v);
-  for (const v of ['YES-POST- AIR LEAK', 'no good', 'yes no brakes', 'air conditioner in tractor don\'t work', 'NO+ mirror']) assert.equal(L.noWriteUp(v), false, v);
+  for (const v of ['YES-NO', 'yes-no', 'YS', 'Y/N', 'Yes/No', 'yes - none', 'YE S', 'Ytes', 'NO', 'UYES', 'yess', 'TES', 'YRS', 'yse', 'UYES-NO', 'yesno']) assert.equal(L.noWriteUp(v), true, v);
+  for (const v of ['YES-POST- AIR LEAK', 'no good', 'yes no brakes', 'air conditioner in tractor don\'t work', 'NO+ mirror', 'eyes', 'UYES flat tire', 'yes leak']) assert.equal(L.noWriteUp(v), false, v);
 });
 
 // Copies of one email, as on TRUCK LIVE 10/18: the old app's (one per answer) and the new reader's (read again 10/15).

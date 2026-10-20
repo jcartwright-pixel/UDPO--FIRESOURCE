@@ -422,6 +422,22 @@ test('Manager Walkthrough: due after 2 hours, past due after 3 hours, only runni
   assert.equal(R.managerWalk({ rows: [], locked: [] }, [], [lines[3]], now).quality.auto, '');
 });
 
+test('Coolers (Joe 10/19): a sensor reading in range counts as checked; Low, High, Offline and Manual only stay due until a manual reading', () => {
+  const now = Date.parse('2026-10-19T20:00:00Z'), ago = (m) => new Date(now - m * 60000).toISOString();
+  const temps = [{ location: 'Dispensers', sensorTemp: 35.8, locked: false, lastCheckedAt: '', status: 'IN RANGE' },
+    { location: 'Cooler East', sensorTemp: 31.5, locked: false, lastCheckedAt: '', status: 'LOW' },
+    { location: 'Cooler Middle', sensorTemp: 36.3, locked: false, lastCheckedAt: '', status: 'OFFLINE' },
+    { location: 'Palletizer', sensorTemp: '', lastManualTemperature: '', locked: false, lastCheckedAt: '', status: 'MANUAL ONLY' },
+    { location: 'Freezer', sensorTemp: '', lastManualTemperature: 36, locked: true, lastCheckedAt: ago(20), lastCheckedBy: 'b@x', status: 'MANUAL ONLY', lastStatus: 'RECORDED' }];
+  assert.deepEqual(temps.map(R.tempChecked), [true, false, false, false, true]);
+  const w = R.managerWalk({ rows: [], locked: [] }, temps, [], now);
+  assert.equal(w.coolers.due, 3, 'Cooler East, Cooler Middle and Palletizer are due');
+  assert.equal(w.coolers.items.find(x => x.name === 'Dispensers').detail, '35.8°F · OK');
+  assert.equal(w.coolers.lastCheck.by, 'b@x', 'the newest check is still the person who checked');
+  const fine = R.managerWalk({ rows: [], locked: [] }, [temps[0], temps[4]], [], now);
+  assert.deepEqual([fine.coolers.due, fine.coolers.state], [0, 'ok'], 'nothing left due: the Coolers step is done');
+});
+
 test('Match to MOCREO names (Joe 10/17): each cooler gets the sensor named for its place; a sensor named for another place leaves', () => {
   const R = require('../../src/plant-rules');
   // The live picks from 9/16 (made while every sensor was "Temperature Humidity Sensor") against the names Joe gave them.

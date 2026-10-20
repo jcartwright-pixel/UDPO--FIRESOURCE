@@ -395,7 +395,7 @@
           loadSequence: effectiveSequence(day),
           dispatchTime: day.dispatchTime, startTime: day.startTime, routeHours: day.routeHours, miles: day.miles,
           driverId: day.driverId, driver: day.driver, intendedDriverId: day.intendedDriverId || '', intendedDriver: day.intendedDriver || '', driverExceptionStatus: day.driverExceptionStatus || '',
-          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer,
+          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer, equipmentOverride: day.equipmentOverride || '',
           forkliftId: day.forkliftId, palletJack: day.palletJack,
           casesOut: day.casesOut, pickup: day.pickup, driverNotes: day.driverNotes,
           plantStatus: day.completeTime ? 'COMPLETE' : day.plantStartedAt ? 'LOADING' : (day.loadStatus || day.status || ''),
@@ -801,6 +801,23 @@
     return !row.driver && (!coverage || coverage === 'UNITED DAIRY');
   }
 
+  // Joe 10/19: a driver can be over on one product and short on another. Both go in the one Live column
+  // (overage_shortage_details) as "OVER 2 cs · 1% milk · Store: ...; SHORT 3 cs · ..."; this takes it apart again.
+  // Text written before (no OVER / SHORT in front) comes back as other.
+  function splitOverShort(text) {
+    var out = { over: '', short: '', other: '' };
+    String(text || '').trim().split(/;\s*(?=(?:OVER|SHORT)\b)/i).forEach(function (part) {
+      part = part.trim();
+      if (!part) return;
+      var m = /^(OVER|SHORT)\b\s*(.*)$/i.exec(part), key = m ? m[1].toLowerCase() : 'other', said = m ? m[2].trim() || 'yes' : part;
+      out[key] = out[key] ? out[key] + '; ' + said : said;
+    });
+    return out;
+  }
+  function joinOverShort(over, short) {
+    return [over && 'OVER ' + String(over).trim(), short && 'SHORT ' + String(short).trim()].filter(Boolean).join('; ');
+  }
+
   // Driver check-ins for one DELIVERY date: every run delivering that day, in route order, with what the driver
   // reported (the same Live columns the current phone check-in writes).
   function checkinRows(runs, deliveryDate) {
@@ -816,7 +833,10 @@
       more.forEach(function (m, i) { if (m && m.issues) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + '): ' + m.issues); if (m && m.needsCleaned) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + ') needs cleaned'); });
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
-      if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
+      var os = splitOverShort(d.overageShortageDetails);
+      if (os.over) issues.push('Over: ' + os.over);
+      if (os.short) issues.push('Short: ' + os.short);
+      if (os.other || (!os.over && !os.short && yes(d.overageShortage))) issues.push('Over/short: ' + (os.other || 'yes'));
       if (d.loadedCorrectly === 'NO') issues.push('Loaded wrong: ' + (d.loadingProblem || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
@@ -1289,7 +1309,23 @@
     if (/^(?:y|ye|yes|yep|yeah|ytes|ye s)$/.test(t)) return true;
     // Joe 10/18: the answering service writes the Pre Trip / Post Trip answers as "YES-NO" (done, nothing wrong), "yes-no",
     // "YS" or "Y/N": only yes / no words, nothing wrong said, so no write-up. "YES-POST- AIR LEAK" says what is wrong and stays.
-    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|n|n0|no|nope|none|na)$/.test(w); });
+    // Joe 10/19: a mistyped "yes" (UYES, YESS, TES, YRS) is still only a yes, so no write-up either: one slip of a key from
+    // "yes" (a letter added, dropped, swapped or changed) counts as yes. "eyes" is a real word and is left alone.
+    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|yesno|n|n0|no|nope|none|na)$/.test(w) || (w !== 'eyes' && oneSlipFrom(w, 'yes')); });
+  }
+
+  // True when a and b differ by one key: one letter added, dropped or changed, or two side-by-side letters swapped.
+  function oneSlipFrom(a, b) {
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    if (a.length === b.length) {
+      var diff = [];
+      for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) diff.push(i);
+      return diff.length === 1 || (diff.length === 2 && diff[1] === diff[0] + 1 && a[diff[0]] === b[diff[1]] && a[diff[1]] === b[diff[0]]);
+    }
+    var long = a.length > b.length ? a : b, short = a.length > b.length ? b : a;
+    for (var j = 0; j < long.length; j++) if (long.slice(0, j) + long.slice(j + 1) === short) return true;
+    return false;
   }
 
   // Joe 10/14 (mock-up A): which screens each person may see, ticked per plant in People & Roles. The areas are the Home
@@ -1379,7 +1415,7 @@
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
-    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
+    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
