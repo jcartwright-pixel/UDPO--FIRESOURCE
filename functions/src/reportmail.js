@@ -6,7 +6,8 @@
  *   REPORT_TO    the Plant Managers group's addresses (comma-separated), used only for a report sent in live mode
  *
  * A report sent from test mode, or from live mode before REPORT_TO is set, goes only to the person who pressed Send,
- * so the sandbox can never email the managers. The report's status says what happened: SENT (sentTo), HELD or FAILED
+ * so the sandbox can never email the managers. Send Test to Me (testOnly, Joe 10/19) goes only to that person on live too.
+ * The Late Forecast box goes only to that person until Administration > Sent Email Log switches it to everyone. The report's status says what happened: SENT (sentTo), HELD or FAILED
  * (reason in plain words); the Manager Center shows it.
  */
 'use strict';
@@ -24,8 +25,17 @@ const REASON = {
 
 function recipients(report, env) {
   const group = addresses(env.REPORT_TO);
-  if (report.mode === 'live' && group.length) return { to: group, copy: false };
+  if (report.mode === 'live' && group.length && !report.testOnly) return { to: group, copy: false };
   return { to: addresses([report.by]), copy: true };
+}
+
+// Joe 10/19 (Late Forecast): an email to the groups leaves the forecast box out until it is switched on for everyone.
+function withoutForecast(report) {
+  let r;
+  try { r = JSON.parse(report.reportJson || ''); } catch (e) { return report; }
+  if (!r || !r.forecast) return report;
+  r.forecast = null;
+  return Object.assign({}, report, { reportJson: JSON.stringify(r), text: (report.note ? 'NOTE: ' + report.note + '\n\n' : '') + R.reportText(r) });
 }
 
 function reportHtml(report) {
@@ -40,7 +50,7 @@ function reportHtml(report) {
 async function logReport(db, report, status, sentTo, reason, from) {
   try {
     await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Plant report', label: report.group || report.groupName || 'Current report', detail: report.mode || '', by: report.by || '',
-      meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live', from: from || '' });
+      meantFor: [], subject: String(report.subject || '').slice(0, 300), sentTo, status, reason: String(reason || '').slice(0, 200), testCopy: report.mode !== 'live' || !!report.testOnly, from: from || '' });
   } catch (e) { console.error('Sent Email Log', e.message || e); }
 }
 
@@ -49,6 +59,7 @@ async function mailReport(ref, report, deps) {
   const d = deps || {};
   let env = d.env || process.env;
   const send = d.sendMail || sendMail;
+  let settingsOf = d.settings || null;
   if (!report || report.status !== 'SENDING') return null;
   let sender = { from: String(env.MAIL_FROM || '').trim(), fromName: 'United Dairy Plant Operations' };
   if (!sender.from) {
@@ -60,6 +71,7 @@ async function mailReport(ref, report, deps) {
   const db = d.db || (ref && ref.firestore) || null;
   if (db) {
     const s = await emailSettings(db);
+    settingsOf = s;
     sender = senderFor(s, report.facilityId, env, 'United Dairy Plant Operations', await personFor(db, report.by));
     if (!s.sending) {
       await ref.update({ status: 'HELD', emailed: false, reason: 'Sending is OFF (Administration > Sent Email Log).' });
@@ -77,6 +89,7 @@ async function mailReport(ref, report, deps) {
     }
   }
   const { to, copy } = recipients(report, env);
+  if (!copy && !(settingsOf && settingsOf.forecastEveryone)) report = withoutForecast(report);
   if (!to.length) {
     await ref.update({ status: 'FAILED', emailed: false, reason: 'No email address to send to.' });
     return 'FAILED';
@@ -84,7 +97,7 @@ async function mailReport(ref, report, deps) {
   try {
     const sent = await send({ from: sender.from, fromName: sender.fromName, to, subject: report.subject, text: report.text, html: reportHtml(report) });
     await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, groupName: report.group || report.groupName || '', sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
-    if (db) await logReport(db, report, 'SENT', sent.to, copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '', sender.from);
+    if (db) await logReport(db, report, 'SENT', sent.to, report.testOnly ? 'Send Test to Me: sent only to ' + sent.to.join(', ') + '.' : copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '', sender.from);
     return 'SENT';
   } catch (e) {
     const reason = REASON[e.code] || ('The email did not go out: ' + (e.message || e));
@@ -95,4 +108,4 @@ async function mailReport(ref, report, deps) {
   }
 }
 
-module.exports = { mailReport, recipients, reportHtml, REASON };
+module.exports = { mailReport, recipients, reportHtml, withoutForecast, REASON };

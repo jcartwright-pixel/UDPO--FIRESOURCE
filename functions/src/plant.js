@@ -1045,7 +1045,9 @@ async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveErro
 // With email set up (MAIL_FROM) it is SENDING and reportmail.js emails it straight after the save; without, it is HELD.
 // The current app's Send Current Report emails the Plant Managers group through its outbound email policy.
 function validateReport(input, SaveError) {
-  const out = { subject: text(input.subject).slice(0, 200), body: text(input.text).slice(0, 20000), note: text(input.note).slice(0, 1500), groupName: text(input.groupName).slice(0, 100) || 'Plant Managers', reportJson: '' };
+  const out = { subject: text(input.subject).slice(0, 200), body: text(input.text).slice(0, 20000), note: text(input.note).slice(0, 1500), groupName: text(input.groupName).slice(0, 100) || 'Plant Managers', reportJson: '',
+    // Joe 10/19: Send Test to Me emails the report only to the person who pressed it, even on the live app.
+    testOnly: input.testOnly === true };
   if (!out.subject || !out.body) throw new SaveError('BAD_REQUEST', 'The report is still loading. Try again in a moment.');
   if (input.report && typeof input.report === 'object' && !Array.isArray(input.report)) {
     const json = JSON.stringify(input.report);
@@ -1057,11 +1059,11 @@ function validateReport(input, SaveError) {
 async function sendReport(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const id = 'REPORT_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 30);
   const mailOn = !!String(process.env.MAIL_FROM || '').trim();
-  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, reportJson: req.reportJson, status: mailOn ? 'SENDING' : 'HELD', emailed: false,
+  const record = { subject: req.subject, text: req.body, note: req.note, groupName: req.groupName, reportJson: req.reportJson, testOnly: !!req.testOnly, status: mailOn ? 'SENDING' : 'HELD', emailed: false,
     date: L.operatingDay(new Date(stamp)), at: stamp, by: email, mode: mode.mode };
   tx.set(db.collection('plantReports').doc(id), record);
   const result = { ok: true, requestId: req.requestId, reportId: id, sent: false, sending: mailOn, subject: req.subject,
-    message: mailOn ? 'Report saved. Sending the email…' : 'Report saved. Email is not set up in Operations yet, so it was not emailed to ' + req.groupName + '.' };
+    message: mailOn ? (req.testOnly ? 'Sending the test to you only…' : 'Report saved. Sending the email…') : 'Report saved. Email is not set up in Operations yet, so it was not emailed' + (req.testOnly ? '.' : ' to ' + req.groupName + '.') };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, reportId: id, result });
   return result;
 }

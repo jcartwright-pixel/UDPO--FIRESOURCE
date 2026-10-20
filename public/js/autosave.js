@@ -4,8 +4,12 @@ import { collection, query, orderBy, limit, onSnapshot } from './firebase.js';
 import { shortTime } from './app.js';
 
 // The round: everything entered since the last report was sent. cb gets the time of that report ('' = none sent yet) and the report.
+// Joe 10/19: a Send Test to Me report (testOnly) does not start a new round; the last report sent to the group does.
 export function watchRound(db, cb) {
-  return onSnapshot(query(collection(db, 'plantReports'), orderBy('at', 'desc'), limit(1)), s => cb(s.docs.length ? String(s.docs[0].data().at || '') : '', s.docs.length ? s.docs[0].data() : null), () => cb('', null));
+  return onSnapshot(query(collection(db, 'plantReports'), orderBy('at', 'desc'), limit(20)), s => {
+    const d = s.docs.map(x => x.data()).find(x => !x.testOnly);
+    cb(d ? String(d.at || '') : '', d || null);
+  }, () => cb('', null));
 }
 
 // One record filled in box by box: the first save makes it, later saves fill in the same record (checkId). Saves go one at a
