@@ -193,6 +193,16 @@ test('scheduler: Save Load checks what the current app checks', () => {
   assert.deepEqual(P.validateSchedule({ lane: 'RECEIVING', op: 'removeSupplier', id: 'SUP-START-2' }, SaveError), { lane: 'RECEIVING', op: 'removeSupplier', id: 'SUP-START-2' });
 });
 
+test('scheduler: typed Start and End times on a box load (Joe 10/20, "in case the plant forgot")', () => {
+  const times = (fields) => P.validateSchedule({ lane: 'SHIPPING', op: 'progress', step: 'times', id: 'SCHED-a2', date: '2026-10-09', fields }, SaveError);
+  const out = times({ startedAt: '2026-10-08T18:10:00Z', completedAt: '2026-10-08T19:45:00.000Z' });
+  assert.deepEqual([out.step, out.startedAt, out.completedAt], ['times', '2026-10-08T18:10:00.000Z', '2026-10-08T19:45:00.000Z']);
+  assert.deepEqual([times({}).startedAt, times({}).completedAt], ['', ''], 'both cleared: back to waiting');
+  assert.throws(() => times({ completedAt: '2026-10-08T19:45:00Z' }), /Start Time too/);
+  assert.throws(() => times({ startedAt: '2026-10-08T19:45:00Z', completedAt: '2026-10-08T18:10:00Z' }), /End Time cannot be before Start Time/);
+  assert.throws(() => times({ startedAt: 'soon' }), /Check the Start Time/);
+});
+
 test('yard checks: a loaded trailer is on the yard until its dispatch time; a check locks it for 2 hours; Left Yard takes the load off', () => {
   const at = (s) => Date.parse(s);
   // Wednesday 10/7 loads: Jersey (done 11:33 AM, dispatch 1 PM, delivers Thursday), an early Walmart load for Saturday,
