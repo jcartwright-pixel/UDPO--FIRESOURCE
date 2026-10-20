@@ -104,7 +104,7 @@
     function gpsWhy(g) { return g.off === null ? '' : g.off === 0 ? 'On the set point' : deg(Math.abs(g.off)) + '° ' + (g.off > 0 ? 'above' : 'below') + ' the set point'; }
     function gpsCell(trailer, setPoint) {
       const g = gpsInfo(trailer, setPoint);
-      if (!g.has) return '<td class="yd-gps none">—</td>';
+      if (!g.has) return '<td class="yd-gps none"' + (g.recording ? ' title="' + escapeHtml(g.noUnit ? 'No GPS unit found for this trailer in Verizon Fleet' : 'The GPS has not sent a temperature for this trailer yet') + '"' : '') + '>—</td>';
       return '<td class="yd-gps' + (g.flag ? ' bad' : '') + '" title="' + escapeHtml(gpsWhy(g)) + '">' + escapeHtml(deg(g.tempF)) + '°</td>';
     }
 
