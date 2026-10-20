@@ -82,3 +82,24 @@ export function watchWashRequests(db, fromKey, cb, onError, list) {
   const stops = [onSnapshot(query(col, where('status', 'not-in', WASH_DONE)), take('open'), onError), onSnapshot(query(col, where('completed_at', '>=', from)), take('done'), onError)];
   return () => stops.forEach(s => s());
 }
+
+// Joe 10/19 (Plant Distribution and Yard Checks slow to open): the loads around today, from the one-record-per-run-and-day
+// list (functions/src/rundays.js), instead of three weeks of whole runs. cb(runs) gets each run put back together as the runs
+// list holds it ({id, route facts, days}), with only its days whose load, carry or delivery dates touch one of dates; every
+// load, yard trailer, unload and return those screens show for today is one of those days.
+export function watchLoads(db, dates, cb, onError) {
+  return onSnapshot(query(collection(db, 'runDays'), where('dates', 'array-contains-any', dates)), s => {
+    const byRun = {};
+    s.docs.forEach(d => {
+      const x = d.data(), id = x.runDocId;
+      if (!id) return;
+      if (!byRun[id]) {
+        const run = Object.assign({ id }, x, { days: {} });
+        delete run.runDocId; delete run.day; delete run.dates;
+        byRun[id] = run;
+      }
+      Object.assign(byRun[id].days, x.days || {});
+    });
+    cb(Object.values(byRun));
+  }, onError);
+}

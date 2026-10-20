@@ -11,9 +11,15 @@ function db() {
   return admin.firestore();
 }
 
+// The emulator answers 409 while a write is still going on (the run-day trigger, src/rundays.js, writes just after a run
+// changes), so a clear waits a moment and tries again.
 async function clear() {
-  const res = await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/' + PROJECT + '/databases/(default)/documents', { method: 'DELETE' });
-  if (!res.ok) throw new Error('could not clear the emulator: ' + res.status);
+  for (let tries = 0; ; tries++) {
+    const res = await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/' + PROJECT + '/databases/(default)/documents', { method: 'DELETE' });
+    if (res.ok) return;
+    if (res.status !== 409 || tries >= 20) throw new Error('could not clear the emulator: ' + res.status);
+    await new Promise(r => setTimeout(r, 250));
+  }
 }
 
 module.exports = { PROJECT, db, clear };

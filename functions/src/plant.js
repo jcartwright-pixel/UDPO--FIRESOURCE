@@ -841,7 +841,8 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
     return result;
   }
   if (!req.departed) {
-    const same = (await tx.get(journal.where('date', '==', req.date))).docs.map(d => d.data());
+    // Joe 10/19 (yard saves slow): only that day's yard checks, not every plant record of the day (the lock reads no others).
+    const same = (await tx.get(journal.where('type', '==', 'YARD_CHECK').where('date', '==', req.date))).docs.map(d => d.data());
     const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
     if (left) throw new SaveError('CONFLICT', 'Trailer ' + req.trailer + ' was already checked. It can be checked again in ' + left + ' minutes.');
   }
