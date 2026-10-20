@@ -5,6 +5,7 @@
  *   config/app                 mode ("test" until cutover), which app owns each screen, the three Live weeks, last transfer
  *   weeks/{weekStart}          one per Live week: tab it came from, row fingerprints used to skip unchanged rows
  *   runs/{weekStart}__{key}    one per Live week row (a route run): route facts plus seven day blocks
+ *   runDays/{runId}__{day}     one per run and day: the run's facts with that one day, and the dates it touches (rundays.js)
  *   drivers/{driver_id}        Driver Master
  *   equipment/{equipment_id}   Equipment Master (trucks, trailers, fork trucks)
  *   routes/{run_id}            Route Master
