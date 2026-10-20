@@ -134,7 +134,7 @@
     const routeNo = (r) => L.routeNumber(r.route), runName = (r) => L.runLabel(r.routeName, r.run, r.routeRunType), fullName = (r) => routeNo(r) + ' ' + runName(r);
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
-    let unsubscribeRuns = null, runs = [], rows = [], editing = false, rowDrag = null, held = false, writeBack = false, editRow = null;
+    let unsubscribeRuns = null, unsubscribePlant = null, plantLoads = [], runs = [], rows = [], editing = false, rowDrag = null, held = false, writeBack = false, editRow = null;
     const getRuns = () => runs;
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
     const keptOff = {}, ovr = {};
@@ -171,6 +171,10 @@
         const sat = L.addDays(loadDate, -1);
         L.dailyRows(runs, sat).filter(r => r.deliveryDate === loadDate).forEach(r => list.push(Object.assign(r, { already: true })));
       }
+      // Joe 10/20: a load with no trailer of its own shows the trailer the plant put on its Plant Scheduler load (dispatch wins on
+      // time, driver and truck, not the trailer). Typing a trailer here replaces it.
+      const plant = L.plantByRun(runs, plantLoads);
+      list.forEach(r => { if (!r.trailer && !r.trailerId) { const t = L.plantTrailer(plant[r.runId + '|' + r.deliveryDate]); if (t) Object.assign(r, { trailer: t, plantTrailer: true }); } });
       return list.map((r, i) => ({ r, i })).sort((a, b) => (a.r.deliveryDate < b.r.deliveryDate ? -1 : a.r.deliveryDate > b.r.deliveryDate ? 1 : 0)
         || (a.r.loadDate < b.r.loadDate ? -1 : a.r.loadDate > b.r.loadDate ? 1 : 0) || a.i - b.i).map(x => x.r);
     }
@@ -206,6 +210,7 @@
         const reason = String(unit.notes || '').replace(/^DOWN:?\s*/i, '').split('|')[0].trim();
         return cell(text + ' ' + why, 'missing offcover unit-down', live && kind).replace(/title="[^"]*"/, () => 'title="' + escapeHtml(text + ' is ' + why.toLowerCase() + (reason && !/^down\b/i.test(reason) ? ' (' + reason + ')' : '') + '. Pick another ' + kind + '.') + '"');
       }
+      if (kind === 'trailer' && r.plantTrailer) return cell(text, '', live && 'trailer').replace(/title="[^"]*"/, () => 'title="' + escapeHtml(text + ' from the Plant Scheduler. Pick a trailer to change it.') + '"');
       return kind === 'truck' ? cell(text, r.truck || !needs || noTractor(r) ? '' : 'missing', live && 'truck') : cell(text, r.trailer || !needs ? '' : 'missing', live && 'trailer');
     }
     // Every load from today on (in the weeks on screen) that still has a down unit, with one button to take those units off.
@@ -650,6 +655,10 @@
       // One live query: every open screen gets each change the moment it is saved, without checking every 30 seconds.
       const weeks = [...new Set(L.weeksForLoadDate(loadDate).concat(isSaturday(loadDate) ? L.weeksForLoadDate(L.addDays(loadDate, 1)) : []))];
       const q = query(collection(db, 'runs'), where('weekStart', 'in', weeks));
+      // The Plant Scheduler's loads for those weeks (their trailers fill a blank Trailer box).
+      if (unsubscribePlant) unsubscribePlant();
+      const first = weeks.slice().sort()[0], last = L.addDays(weeks.slice().sort().pop(), 6);
+      unsubscribePlant = onSnapshot(query(collection(db, 'plantLoads'), where('date', '>=', first), where('date', '<=', last)), snap => { plantLoads = snap.docs.map(d => d.data()); render(); }, () => { plantLoads = []; });
       unsubscribeRuns = onSnapshot(q, snap => {
         runs = withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
         runsRead = true;

@@ -71,6 +71,7 @@
     </div>
     <div class="modal-actions">
       <button type="button" class="left danger-line" id="edit-notrunning">Ended Up Not Running</button>
+      <span class="hint" id="edit-notrunning-why" hidden></span>
       <button type="button" id="edit-pickup">Add Pickup</button>
       <span class="edit-saved" id="edit-saved" role="status"></span>
       <button type="button" data-close>Close</button>
@@ -519,6 +520,12 @@
       document.getElementById('edit-shift').value = row.shift || '';
       document.getElementById('edit-notes').value = row.notes || '';
       ['edit-start', 'edit-end', 'edit-temp', 'edit-shift', 'edit-notes', 'edit-notrunning', 'edit-pickup'].forEach(k => { document.getElementById(k).disabled = !canLoad(); });
+      // Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck, so a load dispatch has a driver on is only marked
+      // not running by dispatch. The button stays, greyed, and says why.
+      const who = row.runDocId ? L.dispatchDriver({ driver: row.driver }) : '', why = document.getElementById('edit-notrunning-why');
+      if (who) document.getElementById('edit-notrunning').disabled = true;
+      why.textContent = who ? 'Dispatch has ' + who + ' on this load. Only dispatch can mark it not running.' : '';
+      why.hidden = !who;
       document.getElementById('edit-saved').textContent = '';
       EDIT_BOXES.forEach(id => { editShown[id] = document.getElementById(id).value; });
       openModal('edit-modal');

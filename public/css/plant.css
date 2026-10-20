@@ -68,6 +68,9 @@
 .plant-page .pu-item small { display: block; color: var(--muted); font-weight: 600; }
 .plant-page .pu-item button { height: 32px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--runs-ink); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page .modal-actions .left { margin-right: auto; }
+/* Joe 10/20: why Ended Up Not Running is greyed (dispatch has a driver on the load). On a phone it takes its own line. */
+.plant-page #edit-notrunning-why { align-self: center; margin-right: auto; }
+@media (max-width: 700px) { .plant-page #edit-modal .modal-actions { flex-wrap: wrap; } .plant-page #edit-notrunning-why { order: -1; flex-basis: 100%; } }
 .plant-page button.danger-line { color: var(--pickup); border-color: #f2b8b2; }
 
 /* Plant Distribution Departments: the four department cards keep the home cards' look. */

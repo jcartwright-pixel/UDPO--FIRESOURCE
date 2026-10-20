@@ -35,6 +35,13 @@ test('Start, End and the status picker follow the current app\'s rule', async ()
 test('counts, temperature, notes and Ended Up Not Running', async () => {
   assert.deepEqual(await values({}, { quantity: '1,240', temperature: '36.5', notes: ' short 2 ', shift: 'FIRST SHIFT' }), { casesOut: 1240, loadTemperature: 36.5, plantNotes: 'short 2', plantShift: 'FIRST SHIFT' });
   assert.deepEqual(await values({}, { runs: false }), { runs: false });
+  // Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck; the plant cannot end a load dispatch has a driver on.
+  await assert.rejects(values({ driverId: 'drv_jacobs', driver: 'JACOBS, JOEL', truck: '123892' }, { runs: false }), /Dispatch has JACOBS, JOEL on this load/);
+  await assert.rejects(values({ driver: 'CARRIER' }, { runs: false }), /Dispatch has CARRIER/);
+  // A load with no driver (or OPEN) still ends up not running, and its truck and trailer come off.
+  const open = await values({ driver: 'OPEN', trailer: 'T-901', trailerId: 'veh_trailer_t_901' }, { runs: false });
+  assert.equal(open.runs, false);
+  assert.equal(open.trailer, '');
   assert.throws(() => P.validateLoad({ fields: { quantity: 'lots' } }, SaveError), /Quantity must be a number/);
   assert.throws(() => P.validateLoad({ fields: { runs: true } }, SaveError), /only be marked as not running/);
 });

@@ -281,6 +281,26 @@ test('Weekly: a plant load marked Not running (plantLoadOff) is off; without the
   assert.equal(L.weeklyCellClass(shown, 'wed', ctx), 'off');
 });
 
+test('Weekly: a day dispatch has a driver on never shows PLANT LOAD (Joe 10/20, 844 Ohio Processor)', () => {
+  const row = { runId: 'run_844', coverageType: 'UNITED DAIRY', days: { wed: { runs: false, date: '2026-10-21', driverId: 'drv_jacobs', driver: 'JACOBS, JOEL' } } };
+  const ctx = { plant: { 'run_844|2026-10-21': [{ runId: 'run_844' }] }, dup: {}, relief: {}, exceptions: [] };
+  assert.equal(L.weeklyCellClass(row, 'wed', ctx), 'off', 'the driver shows, marked Not running, never PLANT LOAD');
+  row.days.wed.runs = true;
+  assert.equal(L.weeklyCellClass(row, 'wed', ctx), 'assigned');
+  assert.equal(L.dispatchDriver({ driver: 'JACOBS, JOEL' }), 'JACOBS, JOEL');
+  assert.equal(L.dispatchDriver({ driver: 'CARRIER' }), 'CARRIER');
+  assert.equal(L.dispatchDriver({ driver: 'OPEN' }), '');
+  assert.equal(L.dispatchDriver({ driver: '' }), '');
+});
+
+test('Daily: the trailer the plant put on a run\'s Scheduler load that day (Joe 10/20, Garber, Ventura, Ohio Processor)', () => {
+  const rows = [{ runId: 'run_844', route: '844', run: '' }];
+  const plant = L.plantByRun(rows, [{ runId: 'run_844', date: '2026-10-21', pickupTime: '16:00', trailer: '' }, { runId: 'run_844', date: '2026-10-21', pickupTime: '17:00', trailer: 't-10295' }]);
+  assert.equal(L.plantTrailer(plant['run_844|2026-10-21']), 'T-10295');
+  assert.equal(L.plantTrailer(plant['run_844|2026-10-22']), '');
+  assert.equal(L.plantTrailer([{ trailer: ' ' }]), '');
+});
+
 test('weekly: an as-needed customer\'s Scheduler loads go on its LOAD 1, LOAD 2 runs by pickup time (Joe 10/14)', () => {
   const days = () => Object.fromEntries(L.DAYS.map(p => [p, { runs: false }]));
   const rows = [1, 2].map(n => ({ runId: 'c905_' + n, route: '905_' + n, run: 'ALDI - CHARLESTON LOAD ' + n, days: days() })).concat([{ runId: 'g892', route: '892', run: 'GARBER', days: days() }]);
