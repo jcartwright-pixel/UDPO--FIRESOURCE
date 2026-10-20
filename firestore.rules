@@ -57,6 +57,8 @@ service cloud.firestore {
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
     match /runs/{id} { allow read: if activeUserOrStation() || tvStation(); }
+    // Joe 10/19: one record per run and day (functions/src/rundays.js), read like the runs they come from.
+    match /runDays/{id} { allow read: if activeUserOrStation() || tvStation(); }
     match /drivers/{id} { allow read: if activeUser() || tvStation(); }
     // Joe 10/15: drivers' mobile phones typed on the Driver Roster, and the Schedule Texts log (the server writes both; the
     // Twilio login stays in private/sms).

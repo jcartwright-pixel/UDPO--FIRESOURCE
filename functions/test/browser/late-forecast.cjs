@@ -69,7 +69,8 @@ async function openPage(browser, url, w, h, opts) {
   try {
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
     await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
-    await mc.waitForFunction(() => /late/.test((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || ''));
+    // The loads reach Manager Center through runDays (filled by a trigger on each run), so wait for all of them.
+    await mc.waitForFunction(() => /2\s*late/.test((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || ''), null, { timeout: 20000 });
     const tile = await mc.textContent('.mc-tile[href="forecast.html"]');
     assert.match(tile, /Late Forecast\s*2\s*late\s*All done est\. \d+:\d\d AM/);
     const cut = await mc.$$eval('[data-card="dept"] .mc-tile span, [data-card="dept"] .mc-tile i', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));

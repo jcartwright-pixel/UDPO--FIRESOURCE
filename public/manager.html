@@ -76,7 +76,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, printInFrame, shortTime, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
-    import { watchWashRequests } from './js/recent-records.js';
+    import { watchWashRequests, watchLoads } from './js/recent-records.js';
     import * as P from './js/plant-core.js';
     import { watchRound } from './js/autosave.js';
     import { cardClicks } from './js/cards.js';
@@ -351,8 +351,8 @@
         readForecastNights(db, date).then(h => { if (date === forDate) { data.history = h; later(); } }, () => {});
         unsubs.splice(0).forEach(u => u());
         loaded.runs = loaded.journal = false;
-        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
-        unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); loaded.runs = true; later(); }, fail('the loads')));
+        // Joe 10/19 (Plant Distribution slow to open): yesterday's and today's loads only, not three weeks of whole runs.
+        unsubs.push(watchLoads(db, [L.addDays(date, -1), date], runs => { data.runs = runs; loaded.runs = true; later(); }, fail('the loads')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); loaded.journal = true; later(); }, fail('the plant journal')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: NOTE_DAYS }, (_, n) => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
         unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); later(); }, fail('the pickups')));
