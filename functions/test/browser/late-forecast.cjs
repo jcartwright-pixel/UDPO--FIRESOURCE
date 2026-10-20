@@ -84,11 +84,15 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(reports.length, 1);
     assert.equal(reports[0].testOnly, true);
     assert.match(JSON.parse(reports[0].reportJson).forecast.paceText, /Mon 10-5-26, Mon 10-12-26 \+ tonight/);
+    assert.doesNotMatch(await mc.textContent('#rp-body'), /\bpace\b|cases an hour|cushion|Mon 10-12-26/i, 'the report window shows no formula');
     assert.deepEqual(mc.errors, []);
 
     await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.mc-tile[href="forecast.html"]')]);
     await mc.waitForSelector('.fc-row.late');
-    await mc.waitForFunction(() => /Mon 10-12-26/.test(document.getElementById('band').textContent));
+    // Past nights read in: the due-by count is the one worked out with them.
+    await mc.waitForFunction(() => /9 loads\s*3,791 cases/.test(document.getElementById('band').textContent));
+    // Joe 10/20: nobody sees how the forecast is worked out (no pace, cases an hour, past nights or minutes a load).
+    assert.doesNotMatch(await mc.evaluate(() => document.body.innerText), /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26|minutes a load|47 cases/i);
     const late = await mc.$$eval('.fc-row.late', rows => rows.map(r => r.querySelector('b').textContent + ' ' + r.querySelector('.fc-why').textContent));
     assert.deepEqual(late.map(t => t.split(' ')[0]), ['909', '907']);
     late.forEach(t => assert.match(t, /past 6 AM shift end · /));

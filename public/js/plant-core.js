@@ -139,17 +139,21 @@ export function nowMinutes(now) {
 }
 
 // Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
-// Saturday loadout for Monday is not behind until Monday (Joe 10/11).
+// Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load left over from last night (still open
+// after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is behind before its dispatch time too.
 export function isBehind(row, today, now) {
   if (row.state === 'DONE') return false;
-  const leaves = departWall(row);
+  const leaves = departWall(row), n = wallNowMinutes(now);
+  if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return true;
   if (leaves === null) return false;
-  return wallNowMinutes(now) > leaves + BEHIND_MINUTES;
+  return n > leaves + BEHIND_MINUTES;
 }
 // Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
 // plant-rules.js departWall: the dispatch time on the route's Departure Day (Load Day = the load date, Delivery Day = the
 // departure date, Joe 10/19), the 6 a.m. guess where the route has none (this file is also used on screens that do not load plant-rules.js).
 const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
+// The end of the shift running at wall minute n: 6 a.m. after the operating day that n falls in.
+export const shiftEndAfter = (n) => (Math.floor((n - 360) / 1440) + 1) * 1440 + 360;
 export function wallNowMinutes(now) {
   const parts = {};
   new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })

@@ -333,6 +333,7 @@ test('report route tiles: the run\'s short name (Joe 10/14)', () => {
   assert.equal(n('906', 'LANCASTER'), 'Lancaster');
   assert.equal(n('6304', 'UT WALMART'), 'Walmart');
   assert.equal(n('503', 'SUN VALLEY'), 'Sun Valley');
+  assert.equal(n('855', 'SAVE-A-LOT 1'), 'Save-A-Lot 1', 'Joe 10/20: the Save-A-Lot loads are told apart');
   assert.equal(n('909', 'MARIETTA LOAD 2'), 'Marietta Load 2');
   assert.equal(n('8302_1', '8302_1'), '', 'a run named by its number has no short name');
   assert.equal(n('801', ''), '');

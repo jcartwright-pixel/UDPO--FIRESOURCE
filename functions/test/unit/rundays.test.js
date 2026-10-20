@@ -13,6 +13,11 @@ test('each day touches its load, carry, delivery and departure dates', () => {
   assert.deepEqual(R.dayDates(run, 'sat', run.days.sat), ['2026-10-24'], 'loaded the same day');
 });
 
+test('a load date far from the delivery (1-1-70 on the Live sheet) does not push the delivery day out (Joe 10/20, Save-A-Lot)', () => {
+  const day = { runs: true, loadDate: '1970-01-01', loadDayOffset: 0.7916666667, deliveryDate: '2026-10-20', departureDate: '2026-10-20' };
+  assert.deepEqual(R.dayDates({ weekStart: '2026-10-18' }, 'tue', day), ['2026-10-20']);
+});
+
 test('one record per day with the route facts and that day only; none for the archive', () => {
   const docs = R.docsFor('2026-10-18__845', run);
   assert.deepEqual(Object.keys(docs), ['2026-10-18__845__mon', '2026-10-18__845__wed', '2026-10-18__845__sat']);

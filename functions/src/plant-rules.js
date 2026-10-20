@@ -852,6 +852,7 @@
   function clockOf(v) { var t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? zoned(t, { hour: 'numeric', minute: '2-digit' }) : text(v); }
   function minutesText12(m) { if (m === null || m === undefined || m === '') return ''; var h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM'); }
   function lateText(minutes) { var m = Math.abs(minutes), h = Math.floor(m / 60), t = h ? h + ' h ' + (m % 60) + ' min' : m + ' min'; return minutes <= 0 ? t + ' late' : 'departs in ' + t; }
+  function leftFrom(key) { var n = dayNum(key); return n === null ? 'last night' : dayShort(n * 1440) + ' ' + dateShort(key); }
   function statusWord(s) { return s === 'WAITING' ? 'NOT LOADED' : s === 'DONE' ? 'COMPLETE' : s; }
   // Every part of the report from what the screens already show: loads (the Loadout Center's rows), open pickups, the shift log,
   // the production lines with their last checks, the temperature rows.
@@ -862,11 +863,15 @@
       if (!areas[r.area]) return;
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
-        startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
+        startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
-      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); } else out.nextUp.push(item);
+      // Joe 10/20: a load left over from last night that leaves before this shift ends missed its shift, so it is behind even
+      // before its dispatch time (a Saturday loadout for Monday still waits for Monday, Joe 10/11).
+      if (until !== null && until < -REPORT_BEHIND) { item.late = lateText(until); out.behind.push(item); }
+      else if (r.prior && (leaves === null || leaves <= (Math.floor((now - 360) / 1440) + 1) * 1440 + 360)) { item.late = 'left over from ' + leftFrom(r.loadDate); out.behind.push(item); }
+      else out.nextUp.push(item);
     });
     var byDepart = function (a, b) { var x = a.minutesUntil === null ? 1e9 : a.minutesUntil, y = b.minutesUntil === null ? 1e9 : b.minutesUntil; return x - y || a.route.localeCompare(b.route, undefined, { numeric: true }); };
     out.behind.sort(byDepart);
@@ -975,15 +980,18 @@
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) });
       var loadDay = dayNum(r.loadDate), shiftEnd = loadDay === null ? null : (loadDay + 1) * 1440 + FORECAST.shiftEnd;
       return { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), loadDate: text(r.loadDate), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), status: r.state,
-        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior };
+        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior, paused: !!r.paused };
     };
     // Loads loading now finish their own time after they started (at least 5 minutes from now); the rest follow them, one
-    // after another in loading order.
-    open.filter(function (r) { return r.state === 'LOADING'; }).forEach(function (r) {
+    // after another in loading order: last night's left-over loads first (Joe 10/20: the plant carries straight on through the
+    // 6 a.m. roll), then today's. A paused load is not loading, so it waits its turn and takes its whole time again.
+    var loadingNow = function (r) { return r.state === 'LOADING' && !r.paused; };
+    open = open.filter(loadingNow).concat(open.filter(function (r) { return !loadingNow(r) && r.prior; }), open.filter(function (r) { return !loadingNow(r) && !r.prior; }));
+    open.filter(loadingNow).forEach(function (r) {
       var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
       x.start = s ? s.start : now; x.est = Math.max(x.start + x.minutes, now + 5); cursor = Math.max(cursor, x.est); out.push(x);
     });
-    open.filter(function (r) { return r.state !== 'LOADING'; }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = cursor + x.minutes; cursor = x.est; out.push(x); });
+    open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = cursor + x.minutes; cursor = x.est; out.push(x); });
     out.forEach(function (x) {
       var dispatchLate = x.leaves !== null && x.est > x.leaves, shiftLate = x.shiftEnd !== null && x.est > x.shiftEnd;
       var deadline = x.leaves === null ? x.shiftEnd : x.shiftEnd === null ? x.leaves : Math.min(x.leaves, x.shiftEnd);
@@ -1028,11 +1036,12 @@
   function shortRun(x) {
     var run = text(x.run);
     if ((!run || routeNumber(run) === routeNumber(x.route)) && text(x.routeName) && routeNumber(x.routeName) !== routeNumber(x.route)) run = text(x.routeName);
-    var w = run.toUpperCase().split(/[\s_\-·]+/).filter(Boolean);
+    // Joe 10/20: "Save-A-Lot 1" and "Save-A-Lot 2" both read "Save A"; Save-A-Lot stays one word so the two are told apart.
+    var w = run.toUpperCase().replace(/SAVE[\s-]*A[\s-]*LOT/g, 'SAVEALOT').split(/[\s_\-·]+/).filter(Boolean);
     if (!run || routeNumber(run) === routeNumber(x.route)) return '';
     if (w.length > 1 && /^[A-Z]{2}$/.test(w[0])) w.shift();
     w = w.filter(function (t) { return t !== 'MILK'; });
-    return w.slice(0, /^\d+$/.test(w[2] || '') ? 3 : 2).map(function (t) { return t.length <= 2 || /\d/.test(t) || !/[AEIOUY]/.test(t) || ACRONYMS.indexOf(t) >= 0 ? t : t.charAt(0) + t.slice(1).toLowerCase(); }).join(' ');
+    return w.slice(0, /^\d+$/.test(w[2] || '') ? 3 : 2).map(function (t) { return t === 'SAVEALOT' ? 'Save-A-Lot' : t.length <= 2 || /\d/.test(t) || !/[AEIOUY]/.test(t) || ACRONYMS.indexOf(t) >= 0 ? t : t.charAt(0) + t.slice(1).toLowerCase(); }).join(' ');
   }
   function reportText(r) {
     var L = [], f = r.forecast;
@@ -1045,7 +1054,6 @@
       forecastLateText(f).forEach(function (t) { L.push('  ' + t); });
       L.push('  Due by ' + f.dueByText + ': ' + f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases' + (f.due.loads ? ', est. done ' + f.due.doneText : ''));
       if (f.loads.length) L.push('  All loads done: est. ' + f.allDoneText + ' · ' + f.casesLeft.toLocaleString('en-US') + ' cases left');
-      L.push('  Pace ' + f.rate.toLocaleString('en-US') + ' cases an hour (' + f.paceText + ')');
       L.push('');
     }
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
@@ -1103,7 +1111,8 @@
       var last = null;
       return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + (doneHead ? '<td align="right" style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + INK + '">' + doneHead + '</td>' : th('Done', 1)) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
         var sep = '';
-        if (splitDays && x.day !== last) { last = x.day; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + INK + ';border-bottom:2px solid ' + INK + '">' + e(deliversLabel(x.day)) + '</td></tr>'; }
+        var key = hasPrior ? (x.prior ? 'prior' : 'today') : x.day;
+        if ((splitDays || hasPrior) && key !== last) { last = key; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + (key === 'prior' ? '#9a5b00' : INK) + ';border-bottom:2px solid ' + (key === 'prior' ? '#e8a317' : INK) + '">' + e(hasPrior ? (x.prior ? 'Left over from ' + leftFrom(x.loadDate) : 'Today ' + todayLabel) : deliversLabel(x.day)) + '</td></tr>'; }
         return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : x.est ? (x.est.late ? '<span style="display:inline-block;padding:1px 6px;border-radius:5px;background:' + RED + ';color:#ffffff;font-weight:800" title="' + e(x.est.reason) + '">' + e(x.est.estText) + ' &#9888;</span>' : '<span style="color:' + GREEN + ';font-weight:800">' + e(x.est.estText) + '</span>') : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
@@ -1112,7 +1121,8 @@
     function shortName(v) { v = text(v); return v.length > 16 ? v.replace(/\bGALLON\b/g, 'GAL').replace(/\bGallon\b/g, 'Gal') : v; }
     function shortShift(v) { return text(v).replace(/^First\b/i, '1st').replace(/^Second\b/i, '2nd').replace(/^Third\b/i, '3rd').replace(/:00\b/g, '').replace(/ to /g, '-'); }
     // Joe 10/19 (Late Forecast): a box under the banner: how many loads will be late and why, the loads due by 5:00 AM with
-    // when they will be done, when every load will be done, the cases left and the pace (estimated, so it says so).
+    // when they will be done, when every load will be done and the cases left (estimated, so it says so). Joe 10/20: no pace,
+    // cases an hour or which nights it came from: the group does not see how the forecast is worked out.
     function forecastBox(f) {
       var bad = f.late > 0, line = function (a, b, k) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + INK + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + a + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + b + '</td></tr>'; };
       var lateList = forecastLateText(f), dueWord = f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases';
@@ -1123,7 +1133,7 @@
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:6px">' +
         line('Due by ' + e(f.dueByText) + ': ' + e(dueWord), f.due.loads ? 'est. ' + e(f.due.doneText) : '&ndash;', f.due.late > 0) +
         (f.loads.length ? line('All loads done', 'est. ' + e(f.allDoneText), bad) + line('Cases left', e(f.casesLeft.toLocaleString('en-US')), false) : line('All loads done', 'nothing left', false)) +
-        line('Pace (' + e(f.paceText) + ')', e(f.rate.toLocaleString('en-US')) + ' cases/hr', false) + '</table></div></td></tr>';
+        '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes by when they leave. Both are split by
@@ -1138,8 +1148,15 @@
       .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
     // Joe 10/19 (Late Forecast): with a forecast, a load not loaded shows its Est. Done (green, or red with a warning sign when late).
     var fc = r.forecast, fcBy = {}; (fc ? fc.loads : []).forEach(function (x) { fcBy[x.id] = x; });
-    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || untilOf(a) - untilOf(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: '#fde8e6', fg: RED }; });
+    // Joe 10/20: after the 6 a.m. roll, like the Loadout Center: what is left over from the day before first, then today's
+    // loads, each in loading order (the forecast's order), instead of by delivery day.
+    var fcAt = {}; (fc ? fc.loads : []).forEach(function (x, i) { fcAt[x.id] = i; });
+    var hasPrior = (r.behind || []).concat(r.nextUp || []).some(function (x) { return x.priorDay; });
+    var todayKey = (r.behind || []).concat(r.nextUp || [], r.loaded || []).filter(function (x) { return !x.priorDay && x.loadDate; }).map(function (x) { return x.loadDate; })[0] || '';
+    var todayLabel = todayKey ? leftFrom(todayKey) : '';
+    var loadOrder = function (a, b) { var x = fcAt[a.id], y = fcAt[b.id]; return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y) || a.loadSequence - b.loadSequence || untilOf(a) - untilOf(b); };
+    var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || untilOf(a) - untilOf(b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
+      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: '#fde8e6', fg: RED }; });
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
     var H = [];

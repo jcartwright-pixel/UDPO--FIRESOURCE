@@ -19,7 +19,8 @@ const M = require('./model');
 
 const COLLECTION = 'runDays';
 const HISTORY_TAB = 'DISPATCH WEEK HISTORY';
-const VERSION = 1;
+// 2: a load date far from the delivery (1-1-70 on the Live sheet) no longer pushes the right dates out (Joe 10/20, Save-A-Lot).
+const VERSION = 2;
 // Left out: the seven days, the sheet's cells, and the copy's own stamps (they change on every copy, and no screen shows them).
 const SKIP = ['days', 'cells', 'fingerprint', 'transferredAt'];
 
@@ -31,8 +32,11 @@ function dayDates(run, prefix, day) {
   if (i < 0 || !L.isDateKey(run.weekStart)) return [];
   const delivery = L.addDays(run.weekStart, i);
   const offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : Number(day.loadDayOffset);
-  const keys = [delivery, L.dateKey(day.deliveryDate), L.dateKey(day.departureDate), L.dateKey(day.loadDate), isFinite(offset) ? L.addDays(delivery, offset) : null]
-    .filter(k => k && L.isDateKey(k)).sort();
+  // Joe 10/20: Save-A-Lot's Tuesday load date read 1-1-70 on the Live sheet, so its dates started in 1970 and it was left off
+  // Manager Center and the shift report. A date more than a week from the delivery is a bad cell and is left out.
+  const near = (k) => k >= L.addDays(delivery, -7) && k <= L.addDays(delivery, 7);
+  const keys = [delivery, L.dateKey(day.deliveryDate), L.dateKey(day.departureDate), L.dateKey(day.loadDate), isFinite(offset) ? L.addDays(delivery, L.dayOffset(offset)) : null]
+    .filter(k => k && L.isDateKey(k) && near(k)).sort();
   const out = [];
   // A load is never more than a week ahead of its delivery; a typo in a date is not allowed to fill the list.
   for (let k = keys[0]; k && k <= keys[keys.length - 1] && out.length < 10; k = L.addDays(k, 1)) out.push(k);
