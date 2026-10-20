@@ -1341,6 +1341,11 @@
   function noWriteUp(value) {
     var t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
     if (!t) return true;
+    // Joe 10/20: "YES - NO WRITE UPS" is a done Post Trip with nothing wrong. A yes in front of (or after) an answer that says
+    // nothing is wrong changes nothing, so it is no write-up either; "YES - AIR LEAK" still says what is wrong and stays.
+    var ends = /^(\S+) (.+)$/.exec(t), tail = /^(.+) (\S+)$/.exec(t);
+    if (ends && yesWord(ends[1]) && noWriteUp(ends[2])) return true;
+    if (tail && yesWord(tail[2]) && noWriteUp(tail[1])) return true;
     if (/^(?:x+|n|no|nope|none|nil|na|n a|n\/a|negative|nothing|ok|okay|good|fine|working|working fine|all good|all ok|all okay|all clear)$/.test(t)) return true;
     if (/^(?:no|nothing|none)(?: (?:new|known|major|minor|other))? (?:write ?ups?|issues?|defects?|problems?|concerns?|repairs?|damages?|complaints?|comments?|reports?|notes?)(?: (?:to report|reported|noted|found|today|at this time|this trip))?$/.test(t)) return true;
     if (/^(?:nothing|none) (?:to report|wrong|noted|today|needed|at this time)$/.test(t)) return true;
@@ -1351,7 +1356,12 @@
     // "YS" or "Y/N": only yes / no words, nothing wrong said, so no write-up. "YES-POST- AIR LEAK" says what is wrong and stays.
     // Joe 10/19: a mistyped "yes" (UYES, YESS, TES, YRS) is still only a yes, so no write-up either: one slip of a key from
     // "yes" (a letter added, dropped, swapped or changed) counts as yes. "eyes" is a real word and is left alone.
-    return t.split(' ').every(function (w) { return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes|yesno|n|n0|no|nope|none|na)$/.test(w) || (w !== 'eyes' && oneSlipFrom(w, 'yes')); });
+    return t.split(' ').every(function (w) { return /^(?:yesno|n|n0|no|nope|none|na)$/.test(w) || yesWord(w); });
+  }
+
+  // A yes, or a yes with one slipped key (UYES, YESS); "eyes" is a real word.
+  function yesWord(w) {
+    return /^(?:y|ye|ys|yes|yse|yea|yeah|yep|ytes)$/.test(w) || (w !== 'eyes' && oneSlipFrom(w, 'yes'));
   }
 
   // True when a and b differ by one key: one letter added, dropped or changed, or two side-by-side letters swapped.
