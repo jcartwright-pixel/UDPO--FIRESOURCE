@@ -223,6 +223,54 @@
     return (entries || []).map(function (x) { return Object.assign({}, x, out[x.id] || { loadNo: 1, slot: null, overSlots: false }); });
   }
 
+  // Joe 10/20 ("we should have the screen a confirmation before we finalize the scheduled delivery"): a PO on Peck was saved by
+  // accident and showed on the wrong loadout day. Before a new load is saved, or a load's dates change, the screen shows what
+  // will be saved, with a warning when the load day has passed or is not the run's usual load day on Route Master (its
+  // delivery weekday's load day offset; blank = the day before). routes = Route Master docs (runId, routeName, days).
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], WEEK_PREFIX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  function weekdayOf(key) { var n = dayNum(key); return n === null ? -1 : ((n % 7) + 11) % 7; }
+  function shortDay(key) { var p = String(key || '').split('-'); return p.length === 3 ? p[1] + '-' + p[2] + '-' + p[0].slice(2) : text(key); }
+  function dayText(key) { var w = weekdayOf(key); return (w < 0 ? '' : WEEKDAYS[w] + ' ') + shortDay(key); }
+  function scheduleCheck(x, routes, today) {
+    x = x || {};
+    var delivery = text(x.date), load = text(x.loadDate) || delivery, warnings = [], usual = '';
+    var route = (routes || []).find(function (r) { return text(r.runId) && text(r.runId) === text(x.runId); });
+    if (route && lane(x.lane) === 'SHIPPING' && dayNum(delivery) !== null) {
+      var day = (route.days || {})[WEEK_PREFIX[weekdayOf(delivery)]] || {}, off = Number(day.loadDayOffset);
+      var offset = day.loadDayOffset === null || day.loadDayOffset === undefined || day.loadDayOffset === '' || !isFinite(off) ? -1 : off;
+      usual = dayNum(delivery) === null ? '' : new Date((dayNum(delivery) + offset) * 86400000).toISOString().slice(0, 10);
+    }
+    if (today && dayNum(load) !== null && load < today) warnings.push('The load date, ' + dayText(load) + ', has already passed.');
+    if (usual && load !== usual) warnings.push((text(route.routeName) || text(route.run) || text(x.run) || 'This run') + ' usually loads ' + dayText(usual) + ' for a ' + WEEKDAYS[weekdayOf(delivery)] + ' delivery.');
+    return { loadDate: load, deliveryDate: delivery, loadText: dayText(load), deliveryText: dayText(delivery), usualLoadDate: usual, warnings: warnings };
+  }
+
+  // Joe 10/20 ("put the default times in there ... the distribution dispatch sheet will always override times"): a Shipping
+  // load's time starts as its run's Route Master dispatch time for the delivery weekday; once the Live week has that run and
+  // day, its dispatch time is the time shown. Minutes of the day (Route Master and the runs keep them so) to 24-hour HH:MM.
+  function minutesClock(min) { var n = Number(min); if (min === null || min === undefined || min === '' || !isFinite(n)) return ''; n = ((Math.round(n) % 1440) + 1440) % 1440; return (n < 600 ? '0' : '') + Math.floor(n / 60) + ':' + (n % 60 < 10 ? '0' : '') + (n % 60); }
+  function routeTime(routes, runId, date) {
+    var w = weekdayOf(date), r = (routes || []).find(function (d) { return text(runId) && text(d.runId) === text(runId); });
+    return w < 0 || !r ? '' : minutesClock(((r.days || {})[WEEK_PREFIX[w]] || {}).dispatchTime);
+  }
+  // The Live week's dispatch time for a load's run and delivery day (a Load N slot uses its slot's run); none for a carrier.
+  function dispatchClock(x, runs) {
+    if (!x || x.scheduleType === 'CARRIER') return '';
+    var runId = text((x.slot && x.slot.runId) || x.runId), w = weekdayOf(x.date), day = dayNum(x.date);
+    if (!runId || w < 0) return '';
+    var run = (runs || []).find(function (r) { return text(r.runId) === runId && dayNum(r.weekStart) !== null && dayNum(r.weekStart) + w === day && r.days && r.days[WEEK_PREFIX[w]]; });
+    return run ? minutesClock(run.days[WEEK_PREFIX[w]].dispatchTime) : '';
+  }
+  // The time a load shows: the dispatch sheet's when it has one (fromDispatch), else the one saved.
+  function withDispatchTimes(list, runs) {
+    return (list || []).map(function (x) {
+      var t = dispatchClock(x, runs);
+      return t && t !== x.pickupTime ? Object.assign({}, x, { pickupTime: t, savedPickupTime: x.pickupTime, fromDispatch: true }) : t ? Object.assign({}, x, { fromDispatch: true }) : x;
+    });
+  }
+  // A new load's starting time: the dispatch sheet's, else Route Master's.
+  function defaultLoadTime(runId, date, routes, runs) { return dispatchClock({ runId: runId, date: date }, runs) || routeTime(routes, runId, date); }
+
   // Receiving's suppliers, in the order they were added. Joe 10/13: each can be edited or removed (the same record, rewritten).
   function scheduleSuppliers(docs) {
     var all = newestRecords(docs, [SUPPLIER_TYPE]), added = Object.keys(all).map(function (k) { return all[k]; }), list = [];
@@ -1144,7 +1192,7 @@
 
   return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, forecastNights: forecastNights, forecastLateText: forecastLateText, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName,
+    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, REEFER_SIGNAL_MINUTES: REEFER_SIGNAL_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,

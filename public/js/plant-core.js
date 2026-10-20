@@ -9,7 +9,7 @@
  *   - Behind = not done more than 45 minutes after it leaves (Joe 10/11: 45 minutes late is not behind, 46 is);
  *   - a pickup (product that did not load at loadout) is open until it is marked complete, and shows red.
  */
-import { shortTime, dateTimeText, hoursMinutesText } from './app.js';
+import { shortTime, dateTimeText, hoursMinutesText, escapeHtml } from './app.js';
 
 const L = window.UDLogic;
 
@@ -425,4 +425,17 @@ export function shortStamp(stamp) {
   const t = Date.parse(stamp || '');
   if (!isFinite(t)) return txt(stamp);
   return dateTimeText(t);
+}
+
+// Joe 10/20: the "Confirm this load" box the Scheduler and Daily Box Loadout show before a new load (or a load whose dates
+// changed) is saved. c = R.scheduleCheck; f = what was typed. Nothing is saved until Confirm is pressed.
+export const SCHED_CONFIRM_TITLE = 'Confirm this load';
+export function scheduleConfirmBody(c, f) {
+  const clock = (t) => { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); };
+  const kind = f.lane === 'RECEIVING' ? 'Receiving (coming in)' : f.scheduleType === 'CARRIER' ? 'Carrier pickup' : 'United Dairy Delivery';
+  const row = (k, v, cls) => '<dt>' + k + '</dt><dd' + (cls ? ' class="' + cls + '"' : '') + '>' + escapeHtml(v || '—') + '</dd>';
+  return '<dl class="sched-confirm">' + row(f.lane === 'RECEIVING' ? 'Supplier' : 'Route / Run', f.who, 'big') + row('Type', kind) + row('Load Date', c.loadText, 'big') +
+    row('Delivery Date', c.deliveryText, 'big') + row('Pickup Time', clock(f.pickupTime)) + row('PO Number', f.poNumber) + row('Cases', f.cases) + '</dl>' +
+    c.warnings.map(w => '<p class="sched-warn" role="alert">&#9888; ' + escapeHtml(w) + '</p>').join('') +
+    '<p class="modal-context">Check the dates. Nothing is saved until you press Confirm.</p>';
 }

@@ -63,6 +63,7 @@
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, printInFrame, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot, getDocs } from './js/firebase.js';
     import * as P from './js/plant-core.js';
+    import { watchLoads as watchRunDays } from './js/recent-records.js';
 
     const L = window.UDLogic, R = window.UDPlant;
     const params = new URLSearchParams(location.search);
@@ -112,7 +113,9 @@
       Object.keys(pending).forEach(id => { const p = pending[id]; if (p.lane === lane && !p.deleted) list.push(p); });
       list.sort((a, b) => a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'));
       // Joe 10/14: a customer's loads on one delivery day are numbered by pickup time (Load 1, Load 2, ...).
-      return R.numberLoads(list, catalog());
+      // Joe 10/20: a Shipping load shows the dispatch sheet's time for its run and day once the Live week has it.
+      const out = R.numberLoads(list, catalog());
+      return lane === 'RECEIVING' ? out : R.withDispatchTimes(out, liveRuns);
     }
     function catalog() {
       if (lane === 'RECEIVING') return R.scheduleSuppliers(supplierDocs).concat(pendingSuppliers);
@@ -151,7 +154,7 @@
       if (view === 'history' && lane !== 'RECEIVING') view = 'month';
       document.getElementById('v-history').hidden = lane !== 'RECEIVING';
       document.querySelector('.sc-ctrl .stepper').hidden = view === 'history';
-      watchLoads();
+      watchLoads(); watchRuns();
       const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
       document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
       document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
@@ -216,15 +219,17 @@
       }
       return h + '</div>';
     }
+    // Joe 10/20: Shipping's customers in alphabetical order by name (Receiving's suppliers stay in the order they were added).
+    const whoList = () => lane === 'RECEIVING' ? catalog() : catalog().slice().sort((a, b) => String(a.name || a.run || a.route || '').localeCompare(String(b.name || b.run || b.route || ''), undefined, { sensitivity: 'base', numeric: true }));
     const idAttrs = (r) => ' data-route-id="' + escapeHtml(r.routeId || '') + '" data-run-id="' + escapeHtml(r.runId || '') + '"';
     function weekHtml(list, ck) {
       const s = L.weekStart(date), t = today(), map = byDate(list), days = [0, 1, 2, 3, 4, 5, 6].map(i => L.addDays(s, i));
       const addDate = days.indexOf(t) >= 0 ? t : s, w = who();
       const side = '<aside class="sc-whos"><h3>' + w + 's' + (lane === 'RECEIVING' && ck ? '<button type="button" class="sc-btn small" id="supplier-add">＋ New</button>' : '') + '</h3>' +
         '<input id="who-search" type="search" placeholder="Search ' + w.toLowerCase() + 's…" aria-label="Search ' + w.toLowerCase() + 's"><div class="sc-wholist">' +
-        (catalog().map(r => { const name = r.name || r.run || r.route || ''; return '<div class="sc-who" data-text="' + escapeHtml([name, r.route, r.run].join(' ').toLowerCase()) + '"><span><strong>' + escapeHtml(name) + '</strong><small>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</small></span>' +
+        (whoList().map(r => { const name = r.name || r.run || r.route || ''; return '<div class="sc-who" data-text="' + escapeHtml([name, r.route, r.run].join(' ').toLowerCase()) + '"><span><strong>' + escapeHtml(name) + '</strong><small>' + escapeHtml([r.route, r.run].filter(Boolean).join(' · ')) + '</small></span>' +
           (ck && lane === 'RECEIVING' && !r.temp ? '<button type="button" class="sc-btn small sc-supedit" data-supplier="' + escapeHtml(r.routeId) + '" aria-label="Edit ' + escapeHtml(name) + '">Edit</button>' : '') +
-          (ck ? '<button type="button" class="sc-plus" data-new=""' + addDate + '"' + idAttrs(r) + ' aria-label="Add load for ' + escapeHtml(name) + '">＋</button>' : '') + '</div>'; }).join('') || '<p class="sc-none">No ' + w.toLowerCase() + 's on the list.</p>') + '</div></aside>';
+          (ck ? '<button type="button" class="sc-plus" data-new="' + addDate + '"' + idAttrs(r) + ' aria-label="Add load for ' + escapeHtml(name) + '">＋</button>' : '') + '</div>'; }).join('') || '<p class="sc-none">No ' + w.toLowerCase() + 's on the list.</p>') + '</div></aside>';
       const counts = days.map(d => { const hol = R.holidayName(d); return '<div class="sc-count' + (d === t ? ' today' : '') + (hol ? ' holiday' : '') + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '><span>' + DAYS[at(d).getDay()] + ' ' + md(d) + '</span><strong>' + (map[d] || []).length + '</strong></div>'; }).join('');
       const cols = days.map(d => {
         const items = (map[d] || []).slice().sort(sortTime);
@@ -284,7 +289,7 @@
         '<label>Schedule Type<select id="f-type"' + dis + '><option value="ROUTE">United Dairy Delivery</option><option value="CARRIER"' + (x && x.scheduleType === 'CARRIER' ? ' selected' : '') + '>Carrier</option></select></label>' +
         (ship ? '<label>Load Type<select id="f-kind"' + dis + '>' + (kind ? '' : '<option value=""></option>') + R.LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></label></div>' : '') +
         '<div class="wide sc-three"><label>Load Date<input id="f-load" type="date" value="' + escapeHtml(loadDate) + '"' + dis + '></label><label>Delivery Date<input id="f-date" type="date" value="' + escapeHtml(x ? x.date : key) + '"' + dis + '><small>The day you clicked</small></label>' +
-        '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '></label></div>' +
+        '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '><small id="f-time-note">' + (x && x.fromDispatch ? 'From the dispatch sheet' : '') + '</small></label></div>' +
         '<label>Trailer<input id="f-trailer" list="f-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer" value="' + escapeHtml(x ? x.trailer : '') + '"' + dis + '><datalist id="f-trailers"></datalist><small id="f-trailer-note">Pick from the list or type one</small></label>' +
         '<label>PO Number<input id="f-po" maxlength="40" placeholder="Needed for a carrier load" value="' + escapeHtml(x ? x.poNumber : '') + '"' + dis + '></label>' +
         '<label>Cases<input id="f-cases" inputmode="numeric" maxlength="6" placeholder="Optional" value="' + escapeHtml(x ? x.cases : '') + '"' + dis + '></label>' +
@@ -300,7 +305,21 @@
         const blank = kindIn.querySelector('option[value=""]'); if (blank) blank.remove();
       });
       loadIn.onchange = () => trailers(loadIn.value);
-      dateIn.onchange = () => { document.getElementById('modal-title').textContent = dialogTitle(x ? x.id : '', dateIn.value); };
+      // Joe 10/20: a new Shipping load's time starts as the run's time for the delivery day (the dispatch sheet's, else Route
+      // Master's), and follows a change of run or day until a time is typed.
+      const timeIn = document.getElementById('f-time'), note = document.getElementById('f-time-note');
+      let filled = '';
+      const fillTime = () => {
+        if (x || !ship || (timeIn.value && timeIn.value !== filled)) return;
+        const r = options[Number(document.getElementById('f-route').value)];
+        const t = r ? R.defaultLoadTime(r.runId, dateIn.value, routeDocs, liveRuns) : '';
+        timeIn.value = filled = t;
+        note.textContent = !t ? '' : R.dispatchClock({ runId: r.runId, date: dateIn.value }, liveRuns) ? 'From the dispatch sheet' : 'Route Master time';
+      };
+      timeIn.addEventListener('input', () => { note.textContent = ''; });
+      document.getElementById('f-route').addEventListener('change', fillTime);
+      dateIn.onchange = () => { document.getElementById('modal-title').textContent = dialogTitle(x ? x.id : '', dateIn.value); fillTime(); };
+      fillTime();
       trailers(loadIn.value || key);
       if (!ck) return;
       document.getElementById('f-save').onclick = () => saveLoad(x, options);
@@ -345,6 +364,25 @@
       if (f.scheduleType === 'CARRIER' && !f.poNumber) return formError('A carrier load needs its PO number.');
       if (f.cases && !/^[0-9]{1,6}$/.test(f.cases)) return formError('Cases must be a whole number.');
       if (f.loadDate && f.loadDate > key) return formError('The load date cannot be after the delivery date.');
+      // Joe 10/20: a new load, or one whose load or delivery date changed, is confirmed first (Confirm / Go back).
+      if (!x || (x.loadDate || x.date) !== (f.loadDate || key) || x.date !== key) return confirmLoad(x, r, f, key);
+      commitLoad(x, r, f, key);
+    }
+    // The box opens again with what was typed (Go back, or a save the server refused).
+    function reopenLoad(x, r, f, key) {
+      openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
+      const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
+      put('f-type', f.scheduleType); if (f.loadType) put('f-kind', f.loadType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+    }
+    function confirmLoad(x, r, f, key) {
+      const c = R.scheduleCheck({ lane, runId: r.runId, run: r.run, date: key, loadDate: f.loadDate }, routeDocs, today());
+      openModal('<h2 id="modal-title">' + P.SCHED_CONFIRM_TITLE + '</h2>' + P.scheduleConfirmBody(c, Object.assign({ lane, who: [r.route, r.run, r.name].filter(Boolean).join(' · ') }, f)) +
+        '<div class="modal-actions"><button type="button" id="f-back">Go back</button><button type="button" class="primary" id="f-confirm">Confirm</button></div>');
+      document.getElementById('f-back').onclick = () => reopenLoad(x, r, f, key);
+      document.getElementById('f-confirm').onclick = () => commitLoad(x, r, f, key);
+      document.getElementById('f-confirm').focus();
+    }
+    async function commitLoad(x, r, f, key) {
       const tmp = x ? x.id : 'new-' + Date.now();
       pending[tmp] = Object.assign({ id: tmp, lane, date: key, status: 'SCHEDULED' }, f, { pickupTime: R.time24(f.pickupTime), trailer: R.trailerText(f.trailer) });
       closeModal();
@@ -357,9 +395,7 @@
       } catch (e) {
         // Nothing typed is lost: the box opens again with the same entries and says why.
         delete pending[tmp]; render();
-        openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
-        const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
-        put('f-type', f.scheduleType); if (f.loadType) put('f-kind', f.loadType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+        reopenLoad(x, r, f, key);
         formError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
       }
     }
@@ -548,6 +584,19 @@
     // starts on the Sunday before its first day), not every load ever made, so the screen does not slow down as the schedule
     // grows. Receiving History reads every load. A load is one record (the server keeps one per load), so a load moved to
     // another day is still never shown twice. Read again only when the shown range leaves what is read.
+    // Joe 10/20: the Live week's runs for the days shown (their dispatch times), read as one small record per run and day.
+    let liveRuns = [], runsKey = '', runsUnsub = null;
+    function watchRuns() {
+      if (!db) return;
+      const r = range(), from = r.start > L.addDays(today(), -7) ? r.start : L.addDays(today(), -7), dates = [];
+      for (let d = from; d <= r.end && dates.length < 30; d = L.addDays(d, 1)) dates.push(d);
+      const key = lane === 'RECEIVING' ? '' : dates.join(',');
+      if (key === runsKey) return;
+      runsKey = key;
+      if (runsUnsub) { runsUnsub(); runsUnsub = null; }
+      liveRuns = [];
+      if (key) runsUnsub = watchRunDays(db, dates, list => { liveRuns = list; render(); }, () => { liveRuns = []; });
+    }
     let loadsFrom = null, loadsUnsubs = [];
     function watchLoads() {
       if (!db) return;

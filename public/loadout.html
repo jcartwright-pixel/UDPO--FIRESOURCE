@@ -95,7 +95,15 @@
     </div>
     <p class="hint" id="s-hint">It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).</p>
     <div class="notice error" id="s-error" hidden></div>
-    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
+    <div class="modal-actions"><button type="button" class="left danger-line" id="s-delete" hidden>Delete Load</button><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
+  </section>
+
+  <!-- Joe 10/20: a new load (or one whose dates changed) is confirmed before it is saved. -->
+  <section class="modal wide-modal" id="sched-confirm-modal" role="dialog" aria-labelledby="sc-confirm-title" hidden>
+    <h2 id="sc-confirm-title">Confirm this load</h2>
+    <div id="sc-confirm-body"></div>
+    <div class="notice error" id="sc-confirm-error" hidden></div>
+    <div class="modal-actions"><button type="button" id="sc-back">Go back</button><button type="button" class="primary" id="sc-confirm">Confirm</button></div>
   </section>
 
   <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
@@ -128,7 +136,8 @@
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     const today = () => L.operatingDay(new Date());
     let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [];
-    const schedPending = {};      // Scheduler load id -> its work and trailer shown before the server has them
+    const schedPending = {};
+    const schedGone = {};         // Scheduler loads deleted here, off the screen before the server has them (Joe 10/20)      // Scheduler load id -> its work and trailer shown before the server has them
     const pending = {};           // row id -> fields shown before the server has them
     /* Joe 10/16 ("whenever they hit skip, it only can move down one position every time they hit skip"): Skip moves a load not
        yet started down one place in the loading order, past the next load still to load, and saves it like a drag (the same
@@ -172,7 +181,7 @@
     }
     function schedToday() {
       const list = R.scheduleEntries(schedDocs, 'SHIPPING');
-      return R.numberLoads(list, R.scheduleCustomers(slotRoutes())).filter(x => (x.loadDate || x.date) === date).map(x => {
+      return R.numberLoads(list, R.scheduleCustomers(slotRoutes())).filter(x => (x.loadDate || x.date) === date && !schedGone[x.id]).map(x => {
         const p = schedPending[x.id];
         return p ? Object.assign({}, x, { trailer: p.trailer !== undefined ? p.trailer : x.trailer, work: Object.assign({}, x.work, p.work) }) : x;
       });
@@ -620,9 +629,21 @@
       put('s-type', x ? x.scheduleType : 'ROUTE'); put('s-load', x ? (x.loadDate || x.date) : date); put('s-date', x ? x.date : L.addDays(date, 1));
       put('s-time', x ? x.pickupTime : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
       document.getElementById('s-error').hidden = true;
+      const del = document.getElementById('s-delete');
+      del.hidden = !x || !canSched(); del.dataset.armed = ''; del.textContent = 'Delete Load';
+      schedFilled = ''; fillSchedTime();
       openModal('sched-modal');
       document.getElementById(x ? 's-time' : 's-route').focus();
     }
+    // Joe 10/20: a new load's time starts as the run's time for the delivery day (the dispatch sheet's, else Route Master's),
+    // and follows a change of run or day until a time is typed.
+    let schedFilled = '';
+    function fillSchedTime() {
+      const t = document.getElementById('s-time'), c = schedOptions[Number(document.getElementById('s-route').value)];
+      if (schedEditing || (t.value && t.value !== schedFilled) || document.getElementById('s-route').value === '') return;
+      t.value = schedFilled = c ? R.defaultLoadTime(c.runId, document.getElementById('s-date').value, routeDocs, runs) : '';
+    }
+    document.getElementById('s-date').addEventListener('change', fillSchedTime);
     const schedError = (t) => { const e = document.getElementById('s-error'); e.textContent = t; e.hidden = !t; };
     document.getElementById('add-load').onclick = () => openSchedLoad(null);
     document.getElementById('s-route').addEventListener('change', ev => {
@@ -630,6 +651,7 @@
       if (!c || ev.target.value === '') return;
       k.value = R.routeLoadType(R.scheduleCustomers(slotRoutes()), c.runId);
       const blank = k.querySelector('option[value=""]'); if (blank) blank.remove();
+      fillSchedTime();
     });
     document.getElementById('s-save').onclick = async () => {
       const c = schedOptions[Number(document.getElementById('s-route').value)], val = (id) => document.getElementById(id).value.trim();
@@ -643,14 +665,47 @@
       if (f.scheduleType === 'CARRIER' && !f.poNumber) return schedError('A carrier load needs its PO number.');
       if (f.cases && !/^[0-9]{1,6}$/.test(f.cases)) return schedError('Cases must be a whole number.');
       if (f.loadDate && f.loadDate > key) return schedError('The load date cannot be after the delivery date.');
-      const b = document.getElementById('s-save');
-      b.disabled = true; schedError('');
+      // Joe 10/20: a new load, or one whose load or delivery date changed, is confirmed first; nothing is saved until Confirm.
+      if (!x || (x.loadDate || x.date) !== (f.loadDate || key) || x.date !== key) {
+        const ck = R.scheduleCheck({ lane: 'SHIPPING', runId: c.runId, run: c.run, date: key, loadDate: f.loadDate }, routeDocs, today());
+        document.getElementById('sc-confirm-body').innerHTML = P.scheduleConfirmBody(ck, Object.assign({ lane: 'SHIPPING', who: [c.route, c.run, c.name].filter(Boolean).join(' · ') }, f));
+        document.getElementById('sc-confirm-error').hidden = true;
+        schedConfirming = { x, f, key };
+        document.getElementById('sched-modal').hidden = true;
+        openModal('sched-confirm-modal');
+        document.getElementById('sc-confirm').focus();
+        return;
+      }
+      commitSched(x, f, key, document.getElementById('s-save'), schedError);
+    };
+    let schedConfirming = null;
+    // Joe 10/20: Delete Load on a Scheduler line (press twice). It comes off this screen at once and off the Scheduler and every
+    // other loadout as soon as the server has it; the record is kept, marked deleted.
+    document.getElementById('s-delete').onclick = () => {
+      const x = schedEditing, btn = document.getElementById('s-delete');
+      if (!x) return;
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Press again to delete ' + R.loadNumberName(x.run || x.route, x.loadNo); return; }
+      closeModals();
+      schedGone[x.id] = true; render();
+      save('savePlantSchedule', { lane: 'SHIPPING', op: 'remove', id: x.id, date: x.date })
+        .catch(e => { delete schedGone[x.id]; render(); showError('Delete Load: ' + (e.message || e)); });
+    };
+    async function commitSched(x, f, key, b, fail) {
+      b.disabled = true; fail('');
       try {
         await save('savePlantSchedule', { lane: 'SHIPPING', op: 'save', id: x ? x.id : '', date: key, fields: f });
         closeModals(); showError('');
       } catch (e) {
-        schedError('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
+        fail('Not saved (' + (e.message || e) + '). Check the entries and press Save Load again.');
       } finally { b.disabled = false; }
+    }
+    // Go back: the Add Load / Edit box again, with what was typed still in it.
+    document.getElementById('sc-back').onclick = () => { document.getElementById('sched-confirm-modal').hidden = true; schedConfirming = null; openModal('sched-modal'); document.getElementById('s-save').focus(); };
+    document.getElementById('sc-confirm').onclick = () => {
+      const k = schedConfirming;
+      if (!k) return;
+      const failHere = (t) => { const e = document.getElementById('sc-confirm-error'); e.textContent = t; e.hidden = !t; };
+      commitSched(k.x, k.f, k.key, document.getElementById('sc-confirm'), failHere);
     };
     document.getElementById('sched-form').addEventListener('input', () => schedError(''));
     document.getElementById('sched-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA') { ev.preventDefault(); document.getElementById('s-save').click(); } });

@@ -287,6 +287,14 @@
   .sched-page .sc-dn b { font-size: 16px; }
 }
 
+/* Joe 10/20: "Confirm this load" before a Scheduler load is saved (Scheduler and Daily Box Loadout). */
+.sched-confirm { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 0 0 14px; align-items: baseline; }
+.sched-confirm dt { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.sched-confirm dd { margin: 0; font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.sched-confirm dd.big { font-size: 22px; font-weight: 900; color: var(--ud-blue-dark); }
+.sched-warn { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fde8e6; border: 1px solid #f3b7b0; color: #b42318; font-size: 18px; font-weight: 800; }
+@media (max-width: 560px) { .sched-confirm { grid-template-columns: 1fr; gap: 2px; } .sched-confirm dd { margin-bottom: 8px; } }
+
 /* ---------- Yard Checks (yard.html) ---------- */
 .yard-page .yd-bar { display: flex; align-items: center; gap: 14px; margin: 0 16px 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; }
 .yard-page .yd-bar[hidden] { display: none; }

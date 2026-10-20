@@ -76,7 +76,7 @@ const JOURNAL = [
 // The Plant Operations Scheduler: Route Master's plant customers and a week of Shipping and Receiving loads.
 const CUSTOMER_HEADERS = ['route_id', 'run_id', 'route_code', 'facility_id', 'route', 'route_name', 'run', 'coverage_type', 'route_status', 'active', 'display_plant_distribution'];
 const CUSTOMERS = [
-  { coverage_type: 'UNITED DAIRY', route_id: 'rte_c892', run_id: 'run_c892', route: '892', route_name: 'Garber Farms', run: 'GARBER', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
+  { coverage_type: 'UNITED DAIRY', route_id: 'rte_c892', run_id: 'run_c892', route: '892', route_name: 'Garber Farms', run: 'GARBER', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE', sat_dispatch_time: '5:15 AM' },
   { coverage_type: 'UNITED DAIRY', route_id: 'rte_c849', run_id: 'run_c849', route: '849', route_name: 'Sun Valley', run: 'SUN VALLEY', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
   { coverage_type: 'UNITED DAIRY', route_id: 'rte_c6302', run_id: 'run_c6302', route: '6302', route_name: 'Walmart DC', run: 'UT WALMART', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },
   { coverage_type: 'BRANCH', route_id: 'rte_c905', run_id: 'run_c905_1', route: '905_1', route_name: 'Aldi Charleston', run: 'ALDI - CHARLESTON LOAD 1', route_status: 'ACTIVE', active: 'TRUE', display_plant_distribution: 'TRUE' },

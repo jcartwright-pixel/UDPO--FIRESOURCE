@@ -74,7 +74,8 @@ async function journal(id, ok) {
       const sc = await openPage(browser, w, h, '/scheduler.html?view=week&date=2026-10-08&' + MANAGER);
       await sc.waitForFunction(() => [...document.querySelectorAll('.sc-load strong')].filter(s => /Aldi/.test(s.textContent)).length === 3, null, { timeout: 15000 });
       const names = await sc.$$eval('.sc-load strong', s => s.map(x => x.textContent).filter(t => /Aldi/.test(t)));
-      assert.deepEqual(names, ['Aldi Charleston Load 1', 'Aldi Charleston Load 2', 'Aldi Charleston Load 3']);
+      // Joe 10/20: Load 1 is also on the Live week, so it shows (and sits at) the dispatch sheet's time; the numbers stay by pickup time.
+      assert.deepEqual(names.slice().sort(), ['Aldi Charleston Load 1', 'Aldi Charleston Load 2', 'Aldi Charleston Load 3']);
       assert.deepEqual(await sc.$$eval('.sc-load strong', s => s.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), [], 'no name cut off at ' + w);
       assert.ok(await fits(sc), 'the Scheduler week fits ' + w);
       await shot(sc, 'scheduler-numbered-' + w + '.png');
@@ -148,6 +149,16 @@ async function journal(id, ok) {
     assert.equal(await lo.isVisible('#s-error'), false, 'the message goes once the box is filled in');
     await shot(lo, 'box-loadout-add-load-1536.png');
     await lo.click('#s-save');
+    // Joe 10/20: "Confirm this load" first, with the load and delivery days; Go back keeps the box filled in.
+    await lo.waitForSelector('#sched-confirm-modal:not([hidden])');
+    assert.match(await lo.textContent('#sc-confirm-body'), /905 · ALDI - CHARLESTON[\s\S]*Thursday 10-08-26[\s\S]*Friday 10-09-26[\s\S]*10:30 AM/);
+    await shot(lo, 'box-loadout-confirm-1536.png');
+    await lo.click('#sc-back');
+    await lo.waitForSelector('#sched-modal:not([hidden])');
+    assert.equal(await lo.inputValue('#s-time'), '10:30');
+    await lo.click('#s-save');
+    await lo.click('#sc-confirm');
+    await lo.waitForSelector('#sched-confirm-modal', { state: 'hidden' });
     await lo.waitForSelector('#sched-modal', { state: 'hidden' });
     await lo.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-row^="sch:"] td:nth-child(2)')].some(td => /Load 4/.test(td.textContent)), null, { timeout: 15000 });
     const added = (await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.map(d => d.data()).find(d => d.createdInApp && d.payload && d.payload.pickupTime === '10:30');
@@ -186,6 +197,20 @@ async function journal(id, ok) {
     await shot(st, 'station-boxing-numbered-1024.png');
     assert.deepEqual(st.errors, []);
     results.push('Plant Station Boxing: Aldi\'s Load 2, 3 and 4 show next to the LOAD 1 box load (before, all were hidden)');
+    // Joe 10/20: Edit on a Scheduler line has Delete Load (press twice); the line comes off at once and the record is marked deleted.
+    const addedRow = 'sch:' + added.recordId;
+    await lo.bringToFront();
+    await lo.click('#areas [data-area="BOXING"]');
+    await lo.waitForSelector(row(addedRow));
+    await lo.click(row(addedRow) + ' [data-sedit]');
+    await lo.waitForSelector('#s-delete:not([hidden])');
+    await lo.click('#s-delete');
+    assert.match(await lo.textContent('#s-delete'), /Press again to delete/);
+    await shot(lo, 'box-loadout-delete-1536.png');
+    await lo.click('#s-delete');
+    await lo.waitForFunction((id) => !document.querySelector('#rows tr[data-row="' + id + '"]'), addedRow, { timeout: 3000 });
+    await journal(added.recordId, r => r.status === 'DELETED');
+    results.push('Daily Box Loadout: Delete Load on a Scheduler line takes it off at once and marks it deleted on the Scheduler');
   } finally {
     await browser.close();
   }
