@@ -254,20 +254,29 @@
     return w < 0 || !r ? '' : minutesClock(((r.days || {})[WEEK_PREFIX[w]] || {}).dispatchTime);
   }
   // The Live week's dispatch time for a load's run and delivery day (a Load N slot uses its slot's run); none for a carrier.
-  function dispatchClock(x, runs) {
-    if (!x || x.scheduleType === 'CARRIER') return '';
+  function dispatchDay(x, runs) {
+    if (!x || x.scheduleType === 'CARRIER') return null;
     var runId = text((x.slot && x.slot.runId) || x.runId), w = weekdayOf(x.date), day = dayNum(x.date);
-    if (!runId || w < 0) return '';
+    if (!runId || w < 0) return null;
     var run = (runs || []).find(function (r) { return text(r.runId) === runId && dayNum(r.weekStart) !== null && dayNum(r.weekStart) + w === day && r.days && r.days[WEEK_PREFIX[w]]; });
-    return run ? minutesClock(run.days[WEEK_PREFIX[w]].dispatchTime) : '';
+    return run ? run.days[WEEK_PREFIX[w]] : null;
   }
+  function dispatchClock(x, runs) { var d = dispatchDay(x, runs); return d ? minutesClock(d.dispatchTime) : ''; }
   // The time a load shows: the dispatch sheet's when it has one (fromDispatch), else the one saved.
+  // Joe 10/20 ("I want to be able to see the trailer also"): the trailer Daily Dispatch and Trailer Assignments put on that
+  // run and day (dispatchTrailer); the Scheduler's own trailer stays as saved.
   function withDispatchTimes(list, runs) {
     return (list || []).map(function (x) {
-      var t = dispatchClock(x, runs);
-      return t && t !== x.pickupTime ? Object.assign({}, x, { pickupTime: t, savedPickupTime: x.pickupTime, fromDispatch: true }) : t ? Object.assign({}, x, { fromDispatch: true }) : x;
+      var d = dispatchDay(x, runs), t = d ? minutesClock(d.dispatchTime) : '', tr = d ? text(d.trailer) : '';
+      if (!t && !tr) return x;
+      var y = Object.assign({}, x);
+      if (tr) y.dispatchTrailer = tr;
+      if (t) { y.fromDispatch = true; if (t !== x.pickupTime) { y.pickupTime = t; y.savedPickupTime = x.pickupTime; } }
+      return y;
     });
   }
+  // The trailer a load shows: the dispatch sheet's, else the Scheduler's.
+  function loadTrailer(x) { return (x && (text(x.dispatchTrailer) || text(x.trailer))) || ''; }
   // A new load's starting time: the dispatch sheet's, else Route Master's.
   function defaultLoadTime(runId, date, routes, runs) { return dispatchClock({ runId: runId, date: date }, runs) || routeTime(routes, runId, date); }
 
@@ -1217,7 +1226,7 @@
 
   return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, forecastNights: forecastNights, forecastLateText: forecastLateText, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, defaultLoadTime: defaultLoadTime,
+    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, REEFER_SIGNAL_MINUTES: REEFER_SIGNAL_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,

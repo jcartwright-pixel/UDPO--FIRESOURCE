@@ -265,8 +265,8 @@
       openDay = key;
       const rows = entries().filter(x => x.date === key).sort(sortTime), hol = R.holidayName(key), ck = canSave();
       openModal('<h2 id="modal-title">' + escapeHtml(longDay(key)) + '</h2>' + (hol ? '<p class="sc-holnote">' + escapeHtml(hol) + '</p>' : '') +
-        '<div class="sc-daylist">' + (rows.length ? '<div class="sc-dayhead"><span>Run</span><span>Time</span><span>Product</span><span>Cases</span><span></span></div>' + rows.map(x =>
-          '<div class="sc-dayrow by-' + hauler(x) + '"><span class="run" title="' + escapeHtml(runName(x)) + '">' + escapeHtml(runName(x)) + '</span><span>' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span title="' + escapeHtml(x.product) + '">' + escapeHtml(x.product || '—') + '</span><span>' + escapeHtml(x.cases || '—') + '</span>' +
+        '<div class="sc-daylist">' + (rows.length ? '<div class="sc-dayhead"><span>Run</span><span>Time</span><span>Trailer</span><span>Product</span><span>Cases</span><span></span></div>' + rows.map(x =>
+          '<div class="sc-dayrow by-' + hauler(x) + '"><span class="run" title="' + escapeHtml(runName(x)) + '">' + escapeHtml(runName(x)) + '</span><span>' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="sc-trl">' + (R.loadTrailer(x) ? '<b class="trl">' + escapeHtml(R.loadTrailer(x)) + '</b>' : '—') + '</span><span title="' + escapeHtml(x.product) + '">' + escapeHtml(x.product || '—') + '</span><span>' + escapeHtml(x.cases || '—') + '</span>' +
           '<button type="button" class="sc-btn small" data-edit="' + escapeHtml(x.id) + '">' + (ck ? 'Edit' : 'View') + '</button></div>').join('') : '<p class="sc-none">No ' + (lane === 'RECEIVING' ? 'loads' : 'routes') + ' scheduled for this day.</p>') + '</div>' +
         '<div class="modal-actions"><button type="button" data-close>Close</button>' + (ck ? '<button type="button" class="primary" data-new="' + key + '">＋ Add a ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button>' : '') + '</div>');
     }
