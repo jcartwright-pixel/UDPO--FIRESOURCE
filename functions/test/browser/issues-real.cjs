@@ -61,26 +61,28 @@ async function buttonsFit(p, label) {
     [kind === 'TRAILER' ? 'trailer_number' : kind === 'FORK_TRUCK' ? 'unit_number' : 'truck_number']: unit, driver, route_id: '827', issue_details: text, status: 'NEEDS_REVIEW',
     opened_at: at(h), source_type: 'GMAIL', source_id: id });
   const rows = {
-    MAIL_m1_tractor: mail('m1', '223876', 'JEREMY PRASTER', 'YES-NO', 1),
-    MAIL_m2_tractor: mail('m2', '223880', 'Rogie Barrow', 'air conditioner in tractor don\'t work- screw where load bar hooks up is coming off', 2),
-    MAIL_m3_tractor: mail('m3', '223881', 'Chad Herman', 'yes-no', 3),
-    MAIL_m4_tractor: mail('m4', '223882', 'John Kemp', 'YS', 4),
-    MAIL_m5_tractor: mail('m5', '225061', 'CHARLES HOWSARE', 'YES-POST- AIR LEAK', 5),
-    MAIL_m6_trailer: mail('m6', 'T-941', 'JEREMY PRASTER', 'yes-no', 6, 'TRAILER'),
-    MAIL_m7_pallet: mail('m7', '331', 'Mark Zidek', 'RIGHT FORK NOT AS HIGH AS LEFT ONE', 7, 'FORK_TRUCK'),
-    MAIL_m8_pallet: mail('m8', '326', 'JEREMY PRASTER', 'Y/N', 8, 'FORK_TRUCK'),
+    MAIL_m1_tractor: mail('m1', '223876', 'PAT LEE', 'YES-NO', 1),
+    MAIL_m2_tractor: mail('m2', '223880', 'Rob Miles', 'air conditioner in tractor don\'t work- screw where load bar hooks up is coming off', 2),
+    MAIL_m3_tractor: mail('m3', '223881', 'Chris Hall', 'yes-no', 3),
+    MAIL_m4_tractor: mail('m4', '223882', 'Jon Kirk', 'YS', 4),
+    MAIL_m5_tractor: mail('m5', '225061', 'CARL HOWE', 'YES-POST- AIR LEAK', 5),
+    MAIL_m6_trailer: mail('m6', 'T-941', 'PAT LEE', 'yes-no', 6, 'TRAILER'),
+    MAIL_m7_pallet: mail('m7', '331', 'Mike Zane', 'RIGHT FORK NOT AS HIGH AS LEFT ONE', 7, 'FORK_TRUCK'),
+    MAIL_m8_pallet: mail('m8', '326', 'PAT LEE', 'Y/N', 8, 'FORK_TRUCK'),
     // Joe 10/19: "UYES" is a mistyped yes (post trip done, nothing wrong), so no row.
-    MAIL_m11_tractor: mail('m11', '123885', 'Chad Herman', 'UYES', 0.5),
-    MAIL_m10_trailer: mail('m10', 'T-826', 'Rogie Barrow', '826-back Door Busted Cables Snapped Will Not Open', 10, 'TRAILER'),
+    MAIL_m11_tractor: mail('m11', '123885', 'Chris Hall', 'UYES', 0.5),
+    // Joe 10/20: "YES - NO WRITE UPS" is a done Post Trip with nothing wrong, so no row either.
+    MAIL_m12_tractor: mail('m12', '223870', 'Sam Driver', 'YES - NO WRITE UPS', 0.4),
+    MAIL_m10_trailer: mail('m10', 'T-826', 'Rob Miles', '826-back Door Busted Cables Snapped Will Not Open', 10, 'TRAILER'),
     // The same email twice: the old app's copy (one per answer) and the new reader's copy read again a day later.
-    MAIL_m9_concerns: Object.assign(mail('m9', '225061', 'Charles Howsare', 'store 2318- she was yelling and threatening to refuse the order', 30), { record_id: 'MAIL|m9|concerns' }),
-    MAIL_m9_tractor: mail('m9', '225061', 'Charles Howsare', 'store 2318- she was yelling and threatening to refuse the order; yes-no', 9),
+    MAIL_m9_concerns: Object.assign(mail('m9', '225061', 'Carl Howe', 'store 2318- she was yelling and threatening to refuse the order', 30), { record_id: 'MAIL|m9|concerns' }),
+    MAIL_m9_tractor: mail('m9', '225061', 'Carl Howe', 'store 2318- she was yelling and threatening to refuse the order; yes-no', 9),
     ['APP_' + run.id + '_' + day + '_tractor']: { record_id: 'APP|' + run.id + '|' + day + '|tractor', kind: 'TRUCK', truck_number: '900002', driver: 'BROOK', route_id: '802',
       issue_details: 'Flat tire on the steer axle', status: 'OPEN', opened_at: at(1.5), source_type: 'ROUTE_APP', source_id: run.id + '|' + day }
   };
   for (const [id, r] of Object.entries(rows)) await db().collection('maintenance').doc(id).set(r);
   await db().collection('mailCopies').doc('m2').set({ id: 'm2', from: 'Lauttamus Answering Service <CallCenter@lauttamus.com>', subject: 'UNIONTOWN DRIVER CHECK IN', receivedAt: at(2),
-    body: 'Name +(UT): Rogie Barrow\nTractor #: 223880\nRoute #: 8\nPre Trip: yes\nPost Trip: yes-no\nConcerns/Issues: air conditioner in tractor don\'t work- screw where load bar hooks up is coming off' });
+    body: 'Name +(UT): Rob Miles\nTractor #: 223880\nRoute #: 8\nPre Trip: yes\nPost Trip: yes-no\nConcerns/Issues: air conditioner in tractor don\'t work- screw where load bar hooks up is coming off' });
   const appId = 'APP_' + run.id + '_' + day + '_tractor';
   const browser = await chromium.launch();
   const results = [];
@@ -91,7 +93,7 @@ async function buttonsFit(p, label) {
       await shot(p, 'trucks-' + width + '.png');
       await buttonsFit(p, 'Trucks at ' + width);
       const list = await p.textContent('#rows');
-      for (const id of ['MAIL_m1_tractor', 'MAIL_m3_tractor', 'MAIL_m4_tractor', 'MAIL_m11_tractor']) assert.equal(await p.locator('tr[data-id="' + id + '"]').count(), 0, id + ' says nothing is wrong');
+      for (const id of ['MAIL_m1_tractor', 'MAIL_m3_tractor', 'MAIL_m4_tractor', 'MAIL_m11_tractor', 'MAIL_m12_tractor']) assert.equal(await p.locator('tr[data-id="' + id + '"]').count(), 0, id + ' says nothing is wrong');
       // One email is one row, dated when the email came in.
       assert.equal(await p.locator('tr[data-id^="MAIL_m9_"]').count(), 1);
       assert.match(await p.textContent('tr[data-id^="MAIL_m9_"] td.wrong'), /^View store 2318- she was yelling and threatening to refuse the order$/);
@@ -129,7 +131,7 @@ async function buttonsFit(p, label) {
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
+    results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {

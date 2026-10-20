@@ -142,6 +142,10 @@ test('Driver Check-In Email: the answering-service email becomes records once; a
   assert.deepEqual([chad.driver, chad.route, chad.taken, chad.driverCaseReturn, chad.refusedReturned], ['Chad Herman', '812', '2026-10-10', 566, '']);
   assert.equal(T.parseCheckinEmail('Sun 11-Oct-26 03:10a TAKEN\nName: A\nRoute: 1').taken, '2026-10-10');
   assert.equal(T.parseCheckinEmail('Name: A\nRoute: 1').taken, '');
+  // Joe 10/20: a check-in saying "Post Trip: YES - NO WRITE UPS" and no concerns makes no truck issue; an over/short is not one.
+  const clean = T.parseCheckinEmail('Name +(UT): Sam Driver\nTractor #: 870\nRoute  #: 8300\nOverage/Shortage: SHORT - 54 1/2 GALS\nPallet Jack Issues: NO\nPre Trip: YES\nPost Trip: YES - NO WRITE UPS\nTrailer Condition: YES\nConcerns/Issues: NO');
+  assert.deepEqual([clean.tractorIssues, clean.trailerIssues, clean.palletJackIssues], ['', '', '']);
+  assert.equal(T.parseCheckinEmail('Name: A\nRoute: 1\nPost Trip: YES - AIR LEAK').tractorIssues, 'YES - AIR LEAK');
 });
 
 test('Driver Check-In Email per location (Joe 10/11): each plant keeps its own settings; Uniontown keeps the saved ones', async () => {
