@@ -395,7 +395,7 @@
           loadSequence: effectiveSequence(day),
           dispatchTime: day.dispatchTime, startTime: day.startTime, routeHours: day.routeHours, miles: day.miles,
           driverId: day.driverId, driver: day.driver, intendedDriverId: day.intendedDriverId || '', intendedDriver: day.intendedDriver || '', driverExceptionStatus: day.driverExceptionStatus || '',
-          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer,
+          truckId: day.truckId, truck: day.truck, trailerId: day.trailerId, trailer: day.trailer, equipmentOverride: day.equipmentOverride || '',
           forkliftId: day.forkliftId, palletJack: day.palletJack,
           casesOut: day.casesOut, pickup: day.pickup, driverNotes: day.driverNotes,
           plantStatus: day.completeTime ? 'COMPLETE' : day.plantStartedAt ? 'LOADING' : (day.loadStatus || day.status || ''),
@@ -809,6 +809,23 @@
     return !row.driver && (!coverage || coverage === 'UNITED DAIRY');
   }
 
+  // Joe 10/19: a driver can be over on one product and short on another. Both go in the one Live column
+  // (overage_shortage_details) as "OVER 2 cs · 1% milk · Store: ...; SHORT 3 cs · ..."; this takes it apart again.
+  // Text written before (no OVER / SHORT in front) comes back as other.
+  function splitOverShort(text) {
+    var out = { over: '', short: '', other: '' };
+    String(text || '').trim().split(/;\s*(?=(?:OVER|SHORT)\b)/i).forEach(function (part) {
+      part = part.trim();
+      if (!part) return;
+      var m = /^(OVER|SHORT)\b\s*(.*)$/i.exec(part), key = m ? m[1].toLowerCase() : 'other', said = m ? m[2].trim() || 'yes' : part;
+      out[key] = out[key] ? out[key] + '; ' + said : said;
+    });
+    return out;
+  }
+  function joinOverShort(over, short) {
+    return [over && 'OVER ' + String(over).trim(), short && 'SHORT ' + String(short).trim()].filter(Boolean).join('; ');
+  }
+
   // Driver check-ins for one DELIVERY date: every run delivering that day, in route order, with what the driver
   // reported (the same Live columns the current phone check-in writes).
   function checkinRows(runs, deliveryDate) {
@@ -824,7 +841,10 @@
       more.forEach(function (m, i) { if (m && m.issues) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + '): ' + m.issues); if (m && m.needsCleaned) issues.push('Trailer ' + (i + 2) + ' (' + m.trailer + ') needs cleaned'); });
       if (d.palletJackIssues) issues.push('Jack: ' + d.palletJackIssues);
       if (yes(d.trailerNeedsCleaned)) issues.push('Trailer needs cleaned');
-      if (d.overageShortageDetails || yes(d.overageShortage)) issues.push('Over/short: ' + (d.overageShortageDetails || 'yes'));
+      var os = splitOverShort(d.overageShortageDetails);
+      if (os.over) issues.push('Over: ' + os.over);
+      if (os.short) issues.push('Short: ' + os.short);
+      if (os.other || (!os.over && !os.short && yes(d.overageShortage))) issues.push('Over/short: ' + (os.other || 'yes'));
       if (d.loadedCorrectly === 'NO') issues.push('Loaded wrong: ' + (d.loadingProblem || 'yes'));
       rows.push({
         id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, run: run.run, coverageType: run.coverageType,
@@ -1387,7 +1407,7 @@
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
-    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
+    vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
