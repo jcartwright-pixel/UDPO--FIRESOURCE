@@ -182,6 +182,29 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.equal(await stored(second, 'wed', 'dispatchTime', 510), 510, 'the dragged block fill saved');
     assert.equal(await p.inputValue(cell(second, 'thu')), '7:00 AM', 'boxes outside the block are left alone');
     results.push('Dragging across Sun to Wed marked four boxes and 8:30 filled them');
+    // Joe 10/21: a save keeps the screen still: no Saving / Saved sign beside the title, the buttons do not move, and a grid
+    // scrolled inside its box stays where it was. 1300 wide so route names wrap onto two lines: a redraw used to draw them
+    // on one line for a frame, and the shorter grid pulled the scroll place up.
+    await p.setViewportSize({ width: 1300, height: 420 });
+    await p.waitForTimeout(300);
+    await p.$eval('#sheet', s => { s.scrollTop = s.scrollHeight; });
+    const still = () => p.evaluate(() => { const s = document.getElementById('sheet'), b = document.querySelector('.head button'), pill = document.getElementById('save-pill');
+      return [s.scrollTop, Math.round(s.getBoundingClientRect().top), Math.round(b.getBoundingClientRect().left), document.scrollingElement.scrollTop, !!(pill && !pill.hidden && pill.offsetParent)]; });
+    const steady = await still();
+    assert.ok(steady[0] > 0, 'the short window scrolls the grid inside its box');
+    assert.ok(await p.$$eval('td.fit-wrap', x => x.length) > 0, 'some route names wrap at this width');
+    const last = rows[rows.length - 1];
+    await p.click(cell(last, 'thu'));
+    await p.evaluate(() => { window.__moves = []; const tick = () => { const s = document.getElementById('sheet'), b = document.querySelector('.head button'), pill = document.getElementById('save-pill');
+      window.__moves.push([s.scrollTop, Math.round(s.getBoundingClientRect().top), Math.round(b.getBoundingClientRect().left), document.scrollingElement.scrollTop, !!(pill && !pill.hidden && pill.offsetParent)].join()); if (window.__moves.length < 300) requestAnimationFrame(tick); }; tick(); });
+    await p.keyboard.type('9:15');
+    await p.keyboard.press('Enter');
+    assert.equal(await stored(last, 'thu', 'dispatchTime', 555), 555, 'the typed time saved');
+    await p.waitForTimeout(500);
+    assert.deepEqual([...new Set(await p.evaluate(() => window.__moves))], [steady.join()], 'nothing moved and no message showed while it saved');
+    results.push('A save keeps the screen still: no Saving / Saved sign, the buttons stay put and the scrolled grid keeps its place');
+    await p.setViewportSize({ width: 1920, height: 1080 });
+    await p.waitForTimeout(300);
     // Every cell is a box all the time (not only the one being typed in), like a spreadsheet.
     const edge = await p.$eval(cell(second, 'sun'), x => { const c = getComputedStyle(x); return [c.borderTopStyle, c.borderTopWidth, c.borderTopColor]; });
     assert.deepEqual(edge.slice(0, 2), ['solid', '1px'], 'boxes have a border');
