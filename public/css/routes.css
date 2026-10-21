@@ -97,3 +97,12 @@ table.routes .step-btn { flex: 1; width: 28px; padding: 0; border: 1px solid #9f
 table.routes .step-btn:hover { background: var(--ud-blue); color: #fff; }
 table.routes td:has(.cell-note) .step { display: none; }
 @media (max-width: 700px) { table.routes td .step { display: none !important; } }
+/* Joe 10/21: Load Day boxes are picked from a list (Same day, Day before, 2 days before); each heading says it is the delivery day. */
+table.routes th .th-sub { display: block; font-size: 16px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+table.routes.offset td input.cell { padding-right: 30px; }
+table.routes .pick-btn { position: absolute; top: 4px; bottom: 4px; right: 6px; z-index: 1; width: 26px; padding: 0; border: 0; background: transparent; color: var(--ud-blue); font-size: 12px; cursor: pointer; }
+table.routes .pick-btn:hover { color: #fff; background: var(--ud-blue); border-radius: 3px; }
+table.routes td:has(.cell-note) .pick-btn { display: none; }
+.pick-list { position: fixed; z-index: 50; display: flex; flex-direction: column; background: #fff; border: 1px solid #9fb3c8; border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, .18); padding: 2px; }
+.pick-list button { font: inherit; font-size: 16px; text-align: left; padding: 7px 12px; border: 0; background: transparent; color: var(--ink, #0f2238); cursor: pointer; white-space: nowrap; }
+.pick-list button:hover, .pick-list button.on { background: var(--band); color: var(--ud-blue); font-weight: 700; }
