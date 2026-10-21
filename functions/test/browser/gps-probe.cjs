@@ -49,7 +49,9 @@ const SHOTS = process.env.SHOTS_DIR;
       await page.waitForFunction(() => document.querySelectorAll('.gps-probe').length === 7, null, { timeout: 20000 });
       assert.deepEqual(errors, []);
       assert.equal(await page.$eval('#p-tag', i => i.value), '', 'the unit box starts blank');
-      assert.match(await page.$eval('#probe-when', e => e.textContent), /^Last asked 10-20-26 .* for T-933 by admin\.test@uniteddairy\.com\.$/);
+      // The date the probe was asked, on the plant's clock (it is asked 3 minutes before the check runs, so it follows the calendar).
+      const asked = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'numeric', day: 'numeric', year: '2-digit' }).format(new Date(at)).replace(/\//g, '-');
+      assert.match(await page.$eval('#probe-when', e => e.textContent), new RegExp('^Last asked ' + asked + ' .* for T-933 by admin\\.test@uniteddairy\\.com\\.$'));
       const steps = await page.$$eval('.gps-probe', a => a.map(x => [x.querySelector('.gps-mark').textContent, x.querySelector('b').textContent]));
       assert.deepEqual(steps.map(x => x[0]), ['✓', '✓', '✓', '✗', '✓', '✗', '✓'], 'a reading batch that came back fine is summed up in the last step, not shown on its own');
       assert.match(steps[5][1], /^Readings 41 to 80/);

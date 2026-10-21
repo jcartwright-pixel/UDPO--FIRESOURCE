@@ -20,7 +20,7 @@ test('js/firebase.js names one Firebase version, the same one the browser checks
   const text = fs.readFileSync(FIREBASE_JS, 'utf8');
   const version = /FIREBASE_VERSION = '(\d+\.\d+\.\d+)'/.exec(text)[1];
   const named = [...text.matchAll(/firebasejs\/(\d+\.\d+\.\d+)\//g)].map(m => m[1]);
-  assert.equal(named.length, 4, 'app, auth, firestore and functions');
+  assert.deepEqual([...new Set([...text.matchAll(/firebasejs\/[^'"]+/g)].map(m => m[0]))].map(u => u.split('/').pop()).sort(), ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js', 'firebase-functions.js'], 'app, auth, firestore and functions (firestore also imported for the read count)');
   named.forEach(v => assert.equal(v, version));
   assert.equal(require('../../package.json').devDependencies.firebase, version);
 });
