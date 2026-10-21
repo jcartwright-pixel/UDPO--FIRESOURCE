@@ -426,18 +426,30 @@
     var seen = g ? when(g.seenAt) : 0, signal = trip && !!text(g.unitId) && !!seen && nowMs - seen <= REEFER_SIGNAL_MINUTES * 60000;
     return !signal && yardDeparted(x, date, nowMs);
   }
+  // Joe 10/20 (T-965 showed last night's 11:50 PM check and set point on today's load): a check or a Left Yard belongs to the
+  // load on the yard only when it was made after that load was marked loaded, and on this operating day (since the 6 a.m.
+  // roll) or still in its 2-hour lock. An older one is left off: the trailer starts the day due with empty boxes.
+  function yardForLoad(e, x, date, nowMs) {
+    var at = when(e.recordedAt), done = wallMinutes(x.completedAt);
+    if (!at) return e.date === date;
+    if (done !== null && wallClock(at) < done) return false;
+    return e.date === date || nowMs - at < YARD_LOCK_MINUTES * 60000;
+  }
   function yardQueue(runs, journal, date, nowMs, gps) {
-    var checks = yardChecks(journal, date), departed = {}, latest = {};
+    var checks = yardChecks(journal, date), departed = {}, byTrailer = {};
     checks.forEach(function (e) {
       var k = yardOf(e), p = payloadOf(e);
-      if (yardStatus(e) === 'DEPARTED') { if (k) departed[k + '|' + text(p.run || e.run).toUpperCase()] = true; return; }
-      if (k && !latest[k]) latest[k] = e;
+      if (!k) return;
+      var key = yardStatus(e) === 'DEPARTED' ? k + '|' + text(p.run || e.run).toUpperCase() : k, into = yardStatus(e) === 'DEPARTED' ? departed : byTrailer;
+      (into[key] = into[key] || []).push(e);
     });
     var seen = {}, rows = [], locked = [];
     yardHolds(runs, date).forEach(function (x, index) {
-      if (yardGone(x, gps && gps[x.trailer], date, nowMs) || seen[x.trailer] || departed[x.trailer + '|' + x.routeRun.toUpperCase()]) return;
+      var left = (departed[x.trailer + '|' + x.routeRun.toUpperCase()] || []).some(function (e) { return yardForLoad(e, x, date, nowMs); });
+      if (yardGone(x, gps && gps[x.trailer], date, nowMs) || seen[x.trailer] || left) return;
       seen[x.trailer] = true;
-      var e = latest[x.trailer], p = payloadOf(e), at = e ? when(e.recordedAt) : 0, age = at ? Math.max(0, (nowMs - at) / 60000) : Infinity;
+      var e = (byTrailer[x.trailer] || []).filter(function (c) { return yardForLoad(c, x, date, nowMs); })[0];
+      var p = payloadOf(e), at = e ? when(e.recordedAt) : 0, age = at ? Math.max(0, (nowMs - at) / 60000) : Infinity;
       var item = Object.assign({}, x, { checkId: e ? text(e.recordId) : '', recordedAt: e ? text(e.recordedAt) : '', recordedBy: e ? text(e.recordedBy) : '', temperature: text(p.temperature),
         setPoint: text(p.setPoint) || x.setPoint, fuelLevel: text(p.fuelLevel).toUpperCase(), notes: text(p.notes), minutesSinceCheck: isFinite(age) ? Math.floor(age) : null,
         minutesUntilDue: isFinite(age) && age < YARD_LOCK_MINUTES ? Math.ceil(YARD_LOCK_MINUTES - age) : 0, locked: isFinite(age) && age < YARD_LOCK_MINUTES, index: index });
@@ -454,7 +466,7 @@
   function yardHistory(journal, date, nowMs) {
     return yardChecks(journal, date).filter(function (e) { var t = when(e.recordedAt); return !t || t >= nowMs - 86400000; }).map(function (e) {
       var p = payloadOf(e);
-      return { recordId: text(e.recordId), recordedAt: text(e.recordedAt), trailer: yardOf(e), temperature: text(p.temperature), setPoint: text(p.setPoint), fuelLevel: text(p.fuelLevel).toUpperCase(),
+      return { recordId: text(e.recordId), date: text(e.date), recordedAt: text(e.recordedAt), trailer: yardOf(e), temperature: text(p.temperature), setPoint: text(p.setPoint), fuelLevel: text(p.fuelLevel).toUpperCase(),
         notes: text(p.notes), status: yardStatus(e) || 'RECORDED', recordedBy: text(e.recordedBy), inApp: !!e.createdInApp };
     });
   }
