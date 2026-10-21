@@ -1173,6 +1173,9 @@ function fitCells() {
   wrap.concat(over).forEach(td => td.classList.add('fit-wrap'));
 }
 function queueFit() { if (!fitQueued) { fitQueued = true; requestAnimationFrame(fitCells); } }
+// Joe 10/21: a screen that redraws on a save fits its cells at once, so rows already have their final height when it puts the
+// scroll place back (otherwise a row that wraps a frame later makes the grid jump).
+export function fitNow() { fitCells(); }
 // Joe 10/21 (screens slow): only a change in a table sets the fitting off again, not a clock or a number elsewhere on the screen.
 const inTable = (m) => {
   const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
