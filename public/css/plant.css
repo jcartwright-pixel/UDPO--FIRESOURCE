@@ -333,11 +333,6 @@
 .yard-page .yd-gps { font-size: 18px; font-weight: 800; }
 .yard-page .yd-gps.none { color: var(--muted); font-weight: 400; }
 .yard-page .yd-gps.bad { background: #fde8e8; color: #bf2020; }
-.yard-page table.yd-road { margin-top: 18px; }
-body.fill.yard-page .scroll-list table.yd-road thead th { position: static; }
-.yard-page table.yd-road th.yd-road-title { text-align: left; font-size: 18px; background: #eef3f8; color: var(--ud-blue-dark); }
-.yard-page table.yd-road td.yd-where { text-align: left; font-size: 17px; white-space: normal; }
-.yard-page table.yd-road td.yd-where.stop { font-weight: 700; }
 @media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
 /* Phone (the yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Action), each box saves as it is left; no notes, no history. */
 .yard-page .yd-cards { display: none; }
