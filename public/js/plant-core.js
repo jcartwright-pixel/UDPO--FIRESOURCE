@@ -115,6 +115,14 @@ export function movedBySomeone(r) {
   return !!(r && r.moveMark && r.baseSequence != null && r.loadSequence != null && Number(r.loadSequence) !== Number(r.baseSequence));
 }
 
+// Joe 10/21 ("the skips and moved were from yesterday. They still retain on this"): a SKIPPED or MOVED tag belongs to the
+// operating day it was made on. A load moved or skipped on an earlier day (for example on tomorrow's loadout the day before)
+// starts its own day with no tag; its loading order is kept.
+export function movedEarlier(r) {
+  const m = r && r.moveMark, at = m && m.savedAt ? new Date(m.savedAt) : null;
+  return !!at && !isNaN(at) && !!r.loadDate && L.operatingDay(at) < r.loadDate;
+}
+
 const byLoad = (a, b) => (Number(b.prior) - Number(a.prior)) || String(a.loadDate).localeCompare(String(b.loadDate)) ||
   (Number(a.loadSequence == null ? 999999 : a.loadSequence) - Number(b.loadSequence == null ? 999999 : b.loadSequence)) ||
   String(a.route).localeCompare(String(b.route), undefined, { numeric: true });

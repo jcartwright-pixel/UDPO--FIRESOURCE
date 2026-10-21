@@ -311,7 +311,7 @@
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
-        const isMoved = moved.has(r.id) || P.movedBySomeone(r), note = P.moveNote(r);
+        const isMoved = !P.movedEarlier(r) && (moved.has(r.id) || P.movedBySomeone(r)), note = P.moveNote(r);
         // Joe 10/20: once a skipped load is Done its SKIPPED tag comes off (a MOVED tag stays).
         const movedTag = isMoved && !(st === 'DONE' && note.word === 'SKIPPED') ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;

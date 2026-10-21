@@ -114,6 +114,23 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       const list = await rows(p), last = list[list.length - 1];
       assert.equal(await p.$(row(last) + ' button.skip'), null, 'the last load to load has no Skip');
       if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'loadout-after-skip-' + w + '.png') });
+      if (w === 1536) {
+        // Joe 10/21: a skip made on an earlier day (the day before this load's own day) shows no tag on its day, here or on the
+        // Plant Station tablet; the loading order it made stays.
+        const ref = db().collection('runs').doc('2026-10-04__run_p811'), d = (await ref.get()).data().days.fri;
+        await ref.update({ 'days.fri.moveMark': Object.assign({}, d.moveMark, { savedAt: new Date(NOON.getTime() - 86400000).toISOString() }) });
+        await p.reload();
+        await p.waitForSelector(row('811') + ' button.skip');
+        assert.equal(await p.$(row('811') + ' .moved-tag'), null, 'yesterday\'s SKIPPED tag is gone');
+        const order = await rows(p);
+        assert.ok(after(order, '811', '812'), 'the order the skip made stays ' + order);
+        const t = await openPage(browser, { viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: true }, '/plant-station.html?' + MANAGER + '&station=CASE');
+        await t.waitForSelector(card('811'));
+        assert.equal(await t.$(card('811') + ' .sw-flag.skip'), null, 'the tablet card shows no tag from yesterday either');
+        assert.deepEqual(t.errors, []);
+        await t.close();
+        results.push('Daily Case Loadout and Plant Station tablet: a skip made the day before shows no SKIPPED tag; its order stays');
+      }
       if (w === 1920) {
         // Joe 10/20: once the skipped load is Done its SKIPPED tag comes off, here and on the Plant Station tablet.
         await p.click(row('811') + ' button.clock');
