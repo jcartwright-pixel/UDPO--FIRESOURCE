@@ -183,14 +183,16 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.equal(await p.inputValue(cell(second, 'thu')), '7:00 AM', 'boxes outside the block are left alone');
     results.push('Dragging across Sun to Wed marked four boxes and 8:30 filled them');
     // Joe 10/21: a save keeps the screen still: no Saving / Saved sign beside the title, the buttons do not move, and a grid
-    // scrolled inside its box stays where it was.
-    await p.setViewportSize({ width: 1536, height: 420 });
+    // scrolled inside its box stays where it was. 1300 wide so route names wrap onto two lines: a redraw used to draw them
+    // on one line for a frame, and the shorter grid pulled the scroll place up.
+    await p.setViewportSize({ width: 1300, height: 420 });
     await p.waitForTimeout(300);
     await p.$eval('#sheet', s => { s.scrollTop = s.scrollHeight; });
     const still = () => p.evaluate(() => { const s = document.getElementById('sheet'), b = document.querySelector('.head button'), pill = document.getElementById('save-pill');
       return [s.scrollTop, Math.round(s.getBoundingClientRect().top), Math.round(b.getBoundingClientRect().left), document.scrollingElement.scrollTop, !!(pill && !pill.hidden && pill.offsetParent)]; });
     const steady = await still();
     assert.ok(steady[0] > 0, 'the short window scrolls the grid inside its box');
+    assert.ok(await p.$$eval('td.fit-wrap', x => x.length) > 0, 'some route names wrap at this width');
     const last = rows[rows.length - 1];
     await p.click(cell(last, 'thu'));
     await p.evaluate(() => { window.__moves = []; const tick = () => { const s = document.getElementById('sheet'), b = document.querySelector('.head button'), pill = document.getElementById('save-pill');
