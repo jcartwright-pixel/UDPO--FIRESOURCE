@@ -76,6 +76,7 @@
     import { mountRowDrag } from './js/row-drag.js';
     import { lists, watchLists, saveOptimistic, forScreen, modeLabel, canReorder } from './js/edit.js';
     forScreen('routes');
+    window.UD_QUIET_SAVES = true; // Joe 10/21: no Saving / Saved sign here either; it shoved the buttons and the grid on every save (a failed save still says Not saved)
     import { collection, query, where, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
@@ -163,6 +164,8 @@
       const list = shownRuns(), t = document.getElementById('table');
       // Tab or Enter moves to the next box while the last one saves: keep the focus there when the grid redraws.
       const focus = document.activeElement && document.activeElement.matches && document.activeElement.matches('input.cell') ? [document.activeElement.dataset.r, document.activeElement.dataset.c] : null;
+      // Joe 10/21: a save redraws the grid; it stays exactly where it was scrolled.
+      const sheet = document.getElementById('sheet'), keepTop = sheet.scrollTop, keepLeft = sheet.scrollLeft;
       let lines = list.length;
       if (g) t.innerHTML = gridView(g, list, edit);
       else if (view === 'days') t.innerHTML = daysView(list, edit);
@@ -180,9 +183,11 @@
       document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs')) +
         (view === 'rules' ? ' · ' + list.filter(r => !weeklyRule(r).shown).length + ' hidden on Weekly for the week of ' + shortDate(liveWeek) : '');
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
-      const sheet = document.getElementById('sheet'), footer = document.querySelector('.footer');
+      const footer = document.querySelector('.footer');
       sheet.style.height = Math.max(160, window.innerHeight - sheet.getBoundingClientRect().top - (footer ? footer.offsetHeight : 0) - 8) + 'px';
-      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) { keepBlock = true; again.focus(); keepBlock = false; if (multi()) again.select(); } }
+      if (focus) { const again = t.querySelector('input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]'); if (again) { keepBlock = true; again.focus({ preventScroll: true }); keepBlock = false; if (multi()) again.select(); } }
+      if (sheet.scrollTop !== keepTop) sheet.scrollTop = keepTop;
+      if (sheet.scrollLeft !== keepLeft) sheet.scrollLeft = keepLeft;
     }
 
     const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
