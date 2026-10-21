@@ -393,7 +393,9 @@
     var departDay = dayNum(x.departureDate || x.deliveryDate || x.loadDate), t = x.departureTime !== undefined ? x.departureTime : x.dispatchTime, load = dayNum(x.loadDate), on = leavesOnOf(x.leavesOn);
     if (departDay === null || t === null || t === undefined || t === '' || !isFinite(Number(t))) return null;
     t = Number(t);
-    if (on === 'LOAD DAY') return (load === null ? departDay : load) * 1440 + t;
+    // Joe 10/21 (Sun Valley 849, Load Day at 4:00 AM): a Load Day time before the 6 a.m. roll is the end of that load day's
+    // shift, the next morning (it cannot leave before the shift that loads it has started).
+    if (on === 'LOAD DAY') return ((load === null ? departDay : load) + (t < 360 ? 1 : 0)) * 1440 + t;
     if (on === 'DELIVERY DAY') return departDay * 1440 + t;
     return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
   }
@@ -975,6 +977,17 @@
     var out = {}; Object.keys(by).forEach(function (k) { out[k] = mid(by[k]); });
     return { of: function (r) { return out[key(r)] || 0; }, all: all.length ? mid(all) : 0 };
   }
+  // Joe 10/21: "We'll know exactly how long each route takes to load": each run's own time on the same weekday's earlier
+  // nights (from its finish to the one before it, the middle one), used more the more nights there are.
+  function routeTimes(history) {
+    var by = {}, key = function (r) { return text(r.route) + '|' + text(r.run); }, mid = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2; };
+    (history || []).forEach(function (h) {
+      var list = (h.loads || []).filter(function (r) { return r.area === 'CASE' && r.state === 'DONE' && wallMinutes(r.completedAt) !== null; })
+        .map(function (r) { return { r: r, end: wallMinutes(r.completedAt) }; }).sort(function (a, b) { return a.end - b.end; });
+      list.forEach(function (x, i) { var gap = i ? x.end - list[i - 1].end : null; if (gap !== null && gap >= 5 && gap <= FORECAST.maxMinutes) (by[key(x.r)] = by[key(x.r)] || []).push(gap); });
+    });
+    return function (r) { var g = by[key(r)]; return g && g.length ? { minutes: mid(g), nights: g.length } : null; };
+  }
   function nightPace(loads) {
     var list = (loads || []).filter(function (r) { return r.area === 'CASE' && r.state === 'DONE' && wallMinutes(r.completedAt) !== null; })
       .map(function (r) { return { r: r, end: wallMinutes(r.completedAt) }; }).sort(function (a, b) { return a.end - b.end; });
@@ -1000,16 +1013,21 @@
     var tonight = nightPace(loads.filter(function (r) { return !r.prior; }));
     var nights = (input.history || []).map(function (h) { var p = nightPace(h.loads); return p ? { date: text(h.date), label: dayShort(dayNum(h.date) * 1440) + ' ' + dateShort(h.date), rate: p.rate, loads: p.loads } : null; })
       .filter(Boolean).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-    var slow = nights.length ? nights.reduce(function (a, b) { return b.rate < a.rate ? b : a; }) : null, weight = 0, rate, from;
+    // Joe 10/21 ("tighten our times up"): the usual night (the middle of the earlier nights), not the slowest one.
+    var byRate = nights.slice().sort(function (a, b) { return a.rate - b.rate; }), slow = byRate.length ? byRate[Math.floor((byRate.length - 1) / 2)] : null, weight = 0, rate, from;
+    if (slow && byRate.length % 2 === 0) slow = { date: slow.date, label: slow.label, loads: slow.loads, rate: Math.round((slow.rate + byRate[byRate.length / 2].rate) / 2) };
     if (tonight && slow) { weight = tonight.loads / (tonight.loads + FORECAST.historyWeight * nights.length); rate = Math.round(weight * tonight.rate + (1 - weight) * slow.rate); from = 'both'; }
     else if (tonight) { weight = 1; rate = tonight.rate; from = 'tonight'; }
     else if (slow) { rate = slow.rate; from = 'history'; }
     else { rate = FORECAST.usualRate; from = 'usual'; }
-    var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history);
+    var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history), own = routeTimes(input.history), usual = slow ? slow.rate : rate;
     var usualCases = sizes.all || (counted.length ? Math.round(counted.reduce(function (a, b) { return a + b; }, 0) / counted.length) : 600);
     var open = loads.filter(function (r) { return r.state !== 'DONE'; }), out = [], cursor = now;
     var item = function (r) {
-      var cases = casesOf(r), minutes = Math.round(forecastMinutes(cases || sizes.of(r) || usualCases, rate));
+      var cases = casesOf(r), minutes = forecastMinutes(cases || sizes.of(r) || usualCases, rate), t = own(r);
+      // A run's own past time, at tonight's pace, counts for as many shares as nights it was seen (the size rule for one share).
+      if (t) minutes = (t.minutes * usual / rate * t.nights + minutes) / (t.nights + 1);
+      minutes = Math.round(minutes);
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) });
       var loadDay = dayNum(r.loadDate), shiftEnd = loadDay === null ? null : (loadDay + 1) * 1440 + FORECAST.shiftEnd;
       return { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), loadDate: text(r.loadDate), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), status: r.state,
@@ -1033,7 +1051,9 @@
       x.estText = minutesText12(((x.est % 1440) + 1440) % 1440); x.estDay = dayShort(x.est);
       x.late = dispatchLate || shiftLate;
       x.reason = !x.late ? '' : deadline === x.leaves && dispatchLate ? 'misses dispatch' : 'past the 6:00 AM shift end';
-      x.lateBy = x.late ? x.est - deadline : 0;
+      // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
+      // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
+      x.lateBy = !x.late ? 0 : x.priorDay ? Math.min(x.est - deadline, x.est - Math.max(x.start, now)) : x.est - deadline;
       x.spare = !x.late && deadline !== null ? deadline - x.est : null;
     });
     var opDay = dayNum(date) === null ? Math.floor((now - FORECAST.shiftEnd) / 1440) : dayNum(date), dueAt = (opDay + 1) * 1440 + dueBy;
@@ -1042,7 +1062,7 @@
     // "Loads due by each time": every dispatch time still ahead, with the loads leaving by then.
     var times = []; out.forEach(function (x) { if (x.leaves !== null && times.indexOf(x.leaves) < 0) times.push(x.leaves); });
     times.sort(function (a, b) { return a - b; });
-    var byTime = times.map(function (t) { var d = out.filter(function (x) { return x.leaves !== null && x.leaves <= t; }); return { at: t, day: dayShort(t), time: minutesText12(((t % 1440) + 1440) % 1440), loads: d.length, cases: sum(d), late: d.filter(function (x) { return x.late; }).length }; });
+    var byTime = times.map(function (t) { var d = out.filter(function (x) { return x.leaves !== null && x.leaves <= t; }); return { at: t, day: dayShort(t), time: minutesText12(((t % 1440) + 1440) % 1440), loads: d.length, cases: sum(d), late: d.filter(function (x) { return x.late; }).length, lateHere: d.filter(function (x) { return x.late && x.leaves === t; }).length }; });
     var allDone = last(out), dueDone = last(due), timed = function (m) { return m === null ? '' : minutesText12(((m % 1440) + 1440) % 1440); };
     return { asOf: zoned(nowMs, { hour: 'numeric', minute: '2-digit' }), now: now, date: date, rate: rate, from: from, weight: Math.round(weight * 100) / 100,
       tonight: tonight, nights: nights, slow: slow ? slow.label : '', loads: out, late: late.length, behind: forecastBehind({ loads: out }),
