@@ -182,8 +182,8 @@ test('plant loading: a LOADOUT HISTORY tab with other headers is never written o
 
 // Joe 10/13 (852 JERSEY LOAD 2 on the Loadout Center came back after Ended Up Not Running): the copy reads a day that still holds
 // a driver as running, so turning a day off (Loadout Center or Daily) takes the driver off too, and it stays off after the copy.
-// Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck, so the Loadout Center's press is for a load with no
-// driver; a load dispatch has a driver on is refused there (next test) and only Daily turns it off.
+// Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck, so the Loadout Center's press takes them off only a
+// load with no driver; on a load dispatch has a driver on they stay (next test).
 for (const [name, save, driver] of [
   ['the Loadout Center\'s Ended Up Not Running', () => ({ action: 'savePlantLoad', fields: { runs: false } }), false],
   ['Daily\'s not running', () => ({ action: 'setRuns', runs: false }), true]
@@ -208,13 +208,21 @@ for (const [name, save, driver] of [
   });
 }
 
-test('the Loadout Center cannot end a load dispatch has a driver on: the driver, truck and day stay (Joe 10/20, 844)', async () => {
+test('the Loadout Center ends a load dispatch has a driver on: the driver and truck stay, the day stays off after the copy (Joe 10/21)', async () => {
   const RUN = '2026-10-04__run_t802';
   await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_adams' }, tick);
+  await applyAction(db(), DISPATCHER, { action: 'assignTrailer', requestId: rid(), runDocId: RUN, day: 'tue', equipmentId: 'veh_trailer_t_901' }, tick);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
   const before = (await db().collection('runs').doc(RUN).get()).data().days.tue;
-  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'savePlantLoad', requestId: rid(), runDocId: RUN, day: 'tue', fields: { runs: false } }, tick), /Dispatch has ADAMS, PAT on this load/);
+  await applyAction(db(), DISPATCHER, { action: 'savePlantLoad', requestId: rid(), runDocId: RUN, day: 'tue', fields: { runs: false } }, tick);
+  assert.equal((await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick })).conflicts, 0);
+  assert.equal(cellOf('run_t802', 'tue_runs'), 'FALSE');
+  assert.equal(cellOf('run_t802', 'tue_driver'), 'ADAMS, PAT');
+  assert.equal(cellOf('run_t802', 'tue_trailer'), '');
+  await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick });
   const day = (await db().collection('runs').doc(RUN).get()).data().days.tue;
-  assert.deepEqual([day.runs, day.driver, day.driverId, day.truck], [before.runs, 'ADAMS, PAT', 'drv_test_adams', before.truck]);
+  assert.equal(day.runs, false, 'it does not come back');
+  assert.deepEqual([day.driver, day.driverId, day.truck, day.trailer], ['ADAMS, PAT', 'drv_test_adams', before.truck, '']);
 });
 
 // Review item 64 (Joe 10/13): the on-save pass and the every-minute pass can run at the same time.

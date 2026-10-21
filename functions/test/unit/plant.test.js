@@ -35,9 +35,14 @@ test('Start, End and the status picker follow the current app\'s rule', async ()
 test('counts, temperature, notes and Ended Up Not Running', async () => {
   assert.deepEqual(await values({}, { quantity: '1,240', temperature: '36.5', notes: ' short 2 ', shift: 'FIRST SHIFT' }), { casesOut: 1240, loadTemperature: 36.5, plantNotes: 'short 2', plantShift: 'FIRST SHIFT' });
   assert.deepEqual(await values({}, { runs: false }), { runs: false });
-  // Joe 10/20 (844 Ohio Processor): dispatch wins on the driver and truck; the plant cannot end a load dispatch has a driver on.
-  await assert.rejects(values({ driverId: 'drv_jacobs', driver: 'JACOBS, JOEL', truck: '123892' }, { runs: false }), /Dispatch has JACOBS, JOEL on this load/);
-  await assert.rejects(values({ driver: 'CARRIER' }, { runs: false }), /Dispatch has CARRIER/);
+  // Joe 10/21 (856 SAVE-A-LOT 2): the plant can end a load dispatch has a driver on; the driver and truck stay (dispatch wins on
+  // them, Joe 10/20), only the trailer comes off.
+  const kept = await values({ driverId: 'drv_jacobs', driver: 'JACOBS, JOEL', truckId: 'veh_truck_123892', truck: '123892', trailerId: 'veh_trailer_t_901', trailer: 'T-901' }, { runs: false });
+  assert.equal(kept.runs, false);
+  assert.deepEqual([kept.trailer, kept.trailerId], ['', '']);
+  ['driver', 'driverId', 'truck', 'truckId'].forEach(k => assert.equal(kept[k], undefined, k + ' is left as it was'));
+  assert.match(kept.plantNotes, /Ended up not running .*\(trailer was T-901\)/);
+  assert.deepEqual(await values({ driver: 'CARRIER' }, { runs: false }), { runs: false });
   // A load with no driver (or OPEN) still ends up not running, and its truck and trailer come off.
   const open = await values({ driver: 'OPEN', trailer: 'T-901', trailerId: 'veh_trailer_t_901' }, { runs: false });
   assert.equal(open.runs, false);

@@ -265,16 +265,17 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
   const f = req.plant, after = {};
   // Ended Up Not Running. Joe 10/13: "No route equals no driver": the day's driver, truck and trailer come off it (that day only)
   // and are free for other loads; the notes keep what they were.
+  // Joe 10/20 (844 Ohio Processor lost JACOBS, JOEL and showed PLANT LOAD on Weekly): dispatch wins on the driver and truck.
+  // Joe 10/21 (856 SAVE-A-LOT 2: "should be allowed to put not running"): the plant can still end a load dispatch has a driver
+  // on. The day stops running and its trailer comes off, but the driver and truck stay on it, so Weekly shows the driver marked
+  // Not running (never PLANT LOAD) and a click there turns it back on. The copy of the sheet keeps such a day off (transfer.js).
   if (f.runs === false) {
-    // Joe 10/20 (844 Ohio Processor lost JACOBS, JOEL and showed PLANT LOAD on Weekly): dispatch wins on the driver and truck,
-    // so a load dispatch has a driver on is only taken off by dispatch (Daily Dispatch > Not running), never from the plant.
-    const who = L.dispatchDriver(day);
-    if (who) throw new SaveError('NOT_ALLOWED', 'Dispatch has ' + who + ' on this load, so only dispatch can mark it not running. Ask dispatch to change it on Daily Dispatch.');
-    const was = [['driver', text(day.driver) || text(day.driverId)], ['truck', text(day.truck) || text(day.truckId)], ['trailer', text(day.trailer) || text(day.trailerId)]].filter(x => x[1]);
+    const keep = !!L.dispatchDriver(day);
+    const was = [['driver', keep ? '' : text(day.driver) || text(day.driverId)], ['truck', keep ? '' : text(day.truck) || text(day.truckId)], ['trailer', text(day.trailer) || text(day.trailerId)]].filter(x => x[1]);
     if (!was.length) return { runs: false };
     const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const notes = text(day.plantNotes);
-    return Object.assign({ runs: false }, L.NOT_RUNNING_CLEARS, { plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (' + was.map(x => x[0] + ' was ' + x[1]).join(', ') + ')').slice(-1200) });
+    return Object.assign({ runs: false }, keep ? { trailerId: '', trailer: '' } : L.NOT_RUNNING_CLEARS, { plantNotes: ((notes ? notes + '\n' : '') + 'Ended up not running ' + at + ' (' + was.map(x => x[0] + ' was ' + x[1]).join(', ') + ')').slice(-1200) });
   }
   const wasLoading = dayLoadingNow(day);
   if (f.quantity !== undefined) after.casesOut = f.quantity;

@@ -2,7 +2,7 @@
 /*
  * Browser check of the plant items from the screen review (7-10), on the made-up plant day:
  *   Loadout: the two-press "Ended Up Not Running" never stays armed for the
- *   next load, and is greyed on a load dispatch has a driver on (Joe 10/20). Unloading: the mode buttons say which is on. Quality: the first box picked on a line saves and
+ *   next load, and works on a load dispatch has a driver on (Joe 10/21). Unloading: the mode buttons say which is on. Quality: the first box picked on a line saves and
  *   says Saved even when the new check arrives before the save answers. Manager Center: Send waits for the plant's data.
  *   Pictures go to SHOTS_DIR.
  */
@@ -47,19 +47,14 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Joe 10/20 (844 Ohio Processor): only a load with no driver can be ended from the plant, so 811 and 815 have none here.
-    for (const r of ['811', '815']) await db().collection('runs').doc('2026-10-04__run_p' + r).update({ 'days.fri.driver': '', 'days.fri.driverId': '' });
     const page = await openPage(browser, 1920, 1080, '/loadout.html?date=' + DATE + '&' + MANAGER);
     await page.waitForSelector(row('811') + ' button.edit-row');
 
-    // Joe 10/20: a load dispatch has a driver on: the button is greyed and says only dispatch can mark it not running.
+    // Joe 10/21 (856 SAVE-A-LOT 2): the button works on a load dispatch has a driver on too.
     await page.click(row('812') + ' button.edit-row');
-    assert.equal(await page.isDisabled('#edit-notrunning'), true);
-    assert.match(await page.textContent('#edit-notrunning-why'), /^Dispatch has \S.* on this load\. Only dispatch can mark it not running\.$/);
-    assert.equal(await page.isVisible('#edit-notrunning-why'), true);
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'extras-notrunning-driver-1920.png'), scale: 'css' });
+    assert.equal(await page.isDisabled('#edit-notrunning'), false);
     await page.click('#edit-modal [data-close]');
-    results.push('Loadout: a load dispatch has a driver on cannot be marked Ended Up Not Running at the plant, and the box says why');
+    results.push('Loadout: Ended Up Not Running can be pressed on a load dispatch has a driver on');
 
     // Ended Up Not Running: pressed once, then Cancel; the next load's box starts unarmed.
     await page.click(row('811') + ' button.edit-row');
@@ -68,9 +63,21 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
     await page.click('#edit-modal [data-close]');
     await page.click(row('815') + ' button.edit-row');
     assert.equal(await page.textContent('#edit-notrunning'), 'Ended Up Not Running');
-    assert.equal(await page.isVisible('#edit-notrunning-why'), false, 'no driver: no note, the button works');
     await page.click('#edit-modal [data-close]');
     results.push('Loadout: "Ended Up Not Running" pressed once then Cancel does not stay armed for the next load');
+
+    // Joe 10/21: pressed twice on 812 (dispatch has a driver on it): the load leaves the loadout, the day stops running, and its
+    // driver and truck stay on it (dispatch wins on them, Joe 10/20); only the trailer comes off.
+    const RUN812 = '2026-10-04__run_p812', had = (await db().collection('runs').doc(RUN812).get()).data().days.fri;
+    assert.ok(had.driver && had.truck, '812 has a driver and truck');
+    await page.click(row('812') + ' button.edit-row');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'extras-notrunning-driver-1920.png'), scale: 'css' });
+    await page.click('#edit-notrunning');
+    await page.click('#edit-notrunning');
+    await until(async () => (await page.$$(row('812'))).length === 0, '812 to leave the loadout');
+    const off = await until(async () => { const d = (await db().collection('runs').doc(RUN812).get()).data().days.fri; return d.runs === false ? d : null; }, '812 to stop running');
+    assert.deepEqual([off.driver, off.driverId, off.truck, off.trailer], [had.driver, had.driverId, had.truck, '']);
+    results.push('Loadout: Ended Up Not Running on a load with a driver takes it off the loadout; the driver and truck stay on dispatch, the trailer comes off');
     assert.deepEqual(page.errors, []);
 
     const un = await openPage(browser, 1920, 1080, '/unloading.html?date=' + DATE + '&' + MANAGER);
