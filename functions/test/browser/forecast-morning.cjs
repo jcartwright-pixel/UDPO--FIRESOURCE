@@ -3,7 +3,7 @@
  * Joe 10/21 (7:51 AM): "I see too much red whenever there's only right now potentially one late... the right-hand pane,
  * it's showing everything late. But see, we catch up, so it shouldn't be shaded. All red... tighten our times up."
  * A Wednesday morning like his: last night's Fairmont Transfer left over, Save-A-Lot 1 loading, Sun Valley (Load Day,
- * 4:00 AM) and the rest of tonight's loads, with two earlier Wednesdays timed. Pictures go to SHOTS_DIR.
+ * 4:00 PM: Joe 10/21, the 4:00 AM in Route Master was a typing mistake) and the rest of tonight's loads, with two earlier Wednesdays timed. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -20,7 +20,7 @@ const NOW = '2026-10-21T11:51:00Z'; // Wednesday 7:51 AM in New York
 const T = (h, m) => h * 60 + (m || 0);
 // Tonight's loads in the plant's loading order: [route, run, dispatch, Departure Day, delivers (day key), usual cases].
 const TONIGHT = [['856', 'SAVE-A-LOT 2', T(15), 'LOAD DAY', 'wed', 600], ['852', 'JERSEY LOAD 1', T(13), 'LOAD DAY', 'thu', 1150], ['852', 'JERSEY LOAD 2', T(13), 'LOAD DAY', 'thu', 1150],
-  ['845', 'I/W BALTIMORE', T(21), 'LOAD DAY', 'thu', 600], ['848', 'I/W COLUMBUS', T(4), 'DELIVERY DAY', 'thu', 800], ['849', 'SUN VALLEY', T(4), 'LOAD DAY', 'thu', 900],
+  ['845', 'I/W BALTIMORE', T(21), 'LOAD DAY', 'thu', 600], ['848', 'I/W COLUMBUS', T(4), 'DELIVERY DAY', 'thu', 800], ['849', 'SUN VALLEY', T(16), 'LOAD DAY', 'thu', 900],
   ['906', 'LANCASTER TRANSFER', T(2), 'DELIVERY DAY', 'thu', 760], ['950_1', 'CHARLESTON TRANSFER', T(22), 'DELIVERY DAY', 'thu', 700], ['825', 'DSD', T(5), 'DELIVERY DAY', 'thu', 190],
   ['827', 'UT WALMART', T(2), 'DELIVERY DAY', 'thu', 1000], ['6304', 'UT WALMART', T(1), 'DELIVERY DAY', 'thu', 990], ['824', 'DSD', T(1), 'DELIVERY DAY', 'thu', 480],
   ['813', 'DSD', T(1, 30), 'DELIVERY DAY', 'thu', 540], ['815', 'DSD', T(3), 'DELIVERY DAY', 'thu', 210], ['8302_2', '8302_2', T(5, 30), 'DELIVERY DAY', 'thu', 400],
@@ -99,10 +99,10 @@ async function openPage(browser, url, w, h) {
     fs.writeFileSync(path.join(SHOTS || require('os').tmpdir(), 'forecast-morning.txt'), text);
     if (process.env.CHECK_AFTER) {
       const rows = await fc.$$eval('.fc-row:not(.fc-head)', r => r.map(x => ({ route: x.querySelector('b').textContent, late: x.classList.contains('late'), text: x.textContent })));
-      // Sun Valley (Load Day, 4:00 AM) leaves Thursday 4:00 AM, not this morning.
+      // Sun Valley (Load Day, 4:00 PM) leaves this afternoon and is loaded before then.
       const sun = rows.find(x => /Sun Valley/.test(x.text));
-      assert.equal(sun.late, false, 'Sun Valley is not 13 hours late');
-      assert.match(sun.text, /Thu 4:00 AM/);
+      assert.equal(sun.late, false, 'Sun Valley is on time');
+      assert.match(sun.text, /4:00 PM/);
       // The right pane: a time is red only where a load leaving then is late.
       const times = await fc.$$eval('#times tbody tr', r => r.map(x => ({ bad: x.classList.contains('bad'), text: x.textContent })));
       assert.ok(times.some(t => !t.bad), 'not every due-by time is red');
