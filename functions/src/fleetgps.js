@@ -82,16 +82,18 @@ const TEMPLATES = Object.freeze({
     'Address = Input.Address',
     'MilesDelta(mile) = Input.OdometerDelta', ''].join('\r\n') },
   // Joe 10/18 ("I actually get temperatures from my trailers from the GPS"): the reefer box's air temperature from Fleet's
-  // GPS points, for the trailers that are being recorded (loaded and complete, until back in the yard). CargoAirTemp is a
-  // Point diagnostic in Fleet's TDE list; Fleet has no reefer set point there, and Joe gets no fuel reading from the GPS.
-  reefer: { name: 'UDPO_ReeferPoints', text: [
-    '[Template]', 'TemplateVersion = 1.0', 'TableID = Point-2.0', 'TemplateName = UDPO_ReeferPoints', 'Intent = Retrieve', '',
-    '[User]', 'Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"', '',
-    '[Filter]', 'Time = Between(Since, Until)', 'UnitId = In(Ids)', '',
+  // GPS points, for the trailers that are being recorded (loaded and complete, until back in the yard). Joe 10/21: Fleet's
+  // "Refrigeration Temperature" is the Point diagnostic RefrigerationTemp (RefrigerationTemp2 is a second sensor, not used);
+  // it was CargoAirTemp before. On live 6.39 every read sent with a list of units failed (Verizon 500), so this one asks
+  // for every unit's points by time only and the trailers are picked out here.
+  reefer: { name: 'UDPO_TrailerTemps', text: [
+    '[Template]', 'TemplateVersion = 1.0', 'TableID = Point-2.0', 'TemplateName = UDPO_TrailerTemps', 'Intent = Retrieve', '',
+    '[User]', 'Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', '',
+    '[Filter]', 'Time = Between(Since, Until)', '',
     '[Output]',
     'UnitId = Input.UnitId',
     'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time',
-    'CargoTempF(Fahrenheit) = Input.CargoAirTemp', ''].join('\r\n') }
+    'TempF(Fahrenheit) = Input.RefrigerationTemp', ''].join('\r\n') }
 });
 // Joe's Fleet places for the Uniontown yard (10/13); 10/14 the Loading Dock, where trucks park, is the yard too (a truck
 // driving from the dock through Uniontown Branch on its way out was read as coming back).
@@ -216,7 +218,7 @@ async function ensureTemplates(d, o, token, list) {
  * both points templates got "Internal server error" run the plain way. While it works Fleet answers 202 {Status} with no new
  * link, so the first ResultUrl is kept. Verizon's reference (ExecutionId) leads any error, for Verizon to look up.
  */
-const POINT_TEMPLATES = ['UDPO_UnitDayPoints', 'UDPO_ReeferPoints'];
+const POINT_TEMPLATES = ['UDPO_UnitDayPoints', 'UDPO_TrailerTemps'];
 async function execute(d, o, token, name, params, opts) {
   const base = baseOf(d, o), points = POINT_TEMPLATES.indexOf(name) >= 0 || !!(opts && opts.points);
   const q = Object.keys(params || {}).map(k => '&' + k + '=' + encodeURIComponent(params[k])).join('') + (points ? '&PollingMode=Async' : '');
@@ -412,10 +414,11 @@ async function pull(db, options) {
     try { out.alerts = await pullAlerts(db, d, o, token, trucks, at); }
     catch (e) { if (!(e instanceof FleetError)) console.error('fleetGps alerts', e); await ref.set({ alertsError: short(e.message), alertsErrorAt: at }, { merge: true }); out.alertsError = short(e.message); }
     // The trailer temperatures too (Joe 10/18); a problem with them never stops the trucks' or alerts' read.
-    try { out.reefer = await pullReefer(db, d, o, token, trucks, at); }
+    const cache = {};
+    try { out.reefer = await pullReefer(db, d, o, token, trucks, at, cache); }
     catch (e) { if (!(e instanceof FleetError)) console.error('fleetGps reefer', e); await ref.set({ reeferError: short(e.message), reeferErrorAt: at }, { merge: true }); out.reeferError = short(e.message); }
     // Joe 10/20: every trailer's temperature for All Fleet Units, every 15 minutes; a problem never stops the rest.
-    try { const n = await pullTemps(db, d, o, token, trucks, at); if (n !== null) out.temps = n; }
+    try { const n = await pullTemps(db, d, o, token, trucks, at, cache); if (n !== null) out.temps = n; }
     catch (e) { if (!(e instanceof FleetError)) console.error('fleetGps temps', e); await ref.set({ tempsError: short(e.message), tempsErrorAt: at }, { merge: true }); out.tempsError = short(e.message); }
     await ref.set({ lastPull: at, lastPullError: '', lastPullTrucks: out.trucks }, { merge: true });
     return out;
@@ -524,7 +527,22 @@ function reeferTrips(prev, loaded, units, at) {
   return { trips };
 }
 const round1 = (n) => n === null ? null : Math.round(n * 10) / 10;
-async function pullReefer(db, d, o, token, trucks, at) {
+const TEMPS_SHARED_MINUTES = 30;
+// Every unit's refrigeration temperatures since a time, read once per run and shared by the recording and All Fleet Units.
+async function trailerTemps(db, d, o, token, cache, since, at) {
+  if (cache.rows && cache.since <= since) return cache.rows.filter(r => r.ms >= since);
+  if (!d.trailerTempsReady) { await ensureTemplates(d, o, token, [TEMPLATES.reefer]); await db.collection('private').doc('gpsFleet').set({ trailerTempsReady: true }, { merge: true }); d.trailerTempsReady = true; }
+  // The first read of a run goes back at least TEMPS_SHARED_MINUTES, so the second one can use the same answer.
+  since = Math.min(since, Date.parse(at) - TEMPS_SHARED_MINUTES * 60000);
+  const rows = [];
+  (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(new Date(since)), Until: fleetTime(new Date(at)) })).forEach(r => {
+    const when = utcIso(r.Time), temp = num(r.TempF);
+    if (when && temp !== null) rows.push({ unitId: String(r.UnitId), at: when, ms: Date.parse(when), tempF: round1(temp) });
+  });
+  Object.assign(cache, { rows, since });
+  return rows;
+}
+async function pullReefer(db, d, o, token, trucks, at, cache) {
   const ref = db.collection('private').doc('gpsFleet'), tripsRef = db.collection('private').doc('gpsReeferTrips');
   const L = require('./logic'), R = require('./plant-rules');
   const date = L.operatingDay(new Date(at)), weeks = [...new Set([L.addDays(date, -6), date, L.addDays(date, 6)].map(L.weekStart))];
@@ -535,17 +553,17 @@ async function pullReefer(db, d, o, token, trucks, at) {
   const open = Object.keys(step.trips).map(k => step.trips[k]).filter(t => t.recording && t.unitId);
   const readings = {};
   if (open.length) {
-    if (!d.reeferTemplatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.reefer]); await ref.set({ reeferTemplatesReady: true }, { merge: true }); }
-    // Joe 10/19: trailers' GPS units send far less often than every 5 minutes (a parked trailer can go an hour or more), so the
-    // read goes back to each trailer's last reading, or REEFER_LOOKBACK_HOURS for one with none yet, not just 30 minutes.
-    const now = new Date(at), since = new Date(Math.min(...open.map(t => t.readingAt ? Date.parse(t.readingAt) - 10 * 60000 : now - REEFER_LOOKBACK_HOURS * 3600000)));
+    // Joe 10/19: trailers' GPS units send far less often than every 5 minutes (a parked trailer can go an hour or more). Every
+    // unit is read by time only (Joe 10/21), so the read carries on from the last one (10 minutes overlap), or goes back
+    // REEFER_LOOKBACK_HOURS the first time, and a trailer's reading is found whenever it comes.
+    const now = Date.parse(at), since = Math.max(now - REEFER_LOOKBACK_HOURS * 3600000, d.reeferUntil ? Date.parse(d.reeferUntil) - 10 * 60000 : 0);
     const byUnit = {};
     open.forEach(t => { byUnit[t.unitId] = t; });
-    (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(since), Until: fleetTime(now), Ids: open.map(t => t.unitId).join(',') })).forEach(r => {
-      const t = byUnit[r.UnitId], when = utcIso(r.Time), temp = num(r.CargoTempF);
-      if (!t || !when || temp === null) return;
+    (await trailerTemps(db, d, o, token, cache, since, at)).forEach(r => {
+      const t = byUnit[r.unitId];
+      if (!t) return;
       const best = readings[t.trailer];
-      if (!best || when > best.at) readings[t.trailer] = { at: when, tempF: round1(temp) };
+      if (!best || r.at > best.at) readings[t.trailer] = { at: r.at, tempF: r.tempF };
     });
   }
   const docs = {}, log = {}, before = prev.trips || {};
@@ -570,29 +588,26 @@ async function pullReefer(db, d, o, token, trucks, at) {
 
 /*
  * Joe 10/20 (Trucks Today > All Fleet Units): the newest cargo temperature of every trailer Fleet shows (tags with a trailer
- * word: T-933, TRL 888...), read every TEMPS_EVERY_MINUTES with the same UDPO_ReeferPoints template, kept in one record
+ * word: T-933, TRL 888...), read every TEMPS_EVERY_MINUTES with the same UDPO_TrailerTemps read, kept in one record
  * gpsTemps/now {units: {tag: {tempF, at}}, readAt}. A reading stays until a newer one comes or it is TEMPS_KEEP_HOURS old.
  */
-const TEMPS_EVERY_MINUTES = 15, TEMPS_KEEP_HOURS = 24, TEMPS_BATCH = 25;
+const TEMPS_EVERY_MINUTES = 15, TEMPS_KEEP_HOURS = 24;
 const isTrailerTag = (tag) => { const c = String(tag || '').toUpperCase().replace(/[\s#_.]+/g, ''); return TAG_BEFORE.test(c) || TAG_AFTER.test(c); };
-async function pullTemps(db, d, o, token, trucks, at) {
+async function pullTemps(db, d, o, token, trucks, at, cache) {
   const ref = db.collection('private').doc('gpsFleet'), now = Date.parse(at);
   if (d.tempsAt && now - Date.parse(d.tempsAt) < (TEMPS_EVERY_MINUTES - 1) * 60000) return null;
   const list = Object.keys(trucks).map(k => trucks[k]).filter(t => t.unitId && isTrailerTag(t.tag));
   const docRef = db.collection('gpsTemps').doc('now'), was = ((await docRef.get()).data() || {}).units || {}, units = {};
   Object.keys(was).forEach(k => { if (now - Date.parse(was[k].at) < TEMPS_KEEP_HOURS * 3600000) units[k] = was[k]; });
   if (list.length) {
-    if (!d.reeferTemplatesReady) { await ensureTemplates(d, o, token, [TEMPLATES.reefer]); await ref.set({ reeferTemplatesReady: true }, { merge: true }); }
-    const since = new Date(d.tempsAt ? Date.parse(d.tempsAt) - 10 * 60000 : now - REEFER_LOOKBACK_HOURS * 3600000), byUnit = {};
+    const since = Math.max(now - REEFER_LOOKBACK_HOURS * 3600000, d.tempsAt ? Date.parse(d.tempsAt) - 10 * 60000 : 0), byUnit = {};
     list.forEach(t => { byUnit[t.unitId] = t; });
-    for (let i = 0; i < list.length; i += TEMPS_BATCH) {
-      (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(since), Until: fleetTime(new Date(now)), Ids: list.slice(i, i + TEMPS_BATCH).map(t => t.unitId).join(',') })).forEach(r => {
-        const t = byUnit[r.UnitId], when = utcIso(r.Time), temp = num(r.CargoTempF);
-        if (!t || !when || temp === null) return;
-        const k = safeIdPart(String(t.tag)), old = units[k];
-        if (!old || when > old.at) units[k] = { tempF: round1(temp), at: when };
-      });
-    }
+    (await trailerTemps(db, d, o, token, cache, since, at)).forEach(r => {
+      const t = byUnit[r.unitId];
+      if (!t) return;
+      const k = safeIdPart(String(t.tag)), old = units[k];
+      if (!old || r.at > old.at) units[k] = { tempF: r.tempF, at: r.at };
+    });
   }
   if (JSON.stringify(units) !== JSON.stringify(was)) await docRef.set({ units, readAt: at });
   const n = Object.keys(units).length;
@@ -777,15 +792,18 @@ const status = (d, h) => ({ history: h ? { done: h.done || 0, total: h.total || 
  * Joe 10/20 ("Reefer Temp is name ... try to ask for everything and see what it returns. No matter what."): GPS Setup's
  * "Ask Verizon for everything" check, for one unit. Read only: it saves its own UDPO_Probe* reports in Fleet (as Test saves
  * ours) and shows exactly what Fleet answers to each, errors included:
- *   1. every field Fleet's Point and Unit tables have whose name or description says temperature, reefer, cargo...
+ *   1. every field Fleet offers (Joe 10/21: "can you ask for all 1,037 fields?"), with table and type names from Fleet's own
+ *      lists, temperature/refrigeration/reefer/cargo/sensor ones first
  *   2. every custom field (attribute) in the account with such a name
- *   3. the unit's own Unit record, with every custom Unit field
- *   4. the unit's GPS points for the last PROBE_HOURS, plain (does the Point table answer at all?)
- *   5. the same points with every temperature-like Point field, all at once and, if that fails, one field at a time.
+ *   3. the unit's own Unit record, from all units asked at once; then asked with a unit list, to compare
+ *   4. every unit's GPS points for the last PROBE_PLAIN_MINUTES, plain, by time only (no unit list)
+ *   5. every readable reading field of the GPS points, PROBE_BATCH at a time, every unit for PROBE_TEMP_MINUTES by time only,
+ *      then one table of every field that came back with a value, the typed unit's latest first.
+ * If the reading batches run out of time, the next press with the same unit within PROBE_RESUME_MINUTES carries on from there.
  * Kept in private/gpsProbe so the answer is still there after the page is closed.
  */
-const PROBE_WORDS = /temp|reefer|cargo|therm|refrig|sensor|probe|zone|setpoint|set point/i, PROBE_HOURS = 6, PROBE_BUDGET_MS = 95000, PROBE_ROWS = 25;
-const PROBE_FALLBACK = ['CargoAirTemp', 'AbnormalRefrigeratorTemp', 'AmbientAirTemp'];
+const PROBE_WORDS = /temp|reefer|cargo|therm|refrig|sensor|probe|zone|setpoint|set point/i, PROBE_PLAIN_MINUTES = 10, PROBE_TEMP_MINUTES = 15, PROBE_BUDGET_MS = 105000, PROBE_ROWS = 25, PROBE_BATCH = 40, PROBE_BATCH_STOP_MS = 80000, PROBE_RESUME_MINUTES = 60;
+const PROBE_FALLBACK = ['RefrigerationTemp', 'RefrigerationTemp2', 'CargoAirTemp'];
 async function saveProbeTemplate(d, o, token, name, table, user, filter, output) {
   const base = baseOf(d, o), lines = ['[Template]', 'TemplateVersion = 1.0', 'TableID = ' + table, 'TemplateName = ' + name, 'Intent = Retrieve', ''];
   if (user.length) lines.push('[User]', ...user, '');
@@ -805,7 +823,10 @@ async function probe(db, d, o, email, tagIn) {
   if (!tag) throw new FleetError('BAD_REQUEST', 'Type a Fleet unit number, like T-933.');
   const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
   const bare = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), unit = trucks.find(t => bare(t.tag) === bare(tag)) || null;
-  const steps = [], ref = db.collection('private').doc('gpsFleet');
+  const ref = db.collection('private').doc('gpsFleet'), saved = db.collection('private').doc('gpsProbe');
+  const prev = (await saved.get()).data() || null, save = async (r) => { await saved.set(r); return r; };
+  const cont = !!(prev && prev.next > 0 && Array.isArray(prev.cols) && unit && bare(prev.tag) === bare(tag) && Date.parse(at) - Date.parse(prev.at || 0) < PROBE_RESUME_MINUTES * 60000);
+  const steps = cont ? (prev.steps || []).filter(x => !x.summary) : [];
   const step = async (label, fn) => {
     if (o.now().getTime() - began > PROBE_BUDGET_MS) { steps.push({ label, ok: false, note: 'Not asked: out of time. Press the button again to finish.' }); return null; }
     try { const r = await fn(); steps.push(Object.assign({ label, ok: true }, r)); return r; }
@@ -814,58 +835,86 @@ async function probe(db, d, o, email, tagIn) {
   const run = async (name, params, points) => execute(d, o, token, name, params, { points, maxPolls: 6 });
   const show = (rows) => rows.slice(0, PROBE_ROWS);
   const token = await key(ref, d, o, false);
-  let pointCols = [], unitCustom = [];
-  await step('Fields Fleet has for GPS points and units, with temperature, reefer, cargo or sensor in the name', async () => {
+  // Joe 10/21: "is there a way that you could ask Verizon just like a running list of everything?" Verizon's own lists of
+  // its tables, data types and units turn each field's numbers into names, so the whole field list can be shown, and every
+  // reading field asked for without us choosing names.
+  const tables = {}, types = {}, units = {}, first = !cont;
+  const quiet = async (name, table, out, fill) => { try { await saveProbeTemplate(d, o, token, name, table, [], [], out); (await run(name, {})).forEach(fill); return true; } catch (e) { if (!(e instanceof FleetError)) throw e; return false; } };
+  let fields = [], hits = [];
+  if (first) await step('Every field Verizon offers (search the list below)', async () => {
+    await quiet('UDPO_ProbeTables', 'Table-1.0', ['Id = Input.Id', 'Name = Input.Name'], r => { tables[r.Id] = r.Name; });
+    await quiet('UDPO_ProbeTypes', 'DataType-1.0', ['Id = Input.Id', 'Name = Input.Name', 'IsMeasurement = Input.IsMeasurement', 'UnitId = Input.ReferenceMeasurementUnitId'], r => { types[r.Id] = r; });
+    await quiet('UDPO_ProbeUnits', 'MeasurementUnit-1.0', ['Id = Input.Id', 'Name = Input.Name', 'Abbreviation = Input.Abbreviation'], r => { units[r.Id] = r; });
     await saveProbeTemplate(d, o, token, 'UDPO_ProbeColumns', 'Column-1.0', [], [], ['TableId = Input.TableId', 'Name = Input.Name', 'Description = Input.Description', 'DataType = Input.DataTypeId', 'IsDiagnostic = Input.IsDiagnostic', 'IsReadable = Input.IsReadable']);
     const rows = await run('UDPO_ProbeColumns', {});
-    const mine = rows.filter(r => /point|unit/i.test(r.TableId || ''));
-    const hits = mine.filter(r => PROBE_WORDS.test(r.Name || '') || PROBE_WORDS.test(r.Description || ''));
-    pointCols = hits.filter(r => /point/i.test(r.TableId) && !/^false$/i.test(r.IsReadable || '')).map(r => ({ name: r.Name, type: r.DataType || '' }));
-    unitCustom = mine.filter(r => /^unit/i.test(r.TableId) && /^custom\./i.test(r.Name || '')).map(r => r.Name);
-    return { note: rows.length + ' fields in all; ' + mine.length + ' for GPS points and units; ' + hits.length + ' with one of those words; ' + unitCustom.length + ' custom unit fields.', rows: show(hits.concat(mine.filter(r => unitCustom.indexOf(r.Name) >= 0 && hits.indexOf(r) < 0))) };
+    fields = rows.map(r => ({ tableId: r.TableId, table: tables[r.TableId] || r.TableId, name: r.Name || '', type: (types[r.DataType] || {}).Name || r.DataType || '', typeId: r.DataType,
+      description: r.Description || '', diagnostic: /^true$/i.test(r.IsDiagnostic || ''), readable: !/^false$/i.test(r.IsReadable || '') }));
+    hits = fields.filter(f => PROBE_WORDS.test(f.name) || PROBE_WORDS.test(f.description));
+    return { note: fields.length + ' fields in all, ' + hits.length + ' with temperature, refrigeration, reefer, cargo or sensor in the name or description (listed first).',
+      fields: hits.concat(fields.filter(f => hits.indexOf(f) < 0)).map(f => ({ table: String(f.table), name: f.name, type: String(f.type), description: f.description, reading: f.diagnostic })) };
   });
-  await step('Custom fields in the account with one of those words', async () => {
+  if (first) await step('Custom fields in the account with one of those words', async () => {
     await saveProbeTemplate(d, o, token, 'UDPO_ProbeAttributes', 'Attribute-1.0', [], [], ['Id = Input.Id', 'Name = Input.Name', 'Type = Input.Type', 'IsGlobal = Input.IsGlobal']);
-    const rows = await run('UDPO_ProbeAttributes', {}), hits = rows.filter(r => PROBE_WORDS.test(r.Name || ''));
-    return { note: rows.length + ' custom fields in all; ' + hits.length + ' with one of those words.', rows: show(hits) };
+    const rows = await run('UDPO_ProbeAttributes', {}), found = rows.filter(r => PROBE_WORDS.test(r.Name || ''));
+    return { note: rows.length + ' custom fields in all; ' + found.length + ' with one of those words.', rows: show(found) };
   });
   if (!unit || !unit.unitId) {
     steps.push({ label: 'This unit in Fleet', ok: false, note: 'Fleet\'s last read has no unit ' + tag + '. Check the number as Fleet shows it.' });
   } else {
-    await step('Unit ' + unit.tag + ' as Fleet keeps it', async () => {
-      const out = ['UnitId = Input.Id', 'Tag = Input.Tag', 'DeviceType = Input.DeviceType', 'AssetType = Input.AssetType', 'LastReport(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastReportTime',
-        'LastDiagnostic(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastDiagnosticTime', 'EngineHours = Input.TotalEngineHours', 'Notes = Input.Notes'].concat(unitCustom.slice(0, 20).map(n => outName(n) + ' = Input.' + n));
-      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnit', 'Unit-1.0', ['Ids(Set<Text>) = "Ids"'], ['Id = In(Ids)'], out);
-      const rows = await run('UDPO_ProbeUnit', { Ids: unit.unitId });
+    // Joe 10/21 (6.39, T-965): every read sent with a list of unit numbers failed (500) while the plain all-units read works,
+    // so these ask without a list, for a short time, and pick the unit out here. One read still sends the list, to compare.
+    const mineOnly = (rows) => rows.filter(r => String(r.UnitId) === String(unit.unitId));
+    if (first) await step('Unit ' + unit.tag + ' as Fleet keeps it (all units asked, no unit list)', async () => {
+      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnit', 'Unit-1.0', [], [], ['UnitId = Input.Id', 'Tag = Input.Tag', 'LastReport(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastReportTime',
+        'LastDiagnostic(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastDiagnosticTime', 'EngineHours = Input.TotalEngineHours', 'AssetType = Input.AssetType', 'DeviceType = Input.DeviceType']);
+      const rows = await run('UDPO_ProbeUnit', {}), mine = mineOnly(rows);
+      return { note: rows.length + ' units; ' + (mine.length ? unit.tag + ' is one of them.' : unit.tag + ' is not among them.'), rows: show(mine) };
+    });
+    if (first) await step('Unit ' + unit.tag + ' asked with a unit list (to compare)', async () => {
+      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnitList', 'Unit-1.0', ['Ids(Set<Text>) = "Ids"'], ['Id = In(Ids)'], ['UnitId = Input.Id', 'Tag = Input.Tag']);
+      const rows = await run('UDPO_ProbeUnitList', { Ids: unit.unitId });
       return { note: rows.length ? 'Fleet answered.' : 'Fleet answered with nothing.', rows: show(rows) };
     });
-    const since = fleetTime(new Date(Date.parse(at) - PROBE_HOURS * 3600000)), until = fleetTime(new Date(at)), params = { Since: since, Until: until, Ids: unit.unitId };
-    const pointTemplate = (name, cols) => saveProbeTemplate(d, o, token, name, 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"'],
-      ['Time = Between(Since, Until)', 'UnitId = In(Ids)'], ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time'].concat(cols));
-    await step('GPS points for ' + unit.tag + ', last ' + PROBE_HOURS + ' hours, plain', async () => {
+    const pointTemplate = (name, cols) => saveProbeTemplate(d, o, token, name, 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'],
+      ['Time = Between(Since, Until)'], ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time'].concat(cols));
+    const window = (min) => ({ Since: fleetTime(new Date(Date.parse(at) - min * 60000)), Until: fleetTime(new Date(at)) });
+    if (first) await step('GPS points for every unit, last ' + PROBE_PLAIN_MINUTES + ' minutes (no unit list), plain', async () => {
       await pointTemplate('UDPO_ProbePoints', ['Tag = Input.Tag', 'Address = Input.Address']);
-      const rows = await run('UDPO_ProbePoints', params, true);
-      return { note: rows.length + ' GPS points.', rows: show(rows.slice(-PROBE_ROWS)) };
+      const rows = await run('UDPO_ProbePoints', window(PROBE_PLAIN_MINUTES), true), mine = mineOnly(rows);
+      return { note: rows.length + ' GPS points from ' + new Set(rows.map(r => r.UnitId)).size + ' units; ' + mine.length + ' from ' + unit.tag + '.', rows: show((mine.length ? mine : rows).slice(-PROBE_ROWS)) };
     });
-    const cols = (pointCols.length ? pointCols : PROBE_FALLBACK.map(name => ({ name, type: '' }))).slice(0, 12);
-    const line = (c, unitC) => outName(c.name) + (unitC ? '(C)' : '') + ' = Input.' + c.name;
-    const isTemp = (c) => /temp/i.test(c.type) || (/temp/i.test(c.name) && !/^abnormal/i.test(c.name));
-    const all = await step('GPS points for ' + unit.tag + ' with every temperature field: ' + cols.map(c => c.name).join(', '), async () => {
-      await pointTemplate('UDPO_ProbeTemps', cols.map(c => line(c, isTemp(c))));
-      const rows = await run('UDPO_ProbeTemps', params, true), filled = rows.filter(r => cols.some(c => String(r[outName(c.name)] || '').trim() !== ''));
-      return { note: rows.length + ' GPS points; ' + filled.length + ' with a value in one of these fields.', rows: show((filled.length ? filled : rows).slice(-PROBE_ROWS)) };
-    });
-    if (!all) for (const c of cols) {
-      await step('GPS points for ' + unit.tag + ' with ' + c.name + ' alone', async () => {
-        await pointTemplate('UDPO_ProbeTemps', [line(c, isTemp(c))]);
-        const rows = await run('UDPO_ProbeTemps', params, true), filled = rows.filter(r => String(r[outName(c.name)] || '').trim() !== '');
-        return { note: rows.length + ' GPS points; ' + filled.length + ' with a value.', rows: show((filled.length ? filled : rows).slice(-PROBE_ROWS)) };
+    // Every reading field of the GPS points (Verizon's "diagnostics"), in batches, each with the unit Verizon keeps it in.
+    const pointId = (() => { const n = {}; fields.filter(f => f.diagnostic).forEach(f => { n[f.tableId] = (n[f.tableId] || 0) + 1; }); return Object.keys(n).sort((x, y) => n[y] - n[x])[0]; })();
+    const unitFor = (c) => { const t = types[c.typeId] || {}, u = units[t.UnitId] || {}; if (/^temperature$/i.test(c.type)) return 'C'; return /^true$/i.test(t.IsMeasurement || '') ? (u.Name || u.Abbreviation || '') : ''; };
+    let cols = cont ? prev.cols : fields.filter(f => f.diagnostic && f.readable && f.tableId === pointId).map(f => ({ name: f.name, description: f.description, unit: unitFor(f) }));
+    if (!cols.length) cols = PROBE_FALLBACK.map(name => ({ name, description: '', unit: 'C' }));
+    const line = (c) => outName(c.name) + (c.unit ? '(' + c.unit + ')' : '') + ' = Input.' + c.name;
+    const seen = cont ? Object.assign({}, prev.seen) : {}, latest = cont ? Object.assign({}, prev.latest) : {}, failed = cont ? (prev.failed || []).slice() : [];
+    let next = 0;
+    for (let i = cont ? prev.next : 0; i < cols.length; i += PROBE_BATCH) {
+      if (o.now().getTime() - began > PROBE_BATCH_STOP_MS) { next = i; break; }
+      const part = cols.slice(i, i + PROBE_BATCH);
+      const r = await step('Readings ' + (i + 1) + ' to ' + (i + part.length) + ' of ' + cols.length + ', every unit, last ' + PROBE_TEMP_MINUTES + ' minutes', async () => {
+        await pointTemplate('UDPO_ProbeTemps', part.map(line));
+        const rows = await run('UDPO_ProbeTemps', window(PROBE_TEMP_MINUTES), true);
+        part.forEach(c => {
+          const k = outName(c.name), have = rows.filter(x => String(x[k] || '').trim() !== '');
+          if (have.length) seen[c.name] = new Set(have.map(x => x.UnitId)).size;
+          const mine = mineOnly(have).sort((x, y) => x.Time < y.Time ? 1 : -1)[0];
+          if (mine) latest[c.name] = { value: mine[k], at: mine.Time };
+        });
+        return { note: rows.length + ' GPS points; ' + part.filter(c => seen[c.name]).length + ' of these ' + part.length + ' fields have a value.', quiet: true };
       });
+      if (!r) failed.push(...part.map(c => c.name));
     }
+    const sent = cols.filter(c => seen[c.name]).sort((x, y) => (latest[y.name] ? 1 : 0) - (latest[x.name] ? 1 : 0) || seen[y.name] - seen[x.name]);
+    steps.push({ label: 'Every reading Verizon sent in the last ' + PROBE_TEMP_MINUTES + ' minutes (' + unit.tag + '\'s first)', ok: sent.length > 0, summary: true,
+      note: sent.length + ' of ' + cols.length + ' reading fields have a value from some unit; ' + Object.keys(latest).length + ' from ' + unit.tag + '.' + (failed.length ? ' Not read (Verizon error): ' + failed.length + ' fields.' : '') +
+        (next ? ' ' + (cols.length - next) + ' fields not asked yet: press Ask Verizon again to carry on.' : ''),
+      rows: sent.slice(0, 300).map(c => ({ Field: c.name, Description: c.description || '', ['Latest from ' + unit.tag]: latest[c.name] ? latest[c.name].value + (c.unit ? ' ' + c.unit : '') : '', At: latest[c.name] ? latest[c.name].at : '', 'Units sending it': String(seen[c.name]) })) });
+    if (next) return save({ at, by: email, tag, steps, next, cols, seen, latest, failed });
   }
-  const result = { at, by: email, tag, steps };
-  await db.collection('private').doc('gpsProbe').set(result);
-  return result;
+  return save({ at, by: email, tag, steps });
 }
 
 /* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag}. The caller has
@@ -882,7 +931,7 @@ async function fleetCall(db, email, input, options) {
     if (String(input.fleet || '').trim()) next.fleet = cleanFleet(input.fleet);
     if (String(input.user || '').trim()) next.user = String(input.user).trim().slice(0, 200);
     if (String(input.password || '')) next.password = String(input.password).slice(0, 200);
-    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false, alertTemplatesReady: false, historyTemplatesReady: false, reeferTemplatesReady: false });
+    Object.assign(next, { savedAt: o.now().toISOString(), savedBy: email, lastTest: null, token: '', tokenUntil: '', templatesReady: false, alertTemplatesReady: false, historyTemplatesReady: false, reeferTemplatesReady: false, trailerTempsReady: false });
     await ref.set(next);
     return status(next);
   }

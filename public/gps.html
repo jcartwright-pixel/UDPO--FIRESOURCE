@@ -61,7 +61,7 @@
       </section>
       <section class="gps-card wide">
         <h2>4. Ask Verizon for everything</h2>
-        <p class="hint">Type one Fleet unit, like a trailer you know has a reefer temperature, and press Ask Verizon. The app asks Fleet for every field it has with temperature, reefer, cargo or sensor in the name, then for that unit's record and its GPS points, and shows exactly what Fleet answers. It only reads; nothing in Fleet changes.</p>
+        <p class="hint">Type one Fleet unit, like a trailer you know has a reefer temperature, and press Ask Verizon. The app lists every field Fleet offers (search it below), then asks for that unit's record and every reading Fleet sends for it, and shows exactly what Fleet answers. If it runs out of time, press Ask Verizon again to carry on. It only reads; nothing in Fleet changes.</p>
         <div class="gps-ask"><label>Fleet unit<input id="p-tag" autocomplete="off"></label><div class="gps-buttons"><button type="button" class="primary" id="probe">Ask Verizon</button></div></div>
         <p class="hint" id="probe-when"></p>
         <div id="probe-out"></div>
@@ -107,15 +107,31 @@
     }
     // Joe 10/20 ("try to ask for everything and see what it returns. No matter what."): each answer as Fleet sent it.
     function renderProbe() {
-      const p = s.probe;
+      const p = s.probe, box = $('probe-out'), was = $('probe-find') ? $('probe-find').value : '';
       $('probe-when').textContent = p ? 'Last asked ' + stamp(p.at) + ' for ' + p.tag + (p.by ? ' by ' + p.by : '') + '.' : '';
-      $('probe-out').innerHTML = !p ? '' : p.steps.map(x => {
+      const table = (cols, rows, cell) => '<div class="gps-probe-rows"><table><thead><tr>' + cols.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(cell).join('') + '</tbody></table></div>';
+      // Joe 10/21: the reading batches that came back fine are summed up in the last step; only a batch Verizon refused is shown on its own.
+      box.innerHTML = !p ? '' : p.steps.filter(x => !(x.quiet && x.ok)).map(x => {
         const rows = x.rows || [], cols = rows.length ? Object.keys(rows[0]) : [];
         return '<div class="gps-probe"><div class="gps-probe-head"><span class="gps-mark ' + (x.ok ? 'ok' : 'bad') + '">' + (x.ok ? '✓' : '✗') + '</span><b>' + escapeHtml(x.label) + '</b></div>' +
           '<p>' + escapeHtml(x.note || '') + '</p>' + (x.error && x.error !== x.note ? '<pre>' + escapeHtml(x.error) + '</pre>' : '') +
-          (rows.length ? '<div class="gps-probe-rows"><table><thead><tr>' + cols.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr></thead><tbody>' +
-            rows.map(r => '<tr>' + cols.map(c => '<td>' + escapeHtml(r[c] == null ? '' : String(r[c])) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '') + '</div>';
+          // Joe 10/21 ("can you ask for all 1,037 fields? ... Or can you show me the list"): every field Verizon offers, searchable.
+          (x.fields ? '<div class="gps-probe-search"><input id="probe-find" type="search" placeholder="Search fields, like refrigeration" aria-label="Search fields"><span id="probe-found" class="hint"></span></div>' +
+            table(['Table', 'Field', 'Type', 'What it is', 'Reading field'], x.fields, f => '<tr data-find="' + escapeHtml((f.table + ' ' + f.name + ' ' + f.type + ' ' + f.description).toLowerCase()) + '"><td>' + escapeHtml(f.table) + '</td><td>' +
+              escapeHtml(f.name) + '</td><td>' + escapeHtml(f.type) + '</td><td class="desc"><div>' + escapeHtml(f.description) + '</div></td><td>' + (f.reading ? 'Yes' : '') + '</td></tr>') : '') +
+          (rows.length ? table(cols, rows, r => '<tr>' + cols.map(c => (c === 'Description' ? '<td class="desc"><div>' + escapeHtml(r[c] || '') + '</div></td>' : '<td>' + escapeHtml(r[c] == null ? '' : String(r[c])) + '</td>')).join('') + '</tr>') : '') + '</div>';
       }).join('');
+      const find = $('probe-find');
+      if (!find) return;
+      const filter = () => {
+        const q = find.value.trim().toLowerCase(), trs = box.querySelectorAll('tr[data-find]');
+        let n = 0;
+        trs.forEach(tr => { const on = !q || tr.dataset.find.indexOf(q) >= 0; tr.hidden = !on; if (on) n++; });
+        $('probe-found').textContent = q ? n + ' of ' + trs.length + ' fields' : trs.length + ' fields';
+      };
+      find.value = was;
+      find.addEventListener('input', filter);
+      filter();
     }
     // Joe 10/14: "how can I tell if we're pulling all the data we want from Verizon?"
     const UNIT = { positions: 'units', odometer: 'units', engineHours: 'trucks', trailerHours: 'trailers', miles: 'trucks', yard: 'trucks', reefer: 'trailers' };
