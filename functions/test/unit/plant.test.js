@@ -228,8 +228,9 @@ test('yard checks: a loaded trailer is on the yard until its dispatch time; a ch
     payload: { trailer: 'T-955', temperature: '34', fuelLevel: '3/4', notes: 'ok', status: 'COMPLETE' } };
   q = R.yardQueue(runs, [check], '2026-10-07', at('2026-10-07T17:10:00Z'));
   assert.deepEqual([q.rows.length, q.locked.length, q.locked[0].minutesUntilDue, q.locked[0].temperature, q.locked[0].fuelLevel], [0, 1, 60, '34', '3/4']);
+  // Joe 10/20: the next operating day it is due with empty boxes; yesterday's check is not shown as its last check.
   q = R.yardQueue(runs, [check], '2026-10-08', at('2026-10-08T16:20:00Z'));
-  assert.deepEqual([q.rows.length, q.rows[0].recordedAt, q.rows[0].temperature], [1, '2026-10-07T16:10:00Z', '34']);
+  assert.deepEqual([q.rows.length, q.rows[0].recordedAt, q.rows[0].temperature, q.rows[0].setPoint], [1, '', '', '']);
   assert.equal(R.yardLockLeft([check], '2026-10-07', '955', at('2026-10-07T17:10:00Z')), 60);
   assert.equal(R.yardLockLeft([check], '2026-10-07', '955', at('2026-10-07T18:11:00Z')), 0);
   // Left Yard (trailer + run) takes that load off.
@@ -502,4 +503,32 @@ test('withDispatchTimes: the trailer Daily Dispatch has on the run and day shows
   assert.deepEqual([jersey.dispatchTrailer, R.loadTrailer(jersey), jersey.pickupTime], [undefined, 'T-50', '13:00']);
   assert.equal(R.loadTrailer(carrier), 'ABC1');
   assert.equal(R.loadTrailer(old), '');
+});
+
+test('yard checks: a check from before this load was loaded, or from an earlier day, is not its last check (Joe 10/20, T-965)', () => {
+  const at = (s) => Date.parse(s);
+  // Wednesday's 8302_1 loaded on T-965 Tuesday 6:08 PM, leaves Wednesday 4 AM. T-965 was checked Monday 11:50 PM on Tuesday's load.
+  const runs = [{ id: 'r8302', weekStart: '2026-10-18', sheetRow: 81, route: '8302_1', run: '8302_1', days: {
+    wed: { loadDate: '2026-10-20', departureDate: '2026-10-21', deliveryDate: '2026-10-21', trailer: 'T-965', dispatchTime: 4 * 60, completeTime: '2026-10-20T22:08:40.244Z', loadStatus: 'COMPLETE' } } }];
+  const old = { type: 'YARD_CHECK', date: '2026-10-19', recordedAt: '2026-10-20T03:50:00Z', recordedBy: 'gk@uniteddairy.com',
+    payload: { trailer: 'T-965', temperature: '35', setPoint: '33', fuelLevel: 'FULL', status: 'COMPLETE' } };
+  const oldLeft = { type: 'YARD_CHECK', date: '2026-10-20', recordedAt: '2026-10-20T08:40:00Z', payload: { trailer: 'T-965', run: '8302_1', status: 'DEPARTED' } };
+  let q = R.yardQueue(runs, [old, oldLeft], '2026-10-20', at('2026-10-21T01:15:00Z'));
+  assert.deepEqual(q.rows.map(r => [r.trailer, r.recordedAt, r.recordedBy, r.setPoint, r.minutesUntilDue]), [['T-965', '', '', '', 0]], 'due, with no old check, set point or Left Yard');
+  // A check of this load tonight is its last check, and Left Yard after it takes it off.
+  const now = { type: 'YARD_CHECK', date: '2026-10-20', recordedAt: '2026-10-21T00:30:00Z', recordedBy: 'gk@uniteddairy.com',
+    payload: { trailer: 'T-965', temperature: '34', setPoint: '33', fuelLevel: '3/4', status: 'COMPLETE' } };
+  q = R.yardQueue(runs, [old, now], '2026-10-20', at('2026-10-21T01:15:00Z'));
+  assert.deepEqual([q.locked.length, q.locked[0].recordedAt, q.locked[0].setPoint], [1, '2026-10-21T00:30:00Z', '33']);
+  const left = { type: 'YARD_CHECK', date: '2026-10-20', recordedAt: '2026-10-21T01:00:00Z', payload: { trailer: 'T-965', run: '8302_1', status: 'DEPARTED' } };
+  q = R.yardQueue(runs, [old, now, left], '2026-10-20', at('2026-10-21T01:15:00Z'));
+  assert.equal(q.rows.length + q.locked.length, 0);
+  // A check at 5:30 AM keeps its 2-hour lock across the 6 a.m. roll.
+  const early = { type: 'YARD_CHECK', date: '2026-10-20', recordedAt: '2026-10-21T09:30:00Z', payload: { trailer: 'T-965', temperature: '34', status: 'COMPLETE' } };
+  const runs2 = [{ id: 'r', weekStart: '2026-10-18', sheetRow: 1, route: '852', run: 'JERSEY 1', days: {
+    thu: { loadDate: '2026-10-21', departureDate: '2026-10-22', deliveryDate: '2026-10-22', trailer: 'T-965', dispatchTime: 13 * 60, completeTime: '2026-10-21T08:00:00Z' } } }];
+  q = R.yardQueue(runs2, [early], '2026-10-21', at('2026-10-21T10:10:00Z'));
+  assert.deepEqual([q.locked.length, q.locked[0].minutesUntilDue], [1, 80]);
+  // History keeps the operating day of each check (Latest on the screen counts today's only).
+  assert.deepEqual(R.yardHistory([old, now], '2026-10-20', at('2026-10-21T01:15:00Z')).map(h => h.date), ['2026-10-20', '2026-10-19']);
 });

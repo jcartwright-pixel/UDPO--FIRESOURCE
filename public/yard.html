@@ -140,7 +140,8 @@
       waiting = false;
       forgetOld();
       const q = queue(), ck = canSave(), hist = U.yardHistory(all(), date, Date.now());
-      const latest = hist.find(h => h.status !== 'DEPARTED');
+      // Joe 10/20: Latest is the newest check of today (since the 6 a.m. roll), not one from last night.
+      const latest = hist.find(h => h.status !== 'DEPARTED' && (!h.date || h.date === date));
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '\n' + shortDate(date);
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
         ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + (why || l) + '</span></div>').join('');
