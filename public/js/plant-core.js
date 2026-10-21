@@ -106,7 +106,12 @@ export function moveNote(r) {
   const word = m.how === 'SKIP' ? 'SKIPPED' : 'MOVED', parts = String(m.name || '').trim().split(/\s+/).filter(Boolean);
   // On the line, short so the load stays one line high: "Joe C." or the station's name; the full name and time show on hover.
   const short = parts.length > 1 ? parts[0] + ' ' + parts[parts.length - 1][0] + '.' : person || m.station || '';
-  return { word, who, short, title: (m.how === 'SKIP' ? 'Skipped down one place' : 'Moved out of the sheet\'s loading order') + (who ? ' by ' + who : '') + (when ? ' at ' + when : '') };
+  // Joe 10/21 ("I want the initials beside whoever is doing this"): the person's initials ("JC" for Joe Cartwright, the first two
+  // letters of the email when the app has no name); a Plant Station tablet signed in with its station code knows no person, so
+  // it reads TABLET (which tablet shows on hover).
+  const named = /@/.test(String(m.name || '')) ? [] : parts, mail = String(m.by || '').split('@')[0].replace(/[^a-z]/gi, '');
+  const initials = m.via === 'TABLET' ? 'TABLET' : named.length > 1 ? (named[0][0] + named[named.length - 1][0]).toUpperCase() : named.length ? named[0].slice(0, 2).toUpperCase() : mail.slice(0, 2).toUpperCase();
+  return { word, who, short, initials, title: (m.how === 'SKIP' ? 'Skipped down one place' : 'Moved out of the sheet\'s loading order') + (who ? ' by ' + who : '') + (when ? ' at ' + when : '') };
 }
 
 // A load someone moved (moveMark) that is still out of the sheet's place: a Skip past one load can leave either of the two

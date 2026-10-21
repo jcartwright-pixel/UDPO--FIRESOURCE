@@ -290,7 +290,8 @@
       const routeCell = (r) => '<td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';
       const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
       // Joe 10/15: a load dragged out of the sheet's order gets a green MOVED tag (dragging stays allowed). Joe 10/19: only the
-      // tag is green, not the whole line, and it is one word on one line; who moved it and when show on hover.
+      // tag is green, not the whole line, and it stays on one line; who moved it and when show on hover. Joe 10/21: SKIPPED
+      // also shows the initials of who pressed Skip (TABLET from a Plant Station tablet).
       const moved = P.movedIds(rows.filter(r => !r.sched));
       let html = '', lastPrior = null;
       rows.forEach(r => {
@@ -312,7 +313,7 @@
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
         const isMoved = !P.movedEarlier(r) && (moved.has(r.id) || P.movedBySomeone(r)), note = P.moveNote(r);
         // Joe 10/20: once a skipped load is Done its SKIPPED tag comes off (a MOVED tag stays).
-        const movedTag = isMoved && !(st === 'DONE' && note.word === 'SKIPPED') ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + '</span>' : '';
+        const movedTag = isMoved && !(st === 'DONE' && note.word === 'SKIPPED') ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.word === 'SKIPPED' && note.initials ? ' · ' + escapeHtml(note.initials) : '') + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
         const stale = st === 'LOADING' && mins !== null && mins >= P.LONG_RUN_MINUTES;
         // Review item 22 (Joe 10/13): a load left running past 12 hours shows just "forgot End?" in Total Time; when it started

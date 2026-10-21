@@ -210,7 +210,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
         '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
-        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
+        '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + (moved.word === 'SKIPPED' && moved.initials ? ' · ' + escapeHtml(moved.initials) : '') + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
       if (isOpen) {
         const dis = !ck || done;
         html += '<div class="sw-body"><div class="sw-fields">' + field(r.id, 'quantity', unit.label, qty(r.quantity), { mode: 'numeric', disabled: dis }) + field(r.id, 'truck', 'Truck', r.truck, { disabled: dis }) +
