@@ -198,3 +198,20 @@ test('a Route Editor "Run By" change stays in the app on the Live weeks: no cove
   const v = tabs["'LIVE NEXT WEEK'"], h = v[5], row = v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t801');
   assert.equal(row[h.indexOf('display_mobile_route')], 'FALSE', 'the other cells of the save are still written');
 });
+
+test('Departure Day and Load Day changed in the Route Editor reach the Current and Next weeks; a load already started keeps its day (Joe 10/21, 950)', async () => {
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { departureDay: 'Load Day' }, days: {} });
+  assert.equal((await run('2026-10-11__run_t801')).masterShow.leavesOn, 'Load Day', 'the Next week leaves on the load day');
+  assert.equal((await run('2026-10-04__run_t801')).masterShow.leavesOn, 'Load Day', 'the Current week too');
+  assert.equal((await db().collection('routes').doc('run_t801').get()).data().departureDay, 'Load Day');
+  // Load Day: Monday 10/12 is loaded the same day now; Tuesday 10/13 is already loaded (COMPLETE), so it keeps its day.
+  const before = (await run('2026-10-11__run_t801')).days.tue;
+  assert.equal(before.loadStatus, 'COMPLETE');
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: {}, days: { mon: { loadDayOffset: '0' }, tue: { loadDayOffset: '-2' } } });
+  const next = await run('2026-10-11__run_t801');
+  assert.deepEqual([next.days.mon.loadDayOffset, next.days.mon.loadDate], [0, '2026-10-12']);
+  assert.deepEqual([next.days.tue.loadDayOffset, next.days.tue.loadDate], [before.loadDayOffset, before.loadDate], 'a loaded load keeps its load day');
+  // A save that does not touch Departure Day or Load Day leaves them alone.
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t801', fields: { routeNotes: 'x' }, days: { thu: { dispatchTime: '4 AM' } } });
+  assert.equal((await run('2026-10-11__run_t801')).masterShow.leavesOn, 'Load Day');
+});

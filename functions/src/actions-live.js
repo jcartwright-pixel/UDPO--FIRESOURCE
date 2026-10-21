@@ -89,6 +89,12 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       // Joe 10/12 (typed OK): the driver Route app switch (phone View Loadout, Driver Room board, check-in) reaches the two weeks' rows too,
       // since those screens read the week's own display_mobile_route first.
       if (req && req.fields && typeof req.fields.displayMobile === 'boolean' && run.displayMobileRoute !== req.fields.displayMobile) changes[i].run.displayMobileRoute = req.fields.displayMobile;
+      // Joe 10/21 (950 Charleston Transfer): a Departure Day changed in the Route Editor reaches the two weeks' loads too, since the
+      // Late Forecast, Yard Checks and the shift report read the week's own copy (masterShow.leavesOn) for when a load leaves.
+      if (req && req.fields && typeof req.fields.departureDay === 'string') {
+        const on = L.leavesOn(m);
+        if (((run.masterShow || {}).leavesOn || '') !== on) changes[i].run['masterShow.leavesOn'] = on;
+      }
     });
     L.DAYS.forEach(p => {
       // A run on two rows (one per set of days): the day belongs to the row that runs it, else the first row.
@@ -107,6 +113,11 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       if (req && req.fields && typeof req.fields.loadType === 'string' && !day.loadTypeByHand) {
         const type = R.loadArea(m.loadType) || 'NONE';
         if (String(day.loadType || '') !== type) ch.loadType = type;
+      }
+      // Joe 10/21: a Load Day changed in the Route Editor moves the days not started yet to their new load date (today or later).
+      if (req && req.days && req.days[p] && 'loadDayOffset' in req.days[p] && !day.plantStartedAt && !day.completeTime && !String(day.loadStatus || '').trim()) {
+        const off = (v) => v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? -1 : Number(v), to = off(want.loadDayOffset);
+        if (off(day.loadDayOffset) !== to && loadDay(week, p, to) >= today) { ch.loadDayOffset = to; ch.loadDate = loadDay(week, p, to); }
       }
       const hours = hoursNumber(want.hours);
       if (hours !== null && !byHand(run, p, 'route_hours_override') && day.routeHours !== hours) ch.routeHours = hours;
