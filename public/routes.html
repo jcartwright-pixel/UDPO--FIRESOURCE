@@ -91,7 +91,8 @@
       times: { field: 'dispatchTime', title: 'Start Times', sub: 'Type a time any way (5, 530, 5:30p, 17:30); it turns into a time like 5:30 PM. ' + KEYS, ph: 'h:mm AM' },
       miles: { field: 'miles', title: 'Mileage', sub: 'Miles per run per day (round trip). ' + KEYS, ph: 'miles' },
       hours: { field: 'hours', title: 'Hours and Return', sub: 'Expected route hours (hours:minutes or decimal). ' + KEYS, ph: 'h:mm' },
-      offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Days before the departure day that the load is built (0 same day, -1 the day before). ' + KEYS, ph: '0' },
+      // Joe 10/21 (mock-up 2): in words, counted back from the delivery day at the top of the column.
+      offset: { field: 'loadDayOffset', title: 'Load Day', sub: 'Each column is the delivery day. Pick how many days before delivery the load is built: Same day, Day before, 2 days before (Monday\'s Saturday load). ' + KEYS, ph: 'Day before' },
       truck: { field: 'tractor', title: 'Default Truck', sub: 'Type a truck number. Blank clears the default. ' + KEYS, ph: 'truck' },
       trailer: { field: 'trailer', title: 'Default Trailer', sub: 'Type a trailer number (T- is added). Blank clears the default. ' + KEYS, ph: 'trailer' },
       jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default. ' + KEYS, ph: 'unit' }
@@ -115,9 +116,24 @@
     function shownRuns() {
       return routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).filter(r => !pickRoute || r.route === pickRoute).filter(r => !pickRun || r.id === pickRun).sort(byOrder);
     }
+    // Joe 10/21 (picked mock-up 2): Load Day reads in words; the number stored stays the same (0 same day, -1 the day before,
+    // -2 two days before), counted back from the delivery day. Typed or pasted words or numbers both work.
+    const OFFSET_WORDS = ['Same day', 'Day before', '2 days before', '3 days before', '4 days before', '5 days before', '6 days before'];
+    const offsetWords = (v) => v === null || v === undefined || v === '' ? '' : OFFSET_WORDS[-Number(v)] || String(v);
+    function offsetNumber(text) {
+      const t = String(text == null ? '' : text).trim().toLowerCase().replace(/\s+/g, ' ');
+      if (t === '') return '';
+      if (/^-?0$|^same( day)?$/.test(t)) return 0;
+      if (/^-?1$|^(the |1 )?day before$/.test(t)) return -1;
+      const m = t.match(/^-?([2-6])( days?)?( before)?$/);
+      return m ? -Number(m[1]) : null;
+    }
+    // What a box sends: Load Day as its number, everything else as typed.
+    const sent = (field, text) => field === 'loadDayOffset' ? String(offsetNumber(text)) : text;
     function cellValue(r, p, field) {
       const v = day(r, p)[field];
       if (field === 'dispatchTime') return L.timeText(v);
+      if (field === 'loadDayOffset') return offsetWords(v);
       return v === null || v === undefined ? '' : String(v);
     }
 
@@ -191,15 +207,16 @@
       if (sheet.scrollLeft !== keepLeft) sheet.scrollLeft = keepLeft;
     }
 
-    const head = (first, last) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '</th>').join('') + (last || '') + '</tr></thead>';
+    const head = (first, last, sub) => '<thead><tr>' + first + DAYS.map(p => '<th>' + NAME(p).slice(0, 3).toUpperCase() + (sub ? '<small class="th-sub">' + sub + '</small>' : '') + '</th>').join('') + (last || '') + '</tr></thead>';
     const routeCells = (r) => '<td class="strong">' + escapeHtml(r.route) + '<small>' + escapeHtml(r.routeName || '') + '</small></td><td class="strong">' + escapeHtml(r.run || '') + '</td>';
     function gridView(g, list, edit) {
-      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>') + '<tbody>' +
+      return '<colgroup><col style="width:8%"><col style="width:15%"><col span="7" style="width:11%"></colgroup>' + head('<th>Route</th><th>Run / Destination</th>', '', g.field === 'loadDayOffset' ? 'delivery' : '') + '<tbody>' +
         list.map((r, ri) => '<tr data-id="' + escapeHtml(r.id) + '">' + routeCells(r) + DAYS.map((p, di) => {
           const on = !!day(r, p).active, value = cellValue(r, p, g.field);
           // Joe 10/20: an up / down clicker on each start time (15 minutes a click; hold to keep going).
           const step = g.field === 'dispatchTime' && edit && value ? '<span class="step"><button type="button" class="step-btn" data-step="15" tabindex="-1" aria-label="15 minutes later" title="15 minutes later">&#9650;</button><button type="button" class="step-btn" data-step="-15" tabindex="-1" aria-label="15 minutes earlier" title="15 minutes earlier">&#9660;</button></span>' : '';
-          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(value) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '>' + step + '</td>';
+          const pick = g.field === 'loadDayOffset' && edit ? '<button type="button" class="pick-btn" tabindex="-1" aria-label="Pick the load day" title="Pick the load day">&#9660;</button>' : '';
+          return '<td class="' + (on ? '' : 'norun') + '"><input class="cell" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(p) + ', ' + g.title) + '" data-day="' + p + '" data-r="' + ri + '" data-c="' + di + '" value="' + escapeHtml(value) + '" placeholder="' + (on ? g.ph : '') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '>' + step + pick + '</td>';
         }).join('') + '</tr>').join('') + '</tbody>' + (list.length ? '' : '<tbody><tr><td colspan="9" class="empty">No runs to show.</td></tr></tbody>');
     }
     function daysView(list, edit) {
@@ -367,23 +384,30 @@
       input.value = L.timeText(m);
       return true;
     }
-    function notTime(input, raw) {
+    function tidyOffset(input, r, p) {
+      const raw = input.value.trim(), n = offsetNumber(raw);
+      if (n === null) { input.value = cellValue(r, p, 'loadDayOffset'); notTime(input, raw, 'Not a choice', 'is not Same day, Day before or 2 to 6 days before; the old value was kept.'); return false; }
+      input.value = offsetWords(n);
+      return true;
+    }
+    const tidy = (field, input, r, p) => field === 'dispatchTime' ? tidyTime(input, r, p) : field === 'loadDayOffset' ? tidyOffset(input, r, p) : true;
+    function notTime(input, raw, word, why) {
       const td = input.closest('td');
       td.querySelectorAll('.cell-note').forEach(x => x.remove());
       input.classList.add('bad');
       const note = document.createElement('span');
       note.className = 'cell-note';
       note.setAttribute('role', 'alert');
-      note.textContent = 'Not a time';
-      input.title = '"' + raw + '" is not a time; the old time was kept.';
+      note.textContent = word || 'Not a time';
+      input.title = '"' + raw + '" ' + (why || 'is not a time; the old time was kept.');
       td.appendChild(note);
       setTimeout(() => { note.remove(); input.classList.remove('bad'); input.removeAttribute('title'); }, 4000);
     }
     function saveCell(input) {
       const r = routes.find(x => x.id === input.closest('tr').dataset.id), p = input.dataset.day, field = GRID[view].field;
-      if (field === 'dispatchTime' && !tidyTime(input, r, p)) return;
+      if (!tidy(field, input, r, p)) return;
       if (input.value.trim() === cellValue(r, p, field)) return;
-      const value = input.value.trim();
+      const value = sent(field, input.value.trim());
       saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
     }
     // What the screen shows at once for a typed value (the server stores the same).
@@ -429,9 +453,9 @@
       if (e.target.matches('input.nm')) return saveName(routes.find(x => x.id === e.target.closest('tr').dataset.id), e.target.dataset.name, e.target.value);
       if (e.target.matches('input.dcell')) {
         const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), p = e.target.dataset.day, field = e.target.dataset.field;
-        if (field === 'dispatchTime' && !tidyTime(e.target, r, p)) return;
-        const value = e.target.value.trim();
-        if (value === cellValue(r, p, field)) return;
+        if (!tidy(field, e.target, r, p)) return;
+        if (e.target.value.trim() === cellValue(r, p, field)) return;
+        const value = sent(field, e.target.value.trim());
         return saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
       }
       const mf = e.target.dataset.many;
@@ -482,13 +506,13 @@
       cells.forEach(x => {
         if (x.readOnly) return;
         const id = x.closest('tr').dataset.id, r = routes.find(y => y.id === id);
-        if (!r || (field === 'dispatchTime' && !tidyTime(x, r, x.dataset.day))) return;
+        if (!r || !tidy(field, x, r, x.dataset.day)) return;
         if (x.value.trim() === cellValue(r, x.dataset.day, field)) return;
         (perRun[id] = perRun[id] || []).push(x);
       });
       Object.keys(perRun).forEach(id => {
         const r = routes.find(x => x.id === id), days = {};
-        perRun[id].forEach(x => { days[x.dataset.day] = { [field]: x.value.trim() }; });
+        perRun[id].forEach(x => { days[x.dataset.day] = { [field]: sent(field, x.value.trim()) }; });
         saveRun(r, null, days, run => Object.keys(days).forEach(p => { run.days[p] = Object.assign({}, run.days[p], { [field]: shown(field, days[p][field]) }); }));
       });
     }
@@ -499,6 +523,11 @@
         const m = L.typedTime(value, r ? day(r, from.dataset.day).dispatchTime : null);
         if (m === null) { if (from && r) { from.value = value; tidyTime(from, r, from.dataset.day); } return; }
         value = L.timeText(m);
+      }
+      if (value && GRID[view].field === 'loadDayOffset') {
+        const n = offsetNumber(value), r = from && routes.find(x => x.id === from.closest('tr').dataset.id);
+        if (n === null) { if (from && r) { from.value = value; tidyOffset(from, r, from.dataset.day); } return; }
+        value = offsetWords(n);
       }
       const cells = blockCells().filter(x => !x.readOnly); cells.forEach(x => { x.value = value; }); saveCells(cells);
     }
@@ -546,6 +575,40 @@
     });
     // Like a sheet (Joe 10/20): one click picks the whole box, so typing replaces it (double-click puts the cursor in the
     // text); Shift+click marks a block from the box you are in; pressing and dragging across boxes marks one too.
+    // Joe 10/21: a Load Day box is picked from a list (its arrow); a pick fills the marked boxes when this box is one of them.
+    const pickList = document.createElement('div');
+    pickList.className = 'pick-list'; pickList.hidden = true; pickList.setAttribute('role', 'listbox');
+    document.body.appendChild(pickList);
+    let pickFor = null;
+    const closePick = () => { pickList.hidden = true; pickFor = null; };
+    table.addEventListener('pointerdown', e => {
+      const b = e.target.closest('.pick-btn');
+      if (!b) return;
+      e.preventDefault();
+      const input = b.closest('td').querySelector('input.cell');
+      if (pickFor === input) return closePick();
+      if (!(multi() && input.classList.contains('picked'))) moveTo(input);
+      pickFor = input;
+      const now = offsetNumber(input.value);
+      pickList.innerHTML = OFFSET_WORDS.map((w, i) => '<button type="button" role="option" data-w="' + w + '"' + (now === -i ? ' class="on" aria-selected="true"' : '') + '>' + w + '</button>').join('');
+      const box = b.closest('td').getBoundingClientRect();
+      pickList.style.left = box.left + 'px'; pickList.style.minWidth = box.width + 'px';
+      pickList.hidden = false;
+      const below = box.bottom + pickList.offsetHeight <= window.innerHeight;
+      pickList.style.top = (below ? box.bottom : Math.max(0, box.top - pickList.offsetHeight)) + 'px';
+    });
+    pickList.addEventListener('pointerdown', e => e.preventDefault());
+    pickList.addEventListener('click', e => {
+      const o = e.target.closest('[data-w]'), input = pickFor;
+      closePick();
+      if (!o || !input || !input.isConnected) return;
+      if (multi() && input.classList.contains('picked')) return fillBlock(o.dataset.w, input);
+      input.value = o.dataset.w;
+      saveCell(input);
+    });
+    window.addEventListener('pointerdown', e => { if (!pickList.hidden && !e.target.closest('.pick-list, .pick-btn')) closePick(); });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && !pickList.hidden) closePick(); });
+    document.getElementById('sheet').addEventListener('scroll', () => { if (!pickList.hidden) closePick(); });
     let dragging = false;
     table.addEventListener('mousedown', e => {
       const input = e.target.closest('input.cell');

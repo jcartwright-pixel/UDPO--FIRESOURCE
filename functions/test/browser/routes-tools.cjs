@@ -283,6 +283,40 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     results.push('Departure Day: a list of Load Day / Delivery Day, 802 showed "' + had + '", picked ' + pick + ' and saved');
     await p.selectOption('#route-select', '');
 
+    // Joe 10/21 (picked mock-up 2): Load Day reads in words, each heading says it is the delivery day, a box is picked from a
+    // list, and the number stored stays the same (0 same day, -1 the day before, -2 two days before).
+    await p.selectOption('#view-select', 'offset');
+    await p.waitForSelector(cell('run_t802', 'mon') + ' ~ .pick-btn');
+    assert.match(await p.textContent('table.routes thead th:nth-child(4)'), /^MON\s*delivery$/);
+    assert.match(await p.textContent('#work-sub'), /^Each column is the delivery day\. Pick how many days before delivery/);
+    const want = (v) => v === null || v === undefined ? '' : ['Same day', 'Day before', '2 days before'][-v];
+    assert.equal(await p.inputValue(cell('run_t801', 'mon')), want((await db().collection('routes').doc('run_t801').get()).data().days.mon.loadDayOffset));
+    await p.click(cell('run_t802', 'mon') + ' ~ .pick-btn');
+    await p.waitForSelector('.pick-list:not([hidden])');
+    assert.deepEqual(await p.$$eval('.pick-list button', b => b.map(x => x.textContent)), ['Same day', 'Day before', '2 days before', '3 days before', '4 days before', '5 days before', '6 days before']);
+    assert.equal(await p.$eval('.pick-list button', b => getComputedStyle(b).fontSize), '16px');
+    await p.click('.pick-list button[data-w="2 days before"]');
+    assert.equal(await stored('run_t802', 'mon', 'loadDayOffset', -2), -2, 'a pick saves the same number as before (-2)');
+    assert.equal(await p.inputValue(cell('run_t802', 'mon')), '2 days before');
+    await p.click(cell('run_t802', 'tue')); await p.keyboard.type('same day'); await p.keyboard.press('Enter');
+    assert.equal(await stored('run_t802', 'tue', 'loadDayOffset', 0), 0, 'typed words save too');
+    await p.click(cell('run_t802', 'wed')); await p.keyboard.type('-1'); await p.keyboard.press('Enter');
+    assert.equal(await stored('run_t802', 'wed', 'loadDayOffset', -1), -1, 'a typed number still works');
+    await p.waitForFunction(() => document.querySelector('tr[data-id="run_t802"] input.cell[data-day="wed"]').value === 'Day before');
+    await p.click(cell('run_t802', 'thu')); const thuWas = await p.inputValue(cell('run_t802', 'thu'));
+    await p.keyboard.type('later'); await p.keyboard.press('Enter');
+    await p.waitForSelector('tr[data-id="run_t802"] .cell-note');
+    assert.equal(await p.textContent('tr[data-id="run_t802"] .cell-note'), 'Not a choice');
+    assert.equal(await p.inputValue(cell('run_t802', 'thu')), thuWas, 'something that is not a choice keeps the old value');
+    // A marked block takes one pick: Shift+click across, pick Day before.
+    await p.click(cell('run_t801', 'tue')); await p.click(cell('run_t801', 'thu'), { modifiers: ['Shift'] });
+    await p.click(cell('run_t801', 'thu') + ' ~ .pick-btn');
+    await p.click('.pick-list button[data-w="Same day"]');
+    for (const d of ['tue', 'wed', 'thu']) assert.equal(await stored('run_t801', d, 'loadDayOffset', 0), 0, 'the marked boxes all take the pick (' + d + ')');
+    assert.ok(await fits(p), 'Load Day fits 1920x1080');
+    await shot(p, 'routes-load-day-1920.png');
+    results.push('Load Day in words: headings say delivery, a pick of 2 days before saved -2, "same day" and -1 typed saved, "later" kept the old value, one pick filled three marked boxes');
+
     // Route Names (Joe 10/12): the route number is the first column and the only one that cannot be typed over. Run Code,
     // Stream ID, Run and Run Type save on that run; Route Name saves on every run of the route and no other; the run id never changes.
     await p.selectOption('#view-select', 'names');
