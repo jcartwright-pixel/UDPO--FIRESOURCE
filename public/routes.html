@@ -654,7 +654,7 @@
       f.route.value = base ? base.route : '';
       f.route.readOnly = !!base;
       f.routeName.value = base ? base.routeName || '' : '';
-      if (base) { f.loadType.value = base.loadType || 'None'; f.coverageOwner.value = base.coverageOwner || 'Uniontown'; f.weekOrder.value = base.weekOrder == null ? '' : base.weekOrder; }
+      if (base) { f.loadType.value = base.loadType || 'None'; f.coverageOwner.value = base.coverageOwner || 'Uniontown'; f.weekOrder.value = base.weekOrder == null ? '' : base.weekOrder; if (DEPARTS.indexOf(base.departureDay) >= 0) f.departureDay.value = base.departureDay; }
       document.getElementById('modal-back').hidden = false;
       document.getElementById('add-modal').hidden = false;
       (base ? f.run : f.route).focus();
