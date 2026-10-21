@@ -65,7 +65,7 @@
       <label class="wide">Run / Destination<input name="run" required maxlength="80"></label>
       <label>Loadout Type<select name="loadType"></select></label>
       <label>Run By<select name="coverageOwner"></select></label>
-      <label>Departure Day<input name="departureDay" value="Delivery Day" maxlength="40"></label>
+      <label>Departure Day<select name="departureDay" required><option value=""></option><option>Load Day</option><option>Delivery Day</option></select></label>
       <label>Order<input name="weekOrder" type="number" step="1"></label>
     </form>
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="add-save">Save Changes</button></div>
@@ -229,6 +229,11 @@
     }
     const yesNo = (name, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '><option value="true"' + (v ? ' selected' : '') + '>YES</option><option value="false"' + (v ? '' : ' selected') + '>NO</option></select>';
     const choice = (name, list, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '>' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
+    // Joe 10/21: Departure Day is picked, not typed - only the two values dispatch knows. A run's current value stays
+    // showing even if it was typed another way; a blank one shows blank.
+    const DEPARTS = ['Load Day', 'Delivery Day'];
+    const departs = (v, edit) => '<select data-f="departureDay"' + (edit ? '' : ' disabled') + '>' + (v ? '' : '<option value="" selected></option>') +
+      (v && DEPARTS.indexOf(v) < 0 ? '<option selected>' + escapeHtml(v) + '</option>' : '') + DEPARTS.map(x => '<option' + (x === v ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>';
     const textIn = (name, v, edit, type) => '<input data-f="' + name + '" value="' + escapeHtml(v == null ? '' : v) + '"' + (type ? ' type="' + type + '"' : '') + (edit ? '' : ' readonly') + '>';
     function detailsView(list, edit) {
       const r = pickRun ? list[0] : list.length === 1 ? list[0] : null;
@@ -237,7 +242,7 @@
         '<label>Route' + textIn('route', r.route, edit) + '</label><label>Route Name' + textIn('routeName', r.routeName, edit) + '</label><label>Order' + textIn('weekOrder', r.weekOrder, edit, 'number') + '</label>' +
         '<label>Run / Destination' + textIn('run', r.run, edit) + '</label><label>Movement Type' + textIn('movementType', r.movementType, edit) + '</label>' +
         '<label>Route ID<input readonly value="' + escapeHtml(r.routeId || '') + '"></label><label>Run ID<input readonly value="' + escapeHtml(r.id) + '"></label><label>Facility ID<input readonly value="' + escapeHtml(r.facilityId || '') + '"></label>' +
-        '<label>Departure Day' + textIn('departureDay', r.departureDay, edit) + '</label><label>Run Active' + yesNo('active', isActive(r), edit) + '</label><label>Sleeper' + yesNo('sleeper', !!r.sleeper, edit) + '</label>' +
+        '<label>Departure Day' + departs(r.departureDay || '', edit) + '</label><label>Run Active' + yesNo('active', isActive(r), edit) + '</label><label>Sleeper' + yesNo('sleeper', !!r.sleeper, edit) + '</label>' +
         '<label>Loadout Type' + choice('loadType', LOADOUT, r.loadType || 'None', edit) + '</label><label>Run By' + choice('coverageOwner', RUN_BY, r.coverageOwner || 'Uniontown', edit) + '</label>' +
         '<label>Show in Plant' + yesNo('displayPlant', shows(r, 'displayPlant'), edit) + '</label><label>Show Daily' + yesNo('displayDaily', shows(r, 'displayDaily'), edit) + '</label>' +
         '<label>Show Weekly' + yesNo('displayWeekly', shows(r, 'displayWeekly'), edit) + '</label><label>Mobile route' + yesNo('displayMobile', shows(r, 'displayMobile'), edit) + '</label><label>Route list' + yesNo('displayRouteMaster', shows(r, 'displayRouteMaster'), edit) + '</label>' +
@@ -649,7 +654,7 @@
       f.route.value = base ? base.route : '';
       f.route.readOnly = !!base;
       f.routeName.value = base ? base.routeName || '' : '';
-      if (base) { f.loadType.value = base.loadType || 'None'; f.coverageOwner.value = base.coverageOwner || 'Uniontown'; f.weekOrder.value = base.weekOrder == null ? '' : base.weekOrder; }
+      if (base) { f.loadType.value = base.loadType || 'None'; f.coverageOwner.value = base.coverageOwner || 'Uniontown'; f.weekOrder.value = base.weekOrder == null ? '' : base.weekOrder; if (DEPARTS.indexOf(base.departureDay) >= 0) f.departureDay.value = base.departureDay; }
       document.getElementById('modal-back').hidden = false;
       document.getElementById('add-modal').hidden = false;
       (base ? f.run : f.route).focus();
@@ -664,6 +669,7 @@
       const fields = { route: f.route.value.trim(), routeName: f.routeName.value.trim(), run: f.run.value.trim(), loadType: f.loadType.value, coverageOwner: f.coverageOwner.value, departureDay: f.departureDay.value.trim() };
       if (f.weekOrder.value !== '') fields.weekOrder = Number(f.weekOrder.value);
       if (!fields.route || !fields.run) { showError('Route and Run / Destination are required.'); return; }
+      if (!fields.departureDay) { showError('Pick a Departure Day (Load Day or Delivery Day).'); return; }
       closeAdd();
       const temp = Object.assign({ id: 'new-' + Date.now(), active: true, routeStatus: 'ACTIVE', days: {} }, fields);
       saveOptimistic('saveRoute', { fields, days: {} }, () => { routes.push(temp); pickRoute = fields.route; pickRun = ''; view = 'days'; },

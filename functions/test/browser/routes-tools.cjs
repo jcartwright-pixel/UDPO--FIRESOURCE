@@ -258,6 +258,31 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await shot(p, 'routes-many-1920.png');
     results.push('Route Details for many runs: 802 set to Boxing, 801 to Fairmont with drop and hook, each saved on its own');
 
+    // Joe 10/21: Departure Day is a list (Load Day / Delivery Day), not a box to type in. The run's value shows; a pick saves.
+    await p.waitForFunction(() => [...document.querySelectorAll('#route-select option')].some(o => o.textContent === '802'));
+    await p.selectOption('#route-select', '802');
+    await p.selectOption('#run-select', 'run_t802');
+    await p.selectOption('#view-select', 'details');
+    await p.waitForSelector('select[data-f="departureDay"]');
+    assert.equal(await p.$$eval('input[data-f="departureDay"]', x => x.length), 0, 'no Departure Day box to type in');
+    const had = (await db().collection('routes').doc('run_t802').get()).data().departureDay || '';
+    const departList = await p.$$eval('select[data-f="departureDay"] option', o => o.map(x => x.textContent));
+    assert.deepEqual(departList.filter(x => x === 'Load Day' || x === 'Delivery Day'), ['Load Day', 'Delivery Day']);
+    assert.equal(await p.$eval('select[data-f="departureDay"]', s => s.value), had, 'the run\'s Departure Day shows');
+    const pick = had === 'Load Day' ? 'Delivery Day' : 'Load Day';
+    await p.selectOption('select[data-f="departureDay"]', pick);
+    await settled();
+    for (let i = 0; i < 40; i++) {
+      if ((await db().collection('routes').doc('run_t802').get()).data().departureDay === pick) break;
+      if (i === 39) assert.fail('Departure Day did not save as ' + pick);
+      await new Promise(r => setTimeout(r, 250));
+    }
+    assert.equal(await p.$eval('select[data-f="departureDay"]', s => getComputedStyle(s).fontSize), '16px');
+    // Add Route starts blank and will not save without a pick.
+    assert.equal(await p.$eval('#add-form select[name="departureDay"], form select[name="departureDay"]', s => s.value), '', 'Add Route Departure Day starts blank');
+    results.push('Departure Day: a list of Load Day / Delivery Day, 802 showed "' + had + '", picked ' + pick + ' and saved');
+    await p.selectOption('#route-select', '');
+
     // Route Names (Joe 10/12): the route number is the first column and the only one that cannot be typed over. Run Code,
     // Stream ID, Run and Run Type save on that run; Route Name saves on every run of the route and no other; the run id never changes.
     await p.selectOption('#view-select', 'names');

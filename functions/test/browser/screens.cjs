@@ -447,6 +447,8 @@ async function noScroll(page) {
     await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => tr.children[0].textContent === '802' && tr.children[3].textContent === 'Tote' && /Wed/.test(tr.children[4].textContent)), null, { timeout: 5000 });
     await rt.click('#add-run');
     await rt.fill('#add-form input[name="run"]', 'WHEELING');
+    // Joe 10/21: Departure Day is picked from a list and must be picked (802's runs have none to copy).
+    await rt.selectOption('#add-form select[name="departureDay"]', 'Delivery Day');
     await rt.click('#add-save');
     await rt.waitForFunction(() => [...document.querySelectorAll('table.routes tbody tr')].some(tr => /WHEELING/.test(tr.textContent)), null, { timeout: 5000 });
     await rt.selectOption('#route-select', '');
