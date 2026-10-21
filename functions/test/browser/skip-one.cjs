@@ -70,7 +70,7 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       const read = (s) => { const f = document.querySelector(s + ' .sw-flag.skip'); return f && f.isConnected && getComputedStyle(f).backgroundColor ? { text: f.textContent, size: parseFloat(getComputedStyle(f).fontSize), title: f.title, bg: getComputedStyle(f).backgroundColor, fits: f.getBoundingClientRect().right <= window.innerWidth } : null; };
       const flag = await (await t.waitForFunction(read, card('811'), { timeout: 8000 })).jsonValue();
       // Joe 10/19: the same green one-word tag as the Daily Loadout; who pressed it shows on hover.
-      assert.ok(flag.text === 'SKIPPED' && flag.bg === 'rgb(46, 125, 67)' && flag.size >= 16 && flag.fits && /Skipped down one place by .*Case Loadout tablet/.test(flag.title), 'a green SKIPPED flag, who on hover, 16px, on screen ' + JSON.stringify(flag));
+      assert.ok(flag.text === 'SKIPPED · TABLET' && flag.bg === 'rgb(46, 125, 67)' && flag.size >= 16 && flag.fits && /Skipped down one place by .*Case Loadout tablet/.test(flag.title), 'a green SKIPPED · TABLET flag (Joe 10/21: a station tablet knows no person), which tablet on hover, 16px, on screen ' + JSON.stringify(flag));
       assert.ok(await t.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at ' + w);
       if (SHOTS && w === 1024) { await t.$eval(card('811'), el => el.scrollIntoView({ block: 'center' })); await t.screenshot({ path: path.join(SHOTS, 'station-after-skip-1024.png') }); }
       if (SHOTS && w === 390) { await t.$eval(card('811'), el => el.scrollIntoView({ block: 'center' })); await t.screenshot({ path: path.join(SHOTS, 'station-after-skip-phone-390.png') }); }
@@ -108,7 +108,7 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       await other.waitForFunction(() => { const r = [...document.querySelectorAll('#rows tr[data-row] td:first-child')].map(td => td.textContent); return r.indexOf('811') === r.indexOf('812') + 1; }, null, { timeout: 8000 });
       await p.waitForFunction(s => / by \S/.test((document.querySelector(s + ' .moved-tag') || {}).title || ''), row('811'), { timeout: 8000 });
       const tag = await p.$eval(row('811') + ' .moved-tag', t => ({ text: t.textContent, title: t.title, size: parseFloat(getComputedStyle(t).fontSize) }));
-      assert.ok(tag.text === 'SKIPPED' && /^Skipped down one place by Test M.* at /.test(tag.title) && tag.size >= 16, 'SKIPPED, the full name and time on hover ' + JSON.stringify(tag));
+      assert.ok(tag.text === 'SKIPPED · TM' && /^Skipped down one place by Test M.* at /.test(tag.title) && tag.size >= 16, 'Joe 10/21: SKIPPED with Test Manager\'s initials, the full name and time on hover ' + JSON.stringify(tag));
       assert.ok(await p.$eval(row('811'), (tr, hi) => tr.getBoundingClientRect().height <= hi + 1, high), 'the line stays one line high at ' + w);
       assert.ok(await other.$(row('811') + ' .moved-tag'), 'the other open screen marks it too');
       const list = await rows(p), last = list[list.length - 1];
@@ -158,7 +158,7 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       await p.waitForSelector(row('811') + ' button.skip');
       await p.click(row('811') + ' button.skip');
       await p.waitForFunction(() => { const r = [...document.querySelectorAll('#rows tr[data-row] td:first-child')].map(td => td.textContent); return r.indexOf('811') === r.indexOf('812') + 1; }, null, { timeout: 8000 });
-      await p.waitForFunction(s => /^SKIPPED$/.test((document.querySelector(s + ' .moved-tag') || {}).textContent || ''), row('811'), { timeout: 8000 });
+      await p.waitForFunction(s => /^SKIPPED · TM$/.test((document.querySelector(s + ' .moved-tag') || {}).textContent || ''), row('811'), { timeout: 8000 });
       const tag = await p.$eval(row('811') + ' .moved-tag', t => ({ size: parseFloat(getComputedStyle(t).fontSize), right: t.getBoundingClientRect().right, w: window.innerWidth }));
       assert.ok(tag.size >= 16 && tag.right <= tag.w, 'the SKIPPED tag is 16px and on screen at ' + w + ' ' + JSON.stringify(tag));
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at ' + w);
@@ -167,7 +167,7 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
       await p.close();
     }
     results.push('Daily Case Loadout at 1024, 800, 600, 412 and 390: Skip moved 811 down one place; the SKIPPED tag is 16px and on screen');
-    results.push('Daily Case Loadout at 1920 and 1536: Skip moved 811 down one place on both open screens, tagged "SKIPPED" on one line (who and when on hover); the last load has no Skip');
+    results.push('Daily Case Loadout at 1920 and 1536: Skip moved 811 down one place on both open screens, tagged "SKIPPED · TM" (Test Manager initials) on one line, full name and time on hover; the last load has no Skip');
   } finally {
     await browser.close();
   }

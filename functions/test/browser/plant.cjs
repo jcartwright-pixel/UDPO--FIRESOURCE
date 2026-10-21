@@ -238,7 +238,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
         .catch(async e => { throw new Error('Skip ' + id + ' below ' + below + ': ' + JSON.stringify(await tab.$$eval('#rows tr[data-row]', t => t.map(r => r.dataset.row))) + ' / ' + (await tab.textContent('#error').catch(() => '')) + ' / ' + tab.errors.join()); });
       assert.equal(await place(), await step(below) + 1, 'one Skip moves the load down one place (just past the next load to load), not to the bottom');
       assert.notEqual(await place(), (await tab.$$eval('#rows tr[data-row]', t => t.length)) - 1, 'not to the bottom');
-      await tab.waitForFunction(x => { const t = document.querySelector(x + ' .moved-tag'); return !!t && t.textContent === 'SKIPPED' && / by \S/.test(t.title); }, sel, { timeout: 8000 });
+      await tab.waitForFunction(x => { const t = document.querySelector(x + ' .moved-tag'); return !!t && /^SKIPPED · [A-Z]{2}$/.test(t.textContent) && / by \S/.test(t.title); }, sel, { timeout: 8000 });
       assert.ok(await tab.$(sel + ' button.skip'), 'Skip can be pressed again to move it one more place');
       const below2 = await tab.$eval('#rows', (b, x) => { const rows = [...b.querySelectorAll('tr[data-drag]')], i = rows.findIndex(r => r.dataset.row === x); return rows[i + 1].dataset.row; }, id);
       await tab.click(sel + ' button.skip');

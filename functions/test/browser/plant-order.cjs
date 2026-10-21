@@ -171,7 +171,7 @@ async function keyMove(page, route, dir) {
     await tablet.click(row('812') + ' button.skip');
     await waitOrder(tablet, ['801', '802', '805', '6302', '815', '808', '811', '812']);
     await waitOrder(watcher, ['801', '802', '805', '6302', '815', '808', '811', '812']);
-    await tablet.waitForFunction(r => { const t = document.querySelector(r + ' .moved-tag'); return !!t && t.textContent === 'SKIPPED' && / by \S/.test(t.title); }, row('812'));
+    await tablet.waitForFunction(r => { const t = document.querySelector(r + ' .moved-tag'); return !!t && /^SKIPPED · [A-Z]{2}$/.test(t.textContent) && / by \S/.test(t.title); }, row('812'));
     assert.ok(await tablet.$(row('812') + '[data-drag]'), 'a skipped load can still be dragged');
     assert.ok(await tablet.$$eval('.clock-cell', cs => cs.every(c => c.parentElement.scrollWidth <= c.parentElement.clientWidth + 1)), 'Start and Skip fit their cell');
     // Review item 59: a finger holds 808 by its Depart cell (not Route or Run) and slides it.
