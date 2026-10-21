@@ -872,6 +872,8 @@ async function applyAction(db, user, input, now, deps) {
       throw new SaveError('CHANGED', run.route + ' ' + run.run + ' was changed by someone else; the screen now shows the latest', { rev: run.rev });
     }
     const after = await resolveAssignment(tx, db, req, stamp, run);
+    // Joe 10/21: a load taken off on Daily or Weekly takes the plant's own Add Load copy of it off too (read now, written below).
+    const plantGone = req.action === 'setRuns' && day.runs && after.runs === false ? await PLANT.scheduledForRun(tx, db, run.runId, day.deliveryDate || L.addDays(run.weekStart, L.DAYS.indexOf(req.day))) : [];
     // Joe 10/12 (Joel Jacobs on 901_1 with no truck): a driver put on a day, from Daily or Weekly, takes his own truck (Driver Master's
     // assigned truck) unless it is not usable or another driver has it that day; his own other loads that day keep it too.
     const warnings = [];
@@ -924,6 +926,7 @@ async function applyAction(db, user, input, now, deps) {
     });
     if (mode.writeBack && req.action === 'savePlantLoad') queueLoadoutHistory(tx, db, req, run, Object.assign({}, day, after), after, stamp, email);
     const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: req.runDocId, rev: run.rev + 1 }].concat(moves.map(m => ({ runDocId: m.snap.id, rev: (m.run.rev || 0) + 1 }))) };
+    if (plantGone.length) result.plantRemoved = PLANT.followRun(tx, db, plantGone, '', email, stamp);
     if (warnings.length) result.warnings = warnings;
     if (writeMaint) result.maintenance = writeMaint(maintQueue(tx, db, mode, req.requestId, stamp, email));
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, runDocId: req.runDocId, day: req.day, before, after, result });

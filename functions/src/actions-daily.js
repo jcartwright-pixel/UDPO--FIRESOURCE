@@ -33,6 +33,8 @@ async function moveRun(tx, db, req, email, stamp, logRef, mode) {
     if (found.empty) throw new SaveError('NOT_FOUND', 'The week of ' + toWeek + ' is not one of the Live weeks, or ' + from.route + ' is not on it');
     toRef = found.docs[0].ref; to = found.docs[0].data();
   }
+  // Joe 10/21: the plant's own Add Load copy of the load moves to the new day with it (read now, written below).
+  const plantCopy = await require('./plant').scheduledForRun(tx, db, from.runId, from.days[req.day].deliveryDate || fromDate);
   const cleared = { runs: false, driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' };
   const fromUpdate = { rev: from.rev + 1, testEdited: true, editedAt: stamp };
   Object.keys(cleared).forEach(k => { fromUpdate['days.' + req.day + '.' + k] = cleared[k]; });
@@ -47,6 +49,7 @@ async function moveRun(tx, db, req, email, stamp, logRef, mode) {
     tx.update(toRef, { rev: to.rev + 1, testEdited: true, editedAt: stamp, ['days.' + toDay + '.runs']: true });
     result.runs.push({ runDocId: req.runDocId, rev: from.rev + 1 }, { runDocId: toRef.id, rev: to.rev + 1 });
   }
+  if (plantCopy.length) result.plantMoved = require('./plant').followRun(tx, db, plantCopy, req.toDate, email, stamp);
   if (mode.writeBack) {
     queueSheetCells(tx, db, req.requestId, '001', from, req.runDocId, req.day, cleared, stamp, email);
     queueSheetCells(tx, db, req.requestId, '002', to, toRef.id, toDay, turnedOn, stamp, email);
