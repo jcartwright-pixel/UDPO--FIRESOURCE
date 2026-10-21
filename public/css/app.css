@@ -1180,5 +1180,6 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
 
-/* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once. */
-body.ud-drawing .side-main, body.ud-drawing #screen > :not(.topbar):not(.side-wrap):not(.phone-top) { opacity: 0; pointer-events: none; }
+/* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once.
+   Only how it looks waits: presses work as they always did, so nothing under the finger changes when it appears. */
+body.ud-drawing .side-main, body.ud-drawing #screen > :not(.topbar):not(.side-wrap):not(.phone-top) { opacity: 0; }

@@ -390,8 +390,14 @@ function addSideMenu() {
   const peek = (open) => { document.body.classList.toggle('side-open', open); document.body.classList.toggle('side-folded', !open); };
   const pin = (p) => { pinned = p; document.body.classList.toggle('side-rail', !p); document.body.classList.toggle('side-pinned', p); peek(p); };
   pin(pinned);
+  // A menu a tap opened stays open until a tap on the screen beside it (or a real mouse leaves it): with no mouse, Chrome can
+  // send a made-up "mouse left" when the page under the finger changes (a screen finishing drawing), which folded the menu
+  // just before the second tap picked a screen.
+  let touching = false;
+  document.addEventListener('pointerdown', e => { touching = e.pointerType !== 'mouse'; }, true);
+  document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') touching = false; }, true);
   const inside = () => { clearTimeout(timer); if (!pinned) peek(true); };
-  const outside = () => { clearTimeout(timer); if (!pinned) timer = setTimeout(() => { peek(false); close(); }, 250); };
+  const outside = () => { clearTimeout(timer); if (!pinned && !touching) timer = setTimeout(() => { peek(false); close(); }, 250); };
   [nav, layer].forEach(el => { el.addEventListener('mouseenter', inside); el.addEventListener('mouseleave', outside); });
   // A tap on the folded strip opens it first; the next tap picks the screen.
   // (A tap's pointerdown comes before the mouse events a tablet makes up, so the strip is still folded here.)
