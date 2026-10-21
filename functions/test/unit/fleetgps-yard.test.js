@@ -136,14 +136,15 @@ test('reefer on the road: Moving, a short stop still reads Moving, stopped 5 min
   assert.equal(R.yardOut(s.trips['T-701'], Date.parse('2026-10-18T20:00:00Z')), null, 'back in the yard: off the list');
 });
 
-// Joe 10/18: the GPS says when a loaded trailer has left the yard; dispatch time only when the trailer has no GPS signal.
-test('yard list: off when the GPS sees this load out; kept past dispatch while the GPS sees it in the yard; dispatch time without signal', () => {
+// Joe 10/18: the GPS says when a loaded trailer has left the yard. Joe 10/20: past its dispatch time it is off the list whatever the GPS says.
+test('yard list: off when the GPS sees this load out, and off at its dispatch time even while the GPS sees it in the yard', () => {
   const R = require('../../src/plant-rules');
   const x = { runDocId: 'w__r1', day: 'mon', trailer: 'T-701', departureDate: '2026-10-19', departureTime: 600, loadDate: '2026-10-19', completedAt: '' };
   const before = Date.parse('2026-10-19T12:00:00Z'), after = Date.parse('2026-10-19T15:00:00Z'); // 8 AM and 11 AM, dispatch at 10 AM
   const g = (extra) => Object.assign({ id: 'w__r1|mon', unitId: 'u1', recording: true, out: '' }, extra);
   assert.equal(R.yardGone(x, g({ out: '2026-10-19T11:30:00Z', seenAt: '2026-10-19T11:55:00Z' }), '2026-10-19', before), true, 'seen out of the yard before its dispatch time: gone');
-  assert.equal(R.yardGone(x, g({ seenAt: '2026-10-19T14:55:00Z' }), '2026-10-19', after), false, 'past dispatch time but the GPS still sees it in the yard: stays');
+  assert.equal(R.yardGone(x, g({ seenAt: '2026-10-19T14:55:00Z' }), '2026-10-19', after), true, 'past dispatch time with the GPS seeing it in the yard (back from its route): gone');
+  assert.equal(R.yardGone(x, g({ seenAt: '2026-10-19T12:00:00Z' }), '2026-10-19', before), false, 'the GPS sees it in the yard before its dispatch time: stays');
   assert.equal(R.yardGone(x, g({ seenAt: '2026-10-19T12:00:00Z' }), '2026-10-19', after), true, 'no GPS report for 3 hours: by dispatch time');
   assert.equal(R.yardGone(x, g({ unitId: '', seenAt: '2026-10-19T14:55:00Z' }), '2026-10-19', after), true, 'no GPS unit: by dispatch time');
   assert.equal(R.yardGone(x, undefined, '2026-10-19', after), true, 'no GPS at all: by dispatch time');
@@ -151,7 +152,7 @@ test('yard list: off when the GPS sees this load out; kept past dispatch while t
   assert.equal(R.yardGone(x, g({ id: 'w__r0|sun', out: '2026-10-17T10:00:00Z', seenAt: '2026-10-19T11:55:00Z' }), '2026-10-19', before), false, 'an older load out on the same trailer is not this one');
   const runs = [{ id: 'w__r1', weekStart: '2026-10-18', sheetRow: 1, route: '801', run: '', days: { mon: { loadDate: '2026-10-19', deliveryDate: '2026-10-19', dispatchTime: 600, trailer: 'T-701', loadStatus: 'COMPLETE' } } }];
   assert.equal(R.yardQueue(runs, [], '2026-10-19', after).rows.length, 0, 'without GPS: gone at dispatch time, as before');
-  assert.equal(R.yardQueue(runs, [], '2026-10-19', after, { 'T-701': g({ seenAt: '2026-10-19T14:55:00Z' }) }).rows.length, 1, 'the GPS still sees it in the yard');
+  assert.equal(R.yardQueue(runs, [], '2026-10-19', after, { 'T-701': g({ seenAt: '2026-10-19T14:55:00Z' }) }).rows.length, 0, 'the GPS still sees it in the yard: gone at dispatch time all the same (Joe 10/20)');
 });
 
 // Joe 10/19: the trailer number is found in Fleet's tag however it is written; a bare number only when no truck has it.
