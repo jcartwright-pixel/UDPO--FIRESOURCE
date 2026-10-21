@@ -418,13 +418,11 @@
   function yardOf(d) { return yardTrailer(payloadOf(d).trailer || d.trailer); }
   // The Active Yard Queue (rows: due now or never checked) and the trailers checked in the last 2 hours (locked).
   // Joe 10/18: gps (gpsReefer by trailer, optional) says when a trailer has left: once the GPS sees this load's trailer out of
-  // the yard it is off the list. Only when the trailer has no GPS signal (no unit, or no report in REEFER_SIGNAL_MINUTES) does
-  // it go by its dispatch time, as before.
+  // the yard it is off the list. Joe 10/20: and once its dispatch time has passed it is off too, even when the GPS still sees
+  // it in the yard (a trailer back from its route stayed on the list): loaded trailers only, until they leave on dispatch.
   function yardGone(x, g, date, nowMs) {
-    var trip = !!g && text(g.id) === text(x.runDocId) + '|' + text(x.day);
-    if (trip && text(g.out)) return true;
-    var seen = g ? when(g.seenAt) : 0, signal = trip && !!text(g.unitId) && !!seen && nowMs - seen <= REEFER_SIGNAL_MINUTES * 60000;
-    return !signal && yardDeparted(x, date, nowMs);
+    if (g && text(g.id) === text(x.runDocId) + '|' + text(x.day) && text(g.out)) return true;
+    return yardDeparted(x, date, nowMs);
   }
   // Joe 10/20 (T-965 showed last night's 11:50 PM check and set point on today's load): a check or a Left Yard belongs to the
   // load on the yard only when it was made after that load was marked loaded, and on this operating day (since the 6 a.m.
@@ -473,7 +471,7 @@
   // Joe 10/18: the trailer's temperature from the GPS (Verizon Fleet, gpsReefer/<trailer>, read every 5 minutes from the time
   // the load is complete until the trailer is back in the yard), beside the yard check's typed temperature, set point and fuel.
   // Red when it is more than REEFER_OFF_BY degrees from the set point; a reading older than REEFER_STALE_MINUTES is shown as old.
-  var REEFER_OFF_BY = 5, REEFER_STALE_MINUTES = 60, REEFER_STOP_MINUTES = 5, REEFER_SIGNAL_MINUTES = 60;
+  var REEFER_OFF_BY = 5, REEFER_STALE_MINUTES = 60, REEFER_STOP_MINUTES = 5;
   function yardGps(r, setPoint, nowMs) {
     if (!r || r.tempF === null || r.tempF === undefined || r.tempF === '') return { has: false, recording: !!(r && r.recording), noUnit: !!(r && r.recording && !r.unitId) };
     var t = Number(r.tempF), at = when(r.readingAt), age = at ? Math.max(0, Math.round((nowMs - at) / 60000)) : null, sp = text(setPoint), off = null;
@@ -1276,7 +1274,7 @@
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
-    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, REEFER_SIGNAL_MINUTES: REEFER_SIGNAL_MINUTES, yardOut: yardOut, yardGone: yardGone,
+    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,

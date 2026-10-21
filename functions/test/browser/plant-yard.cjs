@@ -101,7 +101,7 @@ async function seed() {
       assert.equal(await page.inputValue('#rows tr[data-trailer="T-702"] .yd-temp'), '', 'the boxes start empty');
       assert.notEqual((await page.textContent('#rows tr[data-trailer="T-702"] .yd-last')).trim(), '—', 'the last check shows in Last Check');
       // Joe 10/18: one more column, GPS Temp, after the typed temperature, set point and fuel; red when more than 5° from the set point.
-      assert.deepEqual(await page.$$eval('#pane-current .yd-table:not(.yd-road) thead th', t => t.map(x => (x.querySelector('.l') || x).textContent)),
+      assert.deepEqual(await page.$$eval('#pane-current .yd-table thead th', t => t.map(x => (x.querySelector('.l') || x).textContent)),
         ['Trailer #', 'Actual Temp (°F)', 'Temp Set Point (°F)', 'Fuel Level', 'GPS Temp (°F)', 'Notes', 'Last Check', 'Next Recheck', 'Action']);
       await page.waitForFunction(() => /35\.4°/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-gps') || {}).textContent || ''));
       assert.equal((await page.textContent('#rows tr[data-trailer="T-701"] .yd-gps')).trim(), '35.4°');
@@ -110,15 +110,10 @@ async function seed() {
       assert.match(await page.getAttribute('#rows tr[data-trailer="T-702"] .yd-gps', 'title'), /10\.6° above the set point/);
       assert.equal((await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps')).trim(), '—');
       assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History'], 'no new tab');
-      // Joe 10/18: under the queue, the trailers that left the yard: route, trailer, GPS temp, Moving or where it stopped.
-      await page.waitForSelector('#road-rows tr[data-out="T-706"]');
-      assert.deepEqual(await page.$$eval('#road thead tr:last-child th', t => t.map(x => (x.querySelector('.l') || x).textContent)), ['Route', 'Trailer #', 'GPS Temp (°F)', 'Where now']);
-      const outRows = await page.$$eval('#road-rows tr', r => r.map(x => [...x.cells].map(c => c.textContent.trim())));
-      assert.deepEqual(outRows.map(r => r.slice(0, 3)), [['HILLTOP', 'T-707', '35°'], ['JERSEY 1', 'T-706', '45°'], ['SUN VALLEY', 'T-705', '34.8°']]);
-      assert.deepEqual([outRows[0][3], outRows[2][3]], ['Moving', 'Moving']);
+      // Joe 10/20: no list of the trailers that left the yard under the queue (it was kept until they came back).
+      assert.equal(await page.$('#road'), null, 'no left-the-yard list');
       assert.equal(await page.$('#rows tr[data-trailer="T-707"]'), null, 'the GPS shows T-707 gone: not on the yard list though its dispatch time has not come');
-      assert.match(outRows[1][3], /^Stopped at KROGER #512 · since \d{1,2}:\d{2} (AM|PM)$/);
-      assert.equal(await page.$eval('#road-rows tr[data-out="T-706"] .yd-gps', x => x.classList.contains('bad')), true, '45° against its last set point of 34 is red');
+      assert.equal(await page.$('#rows tr[data-trailer="T-706"]'), null, 'T-706 left: not on the yard list');
       assert.equal(await page.$$eval('#rows tr[data-trailer]', r => r.length), 3, 'the queue itself is unchanged');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
