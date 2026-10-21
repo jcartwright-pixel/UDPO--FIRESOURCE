@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, runDaysSettled } = require('../emulator/helpers');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -46,6 +46,7 @@ async function openPage(browser, url, when) {
     await d.collection('runs').doc('2026-10-11__sat' + route).set({ weekStart: '2026-10-11', sheetRow: 900 + i, route, run, routeId: 'rte_s' + route, runId: 'run_s' + route, active: true, loadType: 'CASE LOADOUT',
       days: { mon: { runs: true, loadDayOffset: -2, loadDate: '2026-10-10', deliveryDate: '2026-10-12', dispatchTime: time, loadSequence: i + 1 } } });
   }
+  await runDaysSettled(d);
   const browser = await chromium.launch();
   const results = [];
   try {

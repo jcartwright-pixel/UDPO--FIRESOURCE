@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, runDaysSettled } = require('../emulator/helpers');
 const localCalls = require('./local-calls.cjs');
 
 const HOSTING = 'http://127.0.0.1:5000';
@@ -65,12 +65,18 @@ async function openPage(browser, url, w, h, opts) {
         days: { tue: { runs: true, loadDayOffset: -1, loadDate: load, deliveryDate: delivery, departureDate: delivery, dispatchTime: 240, loadSequence: 10 + i, casesOut: rate, plantStartedAt: s.toISOString(), completeTime: new Date(s.getTime() + 3600000).toISOString(), loadStatus: 'COMPLETE' } } });
     }
   }
+  await runDaysSettled(d);
   const browser = await chromium.launch();
   try {
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
     await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
     // The loads reach Manager Center through runDays (filled by a trigger on each run), so wait for all of them.
-    await mc.waitForFunction(() => /2\s*late/.test((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || ''), null, { timeout: 20000 });
+    await mc.waitForFunction(() => /2\s*late/.test((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || ''), null, { timeout: 20000 }).catch(async (e) => {
+      // What the tile showed instead, so a slow or wrong fill can be told apart.
+      console.error('late-forecast: the tile reads', JSON.stringify(await mc.evaluate(() => ((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || '(no tile)').replace(/\s+/g, ' '))), 'errors', JSON.stringify(mc.errors));
+      if (SHOTS) await mc.screenshot({ path: path.join(SHOTS, 'late-forecast-timeout-1536.png') });
+      throw e;
+    });
     const tile = await mc.textContent('.mc-tile[href="forecast.html"]');
     assert.match(tile, /Late Forecast\s*2\s*late\s*All done est\. \d+:\d\d AM/);
     const cut = await mc.$$eval('[data-card="dept"] .mc-tile span, [data-card="dept"] .mc-tile i', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
