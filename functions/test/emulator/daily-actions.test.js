@@ -213,3 +213,42 @@ test('Driver Notes: a typed note saves on the run and the write-back writes driv
   assert.equal(row[h.indexOf('mon_driver_notes')], 'Call the store first');
   assert.equal((await db().collection('conflicts').get()).size, 0);
 });
+
+// Joe 10/21 ("if I delete something on the distribution side, it should automatically delete it on the plant side"): the
+// plant's own Add Load copy of a load goes with it when Daily or Weekly takes the load off or moves it to another day.
+test('NO RUN and MOVE TO ANOTHER DAY take the plant\'s Add Load copy off or along; a carrier or started load stays', async () => {
+  const R = require('../../src/plant-rules');
+  const add = async (id, fields) => {
+    const r = await run(id);
+    // The made-up 801 and 802 are not plant customers; the Scheduler's Add Load lists only runs shown on Plant Distribution.
+    await db().collection('routes').doc(r.runId).set({ displayPlant: true }, { merge: true });
+    const out = await applyAction(db(), DISPATCHER, { action: 'savePlantSchedule', requestId: rid(), lane: 'SHIPPING', op: 'save', date: fields.date,
+      fields: Object.assign({ routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, pickupTime: '6:00 AM' }, fields.f || {}) });
+    return out.id;
+  };
+  const ship = async () => R.scheduleEntries((await db().collection('plantJournal').where('type', '==', R.LOAD_TYPE.SHIPPING).get()).docs.map(d => d.data()), 'SHIPPING');
+  const weekly = async (id) => (await db().collection('plantLoads').doc(id).get()).exists;
+  // 802 on Tuesday 10/6: two plant copies, a carrier pickup and one being loaded; Wednesday's copy is another day.
+  const plain = await add(RUN, { date: '2026-10-06', f: { loadDate: '2026-10-05' } });
+  const carrier = await add(RUN, { date: '2026-10-06', f: { scheduleType: 'CARRIER', poNumber: 'P-9' } });
+  const started = await add(RUN, { date: '2026-10-06' });
+  await applyAction(db(), DISPATCHER, { action: 'savePlantSchedule', requestId: rid(), lane: 'SHIPPING', op: 'progress', id: started, date: '2026-10-06', step: 'start' });
+  const wed = await add(RUN, { date: '2026-10-07' });
+  const off = await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false });
+  assert.deepEqual(off.plantRemoved, [plain]);
+  let list = await ship();
+  assert.equal(list.some(x => x.id === plain), false, 'the plant copy is off the Scheduler and the loadout');
+  assert.equal(await weekly(plain), false, 'and off Weekly (no PLANT LOAD)');
+  assert.deepEqual([carrier, started, wed].map(id => list.some(x => x.id === id)), [true, true, true]);
+  assert.equal(await weekly(wed), true);
+  // Turning a day that is already off back to "needs a driver" (Weekly's PLANT LOAD) takes nothing off.
+  const none = await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: RUN, day: 'tue', runs: false, plantLoadOff: false });
+  assert.equal(none.plantRemoved, undefined);
+  // 801 moved from Monday 10/5 to Thursday 10/8: its plant copy moves too, load date and all.
+  const mon = await add('2026-10-04__run_t801', { date: '2026-10-05', f: { loadDate: '2026-10-04' } });
+  const moved = await applyAction(db(), DISPATCHER, { action: 'moveRun', requestId: rid(), runDocId: '2026-10-04__run_t801', day: 'mon', toDate: '2026-10-08' });
+  assert.deepEqual(moved.plantMoved, [mon]);
+  const m = (await ship()).find(x => x.id === mon);
+  assert.deepEqual([m.date, m.loadDate], ['2026-10-08', '2026-10-07']);
+  assert.equal((await db().collection('plantLoads').doc(mon).get()).data().date, '2026-10-08');
+});

@@ -856,6 +856,42 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   return result;
 }
 
+// Joe 10/21 ("if I delete something on the distribution side, it should automatically delete it on the plant side"): a load taken
+// off (or moved to another day) on Daily or Weekly takes the plant's own Add Load copy of it with it, so the loadout does not
+// keep it and Weekly does not show it again as PLANT LOAD. Only a United Dairy Delivery load of that run on that delivery date
+// that the plant has not started; a carrier pickup, or a load being loaded or done, stays. Reads first (a transaction reads
+// before it writes); the second step writes.
+async function scheduledForRun(tx, db, runId, date) {
+  if (!runId || !date) return [];
+  const type = R.LOAD_TYPE.SHIPPING;
+  const docs = (await tx.get(db.collection('plantJournal').where('type', '==', type).where('runId', '==', runId))).docs.map(d => d.data());
+  return Object.values(R.newestRecords(docs, [type])).filter(rec => {
+    const p = rec.payload || {}, state = String((p.work && p.work.state) || '').toUpperCase();
+    return rec.runId === runId && rec.date === date && String(rec.status || '').toUpperCase() !== 'DELETED' &&
+      !(p.scheduleType === 'CARRIER' || p.carrier === true) && (!state || state === 'WAITING');
+  });
+}
+function followRun(tx, db, list, toDate, email, stamp) {
+  const type = R.LOAD_TYPE.SHIPPING;
+  return list.map(had => {
+    const rec = Object.assign({}, had, { recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
+    delete rec.sheetRow; delete rec.cells;
+    const ref = db.collection(M.COLLECTIONS.plantLoads).doc(M.safeIdPart(had.recordId));
+    if (!toDate) {
+      rec.status = 'DELETED';
+      tx.delete(ref);
+    } else {
+      const p = rec.payload = Object.assign({}, had.payload || {}), shift = L.daysBetween(had.date, toDate);
+      rec.date = toDate;
+      if (L.isDateKey(p.loadDate)) p.loadDate = L.addDays(p.loadDate, shift);
+      tx.set(ref, { runId: rec.runId, route: rec.route, run: rec.run, date: rec.date, status: 'SCHEDULED', pickupTime: p.pickupTime || '', loadDate: p.loadDate || '', trailer: p.trailer || '',
+        poNumber: p.poNumber || '', cases: p.cases || '', product: p.product || '', notes: p.notes || '', facilityId: rec.facilityId || '', createdInApp: true, testEdited: true, editedAt: stamp });
+    }
+    tx.set(db.collection('plantJournal').doc(appScheduleId(type, had.recordId)), rec);
+    return had.recordId;
+  });
+}
+
 /* ---------- Yard Checks ---------- */
 
 // saveYardCheck: Record (temperature, fuel, notes) or Left Yard for a loaded trailer, as desktopUiSavePlantYardCheckV5063.
@@ -1368,6 +1404,6 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-module.exports = { productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+module.exports = { scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
