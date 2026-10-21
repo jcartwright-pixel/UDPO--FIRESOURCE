@@ -84,6 +84,12 @@ async function compare(page, days) {
     const P = await import('./js/plant-core.js');
     const { watchLoads } = await import('./js/recent-records.js');
     const L = window.UDLogic, U = window.UDPlant, { db } = await start();
+    // The loads as the server has them: a first answer from this page's own memory of an earlier day's records can be short
+    // (the server's full answer follows it); one from the server, or no change for 2 seconds, is the screen's settled list.
+    const settled = (list) => new Promise((res, rej) => {
+      let last = null, timer = 0;
+      const stop = watchLoads(db, list, (r, s) => { last = r; clearTimeout(timer); if (!s.metadata.fromCache) { stop(); res(r); } else timer = setTimeout(() => { stop(); res(last); }, 2000); }, rej);
+    });
     const size = (s) => s.docs.reduce((n, d) => n + JSON.stringify(d.data()).length, 0);
     const whole = await getDocs(query(collection(db, 'runs'), where('weekStart', 'in', weeks)));
     const all = whole.docs.map(d => Object.assign({ id: d.id }, d.data()));
@@ -92,13 +98,19 @@ async function compare(page, days) {
       const dates = [L.addDays(date, -1), date];
       const s = await getDocs(query(collection(db, 'runDays'), where('dates', 'array-contains-any', dates)));
       out.dayKb.push(Math.round(size(s) / 1024));
-      const runs = await new Promise((res, rej) => { const stop = watchLoads(db, dates, r => { stop(); res(r); }, rej); });
+      const runs = await settled(dates);
       // Noon of that day on the plant's clock: the yard list and Behind follow the time.
       const now = Date.parse(date + 'T16:00:00Z');
       const views = (list) => {
         const loads = P.loadoutRows(list, date, ''), returns = P.returnsFor(list, date, []);
         return JSON.stringify({ loads, yard: U.yardQueue(list, [], date, now), yardHolds: U.yardHolds(list, date), returns, unloads: P.unloadRows(list, date, [], returns, loads) });
       };
+      // Plant Distribution Departments (js/plant-dept.js) reads today, yesterday and the day before, and shows yesterday's loads too.
+      const dates3 = [L.addDays(date, -2), L.addDays(date, -1), date];
+      const runs3 = await settled(dates3);
+      const dept = (list) => { const loads = P.loadoutRows(list, date), returns = P.returnsFor(list, date, []); return JSON.stringify({ loads, yesterday: P.loadoutRows(list, L.addDays(date, -1)), returns, unloads: P.unloadRows(list, date, [], returns, loads) }); };
+      const da = dept(all), db3 = dept(runs3);
+      if (da !== db3) { out.differ.push(date + ' (Plant Departments)'); const A = JSON.parse(da), B = JSON.parse(db3); out.deptDetail = Object.keys(A).filter(k => JSON.stringify(A[k]) !== JSON.stringify(B[k])).map(k => { const x = [].concat(A[k].rows || A[k]), y = [].concat(B[k].rows || B[k]); const i = x.findIndex((v, j) => JSON.stringify(v) !== JSON.stringify(y[j])); return [date, k, x.length, y.length, JSON.stringify(x[i]).slice(0, 700), JSON.stringify(y[i]).slice(0, 700)]; }); }
       const a = views(all), b = views(runs);
       out.shown += JSON.parse(a).loads.length + JSON.parse(a).yard.rows.length;
       if (a !== b) { out.differ.push(date); if (!out.detail) { const A = JSON.parse(a), B = JSON.parse(b); out.detail = Object.keys(A).filter(k => JSON.stringify(A[k]) !== JSON.stringify(B[k])).map(k => { const x = [].concat(A[k].rows || A[k]), y = [].concat(B[k].rows || B[k]); const i = x.findIndex((v, j) => JSON.stringify(v) !== JSON.stringify(y[j])); return [date, k, x.length, y.length, JSON.stringify(x[i]).slice(0, 600), JSON.stringify(y[i]).slice(0, 600)]; }); } }
@@ -116,8 +128,8 @@ async function compare(page, days) {
     await page.waitForSelector('#screen:not([hidden])');
     const days = []; for (let i = -6; i <= 6; i++) days.push(L.addDays(today, i));
     const r = await compare(page, days);
-    if (r.differ.length) console.log('DETAIL', JSON.stringify(r.differ), JSON.stringify(r.detail, null, 1));
-    assert.deepEqual(r.differ, [], 'the loads, yard trailers, unloads and returns are the same from the one-day records on every day');
+    if (r.differ.length) console.log('DETAIL', JSON.stringify(r.differ), JSON.stringify(r.detail, null, 1), JSON.stringify(r.deptDetail, null, 1));
+    assert.deepEqual(r.differ, [], 'the loads, yard trailers, unloads and returns are the same from the one-day records on every day (Manager Center, Yard Checks and Plant Departments)');
     assert.ok(r.shown > 50, 'the days compared have loads and yard trailers to show (' + r.shown + ')');
     const most = Math.max(...r.dayKb);
     assert.ok(most * 3 < r.wholeKb, 'the screens read ' + most + ' KB instead of ' + r.wholeKb + ' KB');

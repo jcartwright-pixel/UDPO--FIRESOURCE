@@ -2,7 +2,7 @@
 // each card shows (loads by depart hour, trailers to unload first, washes waiting longest, returns by reason).
 import { start, requireSignIn, showError, shortDate, escapeHtml } from './app.js';
 import { collection, doc, query, where, onSnapshot } from './firebase.js';
-import { watchWashRequests } from './recent-records.js';
+import { watchWashRequests, watchLoads } from './recent-records.js';
 import * as P from './plant-core.js';
 const L = window.UDLogic;
 const params = new URLSearchParams(location.search);
@@ -85,8 +85,9 @@ export function run(render) {
     const { db } = await start();
     document.getElementById('today').textContent = L.dayName(date) + ' ' + shortDate(date);
     const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-    const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), L.weeksForLoadDate(L.addDays(date, -2)), [L.weekStart(date)]))];
-    onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); go(); }, fail('the loads'));
+    // Joe 10/21 (screens slow): the loads of today, yesterday and the day before (yesterday's card) from the one-day records,
+    // not three weeks of whole runs.
+    watchLoads(db, [L.addDays(date, -2), L.addDays(date, -1), date], runs => { data.runs = runs; go(); }, fail('the loads'));
     onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); go(); }, fail('the pickups'));
     onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); go(); }, fail('the plant journal'));
     watchWashRequests(db, L.weekStart(date), r => { data.wash = r; go(); }, fail('the wash list'), 'plantWash');

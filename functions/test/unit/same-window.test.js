@@ -22,10 +22,16 @@ test('no screen or link opens a new tab or window', () => {
 
 test('moving between screens is set up to look like one app', () => {
   const css = fs.readFileSync(path.join(PUBLIC, 'css/app.css'), 'utf8');
-  assert.match(css, /@view-transition\s*\{\s*navigation:\s*auto/);
-  assert.match(css, /\.topbar\s*\{\s*view-transition-name/);
-  assert.match(css, /\.sidemenu\s*\{\s*view-transition-name/);
+  // The page colour shows while a screen loads (no white flash).
+  assert.match(css, /html\s*\{\s*background:\s*var\(--page\)/);
   const app = fs.readFileSync(path.join(PUBLIC, 'js/app.js'), 'utf8');
-  assert.match(app, /speculationrules/);
   assert.match(app, /sessionStorage\.getItem\('udActive'\)/);
+  // Joe 10/21 ("the older screens are loading and then it's refreshing on the new ones ... I do not want any overlays"): no
+  // picture of the old screen cross-faded over the new one, no screens opened in the background on a resting pointer, and each
+  // screen's own part shows once, when its first data is drawn.
+  const all = files(PUBLIC).filter(f => /\.(html|js|css)$/.test(f)).map(f => [path.relative(PUBLIC, f), fs.readFileSync(f, 'utf8')]);
+  assert.deepEqual(all.filter(([, t]) => /@view-transition|view-transition-name/.test(t)).map(([f]) => f), [], 'no view transitions');
+  assert.deepEqual(all.filter(([, t]) => /speculationrules/.test(t)).map(([f]) => f), [], 'no prerendering');
+  assert.match(app, /function holdUntilDrawn\(\)/);
+  assert.match(css, /body\.ud-drawing \.side-main/);
 });

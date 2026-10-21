@@ -494,8 +494,45 @@ const PAGE_ICON = {
   h1.prepend(box);
 })();
 
-// Moving between screens feels like one app (Joe 10/9): Chrome gets each screen ready while the pointer rests on its menu
-// link, so a click shows it at once. Pages of the current app and the drivers' phone page are left out.
+/* Joe 10/21 ("the older screens are loading and then it's refreshing on the new ones"): a screen shows its header and menu at
+   once, and the rest of it once, when its first data is drawn, instead of empty boxes, dashes and greyed buttons first and the
+   numbers a moment later. js/firebase.js counts the reads a screen starts until each has its first answer; the screen shows
+   when none is waiting and nothing on it has changed for a moment (at most 2.5 seconds after it opened, so a slow line never
+   leaves it blank). An error shows at once. What the screen looks like once drawn is not changed. */
+let drawingSince = 0, drawTimer = 0, readyAt = 0, readsAtStart = 0, lastChange = 0;
+const DRAW_QUIET = 80, DRAW_WAIT_NO_READS = 400, DRAW_CAP = 2500;
+function drawn() {
+  if (!drawingSince) return;
+  drawingSince = 0;
+  clearInterval(drawTimer);
+  document.body.classList.remove('ud-drawing');
+}
+function readyNow() { if (!readyAt) readyAt = performance.now(); }
+function holdUntilDrawn() {
+  const R = window.UDReads;
+  if (drawingSince || !R) return;
+  drawingSince = lastChange = performance.now();
+  readsAtStart = R.started;
+  document.body.classList.add('ud-drawing');
+  drawTimer = setInterval(() => {
+    const now = performance.now(), quiet = now - Math.max(lastChange, R.last);
+    if (now - drawingSince >= DRAW_CAP) { drawn(); return; }
+    if (R.waiting > 0 || quiet < DRAW_QUIET) return;
+    // Reads started and all answered; or none started yet: the screen gets a moment to start them before it shows bare.
+    if (R.started > readsAtStart || quiet >= DRAW_WAIT_NO_READS || (readyAt && now - readyAt >= DRAW_WAIT_NO_READS)) requestAnimationFrame(drawn);
+  }, 20);
+}
+(function drawOnce() {
+  const screen = document.getElementById('screen');
+  if (!screen) return;
+  new MutationObserver(() => { lastChange = performance.now(); }).observe(screen, { childList: true, subtree: true, characterData: true });
+  const watch = () => { if (!screen.hidden) holdUntilDrawn(); };
+  new MutationObserver(watch).observe(screen, { attributes: true, attributeFilter: ['hidden'] });
+  watch();
+})();
+
+// Joe 10/21: Chrome no longer opens screens in the background while the pointer rests on a link (it did from 10/9). Each one
+// started its own reads and drew while another screen was in use, and showed what it had drawn then when it was clicked.
 // Standing rule (Joe, 10/9): every link opens in this window; a link that asks for a new tab is opened here instead.
 document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[target]');
@@ -531,15 +568,6 @@ document.addEventListener('mouseover', e => {
   if (text) el.title = text;
 }, { passive: true });
 
-(function prerenderOnHover() {
-  try {
-    if (!(HTMLScriptElement.supports && HTMLScriptElement.supports('speculationrules'))) return;
-    const rules = document.createElement('script');
-    rules.type = 'speculationrules';
-    rules.textContent = JSON.stringify({ prerender: [{ source: 'document', where: { and: [{ href_matches: '/*.html' }, { not: { href_matches: '/route.html' } }] }, eagerness: 'moderate' }] });
-    document.head.appendChild(rules);
-  } catch (e) { /* not supported */ }
-})();
 
 /* Back goes one step: it first closes what is open on this screen (a pop-up, an opened driver,
    a second tab or view); with nothing open, a main screen goes Home and any other page goes to
@@ -737,7 +765,14 @@ export async function requireSignIn(ready) {
   if (building && !knownAdmin) known = '';
   const here = location.pathname.split('/').pop() || 'index.html';
   if (!mayOpenPage(here)) known = '';
-  if (known) { gate.hidden = true; screen.hidden = false; }
+  if (known) {
+    gate.hidden = true; screen.hidden = false;
+    // Joe 10/21: the initials circle shows with the header, so the header's buttons do not move over when the sign-in is checked.
+    let was = null;
+    try { was = JSON.parse(sessionStorage.getItem('udWho') || 'null'); } catch (e) { /* no storage */ }
+    const who = document.getElementById('who');
+    if (who && was && was.email === known && !who.textContent) { who.textContent = was.initials; who.title = was.email; who.classList.add('initials'); }
+  }
   const { auth } = await start();
   const showWho = (user) => {
     const who = document.getElementById('who');
@@ -748,6 +783,7 @@ export async function requireSignIn(ready) {
     who.classList.add('initials');
     // Joe 10/12 ("tapping does nothing"): a tap on the circle shows the signed-in account for a few seconds.
     who.dataset.initials = who.textContent; who.dataset.email = user.email || '';
+    try { sessionStorage.setItem('udWho', JSON.stringify({ email: String(user.email || '').toLowerCase(), initials: who.textContent })); } catch (e) { /* no storage */ }
     who.setAttribute('role', 'button'); who.tabIndex = 0;
     if (!who.dataset.tap) {
       who.dataset.tap = '1';
@@ -783,6 +819,7 @@ export async function requireSignIn(ready) {
         return;
       }
       if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
+      readyNow();
       ready(user);
       return;
     }
@@ -798,7 +835,7 @@ export async function requireSignIn(ready) {
     // Administration > Start Plant Fresh From Today: loads from before that day stop showing as prior-day work (plant-core.js).
     // Listened to before the screen's own listeners, so the screen draws with it.
     if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
-    if (early) { gate.hidden = true; screen.hidden = false; showWho(user); ready(user); }
+    if (early) { gate.hidden = true; screen.hidden = false; showWho(user); readyNow(); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
     const { db } = await start();
     // A read that fails (the connection dropped, "the client is offline") is tried again and never signs anyone out: signing
@@ -843,6 +880,7 @@ export async function requireSignIn(ready) {
     gate.hidden = true;
     screen.hidden = false;
     showWho(user);
+    readyNow();
     ready(user);
   });
   document.getElementById('signin-button').addEventListener('click', async () => {
@@ -964,6 +1002,7 @@ export async function callServer(name, fields) {
 // Errors are the only messages the screens show (no status bars).
 export function showError(text) {
   if (text && typeof text === 'object') text = friendlyError(text);
+  if (text) drawn();
   ['error', 'signin-error'].forEach(id => {
     const box = document.getElementById(id);
     if (!box) return;
@@ -1128,7 +1167,12 @@ function fitCells() {
   wrap.concat(over).forEach(td => td.classList.add('fit-wrap'));
 }
 function queueFit() { if (!fitQueued) { fitQueued = true; requestAnimationFrame(fitCells); } }
-new MutationObserver(queueFit).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+// Joe 10/21 (screens slow): only a change in a table sets the fitting off again, not a clock or a number elsewhere on the screen.
+const inTable = (m) => {
+  const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+  return !!(t && t.closest('table')) || [...m.addedNodes].some(n => n.nodeType === 1 && (/^(TABLE|TBODY|TR|TD)$/.test(n.tagName) || n.querySelector('tbody')));
+};
+new MutationObserver(ms => { if (!fitQueued && ms.some(inTable)) queueFit(); }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 window.addEventListener('resize', queueFit);
 
 // Review item 2 (Joe 10/13): every date box reads 10-8-26 like the rest of the app, not the browser's 10/08/2026. The browser's

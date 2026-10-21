@@ -100,6 +100,6 @@ export function watchLoads(db, dates, cb, onError) {
       }
       Object.assign(byRun[id].days, x.days || {});
     });
-    cb(Object.values(byRun));
+    cb(Object.values(byRun), s);
   }, onError);
 }
