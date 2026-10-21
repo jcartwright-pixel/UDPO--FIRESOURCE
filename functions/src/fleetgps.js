@@ -777,14 +777,15 @@ const status = (d, h) => ({ history: h ? { done: h.done || 0, total: h.total || 
  * Joe 10/20 ("Reefer Temp is name ... try to ask for everything and see what it returns. No matter what."): GPS Setup's
  * "Ask Verizon for everything" check, for one unit. Read only: it saves its own UDPO_Probe* reports in Fleet (as Test saves
  * ours) and shows exactly what Fleet answers to each, errors included:
- *   1. every field Fleet's Point and Unit tables have whose name or description says temperature, reefer, cargo...
+ *   1. every field Fleet has whose name or description says temperature, reefer, cargo...
  *   2. every custom field (attribute) in the account with such a name
- *   3. the unit's own Unit record, with every custom Unit field
- *   4. the unit's GPS points for the last PROBE_HOURS, plain (does the Point table answer at all?)
- *   5. the same points with every temperature-like Point field, all at once and, if that fails, one field at a time.
+ *   3. the unit's own Unit record, from all units asked at once; then asked with a unit list, to compare
+ *   4. every unit's GPS points for the last PROBE_PLAIN_MINUTES, plain (does the Point table answer at all?)
+ *   5. every unit's points for PROBE_TEMP_MINUTES with every temperature-like diagnostic, all at once and, if that fails,
+ *      one field at a time.
  * Kept in private/gpsProbe so the answer is still there after the page is closed.
  */
-const PROBE_WORDS = /temp|reefer|cargo|therm|refrig|sensor|probe|zone|setpoint|set point/i, PROBE_HOURS = 6, PROBE_BUDGET_MS = 95000, PROBE_ROWS = 25;
+const PROBE_WORDS = /temp|reefer|cargo|therm|refrig|sensor|probe|zone|setpoint|set point/i, PROBE_PLAIN_MINUTES = 10, PROBE_TEMP_MINUTES = 30, PROBE_BUDGET_MS = 95000, PROBE_ROWS = 25;
 const PROBE_FALLBACK = ['CargoAirTemp', 'AbnormalRefrigeratorTemp', 'AmbientAirTemp'];
 async function saveProbeTemplate(d, o, token, name, table, user, filter, output) {
   const base = baseOf(d, o), lines = ['[Template]', 'TemplateVersion = 1.0', 'TableID = ' + table, 'TemplateName = ' + name, 'Intent = Retrieve', ''];
@@ -814,15 +815,16 @@ async function probe(db, d, o, email, tagIn) {
   const run = async (name, params, points) => execute(d, o, token, name, params, { points, maxPolls: 6 });
   const show = (rows) => rows.slice(0, PROBE_ROWS);
   const token = await key(ref, d, o, false);
-  let pointCols = [], unitCustom = [];
-  await step('Fields Fleet has for GPS points and units, with temperature, reefer, cargo or sensor in the name', async () => {
+  let pointCols = [];
+  // Joe 10/21 (6.39, T-965): Fleet labels each field with its table's number, not "Point" or "Unit", so every field is
+  // searched; and every read sent with a list of unit numbers failed (500) while the plain all-units read works, so these
+  // ask without a list, for a short time, and pick the unit out here. One read still sends the list, to compare.
+  await step('Fields Fleet has with temperature, refrigeration, reefer, cargo or sensor in the name', async () => {
     await saveProbeTemplate(d, o, token, 'UDPO_ProbeColumns', 'Column-1.0', [], [], ['TableId = Input.TableId', 'Name = Input.Name', 'Description = Input.Description', 'DataType = Input.DataTypeId', 'IsDiagnostic = Input.IsDiagnostic', 'IsReadable = Input.IsReadable']);
     const rows = await run('UDPO_ProbeColumns', {});
-    const mine = rows.filter(r => /point|unit/i.test(r.TableId || ''));
-    const hits = mine.filter(r => PROBE_WORDS.test(r.Name || '') || PROBE_WORDS.test(r.Description || ''));
-    pointCols = hits.filter(r => /point/i.test(r.TableId) && !/^false$/i.test(r.IsReadable || '')).map(r => ({ name: r.Name, type: r.DataType || '' }));
-    unitCustom = mine.filter(r => /^unit/i.test(r.TableId) && /^custom\./i.test(r.Name || '')).map(r => r.Name);
-    return { note: rows.length + ' fields in all; ' + mine.length + ' for GPS points and units; ' + hits.length + ' with one of those words; ' + unitCustom.length + ' custom unit fields.', rows: show(hits.concat(mine.filter(r => unitCustom.indexOf(r.Name) >= 0 && hits.indexOf(r) < 0))) };
+    const hits = rows.filter(r => PROBE_WORDS.test(r.Name || '') || PROBE_WORDS.test(r.Description || ''));
+    pointCols = hits.filter(r => /^true$/i.test(r.IsDiagnostic || '') && !/^false$/i.test(r.IsReadable || '')).map(r => ({ name: r.Name, type: r.DataType || '' }));
+    return { note: rows.length + ' fields in all; ' + hits.length + ' with one of those words; ' + pointCols.length + ' of them GPS diagnostics.', rows: hits.slice(0, 60) };
   });
   await step('Custom fields in the account with one of those words', async () => {
     await saveProbeTemplate(d, o, token, 'UDPO_ProbeAttributes', 'Attribute-1.0', [], [], ['Id = Input.Id', 'Name = Input.Name', 'Type = Input.Type', 'IsGlobal = Input.IsGlobal']);
@@ -832,34 +834,40 @@ async function probe(db, d, o, email, tagIn) {
   if (!unit || !unit.unitId) {
     steps.push({ label: 'This unit in Fleet', ok: false, note: 'Fleet\'s last read has no unit ' + tag + '. Check the number as Fleet shows it.' });
   } else {
-    await step('Unit ' + unit.tag + ' as Fleet keeps it', async () => {
-      const out = ['UnitId = Input.Id', 'Tag = Input.Tag', 'DeviceType = Input.DeviceType', 'AssetType = Input.AssetType', 'LastReport(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastReportTime',
-        'LastDiagnostic(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastDiagnosticTime', 'EngineHours = Input.TotalEngineHours', 'Notes = Input.Notes'].concat(unitCustom.slice(0, 20).map(n => outName(n) + ' = Input.' + n));
-      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnit', 'Unit-1.0', ['Ids(Set<Text>) = "Ids"'], ['Id = In(Ids)'], out);
-      const rows = await run('UDPO_ProbeUnit', { Ids: unit.unitId });
+    const mineOnly = (rows) => rows.filter(r => String(r.UnitId) === String(unit.unitId));
+    await step('Unit ' + unit.tag + ' as Fleet keeps it (all units asked, no unit list)', async () => {
+      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnit', 'Unit-1.0', [], [], ['UnitId = Input.Id', 'Tag = Input.Tag', 'LastReport(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastReportTime',
+        'LastDiagnostic(yyyy-MM-dd HH:mm:ss, UTC) = Input.LastDiagnosticTime', 'EngineHours = Input.TotalEngineHours', 'AssetType = Input.AssetType', 'DeviceType = Input.DeviceType']);
+      const rows = await run('UDPO_ProbeUnit', {}), mine = mineOnly(rows);
+      return { note: rows.length + ' units; ' + (mine.length ? unit.tag + ' is one of them.' : unit.tag + ' is not among them.'), rows: show(mine) };
+    });
+    await step('Unit ' + unit.tag + ' asked with a unit list (to compare)', async () => {
+      await saveProbeTemplate(d, o, token, 'UDPO_ProbeUnitList', 'Unit-1.0', ['Ids(Set<Text>) = "Ids"'], ['Id = In(Ids)'], ['UnitId = Input.Id', 'Tag = Input.Tag']);
+      const rows = await run('UDPO_ProbeUnitList', { Ids: unit.unitId });
       return { note: rows.length ? 'Fleet answered.' : 'Fleet answered with nothing.', rows: show(rows) };
     });
-    const since = fleetTime(new Date(Date.parse(at) - PROBE_HOURS * 3600000)), until = fleetTime(new Date(at)), params = { Since: since, Until: until, Ids: unit.unitId };
-    const pointTemplate = (name, cols) => saveProbeTemplate(d, o, token, name, 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"'],
-      ['Time = Between(Since, Until)', 'UnitId = In(Ids)'], ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time'].concat(cols));
-    await step('GPS points for ' + unit.tag + ', last ' + PROBE_HOURS + ' hours, plain', async () => {
+    const pointTemplate = (name, cols) => saveProbeTemplate(d, o, token, name, 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'],
+      ['Time = Between(Since, Until)'], ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time'].concat(cols));
+    const window = (min) => ({ Since: fleetTime(new Date(Date.parse(at) - min * 60000)), Until: fleetTime(new Date(at)) });
+    await step('GPS points for every unit, last ' + PROBE_PLAIN_MINUTES + ' minutes (no unit list), plain', async () => {
       await pointTemplate('UDPO_ProbePoints', ['Tag = Input.Tag', 'Address = Input.Address']);
-      const rows = await run('UDPO_ProbePoints', params, true);
-      return { note: rows.length + ' GPS points.', rows: show(rows.slice(-PROBE_ROWS)) };
+      const rows = await run('UDPO_ProbePoints', window(PROBE_PLAIN_MINUTES), true), mine = mineOnly(rows);
+      return { note: rows.length + ' GPS points from ' + new Set(rows.map(r => r.UnitId)).size + ' units; ' + mine.length + ' from ' + unit.tag + '.', rows: show((mine.length ? mine : rows).slice(-PROBE_ROWS)) };
     });
     const cols = (pointCols.length ? pointCols : PROBE_FALLBACK.map(name => ({ name, type: '' }))).slice(0, 12);
     const line = (c, unitC) => outName(c.name) + (unitC ? '(C)' : '') + ' = Input.' + c.name;
     const isTemp = (c) => /temp/i.test(c.type) || (/temp/i.test(c.name) && !/^abnormal/i.test(c.name));
-    const all = await step('GPS points for ' + unit.tag + ' with every temperature field: ' + cols.map(c => c.name).join(', '), async () => {
+    const filledIn = (rows, list) => rows.filter(r => list.some(c => String(r[outName(c.name)] || '').trim() !== ''));
+    const all = await step('GPS points for every unit, last ' + PROBE_TEMP_MINUTES + ' minutes, with every temperature field: ' + cols.map(c => c.name).join(', '), async () => {
       await pointTemplate('UDPO_ProbeTemps', cols.map(c => line(c, isTemp(c))));
-      const rows = await run('UDPO_ProbeTemps', params, true), filled = rows.filter(r => cols.some(c => String(r[outName(c.name)] || '').trim() !== ''));
-      return { note: rows.length + ' GPS points; ' + filled.length + ' with a value in one of these fields.', rows: show((filled.length ? filled : rows).slice(-PROBE_ROWS)) };
+      const rows = await run('UDPO_ProbeTemps', window(PROBE_TEMP_MINUTES), true), filled = filledIn(rows, cols), mine = filledIn(mineOnly(rows), cols);
+      return { note: rows.length + ' GPS points; ' + filled.length + ' with a temperature, from ' + new Set(filled.map(r => r.UnitId)).size + ' units; ' + mine.length + ' from ' + unit.tag + '.', rows: show((mine.length ? mine : filled.length ? filled : rows).slice(-PROBE_ROWS)) };
     });
     if (!all) for (const c of cols) {
-      await step('GPS points for ' + unit.tag + ' with ' + c.name + ' alone', async () => {
+      await step('GPS points for every unit, last ' + PROBE_TEMP_MINUTES + ' minutes, with ' + c.name + ' alone', async () => {
         await pointTemplate('UDPO_ProbeTemps', [line(c, isTemp(c))]);
-        const rows = await run('UDPO_ProbeTemps', params, true), filled = rows.filter(r => String(r[outName(c.name)] || '').trim() !== '');
-        return { note: rows.length + ' GPS points; ' + filled.length + ' with a value.', rows: show((filled.length ? filled : rows).slice(-PROBE_ROWS)) };
+        const rows = await run('UDPO_ProbeTemps', window(PROBE_TEMP_MINUTES), true), filled = filledIn(rows, [c]);
+        return { note: rows.length + ' GPS points; ' + filled.length + ' with a value.', rows: show(filled.slice(-PROBE_ROWS)) };
       });
     }
   }

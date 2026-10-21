@@ -359,7 +359,7 @@ test('Fleet GPS temps (Joe 10/20): every trailer\'s newest cargo temperature in 
   assert.equal((await db().collection('gpsTemps').doc('now').get()).data().units['T-635'].tempF, 36.2, 'an error keeps the last reading');
 });
 
-test('Fleet GPS "Ask Verizon for everything" (Joe 10/20): read-only reports for one unit, every answer shown as Fleet sent it, errors included', async () => {
+test('Fleet GPS "Ask Verizon for everything" (Joe 10/20, 10/21): read-only reports for one unit, asked without a unit list, every answer shown as Fleet sent it, errors included', async () => {
   const log = [], base = fleet(log, {}), saved = {};
   const VERIZON_500 = '{ "errorInfo":[{ "errorCode":"5","errorText":"Internal server error.","errorParameters":[{ "parameter":"ExecutionId","value":"aaaa1111-0000-0000-0000-000000000001"}]}]}';
   const fetch = async (url, init) => {
@@ -375,34 +375,42 @@ test('Fleet GPS "Ask Verizon for everything" (Joe 10/20): read-only reports for 
       const r = await base(url, init), list = JSON.parse(await r.text());
       return reply(200, JSON.stringify({ templates: list.concat(Object.keys(saved).map(n => ({ name: n, templateId: Number(saved[n].id) }))) }));
     }
-    if (/template=UDPO_ProbeColumns/.test(url)) return reply(200, 'TableId,Name,Description,DataType,IsDiagnostic,IsReadable\r\nPoint-2.0,CargoAirTemp,Air temperature inside the cargo container,Temperature,True,True\r\nPoint-2.0,Lat,,Angle,False,True\r\nUnit-1.0,Custom.ReeferTemp,,Text,False,True\r\nAlert-1.0,Temp,,Text,False,True\r\n');
+    // Fleet labels each field with its table's number (Joe 10/21: "0 for GPS points and units" when we looked for the word).
+    if (/template=UDPO_ProbeColumns/.test(url)) return reply(200, 'TableId,Name,Description,DataType,IsDiagnostic,IsReadable\r\n27,CargoAirTemp,Air temperature inside the cargo container,Temperature,True,True\r\n27,Lat,,Angle,False,True\r\n27,ReeferTemp,Refrigeration Temperature,Temperature,True,True\r\n41,Custom.ReeferTemp,,Text,False,True\r\n');
     if (/template=UDPO_ProbeAttributes/.test(url)) return reply(200, 'Id,Name,Type,IsGlobal\r\n1,Reefer Temp,Number,False\r\n2,Door,Boolean,False\r\n');
-    if (/template=UDPO_ProbeUnit/.test(url)) { log.push('unit ' + new URL(url).searchParams.get('Ids')); return reply(200, 'UnitId,Tag,DeviceType,AssetType,LastReport,LastDiagnostic,EngineHours,Notes,F_Custom_ReeferTemp\r\n12,T-635,TrailerTracker,Trailer,2026-10-13 14:06:00,2026-10-13 14:06:00,812,,34\r\n'); }
-    if (/template=UDPO_ProbePoints/.test(url)) { assert.match(url, /PollingMode=Async/); return reply(500, VERIZON_500); }
-    if (/template=UDPO_ProbeTemps/.test(url)) return reply(200, 'UnitId,Time,F_CargoAirTemp\r\n12,2026-10-13 14:00:00,\r\n12,2026-10-13 14:05:00,2.5\r\n');
+    // As on live 6.39 (Joe 10/21, T-965): anything sent with a unit list fails; the plain reads answer.
+    if (/[?&]Ids=/.test(url)) { log.push('list ' + /template=(\w+)/.exec(url)[1]); return reply(500, VERIZON_500); }
+    if (/template=UDPO_ProbeUnit&/.test(url)) return reply(200, 'UnitId,Tag,LastReport,LastDiagnostic,EngineHours,AssetType,DeviceType\r\n11,223876,2026-10-13 14:05:00,,15022.5,Truck,\r\n12,T-635,2026-10-13 14:06:00,2026-10-13 14:06:00,812,Trailer,TrailerTracker\r\n');
+    if (/template=UDPO_ProbePoints/.test(url)) { assert.match(url, /PollingMode=Async/); const q = new URL(url).searchParams; log.push('points ' + q.get('Since') + ' to ' + q.get('Until')); return reply(200, 'UnitId,Time,Tag,Address\r\n11,2026-10-13 14:02:00,223876,Main St\r\n12,2026-10-13 14:05:00,T-635,Route 8\r\n'); }
+    if (/template=UDPO_ProbeTemps/.test(url)) { const q = new URL(url).searchParams; log.push('temps ' + q.get('Since') + ' to ' + q.get('Until')); return reply(200, 'UnitId,Time,F_CargoAirTemp\r\n11,2026-10-13 13:50:00,\r\n12,2026-10-13 14:00:00,\r\n12,2026-10-13 14:05:00,2.5\r\n'); }
     return base(url, init);
   };
   const o = { fetch, base: BASE, now: NOW, sleep: async () => {} };
   await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
   await pull(db(), o);
   await assert.rejects(gpsCall(db(), DISPATCHER, { kind: 'fleet', op: 'probe', tag: 'T-635' }, o), /Only a manager or administrator/);
-  const s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 't 635' }, o), p = s.probe;
+  const from = log.length, s = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 't 635' }, o), p = s.probe;
   assert.equal(p.tag, 't 635');
-  assert.deepEqual(p.steps.map(x => x.ok), [true, true, true, false, true]);
-  assert.match(p.steps[0].note, /^4 fields in all; 3 for GPS points and units; 2 with one of those words; 1 custom unit fields\.$/);
-  assert.deepEqual(p.steps[0].rows.map(r => r.Name), ['CargoAirTemp', 'Custom.ReeferTemp']);
+  assert.deepEqual(p.steps.map(x => x.ok), [true, true, true, false, true, true]);
+  assert.equal(p.steps[0].note, '4 fields in all; 3 with one of those words; 2 of them GPS diagnostics.', 'every field is searched, whatever its table number');
+  assert.deepEqual(p.steps[0].rows.map(r => r.Name), ['CargoAirTemp', 'ReeferTemp', 'Custom.ReeferTemp'], 'Joe 10/21: Fleet shows it as "Refrigeration Temperature"');
+  assert.match(saved.UDPO_ProbeTemps.text, /F_ReeferTemp\(C\) = Input\.ReeferTemp/, 'the field found is the one asked for');
   assert.deepEqual(p.steps[1].rows.map(r => r.Name), ['Reefer Temp'], 'Joe\'s "Reefer Temp"');
-  assert.equal(p.steps[2].rows[0].F_Custom_ReeferTemp, '34');
-  assert.ok(log.indexOf('unit 12') >= 0, 'asks for this unit only');
-  assert.match(saved.UDPO_ProbeUnit.text, /F_Custom_ReeferTemp = Input\.Custom\.ReeferTemp/);
-  assert.match(p.steps[3].note, /answered 500 when running UDPO_ProbePoints \(Verizon reference aaaa1111-0000-0000-0000-000000000001\)/);
-  assert.match(p.steps[3].error, /Internal server error/);
+  assert.equal(p.steps[2].note, '2 units; T-635 is one of them.');
+  assert.deepEqual(p.steps[2].rows.map(r => r.Tag), ['T-635'], 'all units asked, this one picked out');
+  assert.doesNotMatch(saved.UDPO_ProbeUnit.text, /\[Filter\]/, 'the unit record is asked the way the working 5-minute read asks');
+  assert.match(p.steps[3].note, /answered 500 when running UDPO_ProbeUnitList \(Verizon reference aaaa1111-0000-0000-0000-000000000001\)/, 'the same unit asked with a list, to compare');
+  assert.deepEqual(log.slice(from).filter(l => l.startsWith('list ')), ['list UDPO_ProbeUnitList'], 'only the comparison sends a unit list');
+  assert.ok(log.indexOf('points 2026-10-13 14:00:00 to 2026-10-13 14:10:00') >= 0, 'every unit\'s points for 10 minutes');
+  assert.equal(p.steps[4].note, '2 GPS points from 2 units; 1 from T-635.');
+  assert.doesNotMatch(saved.UDPO_ProbePoints.text, /UnitId = In\(|Ids/);
+  assert.ok(log.indexOf('temps 2026-10-13 13:40:00 to 2026-10-13 14:10:00') >= 0, 'every unit\'s temperatures for 30 minutes');
   assert.match(saved.UDPO_ProbeTemps.text, /F_CargoAirTemp\(C\) = Input\.CargoAirTemp/);
   assert.match(saved.UDPO_ProbeTemps.text, /TableID = Point-2\.0/);
-  assert.equal(p.steps[4].note, '2 GPS points; 1 with a value in one of these fields.');
-  assert.deepEqual(p.steps[4].rows, [{ UnitId: '12', Time: '2026-10-13 14:05:00', F_CargoAirTemp: '2.5' }]);
+  assert.equal(p.steps[5].note, '3 GPS points; 1 with a temperature, from 1 units; 1 from T-635.');
+  assert.deepEqual(p.steps[5].rows, [{ UnitId: '12', Time: '2026-10-13 14:05:00', F_CargoAirTemp: '2.5' }]);
   // Kept for the page, and asked again it updates the same reports.
-  assert.equal((await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o)).probe.steps.length, 5);
+  assert.equal((await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'status' }, o)).probe.steps.length, 6);
   await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 'T-635' }, o);
   await assert.rejects(gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: '' }, o), /Type a Fleet unit number/);
   const none = await gpsCall(db(), ADMIN, { kind: 'fleet', op: 'probe', tag: 'T-999' }, o);
