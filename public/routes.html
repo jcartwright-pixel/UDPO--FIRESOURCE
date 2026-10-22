@@ -398,7 +398,10 @@
 
     /* ---------- Saves: shown at once, one call each ---------- */
     // The redraw waits a moment so Tab / Enter has already moved to the next box (render keeps the focus there).
-    const renderSoon = () => setTimeout(render, 0);
+    // A box someone is typing in (Route Names, a day's time) is never redrawn under them: a redraw would put the old text back
+    // and the typing would never save. The grid redraws when the box is left.
+    const typingBox = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#table') && a.matches('input') && (!a.matches('input.cell') || a.value !== a.defaultValue)); };
+    const renderSoon = () => setTimeout(() => { if (typingBox()) { redrawLater = true; return; } render(); }, 0);
     // Changes still saving, by run: a Route Master update that lands before them is shown with them laid on top,
     // so a block paste saving one run at a time never flashes back to the older times.
     const pending = [];
