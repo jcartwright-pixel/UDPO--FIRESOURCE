@@ -285,7 +285,10 @@ async function writes() {
   await write('Loadout Start and End', async (p, rec) => {
     await open(p, 'loadout.html');
     const sel = await p.evaluate(() => {
-      const tr = [...document.querySelectorAll('#rows tr[data-row]')].find(t => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.clock:not([disabled])'));
+      // A load of this day: a left-over from yesterday leaves the list once it is done, so it cannot be put back.
+      let prior = false;
+      const today = [...document.querySelectorAll('#rows tr')].filter(t => { if (t.classList.contains('divider')) { prior = t.classList.contains('prior'); return false; } return !prior && t.dataset.row; });
+      const tr = today.find(t => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.clock:not([disabled])'));
       return tr ? { row: tr.dataset.row, route: tr.children[0].textContent.trim() } : null;
     });
     if (!sel) throw new Error('no load to start today');
@@ -311,7 +314,9 @@ async function writes() {
     await open(p, 'loadout.html');
     const sel = await p.evaluate(() => {
       // A load with no Skipped/Moved tag yet, so the new tag (who and when) can be read.
-      const tr = [...document.querySelectorAll('#rows tr[data-row]')].find(t => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.skip') && !t.querySelector('.moved-tag'));
+      // The next load must not be one skipped earlier either: skipping past it would only put both back in their own order (no tag).
+      const all = [...document.querySelectorAll('#rows tr[data-row]')];
+      const tr = all.find((t, i) => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.skip') && !t.querySelector('.moved-tag') && all[i + 1] && !all[i + 1].querySelector('.moved-tag') && !all[i + 1].classList.contains('moved'));
       return tr ? { row: tr.dataset.row, route: tr.children[0].textContent.trim(), order: [...document.querySelectorAll('#rows tr[data-row]')].map(x => x.children[0].textContent.trim()).join(' ') } : null;
     });
     if (!sel) throw new Error('no load to skip');
@@ -352,7 +357,10 @@ async function writes() {
       const day = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(Date.now() - 6 * 3600000 - 4 * 3600000).getUTCDay()];
       const prev = report.writes.find(w => w.name === 'Weekly driver change');
       const cellSel = back && prev ? prev.cell : await p.evaluate(d => {
-        const td = [...document.querySelectorAll('tr td.day.editable[data-day="' + d + '"]')].find(t => t.textContent.trim() && !/not running|off/i.test(t.textContent));
+        // A driver on only one load today: a driver booked twice drops out of the list once moved off, so he could not be put back.
+        const cells = [...document.querySelectorAll('tr td.day.editable[data-day="' + d + '"]')].filter(t => t.textContent.trim() && !/not running|off|carrier|plant load/i.test(t.textContent));
+        const name = (t) => (t.firstChild && t.firstChild.textContent || t.textContent).trim().toUpperCase();
+        const td = cells.find(t => cells.filter(x => name(x) === name(t)).length === 1);
         if (!td) return '';
         const tr = td.closest('tr'); tr.dataset.auditRow = '1';
         return tr.dataset.index !== undefined ? 'tr[data-index="' + tr.dataset.index + '"] td[data-day="' + d + '"]' : '';
@@ -368,7 +376,8 @@ async function writes() {
         const o = want ? opts.find(x => x.value === want) : opts.find(x => x.value !== s.value && !/PLANT LOAD|not running/i.test(x.textContent));
         return { now: s.value, value: o ? o.value : '', text: o ? o.textContent.trim() : '' };
       }, [back, back && prev ? prev.was : '']);
-      if (!pick.value) throw new Error('no other driver to pick');
+      if (!pick.value) throw new Error(back ? 'the first driver is not in the driver list' : 'no other driver to pick');
+      if (!back && !pick.now) throw new Error('the driver on this load is not in the driver list');
       Object.assign(rec, { was: pick.now, picked: pick.text });
       await timed(p, rec, 'pick driver', () => p.selectOption('.popover select[data-kind="driver"]', pick.value), { fn: ([s, b]) => (document.querySelector(s) || {}).textContent !== b, arg: [cellSel, rec.before] }, 12000);
       rec.after = await p.textContent(cellSel);
@@ -414,8 +423,11 @@ async function writes() {
     await p.click(sel + ' [data-sedit]');
     await p.waitForSelector('#sched-modal:not([hidden])');
     rec.before = { start: await p.inputValue('#s-start'), end: await p.inputValue('#s-end') };
-    await p.fill('#s-start', '1:30 PM');
-    await p.fill('#s-end', '2:10 PM');
+    // Times already past: the box says "That time has not come yet" for a later one.
+    const clock = (ago) => new Date(Date.now() - ago * 60000).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+    rec.typed = { start: clock(40), end: clock(5) };
+    await p.fill('#s-start', rec.typed.start);
+    await p.fill('#s-end', rec.typed.end);
     await timed(p, rec, 'Save times', () => p.click('#s-save'), { fn: (s) => { const m = document.getElementById('sched-modal'); return m && m.hidden && !!document.querySelector(s + ' button.state.done'); }, arg: sel });
     rec.after = await p.evaluate(s => document.querySelector(s).innerText.replace(/\s+/g, ' '), sel);
     // Put back.
@@ -449,7 +461,7 @@ async function writes() {
   await write('Yard check temperature', async (p, rec) => {
     await open(p, 'yard.html');
     const t = await p.evaluate(() => { const r = document.querySelector('#rows tr[data-trailer]'); return r ? r.dataset.trailer : ''; });
-    if (!t) throw new Error('no trailer in the yard queue');
+    if (!t) { rec.skipped = 'no trailer due for a yard check right now'; return; }
     rec.trailer = t;
     const row = '#rows tr[data-trailer="' + t + '"]';
     rec.before = await p.evaluate(() => (document.getElementById('hstats') || {}).textContent || '');
@@ -464,10 +476,14 @@ async function writes() {
     await open(p, 'temps.html');
     const ok = await p.$('.tp-manual');
     if (!ok) throw new Error('no cooler to enter a reading for');
-    await p.fill('.tp-manual >> nth=0', '36');
+    // A reading different from the one in the box (the same number again saves nothing).
+    const was = await p.inputValue('.tp-manual >> nth=0');
+    rec.typed = was === '36' ? '37' : '36';
+    await p.fill('.tp-manual >> nth=0', rec.typed);
     const t = Date.now();
     await p.keyboard.press('Tab');
     for (let i = 0; i < 40 && !p.w.calls.some(c => c.at >= t); i++) await p.waitForTimeout(250);
+    if (!p.w.calls.some(c => c.at >= t)) throw new Error('the reading was not saved within 10 seconds');
     rec.steps.push({ what: 'reading saved', ms: Date.now() - t });
   });
 
