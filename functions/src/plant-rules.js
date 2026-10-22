@@ -377,7 +377,7 @@
           var t = clockMinutes(d.dispatchTime);
           out.push({ runDocId: run.id || '', day: p, trailer: trailer, route: text(run.route), run: text(run.run), routeRun: text(run.run) || text(run.route), loadDate: load,
             departureDate: departure, departureTime: t === null ? clockMinutes(d.startTime) : t, deliveryDate: delivery || departure, completedAt: text(d.completeTime),
-            setPoint: '' });
+            leavesOn: text(run.masterShow && run.masterShow.leavesOn), setPoint: '' });
         });
       });
     });
@@ -405,6 +405,9 @@
     if (opDay !== null && departDay < opDay) return true;
     var t = x.departureTime;
     if (t === null || t === undefined || opDay === null) return false;
+    // Audit batch 1 (Joe 10/22): a route with a Departure Day leaves when dispatch and the Late Forecast say it does (departWall),
+    // so a Delivery Day load built the day before stays on the yard until its delivery day's dispatch time.
+    if (leavesOnOf(x.leavesOn)) return wallClock(nowMs) >= departWall({ departureDate: x.departureDate, deliveryDate: x.deliveryDate, loadDate: x.loadDate, leavesOn: x.leavesOn, departureTime: t });
     var load = dayNum(x.loadDate), done = wallMinutes(x.completedAt), departAt;
     if (done !== null) departAt = Math.ceil((done - 360 - t) / 1440) * 1440 + t;
     // An early load (made days ahead) waits on the yard until the operating day before its departure date.
