@@ -1183,3 +1183,20 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 /* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once.
    Only how it looks waits: presses work as they always did, so nothing under the finger changes when it appears. */
 body.ud-drawing .side-main, body.ud-drawing #screen > :not(.topbar):not(.side-wrap):not(.phone-top) { opacity: 0; }
+
+/* Joe 10/22: the version and when it was last updated sit in the header on every screen ("Version 6.48 · Updated 10-22-26
+   1:30 PM"). One line on a wide screen (1920); on Joe's 1536 window, a laptop or tablet the number goes over the date; on a phone it takes its own
+   row under the rest of the header. White words, 16px, never cut off. */
+.hdr-version { flex: none; color: #fff; font-size: 16px; font-weight: 700; line-height: 1.2; white-space: nowrap; text-align: right; }
+.hdr-version:empty { display: none; }
+.hdr-version b { font-weight: 800; }
+.hdr-version small { font-size: 16px; font-weight: 600; }
+.phone-top .hdr-version { flex: none; }
+.hdr-version small::before { content: '· '; }
+@media (max-width: 1700px) { .topbar .hdr-version b, .topbar .hdr-version small { display: block; } .topbar .hdr-version small::before { content: none; } }
+@media (max-width: 480px) {
+  .topbar, .phone-top { flex-wrap: wrap; row-gap: 4px; }
+  .topbar .hdr-version, .phone-top .hdr-version { order: 9; flex: 1 1 100%; white-space: normal; }
+  .topbar .hdr-version b, .topbar .hdr-version small { display: inline; }
+  .topbar .hdr-version small::before { content: '· '; }
+}

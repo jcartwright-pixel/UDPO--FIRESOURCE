@@ -91,6 +91,42 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
       results.push(name + ': a newer version shows "Update ready" under the header with a Refresh button; it reloads only when pressed');
     }
 
+    // Joe 10/22: "in the upper banner is where I want the version and the last time it was updated." Every screen's header
+    // shows the version and when it was put up, in white 16px words, wholly on screen and clear of the header's buttons.
+    const V3 = { ...V1, banner: 'Version 6.48 · Updated 10-22-26 1:30 PM' };
+    for (const [w, h, url, ready] of [
+      [1920, 1080, '/daily.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'], [1536, 790, '/daily.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'],
+      [1536, 790, '/index.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'], [1536, 790, '/administration.html?' + ADMIN, '.adm-item'],
+      [1024, 768, '/weekly.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'], [800, 1280, '/index.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'],
+      [390, 844, '/drivers.html?' + ADMIN, '#screen:not([hidden]) .topbar .brand'], [390, 844, '/route.html', '.phone-top']
+    ]) {
+      const p = await openPage(browser, w, h, url, V3);
+      await p.waitForSelector(ready);
+      await p.waitForFunction(() => [...document.querySelectorAll('.hdr-version')].some(e => e.offsetWidth && /Updated/.test(e.textContent)));
+      const name = url.split(/[/.]/)[1] + ' ' + w;
+      const look = await p.evaluate(() => {
+        const el = [...document.querySelectorAll('.hdr-version')].find(e => e.offsetWidth), head = el.parentNode, r = el.getBoundingClientRect();
+        const hit = [...head.children].filter(c => c !== el && c.offsetWidth).filter(c => { const o = c.getBoundingClientRect(); return o.left < r.right - 1 && o.right > r.left + 1 && o.top < r.bottom - 1 && o.bottom > r.top + 1; });
+        return { text: el.textContent.replace(/\s+/g, ' ').trim(), fonts: [el, ...el.children].map(e => parseFloat(getComputedStyle(e).fontSize)), color: getComputedStyle(el).color,
+          inHead: r.top >= head.getBoundingClientRect().top - 1 && r.bottom <= head.getBoundingClientRect().bottom + 1, onScreen: r.left >= 0 && r.right <= innerWidth + 1,
+          hit: hit.map(c => c.id || c.className), count: document.querySelectorAll('.hdr-version').length, wide: document.scrollingElement.scrollWidth <= innerWidth + 1 };
+      });
+      assert.equal(look.text, 'Version 6.48 Updated 10-22-26 1:30 PM', name + ': the header names the version and when it was updated');
+      assert.ok(look.fonts.every(f => f >= 16), name + ': 16px words ' + look.fonts);
+      assert.equal(look.color, 'rgb(255, 255, 255)', name + ': white on the blue header');
+      assert.ok(look.inHead && look.onScreen, name + ': inside the header and on screen');
+      assert.deepEqual(look.hit, [], name + ': clear of the header buttons');
+      assert.ok(look.wide, name + ': no sideways scrolling');
+      await shot(p, 'header-version-' + name.replace(' ', '-') + '.png');
+      assert.deepEqual(p.errors, []);
+      await p.close();
+    }
+    // The line at the bottom of the menu stays as it was.
+    const m = await openPage(browser, 1536, 790, '/daily.html?' + ADMIN, V3);
+    await m.waitForFunction(() => /Version 6\.16/.test((document.querySelector('.sidemenu .side-version') || {}).textContent || ''));
+    await m.close();
+    results.push('header: every screen shows "Version 6.48 · Updated 10-22-26 1:30 PM" in the top banner at 1920, 1536, 1024, 800 and 390; the menu line stays');
+
     // Typing is never interrupted: the banner shows while a box has text in it, the box keeps its text and focus.
     const t = await openPage(browser, 1536, 864, '/administration.html?' + ADMIN, V1);
     await t.waitForSelector('.adm-item');

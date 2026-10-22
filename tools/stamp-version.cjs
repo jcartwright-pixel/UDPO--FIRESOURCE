@@ -9,6 +9,8 @@
  * Joe 10/12: "should we have a version number". Production Prep names each release commit "Release X.Y: ...", so the
  * number goes up with every release by itself.
  * The repository keeps a placeholder version.json for a local copy ("Test copy on this computer").
+ * Joe 10/22: "in the upper banner is where I want the version and the last time it was updated." The deploy also writes
+ * the header line, "Version 6.48 · Updated 10-22-26 1:30 PM" (the time this copy was put up, on the plant's clock).
  */
 const fs = require('fs');
 const path = require('path');
@@ -43,6 +45,15 @@ function today(now = new Date()) {
     .formatToParts(now).map(x => [x.type, x.value]));
   return p.month + '-' + p.day + '-' + p.year;
 }
+// The time of day on the plant's clock, like 1:30 PM.
+function clock(now = new Date()) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true }).format(now).replace(/\u202f/g, ' ');
+}
+// The header line: "Version 6.48 · Updated 10-22-26 1:30 PM" (the test copy shows the number it will be released as).
+function banner(n, date, time, live) {
+  const v = live ? n : nextRelease(n);
+  return (v == null ? 'Version' : 'Version ' + v) + ' · Updated ' + date + (time ? ' ' + time : '');
+}
 // Live: "Version 6.3 · 10-12-26". Test copy: "Version 6.4 · 10-12-26 · Test copy" (n is the last release on main).
 function label(n, date, live) {
   const v = live ? n : nextRelease(n);
@@ -50,10 +61,10 @@ function label(n, date, live) {
 }
 
 if (require.main === module) {
-  const n = release(), date = today(), live = target === 'production';
+  const now = new Date(), n = release(), date = today(now), time = clock(now), live = target === 'production';
   const commit = (process.env.GITHUB_SHA || git('rev-parse HEAD')).slice(0, 7);
-  const out = { label: label(n, date, live), release: live ? n : nextRelease(n), lastRelease: n, date, copy: live ? 'Live' : 'Test copy', commit };
+  const out = { label: label(n, date, live), release: live ? n : nextRelease(n), lastRelease: n, date, copy: live ? 'Live' : 'Test copy', commit, time, banner: banner(n, date, time, live) };
   fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify(out) + '\n');
   console.log('Version: ' + out.label + ' (' + commit + ')');
 }
-module.exports = { label, today, parseRelease, nextRelease };
+module.exports = { label, banner, clock, today, parseRelease, nextRelease };
