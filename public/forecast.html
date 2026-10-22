@@ -94,7 +94,8 @@
       // that shows as an arrow at the right end.
       const shiftEnd = f.loads.length ? Math.max(...f.loads.map(z => z.shiftEnd || 0)) : today + 360;
       const t0 = Math.floor(Math.min(today, ...f.loads.map(z => z.start)) / 60) * 60, t1 = Math.ceil(Math.max(today + 360, shiftEnd + 60, ...f.loads.map(z => z.est + 60)) / 60) * 60;
-      const step = t1 - t0 <= 720 ? 120 : t1 - t0 <= 1440 ? 240 : 360;
+      // Joe 10/22 (practice test): no more than 6 hour labels, so they never run together ("6 AM12 PM6 PM").
+      const step = [120, 240, 360, 720, 1440].find(n => (t1 - t0) / n <= 6) || 1440;
       const x = (m) => (100 * (Math.min(Math.max(m, t0), t1) - t0) / (t1 - t0)).toFixed(2) + '%';
       const ticks = []; for (let m = Math.ceil(t0 / step) * step; m < t1; m += step) ticks.push(m);
       const hour = (m) => { const h = Math.floor(((m % 1440) + 1440) % 1440 / 60); return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM'); };
