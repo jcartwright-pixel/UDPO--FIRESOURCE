@@ -97,7 +97,7 @@
       ['list', 'last', 'ask'].forEach(id => { document.getElementById(id).hidden = !manager || !codeOk; });
       if (!manager || !codeOk || !loaded.runs || !loaded.journal) return;
       const now = Date.now(), journal = data.journal;
-      const yard = U.yardQueue(data.runs, journal, date, now);
+      const yard = U.yardQueue(data.runs, journal, date, now, data.gps);
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
       const lines = U.qualityLines(data.setup, journal, data.lineStatus, now);
       const W = U.managerWalk(yard, temps, lines, now);
@@ -168,6 +168,8 @@
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
       onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
+      // Joe 10/22: a loaded trailer whose GPS temperature is in range needs no yard check (the same rule as Yard Checks).
+      onSnapshot(collection(db, 'gpsReefer'), s => { data.gps = {}; s.docs.forEach(d => { const r = d.data(); data.gps[U.yardTrailer(r.trailer || d.id)] = r; }); later(); }, () => {});
       onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
       const unsubs = [];
       const watch = () => {

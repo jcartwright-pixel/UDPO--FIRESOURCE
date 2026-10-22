@@ -317,6 +317,9 @@
 .yard-page .yd-next { font-weight: 800; line-height: 1.25; white-space: nowrap; }
 .yard-page .yd-next small { display: block; font-weight: 700; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .yard-page .yd-next.overdue { color: #bf2020; }
+/* Joe 10/22: GPS temperature in range, no check needed; a GPS stuck at exactly 32°F is a fault. */
+.yard-page .yd-next.gpsok, .yard-page .yd-due.gpsok { color: #157a3a; }
+.yard-page .yd-next small.yd-stuck { color: #bf2020; }
 .yard-page .yd-act { white-space: nowrap; }
 .yard-page button.yd-record, .yard-page button.yd-left { height: 40px; min-width: 96px; border-radius: 8px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; padding: 0 10px; }
 .yard-page button.yd-record { min-width: 84px; border: 0; background: var(--ud-blue); color: #fff; }
@@ -347,6 +350,7 @@
   .yard-page .yd-ptrailer small.now, .yard-page .yd-ptrailer small.error { color: #bf2020; }
   .yard-page .yd-ptrailer small.yd-tick { color: var(--runs-ink); }
   .yard-page .yd-ptrailer small.saving { color: var(--muted); }
+  .yard-page .yd-ptrailer small.gpsok { color: #157a3a; }
   .yard-page td.yd-gpsf { font-size: 18px; font-weight: 800; color: var(--ink); }
   .yard-page td.yd-gpsf.bad { background: #fde8e8; color: #bf2020; }
   .yard-page button.yd-notesbtn { width: 100%; min-height: 46px; border: 2px solid #9fb3c6; border-radius: 8px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; padding: 2px; }

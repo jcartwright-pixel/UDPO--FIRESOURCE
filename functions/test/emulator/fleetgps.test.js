@@ -325,6 +325,35 @@ test('Fleet GPS: the 6-month cleanup runs with no GPS login at all, and goes a p
 
 // Joe 10/19: loaded trailers showed no GPS temperature on live. Fleet's trailer tags aren't always "T-701", and a trailer's
 // unit can go well over 30 minutes between reports.
+// Joe 10/22: exactly 32°F is the reefer's "no reading" value, so the trip keeps when an unbroken run of 32s started; Fleet's
+// "not available" ends of the RefrigerationTemp range are not readings at all.
+test('Fleet GPS: a run of exactly 32°F readings is timed from its first, cleared by any other reading; a "not available" value is dropped', async () => {
+  const L = require('../../src/logic');
+  const log = [], state = { trailerPlace: 'Loading Dock', reefer: [] }, clock = { now: new Date('2026-10-13T14:10:00Z') };
+  const o = { fetch: fleet(log, state), base: BASE, now: () => clock.now, sleep: async () => {} };
+  const date = L.operatingDay(clock.now), d = db();
+  await d.collection('runs').doc(L.weekStart(date) + '__reefer').set({ weekStart: L.weekStart(date), sheetRow: 950, route: '849', run: 'SUN VALLEY', active: true,
+    days: { [L.dayPrefix(L.addDays(date, 1))]: { runs: true, loadDate: date, deliveryDate: L.addDays(date, 1), dispatchTime: 600, trailer: '701', loadStatus: 'COMPLETE' } } });
+  await gpsCall(d, ADMIN, { kind: 'fleet', op: 'save', fleet: 'united-dairy', user: 'app', password: 'pw' }, o);
+  const trip = async () => (await d.collection('gpsReefer').doc('T-701').get()).data();
+  state.reefer = [['71', '2026-10-13 13:00:00', '36'], ['71', '2026-10-13 14:00:00', '32'], ['71', '2026-10-13 14:05:00', '32']];
+  await pull(d, o);
+  let g = await trip();
+  assert.deepEqual([g.tempF, g.flatSince], [32, '2026-10-13T14:00:00.000Z'], 'the run of 32s starts at its first reading');
+  clock.now = new Date('2026-10-13T16:10:00Z'); state.reefer = [['71', '2026-10-13 16:05:00', '32']];
+  await pull(d, o);
+  g = await trip();
+  assert.deepEqual([g.tempF, g.flatSince], [32, '2026-10-13T14:00:00.000Z'], 'still 32: the run keeps its start');
+  clock.now = new Date('2026-10-13T16:20:00Z'); state.reefer = [['71', '2026-10-13 16:15:00', '-5866.2']];
+  await pull(d, o);
+  g = await trip();
+  assert.deepEqual([g.tempF, g.readingAt], [32, '2026-10-13T16:05:00.000Z'], 'Fleet\'s "not available" value is not a reading');
+  clock.now = new Date('2026-10-13T16:30:00Z'); state.reefer = [['71', '2026-10-13 16:25:00', '35.5']];
+  await pull(d, o);
+  g = await trip();
+  assert.deepEqual([g.tempF, g.flatSince], [35.5, ''], 'a real reading ends the run');
+});
+
 test('Fleet GPS: a trailer tagged "TRL 701" in Fleet is matched, a reading 2 hours old is shown, and GPS Setup says which trailers get none', async () => {
   const L = require('../../src/logic');
   const log = [], state = { trailerPlace: 'Loading Dock', trailerTag: 'TRL 701', reefer: [['71', '2026-10-13 12:15:00', '34.2']] };

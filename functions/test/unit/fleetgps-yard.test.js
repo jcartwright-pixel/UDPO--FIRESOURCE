@@ -155,6 +155,39 @@ test('yard list: off when the GPS sees this load out, and off at its dispatch ti
   assert.equal(R.yardQueue(runs, [], '2026-10-19', after, { 'T-701': g({ seenAt: '2026-10-19T14:55:00Z' }) }).rows.length, 0, 'the GPS still sees it in the yard: gone at dispatch time all the same (Joe 10/20)');
 });
 
+// Joe 10/22: a loaded trailer whose GPS temperature is 30 to 42°F needs no yard check; exactly 32°F for 4 hours is the reefer's
+// "no reading" value (a fault) and needs one; a reading over 2 hours old is not trusted.
+test('yard GPS cover: 30 to 42°F in range, stuck at 32°F for 4 hours is due, an old reading or another load\'s trip does not count', () => {
+  const R = require('../../src/plant-rules');
+  const now = Date.parse('2026-10-19T14:00:00Z'), ago = (m) => new Date(now - m * 60000).toISOString();
+  const x = { runDocId: 'w__r1', day: 'mon' };
+  const g = (tempF, extra) => Object.assign({ id: 'w__r1|mon', tempF, readingAt: ago(10) }, extra);
+  assert.equal(R.YARD_GPS_LOW, 30); assert.equal(R.YARD_GPS_HIGH, 42);
+  assert.deepEqual([30, 36, 42].map(t => R.yardGpsCover(x, g(t), now).ok), [true, true, true]);
+  assert.deepEqual([29.9, 42.1, 50].map(t => R.yardGpsCover(x, g(t), now).ok), [false, false, false]);
+  assert.equal(R.yardGpsCover(x, g(36, { readingAt: ago(121) }), now).ok, false, 'a reading over 2 hours old');
+  assert.equal(R.yardGpsCover(x, g(36, { id: 'w__r0|sun' }), now).ok, false, 'an older load on the same trailer');
+  assert.equal(R.yardGpsCover(x, g(null), now).ok, false, 'no reading');
+  assert.equal(R.yardGpsCover(x, undefined, now).ok, false);
+  const stuck = R.yardGpsCover(x, g(32, { flatSince: ago(240) }), now);
+  assert.deepEqual([stuck.ok, stuck.stuck], [false, true], 'exactly 32 for 4 hours: a fault');
+  const young = R.yardGpsCover(x, g(32, { flatSince: ago(239) }), now);
+  assert.deepEqual([young.ok, young.stuck], [true, false], '32 for under 4 hours is still a reading');
+  assert.deepEqual([R.yardGpsCover(x, g(32.1, { flatSince: ago(300) }), now).stuck], [false], 'only exactly 32');
+  // The queue: in range goes to gps (not due), stuck and out of range stay due; Manager Walkthrough counts only the due ones.
+  const day = (trailer) => ({ loadDate: '2026-10-19', deliveryDate: '2026-10-19', dispatchTime: 1200, trailer, loadStatus: 'COMPLETE' });
+  const runs = ['1', '2', '3'].map(n => ({ id: 'w__r' + n, weekStart: '2026-10-18', sheetRow: Number(n), route: '80' + n, run: '', days: { mon: day('T-70' + n) } }));
+  const trip = (n, tempF, extra) => Object.assign({ id: 'w__r' + n + '|mon', unitId: 'u' + n, recording: true, out: '', seenAt: ago(5), tempF, readingAt: ago(10) }, extra);
+  const q = R.yardQueue(runs, [], '2026-10-19', now, { 'T-701': trip('1', 35), 'T-702': trip('2', 48), 'T-703': trip('3', 32, { flatSince: ago(300) }) });
+  assert.deepEqual([q.rows.map(r => r.trailer), q.gps.map(r => r.trailer), q.locked.length], [['T-702', 'T-703'], ['T-701'], 0]);
+  assert.equal(q.rows.find(r => r.trailer === 'T-703').gpsStuck, true);
+  const w = R.managerWalk(q, [], [], now);
+  assert.equal(w.yard.due, 2);
+  assert.equal(w.yard.gps, 1);
+  const allOk = R.yardQueue(runs.slice(0, 1), [], '2026-10-19', now, { 'T-701': trip('1', 35) });
+  assert.equal(R.managerWalk(allOk, [], [], now).yard.auto, 'GPS temps in range');
+});
+
 // Joe 10/19: the trailer number is found in Fleet's tag however it is written; a bare number only when no truck has it.
 test('trailer GPS units: T-864, TRL 888, Trailer 0901, 920 Reefer and a bare 905 all match; a bare truck number does not', () => {
   const { trailerUnits, runTrucks } = require('../../src/fleetgps');

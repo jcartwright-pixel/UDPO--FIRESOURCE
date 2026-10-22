@@ -438,6 +438,18 @@
     if (done !== null && wallClock(at) < done) return false;
     return e.date === date || nowMs - at < YARD_LOCK_MINUTES * 60000;
   }
+  // Joe 10/22: a loaded trailer whose GPS temperature is in range (YARD_GPS_LOW to YARD_GPS_HIGH °F, read in the last
+  // YARD_GPS_FRESH_MINUTES) needs no yard check and is not due. Exactly 32°F is what a reefer sends when it has no real reading:
+  // 32 at every reading for YARD_GPS_STUCK_MINUTES (more than 2 readings in a row, 2 hours apart) is a fault, and the
+  // trailer is checked by hand. g = the trailer's gpsReefer (flatSince: when its unbroken run of exactly 32 began).
+  var YARD_GPS_LOW = 30, YARD_GPS_HIGH = 42, YARD_GPS_FRESH_MINUTES = 120, YARD_GPS_STUCK_F = 32, YARD_GPS_STUCK_MINUTES = 240;
+  function yardGpsCover(x, g, nowMs) {
+    if (!g || text(g.id) !== text(x.runDocId) + '|' + text(x.day) || g.tempF === null || g.tempF === undefined || g.tempF === '') return { ok: false, stuck: false };
+    var t = Number(g.tempF), at = when(g.readingAt), flat = when(g.flatSince);
+    if (!isFinite(t) || !at || (nowMs - at) / 60000 > YARD_GPS_FRESH_MINUTES) return { ok: false, stuck: false, tempF: t };
+    var stuck = t === YARD_GPS_STUCK_F && !!flat && (nowMs - flat) / 60000 >= YARD_GPS_STUCK_MINUTES;
+    return { ok: !stuck && t >= YARD_GPS_LOW && t <= YARD_GPS_HIGH, stuck: stuck, tempF: t, readingAt: text(g.readingAt) };
+  }
   function yardQueue(runs, journal, date, nowMs, gps) {
     var checks = yardChecks(journal, date), departed = {}, byTrailer = {};
     checks.forEach(function (e) {
@@ -446,7 +458,7 @@
       var key = yardStatus(e) === 'DEPARTED' ? k + '|' + text(p.run || e.run).toUpperCase() : k, into = yardStatus(e) === 'DEPARTED' ? departed : byTrailer;
       (into[key] = into[key] || []).push(e);
     });
-    var seen = {}, rows = [], locked = [];
+    var seen = {}, rows = [], locked = [], covered = [];
     yardHolds(runs, date).forEach(function (x, index) {
       var left = (departed[x.trailer + '|' + x.routeRun.toUpperCase()] || []).some(function (e) { return yardForLoad(e, x, date, nowMs); });
       if (yardGone(x, gps && gps[x.trailer], date, nowMs) || seen[x.trailer] || left) return;
@@ -456,14 +468,17 @@
       var item = Object.assign({}, x, { checkId: e ? text(e.recordId) : '', recordedAt: e ? text(e.recordedAt) : '', recordedBy: e ? text(e.recordedBy) : '', temperature: text(p.temperature),
         setPoint: text(p.setPoint) || x.setPoint, fuelLevel: text(p.fuelLevel).toUpperCase(), notes: text(p.notes), minutesSinceCheck: isFinite(age) ? Math.floor(age) : null,
         minutesUntilDue: isFinite(age) && age < YARD_LOCK_MINUTES ? Math.ceil(YARD_LOCK_MINUTES - age) : 0, locked: isFinite(age) && age < YARD_LOCK_MINUTES, index: index });
-      (item.locked ? locked : rows).push(item);
+      var cover = yardGpsCover(x, gps && gps[x.trailer], nowMs);
+      item.gpsOk = cover.ok; item.gpsStuck = cover.stuck; item.gpsTempF = cover.tempF === undefined ? null : cover.tempF;
+      (item.locked ? locked : cover.ok ? covered : rows).push(item);
     });
     rows.sort(function (a, b) {
       var ta = a.departureTime === null ? 99999 : a.departureTime, tb = b.departureTime === null ? 99999 : b.departureTime;
       return a.departureDate.localeCompare(b.departureDate) || ta - tb || a.index - b.index;
     });
     locked.sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); });
-    return { rows: rows, locked: locked };
+    covered.sort(function (a, b) { return a.index - b.index; });
+    return { rows: rows, locked: locked, gps: covered };
   }
   // Every yard check and Left Yard of the last 24 hours, newest first.
   function yardHistory(journal, date, nowMs) {
@@ -825,7 +840,7 @@
     var last = function (at) { return when(at) ? 'last ' + clockOf(at) : 'never checked'; };
     var rank = { bad: 0, warn: 1, ok: 2 }, sorted = function (a) { return a.map(function (x, i) { return [x, i]; }).sort(function (p, q) { return rank[p[0].kind] - rank[q[0].kind] || p[1] - q[1]; }).map(function (p) { return p[0]; }); };
     var newest = function (list) { return list.filter(function (c) { return when(c.at); }).sort(function (a, b) { return when(b.at) - when(a.at); })[0] || null; };
-    var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), tempDue = (temps || []).filter(function (r) { return !tempChecked(r); });
+    var yardDue = ((yard || {}).rows || []), yardDone = ((yard || {}).locked || []), yardGpsOk = ((yard || {}).gps || []), tempDue = (temps || []).filter(function (r) { return !tempChecked(r); });
     // A line is running when it has a check today that is not Finished.
     var running = function (l) { var x = l.last || {}, t = when(x.recordedAt); return !!t && !lineDone(x, nowMs) && opDayAt(t) === opDayAt(nowMs); };
     var isDue = function (l) { var x = l.last || {}, t = when(x.recordedAt); return running(l) && (!t || (nowMs - t) / 60000 >= cycle); };
@@ -834,7 +849,8 @@
     var tempChecks = (temps || []).filter(function (r) { return r.lastCheckedAt; }).map(function (r) { return { at: r.lastCheckedAt, by: r.lastCheckedBy }; });
     var lineChecks = (lines || []).filter(function (l) { var x = l.last || {}; return x.recordedAt && x.inApp; }).map(function (l) { return { at: l.last.recordedAt, by: l.last.recordedBy }; });
     var route = function (x) { return x.route ? 'Route ' + x.route : text(x.routeRun); };
-    var yardItems = yardDue.map(function (x) { var l = late(x.recordedAt); return { name: 'Trailer ' + x.trailer, detail: [route(x), l ? 'PAST DUE' : 'DUE', last(x.recordedAt)].filter(Boolean).join(' · '), kind: l ? 'bad' : 'warn' }; })
+    var yardItems = yardDue.map(function (x) { var l = late(x.recordedAt); return { name: 'Trailer ' + x.trailer, detail: [route(x), x.gpsStuck ? 'GPS stuck at 32°F' : '', l ? 'PAST DUE' : 'DUE', last(x.recordedAt)].filter(Boolean).join(' · '), kind: l || x.gpsStuck ? 'bad' : 'warn' }; })
+      .concat(yardGpsOk.map(function (x) { return { name: 'Trailer ' + x.trailer, detail: [route(x), 'GPS ' + x.gpsTempF + '°F · in range'].filter(Boolean).join(' · '), kind: 'ok' }; }))
       .concat(yardDone.map(function (x) { return { name: 'Trailer ' + x.trailer, detail: [route(x), (x.temperature !== '' ? x.temperature + '°F · ' : '') + 'checked ' + clockOf(x.recordedAt)].filter(Boolean).join(' · '), kind: 'ok' }; }));
     var coolerItems = (temps || []).map(function (r) {
       var reading = r.sensorTemp !== '' && r.sensorTemp !== undefined ? r.sensorTemp : r.lastManualTemperature, read = reading !== '' && reading !== undefined && reading !== null ? reading + '°F' : '';
@@ -858,7 +874,8 @@
     };
     var lateYard = yardDue.filter(function (x) { return late(x.recordedAt); }).length, lateLines = lineDue.filter(function (l) { return late((l.last || {}).recordedAt); }).length;
     return {
-      yard: area({ due: yardDue.length, late: lateYard, total: yardDue.length + yardDone.length, items: sorted(yardItems) }, yardChecks, yardDue.length + yardDone.length ? '' : 'No trucks in the yard'),
+      yard: area({ due: yardDue.length, late: lateYard, gps: yardGpsOk.length, total: yardDue.length + yardDone.length + yardGpsOk.length, items: sorted(yardItems) }, yardChecks,
+        yardDue.length + yardDone.length ? '' : yardGpsOk.length ? 'GPS temps in range' : 'No trucks in the yard'),
       coolers: area({ due: tempDue.length, late: tempDue.filter(function (r) { return late(r.lastCheckedAt); }).length, out: (temps || []).filter(tempAlert).length, total: (temps || []).length, items: sorted(coolerItems) }, tempChecks, ''),
       quality: area({ due: lineDue.length, late: lateLines, total: (lines || []).length, running: (lines || []).filter(running).length, items: sorted(qualityItems) }, lineChecks,
         (lines || []).some(running) ? '' : (lines || []).some(function (l) { return lineDone(l.last, nowMs); }) ? 'Production finished' : 'No lines running'),
@@ -1296,7 +1313,7 @@
   return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
-    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
+    YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
