@@ -82,9 +82,17 @@ async function openPage(browser, width, height, url) {
     assert.equal(await p.$eval(row + ' select', s => s.value), 'off');
     await p.selectOption(row + ' select', '');
     await p.waitForFunction((s) => document.querySelector(s).classList.contains('hol-need'), cell('hol_0', 'thu'), { timeout: 8000 });
-    // The heading counts after the Thursday cell is redrawn, so wait for it rather than read it at once.
-    await p.waitForFunction(() => document.getElementById('hol-head').textContent.endsWith('3 left'), null, { timeout: 8000 });
+    // The heading counts after the Thursday cell is redrawn, so wait for it rather than read it at once; the Not running save
+    // can still land after it and draw it once more, so it must read 3 left for a whole second (the redraws are done).
+    await p.waitForFunction(() => {
+      const ok = document.getElementById('hol-head').textContent.endsWith('3 left'), w = window.__holSince;
+      if (!ok) { window.__holSince = 0; return false; }
+      if (!w) window.__holSince = Date.now();
+      return Date.now() - window.__holSince >= 1000;
+    }, null, { timeout: 10000, polling: 100 });
     assert.equal(await p.textContent('#hol-head'), 'Move Thanksgiving loads to · 3 left');
+    const back = (await d.collection('runs').doc(WEEK + '_hol_0').get()).data().days;
+    assert.deepEqual([back.thu.runs, back.fri.runs], [true, false], 'saved: back on Thursday, not on Friday');
     results.push('Not running took Friday back off; the blank choice put 855 back on Thursday');
 
     // A week with no holiday looks as before.
