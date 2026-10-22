@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/routeweek.css">
   <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill routeweek-page">
   <div class="signin" id="signin" hidden>
@@ -44,13 +45,17 @@
           <div><b id="week-label">-</b><small id="week-kind"></small></div>
           <button type="button" id="next" aria-label="Next week">&#9654;</button>
         </div>
+        <label class="rw-reason" id="hol-pick-box" hidden>Holiday this week<select id="hol-pick"></select></label>
         <label class="rw-reason">Reason for this week's changes<textarea id="reason" maxlength="300" rows="2" placeholder="Holiday week, plant shutdown, customer closed..."></textarea></label>
         <div class="rw-counts"><div><b id="n-over">0</b><span>Overrides this week</span></div><div><b id="n-routes">0</b><span>Routes affected</span></div></div>
-        <div class="tabs rw-filter" role="tablist">
+        <div class="tabs rw-filter" id="rw-filter" role="tablist">
           <button type="button" role="tab" data-show="all" aria-selected="true">All Routes</button>
           <button type="button" role="tab" data-show="changed" aria-selected="false">Changed Only</button>
         </div>
         <div class="rw-list" id="change-list"></div>
+        <!-- Joe 10/22: in a holiday week the side lists every load on the holiday, each with where it moves to. -->
+        <div class="rw-hol-head" id="hol-head" hidden></div>
+        <div class="rw-list rw-hol-list" id="hol-list" hidden></div>
         <button type="button" class="warn" id="reset" data-top>Reset Week to Normal</button>
       </aside>
     </div>
@@ -62,17 +67,27 @@
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     forScreen('weeklyDispatch');
 
-    const L = window.UDLogic;
+    const L = window.UDLogic, R = window.UDPlant;
     const NAME = (p) => L.DAY_NAMES[L.DAYS.indexOf(p)];
     // Opened from Weekly: the week Weekly was showing (?week=), as in the current app (RouteWeekOverride.html).
     const asked = (() => { const w = new URLSearchParams(location.search).get('week'); return L.isDateKey(w) ? L.weekStart(w) : ''; })();
     let db = null, week = '', weeks = [], runs = [], routes = {}, weekDoc = null, show = 'all', stopRuns = null, stopWeek = null, typing = false;
+    let holPick = '';
     const getRuns = () => runs;
     // The normal week: Route Master's day switches for the run (routes/{runId}).
     const normal = (r) => { const m = routes[r.runId]; return m && m.days ? m.days : null; };
     const normalOn = (r, p) => { const n = normal(r); return n ? !!(n[p] && n[p].active) : !!(r.days[p] && r.days[p].runs); };
     const isOver = (r, p) => !!(r.days[p] && r.days[p].runs) !== normalOn(r, p);
     const overRow = (r) => L.DAYS.some(p => isOver(r, p));
+
+    // Joe 10/22: the week's holidays, from the same list the Scheduler's calendar marks. The first one is picked unless
+    // the Holiday drop-down says another.
+    const weekHolidays = () => L.DAYS.map((p, i) => ({ p, i, key: L.addDays(week, i), name: R.holidayName(L.addDays(week, i)) })).filter(h => h.name);
+    const holiday = () => { const list = weekHolidays(); return list.find(h => h.p === holPick) || list[0] || null; };
+    const runsOn = (r, p) => !!(r.days[p] && r.days[p].runs);
+    // Where a load moved off the holiday went: the other day changed to run (blank: not running).
+    const movedTo = (r, h) => L.DAYS.find(p => p !== h.p && isOver(r, p) && runsOn(r, p)) || '';
+    const dayText = (p) => NAME(p).slice(0, 3) + ' ' + shortDate(L.addDays(week, L.DAYS.indexOf(p)));
 
     function shown() {
       // Every run Weekly shows for the week, in Weekly's order.
@@ -88,14 +103,17 @@
       document.getElementById('week-kind').textContent = week === live.current ? 'This week' : week === live.next ? 'Next week' : week === live.previous ? 'Last week' : '';
       document.getElementById('prev').disabled = weeks.indexOf(week) <= 0;
       document.getElementById('next').disabled = weeks.indexOf(week) >= weeks.length - 1;
-      document.getElementById('heads').innerHTML = '<th>Route</th><th>Load / Trip</th>' + L.DAYS.map((p, i) => '<th>' + NAME(p).slice(0, 3).toUpperCase() + '<small>' + shortDate(L.addDays(week, i)).replace(/\/\d{4}$/, '') + ' · ' + list.filter(r => r.days[p] && r.days[p].runs).length + ' run</small></th>').join('');
-      const rows = show === 'changed' ? over : list;
+      const hol = holiday(), hp = hol ? hol.p : '';
+      document.getElementById('heads').innerHTML = '<th>Route</th><th>Load / Trip</th>' + L.DAYS.map((p, i) => '<th' + (p === hp ? ' class="hol" title="' + escapeHtml(hol.name) + '"><span class="hol-word">Holiday</span>' : '>') + NAME(p).slice(0, 3).toUpperCase() + '<small>' + shortDate(L.addDays(week, i)).replace(/\/\d{4}$/, '') + ' · ' + list.filter(r => r.days[p] && r.days[p].runs).length + ' run</small></th>').join('');
+      // A holiday week lists its own changes in the side (no All Routes / Changed Only there), so the grid shows every route.
+      const rows = show === 'changed' && !hol ? over : list;
       let prior = '';
       document.getElementById('rows').innerHTML = rows.map(r => {
         const first = r.route !== prior; prior = r.route;
-        return '<tr data-id="' + escapeHtml(r.id) + '"' + (first ? ' class="first"' : '') + '><td class="strong">' + (first ? escapeHtml(r.route) : '') + '</td><td>' + escapeHtml(r.run || r.routeName || '') + '</td>' +
+        const need = hp && runsOn(r, hp), cls = [first ? 'first' : '', need ? 'hol-need' : ''].filter(Boolean).join(' ');
+        return '<tr data-id="' + escapeHtml(r.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '><td class="strong">' + (first ? escapeHtml(r.route) : '') + '</td><td>' + escapeHtml(r.run || r.routeName || '') + '</td>' +
           L.DAYS.map(p => { const on = !!(r.days[p] && r.days[p].runs), o = isOver(r, p);
-            return '<td><button type="button" class="rw-day' + (on ? '' : ' off') + (o ? ' over' : '') + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' title="' + (o ? 'Changed from the normal week (normal: ' + (normalOn(r, p) ? 'runs' : 'does not run') + ')' : 'Normal week') + '">' + (on ? '&#10003; RUNS' : 'OFF') + '</button></td>'; }).join('') + '</tr>';
+            return '<td' + (p === hp ? ' class="hol-col"' : '') + '><button type="button" class="rw-day' + (on ? '' : ' off') + (o ? ' over' : '') + (on && p === hp ? ' hol-need' : '') + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' title="' + (o ? 'Changed from the normal week (normal: ' + (normalOn(r, p) ? 'runs' : 'does not run') + ')' : 'Normal week') + '">' + (on ? '&#10003; RUNS' : 'OFF') + '</button></td>'; }).join('') + '</tr>';
       }).join('') || '<tr><td colspan="9" class="empty">' + (show === 'changed' ? 'Every route runs its normal week.' : 'No routes for this week.') + '</td></tr>';
       document.getElementById('n-over').textContent = over.reduce((a, r) => a + L.DAYS.filter(p => isOver(r, p)).length, 0);
       document.getElementById('n-routes').textContent = new Set(over.map(r => r.route)).size;
@@ -106,6 +124,25 @@
       box.disabled = !edit;
       if (!typing) box.value = weekDoc && weekDoc.overrideReason || '';
       document.getElementById('reset').disabled = !edit || !over.length;
+      renderHoliday(list, hol, edit);
+    }
+
+    // The holiday list: each load on the holiday (red until moved) and each one moved off it (green), with a Move to drop-down:
+    // a day that route does not already run, or Not running.
+    function renderHoliday(list, hol, edit) {
+      const pickBox = document.getElementById('hol-pick-box'), head = document.getElementById('hol-head'), box = document.getElementById('hol-list');
+      pickBox.hidden = head.hidden = box.hidden = !hol;
+      document.getElementById('rw-filter').hidden = document.getElementById('change-list').hidden = !!hol;
+      if (!hol) return;
+      document.getElementById('hol-pick').innerHTML = weekHolidays().map(h => '<option value="' + h.p + '"' + (h.p === hol.p ? ' selected' : '') + '>' + escapeHtml(h.name) + ' &middot; ' + dayText(h.p) + '</option>').join('');
+      const rows = list.filter(r => runsOn(r, hol.p) || isOver(r, hol.p)), left = rows.filter(r => runsOn(r, hol.p)).length;
+      head.textContent = 'Move ' + hol.name + ' loads to' + (rows.length ? ' · ' + (left ? left + ' left' : 'all moved') : '');
+      box.innerHTML = rows.map(r => {
+        const on = runsOn(r, hol.p), to = on ? null : movedTo(r, hol);
+        const opts = '<option value=""></option>' + L.DAYS.filter(p => p !== hol.p && (!runsOn(r, p) || p === to)).map(p => '<option value="' + p + '"' + (p === to ? ' selected' : '') + '>' + dayText(p) + '</option>').join('') +
+          '<option value="off"' + (to === '' ? ' selected' : '') + '>Not running</option>';
+        return '<div class="' + (on ? 'need' : 'done') + '" data-id="' + escapeHtml(r.id) + '"><span><b>' + escapeHtml(r.route) + '</b> &middot; ' + escapeHtml(r.run || r.routeName || '') + '</span><select aria-label="Move to"' + (edit ? '' : ' disabled') + '>' + opts + '</select></div>';
+      }).join('') || '<div class="empty">No loads run on ' + escapeHtml(hol.name) + '.</div>';
     }
 
     function toggle(r, p) {
@@ -118,6 +155,26 @@
       if (!b) return;
       const r = runs.find(x => x.id === b.closest('tr').dataset.id);
       if (r) toggle(r, b.dataset.day);
+    });
+    document.getElementById('hol-pick').onchange = (e) => { holPick = e.target.value; render(); };
+    // Move to: the load comes off the holiday and runs on the day picked (Not running: off only). Changing it again puts
+    // the old day back first; the blank choice puts the load back on the holiday. One save per day changed, as the boxes do.
+    document.getElementById('hol-list').addEventListener('change', async (e) => {
+      const sel = e.target.closest('select'), hol = holiday();
+      const r = sel && hol && runs.find(x => x.id === sel.closest('[data-id]').dataset.id);
+      if (!r || !canSave()) return;
+      const want = sel.value, was = runsOn(r, hol.p) ? null : movedTo(r, hol);
+      try {
+        if (was) await toggle(r, was);
+        if (want === '') { if (!runsOn(r, hol.p)) await toggle(r, hol.p); return; }
+        if (runsOn(r, hol.p)) await toggle(r, hol.p);
+        if (want !== 'off' && !runsOn(r, want)) await toggle(r, want);
+      } catch (err) { return; /* the save puts the day back and shows why */ }
+      // The week's reason, when none is typed yet, becomes the holiday's name.
+      if (weekDoc && !weekDoc.overrideReason && !typing) {
+        weekDoc.overrideReason = hol.name; render();
+        try { await save('setWeekReason', { weekStart: week, reason: hol.name }); } catch (err) { weekDoc.overrideReason = ''; render(); showError('The week reason was not saved (' + (err.message || String(err)) + '). Type it in the Reason box.'); }
+      }
     });
     document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { show = b.dataset.show; render(); });
     // Reset Week to Normal: every changed day goes back to Route Master's normal week, one save each.
@@ -147,7 +204,7 @@
       try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
     });
     function setWeek(w) {
-      if (w !== week) disarm();
+      if (w !== week) { disarm(); holPick = ''; }
       week = w;
       if (stopRuns) stopRuns();
       if (stopWeek) stopWeek();
