@@ -48,3 +48,35 @@ test('Departure Day from the route setup decides the day a load leaves', () => {
   const loads = [tue('852', 780, 'Load Day'), tue('901', 420, 'Delivery Day'), tue('907', 540, 'Delivery Day'), tue('827', 60, 'Delivery Day')];
   assert.deepEqual(R.plantReport({ loads }, at('2026-10-19T18:57:00Z')).behind.map(x => x.route), ['852'], 'Monday 2:57 PM: only Jersey is behind');
 });
+
+// Audit batch 1 (Joe 10/22, "ah"): every screen agrees on when a load leaves. The Loadout Center's Behind (plant-core.js) asks
+// plant-rules.js, so it has the 10/21 next-morning rule too, and Yard Checks follows the route's Departure Day.
+test('Yard Checks: a load with a Departure Day stays on the yard until it leaves by the same rule as the Late Forecast', () => {
+  const week = '2026-10-18';
+  const run = (id, route, leavesOn, tue) => ({ id, weekStart: week, route, run: route, masterShow: leavesOn ? { leavesOn } : undefined,
+    days: { tue: Object.assign({ loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: '2026-10-20', loadStatus: 'COMPLETE', completeTime: '2026-10-20T00:30:00Z' }, tue) } });
+  const runs = [run('a', '950', 'Delivery Day', { dispatchTime: '10:00 PM', trailer: 'T-950' }), run('b', '852', 'Load Day', { dispatchTime: '9:00 PM', trailer: 'T-852' }),
+    run('c', '849', 'Load Day', { dispatchTime: '4:00 AM', trailer: 'T-849' })];
+  const queue = (iso, date) => R.yardQueue(runs, [], date, at(iso)).rows.map(x => x.trailer).sort();
+  // Monday 11:00 PM: Jersey (Load Day, 9 PM Monday) has left; Charleston Transfer (Delivery Day) leaves Tuesday 10 PM and Sun
+  // Valley (Load Day, 4 AM) leaves Tuesday 4 AM, so both are still on the yard.
+  assert.deepEqual(queue('2026-10-20T03:00:00Z', '2026-10-19'), ['T-849', 'T-950']);
+  // Tuesday 4:30 AM (still Monday's operating day): Sun Valley has left.
+  assert.deepEqual(queue('2026-10-20T08:30:00Z', '2026-10-19'), ['T-950']);
+  // Tuesday 9:59 PM: Charleston Transfer is still there; at 10:00 PM it has left.
+  assert.deepEqual(queue('2026-10-21T01:59:00Z', '2026-10-20'), ['T-950']);
+  assert.deepEqual(queue('2026-10-21T02:00:00Z', '2026-10-20'), []);
+});
+
+test('the Loadout Center and the other plant screens use the Late Forecast\'s leave rule, not a copy of their own', () => {
+  const fs = require('fs'), path = require('path'), pub = path.join(__dirname, '../../../public');
+  const core = fs.readFileSync(path.join(pub, 'js/plant-core.js'), 'utf8');
+  assert.match(core, /export function departWall\(row\) \{\s*return window\.UDPlant\.departWall\(/);
+  // Every page that can reach it (directly or through the plant screens' shared files) loads plant-rules.js first. Daily
+  // Dispatch takes only runArea from plant-core.js.
+  const users = /js\/(plant-core|plant-dept|plant-reports|station-work|forecast)\.js/;
+  fs.readdirSync(pub).filter(f => f.endsWith('.html') && f !== 'daily.html').forEach(f => {
+    const html = fs.readFileSync(path.join(pub, f), 'utf8');
+    if (users.test(html)) assert.match(html, /<script src="js\/plant-rules\.js"><\/script>/, f + ' loads plant-rules.js');
+  });
+});

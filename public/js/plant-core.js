@@ -163,9 +163,8 @@ export function isBehind(row, today, now) {
   if (leaves === null) return false;
   return n > leaves + BEHIND_MINUTES;
 }
-// Minutes since 1/1/1970 on the plant's wall clock (New York), and when a load leaves on that clock: the same rule as
-// plant-rules.js departWall: the dispatch time on the route's Departure Day (Load Day = the load date, Delivery Day = the
-// departure date, Joe 10/19), the 6 a.m. guess where the route has none (this file is also used on screens that do not load plant-rules.js).
+// Minutes since 1/1/1970 on the plant's wall clock (New York). When a load leaves (departWall) is plant-rules.js's own rule, the one
+// the Late Forecast and the report use (audit batch 1, Joe 10/22: every screen agrees); every page that loads this file loads it.
 const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 // The end of the shift running at wall minute n: 6 a.m. after the operating day that n falls in.
 export const shiftEndAfter = (n) => (Math.floor((n - 360) / 1440) + 1) * 1440 + 360;
@@ -176,12 +175,7 @@ export function wallNowMinutes(now) {
   return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
 }
 export function departWall(row) {
-  const departDay = dayNumber(row.departureDate || row.deliveryDate || row.loadDate), load = dayNumber(row.loadDate), on = leavesOnOf(row.leavesOn);
-  if (departDay === null || row.dispatchTime === null || row.dispatchTime === undefined || row.dispatchTime === '' || !isFinite(Number(row.dispatchTime))) return null;
-  const t = Number(row.dispatchTime);
-  if (on === 'LOAD DAY') return (load === null ? departDay : load) * 1440 + t;
-  if (on === 'DELIVERY DAY') return departDay * 1440 + t;
-  return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
+  return window.UDPlant.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: row.dispatchTime });
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }
