@@ -33,3 +33,11 @@ test('version line: the deploy stamps version.json before uploading the screens'
   const placeholder = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../public/version.json'), 'utf8'));
   assert.equal(placeholder.label, 'Test copy on this computer');
 });
+
+// Joe 10/22: "in the upper banner is where I want the version and the last time it was updated."
+test('header line: the version and when it was last updated, on the plant clock', () => {
+  assert.equal(V.banner('6.48', '10-22-26', '1:30 PM', true), 'Version 6.48 · Updated 10-22-26 1:30 PM');
+  assert.equal(V.banner('6.47', '10-22-26', '1:30 PM', false), 'Version 6.48 · Updated 10-22-26 1:30 PM', 'the test copy shows the number it will be released as');
+  assert.equal(V.clock(new Date('2026-10-22T17:30:00Z')), '1:30 PM');
+  assert.equal(V.clock(new Date('2026-10-23T03:05:00Z')), '11:05 PM', 'evening in Ohio');
+});

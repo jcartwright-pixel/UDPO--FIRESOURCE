@@ -653,6 +653,30 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
     if (who) who.before(adm); else bar.append(adm);
   }
 })();
+// Joe 10/22: "in the upper banner is where I want the version and the last time it was updated." Every screen's header
+// shows "Version 6.48 · Updated 10-22-26 1:30 PM" (stamped by the deploy), just before Administration, the initials and
+// Sign out. The line at the bottom of the menu stays as it is.
+(function headerVersion() {
+  if (EMBED) return;
+  const bars = [...document.querySelectorAll('.topbar, .phone-top')].filter(bar => !bar.querySelector('.hdr-version'));
+  if (!bars.length) return;
+  const boxes = bars.map(bar => {
+    const box = document.createElement('div');
+    box.className = 'hdr-version';
+    box.title = 'The version of the app on this screen and when it was last updated';
+    const right = [...bar.children].find(el => el.matches('.hdr-admin, .who, #who, #signout, #change'));
+    if (right) right.before(box); else bar.append(box);
+    return box;
+  });
+  appVersion().then(v => {
+    if (!v || !(v.banner || v.label)) return;
+    const parts = (v.banner || v.label).split(' · ');
+    boxes.forEach(box => {
+      box.innerHTML = '<b>' + escapeHtml(parts[0]) + '</b>' + (parts.length > 1 ? ' <small>' + escapeHtml(parts.slice(1).join(' · ')) + '</small>' : '');
+      if (v.commit) box.title = (v.banner || v.label) + ' (' + v.commit + ')';
+    });
+  });
+})();
 // Joe 10/10: on every screen with cards, clicking anywhere on a card opens that card's screen in its first view, and clicking
 // one line or number inside it opens that particular screen. A card carries data-card="page"; a line or number data-open="page"
 // (real links and buttons inside keep their own job). Always this window.
