@@ -56,6 +56,11 @@ const misfits = (page) => page.evaluate(() => {
       }
     }
   });
+  // Labels placed side by side (the Late Forecast hours) that run into each other.
+  document.querySelectorAll('.fc-head .fc-line').forEach(line => {
+    const r = [...line.querySelectorAll('i')].map(i => i.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+    for (let i = 1; i < r.length; i++) if (r[i].left < r[i - 1].right + 4) out.push('labels touch in the Late Forecast hours');
+  });
   // A picker or box whose value is cut (the day name, the week date).
   document.querySelectorAll('select, input[type="date"], input[type="text"]').forEach(el => {
     if (!el.offsetParent) return;
@@ -76,6 +81,9 @@ const misfits = (page) => page.evaluate(() => {
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date(PD.PLANT_DATE + 'T14:00:00Z') });
+  // Live data has long run names (Late Forecast showed "Charleston Transf…" and "Pa…"): two of the day's runs get them.
+  const runs = (await db().collection('runs').get()).docs.filter(d => ['811', '808'].includes(String(d.data().route)));
+  await Promise.all(runs.map(d => d.ref.update({ run: String(d.data().route) === '811' ? 'CHARLESTON TRANSFER' : 'PARKERSBURG MARIETTA' })));
   const browser = await chromium.launch();
   const results = [], found = [];
   try {

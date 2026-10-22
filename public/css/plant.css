@@ -1479,12 +1479,14 @@
 .forecast-page .fc-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-height: 0; display: flex; flex-direction: column; }
 .forecast-page .fc-card h2 { margin: 0 0 4px; font-size: 20px; color: var(--ud-blue-dark); }
 .forecast-page .fc-scroll { flex: 1; min-height: 0; overflow: auto; }
-.forecast-page .fc-row { display: grid; grid-template-columns: 64px minmax(130px, 1fr) 70px 112px 132px minmax(240px, 2.2fr); align-items: center; column-gap: 8px; min-height: 28px; border-bottom: 1px solid #e3eaf1; font-size: 16px; }
+.forecast-page .fc-row { display: grid; grid-template-columns: 64px minmax(130px, 1fr) 70px 124px 132px minmax(240px, 2.2fr); align-items: center; column-gap: 8px; min-height: 28px; border-bottom: 1px solid #e3eaf1; font-size: 16px; }
 .forecast-page .fc-row .num { text-align: right; }
 .forecast-page .fc-row.fc-head { position: sticky; top: 0; z-index: 2; background: var(--ud-blue); color: #fff; font-weight: 800; text-transform: uppercase; min-height: 34px; border-radius: 6px 6px 0 0; padding-top: 0; }
 .forecast-page .fc-row.fc-head > span:first-child { padding-left: 8px; }
 .forecast-page .fc-row > b { padding-left: 8px; }
-.forecast-page .fc-run { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Joe 10/22 (practice test on live data): the whole run name shows ("Charleston Transfer", not "Pa…"); it wraps instead. */
+.forecast-page .fc-run { min-width: 0; overflow-wrap: normal; white-space: normal; line-height: 1.2; }
+.forecast-page .fc-row > span:nth-child(4) { white-space: nowrap; }
 .forecast-page .fc-run small.fc-why-sm { display: none; }
 .forecast-page .fc-run small { display: block; line-height: 1.1; color: #c62828; font-weight: 800; font-size: 16px; white-space: normal; }
 .forecast-page .fc-pill { font-style: normal; font-size: 16px; padding: 0 8px; border-radius: 999px; background: #ffe9b0; color: #7a4b00; }
