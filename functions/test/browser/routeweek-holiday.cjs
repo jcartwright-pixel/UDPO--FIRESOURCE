@@ -82,6 +82,8 @@ async function openPage(browser, width, height, url) {
     assert.equal(await p.$eval(row + ' select', s => s.value), 'off');
     await p.selectOption(row + ' select', '');
     await p.waitForFunction((s) => document.querySelector(s).classList.contains('hol-need'), cell('hol_0', 'thu'), { timeout: 8000 });
+    // The heading counts after the Thursday cell is redrawn, so wait for it rather than read it at once.
+    await p.waitForFunction(() => document.getElementById('hol-head').textContent.endsWith('3 left'), null, { timeout: 8000 });
     assert.equal(await p.textContent('#hol-head'), 'Move Thanksgiving loads to · 3 left');
     results.push('Not running took Friday back off; the blank choice put 855 back on Thursday');
 
