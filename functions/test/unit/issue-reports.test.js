@@ -6,7 +6,7 @@ const L = require('../../src/logic');
 const G = require('../../src/garage');
 
 test('a Pre Trip / Post Trip answer that only says yes or no is not a write-up', () => {
-  for (const v of ['YES-NO', 'yes-no', 'YS', 'Y/N', 'Yes/No', 'yes - none', 'YE S', 'Ytes', 'NO', 'UYES', 'yess', 'TES', 'YRS', 'yse', 'UYES-NO', 'yesno', 'YES - NO WRITE UPS', 'yes, no issues', 'NO WRITE UPS - YES', 'Yes no defects found']) assert.equal(L.noWriteUp(v), true, v);
+  for (const v of ['YES-NO', 'yes-no', 'YS', 'Y/N', 'Yes/No', 'yes - none', 'YE S', 'Ytes', 'NO', 'UYES', 'yess', 'TES', 'YRS', 'yse', 'UYES-NO', 'yesno', 'YES - NO WRITE UPS', 'yes, no issues', 'NO WRITE UPS - YES', 'Yes no defects found', 'NO WRITES', 'YES - NO WRITES']) assert.equal(L.noWriteUp(v), true, v);
   for (const v of ['YES-POST- AIR LEAK', 'no good', 'yes no brakes', 'air conditioner in tractor don\'t work', 'NO+ mirror', 'eyes', 'UYES flat tire', 'yes leak', 'YES - WRITE UP BRAKES', 'yes no write ups, mirror broken']) assert.equal(L.noWriteUp(v), false, v);
 });
 
@@ -39,6 +39,23 @@ test('a copy repaired or removed closes the same email\'s other copy; a removed 
     mail('e', 'concerns', '223881', 'mirror broken', 'OPEN', '2026-10-16T21:00:00.000Z')
   ], 'TRUCK', NOW);
   assert.deepEqual(rows.map(r => [r.unit, r.text]), [['223881', 'mirror broken']]);
+});
+
+// Joe 10/22: truck 225061 showed 3 times on 10-22, from a check-in and two DVIRs sent minutes apart.
+const app = (source, key, unit, text, opened) => ({ record_id: 'APP|' + source + '|' + key, kind: 'TRUCK', truck_number: unit, issue_details: text, source_type: 'ROUTE_APP', source_id: source,
+  status: 'OPEN', opened_at: opened, service_date: opened.slice(0, 10), driver: 'Pat Lee' });
+
+test('reports on one truck on the same day are one row, counted once', () => {
+  const rows = L.issueRows([
+    app('2026-10-18__run_x|thu', 'tractor', '225061', 'Wiper blades', '2026-10-22T18:22:29.203Z'),
+    app('DVIR_app_aaa_1', 'dvir-tractor', '225061', 'Wiper blades  need replaced', '2026-10-22T18:24:36.290Z'),
+    app('DVIR_app_bbb_1', 'dvir-tractor', '225061', 'Wiper blades need replaced', '2026-10-22T18:26:32.599Z'),
+    app('DVIR_app_ccc_1', 'dvir-tractor', '225061', 'Mirror loose', '2026-10-20T12:00:00.000Z'),
+    app('DVIR_app_ddd_1', 'dvir-tractor', '223880', 'Wiper blades need replaced', '2026-10-22T18:30:00.000Z')
+  ], 'TRUCK', Date.parse('2026-10-22T19:00:00Z'));
+  assert.deepEqual(rows.map(r => [r.unit, r.text, r.occurrences]), [['223880', 'Wiper blades need replaced', 1], ['225061', 'Wiper blades', 2], ['225061', 'Mirror loose', 1]]);
+  const wipers = rows[1];
+  assert.deepEqual([wipers.reported, wipers.checkinId, wipers.recordIds.length], ['2026-10-22T18:22:29.203Z', '2026-10-18__run_x|thu', 3]);
 });
 
 test('the Garage Station lists one job for one email', () => {

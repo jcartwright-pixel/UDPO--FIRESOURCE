@@ -287,6 +287,23 @@
     }).filter(function (r) { return r.recordId; });
     // One row per report. A copy that says nothing is wrong ("YES-NO") adds nothing. When a copy was removed or repaired and it
     // says the same problems as the copies still open, the report is closed (the same email's other copy is not a new problem).
+    // Rows that make one report (each with its recordIds and reviewIds) as one row: its problems said once, dated by the first.
+    function combine(list) {
+      if (list.length === 1) { list[0].text = issueText([list[0].text]) || list[0].text; return list[0]; }
+      list.sort(function (a, b) { return (a.openedMs || Infinity) - (b.openedMs || Infinity); });
+      // The copy the Garage and Lessor buttons act on: one already sent, else the first.
+      var main = list.filter(function (r) { return r.atGarage || r.toLessor || r.emailed; })[0] || list[0];
+      var row = Object.assign({}, main), any = function (k) { return list.some(function (r) { return r[k]; }); }, first = function (k) { var x = list.filter(function (r) { return r[k]; })[0]; return x ? x[k] : ''; };
+      row.text = issueText(list.map(function (r) { return r.text; }));
+      row.openedMs = list[0].openedMs; row.reported = list[0].reported;
+      row.needsReview = any('needsReview'); row.unit = row.unit || first('unit'); row.unitKey = row.unitKey || first('unitKey'); row.driver = row.driver || first('driver'); row.route = row.route || first('route');
+      row.emailId = row.emailId || first('emailId'); row.fromEmail = any('fromEmail'); row.checkinId = row.checkinId || first('checkinId');
+      if (!row.reviewed) { row.reviewed = any('reviewed'); row.reviewedBy = first('reviewedBy'); }
+      // The buttons act on every copy (Reviewed on the ones that need it), so the report closes as one.
+      row.recordIds = [].concat.apply([], list.map(function (r) { return r.recordIds; }));
+      row.reviewIds = [].concat.apply([], list.map(function (r) { return r.reviewIds; }));
+      return row;
+    }
     var groups = {}, order = [], removed = {};
     copies.forEach(function (r) {
       if (r.status === 'REMOVED') { (removed[r.report] = removed[r.report] || []).push(r.text); return; }
@@ -300,21 +317,18 @@
       // Repaired: the open copies say nothing the repaired copy did not.
       if (still.length && still.length < list.length && issueCovered(texts(still), texts(list.filter(function (r) { return r.done; })))) list = list.filter(function (r) { return r.done; });
       else if (still.length && still.length < list.length) list = still;
-      if (list.length === 1) { list[0].text = issueText([list[0].text]) || list[0].text; list[0].recordIds = [list[0].recordId]; list[0].reviewIds = list[0].needsReview ? [list[0].recordId] : []; return list[0]; }
-      list.sort(function (a, b) { return (a.openedMs || Infinity) - (b.openedMs || Infinity); });
-      // The copy the Garage and Lessor buttons act on: one already sent, else the first.
-      var main = list.filter(function (r) { return r.atGarage || r.toLessor || r.emailed; })[0] || list[0];
-      var row = Object.assign({}, main), any = function (k) { return list.some(function (r) { return r[k]; }); }, first = function (k) { var x = list.filter(function (r) { return r[k]; })[0]; return x ? x[k] : ''; };
-      row.text = issueText(list.map(function (r) { return r.text; }));
-      row.openedMs = list[0].openedMs; row.reported = list[0].reported;
-      row.needsReview = any('needsReview'); row.unit = row.unit || first('unit'); row.unitKey = row.unitKey || first('unitKey'); row.driver = row.driver || first('driver'); row.route = row.route || first('route');
-      row.emailId = row.emailId || first('emailId'); row.fromEmail = any('fromEmail'); row.checkinId = row.checkinId || first('checkinId');
-      if (!row.reviewed) { row.reviewed = any('reviewed'); row.reviewedBy = first('reviewedBy'); }
-      // The buttons act on every copy (Reviewed on the ones that need it), so the report closes as one.
-      row.recordIds = list.map(function (r) { return r.recordId; });
-      row.reviewIds = list.filter(function (r) { return r.needsReview; }).map(function (r) { return r.recordId; });
-      return row;
+      list.forEach(function (r) { r.recordIds = [r.recordId]; r.reviewIds = r.needsReview ? [r.recordId] : []; });
+      return combine(list);
     }).filter(Boolean);
+    // Joe 10/22 ("why did this show up 3 times for the same day"): a driver can send the same problem as a check-in and again on
+    // one or more DVIRs minutes apart. Reports on one unit on the same day are one row, counted once; the buttons act on them all.
+    var days = {}, dayOrder = [];
+    written.forEach(function (r) {
+      var key = r.unitKey ? r.unitKey + '|' + localDay(r.reported) + '|' + (r.done ? 'done' : 'open') : '#' + dayOrder.length;
+      if (!days[key]) { days[key] = []; dayOrder.push(key); }
+      days[key].push(r);
+    });
+    written = dayOrder.map(function (k) { return combine(days[k]); });
     var seen = {};
     written.slice().sort(function (a, b) { return a.openedMs - b.openedMs; }).forEach(function (r) {
       if (!r.unitKey) return;
@@ -1341,13 +1355,14 @@
   function noWriteUp(value) {
     var t = String(value === null || value === undefined ? '' : value).toLowerCase().replace(/[^a-z0-9/+ ]+/g, ' ').replace(/\s+/g, ' ').replace(/^[/+ ]+|[/+ ]+$/g, '');
     if (!t) return true;
+    // Joe 10/22: "NO WRITES" (and "YES - NO WRITES") is "no write-ups" said short.
     // Joe 10/20: "YES - NO WRITE UPS" is a done Post Trip with nothing wrong. A yes in front of (or after) an answer that says
     // nothing is wrong changes nothing, so it is no write-up either; "YES - AIR LEAK" still says what is wrong and stays.
     var ends = /^(\S+) (.+)$/.exec(t), tail = /^(.+) (\S+)$/.exec(t);
     if (ends && yesWord(ends[1]) && noWriteUp(ends[2])) return true;
     if (tail && yesWord(tail[2]) && noWriteUp(tail[1])) return true;
     if (/^(?:x+|n|no|nope|none|nil|na|n a|n\/a|negative|nothing|ok|okay|good|fine|working|working fine|all good|all ok|all okay|all clear)$/.test(t)) return true;
-    if (/^(?:no|nothing|none)(?: (?:new|known|major|minor|other))? (?:write ?ups?|issues?|defects?|problems?|concerns?|repairs?|damages?|complaints?|comments?|reports?|notes?)(?: (?:to report|reported|noted|found|today|at this time|this trip))?$/.test(t)) return true;
+    if (/^(?:no|nothing|none)(?: (?:new|known|major|minor|other))? (?:write ?ups?|writes?|issues?|defects?|problems?|concerns?|repairs?|damages?|complaints?|comments?|reports?|notes?)(?: (?:to report|reported|noted|found|today|at this time|this trip))?$/.test(t)) return true;
     if (/^(?:nothing|none) (?:to report|wrong|noted|today|needed|at this time)$/.test(t)) return true;
     if (/^(?:n0|it ?s (?:fine|good|ok|okay)|it is (?:fine|good|ok|okay)|its (?:fine|good|ok|okay))$/.test(t)) return true;
     t = t.replace(/[^a-z0-9 ]+/g, ' ').trim();
