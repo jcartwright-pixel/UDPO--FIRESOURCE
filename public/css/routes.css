@@ -61,9 +61,9 @@ table.routes td.screen-name { text-align: left; color: var(--ud-blue); }
   .routes-page .head .actions.in-head.top-row { order: 2; margin-left: 0; flex-wrap: nowrap; }
   .routes-page .head .selectors { order: 3; margin-left: auto; flex: none; }
   .routes-page .head .selectors select, .routes-page #active-filter { min-width: 0; }
-  .routes-page #route-select { width: 130px; }
+  .routes-page #route-select { width: 180px; }
   .routes-page #run-select { width: 150px; }
-  .routes-page #view-select { width: 196px; }
+  .routes-page #view-select { width: 210px; }
   .routes-page #active-filter { width: 140px; }
 }
 .routes-page table.routes.days button[data-runday] { padding: 0 2px; white-space: nowrap; letter-spacing: -.01em; }
@@ -106,3 +106,8 @@ table.routes td:has(.cell-note) .pick-btn { display: none; }
 .pick-list { position: fixed; z-index: 50; display: flex; flex-direction: column; background: #fff; border: 1px solid #9fb3c8; border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, .18); padding: 2px; }
 .pick-list button { font: inherit; font-size: 16px; text-align: left; padding: 7px 12px; border: 0; background: transparent; color: var(--ink, #0f2238); cursor: pointer; white-space: nowrap; }
 .pick-list button:hover, .pick-list button.on { background: var(--band); color: var(--ud-blue); font-weight: 700; }
+/* Joe 10/22: Load Day and Run By pick lists on the Load Order list. */
+table.routes.seq select.seq-pick { width: 100%; max-width: 240px; font-size: 16px; padding: 4px 6px; border: 1px solid #9aa7b6; border-radius: 4px; background: #fff; color: inherit; }
+table.routes.seq td.seq-time-cell { position: relative; padding: 3px 4px; }
+table.routes.seq input.seq-time { width: 100%; max-width: 240px; box-sizing: border-box; font-size: 16px; text-align: center; padding: 4px 34px 4px 6px; border: 1px solid #9aa7b6; border-radius: 4px; background: #fff; color: inherit; }
+table.routes.seq input.seq-time.bad { border-color: var(--error-ink); background: var(--error-bg); }
