@@ -84,7 +84,7 @@
       document.getElementById('band').innerHTML =
         tile(f.late ? 'bad' : 'good', 'Forecast at ' + e(f.asOf), f.late ? '&#9888; ' + f.late + ' load' + (f.late === 1 ? '' : 's') + ' late' : '&#10003; On time',
           // A route with two loads late reads "909 Marietta L1, 909 Marietta L2", not "909, 909".
-          f.late ? e(lateList.map(x => U.routeNumber(x.route) + (lateList.filter(y => U.routeNumber(y.route) === U.routeNumber(x.route)).length > 1 && U.shortRun(x) ? ' ' + U.shortRun(x).replace(/\bLoad (\d+)$/, 'L$1') : '')).join(', ')) + (lateList.every(x => x.reason === lateList[0].reason) ? ' · ' + e(lateList[0].reason) : '') : f.loads.length ? 'every load done before it leaves and by 6:00 AM' : 'nothing left to load') +
+          f.late ? e(lateList.map(x => U.routeNumber(x.route) + (lateList.filter(y => U.routeNumber(y.route) === U.routeNumber(x.route)).length > 1 && U.shortRun(x) ? ' ' + U.shortRun(x).replace(/\bLoad (\d+)$/, 'L$1') : '')).join(', ')) + (lateList.every(x => x.reason === lateList[0].reason) ? ' · ' + e(lateList[0].reason) : '') : f.loads.length ? 'every load done before it leaves' : 'nothing left to load') +
         tile(f.due.late ? 'bad' : '', 'Due by ' + e(f.dueByText), f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's'), n(f.due.cases) + ' cases' + (f.due.loads ? ' · est. done <em>' + e(when(f.due.done, f.due.doneText, f.due.doneDay)) + '</em>' : '') + (f.due.late ? ' · ' + f.due.late + ' late' : '')) +
         tile(f.late ? 'bad' : '', 'All loads done', f.loads.length ? 'est. ' + e(when(f.allDone, f.allDoneText, f.allDoneDay)) : 'Done', f.loads.length + ' load' + (f.loads.length === 1 ? '' : 's') + ' · ' + n(f.casesLeft) + ' cases left');
       // Joe 10/20: no pace tile; nobody sees how the forecast is worked out.
@@ -113,7 +113,7 @@
           '<span class="fc-line">' + ticks.map(m => '<s style="left:' + x(m) + '"></s>').join('') +
           '<u class="' + (z.late ? 'late' : 'ok') + '" style="left:' + x(z.start) + ';width:calc(' + x(z.est) + ' - ' + x(z.start) + ')"></u>' +
           // Why it is late, beside its bar (before it when the bar is far right), so the row stays one line.
-          (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 100 - parseFloat(x(z.est)) ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" data-short="' + span(z.lateBy) + ' late" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.reason === 'misses dispatch' ? 'misses dispatch' : z.priorDay ? 'left over' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
+          (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 100 - parseFloat(x(z.est)) ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" data-short="' + span(z.lateBy) + ' late" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.priorDay ? 'left over' : z.reason === 'misses dispatch' ? 'misses dispatch' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
           (z.leaves !== null && z.leaves >= t0 && z.leaves <= t1 ? '<em class="dep' + (z.late && z.reason === 'misses dispatch' ? ' late' : '') + '" style="left:' + x(z.leaves) + '"></em>' : '') +
           (z.leaves !== null && z.leaves > t1 ? '<em class="far" title="Dispatch ' + dep + '">&#9656;</em>' : '') +
           '<em class="now" style="left:' + x(today) + '"></em></span></div>';
@@ -128,7 +128,7 @@
         // Joe 10/21: "we catch up, so it shouldn't be shaded all red": a time is red only for the loads that leave then and are late.
         f.byTime.map(t => '<tr class="' + (t.lateHere ? 'bad' : '') + '"><td>' + e(when(t.at, t.time, t.day)).replace(/ /g, '&nbsp;') + '</td><td class="num">' + t.loads + '</td><td class="num">' + n(t.cases) + '</td><td>' + (t.lateHere ? t.lateHere + ' late' : 'On time') + '</td></tr>').join('') +
         '</tbody></table>' : '<p class="fc-empty">Nothing left to load.</p>';
-      document.getElementById('how').textContent = 'Estimated. Late = done after its dispatch time or after the 6:00 AM shift end. Updates when a load starts or ends.';
+      document.getElementById('how').textContent = 'Estimated. Late = done after its dispatch time (a load with no dispatch time: after the 6:00 AM shift end). Updates when a load starts or ends.';
     }
 
     requireSignIn(async () => {

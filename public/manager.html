@@ -157,8 +157,8 @@
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash'),
         // Joe 10/19 (option t): the Late Forecast tile opens the Late Forecast screen.
-        x.forecast.late ? tile('forecast.html', 'Late Forecast', x.forecast.late, 'late', 'All done est. ' + x.forecast.allDoneText, null, 'bad')
-          : tile('forecast.html', 'Late Forecast', 'On time', '', x.forecast.loads.length ? 'All done est. ' + x.forecast.allDoneText : 'nothing left to load', null, 'good')]));
+        x.forecast.late ? tile('forecast.html', 'Late Forecast', x.forecast.late, 'late', 'All done est. ' + x.forecast.allDoneWhen, null, 'bad')
+          : tile('forecast.html', 'Late Forecast', 'On time', '', x.forecast.loads.length ? 'All done est. ' + x.forecast.allDoneWhen : 'nothing left to load', null, 'good')]));
       // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Production (each opens its screen with the walkthrough
       // bar). Joe 10/15 (later): each tile carries what it can fit: every trailer, cooler and line with its reading or when it
       // is due, problems first in red; the rest under "+ N more". A past-due check puts a flashing "past due" pill on the card.
@@ -243,9 +243,12 @@
         '<div class="mc-banner ' + (r.behind.length ? 'bad' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
         // Joe 10/20: how far behind, not the list of every late load.
         (r.forecast ? sect('Late forecast (estimated) at ' + r.forecast.asOf, r.forecast.late ? r.forecast.late + ' potentially late' : 'on time', r.forecast.late ? 'bad' : '',
-          (r.forecast.late ? [row('Behind', U.forecastSummary(r.forecast).behindText, 'bad')] : []).concat([
-            row('Due by ' + r.forecast.dueByText, r.forecast.due.loads + ' loads · ' + r.forecast.due.cases.toLocaleString('en-US') + ' cases' + (r.forecast.due.loads ? ' · est. done ' + r.forecast.due.doneText : ''), r.forecast.due.late ? 'bad' : ''),
-            row('All loads done', r.forecast.loads.length ? 'est. ' + r.forecast.allDoneText + ' · ' + r.forecast.casesLeft.toLocaleString('en-US') + ' cases left' : 'nothing left to load', r.forecast.late ? 'bad' : '')]), '') : '') +
+          // Joe 10/22 (option az): last night's left-over loads on their own line, then today's; every time has its day.
+          (r.forecast.late ? [row('Behind', U.forecastSummary(r.forecast).behindText, 'bad')] : []).concat(r.forecast.prior && r.forecast.prior.loads ? [
+            row('Left over from ' + r.forecast.prior.from, r.forecast.prior.loads + ' load' + (r.forecast.prior.loads === 1 ? '' : 's') + ' · ' + r.forecast.prior.cases.toLocaleString('en-US') + ' cases · est. done ' + r.forecast.prior.doneWhen, r.forecast.prior.late ? 'bad' : ''),
+            row('Today\'s loads', r.forecast.todayLate ? r.forecast.todayLate + ' late' : 'On time', r.forecast.todayLate ? 'bad' : '')] : []).concat([
+            row('Due by ' + (r.forecast.dueByWhen || r.forecast.dueByText), r.forecast.due.loads + ' loads · ' + r.forecast.due.cases.toLocaleString('en-US') + ' cases' + (r.forecast.due.loads ? ' · est. done ' + (r.forecast.due.doneWhen || r.forecast.due.doneText) : ''), r.forecast.due.late ? 'bad' : ''),
+            row('All loads done', r.forecast.loads.length ? 'est. ' + (r.forecast.allDoneWhen || r.forecast.allDoneText) + ' · ' + r.forecast.casesLeft.toLocaleString('en-US') + ' cases left' : 'nothing left to load', r.forecast.late ? 'bad' : '')]), '') : '') +
         '<section><h3>Routes<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em></h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +
         (notLoaded.length ? '<h4 class="bad">Not loaded (' + notLoaded.length + ')</h4><div class="mc-routes">' + notLoaded.join('') + '</div>' : '') + (r.totalLoads ? '' : '<p>No loads on the dispatch sheet for this day.</p>') + '</section>' +
         sect('Routes behind', r.behind.length, r.behind.length ? 'bad' : '', r.behind.map(z => row(U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.startedAt ? ' since ' + z.startedAt : '') + ' · ' + z.late + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : ''), 'bad')), 'No route is more than ' + r.behindMinutes + ' minutes past its depart time.') +

@@ -999,15 +999,21 @@
   }
   /* ---------- Late Forecast (Joe 10/19, option t) ---------- */
   // Joe 10/19 ("I need a forecast if the plant is going to be late… how fast they load, what they have to load and the dispatch
-  // time"): each case load still to load gets an estimated done time (Est. Done), taken in the plant's loading order at the
-  // plant's pace. A load is late when its Est. Done is after it leaves (the dispatch's own rule, departWall) or after the 6 a.m.
-  // shift end that follows its load day (the shift stops at 6 a.m., so a load not done by then is late even if it leaves later).
-  // Pace = cases an hour while loading. It compares the same weekday (last Monday night against this Monday night, up to 4
-  // weeks back) with tonight's finished loads; tonight counts for more while there are few past nights, and the past nights use
-  // the slowest one, a cushion for a slow night. A time under 15 minutes or over 3 hours is left out (a missed Start or End).
+  // time"): each case load still to load gets an estimated done time (Est. Done), taken in the plant's loading order, one after
+  // another from now. A load is late when its Est. Done is after it leaves (the dispatch's own rule, departWall); a load with
+  // no dispatch time is late after the 6 a.m. shift end that follows its load day.
   // Joe 10/20 ("a rule of thumb is 1,000 cases takes 1 hour"): a load's standard time is 1 hour for every 1,000 cases (never
-  // under 15 minutes), stretched or shrunk by the pace.
-  var FORECAST = { perCase: 0.06, minLoad: 15, usualRate: 1000, minMinutes: 15, maxMinutes: 180, shiftEnd: 360, dueBy: 300, historyWeight: 1.5, weeksBack: 4 };
+  // under 15 minutes).
+  // Joe 10/22 (7:36 AM report "About 8 hr 20 min behind" with nothing loaded yet; option az, fresh start at 6 AM): the speed
+  // used to come from the same weekday's earlier nights measured from one load's End to the next, so every wait for product
+  // counted as loading and the plant read about 300 cases an hour. Now each day starts fresh at the 6 a.m. roll on the 1,000
+  // rule (last night's left-over loads first, each with its own time); once 3 of today's loads have a real loading time (Start
+  // to End, 10 minutes to 3 hours; anything else is a missed or bunched press) today's own speed takes over from the rule.
+  // Joe 10/22 ("some kind of percentage of using past data until it builds up… 80% max… every week, let's increase that"):
+  // each load's time blends in its own route's real loading times from the same weekday's earlier nights (the plant's, when
+  // the route has none), 10% in the week of Sun 10-18-26 and 10% more each week, up to 80% from Sun 12-6-26.
+  var FORECAST = { perCase: 0.06, minLoad: 15, usualRate: 1000, minMinutes: 10, maxMinutes: 180, shiftEnd: 360, dueBy: 300, weeksBack: 4,
+    todayLoads: 3, historyStart: '2026-10-18', historyStep: 0.1, historyMax: 0.8 };
   function plainMinutes(cases) { return Math.max(FORECAST.minLoad, FORECAST.perCase * cases); }
   function forecastMinutes(cases, rate) { return plainMinutes(cases) * FORECAST.usualRate / rate; }
   // When a load was started and finished on the plant's wall clock. A start written as a time only takes the finish's day.
@@ -1017,13 +1023,15 @@
     if (start === null) { var t = clockMinutes(r.startedAt); if (t === null) return null; start = Math.floor(end / 1440) * 1440 + t; if (start > end) start -= 1440; }
     return { start: start, end: end };
   }
-  // A night's pace. Joe 10/20 ("no way we would be done at midnight"; "the more routes we have, the longer it's going to
-  // take"): measured from one load's End to the next load's End, so the time between loads (trailer changes, waiting on
-  // product) counts, not only the minutes a load was being loaded. Start times are not used, so a load whose Start and End
-  // were pressed together (1 or 5 minutes, Joe 10/20) cannot make the night look fast. A gap over 3 hours (a break or nothing
-  // to load) is left out. Given as cases an hour: the standard (1,000) stretched by how much longer the night ran.
   // A load's case count ("1,150" reads 1150); 0 when it has none yet.
   function casesOf(r) { var n = Number(String(r && r.quantity != null ? r.quantity : '').replace(/,/g, '')); return n > 0 ? n : 0; }
+  // A done case load's real loading time, Start to End, in minutes; null when it was not timed cleanly (no Start, Start and End
+  // pressed together, or longer than 3 hours).
+  function cleanMinutes(r) {
+    if (!r || r.area !== 'CASE' || r.state !== 'DONE') return null;
+    var s = loadSpan(r), m = s ? s.end - s.start : null;
+    return m !== null && m >= FORECAST.minMinutes && m <= FORECAST.maxMinutes ? m : null;
+  }
   // Joe 10/20: a load with no case count yet is sized from its own route's usual load (the middle of its counts on the same
   // weekday's earlier nights), not from the few loads counted so far tonight (often the big transfers).
   function usualSizes(history) {
@@ -1032,29 +1040,28 @@
     var out = {}; Object.keys(by).forEach(function (k) { out[k] = mid(by[k]); });
     return { of: function (r) { return out[key(r)] || 0; }, all: all.length ? mid(all) : 0 };
   }
-  // Joe 10/21: "We'll know exactly how long each route takes to load": each run's own time on the same weekday's earlier
-  // nights (from its finish to the one before it, the middle one), used more the more nights there are.
-  function routeTimes(history) {
-    var by = {}, key = function (r) { return text(r.route) + '|' + text(r.run); }, mid = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2; };
-    (history || []).forEach(function (h) {
-      var list = (h.loads || []).filter(function (r) { return r.area === 'CASE' && r.state === 'DONE' && wallMinutes(r.completedAt) !== null; })
-        .map(function (r) { return { r: r, end: wallMinutes(r.completedAt) }; }).sort(function (a, b) { return a.end - b.end; });
-      list.forEach(function (x, i) { var gap = i ? x.end - list[i - 1].end : null; if (gap !== null && gap >= 5 && gap <= FORECAST.maxMinutes) (by[key(x.r)] = by[key(x.r)] || []).push(gap); });
-    });
-    return function (r) { var g = by[key(r)]; return g && g.length ? { minutes: mid(g), nights: g.length } : null; };
-  }
-  function nightPace(loads) {
-    var list = (loads || []).filter(function (r) { return r.area === 'CASE' && r.state === 'DONE' && wallMinutes(r.completedAt) !== null; })
-      .map(function (r) { return { r: r, end: wallMinutes(r.completedAt) }; }).sort(function (a, b) { return a.end - b.end; });
+  // Cases an hour over a list of cleanly timed loads: the standard (1,000) stretched by how much longer they really took.
+  // A load with no case count counts as 600 cases.
+  function cleanPace(loads) {
     var real = 0, std = 0, n = 0, cases = 0;
-    list.forEach(function (x, i) {
-      if (!i) return;
-      var gap = x.end - list[i - 1].end, c = casesOf(x.r);
-      if (gap > FORECAST.maxMinutes) return;
-      real += gap; std += plainMinutes(c || 600); n++; cases += c;
-    });
-    if (!n || real < FORECAST.minMinutes) return null;
-    return { rate: Math.round(FORECAST.usualRate * std / real), loads: n, cases: cases };
+    (loads || []).forEach(function (r) { var m = cleanMinutes(r); if (m === null) return; var c = casesOf(r); real += m; std += plainMinutes(c || 600); n++; cases += c; });
+    return n ? { rate: Math.round(FORECAST.usualRate * std / real), loads: n, cases: cases } : null;
+  }
+  // A night's speed (its cleanly timed case loads), null when none was timed cleanly.
+  function nightPace(loads) { return cleanPace(loads); }
+  // Joe 10/21: "We'll know exactly how long each route takes to load": each run's own speed on the same weekday's earlier nights.
+  function routePaces(history) {
+    var by = {}, key = function (r) { return text(r.route) + '|' + text(r.run); };
+    (history || []).forEach(function (h) { (h.loads || []).forEach(function (r) { if (cleanMinutes(r) !== null) (by[key(r)] = by[key(r)] || []).push(r); }); });
+    return function (r) { var g = by[key(r)]; return g ? cleanPace(g) : null; };
+  }
+  // How much of a load's time comes from past nights on operating day `date`: 10% in the week of historyStart, 10% more each
+  // week (weeks start Sunday), never over 80%.
+  function historyShare(date) {
+    var d = dayNum(date), s = dayNum(FORECAST.historyStart);
+    if (d === null || s === null || d < s) return FORECAST.historyStep;
+    var weeks = Math.floor((d - s) / 7) + 1;
+    return Math.min(FORECAST.historyMax, Math.round(weeks * FORECAST.historyStep * 100) / 100);
   }
   // The same weekday's earlier operating days to compare with (date - 7, - 14, …).
   function forecastNights(date) { var n = dayNum(date), out = []; for (var w = 1; w <= FORECAST.weeksBack && n !== null; w++) out.push(dayKey(n - 7 * w)); return out; }
@@ -1065,23 +1072,19 @@
   function loadForecast(input, nowMs) {
     var now = wallClock(nowMs), date = text(input.date), dueBy = input.dueBy === undefined || input.dueBy === null || input.dueBy === '' ? FORECAST.dueBy : Number(input.dueBy);
     var loads = (input.loads || []).filter(function (r) { return r.area === 'CASE'; });
-    var tonight = nightPace(loads.filter(function (r) { return !r.prior; }));
+    var today = cleanPace(loads.filter(function (r) { return !r.prior; }));
     var nights = (input.history || []).map(function (h) { var p = nightPace(h.loads); return p ? { date: text(h.date), label: dayShort(dayNum(h.date) * 1440) + ' ' + dateShort(h.date), rate: p.rate, loads: p.loads } : null; })
       .filter(Boolean).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-    // Joe 10/21 ("tighten our times up"): the usual night (the middle of the earlier nights), not the slowest one.
-    var byRate = nights.slice().sort(function (a, b) { return a.rate - b.rate; }), slow = byRate.length ? byRate[Math.floor((byRate.length - 1) / 2)] : null, weight = 0, rate, from;
-    if (slow && byRate.length % 2 === 0) slow = { date: slow.date, label: slow.label, loads: slow.loads, rate: Math.round((slow.rate + byRate[byRate.length / 2].rate) / 2) };
-    if (tonight && slow) { weight = tonight.loads / (tonight.loads + FORECAST.historyWeight * nights.length); rate = Math.round(weight * tonight.rate + (1 - weight) * slow.rate); from = 'both'; }
-    else if (tonight) { weight = 1; rate = tonight.rate; from = 'tonight'; }
-    else if (slow) { rate = slow.rate; from = 'history'; }
-    else { rate = FORECAST.usualRate; from = 'usual'; }
-    var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history), own = routeTimes(input.history), usual = slow ? slow.rate : rate;
+    var past = cleanPace([].concat.apply([], (input.history || []).map(function (h) { return h.loads || []; })));
+    var useToday = !!today && today.loads >= FORECAST.todayLoads, rate = useToday ? today.rate : FORECAST.usualRate, from = useToday ? 'today' : 'rule';
+    var share = past ? historyShare(date) : 0, ownPace = routePaces(input.history);
+    var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history);
     var usualCases = sizes.all || (counted.length ? Math.round(counted.reduce(function (a, b) { return a + b; }, 0) / counted.length) : 600);
     var open = loads.filter(function (r) { return r.state !== 'DONE'; }), out = [], cursor = now;
     var item = function (r) {
-      var cases = casesOf(r), minutes = forecastMinutes(cases || sizes.of(r) || usualCases, rate), t = own(r);
-      // A run's own past time, at tonight's pace, counts for as many shares as nights it was seen (the size rule for one share).
-      if (t) minutes = (t.minutes * usual / rate * t.nights + minutes) / (t.nights + 1);
+      var cases = casesOf(r), size = cases || sizes.of(r) || usualCases, minutes = forecastMinutes(size, rate);
+      // The run's own past speed (the plant's when it has none), for this week's share.
+      if (share) { var p = ownPace(r) || past; minutes = (1 - share) * minutes + share * forecastMinutes(size, p.rate); }
       minutes = Math.round(minutes);
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) });
       var loadDay = dayNum(r.loadDate), shiftEnd = loadDay === null ? null : (loadDay + 1) * 1440 + FORECAST.shiftEnd;
@@ -1101,11 +1104,12 @@
     });
     open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
     out.forEach(function (x) {
-      var dispatchLate = x.leaves !== null && x.est > x.leaves, shiftLate = x.shiftEnd !== null && x.est > x.shiftEnd;
-      var deadline = x.leaves === null ? x.shiftEnd : x.shiftEnd === null ? x.leaves : Math.min(x.leaves, x.shiftEnd);
+      // Joe 10/22 ("Route 8302 being late, but the dispatch time is 9 a.m., so that's not late"): a load is late only when it is
+      // done after its own dispatch time; the 6:00 AM shift end counts only for a load with no dispatch time.
+      var deadline = x.leaves === null ? x.shiftEnd : x.leaves;
       x.estText = minutesText12(((x.est % 1440) + 1440) % 1440); x.estDay = dayShort(x.est);
-      x.late = dispatchLate || shiftLate;
-      x.reason = !x.late ? '' : deadline === x.leaves && dispatchLate ? 'misses dispatch' : 'past the 6:00 AM shift end';
+      x.late = deadline !== null && x.est > deadline;
+      x.reason = !x.late ? '' : x.leaves !== null ? 'misses dispatch' : 'past the 6:00 AM shift end';
       // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
       // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
       x.lateBy = !x.late ? 0 : x.priorDay ? Math.min(x.est - deadline, x.est - Math.max(x.start, now)) : x.est - deadline;
@@ -1119,18 +1123,23 @@
     times.sort(function (a, b) { return a - b; });
     var byTime = times.map(function (t) { var d = out.filter(function (x) { return x.leaves !== null && x.leaves <= t; }); return { at: t, day: dayShort(t), time: minutesText12(((t % 1440) + 1440) % 1440), loads: d.length, cases: sum(d), late: d.filter(function (x) { return x.late; }).length, lateHere: d.filter(function (x) { return x.late && x.leaves === t; }).length }; });
     var allDone = last(out), dueDone = last(due), timed = function (m) { return m === null ? '' : minutesText12(((m % 1440) + 1440) % 1440); };
-    return { asOf: zoned(nowMs, { hour: 'numeric', minute: '2-digit' }), now: now, date: date, rate: rate, from: from, weight: Math.round(weight * 100) / 100,
-      tonight: tonight, nights: nights, slow: slow ? slow.label : '', loads: out, late: late.length, behind: forecastBehind({ loads: out }),
-      dueBy: dueBy, dueByText: minutesText12(dueBy), dueAt: dueAt, due: { loads: due.length, cases: sum(due), late: due.filter(function (x) { return x.late; }).length, done: dueDone, doneText: timed(dueDone), doneDay: dueDone === null ? '' : dayShort(dueDone) },
-      allDone: allDone, allDoneText: timed(allDone), allDoneDay: allDone === null ? '' : dayShort(allDone), casesLeft: sum(out), byTime: byTime, paceText: forecastPaceText({ from: from, nights: nights, tonight: tonight }) };
+    // Joe 10/22 (option az): every time says its day ("Fri 9:00 AM", not "9:00 AM"), and last night's left-over loads have a line.
+    var dayTime = function (m) { return m === null ? '' : dayShort(m) + ' ' + timed(m); };
+    var prior = out.filter(function (x) { return x.priorDay; }), priorDone = last(prior), todays = out.filter(function (x) { return !x.priorDay; });
+    var priorDate = prior.length ? prior[0].loadDate : '';
+    return { asOf: zoned(nowMs, { hour: 'numeric', minute: '2-digit' }), now: now, date: date, rate: rate, from: from, share: share,
+      today: today, nights: nights, loads: out, late: late.length, behind: forecastBehind({ loads: out }),
+      dueBy: dueBy, dueByText: minutesText12(dueBy), dueByWhen: dayShort(dueAt) + ' ' + minutesText12(dueBy), dueAt: dueAt,
+      due: { loads: due.length, cases: sum(due), late: due.filter(function (x) { return x.late; }).length, done: dueDone, doneText: timed(dueDone), doneDay: dueDone === null ? '' : dayShort(dueDone), doneWhen: dayTime(dueDone) },
+      prior: { loads: prior.length, cases: sum(prior), late: prior.filter(function (x) { return x.late; }).length, from: priorDate ? leftFrom(priorDate) : '', done: priorDone, doneWhen: dayTime(priorDone) },
+      todayLate: todays.filter(function (x) { return x.late; }).length, todayLoads: todays.length,
+      allDone: allDone, allDoneText: timed(allDone), allDoneDay: allDone === null ? '' : dayShort(allDone), allDoneWhen: dayTime(allDone), casesLeft: sum(out), byTime: byTime,
+      paceText: forecastPaceText({ from: from, today: today, share: share, nights: nights }) };
   }
-  // Where the pace came from, in words: "Mon 10-5, Mon 10-12 + tonight (5 loads), slow-night cushion".
+  // Where the speed came from, in words (for the people who set it up; the report never shows it).
   function forecastPaceText(f) {
-    var past = (f.nights || []).map(function (n) { return n.label; }).join(', ');
-    if (f.from === 'both') return past + ' + tonight (' + f.tonight.loads + ' load' + (f.tonight.loads === 1 ? '' : 's') + '), slow-night cushion';
-    if (f.from === 'tonight') return 'tonight only (' + f.tonight.loads + ' load' + (f.tonight.loads === 1 ? '' : 's') + '), no past ' + 'nights yet';
-    if (f.from === 'history') return past + ', slow-night cushion (nothing finished tonight yet)';
-    return 'the plant\'s usual pace (no timed loads yet)';
+    var base = f.from === 'today' ? 'today\'s speed (' + f.today.loads + ' loads)' : '1,000 cases an hour';
+    return base + (f.share ? ' + ' + Math.round(f.share * 100) + '% past nights (' + (f.nights || []).map(function (n) { return n.label; }).join(', ') + ')' : '');
   }
   // Joe 10/20: how far behind the forecast is: the most any load runs past when it is needed, rounded up to 5 minutes.
   function forecastBehind(f) {
@@ -1185,8 +1194,12 @@
       L.push('LATE FORECAST (ESTIMATED) AT ' + f.asOf + ': ' + (f.late ? f.late + ' load' + (f.late === 1 ? '' : 's') + ' potentially late' : 'all loads on time'));
       if (sm.behindText) L.push('  ' + sm.behindText);
       if (sm.changeText) L.push('  ' + sm.changeText);
-      L.push('  Due by ' + f.dueByText + ': ' + f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases' + (f.due.loads ? ', est. done ' + f.due.doneText : ''));
-      if (f.loads.length) L.push('  All loads done: est. ' + f.allDoneText + ' · ' + f.casesLeft.toLocaleString('en-US') + ' cases left');
+      if (f.prior && f.prior.loads) {
+        L.push('  Left over from ' + f.prior.from + ': ' + f.prior.loads + ' load' + (f.prior.loads === 1 ? '' : 's') + ', ' + f.prior.cases.toLocaleString('en-US') + ' cases, est. done ' + f.prior.doneWhen);
+        L.push('  Today\'s loads: ' + (f.todayLate ? f.todayLate + ' late' : 'on time'));
+      }
+      L.push('  Due by ' + (f.dueByWhen || f.dueByText) + ': ' + f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases' + (f.due.loads ? ', est. done ' + (f.due.doneWhen || f.due.doneText) : ''));
+      if (f.loads.length) L.push('  All loads done: est. ' + (f.allDoneWhen || f.allDoneText) + ' · ' + f.casesLeft.toLocaleString('en-US') + ' cases left');
       L.push('');
     }
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
@@ -1259,7 +1272,7 @@
     // when they will be done, when every load will be done and the cases left (estimated, so it says so). Joe 10/20: no pace,
     // cases an hour or which nights it came from: the group does not see how the forecast is worked out.
     function forecastBox(f) {
-      var bad = f.late > 0, line = function (a, b, k) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + INK + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + a + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + b + '</td></tr>'; };
+      var bad = f.late > 0, line = function (a, b, k, c) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + (c || INK) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + a + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + b + '</td></tr>'; };
       var sm = forecastSummary(f), dueWord = f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases';
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + (bad ? '#fde8e6' : '#e2f4ea') + ';border-left:5px solid ' + (bad ? RED : GREEN) + ';padding:10px 12px">' +
         '<div style="font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (bad ? RED : GREEN) + '">Forecast at ' + e(f.asOf) + ' (estimated)</div>' +
@@ -1267,8 +1280,11 @@
         (sm.behindText ? '<div style="font-size:17px;font-weight:800;margin-top:4px;color:' + RED + '">' + e(sm.behindText) + '</div>' : '') +
         (sm.changeText ? '<div style="font-size:16px;font-weight:800;margin-top:4px;color:' + (sm.change > 0 ? GREEN : sm.change < 0 ? RED : GREY) + '">' + (sm.change > 0 ? '&#9650; ' : sm.change < 0 ? '&#9660; ' : '') + e(sm.changeText) + '</div>' : '') +
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:6px">' +
-        line('Due by ' + e(f.dueByText) + ': ' + e(dueWord), f.due.loads ? 'est. ' + e(f.due.doneText) : '&ndash;', f.due.late > 0) +
-        (f.loads.length ? line('All loads done', 'est. ' + e(f.allDoneText), bad) + line('Cases left', e(f.casesLeft.toLocaleString('en-US')), false) : line('All loads done', 'nothing left', false)) +
+        // Joe 10/22 (option az): last night's left-over loads on their own line, then how today's loads stand; every time has its day.
+        (f.prior && f.prior.loads ? line('Left over from ' + e(f.prior.from) + ': ' + f.prior.loads + ' load' + (f.prior.loads === 1 ? '' : 's') + ', ' + f.prior.cases.toLocaleString('en-US') + ' cases', 'est. ' + e(f.prior.doneWhen), f.prior.late > 0, '#9a5b00') +
+          line('Today\'s loads', f.todayLate ? f.todayLate + ' late' : 'On time', f.todayLate > 0) : '') +
+        line('Due by ' + e(f.dueByWhen || f.dueByText) + ': ' + e(dueWord), f.due.loads ? 'est. ' + e(f.due.doneWhen || f.due.doneText) : '&ndash;', f.due.late > 0) +
+        (f.loads.length ? line('All loads done', 'est. ' + e(f.allDoneWhen || f.allDoneText), bad) + line('Cases left', e(f.casesLeft.toLocaleString('en-US')), false) : line('All loads done', 'nothing left', false)) +
         '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
@@ -1345,7 +1361,7 @@
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff">' + H.join('') + '</table></body></html>';
   }
 
-  return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
+  return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
