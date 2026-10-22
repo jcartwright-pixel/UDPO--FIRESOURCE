@@ -322,3 +322,26 @@ test('the morning after a slow night: left-over loads on their own line, today o
   assert.match(r.text, /Left over from Wed 10-21-26: 2 loads, 1,700 cases, est\. done Thu \d+:\d\d AM/);
   assert.match(r.text, /Today's loads: on time/);
 });
+
+// Joe 10/22 ("When these are paused, you're showing time like total time. That shouldn't count as loading time"): paused
+// minutes never count as loading time, on Total Time or in the forecast's past speed.
+test('paused minutes are not loading time: Total Time, the clean loading time and a pause from an older note', () => {
+  const at = (hm) => Date.parse(iso(MON, hm));
+  // Started 2:00 PM, paused 2:30 PM, still paused at 7:00 PM: 4 h 30 min of it paused.
+  const paused = { startedAt: iso(MON, '14:00'), paused: true, pauseMark: { at: iso(MON, '14:30'), minutes: 0 } };
+  assert.equal(R.pausedMinutes(paused, NOW), 270);
+  // A load paused before pauses were timed: its last "Paused" note says when.
+  assert.equal(R.pausedMinutes({ startedAt: iso(MON, '10:00'), paused: true, notes: 'Paused 10/19, 11:37 AM: No buttermilk\nPaused 10/19, 2:43 PM: No skim', pauseMark: null }, NOW), 257);
+  assert.equal(R.pausedMinutes({ startedAt: iso(MON, '10:00'), paused: true, notes: 'Not started yet' }, NOW), 0, 'no note: nothing known to take off');
+  // Pause, resume, pause again, resume: both pauses add up; a new pause starts its own clock.
+  let m = R.nextPauseMark({ startedAt: iso(MON, '14:00'), paused: false }, true, false, new Date(at('14:30')).toISOString());
+  m = R.nextPauseMark({ startedAt: iso(MON, '14:00'), paused: true, pauseMark: m }, false, false, new Date(at('15:00')).toISOString());
+  assert.deepEqual(m, { at: '', minutes: 30 });
+  m = R.nextPauseMark({ startedAt: iso(MON, '14:00'), paused: false, pauseMark: m }, true, false, new Date(at('16:00')).toISOString());
+  m = R.nextPauseMark({ startedAt: iso(MON, '14:00'), paused: true, pauseMark: m }, false, false, new Date(at('16:20')).toISOString());
+  assert.deepEqual(m, { at: '', minutes: 50 });
+  assert.deepEqual(R.nextPauseMark({ paused: false, pauseMark: m }, false, true, iso(MON, '17:00')), { at: '', minutes: 0 }, 'back to waiting starts over');
+  // Start 2:00 PM to End 4:20 PM with 50 paused minutes: 90 minutes of loading for the forecast's past speed.
+  assert.equal(R.cleanMinutes(done('852', '14:00', '16:20', 1150, { pauseMark: m })), 90);
+  assert.equal(R.cleanMinutes(done('852', '14:00', '16:20', 1150)), 140);
+});

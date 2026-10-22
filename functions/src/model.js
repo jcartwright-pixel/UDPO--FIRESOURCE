@@ -92,7 +92,9 @@ const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver',
   'moveMark',
   // Joe 10/19 (800 Specials: "could be totes, could be cases, could be anything"): the day's own load type, which picks the loadout it
   // goes to (Case, Totes, Boxes, Tanker), and whether it was picked by hand on Daily Dispatch (a Route Editor change then leaves it).
-  'loadType', 'loadTypeByHand']);
+  'loadType', 'loadTypeByHand',
+  // Joe 10/22: when a paused load's pause began and the minutes of its earlier pauses (plant-rules pauseMark), so pauses are not loading time.
+  'pauseMark']);
 // Joe 10/13 (Sheet conflicts, route 906): the real Live week tabs have no coverage_owner column. "Run By" lives in Route Master;
 // on Live rows it stays in the app and is never written to the sheet.
 const APP_ONLY_RUN_FIELDS = Object.freeze(['coverageOwner']);

@@ -129,7 +129,7 @@
     w = w || {};
     var st = text(w.state).toUpperCase();
     return { state: st === 'COMPLETE' ? 'COMPLETE' : st === 'WORKING' || st === 'PAUSED' ? st : 'WAITING', count: text(w.count), temperature: text(w.temperature), notes: text(w.notes),
-      startedAt: text(w.startedAt), startedBy: text(w.startedBy), completedAt: text(w.completedAt), completedBy: text(w.completedBy) };
+      startedAt: text(w.startedAt), startedBy: text(w.startedBy), completedAt: text(w.completedAt), completedBy: text(w.completedBy), pauseMark: w.pauseMark || null };
   }
 
   function scheduleEntries(docs, laneName) {
@@ -252,7 +252,7 @@
       var w = x.work || {}, n = Number(w.count);
       extra.push({ id: 'sch:' + x.id, sched: x, area: kind, prior: false, route: (x.slot && x.slot.route) || x.route, run: loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
         driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
-        state: scheduleLoadState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '' });
+        state: scheduleLoadState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '', notes: w.notes || '', pauseMark: w.pauseMark || null });
     });
     extra.sort(function (a, b) { return (a.sched.pickupTime || '99:99').localeCompare(b.sched.pickupTime || '99:99'); });
     return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r; }).concat(extra);
@@ -389,6 +389,35 @@
     var h = Number(m[1]), ap = String(m[3] || '').toUpperCase();
     if (ap) { if (h === 12) h = 0; if (ap === 'PM') h += 12; }
     return h * 60 + Number(m[2]);
+  }
+  // Joe 10/22 ("When these are paused, you're showing time like total time. That shouldn't count as loading time"): the minutes a
+  // load sat paused never count as loading time. pauseMark = { at: when the pause now running began ('' when not paused),
+  // minutes: the earlier pauses added up }. A load paused before pauses were timed takes its pause start from its last
+  // "Paused 10/22, 2:43 PM:" note.
+  function pauseStart(r) {
+    var at = wallMinutes(r.pauseMark && r.pauseMark.at), found = null, re = /Paused (\d{1,2})\/(\d{1,2}), (\d{1,2}):(\d{2})\s*([AP]M):/gi, x;
+    if (at !== null) return at;
+    while ((x = re.exec(text(r.notes)))) found = x;
+    if (!found) return null;
+    var s = wallMinutes(r.startedAt), year = s === null ? new Date().getUTCFullYear() : dayKey(Math.floor(s / 1440)).slice(0, 4);
+    return wallMinutes(found[1] + '/' + found[2] + '/' + year + ' ' + found[3] + ':' + found[4] + ' ' + found[5]);
+  }
+  // A load's paused minutes so far (r = a loadout row: startedAt, notes, paused, pauseMark).
+  function pausedMinutes(r, nowMs) {
+    var done = Math.max(0, Number(r && r.pauseMark && r.pauseMark.minutes) || 0);
+    if (!r || !r.paused) return done;
+    var s = pauseStart(r), started = wallMinutes(r.startedAt);
+    if (s === null) return done;
+    if (started !== null && s < started) s = started;
+    return done + Math.max(0, wallClock(nowMs === undefined ? Date.now() : nowMs) - s);
+  }
+  // The pauseMark a save leaves: r = the load before the save; paused = paused after it; waiting = back to not started (the
+  // count starts over). A pause that ends adds its minutes; a new pause starts its clock at `stamp`.
+  function nextPauseMark(r, paused, waiting, stamp) {
+    var m = (r && r.pauseMark) || {}, minutes = Math.max(0, Number(m.minutes) || 0);
+    if (waiting) return { at: '', minutes: 0 };
+    if (r && r.paused) return paused ? { at: text(m.at), minutes: minutes } : { at: '', minutes: pausedMinutes(r, Date.parse(stamp)) };
+    return { at: paused ? stamp : '', minutes: minutes };
   }
   function yardLoaded(day) {
     var loaded = text(day.loadedComplete).toUpperCase();
@@ -1025,11 +1054,11 @@
   }
   // A load's case count ("1,150" reads 1150); 0 when it has none yet.
   function casesOf(r) { var n = Number(String(r && r.quantity != null ? r.quantity : '').replace(/,/g, '')); return n > 0 ? n : 0; }
-  // A done case load's real loading time, Start to End, in minutes; null when it was not timed cleanly (no Start, Start and End
+  // A done case load's real loading time, Start to End less its paused minutes; null when it was not timed cleanly (no Start, Start and End
   // pressed together, or longer than 3 hours).
   function cleanMinutes(r) {
     if (!r || r.area !== 'CASE' || r.state !== 'DONE') return null;
-    var s = loadSpan(r), m = s ? s.end - s.start : null;
+    var s = loadSpan(r), m = s ? s.end - s.start - pausedMinutes(r) : null;
     return m !== null && m >= FORECAST.minMinutes && m <= FORECAST.maxMinutes ? m : null;
   }
   // Joe 10/20: a load with no case count yet is sized from its own route's usual load (the middle of its counts on the same
@@ -1100,7 +1129,7 @@
     open = open.filter(loadingNow).concat(open.filter(function (r) { return !loadingNow(r) && r.prior; }), open.filter(function (r) { return !loadingNow(r) && !r.prior; }));
     open.filter(loadingNow).forEach(function (r) {
       var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
-      x.start = s ? s.start : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
+      x.start = s ? s.start + pausedMinutes(r, nowMs) : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
     });
     open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
     out.forEach(function (x) {
@@ -1361,7 +1390,7 @@
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff">' + H.join('') + '</table></body></html>';
   }
 
-  return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
+  return { pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
