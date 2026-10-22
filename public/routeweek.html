@@ -159,23 +159,33 @@
     document.getElementById('hol-pick').onchange = (e) => { holPick = e.target.value; render(); };
     // Move to: the load comes off the holiday and runs on the day picked (Not running: off only). Changing it again puts
     // the old day back first; the blank choice puts the load back on the holiday. One save per day changed, as the boxes do.
-    document.getElementById('hol-list').addEventListener('change', async (e) => {
+    // Picks made quickly one after another are worked out one at a time, each from the load as it is shown then (a second pick
+    // read the load while the first was still saving, and the blank choice could leave it Not running).
+    let holChain = Promise.resolve();
+    const setDay = (id, p, on) => { const r = runs.find(x => x.id === id); return r && runsOn(r, p) !== on ? toggle(r, p) : Promise.resolve(); };
+    document.getElementById('hol-list').addEventListener('change', (e) => {
       const sel = e.target.closest('select'), hol = holiday();
-      const r = sel && hol && runs.find(x => x.id === sel.closest('[data-id]').dataset.id);
-      if (!r || !canSave()) return;
-      const want = sel.value, was = runsOn(r, hol.p) ? null : movedTo(r, hol);
+      const id = sel && hol && sel.closest('[data-id]').dataset.id;
+      if (!id || !runs.some(x => x.id === id) || !canSave()) return;
+      const want = sel.value;
+      holChain = holChain.then(() => movePick(id, hol, want)).catch(() => {});
+    });
+    async function movePick(id, hol, want) {
+      const now = () => runs.find(x => x.id === id);
+      if (!now()) return;
+      const was = runsOn(now(), hol.p) ? null : movedTo(now(), hol);
       try {
-        if (was) await toggle(r, was);
-        if (want === '') { if (!runsOn(r, hol.p)) await toggle(r, hol.p); return; }
-        if (runsOn(r, hol.p)) await toggle(r, hol.p);
-        if (want !== 'off' && !runsOn(r, want)) await toggle(r, want);
+        if (was && was !== want) await setDay(id, was, false);
+        if (want === '') { await setDay(id, hol.p, true); return; }
+        await setDay(id, hol.p, false);
+        if (want !== 'off') await setDay(id, want, true);
       } catch (err) { return; /* the save puts the day back and shows why */ }
       // The week's reason, when none is typed yet, becomes the holiday's name.
       if (weekDoc && !weekDoc.overrideReason && !typing) {
         weekDoc.overrideReason = hol.name; render();
         try { await save('setWeekReason', { weekStart: week, reason: hol.name }); } catch (err) { weekDoc.overrideReason = ''; render(); showError('The week reason was not saved (' + (err.message || String(err)) + '). Type it in the Reason box.'); }
       }
-    });
+    }
     document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { show = b.dataset.show; render(); });
     // Reset Week to Normal: every changed day goes back to Route Master's normal week, one save each.
     // A second click within 6 seconds confirms, as on the current screen (the button says so, nothing pops up).

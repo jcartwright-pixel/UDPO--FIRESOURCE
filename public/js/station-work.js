@@ -560,7 +560,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (fields.count !== undefined) fields.count = fields.count.replace(/,/g, '');
     if (fields.count && !/^\d+$/.test(fields.count)) { showError('Type a whole number for ' + (lane === 'RECEIVING' ? 'cases / pallets in' : 'boxes') + '.'); return; }
     if (step === 'save' && !Object.keys(fields).length) { showError('Nothing changed on ' + x.route + ' ' + (x.run || '') + '.'); return; }
-    const work = Object.assign({}, fields, { state: step === 'complete' ? 'COMPLETE' : step === 'pause' || (step === 'save' && x.work.state === 'PAUSED') ? 'PAUSED' : 'WORKING' });
+    // A save keeps the load as it was (Joe 10/22: typing a trailer never starts it); Start, Pause and Complete change it.
+    const work = Object.assign({}, fields, { state: step === 'complete' ? 'COMPLETE' : step === 'pause' ? 'PAUSED' : step === 'save' ? (x.work.state === 'PAUSED' || x.work.state === 'WORKING' ? x.work.state : 'WAITING') : 'WORKING' });
     delete work.trailer;
     const shown = { work };
     if (fields.trailer !== undefined) shown.trailer = fields.trailer;
