@@ -527,6 +527,9 @@ function reeferTrips(prev, loaded, units, at) {
   return { trips };
 }
 const round1 = (n) => n === null ? null : Math.round(n * 10) / 10;
+// Joe 10/22: the reefer's own "no reading" value is exactly 32°F. RefrigerationTemp's range is -3,276.8 to 3,276.7 °C, so a value
+// at either end (far outside any reefer, beyond NO_READING_F) means "not available", and is not a reading.
+const STUCK_TEMP_F = 32, NO_READING_F = 300;
 const TEMPS_SHARED_MINUTES = 30;
 // Every unit's refrigeration temperatures since a time, read once per run and shared by the recording and All Fleet Units.
 async function trailerTemps(db, d, o, token, cache, since, at) {
@@ -537,7 +540,7 @@ async function trailerTemps(db, d, o, token, cache, since, at) {
   const rows = [];
   (await execute(d, o, token, TEMPLATES.reefer.name, { Since: fleetTime(new Date(since)), Until: fleetTime(new Date(at)) })).forEach(r => {
     const when = utcIso(r.Time), temp = num(r.TempF);
-    if (when && temp !== null) rows.push({ unitId: String(r.UnitId), at: when, ms: Date.parse(when), tempF: round1(temp) });
+    if (when && temp !== null && Math.abs(temp) < NO_READING_F) rows.push({ unitId: String(r.UnitId), at: when, ms: Date.parse(when), tempF: round1(temp) });
   });
   Object.assign(cache, { rows, since });
   return rows;
@@ -551,7 +554,7 @@ async function pullReefer(db, d, o, token, trucks, at, cache) {
   const prev = (await tripsRef.get()).data() || {};
   const step = reeferTrips(prev, holds, units, at);
   const open = Object.keys(step.trips).map(k => step.trips[k]).filter(t => t.recording && t.unitId);
-  const readings = {};
+  const readings = {}, series = {};
   if (open.length) {
     // Joe 10/19: trailers' GPS units send far less often than every 5 minutes (a parked trailer can go an hour or more). Every
     // unit is read by time only (Joe 10/21), so the read carries on from the last one (10 minutes overlap), or goes back
@@ -564,13 +567,18 @@ async function pullReefer(db, d, o, token, trucks, at, cache) {
       if (!t) return;
       const best = readings[t.trailer];
       if (!best || r.at > best.at) readings[t.trailer] = { at: r.at, tempF: r.tempF };
+      (series[t.trailer] = series[t.trailer] || []).push(r);
     });
   }
   const docs = {}, log = {}, before = prev.trips || {};
   Object.keys(step.trips).forEach(k => {
     const t = step.trips[k], r = readings[k], old = before[k] || {};
     if (r && r.at > (t.readingAt || '') && t.recording) {
-      Object.assign(t, { tempF: r.tempF, readingAt: r.at });
+      // Joe 10/22: a reefer with no real reading sends exactly 32°F. flatSince = when the unbroken run of exactly-32 readings
+      // began (every reading since then was 32); any other reading ends it. Yard Checks calls it a fault after a while.
+      let flat = t.flatSince || '';
+      series[k].filter(x => x.at > (t.readingAt || '')).sort((a, b) => a.ms - b.ms).forEach(x => { flat = x.tempF === STUCK_TEMP_F ? flat || x.at : ''; });
+      Object.assign(t, { tempF: r.tempF, readingAt: r.at, flatSince: flat });
       log[safeIdPart(k + '_' + r.at.replace(/[^0-9]/g, '').slice(0, 14))] = { trailer: k, date: nyDate(r.at), at: r.at, tempF: r.tempF, routeRun: t.routeRun, tripId: t.id, tag: t.tag || '', where: t.where || '', speedMph: t.speedMph === undefined ? null : t.speedMph };
     }
     if (JSON.stringify(old) !== JSON.stringify(t)) docs[safeIdPart(k)] = Object.assign({}, t, { tempF: t.tempF === undefined ? null : t.tempF, readingAt: t.readingAt || '', updatedAt: at });

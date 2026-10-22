@@ -119,7 +119,7 @@
     function build() {
       const now = Date.now(), journal = data.journal, todays = journal.filter(d => d.date === date);
       const loads = P.loadoutRows(data.runs, date);
-      const yard = U.yardQueue(data.runs, journal, date, now);
+      const yard = U.yardQueue(data.runs, journal, date, now, data.gps);
       const done = P.counts(loads), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
       const wash = P.washItems(date, data.wash, data.appWash, todays), seen = {};
       let repeat = 0;
@@ -337,6 +337,8 @@
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
       onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
+      // Joe 10/22: a loaded trailer whose GPS temperature is in range needs no yard check (the same rule as Yard Checks).
+      onSnapshot(collection(db, 'gpsReefer'), s => { data.gps = {}; s.docs.forEach(d => { const r = d.data(); data.gps[U.yardTrailer(r.trailer || d.id)] = r; }); later(); }, () => {});
       onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
       watchRound(db, at => { data.roundStart = at; later(); });
       watchWashRequests(db, L.weekStart(today()), r => { data.wash = r; later(); }, fail('the wash list'), 'plantWash');
