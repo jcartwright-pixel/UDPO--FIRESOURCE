@@ -37,7 +37,8 @@ const SDK = path.dirname(require.resolve('firebase/package.json'));
     const pg = await ctx.newPage();
     const errors = [];
     pg.on('pageerror', e => errors.push(e.message));
-    if (email) { await pg.goto(HOSTING + '/index.html?testEmail=' + email); await pg.waitForFunction(() => !document.getElementById('screen').hidden, null, { timeout: 15000 }); }
+    // ?full=1: a manager on a phone is sent from Home to the Manager Walkthrough, which would cut off the route.html goto.
+    if (email) { await pg.goto(HOSTING + '/index.html?full=1&testEmail=' + email); await pg.waitForFunction(() => !document.getElementById('screen').hidden, null, { timeout: 15000 }); }
     await pg.goto(HOSTING + '/route.html');
     await pg.fill('#code', code); await pg.click('#step-code button[type=submit]');
     await pg.click('#m-checkin');
