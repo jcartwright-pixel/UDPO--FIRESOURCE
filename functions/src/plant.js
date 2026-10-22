@@ -664,6 +664,9 @@ function validateSchedule(input, SaveError) {
   if (!L.isDateKey(out.date)) throw new SaveError('BAD_REQUEST', 'Pick the delivery date.');
   if (out.op === 'remove') {
     if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the load to delete');
+    // Joe 10/22 (practice test): Ended Up Not Running on a Scheduler load (a carrier pickup) takes it off the same way, marked
+    // as not run rather than deleted by mistake.
+    out.notRunning = input.notRunning === true;
     return out;
   }
   // Joe 10/12 (Boxing station): Shipping / Loadout loads a scheduled load and Receiving receives one. step start, save
@@ -826,7 +829,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   const before = had ? R.scheduleEntries([had], req.lane)[0] || null : null;
   let rec;
   if (req.op === 'remove') {
-    rec = Object.assign({}, had, { status: 'DELETED', date: had.date || req.date });
+    rec = Object.assign({}, had, { status: 'DELETED', date: had.date || req.date }, req.notRunning ? { notRunning: true, notRunningAt: stamp, notRunningBy: email } : {});
   } else {
     let pick = choices.filter(r => r.routeId === req.routeId && r.runId === req.runId);
     // A load booked with a supplier since removed can still be edited, keeping that supplier.

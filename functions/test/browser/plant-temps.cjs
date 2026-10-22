@@ -77,7 +77,7 @@ async function shots(page, name, w) {
     await desk.fill(row + ' .tp-manual', '44.5');
     const t0 = Date.now();
     await desk.press(row + ' .tp-manual', 'Tab');
-    await desk.waitForFunction((r) => /Saved \d[\s\S]*HIGH/.test(document.querySelector(r + ' .tp-act').textContent), row);
+    await desk.waitForFunction((r) => /Checked \d[\s\S]*HIGH/.test(document.querySelector(r + ' .tp-act').textContent), row);
     const shown = Date.now() - t0;
     await watcher.waitForFunction((r) => { const x = document.querySelector(r); return x && /Last manual 44\.5°F HIGH/.test(x.textContent); }, row, { timeout: 8000 });
     results.push('Cooler North 44.5°F saved on leaving the box: HIGH on screen in ' + shown + ' ms, on the other screen in ' + (Date.now() - t0) + ' ms');

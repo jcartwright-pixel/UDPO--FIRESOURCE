@@ -97,7 +97,7 @@
     </div>
     <p class="hint" id="s-hint">It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).</p>
     <div class="notice error" id="s-error" hidden></div>
-    <div class="modal-actions"><button type="button" class="left danger-line" id="s-delete" hidden>Delete Load</button><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
+    <div class="modal-actions"><button type="button" class="left danger-line" id="s-notrunning" hidden>Ended Up Not Running</button><button type="button" class="left danger-line" id="s-delete" hidden>Delete Load</button><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
   </section>
 
   <!-- Joe 10/20: a new load (or one whose dates changed) is confirmed before it is saved. -->
@@ -173,40 +173,19 @@
        loads on one delivery day are Load 1, 2, 3 by pickup time and Load N is Route Master's LOAD N run: when that run is
        already a box load today it shows once, as that line, with the Scheduler's PO and pickup time on it. More loads than
        the customer has LOAD runs share the last one, marked so a slot can be added on Route Master. */
-    const up = (v) => String(v || '').trim().toUpperCase();
-    const sameRun = (a, b) => (a.runId && a.runId === b.runId) || (!!up(a.route) && up(a.route) === up(b.route) && up(a.run) === up(b.run));
     // Route Master's runs; a station-code tablet cannot read them, so it uses the runs on this week's loads.
-    function slotRoutes() {
-      if (routeDocs.length) return routeDocs;
-      const seen = {};
-      return runs.filter(r => r.runId && !seen[r.runId] && (seen[r.runId] = true)).map(r => ({ runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '' }));
-    }
+    const slotRoutes = () => R.scheduleRoutes(routeDocs, runs);
     function schedToday() {
-      const list = R.scheduleEntries(schedDocs, 'SHIPPING');
-      return R.numberLoads(list, R.scheduleCustomers(slotRoutes())).filter(x => (x.loadDate || x.date) === date && !schedGone[x.id]).map(x => {
+      return R.scheduleLoadsOn(schedDocs, R.scheduleCustomers(slotRoutes()), date).filter(x => !schedGone[x.id]).map(x => {
         const p = schedPending[x.id];
         return p ? Object.assign({}, x, { trailer: p.trailer !== undefined ? p.trailer : x.trailer, work: Object.assign({}, x.work, p.work) }) : x;
       });
     }
-    const slotOf = (x) => (x.slot ? Object.assign({}, x, x.slot) : x);
-    const schedState = (w) => (w.state === 'COMPLETE' ? 'DONE' : w.state === 'WORKING' || w.state === 'PAUSED' ? 'LOADING' : 'WAITING');
     const clock24 = (t) => { const m = /^(\d{2}):(\d{2})$/.exec(t || ''); if (!m) return t || ''; const h = Number(m[1]); return (h % 12 || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM'); };
     // Each loadout's loads with their Scheduler line put on, and the Scheduler loads of that load type that are not one of its
-    // loads today (Joe 10/14: a case trailer on the dispatch sheet shows once, on Case Loadout, not again on Boxes).
-    function withSched(live) {
-      const on = {}, extra = [], customers = R.scheduleCustomers(slotRoutes());
-      schedToday().forEach(x => {
-        const kind = R.scheduleArea(x, customers);
-        const r = x.overSlots ? null : live.find(b => b.area === kind && !b.prior && !on[b.id] && sameRun(b, slotOf(x)));
-        if (r) { on[r.id] = x; return; }
-        const w = x.work || {}, n = Number(w.count);
-        extra.push({ id: 'sch:' + x.id, sched: x, area: kind, prior: false, route: (x.slot && x.slot.route) || x.route, run: R.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
-          driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
-          state: schedState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '' });
-      });
-      extra.sort((a, b) => (a.sched.pickupTime || '99:99').localeCompare(b.sched.pickupTime || '99:99'));
-      return live.map(r => (on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r)).concat(extra);
-    }
+    // loads today (Joe 10/14: a case trailer on the dispatch sheet shows once, on Case Loadout, not again on Boxes). The same
+    // rule counts the loads on Plant Departments, Manager Center and the Late Forecast (Joe 10/22).
+    const withSched = (live) => R.withScheduleLoads(live, schedToday(), R.scheduleCustomers(slotRoutes()));
     // Joe 10/14: the Route column is the route number (905, not 905_2); the Run says which load it is.
     const routeNo = (route) => String(route || '').replace(/_[0-9]+$/, '');
     const schedTag = (x) => [x.poNumber ? 'PO ' + x.poNumber : '', x.pickupTime ? clock24(x.pickupTime) : ''].filter(Boolean).join(' · ');
@@ -292,7 +271,9 @@
       // Joe 10/15: a load dragged out of the sheet's order gets a green MOVED tag (dragging stays allowed). Joe 10/19: only the
       // tag is green, not the whole line, and it stays on one line; who moved it and when show on hover. Joe 10/21: SKIPPED
       // also shows the initials of who pressed Skip (TABLET from a Plant Station tablet).
-      const moved = P.movedIds(rows.filter(r => !r.sched));
+      // Joe 10/22 (practice test: 825's MOVED tag went away while another load was skipped, then came back): a tag shows only on
+      // a load someone moved or skipped and that is still out of the sheet's place, the same as the Plant Station tablets; it no
+      // longer follows a guess from the order, which changed as other loads moved.
       let html = '', lastPrior = null;
       rows.forEach(r => {
         if (r.sched) { html += schedRowHtml(r) + noteLine(r, [r.sched.notes, r.sched.work && r.sched.work.notes].filter((v, i, a) => v && a.indexOf(v) === i).join('\n'), cols.length, 'data-sedit'); return; }
@@ -311,7 +292,7 @@
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
-        const isMoved = !P.movedEarlier(r) && (moved.has(r.id) || P.movedBySomeone(r)), note = P.moveNote(r);
+        const isMoved = !P.movedEarlier(r) && P.movedBySomeone(r), note = P.moveNote(r);
         // Joe 10/20: once a skipped load is Done its SKIPPED tag comes off (a MOVED tag stays).
         const movedTag = isMoved && !(st === 'DONE' && note.word === 'SKIPPED') ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.word === 'SKIPPED' && note.initials ? ' · ' + escapeHtml(note.initials) : '') + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
@@ -545,9 +526,9 @@
       }
       editShown[id] = el.value;
       const said = document.getElementById('edit-saved');
-      said.textContent = 'Saving…';
-      // saveLoad shows a refusal on the page's error line; the box says which it was.
-      saveLoad(row, fields, shown).then(() => { if (said.textContent === 'Saving…') said.textContent = document.getElementById('error').hidden ? 'Saved ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Not saved'; });
+      said.textContent = '';
+      // saveLoad shows a refusal on the page's error line; the box says only when it was not saved (Joe 10/22: no save messages).
+      saveLoad(row, fields, shown).then(() => { said.textContent = document.getElementById('error').hidden ? '' : 'Not saved'; });
     }
     document.getElementById('edit-modal').addEventListener('focusout', e => editBoxSave(e.target));
     document.getElementById('edit-shift').addEventListener('change', e => editBoxSave(e.target));
@@ -639,6 +620,9 @@
       document.getElementById('s-error').hidden = true;
       const del = document.getElementById('s-delete');
       del.hidden = !x || !canSched(); del.dataset.armed = ''; del.textContent = 'Delete Load';
+      // Joe 10/22 (practice test): a Scheduler load (a carrier pickup) can be marked Ended Up Not Running too (press twice).
+      const nr = document.getElementById('s-notrunning');
+      nr.hidden = !x || !canSched(); nr.dataset.armed = ''; nr.textContent = 'Ended Up Not Running';
       schedFilled = ''; fillSchedTime();
       openModal('sched-modal');
       document.getElementById(x ? 's-time' : 's-route').focus();
@@ -723,6 +707,15 @@
       schedGone[x.id] = true; render();
       save('savePlantSchedule', { lane: 'SHIPPING', op: 'remove', id: x.id, date: x.date })
         .catch(e => { delete schedGone[x.id]; render(); showError('Delete Load: ' + (e.message || e)); });
+    };
+    document.getElementById('s-notrunning').onclick = () => {
+      const x = schedEditing, btn = document.getElementById('s-notrunning');
+      if (!x) return;
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Press again: ' + R.loadNumberName(x.run || x.route, x.loadNo) + ' did not run'; return; }
+      closeModals();
+      schedGone[x.id] = true; render();
+      save('savePlantSchedule', { lane: 'SHIPPING', op: 'remove', id: x.id, date: x.date, notRunning: true })
+        .catch(e => { delete schedGone[x.id]; render(); showError('Ended Up Not Running: ' + (e.message || e)); });
     };
     async function commitSched(x, f, key, b, fail, times) {
       b.disabled = true; fail('');

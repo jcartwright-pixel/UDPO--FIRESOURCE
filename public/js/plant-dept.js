@@ -8,7 +8,8 @@ const L = window.UDLogic;
 const params = new URLSearchParams(location.search);
 const date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
 let NOW = new Date();
-const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [] };
+const data = { runs: [], journal: [], wash: [], appWash: [], pickups: [], sched: [], routes: [] };
+const R = window.UDPlant;
 const esc = escapeHtml;
 // Review item 28 (Joe 10/13): a long Returns or Washing line wraps to two lines, and the whole text shows on hover.
 const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '" title="' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
@@ -27,9 +28,13 @@ function reason(text) {
 
 function model() {
   NOW = new Date();
-  const rows = P.loadoutRows(data.runs, date), all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today), pickups = P.withNotePickups(rows, data.pickups);
+  // Joe 10/22 (practice test): the same loads as the loadouts, Scheduler loads included (plant-rules withScheduleLoads), and
+  // the same counts: a paused load is still loading. Driver pickups count in the totals too (Joe 10/10).
+  const customers = R.scheduleCustomers(R.scheduleRoutes(data.routes, data.runs));
+  const rows = R.withScheduleLoads(P.loadoutRows(data.runs, date), R.scheduleLoadsOn(data.sched, customers, date), customers);
+  const all = P.counts(rows), today = rows.filter(r => !r.prior), c = P.counts(today), pickups = P.withNotePickups(rows, data.pickups);
   const pu = today.flatMap(r => P.pickupsFor(r, pickups).map(p => Object.assign({ route: r.route }, p))), puOpen = pu.filter(P.pickupOpen);
-  const load = { total: c.total + pu.length, waiting: c.waiting + puOpen.length, loading: c.loading, done: c.done + pu.length - puOpen.length };
+  const load = { total: c.total + pu.length, waiting: c.waiting + puOpen.length, loading: c.loading + c.paused, done: c.done + pu.length - puOpen.length };
   const returns = P.returnsFor(data.runs, date, data.journal), urows = P.unloadRows(data.runs, date, data.journal, returns, rows), uc = P.unloadCounts(urows);
   const unload = { total: uc.total, waiting: uc.waiting, unloading: uc.unloading, done: uc.complete };
   const openWash = P.washItems(date, data.wash, data.appWash, data.journal);
@@ -90,6 +95,9 @@ export function run(render) {
     watchLoads(db, [L.addDays(date, -2), L.addDays(date, -1), date], runs => { data.runs = runs; go(); }, fail('the loads'));
     onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1)])), s => { data.pickups = s.docs.map(d => d.data()); go(); }, fail('the pickups'));
     onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { data.journal = s.docs.map(d => d.data()); go(); }, fail('the plant journal'));
+    // The Scheduler's Shipping loads and Route Master's runs, read the way the loadouts read them (Joe 10/22).
+    onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING), where('date', '>=', L.addDays(date, -14))), s => { data.sched = s.docs.map(d => d.data()); go(); }, () => { data.sched = []; });
+    onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); go(); }, () => { data.routes = []; });
     watchWashRequests(db, L.weekStart(date), r => { data.wash = r; go(); }, fail('the wash list'), 'plantWash');
     // Joe 10/18 (screen speed): the open wash requests and the week's finished ones, not every one ever made.
     watchWashRequests(db, L.weekStart(date), r => { data.appWash = r; go(); }, fail('the wash requests'));
@@ -124,7 +132,7 @@ function card(k, inner, cls) {
 const head = (k) => '<div class="dc-head"><span class="dc-icon">' + ICON[k] + '</span><span class="dc-text"><small>' + D[k].small + '</small><strong>' + D[k].title + '</strong></span></div>';
 const met = (em, b, small, red, n) => '<span class="dc-metric"><em>' + em + '</em><b' + (n ? ' data-n="' + n + '"' : '') + (red ? ' class="red"' : '') + '>' + b + '</b><small>' + small + '</small></span>';
 function metrics(m, k) {
-  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, m.pu.length ? m.c.total + ' loads · ' + m.pu.length + (m.pu.length === 1 ? ' pickup' : ' pickups') : 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
+  if (k === 'load') return '<div class="dc-metrics n4">' + met('Today', m.load.total, m.pu.length ? m.c.total + ' loads · ' + m.pu.length + (m.pu.length === 1 ? ' pickup' : ' pickups') : 'Loads Today', false, 'load.total') + met('Waiting', m.load.waiting, 'Waiting', false, 'load.waiting') + met('Loading', m.load.loading, m.c.paused ? m.c.paused + ' paused' : 'Loading', false, 'load.loading') + met('Done', m.load.done, 'Complete', false, 'load.done') + '</div>';
   if (k === 'unload') return '<div class="dc-metrics n4">' + met('Total', m.unload.total, 'Trailers', false, 'unload.total') + met('Waiting', m.unload.waiting, 'Waiting', false, 'unload.waiting') + met('Unloading', m.unload.unloading, 'Unloading', false, 'unload.unloading') + met('Done', m.unload.done, 'Complete', false, 'unload.done') + '</div>';
   if (k === 'wash') return met('Open', m.openWash.length, 'To wash', m.openWash.length > 0, 'wash.open') + met('Washed', m.washed, 'Today', false, 'wash.done');
   return met('Returns', m.returns.length, 'Today', false, 'ret.total') + met('Pending', m.pend.length, 'Not returned', m.pend.length > 0, 'ret.pending');
@@ -135,12 +143,13 @@ const delta = (t, y, lowerBetter) => { if (y == null || t == null) return ''; co
 
 function hourBars(m, tall) {
   const max = Math.max(1, ...m.byHour.map(h => h.done + h.loading + h.waiting)), H = tall || 110;
+  // Joe 10/22 (practice test: "9 PM10 PM" ran together with 11 hours): with many hours each label is two short lines.
   return '<div class="hours">' + m.byHour.map(h => {
     const px = (n) => Math.round(n * H / max);
     const notBehindWaiting = h.waiting - Math.min(h.waiting, h.behind);
     const behindW = Math.min(h.waiting, h.behind);
     return '<div class="hour">' + (h.pickups ? '<span class="pu">P/U ' + h.pickups + '</span>' : '') + '<b>' + h.done + '/' + (h.done + h.loading + h.waiting) + '</b><div class="stack">' +
-      '<i class="s-done" style="height:' + px(h.done) + 'px"></i><i class="s-loading" style="height:' + px(h.loading) + 'px"></i><i class="s-behind" style="height:' + px(behindW) + 'px"></i><i class="s-waiting" style="height:' + px(notBehindWaiting) + 'px"></i></div><small>' + m.hourText(h.h) + '</small></div>';
+      '<i class="s-done" style="height:' + px(h.done) + 'px"></i><i class="s-loading" style="height:' + px(h.loading) + 'px"></i><i class="s-behind" style="height:' + px(behindW) + 'px"></i><i class="s-waiting" style="height:' + px(notBehindWaiting) + 'px"></i></div><small>' + (m.byHour.length > 7 ? (h.h % 12 || 12) + '<br>' + (h.h < 12 ? 'AM' : 'PM') : m.hourText(h.h)) + '</small></div>';
   }).join('') + '</div>';
 }
 const legend = '<div class="legend"><span><i class="s-done"></i>Done</span><span><i class="s-loading"></i>Loading</span><span><i class="s-behind"></i>Behind</span><span><i class="s-waiting"></i>Waiting</span><span><i style="background:var(--pickup)"></i>Pickup open</span></div>';
@@ -161,7 +170,7 @@ function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, 'all departments · 30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, '30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

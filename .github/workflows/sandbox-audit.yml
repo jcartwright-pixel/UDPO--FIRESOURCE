@@ -1,0 +1,125 @@
+name: Practice copy test (live data copy + full browser test)
+
+# Joe 10/22: "copy the live data that we have now into the sandbox version ... use Playwright on the sandbox version. Do all
+# your reads and writes. Do the timings."
+# - [copy live] in the commit message: copies the live database into the practice copy (tools/copy-live-to-sandbox.cjs).
+#   Live is only read. It runs in the distribution-production environment, so Joe presses Approve first. The deploy keys
+#   cannot change Google Cloud access themselves: Joe gives the live deploy key read-only database access (Cloud Datastore
+#   Viewer) and the practice copy's key database access on the practice copy, both set to end by themselves.
+# - [audit] in the commit message: the full browser test against the practice copy (functions/test/browser/practice-audit.cjs).
+# Neither one deploys anything or changes the live app.
+on:
+  push:
+    branches: [claude/project-thread-wsuoyf]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: practice-copy-test
+  cancel-in-progress: false
+
+jobs:
+  copy-live:
+    if: contains(github.event.head_commit.message, '[copy live]')
+    runs-on: ubuntu-latest
+    environment: distribution-production
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Keys
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+          SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SA_SANDBOX" ] || [ -z "$SA_PRODUCTION" ]; then echo "::error::Both deploy keys are needed (sandbox: ${#SA_SANDBOX} chars, production: ${#SA_PRODUCTION} chars)"; exit 1; fi
+          printf '%s' "$SA_PRODUCTION" > "$RUNNER_TEMP/live.json"
+          printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
+          node -e "const a=require('$RUNNER_TEMP/live.json'),b=require('$RUNNER_TEMP/practice.json'); console.log('Live:', a.project_id, a.client_email); console.log('Practice copy:', b.project_id, b.client_email); if (b.project_id !== 'ud-distribution-sandbox' || a.project_id === b.project_id) process.exit(1)"
+      - name: Install
+        run: npm ci
+      - name: Copy live data into the practice copy
+        env:
+          SRC_KEY: ${{ runner.temp }}/live.json
+          DST_KEY: ${{ runner.temp }}/practice.json
+          BACKUP: ${{ runner.temp }}/practice-copy-before.ndjson.gz
+        run: |
+          set -uo pipefail
+          # New access can take a few minutes to reach the database.
+          for try in $(seq 1 12); do
+            node -e "
+              const r=require('module').createRequire(process.cwd()+'/package.json'); const admin=r('firebase-admin'); const {getFirestore}=r('firebase-admin/firestore');
+              const a=getFirestore(admin.initializeApp({credential:admin.credential.cert(require(process.env.SRC_KEY))},'a'));
+              const b=getFirestore(admin.initializeApp({credential:admin.credential.cert(require(process.env.DST_KEY))},'b'));
+              Promise.all([a.collection('runs').limit(1).get(), b.collection('runs').limit(1).get()]).then(()=>process.exit(0),e=>{console.log(String(e.message).slice(0,120));process.exit(1)})" && break
+            echo "Database access not there yet (try $try of 12), waiting 30 seconds"; sleep 30
+          done
+          node ../tools/copy-live-to-sandbox.cjs | tee copy.txt
+          { echo "## Live data copied into the practice copy"; sed 's/^/    /' copy.txt; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the practice copy's old data (backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-copy-before-live-copy
+          path: ${{ runner.temp }}/practice-copy-before.ndjson.gz
+          retention-days: 14
+          if-no-files-found: ignore
+
+  audit:
+    if: contains(github.event.head_commit.message, '[audit]')
+    runs-on: ubuntu-latest
+    environment: distribution-sandbox
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Key
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
+          node -e "if (require('$RUNNER_TEMP/practice.json').project_id !== 'ud-distribution-sandbox') process.exit(1)"
+      - name: Install
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Full browser test on the practice copy
+        continue-on-error: true
+        env:
+          KEY: ${{ runner.temp }}/practice.json
+          NO_WRITES: ${{ contains(github.event.head_commit.message, '[reads only]') && '1' || '' }}
+        run: |
+          out="../practice-audit/$(date -u +%Y%m%d-%H%M)"
+          echo "OUT=$out" >> "$GITHUB_ENV"
+          mkdir -p "$out"
+          # The practice test administrator (practice copy only; live has no such person).
+          node -e "
+            const r=require('module').createRequire(process.cwd()+'/package.json'); const admin=r('firebase-admin'); const {getFirestore}=r('firebase-admin/firestore');
+            const k=require(process.env.KEY); if (k.project_id!=='ud-distribution-sandbox') process.exit(1);
+            getFirestore(admin.initializeApp({credential:admin.credential.cert(k)})).collection('users').doc('practice.audit@uniteddairy.com')
+              .set({ name: 'Practice Test', status: 'ACTIVE', roles: ['ADMINISTRATOR'], facilities: ['*'] }, { merge: true }).then(()=>process.exit(0), e=>{console.error(e.message);process.exit(1)})"
+          node test/browser/practice-data-check.cjs "$out/data-check-before.json" || true
+          node test/browser/practice-audit.cjs https://ud-distribution-sandbox.web.app "$out" 2>&1 | tee "$RUNNER_TEMP/audit.log"
+          node test/browser/practice-data-check.cjs "$out/data-check-after.json" || true
+      - name: Keep the results on the branch
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -n "${OUT:-}" ] && [ -d "$OUT" ] || { echo "No results"; exit 0; }
+          cp "$RUNNER_TEMP/audit.log" "$OUT/console.log" || true
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add practice-audit
+          git commit -q -m "Practice copy test results $(basename "$OUT")"
+          for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
