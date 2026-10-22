@@ -45,7 +45,7 @@
       </div>
       <div class="sheet scroll-list" id="pane-current">
         <table class="loadout tp-table">
-          <colgroup><col style="width:15%"><col style="width:8%"><col style="width:9%"><col style="width:5%"><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:17%"><col style="width:8%"><col style="width:5%"><col style="width:7%"></colgroup>
+          <colgroup><col style="width:15%"><col style="width:8%"><col style="width:11%"><col style="width:4%"><col style="width:11%"><col style="width:7%"><col style="width:8%"><col style="width:13%"><col style="width:8%"><col style="width:8%"><col style="width:7%"></colgroup>
           <thead><tr><th>Sensor Name</th><th>Current Temp</th><th>Manual Read</th><th>Trend</th><th>Status</th><th>Battery</th><th>Last Reading</th><th>Notes</th><th>Last Checked</th><th>By</th><th>Action</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
@@ -64,7 +64,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, shortTime, shortDay, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
-    import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
+    import { watchRound, fillIn, clockOf, inRound } from './js/autosave.js';
     import { walkBar } from './js/walk-bar.js';
 
     walkBar('coolers');
@@ -142,7 +142,7 @@
           '<td class="tp-last">' + (bySensor ? readAt(r.sensorLastReadingAt) : r.lastCheckedAt ? escapeHtml(clock(r.lastCheckedAt)) + (r.lastManualTemperature !== '' ? '<small>' + escapeHtml(r.lastManualTemperature) + '°F</small>' : '') : '—') + '</td>' +
           '<td>' + (bySensor ? 'Sensor' : escapeHtml(initials(r.lastCheckedBy) || '—')) + '</td>' +
           // Joe 10/10: no Save button; the column shows when the reading saved, or how long the location is locked.
-          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Saved ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : bySensor ? '<small class="as-note tp-pill ok" title="The sensor reads in range, so no manual check is needed">OK</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
+          '<td class="tp-act">' + (!ck ? '<span class="pill">View only</span>' : note ? '<small class="as-note' + (/^Not|^Enter/.test(note) ? ' bad' : '') + '">' + escapeHtml(note) + '</small>' : r.locked && !cur ? '<small class="as-last tp-pill locked" title="Can be checked again in ' + r.minutesUntilDue + ' minutes">Locked ' + r.minutesUntilDue + ' min</small>' : cur ? '<small class="as-note tp-pill saved">Checked ' + escapeHtml(clockOf(r.lastCheckedAt)) + '</small>' : bySensor ? '<small class="as-note tp-pill ok" title="The sensor reads in range, so no manual check is needed">OK</small>' : '<small class="as-last tp-pill due" title="Type the reading in Manual °F; it saves as you leave the box">Due</small>') + '</td></tr>';
       }).join('') || '<tr><td colspan="11" class="empty">' + (rows.length ? 'No locations match the ' + escapeHtml(FILTERS.find(f => f[0] === filter)[1]) + ' filter.' : (setupSeen ? 'No temperature locations are set up for this plant.' : 'Loading the temperature locations&hellip;')) + '</td></tr>';
       // Review item 24 (Joe 10/13): on a small tablet each location is a card (as on Yard Checks), every column named on the card.
       const heads = [...document.querySelectorAll('#pane-current thead th')].map(th => th.textContent);
@@ -190,14 +190,15 @@
       mine.payload = { locationId: id, location: loc.location, manualTemperature: Number(fields.manualTemperature), notes: fields.notes, status };
       pending[id] = mine;
       drafts[id] = fields;
-      notes[id] = 'Saving…';
+      notes[id] = '';
       render(); tick(id);
       try {
         const done = await fills[id].send(fields);
         if (done && done.checkId) { mine._id = done.checkId; if (done.recordedAt) mine.recordedAt = done.recordedAt; }
         mine.saved = true;
         if (drafts[id] === fields) delete drafts[id];
-        notes[id] = savedText() + (status === 'HIGH' || status === 'LOW' ? ' · ' + status : '');
+        // Joe 10/22 (no save messages): the row says the location is checked, and when.
+        notes[id] = 'Checked ' + clockOf(Date.now()) + (status === 'HIGH' || status === 'LOW' ? ' · ' + status : '');
         tick(id);
         showError('');
       } catch (err) {

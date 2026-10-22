@@ -68,6 +68,7 @@
 .plant-page .pu-item small { display: block; color: var(--muted); font-weight: 600; }
 .plant-page .pu-item button { height: 32px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--runs-ink); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page .modal-actions .left { margin-right: auto; }
+.plant-page .modal-actions .left:has(+ .left:not([hidden])) { margin-right: 0; }
 .plant-page button.danger-line { color: var(--pickup); border-color: #f2b8b2; }
 
 /* Plant Distribution Departments: the four department cards keep the home cards' look. */
@@ -1200,7 +1201,7 @@
 .products-page .pm-sheet col.c-name { width: 300px; } .products-page .pm-sheet col.c-sku { width: 96px; } .products-page .pm-sheet col.c-upc { width: 130px; }
 .products-page .pm-sheet col.c-type { width: 112px; } .products-page .pm-sheet col.c-group { width: 92px; } .products-page .pm-sheet col.c-mach { width: 80px; }
 .products-page .pm-sheet col.c-num { width: 86px; } .products-page .pm-sheet col.c-rm { width: 104px; }
-.products-page .pm-sheet thead tr.pm-band th { height: 30px; top: 0; font-size: 14px; letter-spacing: .06em; border-bottom: 1px solid rgba(255, 255, 255, .25); }
+.products-page .pm-sheet thead tr.pm-band th { height: 30px; top: 0; font-size: 16px; letter-spacing: .06em; border-bottom: 1px solid rgba(255, 255, 255, .25); }
 .products-page .pm-sheet thead tr:not(.pm-band) th { top: 30px; height: 58px; padding: 4px 3px; overflow-wrap: anywhere; }
 .products-page .pm-sheet thead th { border-right: 1px solid rgba(255, 255, 255, .18); }
 .products-page .pm-sheet thead th.pm-m { background: #0d6b45; }
@@ -1219,7 +1220,7 @@
 .products-page .pm-edit-three .pm-field.wide { grid-column: 1 / -1; }
 .products-page .pm-edit-three .pm-field input, .products-page .pm-edit-three .pm-field select { height: 38px; }
 .products-page .pm-edit-sub { margin: 12px 0 6px; font-size: 16px; color: var(--ud-blue-dark); }
-.products-page .pm-edit-sub small { font-size: 14px; font-weight: 600; color: var(--muted); }
+.products-page .pm-edit-sub small { font-size: 16px; font-weight: 600; color: var(--muted); }
 .products-page .pm-mgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .products-page .pm-mbox { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 3px 10px; border: 1px solid #b8cadb; border-radius: 9px; background: #fff; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; text-align: left; cursor: pointer; }
 .products-page .pm-mbox.on { background: #eaf6ee; border-color: #1d7a3e; }
@@ -1237,7 +1238,7 @@
 .machine-setup-page .ms-list h3 { margin: 4px 6px 8px; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .machine-setup-page .ms-mach { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; padding: 8px 12px; border: 1px solid transparent; border-radius: 9px; background: none; color: var(--ud-blue-dark); font: inherit; font-size: 16px; font-weight: 800; text-align: left; cursor: pointer; }
 .machine-setup-page .ms-mach:hover { background: #f1f6fb; }
-.machine-setup-page .ms-mach small { display: block; font-size: 14px; font-weight: 700; color: var(--muted); }
+.machine-setup-page .ms-mach small { display: block; font-size: 16px; font-weight: 700; color: var(--muted); }
 .machine-setup-page .ms-mach b { flex: none; background: #e8f0f8; border-radius: 999px; padding: 1px 10px; font-size: 16px; }
 .machine-setup-page .ms-mach.on { background: var(--ud-blue-dark); color: #fff; }
 .machine-setup-page .ms-mach.on small { color: #cfe0f0; }
@@ -1334,6 +1335,8 @@
 .manager-page .mc-grid [data-card="walk"] { grid-column: 1 / -1; }
 .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .manager-page [data-card="walk"] .mc-tile.warn b { color: #b45f00; }
+/* Joe 10/22 (practice test): the big walkthrough numbers get room for the whole letter height. */
+.manager-page [data-card="walk"] .mc-tile b { line-height: 1.15; }
 @media (max-width: 760px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; } }
 /* Joe 10/15 (Manager Walkthrough, look C, option 1): the phone and tablet start screen (three choices) and the walkthrough
    (Coolers, then Quality) as big tiles with big numbers; a red tile flashes while a check is past due. */
@@ -1369,7 +1372,7 @@
 .manager-page [data-card="walk"] .wk-tile { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line num" "list list"; align-content: start; row-gap: 2px; padding: 8px 12px; }
 .manager-page [data-card="walk"] .wk-tile b { grid-area: num; text-align: right; align-self: center; }
 .manager-page [data-card="walk"] .wk-tile .wk-items { grid-area: list; list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.manager-page [data-card="walk"] .wk-items li { font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page [data-card="walk"] .wk-items li { font-size: 16px; font-weight: 700; color: var(--ink); white-space: normal; overflow-wrap: normal; line-height: 1.2; }
 .manager-page [data-card="walk"] .wk-items li b { font-size: 16px; font-weight: 900; color: inherit; line-height: inherit; text-align: left; }
 .manager-page [data-card="walk"] .wk-items li.bad { color: #c62828; }
 .manager-page [data-card="walk"] .wk-items li.warn { color: #b45f00; }
@@ -1544,3 +1547,7 @@
   .sched-page .sc-dayrow .trl { padding: 2px 6px; }
   .sched-page .sc-dayhead > :last-child, .sched-page .sc-dayrow > :last-child { grid-row: 1; grid-column: 4; justify-self: end; }
 }
+/* Joe 10/22 (practice test: "Senso r" and "Last: 37°F …" on Cooler Temperature): the last reading under Manual Read shows whole
+   on a second line, and By has room for "Sensor". */
+.temp-page table.tp-table .as-last { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; }
+.temp-page table.tp-table td { overflow-wrap: normal; }
