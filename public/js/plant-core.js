@@ -71,7 +71,8 @@ function rowFor(run, block, loadDate, prior) {
     quantity: day.casesOut, temperature: day.loadTemperature, notes: day.plantNotes || '', shift: day.plantShift || '', updatedAt: day.updatedAt || '', updatedBy: day.updatedBy || '', moveMark: day.moveMark || null,
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day),
     // Joe 10/12: a paused load is started but not loading now (it does not count toward the loadout's limit).
-    paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED'
+    paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED',
+    pauseMark: day.pauseMark || null
   };
 }
 
@@ -230,7 +231,10 @@ export function clock(stamp) {
 export function minutesTaken(row, now) {
   if (!row.startedAt) return null;
   const a = Date.parse(row.startedAt), b = row.completedAt ? Date.parse(row.completedAt) : (now || new Date()).getTime();
-  return isFinite(a) && isFinite(b) && b >= a ? Math.round((b - a) / 60000) : null;
+  if (!(isFinite(a) && isFinite(b) && b >= a)) return null;
+  // Joe 10/22: paused minutes are not loading time (plant-rules pausedMinutes).
+  const paused = typeof window !== 'undefined' && window.UDPlant ? window.UDPlant.pausedMinutes(row, now ? now.getTime() : undefined) : 0;
+  return Math.max(0, Math.round((b - a) / 60000 - paused));
 }
 
 // "38 min", or "2 h 05 min" once it runs past two hours.

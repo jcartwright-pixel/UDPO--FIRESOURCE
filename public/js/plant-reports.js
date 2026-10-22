@@ -52,7 +52,7 @@ export function minutesText(m) {
 // One load's result: ON TIME, LATE, NOT LOADED, LOADED (done with no End time) or TO COME (its time has not come yet).
 export function loadOutcome(row, nowWall) {
   const depart = departAt(row), done = U.wallMinutes(row.completedAt), started = U.wallMinutes(row.startedAt);
-  const out = { route: text(row.route), run: text(row.run), area: row.area, depart, done, started, late: null, taken: done !== null && started !== null && done >= started ? done - started : null,
+  const out = { route: text(row.route), run: text(row.run), area: row.area, depart, done, started, late: null, taken: done !== null && started !== null && done >= started ? Math.max(0, done - started - U.pausedMinutes(row)) : null,
     truck: text(row.truck), trailer: text(row.trailer), runDocId: row.runDocId, day: row.day, runId: row.runId, loadDate: row.loadDate, deliveryDate: row.deliveryDate };
   if (row.state === 'DONE') {
     if (done === null || depart === null) out.result = 'LOADED';

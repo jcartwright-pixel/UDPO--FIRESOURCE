@@ -232,6 +232,10 @@ test('Loading limit: Case Loadout loads 2 at a time; a paused one does not count
   await plantLoad(p808.runDocId, p808.day, { status: 'LOADING' });
   const resumed = (await db().collection('runs').doc(p808.runDocId).get()).data().days[p808.day];
   assert.deepEqual([resumed.loadStatus, resumed.plantStartedAt], ['LOADING', '2026-10-08T05:27:00.000Z'], 'resuming keeps the start time');
+  // Joe 10/22: the pause was timed, so its minutes do not count as loading time.
+  assert.equal(paused.pauseMark.at !== '', true, 'the pause start is kept');
+  assert.equal(resumed.pauseMark.at, '');
+  assert.ok(resumed.pauseMark.minutes >= 0 && resumed.pauseMark.minutes === Math.round(resumed.pauseMark.minutes), 'the paused minutes are added up on resume');
 });
 
 // Joe 10/13: a manager may go past the limit from the Loadout Center (it asks with overLimit); a dispatcher, a Plant Station
@@ -262,6 +266,7 @@ test('Loading limit: Boxing loads 3 at a time, its Scheduler shipments included;
   await ship('pause', { pauseReason: 'Carrier late' });
   assert.equal((await lanes('SHIPPING')).find(e => e.id === 'SCHED-a1').work.state, 'PAUSED');
   assert.match((await lanes('SHIPPING')).find(e => e.id === 'SCHED-a1').work.notes, /Paused .*: Carrier late/);
+  assert.ok((await lanes('SHIPPING')).find(e => e.id === 'SCHED-a1').work.pauseMark.at, 'Joe 10/22: the shipment\'s pause is timed');
   if (more) {
     await plantLoad(more.runDocId, more.day, { status: 'LOADING' });
     await assert.rejects(ship('start'), /3 loads are already loading/, 'resuming the shipment needs room');

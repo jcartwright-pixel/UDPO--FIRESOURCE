@@ -324,6 +324,13 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
       after[idField] = u.id;
     });
   }
+  // Joe 10/22 ("When these are paused ... That shouldn't count as loading time"): each pause is timed (plant-rules pauseMark).
+  const next = Object.assign({}, day, after), isPaused = d => !text(d.completeTime) && d.loadedComplete !== true && text(d.loadStatus).toUpperCase() === 'PAUSED';
+  const ended = Date.parse(text(next.completeTime)), at = isFinite(ended) && ended < Date.parse(stamp) ? new Date(ended).toISOString() : stamp;
+  const mark = R.nextPauseMark({ startedAt: text(day.plantStartedAt), notes: text(day.plantNotes), paused: isPaused(day), pauseMark: day.pauseMark || null },
+    isPaused(next), !text(next.plantStartedAt) && !text(next.completeTime), at);
+  const had = day.pauseMark || { at: '', minutes: 0 };
+  if (text(had.at) !== mark.at || (Number(had.minutes) || 0) !== mark.minutes) after.pauseMark = mark;
   if (req.saver) markTimes(day, after, stamp, req.saver);
   return after;
 }
@@ -731,6 +738,8 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : req.step === 'save' ? kept : 'WORKING';
   if (req.lane === 'SHIPPING' && state === 'WORKING' && was.state !== 'WORKING') overLimit('BOXING', await loadingNow(tx, db, 'BOXING', stamp, req.id), SaveError);
   const work = Object.assign({}, was, req.work, { state });
+  // Joe 10/22: paused minutes are not loading time (plant-rules pauseMark).
+  work.pauseMark = R.nextPauseMark({ startedAt: text(was.startedAt), notes: text(was.notes), paused: was.state === 'PAUSED', pauseMark: was.pauseMark || null }, state === 'PAUSED', state === 'WAITING', stamp);
   if (req.step === 'pause') {
     const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     work.notes = ((text(work.notes) ? text(work.notes) + '\n' : '') + 'Paused ' + at + ': ' + req.pauseReason).slice(-1200);
@@ -757,8 +766,10 @@ async function scheduleTimes(tx, db, req, had, before, was, type, email, stamp, 
   // A time left as it was keeps who pressed it.
   const same = (a, b) => !!a && !!b && Date.parse(a) === Date.parse(b);
   const startedAt = same(req.startedAt, was.startedAt) ? was.startedAt : req.startedAt, completedAt = same(req.completedAt, was.completedAt) ? was.completedAt : req.completedAt;
+  const ended = Date.parse(completedAt || ''), closeAt = isFinite(ended) && ended < Date.parse(stamp) ? new Date(ended).toISOString() : stamp;
   const work = Object.assign({}, was, { state, startedAt, completedAt,
-    startedBy: startedAt ? (startedAt === was.startedAt && was.startedBy) || email : '', completedBy: completedAt ? (completedAt === was.completedAt && was.completedBy) || email : '' });
+    startedBy: startedAt ? (startedAt === was.startedAt && was.startedBy) || email : '', completedBy: completedAt ? (completedAt === was.completedAt && was.completedBy) || email : '',
+    pauseMark: R.nextPauseMark({ startedAt: text(was.startedAt), notes: text(was.notes), paused: was.state === 'PAUSED', pauseMark: was.pauseMark || null }, state === 'PAUSED', state === 'WAITING', closeAt) });
   const payload = Object.assign({}, had.payload || {}, { work });
   const rec = Object.assign({}, had, { payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
   delete rec.sheetRow; delete rec.cells;
