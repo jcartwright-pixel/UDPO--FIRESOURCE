@@ -31,7 +31,9 @@ const fillToQuality = (lineName) => !PR.qualitySkip(lineName).weight;
 // The line's newest Quality check of today and yesterday (operating days): { id, data } or null.
 async function latestQuality(get, db, operationId, stamp) {
   const day = L.operatingDay(new Date(stamp));
-  const snap = await get(db.collection('plantJournal').where('date', 'in', [L.addDays(day, -1), day]));
+  // Joe 10/22: only the two days' quality checks, not every plant record of those days (a whole-day read in a save ran past its
+  // time on a busy live day: Cooler Temperature's manual readings).
+  const snap = await get(db.collection('plantJournal').where('type', '==', QUALITY_TYPE).where('date', 'in', [L.addDays(day, -1), day]));
   const mine = snap.docs.map(d => ({ id: d.id, data: d.data() }))
     .filter(x => text(x.data.type).toUpperCase() === QUALITY_TYPE && text((x.data.payload || {}).operationId) === operationId && !(x.data.payload || {}).undone)
     .sort((a, b) => when(b.data.recordedAt) - when(a.data.recordedAt));

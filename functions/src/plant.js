@@ -1119,7 +1119,9 @@ async function saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveErro
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, locationId: loc.locationId, checkId: req.checkId, before: p, after: payload, result });
     return result;
   }
-  const recent = (await tx.get(db.collection('plantJournal').where('date', 'in', [L.addDays(day, -1), day]))).docs.map(x => x.data());
+  // Joe 10/22 (no manual reading saved on live): only the two days' temperature readings, not every plant record of those days.
+  // Reading (and so locking) the whole day's plant records in the save made it run past its time on a busy day, as Yard Checks did.
+  const recent = (await tx.get(db.collection('plantJournal').where('type', '==', R.TEMP_TYPE).where('date', 'in', [L.addDays(day, -1), day]))).docs.map(x => x.data());
   const left = R.tempLockLeft(recent, loc, now.getTime());
   if (left) throw new SaveError('CONFLICT', loc.location + ' was already checked. It can be checked again in ' + left + ' minutes.');
   const status = R.tempStatus(loc, req.manualTemperature);
