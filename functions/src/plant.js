@@ -725,14 +725,17 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   if (req.step === 'times') return scheduleTimes(tx, db, req, had, before, was, type, email, stamp, logRef, mode, SaveError);
   if (was.state === 'COMPLETE') throw new SaveError('CONFLICT', 'That load is already ' + (req.lane === 'RECEIVING' ? 'received' : 'complete') + '.');
   // Joe 10/12: a Shipping load started or resumed counts toward Boxing's limit (paused ones do not).
-  const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : (req.step === 'save' && was.state === 'PAUSED') ? 'PAUSED' : 'WORKING';
+  // Joe 10/22 ("whenever the trailers are being entered ... it automatically then starts like it's loading"): a save of what
+  // was typed (trailer, count, temperature, notes) keeps the load as it was; only Start, Resume and Complete change it.
+  const kept = was.state === 'WORKING' || was.state === 'PAUSED' ? was.state : 'WAITING';
+  const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : req.step === 'save' ? kept : 'WORKING';
   if (req.lane === 'SHIPPING' && state === 'WORKING' && was.state !== 'WORKING') overLimit('BOXING', await loadingNow(tx, db, 'BOXING', stamp, req.id), SaveError);
   const work = Object.assign({}, was, req.work, { state });
   if (req.step === 'pause') {
     const at = new Date(stamp).toLocaleString('en-US', { timeZone: L.TIME_ZONE, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     work.notes = ((text(work.notes) ? text(work.notes) + '\n' : '') + 'Paused ' + at + ': ' + req.pauseReason).slice(-1200);
   }
-  if (req.step === 'start' || !was.startedAt) Object.assign(work, { startedAt: was.startedAt || stamp, startedBy: was.startedBy || email });
+  if (state !== 'WAITING' && (req.step === 'start' || !was.startedAt)) Object.assign(work, { startedAt: was.startedAt || stamp, startedBy: was.startedBy || email });
   if (req.step === 'complete') Object.assign(work, { completedAt: stamp, completedBy: email });
   const payload = Object.assign({}, had.payload || {}, { work });
   if (req.work.trailer !== undefined) payload.trailer = req.work.trailer;

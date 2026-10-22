@@ -262,10 +262,14 @@ async function keyMove(page, route, dir) {
     // the page scrolls as a whole (no strip a few rows high) and nothing slides sideways.
     const phone = await openPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
     await phone.waitForSelector(row('811') + '[data-drag]');
-    const card = await phone.$eval(row('811'), tr => {
-      const box = tr.getBoundingClientRect(), input = tr.querySelector('input[data-k="truck"]').getBoundingClientRect();
-      return { display: getComputedStyle(tr).display, width: box.width, height: box.height, input: input.height, label: getComputedStyle(tr.querySelector('input[data-k="truck"]').closest('td'), '::before').content };
-    });
+    // Read the card once the list has finished drawing: a redraw just after it shows replaces the row, and a row read as it is
+    // taken off the page measures 0.
+    const card = await (await phone.waitForFunction((sel) => {
+      const tr = document.querySelector(sel), truck = tr && tr.querySelector('input[data-k="truck"]');
+      if (!truck || !tr.isConnected || !tr.getBoundingClientRect().width) return null;
+      const box = tr.getBoundingClientRect(), input = truck.getBoundingClientRect();
+      return { display: getComputedStyle(tr).display, width: box.width, height: box.height, input: input.height, label: getComputedStyle(truck.closest('td'), '::before').content };
+    }, row('811'), { timeout: 8000 })).jsonValue();
     assert.equal(card.display, 'grid', 'a load is a card on a phone ' + JSON.stringify(card));
     assert.ok(card.input >= 44 && card.label === '"Truck"', 'the truck box is named and big enough for a thumb ' + JSON.stringify(card));
     assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways on a phone');
