@@ -24,62 +24,81 @@ const tonightLeft = [
 const night = (date, rate) => ({ date, loads: [{ area: 'CASE', state: 'DONE', quantity: 500, completedAt: date + 'T20:00:00-04:00' }, { area: 'CASE', state: 'DONE', quantity: rate, completedAt: date + 'T21:00:00-04:00' }] });
 const up5 = (m) => Math.ceil(m / 5) * 5;
 
-// Joe 10/20: "no way we would be done at midnight"; "1,000 cases takes 1 hour"; a 1- or 5-minute time is a mistake.
-test('a night\'s pace: from one load\'s End to the next, against 1,000 cases an hour; long gaps left out', () => {
-  // Tonight's Ends: 6:47, 11:22, 1:49, 3:02, 4:00, 5:50, 6:57. The 4 h 35 min before 906 is left out (over 3 hours).
+// Joe 10/22 (7:36 AM "About 8 hr 20 min behind" with nothing loaded): only real loading time counts, Start to End, 10 minutes to 3 hours.
+test('a night\'s speed: each load\'s own Start to End, against 1,000 cases an hour; missed or bunched presses left out', () => {
+  // Tonight: 849 77 min, 906 47, 980 0 (Start and End pressed together: left out), 848 73, 852 151, 827 70, 6304 64.
   const p = R.nightPace(tonightDone);
-  assert.equal(p.loads, 5);
-  assert.equal(p.cases, 820 + 892 + 1150 + 1017 + 887);
-  assert.equal(p.rate, Math.round(1000 * (0.06 * p.cases) / (147 + 73 + 58 + 110 + 67)), 'the time between loads counts');
-  assert.ok(p.rate < 1000, 'tonight ran slower than 1,000 cases an hour');
-  assert.equal(R.nightPace(night('2026-10-12', 1000).loads).rate, 1000);
-  assert.equal(R.nightPace([done('1', '01:00', '02:00', 900)]), null, 'one load alone has nothing to measure from');
-  assert.equal(R.nightPace([done('1', null, '01:00', 900), done('2', null, '05:00', 900)]), null, 'over 3 hours is left out');
-  assert.equal(R.nightPace([done('1', null, '01:00', 900), done('2', null, '02:00', 900, { area: 'TOTES' })]), null, 'case loads only');
+  assert.equal(p.loads, 6);
+  assert.equal(p.cases, 900 + 863 + 892 + 1150 + 1017 + 887);
+  assert.equal(p.rate, Math.round(1000 * (0.06 * p.cases) / (77 + 47 + 73 + 151 + 70 + 64)), 'waits between loads do not count');
+  assert.equal(R.cleanMinutes(done('1', '01:00', '01:05', 900)), null, 'a 5-minute load is a bunched press');
+  assert.equal(R.cleanMinutes(done('1', '01:00', '04:30', 900)), null, 'over 3 hours is a missed End');
+  assert.equal(R.cleanMinutes(done('1', null, '01:00', 900)), null, 'no Start, no time');
+  assert.equal(R.cleanMinutes(done('1', '01:00', '02:00', 900, { area: 'TOTES' })), null, 'case loads only');
+  assert.equal(R.cleanMinutes(done('1', '01:00', '02:00', 900)), 60);
+  assert.equal(R.nightPace([done('1', '01:00', '02:00', 1000)]).rate, 1000);
 });
 
 test('the same weekday is compared: Monday nights 1 to 4 weeks back', () => {
   assert.deepEqual(R.forecastNights(MON), ['2026-10-12', '2026-10-05', '2026-09-28', '2026-09-21']);
 });
 
-// Joe 10/21 ("tighten our times up"): the usual past night (the middle one), not the slowest.
-test('tonight blends with the usual past night, and counts for more while there are few nights', () => {
-  const f = R.loadForecast({ date: MON, loads: tonightDone.concat(tonightLeft), history: [night('2026-10-12', 785), night('2026-10-05', 744)] }, NOW);
-  const t = R.nightPace(tonightDone), p = [R.nightPace(night('2026-10-12', 785).loads).rate, R.nightPace(night('2026-10-05', 744).loads).rate];
-  assert.equal(f.from, 'both');
-  const w = 5 / (5 + 1.5 * 2);
-  assert.equal(f.rate, Math.round(w * t.rate + (1 - w) * Math.round((p[0] + p[1]) / 2)), 'two nights: halfway between them');
-  const three = R.loadForecast({ date: MON, loads: tonightLeft, history: [night('2026-10-12', 785), night('2026-10-05', 744), night('2026-09-28', 300)] }, NOW);
-  assert.equal(three.rate, R.nightPace(night('2026-10-05', 744).loads).rate, 'three nights: the middle one, not the slow 300');
-  assert.ok(w > 0.5, 'tonight weighs more than the past nights while there are only two');
-  assert.match(f.paceText, /^Mon 10-5-26, Mon 10-12-26 \+ tonight \(5 loads\), slow-night cushion$/);
-  const more = R.loadForecast({ date: MON, loads: tonightDone, history: [1, 2, 3, 4].map(n => night('2026-09-' + (10 + n), 800)) }, NOW);
-  assert.ok(more.weight < f.weight, 'more past nights, less weight on tonight');
-  assert.equal(R.loadForecast({ date: MON, loads: tonightDone, history: [] }, NOW).from, 'tonight');
-  assert.equal(R.loadForecast({ date: MON, loads: tonightLeft, history: [night('2026-10-12', 785)] }, NOW).rate, 785);
-  assert.equal(R.loadForecast({ date: MON, loads: tonightLeft, history: [] }, NOW).rate, R.FORECAST.usualRate, 'nothing timed yet: the plant\'s usual pace');
+// Joe 10/22 ("some kind of percentage of using past data until it builds up… 80% max… every week, let's increase that").
+test('past nights count 10% in the week of Sun 10-18-26, 10% more each week, never over 80%', () => {
+  assert.equal(R.historyShare('2026-10-18'), 0.1);
+  assert.equal(R.historyShare('2026-10-24'), 0.1, 'Saturday is the same week');
+  assert.equal(R.historyShare('2026-10-25'), 0.2);
+  assert.equal(R.historyShare('2026-11-29'), 0.7);
+  assert.equal(R.historyShare('2026-12-06'), 0.8);
+  assert.equal(R.historyShare('2027-03-01'), 0.8, 'never over 80%');
+  assert.equal(R.historyShare('2026-10-01'), 0.1);
 });
 
-test('loads follow each other in loading order; late = after dispatch or after the 6 a.m. shift end', () => {
-  const f = R.loadForecast({ date: MON, loads: tonightDone.concat(tonightLeft), history: [night('2026-10-12', 785), night('2026-10-05', 744)] }, NOW);
+// A past night where one load of `cases` cases loaded in an hour.
+const timedNight = (date, cases, route) => ({ date, loads: [{ area: 'CASE', state: 'DONE', route: route || 'X', run: '', quantity: cases, startedAt: date + 'T20:00:00-04:00', completedAt: date + 'T21:00:00-04:00' }] });
+// Joe 10/22 (option az): a fresh start at 6 AM on the 1,000 rule; today's own speed once 3 of today's loads are timed.
+test('the 1,000 rule until 3 of today\'s loads are timed, then today\'s speed; past nights blend in by the week\'s share', () => {
+  const one = wait('1', '', 1000, H(4));
+  const rule = R.loadForecast({ date: MON, loads: [one], history: [] }, NOW);
+  assert.equal(rule.from, 'rule');
+  assert.equal(rule.rate, 1000);
+  assert.equal(rule.share, 0, 'no past nights: nothing to blend');
+  assert.equal(rule.loads[0].minutes, 60);
+  const two = R.loadForecast({ date: MON, loads: tonightDone.slice(0, 2).concat([one]), history: [] }, NOW);
+  assert.equal(two.from, 'rule', 'two timed loads today are not enough');
+  const t = R.loadForecast({ date: MON, loads: tonightDone.concat([one]), history: [] }, NOW);
+  assert.equal(t.from, 'today');
+  assert.equal(t.rate, R.nightPace(tonightDone).rate);
+  assert.equal(t.loads[0].minutes, Math.round(60 * 1000 / t.rate));
+  // Mon 10-19-26 is in the first week (10%). A past Monday that loaded 500 cases an hour: 1,000 cases = 120 minutes there.
+  const h = R.loadForecast({ date: MON, loads: [one], history: [timedNight('2026-10-12', 500)] }, NOW);
+  assert.equal(h.share, 0.1);
+  assert.equal(h.loads[0].minutes, Math.round(0.9 * 60 + 0.1 * 120));
+  const later = R.loadForecast({ date: '2026-12-07', loads: [Object.assign({}, one, { loadDate: '2026-12-07', deliveryDate: '2026-12-08', departureDate: '2026-12-08' })], history: [timedNight('2026-11-30', 500)] }, Date.parse('2026-12-07T23:00:00Z'));
+  assert.equal(later.share, 0.8);
+  assert.equal(later.loads[0].minutes, Math.round(0.2 * 60 + 0.8 * 120));
+  // A past night timed only from End to End (no Start) has nothing clean to give.
+  assert.equal(R.loadForecast({ date: MON, loads: [one], history: [{ date: '2026-10-12', loads: [{ area: 'CASE', state: 'DONE', quantity: 500, completedAt: '2026-10-12T20:00:00-04:00' }] }] }, NOW).share, 0);
+  assert.doesNotMatch(h.paceText, /cushion/);
+  assert.match(h.paceText, /^1,000 cases an hour \+ 10% past nights \(Mon 10-12-26\)$/);
+});
+
+test('loads follow each other in loading order; late = done after its own dispatch', () => {
+  const f = R.loadForecast({ date: MON, loads: tonightLeft, history: [] }, NOW);
   assert.deepEqual(f.loads.map(x => x.route), tonightLeft.map(x => x.route), 'loading order');
   const by = Object.fromEntries(f.loads.map(x => [x.route, x]));
   const now = R.wallClock(NOW);
   assert.equal(by['845'].start, now);
   f.loads.slice(1).forEach((x, i) => assert.equal(x.start, f.loads[i].est, x.route + ' starts when the one before is done'));
   // Bigger loads take longer; even a small one takes at least 15 minutes at the standard.
-  assert.ok(by['907_1'].minutes > by['805'].minutes && by['805'].minutes >= Math.round(15 * 1000 / f.rate) - 1);
+  assert.ok(by['907_1'].minutes > by['805'].minutes && by['805'].minutes === 15, 'a small load takes 15 minutes at 1,000 an hour');
   f.loads.forEach(x => assert.equal(x.est % 5, 0, x.route + ' Est. Done is rounded up to 5 minutes'));
   assert.equal(by['845'].late, false);
   assert.equal(by['950_1'].late, false, 'Charleston leaves Tuesday 4 PM (Delivery Day) and is done tonight');
   const shiftEnd = R.wallClock(Date.parse('2026-10-20T10:00:00Z'));
   assert.equal(by['909_1'].shiftEnd, shiftEnd);
-  assert.ok(by['909_1'].est > shiftEnd, 'Marietta is near the end of the line');
-  assert.equal(by['909_1'].late, true);
-  assert.equal(by['909_1'].reason, 'past the 6:00 AM shift end', 'it leaves Tuesday 9 PM, but the shift stops at 6 a.m.');
-  assert.equal(by['909_1'].lateBy, by['909_1'].est - shiftEnd);
   assert.equal(f.late, f.loads.filter(x => x.late).length);
-  assert.ok(f.late >= 1);
+  f.loads.forEach(x => assert.equal(x.late, x.est > x.leaves, x.route + ' is late only when done after its own dispatch'));
   // Due by 5:00 AM: the loads leaving by Tuesday 5:00 AM.
   assert.deepEqual(f.loads.filter(x => x.leaves <= f.dueAt).map(x => x.route).sort(), ['803', '805', '808', '812', '813', '822', '825', '845', '971']);
   assert.equal(f.due.loads, 9);
@@ -102,6 +121,20 @@ test('a load misses dispatch before the shift end', () => {
   assert.match(R.forecastLateText(f)[0], /^1 est\. \d+:\d\d PM, leaves 7:30 PM$/);
 });
 
+// Joe 10/22 ("Route 8302 being late, but the dispatch time is 9 a.m., so that's not late"): done after 6 AM but before its own
+// dispatch is on time; the 6:00 AM shift end counts only for a load with no dispatch time.
+test('a load done after 6 AM but before its own dispatch is not late; one with no dispatch time is late after 6 AM', () => {
+  const at = Date.parse('2026-10-20T09:30:00Z'); // Tue 5:30 AM, Monday's operating day
+  const f = R.loadForecast({ date: MON, loads: [wait('8302', 'WALMART', 900, H(9), { leavesOn: 'Delivery Day' }), wait('x', '', 900, null)] }, at);
+  const by = Object.fromEntries(f.loads.map(x => [x.route, x]));
+  assert.ok(by['8302'].est > by['8302'].shiftEnd, '8302 is done after 6 AM');
+  assert.equal(by['8302'].late, false, 'but it leaves at 9:00 AM');
+  assert.equal(by['x'].leaves, null);
+  assert.equal(by['x'].late, true);
+  assert.equal(by['x'].reason, 'past the 6:00 AM shift end');
+  assert.equal(f.late, 1);
+});
+
 test('a load being loaded finishes its own time after it started; the line waits for it', () => {
   const loading = wait('2', '', 600, H(4), { state: 'LOADING', startedAt: iso(MON, '18:30') });
   const f = R.loadForecast({ date: MON, loads: [wait('3', '', 600, H(4)), loading], history: [] }, NOW);
@@ -120,7 +153,8 @@ test('a load with no cases counted takes the night\'s usual load', () => {
 });
 
 test('the email and the report carry the forecast', () => {
-  const loads = tonightDone.concat(tonightLeft), forecast = R.loadForecast({ date: MON, loads, history: [night('2026-10-12', 785), night('2026-10-05', 744)] }, NOW);
+  // 6304 leaves at 9:00 PM tonight on its load day and cannot be done by then.
+  const loads = tonightDone.concat([wait('6304_2', 'WALMART', 1200, H(19, 30), { departureDate: MON, leavesOn: 'Load Day' })], tonightLeft), forecast = R.loadForecast({ date: MON, loads, history: [] }, NOW);
   const r = R.plantReport({ loads, forecast }, NOW);
   assert.equal(r.forecast, forecast);
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
@@ -131,11 +165,13 @@ test('the email and the report carry the forecast', () => {
   assert.match(html, new RegExp('About ' + R.forecastSummary(forecast).behindText.replace(/^About /, '')));
   assert.doesNotMatch(html, /est\. [0-9:]+ [AP]M, (leaves|past the)/);
   assert.match(r.text, /About .* behind/);
-  assert.match(html, /Due by 5:00 AM/);
+  // Joe 10/22 (option az): every time has its day.
+  assert.match(html, /Due by Tue 5:00 AM: \d+ loads, [\d,]+ cases.*est\. Tue \d+:\d\d [AP]M/);
+  assert.match(html, /All loads done.*est\. (Mon|Tue) \d+:\d\d [AP]M/);
   assert.match(html, /Est\. Done/);
-  assert.match(html, /past the 6:00 AM shift end/);
+  assert.match(html, /misses dispatch/);
   assert.match(r.text, /^LATE FORECAST \(ESTIMATED\)/m);
-  assert.match(r.text, /Due by 5:00 AM: 9 loads/);
+  assert.match(r.text, /Due by Tue 5:00 AM: 10 loads, [\d,]+ cases, est\. done Tue \d+:\d\d [AP]M/);
   // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
   [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
@@ -229,9 +265,9 @@ test('a load with no case count is sized from its own route, and "1,150" reads a
 test('a run with past nights takes its own time, and a due-by time is red only for the late loads leaving then', () => {
   const at = (d, h, m) => new Date(Date.UTC(2026, 9, d, h + 4, m)).toISOString();
   const past = (d) => ({ date: '2026-10-' + d, loads: [
-    { id: 'a' + d, area: 'CASE', route: '808', run: 'DSD', quantity: '400', state: 'DONE', completedAt: at(d, 20, 0) },
-    { id: 'b' + d, area: 'CASE', route: '812', run: 'DSD', quantity: '400', state: 'DONE', completedAt: at(d, 20, 20) },
-    { id: 'c' + d, area: 'CASE', route: '822', run: 'DSD', quantity: '400', state: 'DONE', completedAt: at(d, 21, 50) }] });
+    { id: 'a' + d, area: 'CASE', route: '808', run: 'DSD', quantity: '400', state: 'DONE', startedAt: at(d, 19, 40), completedAt: at(d, 20, 0) },
+    { id: 'b' + d, area: 'CASE', route: '812', run: 'DSD', quantity: '400', state: 'DONE', startedAt: at(d, 20, 0), completedAt: at(d, 20, 20) },
+    { id: 'c' + d, area: 'CASE', route: '822', run: 'DSD', quantity: '400', state: 'DONE', startedAt: at(d, 20, 20), completedAt: at(d, 21, 50) }] });
   const now = Date.UTC(2026, 9, 21, 22, 0);
   const L = (route, disp) => ({ id: 't' + route, area: 'CASE', route, run: 'DSD', quantity: '400', state: 'NOT_STARTED', loadDate: '2026-10-21', deliveryDate: '2026-10-22', dispatchTime: disp });
   const f = R.loadForecast({ date: '2026-10-21', loads: [L('812', '18:20'), L('822', '04:00')], history: [past(14), past(7)] }, now);
@@ -251,8 +287,38 @@ test('a load left over from last night is behind only by the loading it still ha
     { id: 't', area: 'CASE', route: '856', run: 'SAVE-A-LOT 2', quantity: '900', state: 'NOT_STARTED', loadDate: '2026-10-21', deliveryDate: '2026-10-22', dispatchTime: '3:00 PM', leavesOn: 'Load Day' }];
   const f = R.loadForecast({ date: '2026-10-21', loads }, now);
   const p = f.loads.find(x => x.id === 'p');
-  assert.equal(p.late, true, 'past its 6:00 AM shift end');
+  assert.equal(p.late, true, 'done after its 8:00 AM dispatch');
+  assert.equal(p.reason, 'misses dispatch');
   assert.ok(p.est - p.shiftEnd > p.minutes, 'it finishes more than its own loading time after 6 a.m.');
-  assert.equal(p.lateBy, p.est - Math.max(p.start, f.now), 'but it is behind only by its own loading time');
+  assert.equal(p.lateBy, Math.min(p.est - p.leaves, p.est - Math.max(p.start, f.now)), 'behind by no more than its own loading time');
+  assert.ok(p.lateBy <= p.est - Math.max(p.start, f.now));
   assert.equal(f.behind, Math.ceil(p.lateBy / 5) * 5);
+});
+
+// Joe 10/22 (7:36 AM, 0 of 29 loaded, "About 8 hr 20 min behind"; option az): a fresh start at 6 AM. Last night's left-over
+// loads go first with their own times on their own line; today's loads go at 1,000 cases an hour, so a morning with nothing
+// loaded yet is not hours behind. Past nights timed End to End (waits counted as loading) no longer slow it down.
+test('the morning after a slow night: left-over loads on their own line, today on time', () => {
+  const at = Date.parse('2026-10-22T11:36:00Z'), WED = '2026-10-21', THU = '2026-10-22', FRI = '2026-10-23';
+  const row = (id, route, run, cases, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', state: 'WAITING', loadDate: THU, deliveryDate: FRI, departureDate: FRI, leavesOn: 'Delivery Day', dispatchTime: dispatch, quantity: cases, prior: false }, extra || {});
+  const left = (id, route, run, cases, dispatch) => row(id, route, run, cases, dispatch, { loadDate: WED, deliveryDate: THU, departureDate: THU, prior: true });
+  const today = [['813', 1, 30], ['824', 1], ['6303', 1], ['854', 2], ['880', 2], ['6302', 3], ['6304', 3], ['808', 3, 45], ['8301', 4], ['803', 4, 30], ['812', 5], ['6301_1', 5], ['822', 5, 15], ['825', 5, 30],
+    ['901_1', 7], ['980', 7], ['907', 8], ['971', 8], ['909_1', 6], ['8302_1', 9], ['6301_2', 9], ['901_2', 11]].map(([r, h, m]) => row('t' + r, r, '', 300, H(h, m)));
+  // A past Thursday where every load waited an hour on product before the next: End to End it read about 300 cases an hour.
+  const past = { date: '2026-10-15', loads: [0, 1, 2, 3].map(i => ({ id: 'h' + i, area: 'CASE', route: '6302', run: '', quantity: 300, state: 'DONE', completedAt: '2026-10-15T' + (20 + i) + ':00:00-04:00' })) };
+  const loads = [left('p901', '901_1', 'PRODUCT 1', 850, H(7)), left('p907', '907', 'FAIRMONT TRANSFER', 850, H(8))].concat(today);
+  const f = R.loadForecast({ date: THU, loads, history: [past] }, at);
+  assert.equal(f.rate, 1000);
+  assert.equal(f.share, 0, 'the past night has no Start times: nothing clean to blend in');
+  assert.equal(f.todayLate, 0, 'today\'s loads are on time');
+  assert.deepEqual([f.prior.loads, f.prior.cases, f.prior.from], [2, 1700, 'Wed 10-21-26']);
+  assert.match(f.prior.doneWhen, /^Thu \d+:\d\d AM$/);
+  assert.ok(f.behind <= 120, 'behind by the left-over loading only, not 8 hours: ' + f.behind);
+  assert.match(f.allDoneWhen, /^Thu /);
+  const r = R.plantReport({ loads, forecast: f }, at), html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
+  assert.match(html, /Left over from Wed 10-21-26: 2 loads, 1,700 cases/);
+  assert.match(html, /Today&#39;s loads|Today's loads/);
+  assert.match(html, /On time/);
+  assert.match(r.text, /Left over from Wed 10-21-26: 2 loads, 1,700 cases, est\. done Thu \d+:\d\d AM/);
+  assert.match(r.text, /Today's loads: on time/);
 });
