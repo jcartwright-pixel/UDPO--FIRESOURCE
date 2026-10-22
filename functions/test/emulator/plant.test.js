@@ -174,6 +174,10 @@ test('Scheduler: no sample suppliers; a supplier can be edited or removed (Joe 1
 test('Scheduler: a station loads a Shipping load and receives a Receiving load (Joe 10/12, Boxing); a finished one stays finished', async () => {
   const work = async (lane, id) => (await lanes(lane)).find(e => e.id === id).work;
   assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WAITING');
+  // Joe 10/22: typing a trailer (or a count) on a load not yet started saves it and leaves the load waiting.
+  await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { trailer: 'T-969', count: '10' } });
+  const typed = (await lanes('SHIPPING')).find(e => e.id === 'SCHED-s1');
+  assert.deepEqual([typed.work.state, typed.work.startedAt, typed.trailer, typed.work.count], ['WAITING', '', 'T-969', '10'], 'a typed trailer does not start the load');
   await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'start' });
   assert.equal((await work('SHIPPING', 'SCHED-s1')).state, 'WORKING');
   await schedule({ lane: 'SHIPPING', op: 'progress', id: 'SCHED-s1', date: '2026-10-08', step: 'save', fields: { count: '412', temperature: '34', trailer: 'T-970' } });
