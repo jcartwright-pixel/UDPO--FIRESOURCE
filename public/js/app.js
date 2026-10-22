@@ -909,7 +909,10 @@ export async function requireSignIn(ready) {
 // "Saving... / Saved" beside the screen's title (Daily's sign), on every screen that saves (polish 15). Screens that use
 // edit.js show it from there instead, around their own saves.
 let pillTimer = null, saving = 0, saveFailed = false;
+// Joe 10/22 (practice test; his standing rule: no save messages anywhere): no screen shows "Saving…" or "Saved"; only a save
+// that failed says "Not saved", and the next save that works takes it away.
 export function savePill(state) {
+  if (state !== 'failed') { const p = document.getElementById('save-pill'); if (p) p.hidden = true; return; }
   let pill = document.getElementById('save-pill');
   if (!pill) {
     const title = document.querySelector('.head .title h1');

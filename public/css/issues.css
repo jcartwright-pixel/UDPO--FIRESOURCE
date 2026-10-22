@@ -58,7 +58,7 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
 
 /* Trucks Today (trucks.html): one pill per truck's status. */
 .trucks-page .tt-board td small { display: block; color: var(--muted); font-size: 16px; }
-.trucks-page .tt-pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-weight: 800; font-size: 15px; white-space: nowrap; }
+.trucks-page .tt-pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-weight: 800; font-size: 16px; white-space: nowrap; }
 .trucks-page .tt-road { background: #e3f4e8; color: #1d6b37; }
 .trucks-page .tt-stopped { background: #e7eef7; color: #1d4f86; }
 .trucks-page .tt-yard { background: #eef2f5; color: #4b5b6b; }
@@ -72,7 +72,7 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
 .trucks-page .tt-alerts.has { border-color: #e7a6a0; background: #fde3df; color: #a8321f; }
 .trucks-page tr.tt-events > td { background: #f6f8fb; padding: 4px 12px 8px; }
 .trucks-page tr.tt-events table { width: 100%; border-collapse: collapse; font-size: 16px; }
-.trucks-page tr.tt-events th, .trucks-page tr.tt-events table td { position: static; background: none; color: var(--muted); border: 0; text-align: left; padding: 4px 10px; font-size: 14px; text-transform: uppercase; }
+.trucks-page tr.tt-events th, .trucks-page tr.tt-events table td { position: static; background: none; color: var(--muted); border: 0; text-align: left; padding: 4px 10px; font-size: 16px; text-transform: uppercase; }
 .trucks-page tr.tt-events table td { color: inherit; font-size: 16px; text-transform: none; }
 .trucks-page tr.tt-events th:nth-child(1) { width: 12%; } .trucks-page tr.tt-events th:nth-child(2) { width: 22%; } .trucks-page tr.tt-events th:nth-child(3) { width: 28%; }
 .trucks-page .tt-none { color: var(--muted); padding: 6px 10px; text-align: left; }

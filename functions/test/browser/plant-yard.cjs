@@ -137,7 +137,7 @@ async function seed() {
     await desk.fill(row('T-701') + ' .yd-temp', '35');
     const t0 = Date.now();
     await desk.press(row('T-701') + ' .yd-temp', 'Tab');
-    await desk.waitForFunction(() => /Saved|\d/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-tick') || {}).textContent || ''));
+    await desk.waitForFunction(() => /Checked|\d/.test((document.querySelector('#rows tr[data-trailer="T-701"] .yd-tick') || {}).textContent || ''));
     const shown = Date.now() - t0;
     await watcher.waitForFunction(() => !document.querySelector('#rows tr[data-trailer="T-701"]') && /^4Active2Due2Checked/.test(document.getElementById('hstats').textContent), null, { timeout: 8000 });
     await desk.selectOption(row('T-701') + ' select', '1/2');
@@ -193,16 +193,16 @@ async function seed() {
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-390.png'), scale: 'css' });
     await phone.fill(card + ' [data-k="temperature"]', '37');
     await phone.press(card + ' [data-k="temperature"]', 'Enter');
-    await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
+    await phone.waitForFunction((c) => /Checked/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     await phone.fill(card + ' [data-k="setPoint"]', '33');
     await phone.press(card + ' [data-k="setPoint"]', 'Enter');
     await phone.selectOption(card + ' [data-k="fuelLevel"]', '3/4');
     await new Promise(r => setTimeout(r, 1500));
-    await phone.waitForFunction((c) => /Saved/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
+    await phone.waitForFunction((c) => /Checked/.test((document.querySelector(c + ' .yd-tick') || {}).textContent || ''), card);
     const one = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-702');
     assert.equal(one.length, 1, 'the three boxes fill in one check');
     assert.deepEqual([one[0].payload.temperature, one[0].payload.setPoint, one[0].payload.fuelLevel, one[0].payload.notes], ['37', '33', '3/4', '']);
-    results.push('Phone: T-702 temp, set point and fuel each saved as they were left, into one check; the row stays with "Saved"');
+    results.push('Phone: T-702 temp, set point and fuel each saved as they were left, into one check; the row stays with "Checked"');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'yard-phone-saved-390.png'), scale: 'css' });
     // Notes: the button opens a box under the row; what is typed saves into the same check when the box is left.
     await phone.click(card + ' [data-notes]');

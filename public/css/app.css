@@ -414,6 +414,10 @@ body.weekly-page { background: #eef3f7; }
 .dc-link span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-link .dc-arrow { font-size: 22px; }
 .dc-link:hover { border-color: var(--accent); background: #f5f9fd; }
+/* Joe 10/22 (practice test: Route Distribution's NEEDS DRI…, HAVE A DR…, ACTIVE RU…, DRIVERS T…): a tile's words show whole,
+   taking a second line when the tile is narrow, never cut with "…". */
+.dc-metric em, .dc-metric small { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; text-align: center; }
+.dc-link span:first-child { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; }
 .card.home4:hover { box-shadow: 0 7px 18px rgba(13,52,87,.075); }
 .card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
@@ -726,6 +730,12 @@ table.otr-bydate td { padding: 0; height: 36px; }
   .head:has(#print-sheet) h1 { font-size: 26px; }
   .head:has(#print-sheet) .coverage { width: 82px; }
 }
+/* Joe 10/22 (practice test: "Wednesd" and "10-18-2" at 1536): the week box and the day picker are as wide as their longest
+   word and never squeezed by the tiles beside them. */
+.head:has(#print-sheet) .field { flex: none; }
+.head:has(#print-sheet) .field .stepper #load-day { flex: none; width: 12.5ch; min-width: 12.5ch; }
+.head:has(#print-sheet) .field .stepper #week-begin { flex: none; width: 9.5ch; min-width: 9.5ch; }
+.head:has(#print-sheet) .field .stepper #delivery-day { flex: none; width: 11ch; min-width: 11ch; }
 /* Link tiles match the button tiles. */
 .head .actions.in-head a.button { display: inline-flex; align-items: center; justify-content: center; width: 92px; min-width: 92px; height: 58px; min-height: 58px; padding: 4px 7px; border-radius: 10px; white-space: normal; line-height: 1.12; font-size: 16px; font-weight: 800; text-align: center; }
 @media (max-width: 1500px) { .head .actions.in-head a.button { width: 82px; min-width: 82px; font-size: 16px; } }

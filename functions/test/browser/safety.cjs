@@ -159,8 +159,9 @@ async function cameraShot(page, color) {
     assert.equal(await wk.textContent(row('exit_routes') + ' .sw-state'), 'Not checked');
     // Joe 10/12: every row has a note box, marked or not.
     assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('input[data-note]')).length), 0, 'every row has a note box');
-    await wk.click(row('exit_routes') + ' .sw-btn.good');
-    await wk.waitForFunction(() => document.querySelector('#save-pill') && /Saved/.test(document.querySelector('#save-pill').textContent));
+    // Joe 10/22: no "Saved" sign on any screen; the save's answer is waited for instead.
+    await Promise.all([wk.waitForResponse(r => /\/save(\?|$)/.test(r.url()) && r.request().method() === 'POST' && r.ok()), wk.click(row('exit_routes') + ' .sw-btn.good')]);
+    assert.equal(await wk.evaluate(() => { const x = document.getElementById('save-pill'); return !!(x && !x.hidden); }), false, 'no save sign after a save');
     await wk.click(row('panel_labels') + ' .sw-btn.bad');
     await wk.waitForSelector('#list tr[data-more="panel_labels"]');
     assert.equal(await wk.getAttribute('#list input[data-note="panel_labels"]', 'placeholder'), 'What is wrong');

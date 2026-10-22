@@ -223,6 +223,41 @@
     return (entries || []).map(function (x) { return Object.assign({}, x, out[x.id] || { loadNo: 1, slot: null, overSlots: false }); });
   }
 
+  /* Joe 10/22 (practice test: "7 / 22" on Plant Departments, "7 of 23" on the Case Loadout): every screen that counts a day's
+     loads counts what the loadouts show, each loadout's dispatch loads with their Scheduler line put on, plus that day's
+     Scheduler loads of its load type that are not one of them (a carrier pickup, a box load). routes = Route Master docs
+     (runId); a screen that cannot read them (a station-code tablet) passes [] and the runs on its loads stand in. */
+  function scheduleRoutes(routes, runs) {
+    if (routes && routes.length) return routes;
+    var seen = {};
+    return (runs || []).filter(function (r) { return r.runId && !seen[r.runId] && (seen[r.runId] = true); }).map(function (r) {
+      return { runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '' };
+    });
+  }
+  // The day's Shipping loads (by load day), numbered, from the Scheduler records (plantJournal).
+  function scheduleLoadsOn(docs, customers, date) {
+    return numberLoads(scheduleEntries(docs, 'SHIPPING'), customers).filter(function (x) { return (x.loadDate || x.date) === date; });
+  }
+  function scheduleLoadState(w) { return w.state === 'COMPLETE' ? 'DONE' : w.state === 'WORKING' || w.state === 'PAUSED' ? 'LOADING' : 'WAITING'; }
+  // live = the loadouts' rows (plant-core loadoutRows); todays = scheduleLoadsOn. A Scheduler load goes on the dispatch load of
+  // its run (Joe 10/14: a case trailer on the dispatch sheet shows once); the others are added as their own lines.
+  function withScheduleLoads(live, todays, customers) {
+    var up = function (v) { return text(v).toUpperCase(); };
+    var sameRun = function (a, b) { return (a.runId && a.runId === b.runId) || (!!up(a.route) && up(a.route) === up(b.route) && up(a.run) === up(b.run)); };
+    var on = {}, extra = [];
+    (todays || []).forEach(function (x) {
+      var kind = scheduleArea(x, customers), slot = x.slot ? Object.assign({}, x, x.slot) : x;
+      var r = x.overSlots ? null : (live || []).find(function (b) { return b.area === kind && !b.prior && !on[b.id] && sameRun(b, slot); });
+      if (r) { on[r.id] = x; return; }
+      var w = x.work || {}, n = Number(w.count);
+      extra.push({ id: 'sch:' + x.id, sched: x, area: kind, prior: false, route: (x.slot && x.slot.route) || x.route, run: loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
+        driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
+        state: scheduleLoadState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '' });
+    });
+    extra.sort(function (a, b) { return (a.sched.pickupTime || '99:99').localeCompare(b.sched.pickupTime || '99:99'); });
+    return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r; }).concat(extra);
+  }
+
   // Joe 10/20 ("we should have the screen a confirmation before we finalize the scheduled delivery"): a PO on Peck was saved by
   // accident and showed on the wrong loadout day. Before a new load is saved, or a load's dates change, the screen shows what
   // will be saved, with a warning when the load day has passed or is not the run's usual load day on Route Master (its
@@ -1312,7 +1347,7 @@
 
   return { FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
+    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,

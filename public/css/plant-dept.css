@@ -84,7 +84,7 @@
    on hover), and the chart, list and tile labels are 16px. */
 .dept-a .dc-links, .dept-a .dc-links.two { grid-auto-rows: minmax(42px, auto); }
 .dept-a .dc-link, .dept-a .dc-links.two .dc-link { font-size: 16px; padding-top: 3px; padding-bottom: 3px; }
-.dept-a .dc-link span:first-child { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.2; overflow-wrap: anywhere; }
+.dept-a .dc-link span:first-child { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.2; overflow-wrap: anywhere; overflow: hidden; }
 .dept-a .dc-link .dc-side { font-size: 16px; }
 .dept-a .dc-text small { font-size: 16px; letter-spacing: .04em; }
 .dept-a .sec-t { font-size: 16px; letter-spacing: .03em; }
@@ -112,3 +112,7 @@
 .dept-a .card.dc .dc-metric small { font-size: 16px; letter-spacing: 0; text-transform: none; font-weight: 700; }
 .dept-a .card.dc .dc-metrics { grid-auto-rows: 76px; }
 .plant-page .dept-a .dc-note { font-size: 16px; }
+/* Joe 10/22 (practice test on live data: "23 loads · 2 pic…", "Behind schedule all departments · 3…", "T-978 · 8302_2 needed
+   f…"): every word shows whole; a line too long for its box takes a second line instead of being cut with "…". */
+.dept-a .card .chip small, .dept-a .card .li > span:first-child, .dept-a .sec-t span:last-child { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; }
+.dept-a .hour small { line-height: 1.05; text-align: center; }

@@ -200,7 +200,8 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     for (const [w, h] of [[1920, 950], [1366, 650]]) {
       const home = await openPage(browser, w, h, '/plant.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
       // Joe 10/10: driver pickups count in the Loading totals: 16 runs plus 3 pickups (two in plant-demo.js, one added above).
-      await home.waitForFunction(() => document.querySelector('[data-n="load.total"]').textContent === '19');
+      // Joe 10/22: the Scheduler's Sun Valley carrier load for this day (SCHED-s1) counts too, as on the Loadout pages: 20.
+      await home.waitForFunction(() => document.querySelector('[data-n="load.total"]').textContent === '20');
       // Thursday's trailers back: 16 runs plus 6303; 6303 and 802 unloaded, 805 unloading (plant-demo.js).
       await home.waitForFunction(() => document.querySelector('[data-n="unload.total"]').textContent === '17');
       assert.equal(await home.textContent('[data-n="unload.done"]'), '2');
