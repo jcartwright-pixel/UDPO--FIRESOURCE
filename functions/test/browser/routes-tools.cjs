@@ -238,6 +238,60 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     assert.ok(await fits(p), 'Load Order fits 1920x1080');
     results.push('Load Order: dragging a line and Alt+Up moved a run and saved the day\'s order (no arrows)');
 
+    // Joe 10/22: Load Day and Run By change on the Load Order list from pick lists only; Start Time stays, typed or moved
+    // 15 minutes a click with the up / down clicker.
+    const seqRow = 'table.routes tr[data-id="' + before[0] + '"] ';
+    assert.equal(await p.$$eval(seqRow + 'select[data-seq="loadDayOffset"] option', o => o.filter(x => x.value).map(x => x.textContent).slice(0, 3).join('|')), 'Same day|Day before|2 days before');
+    await p.selectOption(seqRow + 'select[data-seq="loadDayOffset"]', '-2');
+    assert.equal(await stored(before[0], 'mon', 'loadDayOffset', -2), -2, 'Load Day picked on Load Order: 2 days before');
+    const owner = (await db().collection('routes').doc(before[0]).get()).data().coverageOwner || '';
+    await p.selectOption(seqRow + 'select[data-seq="coverageOwner"]', 'Fairmont');
+    await settled();
+    assert.equal((await db().collection('routes').doc(before[0]).get()).data().coverageOwner, 'Fairmont', 'Run By picked on Load Order');
+    if (owner) { await p.selectOption(seqRow + 'select[data-seq="coverageOwner"]', owner); await settled(); }
+    await p.fill(seqRow + 'input.seq-time', '530a');
+    await p.keyboard.press('Enter');
+    assert.equal(await p.$eval(seqRow + 'input.seq-time', x => x.value), '5:30 AM', 'a typed time reads as a time');
+    assert.equal(await stored(before[0], 'mon', 'dispatchTime', 330), 330, 'typed start time saved');
+    await p.hover(seqRow + 'td.seq-time-cell');
+    await p.click(seqRow + 'button.seq-step[data-step="15"]');
+    await p.waitForFunction((s) => document.querySelector(s).value === '5:45 AM', seqRow + 'input.seq-time');
+    assert.equal(await stored(before[0], 'mon', 'dispatchTime', 345), 345, 'the clicker moved it 15 minutes later');
+    assert.equal(await p.$eval(seqRow + 'select[data-seq="loadDayOffset"]', x => getComputedStyle(x).fontSize), '16px');
+    results.push('Load Order: Load Day and Run By saved from pick lists; Start Time saved typed and by the 15-minute clicker');
+
+    // Joe 10/22: "Uniontown routes" in the route list shows only the runs on Weekly Dispatch.
+    await p.selectOption('#route-select', '__weekly__');
+    await p.waitForTimeout(300);
+    const shownSeq = await order();
+    const weekRows = (await db().collection('runs').get()).docs.map(d => d.data());
+    assert.ok(shownSeq.length > 0, 'some runs are on Weekly');
+    // Every run left on the list has a row on the Live week (Weekly reads those).
+    for (const id of shownSeq) assert.ok(weekRows.some(x => String(x.runId || '').replace(/[\/\s]+/g, '_') === id), id + ' is on a Live week');
+    await p.selectOption('#route-select', '');
+    await p.waitForTimeout(300);
+    assert.ok((await order()).length >= shownSeq.length, 'All routes shows at least as many');
+    results.push('Route list: "Uniontown routes" shows only the runs on Weekly');
+
+    // Joe 10/22: Weekly Order sets the Weekly Dispatch line order; Weekly's own rows for this week follow at once.
+    await p.selectOption('#view-select', 'weekseq');
+    await p.waitForSelector('table.routes.weekseq tr[data-i="1"][data-drag]');
+    const wk = await order();
+    await p.focus('table.routes tr[data-drag="' + wk[0] + '"]');
+    await p.keyboard.press('Alt+ArrowDown');
+    await p.waitForFunction((b) => [...document.querySelectorAll('table.routes tbody tr[data-i]')].map(x => x.dataset.id)[1] === b[0], wk, { timeout: 5000 });
+    await settled();
+    const wo = async (id) => (await db().collection('routes').doc(id).get()).data().weekOrder;
+    assert.ok(await wo(wk[1]) < await wo(wk[0]), 'the run moved down comes after the next one in Route Master');
+    const cur = ((await db().collection('config').doc('app').get()).data().liveWeeks || {}).current;
+    const rowsNow = (await db().collection('runs').get()).docs.map(d => d.data()).filter(x => x.weekStart >= cur && String(x.runId || '').replace(/[\/\s]+/g, '_') === wk[0]);
+    assert.ok(rowsNow.length, 'the moved run has rows this week');
+    for (const x of rowsNow) assert.equal(x.weekOrder, await wo(wk[0]), 'Weekly\'s rows take the new order at once');
+    assert.ok(await fits(p), 'Weekly Order fits 1920x1080');
+    await shot(p, 'routes-week-order-1920.png');
+    results.push('Weekly Order: Alt+Down moved a run down the Weekly line order and saved it');
+    await p.selectOption('#view-select', 'seq');
+
     // Route Details for many runs at once: every run on one page; a list and a box save on their own.
     await p.selectOption('#view-select', 'many');
     await p.waitForSelector('table.routes.many tr[data-id="run_t802"] select[data-many="loadType"]');

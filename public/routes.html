@@ -36,7 +36,7 @@
         <label>View / Edit<select id="view-select">
           <option value="times">Start Times</option><option value="miles">Mileage</option><option value="hours">Hours and Return</option><option value="offset">Load Day</option>
           <option value="truck">Default Truck</option><option value="trailer">Default Trailer</option><option value="jack">Default Pallet Jack</option>
-          <option value="seq">Load Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="names">Route Names</option><option value="many">Route Details (many runs)</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
+          <option value="seq">Daily Order (drag)</option><option value="weekseq">Weekly Order (drag)</option><option value="days">Days and Visibility</option><option value="rules">Show / Hide Rules</option><option value="names">Route Names</option><option value="many">Route Details (many runs)</option><option value="details">Route Editor (one run)</option><option value="recap">Recap</option>
         </select></label>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Route Master is not changed yet</span></div>
@@ -98,7 +98,8 @@
       jack: { field: 'forklift', title: 'Default Pallet Jack / Forklift', sub: 'Type the unit number. Blank clears the default. ' + KEYS, ph: 'unit' }
     };
     const OTHER = {
-      seq: ['Load Order', 'Pick a day, then drag a whole run line to its place in the loadout (or Alt+Up / Alt+Down). Saved as you move it.'],
+      seq: ['Daily Order', 'Pick a day, then drag a whole run line to its place in the loadout (or Alt+Up / Alt+Down). Daily Dispatch and the plant use this order. Saved as you move it.'],
+      weekseq: ['Weekly Order', 'The runs on Weekly Dispatch in its line order. Drag a whole run line to its place (or Alt+Up / Alt+Down); Weekly shows the new order this week and next. Saved as you move it.'],
       names: ['Route Names', 'Every name a run has in Route Master. The route number is locked; click any white box, type, then press Enter or click away to save.'],
       many: ['Route Details', 'Run settings for every run shown (pick a route at the top for just its runs). Each box and list saves the moment you change it.'],
       days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
@@ -113,8 +114,11 @@
     const day = (r, p) => (r.days && r.days[p]) || {};
     const byOrder = (a, b) => (a.weekOrder == null ? 999999 : a.weekOrder) - (b.weekOrder == null ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run));
 
+    // Joe 10/22: besides All routes, the route list can show only the routes Uniontown runs: the runs that show on Weekly Dispatch.
+    const WEEKLY = '__weekly__';
+    const pickedRoute = (r) => !pickRoute || (pickRoute === WEEKLY ? weeklyRule(r).shown : r.route === pickRoute);
     function shownRuns() {
-      return routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).filter(r => !pickRoute || r.route === pickRoute).filter(r => !pickRun || r.id === pickRun).sort(byOrder);
+      return routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).filter(pickedRoute).filter(r => !pickRun || r.id === pickRun).sort(byOrder);
     }
     // Joe 10/21 (picked mock-up 2): Load Day reads in words; the number stored stays the same (0 same day, -1 the day before,
     // -2 two days before), counted back from the delivery day. Typed or pasted words or numbers both work.
@@ -140,12 +144,12 @@
     function refreshSelectors() {
       const rs = document.getElementById('route-select'), ns = document.getElementById('run-select');
       const names = [...new Set(routes.filter(r => filter === 'ALL' || (filter === 'ACTIVE') === isActive(r)).sort(byOrder).map(r => r.route))];
-      if (pickRoute && names.indexOf(pickRoute) < 0) pickRoute = '';
-      rs.innerHTML = '<option value="">All routes</option>' + names.map(n => '<option' + (n === pickRoute ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('');
+      if (pickRoute && pickRoute !== WEEKLY && names.indexOf(pickRoute) < 0) pickRoute = '';
+      rs.innerHTML = '<option value="">All routes</option><option value="' + WEEKLY + '"' + (pickRoute === WEEKLY ? ' selected' : '') + '>Uniontown routes</option>' + names.map(n => '<option' + (n === pickRoute ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('');
       const runs = routes.filter(r => r.route === pickRoute).sort(byOrder);
       if (pickRun && !runs.some(r => r.id === pickRun)) pickRun = '';
-      ns.innerHTML = '<option value="">' + (pickRoute ? 'All runs of ' + escapeHtml(pickRoute) : 'All runs') + '</option>' + runs.map(r => '<option value="' + escapeHtml(r.id) + '"' + (r.id === pickRun ? ' selected' : '') + '>' + escapeHtml(r.run) + '</option>').join('');
-      ns.disabled = !pickRoute;
+      ns.innerHTML = '<option value="">' + (pickRoute && pickRoute !== WEEKLY ? 'All runs of ' + escapeHtml(pickRoute) : 'All runs') + '</option>' + runs.map(r => '<option value="' + escapeHtml(r.id) + '"' + (r.id === pickRun ? ' selected' : '') + '>' + escapeHtml(r.run) + '</option>').join('');
+      ns.disabled = !pickRoute || pickRoute === WEEKLY;
       document.getElementById('view-select').value = view;
     }
 
@@ -158,7 +162,7 @@
       liveStop = onSnapshot(query(collection(liveDb, 'runs'), where('weekStart', '==', w)), snap => {
         liveRows = {};
         snap.docs.forEach(d => { const x = d.data(); const k = String(x.runId || '').trim().replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, ''); if (k && !liveRows[k]) liveRows[k] = x; });
-        if (view === 'rules') render();
+        if (view === 'rules' || view === 'weekseq' || pickRoute === WEEKLY) render();
       }, e => showError('Could not read the Live week: ' + e.message));
     }
 
@@ -170,7 +174,7 @@
       const edit = canEdit();
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       ['add-route', 'add-run'].forEach(id => { document.getElementById(id).disabled = !edit; });
-      document.getElementById('add-run').disabled = !edit || !pickRoute;
+      document.getElementById('add-run').disabled = !edit || !pickRoute || pickRoute === WEEKLY;
       refreshSelectors();
       const g = GRID[view], o = OTHER[view];
       document.getElementById('work-title').textContent = g ? g.title : o[0];
@@ -186,17 +190,18 @@
       if (g) t.innerHTML = gridView(g, list, edit);
       else if (view === 'days') t.innerHTML = daysView(list, edit);
       else if (view === 'seq') { const seq = seqList(); t.innerHTML = seqView(seq, edit); lines = seq.length; }
+      else if (view === 'weekseq') { const wk = weekList(); t.innerHTML = weekView(wk, edit); lines = wk.length; }
       else if (view === 'details') { t.innerHTML = detailsView(list, edit); lines = 12; }
       else if (view === 'names') t.innerHTML = namesView(list, edit);
       else if (view === 'many') t.innerHTML = manyView(list, edit);
       else if (view === 'rules') t.innerHTML = rulesView(onlyHidden ? list.filter(r => !weeklyRule(r).shown) : list, edit);
       else t.innerHTML = recapView(list);
-      t.className = 'routes ' + view;
+      t.className = 'routes ' + (view === 'weekseq' ? 'seq weekseq' : view);
       const totals = document.getElementById('recap-totals');
       totals.hidden = view !== 'recap';
       if (view === 'recap') totals.innerHTML = recapTotals();
       if (g) markBlock();
-      document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : list.length + (list.length === 1 ? ' run' : ' runs')) +
+      document.getElementById('count').textContent = (view === 'seq' ? lines + ' runs on ' + NAME(seqDay) : view === 'weekseq' ? lines + ' runs on Weekly Dispatch for the week of ' + shortDate(liveWeek) : list.length + (list.length === 1 ? ' run' : ' runs')) +
         (view === 'rules' ? ' · ' + list.filter(r => !weeklyRule(r).shown).length + ' hidden on Weekly for the week of ' + shortDate(liveWeek) : '');
       // Readable rows and print: the grid scrolls inside its box under fixed headings; the page itself does not.
       const footer = document.querySelector('.footer');
@@ -232,17 +237,46 @@
         }).join('') + (list.length ? '' : '<tr><td colspan="10" class="empty">No runs to show.</td></tr>') + '</tbody>';
     }
     function seqList() {
-      return routes.filter(r => isActive(r) && day(r, seqDay).active && (!pickRoute || r.route === pickRoute))
+      return routes.filter(r => isActive(r) && day(r, seqDay).active && pickedRoute(r))
         .sort((a, b) => (day(a, seqDay).loadOrder == null ? 999999 : day(a, seqDay).loadOrder) - (day(b, seqDay).loadOrder == null ? 999999 : day(b, seqDay).loadOrder) || byOrder(a, b));
+    }
+    // Joe 10/22: Load Day and Run By are changed right on the Load Order list, from pick lists only (nothing typed).
+    // Load Day is the day's number in words (0 Same day, -1 Day before ...); a blank Load Day or Run By stays blank until picked.
+    function seqOffset(r, edit) {
+      const v = day(r, seqDay).loadDayOffset, none = v === null || v === undefined || v === '';
+      return '<select class="seq-pick" data-seq="loadDayOffset" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(seqDay) + ', Load Day') + '"' + (edit ? '' : ' disabled') + '>' +
+        (none ? '<option value="" selected></option>' : '') + OFFSET_WORDS.map((w, i) => '<option value="' + (-i) + '"' + (!none && Number(v) === -i ? ' selected' : '') + '>' + w + '</option>').join('') + '</select>';
+    }
+    // Joe 10/22: Start Time stays on the Load Order list, typed any way or moved 15 minutes a click with the up / down clicker.
+    function seqTime(r, edit) {
+      const v = cellValue(r, seqDay, 'dispatchTime');
+      return '<input class="seq-time" data-seq="dispatchTime" value="' + escapeHtml(v) + '" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', ' + NAME(seqDay) + ', Start time') + '" autocomplete="off"' + (edit ? '' : ' readonly') + '>' +
+        (edit ? '<span class="step"><button type="button" class="step-btn seq-step" data-step="15" tabindex="-1" aria-label="15 minutes later" title="15 minutes later">&#9650;</button><button type="button" class="step-btn seq-step" data-step="-15" tabindex="-1" aria-label="15 minutes earlier" title="15 minutes earlier">&#9660;</button></span>' : '');
+    }
+    function seqRunBy(r, edit) {
+      const v = r.coverageOwner || '';
+      return '<select class="seq-pick" data-seq="coverageOwner" aria-label="' + escapeHtml(r.route + ' ' + (r.run || '') + ', Run By') + '"' + (edit ? '' : ' disabled') + '>' +
+        (v ? '' : '<option value="" selected></option>') + (v && RUN_BY.indexOf(v) < 0 ? '<option selected>' + escapeHtml(v) + '</option>' : '') +
+        RUN_BY.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
     }
     function seqView(list, edit) {
       // Review item 8 (Joe 10/13): grab the whole line and drag it (Alt+Up / Alt+Down on a focused line); no arrows.
       return '<colgroup><col style="width:9%"><col style="width:13%"><col style="width:30%"><col style="width:15%"><col style="width:14%"><col style="width:19%"></colgroup>' +
         '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Start time</th><th>Load day</th><th>Run by</th></tr></thead><tbody>' +
         list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '"' + (edit ? ' data-drag="' + escapeHtml(r.id) + '" tabindex="0"' : ' class="no-drag"') + '><td>' + escapeHtml(cellValue(r, seqDay, 'loadOrder') || '-') + '</td>' +
-          '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(cellValue(r, seqDay, 'dispatchTime')) + '</td>' +
-          '<td>' + escapeHtml(cellValue(r, seqDay, 'loadDayOffset')) + '</td><td>' + escapeHtml(r.coverageOwner || '') + '</td></tr>').join('') +
+          '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td class="seq-time-cell">' + seqTime(r, edit) + '</td>' +
+          '<td>' + seqOffset(r, edit) + '</td><td>' + seqRunBy(r, edit) + '</td></tr>').join('') +
         (list.length ? '' : '<tr><td colspan="6" class="empty">No runs on ' + NAME(seqDay) + '.</td></tr>') + '</tbody>';
+    }
+    // Joe 10/22: the Weekly Dispatch line order, set here the same way as on Weekly (its runs, its order).
+    const weekAll = () => routes.filter(r => weeklyRule(r).shown).sort(byOrder);
+    const weekList = () => weekAll().filter(pickedRoute);
+    function weekView(list, edit) {
+      return '<colgroup><col style="width:12%"><col style="width:18%"><col style="width:40%"><col style="width:30%"></colgroup>' +
+        '<thead><tr><th>Order</th><th>Route</th><th>Run / Destination</th><th>Route name</th></tr></thead><tbody>' +
+        list.map((r, i) => '<tr data-id="' + escapeHtml(r.id) + '" data-i="' + i + '"' + (edit ? ' data-drag="' + escapeHtml(r.id) + '" tabindex="0"' : ' class="no-drag"') + '><td>' + escapeHtml(r.weekOrder == null ? '-' : String(r.weekOrder)) + '</td>' +
+          '<td class="strong">' + escapeHtml(r.route) + '</td><td>' + escapeHtml(r.run || '') + '</td><td>' + escapeHtml(r.routeName || '') + '</td></tr>').join('') +
+        (list.length ? '' : '<tr><td colspan="4" class="empty">No runs on Weekly Dispatch for the week of ' + shortDate(liveWeek) + '.</td></tr>') + '</tbody>';
     }
     const yesNo = (name, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '><option value="true"' + (v ? ' selected' : '') + '>YES</option><option value="false"' + (v ? '' : ' selected') + '>NO</option></select>';
     const choice = (name, list, v, edit) => '<select data-f="' + name + '"' + (edit ? '' : ' disabled') + '>' + (list.indexOf(v) < 0 && v ? '<option selected>' + escapeHtml(v) + '</option>' : '') + list.map(x => '<option' + (x === v ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
@@ -428,11 +462,26 @@
       clearTimeout(stepSave);
       stepSave = setTimeout(() => saveCell(input), 700);
     }
+    // The Load Order list's clicker: the same 15-minute steps; the time saves once the clicking stops.
+    function seqStep(b) {
+      const input = b.closest('td').querySelector('input.seq-time'), by = Number(b.dataset.step);
+      const once = () => {
+        const r = routes.find(x => x.id === input.closest('tr').dataset.id), m = r ? L.typedTime(input.value, day(r, seqDay).dispatchTime) : null;
+        if (m === null) return;
+        input.value = L.timeText((m + by + 1440) % 1440);
+        clearTimeout(stepSave);
+        stepSave = setTimeout(() => input.dispatchEvent(new Event('change', { bubbles: true })), 700);
+      };
+      once();
+      stopStep();
+      stepTimer = setTimeout(() => { stepTimer = setInterval(once, 120); }, 400);
+    }
     const stopStep = () => { clearTimeout(stepTimer); clearInterval(stepTimer); stepTimer = null; };
     table.addEventListener('pointerdown', e => {
       const b = e.target.closest('.step-btn');
       if (!b) return;
       e.preventDefault();
+      if (b.classList.contains('seq-step')) return seqStep(b);
       const input = b.closest('td').querySelector('input.cell'), by = Number(b.dataset.step);
       if (document.activeElement !== input) moveTo(input);
       stepTime(input, by);
@@ -443,7 +492,7 @@
     table.addEventListener('pointerout', e => { if (e.target.closest('.step-btn')) stopStep(); });
     // A Route Master update that arrived while a box was being typed in is drawn once the box is left (after its own save).
     table.addEventListener('keydown', e => {
-      if (!e.target.matches('input.nm')) return;
+      if (!e.target.matches('input.nm, input.seq-time')) return;
       if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
       if (e.key === 'Escape') { e.target.value = e.target.defaultValue; e.target.blur(); }
     });
@@ -457,6 +506,19 @@
         if (e.target.value.trim() === cellValue(r, p, field)) return;
         const value = sent(field, e.target.value.trim());
         return saveRun(r, null, { [p]: { [field]: value } }, x => { x.days[p] = Object.assign({}, x.days[p], { [field]: shown(field, value) }); });
+      }
+      const sq = e.target.dataset.seq;
+      if (sq) {
+        const r = routes.find(x => x.id === e.target.closest('tr').dataset.id), v = e.target.value, p = seqDay;
+        if (sq === 'dispatchTime') {
+          const raw = v.trim(), was = day(r, p).dispatchTime, m = raw === '' ? null : L.typedTime(raw, was);
+          if (raw !== '' && m === null) { e.target.value = cellValue(r, p, 'dispatchTime'); notTime(e.target, raw); return; }
+          e.target.value = m === null ? '' : L.timeText(m);
+          if (m === (was == null ? null : was)) return;
+          return saveRun(r, null, { [p]: { dispatchTime: e.target.value } }, x => { x.days[p] = Object.assign({}, x.days[p], { dispatchTime: m }); });
+        }
+        if (sq === 'loadDayOffset') return saveRun(r, null, { [p]: { loadDayOffset: v } }, x => { x.days[p] = Object.assign({}, x.days[p], { loadDayOffset: v === '' ? null : Number(v) }); });
+        return saveRun(r, { coverageOwner: v }, null, x => { x.coverageOwner = v; });
       }
       const mf = e.target.dataset.many;
       if (mf) {
@@ -684,16 +746,16 @@
       if (ed) { const r = routes.find(x => x.id === ed.dataset.editRoute); pickRoute = r.route; pickRun = r.id; view = 'details'; render(); }
     });
     // Load Order: grab a run's line and drag it (js/row-drag.js); the day's whole order saves as one call.
-    mountRowDrag({ box: table, canDrag: () => view === 'seq' && canEdit(), onMove: (id, to, byKey) => {
+    mountRowDrag({ box: table, canDrag: () => (view === 'seq' || view === 'weekseq') && canEdit(), onMove: (id, to, byKey) => {
       // By run, not by row number: a copy that arrived during the drag may have changed the order behind the drawn rows.
-      const list = seqList(), from = list.findIndex(r => r.id === id);
+      const list = view === 'weekseq' ? weekList() : seqList(), from = list.findIndex(r => r.id === id);
       if (from < 0 || to === from) return;
       list.splice(to, 0, list.splice(from, 1)[0]);
-      saveOrder(list);
+      if (view === 'weekseq') saveWeekOrder(list, id); else saveOrder(list);
       if (byKey) requestAnimationFrame(() => { const row = table.querySelector('tr[data-drag="' + CSS.escape(id) + '"]'); if (row) row.focus(); });
     } });
     // A line pressed to drag is not redrawn under the pointer (a copy arriving then would cancel the drag); the redraw waits for the release.
-    table.addEventListener('pointerdown', e => { if (e.button === 0 && view === 'seq' && e.target.closest('tr[data-drag]') && !e.target.closest('input, select, button, a')) pressing = true; });
+    table.addEventListener('pointerdown', e => { if (e.button === 0 && (view === 'seq' || view === 'weekseq') && e.target.closest('tr[data-drag]') && !e.target.closest('input, select, button, a')) pressing = true; });
     document.addEventListener('pointerup', () => { if (!pressing) return; pressing = false; if (redrawLater) setTimeout(() => { if (!pressing && redrawLater) render(); }); });
     // The day's whole order saves as one call.
     function saveOrder(list) {
@@ -704,6 +766,21 @@
       const done = () => { const k = pending.indexOf(mine); if (k >= 0) pending.splice(k, 1); };
       saveOptimistic('reorderRouteDay', { day: p, runIds: ids }, mine.apply,
         () => { done(); list.forEach((r, i) => { r.days[p] = Object.assign({}, r.days[p], { loadOrder: before[i] }); }); }, render).then(done);
+    }
+
+    // Weekly order: the whole Weekly list goes in one call (reorderWeek, as Weekly Dispatch sends it), so a run moved
+    // while one route is picked lands next to the run it was dropped by, and the other routes keep their places.
+    function saveWeekOrder(shownList, id) {
+      const all = weekAll().filter(r => r.id !== id), moved = routes.find(r => r.id === id), k = shownList.findIndex(r => r.id === id);
+      const next = shownList[k + 1], prev = shownList[k - 1];
+      const at = next ? all.findIndex(r => r.id === next.id) : prev ? all.findIndex(r => r.id === prev.id) + 1 : all.length;
+      all.splice(at < 0 ? all.length : at, 0, moved);
+      const before = all.map(r => r.weekOrder), ids = all.map(r => r.id);
+      const mine = { all: true, apply: () => ids.forEach((x, i) => { const r = routes.find(y => y.id === x); if (r) r.weekOrder = (i + 1) * 10; }) };
+      pending.push(mine);
+      const done = () => { const j = pending.indexOf(mine); if (j >= 0) pending.splice(j, 1); };
+      saveOptimistic('reorderWeek', { weekStart: liveWeek, runIds: ids }, mine.apply,
+        () => { done(); all.forEach((r, i) => { r.weekOrder = before[i]; }); }, render).then(done);
     }
 
     /* ---------- Add Route / Add Run / Destination ---------- */
@@ -760,7 +837,7 @@
         // A box being typed in keeps its text: the grid redraws when it is left. A grid box that only has the focus (Tab moved
         // there, or a paste filled it) redraws at once, so a save that lands meanwhile is never hidden behind an older copy.
         const a = document.activeElement;
-        if (a && a.closest && a.closest('#table') && a.matches('input') && (!a.matches('input.cell') || a.value !== a.defaultValue)) { redrawLater = true; return; }
+        if (a && a.closest && a.closest('#table') && (a.matches('select') || (a.matches('input') && (!a.matches('input.cell') || a.value !== a.defaultValue)))) { redrawLater = true; return; }
         render();
       }, e => showError('Could not read Route Master: ' + e.message));
       window.addEventListener('resize', render);
