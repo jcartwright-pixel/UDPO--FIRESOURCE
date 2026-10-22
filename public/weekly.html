@@ -206,7 +206,7 @@
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
       const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs', 'plant'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
-      document.getElementById('count').textContent = rows.length + ' runs' + (open ? ', ' + open + ' days need a driver' : '') + ' \u00b7 ' + board.length + ' active drivers';
+      document.getElementById('count').textContent = rows.length + ' runs' + (open ? ', ' + open + (open === 1 ? ' day needs a driver' : ' days need a driver') : '') + ' \u00b7 ' + board.length + ' active drivers';
       if (!document.getElementById('days-modal').hidden) paintRunDays();
     }
 

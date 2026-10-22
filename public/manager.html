@@ -88,7 +88,7 @@
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
-    const data = { history: [], sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], roundStart: '' };
+    const data = { history: [], sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], routes: [], roundStart: '' };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null, prod = null, stopProd = null;
     // Joe 10/14 follow-on (end-of-shift production report): each line's shift from the line tablets rides on the Current Report.
     const lineOutput = () => {
@@ -120,7 +120,9 @@
       const now = Date.now(), journal = data.journal, todays = journal.filter(d => d.date === date);
       const loads = P.loadoutRows(data.runs, date);
       const yard = U.yardQueue(data.runs, journal, date, now, data.gps);
-      const done = P.counts(loads), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
+      // Joe 10/22 (practice test): the Loadout Center tile counts what the loadouts show, Scheduler loads included.
+      const customers = U.scheduleCustomers(U.scheduleRoutes(data.routes, data.runs));
+      const done = P.counts(U.withScheduleLoads(loads, U.scheduleLoadsOn(data.ship, customers, date), customers)), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
       const wash = P.washItems(date, data.wash, data.appWash, todays), seen = {};
       let repeat = 0;
       wash.forEach(w => { const k = String(w.trailer || '').toUpperCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] === 2) repeat++; });
@@ -150,7 +152,7 @@
         // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
         tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
       put('dept', card('&#9638;', 'Plant Distribution Departments', 'Loading, unloading, returns, washing and live workboards', 'plant.html', [
-        tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + x.done.loading + ' loading', pct(x.done.done, x.done.total)),
+        tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + (x.done.loading + x.done.paused) + ' loading' + (x.done.paused ? ' (' + x.done.paused + ' paused)' : ''), pct(x.done.done, x.done.total)),
         tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
         tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
         tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash'),
@@ -366,6 +368,7 @@
         const from = [date.slice(0, 8) + '01', L.weekStart(date)].sort()[0];
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE.SHIPPING), where('date', '>=', from)), s => { data.ship = s.docs.map(d => d.data()); later(); }, fail('the Shipping schedule')));
         unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE.RECEIVING), where('date', '>=', from)), s => { data.recv = s.docs.map(d => d.data()); later(); }, fail('the Receiving schedule')));
+        unsubs.push(onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); later(); }, () => { data.routes = []; }));
       };
       watch();
       // Behind and the 2-hour locks move with the clock; the day rolls at 6 AM.
