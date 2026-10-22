@@ -33,3 +33,22 @@
 .routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }
 /* Review item 6 (Joe 10/13): Route Week Override's day boxes read RUNS or OFF on one line at readable size. */
 .routeweek-page .rw-day, .routeweek-page .rw-shell .rw-day { font-size: 16px; min-height: 32px; }
+/* Joe 10/22: a holiday week. The holiday's column is gold, a load still running on it is outlined red (and its route and
+   name shaded) until it is moved, and the side lists each one with a Move to drop-down. */
+.routeweek-page .rw-reason select { font: inherit; font-size: 16px; font-weight: 700; text-transform: none; border: 2px solid #f2b632; border-radius: 8px; padding: 6px 8px; background: #fff8e6; color: #12324f; }
+.routeweek-page .rw-hol-head { font-size: 16px; font-weight: 800; color: #8a1f12; text-transform: uppercase; }
+.routeweek-page .rw-hol-list > div { align-items: center; background: #fde8e6; border-color: #f5c6c0; }
+.routeweek-page .rw-hol-list > div.done { background: #e3f5ee; border-color: #bfe6d6; }
+.routeweek-page .rw-hol-list select { font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: #fff; width: 140px; flex: none; }
+.routeweek-page .rw-hol-head[hidden], .routeweek-page .rw-list[hidden], .routeweek-page .rw-filter[hidden] { display: none; }
+.routeweek-page .rw-reason[hidden] { display: none; }
+.routeweek-page table.rw th.hol { background: #f2b632; color: #3d2a00; }
+.routeweek-page table.rw th.hol small { opacity: 1; }
+.routeweek-page table.rw th .hol-word { display: block; font-size: 16px; font-weight: 900; text-transform: uppercase; }
+.routeweek-page table.rw td.hol-col { background: #fff4d6; }
+.routeweek-page .rw-day.hol-need { background: #fff; color: #c0392b; box-shadow: inset 0 0 0 3px #c0392b; }
+.routeweek-page tr.hol-need td:nth-child(1), .routeweek-page tr.hol-need td:nth-child(2) { background: #fde8e6; color: #8a1f12; }
+@media (max-width: 1100px) {
+  .routeweek-page table.rw th.hol { padding-left: 0; padding-right: 0; }
+  .routeweek-page table.rw th .hol-word { letter-spacing: -1px; }
+}
