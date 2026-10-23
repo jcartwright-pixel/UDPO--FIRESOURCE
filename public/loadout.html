@@ -198,13 +198,20 @@
     // Run get the room, so a run like "ALDI - CHARLESTON Load 1" is one line. (Before, Joe 10/11: Driver / CVG had that room.)
     const COLS = {
       // Review item 22 (Joe 10/13): the Start / End column has its heading.
-      // Joe 10/23 (found with the case counter): P/U takes 1.5 points from Depart and Edit so "Completed" shows whole on the 1280
-      // Plant Station tablet; Run (Joe 10/14: the run name on one line) and Start / End (Start and Skip side by side) keep theirs.
-      normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 6.25], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8.5], ['', 5.25]],
+      normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // Joe 10/23: with the palletizer's case counter set up, Daily Case Loadout gets a Counted column beside Cases Out (Run gives the room).
-    const COUNTED_COLS = COLS.normal.slice(0, 6).concat([['Counted', 7.5]], COLS.normal.slice(6)).map(c => c[0] === 'Run' ? ['Run', 10.9] : c);
+    const COUNTED_COLS = COLS.normal.slice(0, 6).concat([['Counted', 7.5]], COLS.normal.slice(6)).map(c => c[0] === 'Run' ? ['Run', c[1] - 7.5] : c);
+    // Joe 10/23 (found with the case counter): on the 1280 Plant Station tablet "Completed" on the P/U button was cut off, so on
+    // screens under 1400 wide P/U takes 3.5 points from Run (a long run name may wrap there; at 1536 and 1920 it stays one line).
+    let shownCols = [];
+    function setCols(cols) {
+      shownCols = cols;
+      const narrow = innerWidth < 1400 && cols !== COLS.TANKER;
+      document.getElementById('cols').innerHTML = cols.map(([h, w]) => '<col style="width:' + Math.round((narrow && h === 'Run' ? w - 3.5 : narrow && h === 'P/U' ? w + 3.5 : w) * 100) / 100 + '%">').join('');
+    }
+    addEventListener('resize', () => { if (shownCols.length) setCols(shownCols); });
     // What the counter counted on a load against its Cases Out: counting while it loads, then matches, short or over (red).
     function countedCell(r) {
       const c = caseCounts[r.runDocId + '|' + r.day], cmp = R.caseCompare(r.quantity, c ? c.counted : null, r.state === 'LOADING' && !r.paused ? 'RUNNING' : r.state === 'DONE' ? 'DONE' : '');
@@ -291,7 +298,7 @@
         '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>' + countStrip(rows);
       const movable = canOrder() ? orderRows(rows).filter(r => r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
       const cols = counting() ? COUNTED_COLS : COLS[area === 'TANKER' ? area : 'normal'];
-      document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
+      setCols(cols);
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
       const orderIds = ordering ? movable.map(r => r.id) : [];
