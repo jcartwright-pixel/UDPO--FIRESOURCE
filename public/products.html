@@ -49,12 +49,12 @@
       </section>
       <!-- Areas & Groups: the plant's machines (from Plant Operations), the areas it adds itself, and its group list. -->
       <section class="qc-form pm-form" id="setup-pane" hidden>
-        <div class="qc-top"><h2 id="setup-title">Areas &amp; Groups</h2><span class="qc-last">Machines come from Plant Operations. Add, rename or remove this plant's own areas and groups.</span></div>
+        <div class="qc-top"><h2 id="setup-title">Areas &amp; Groups</h2><span class="qc-last">Machines come from Plant Operations. Add, rename or remove this plant's own areas and groups. Each box saves when you leave it.</span></div>
         <div class="pm-setup">
           <div><h3>Areas</h3><div id="setup-areas"></div><button type="button" class="rp-btn" id="add-area">+ Add Area</button></div>
           <div><h3>Groups</h3><div id="setup-groups"></div><button type="button" class="rp-btn" id="add-group">+ Add Group</button></div>
         </div>
-        <div class="pm-acts"><button type="button" class="rp-btn" id="setup-cancel">Cancel</button><button type="button" class="rp-btn primary" id="setup-save">Save Areas &amp; Groups</button></div>
+        <div class="pm-acts"><button type="button" class="rp-btn" id="setup-close">Close</button></div>
       </section>
       <!-- Upload: what the file will add, change and remove, before anything is saved. -->
       <section class="qc-form pm-form" id="preview-pane" hidden>
@@ -392,21 +392,28 @@
     });
     document.getElementById('setup-pane').addEventListener('click', e => {
       const r = e.target.closest('[data-sremove]');
-      if (r) { const [k, i] = r.dataset.sremove.split('|'); (k === 'area' ? draft.areas : draft.groups).splice(Number(i), 1); drawSetup('setup'); return; }
+      if (r) { const [k, i] = r.dataset.sremove.split('|'); (k === 'area' ? draft.areas : draft.groups).splice(Number(i), 1); drawSetup('setup'); saveSetup(); return; }
       if (e.target.id === 'add-area') { draft.areas.push({ id: '', name: '' }); drawSetup('setup'); const ins = document.querySelectorAll('#setup-areas input'); if (ins.length) ins[ins.length - 1].focus(); }
       if (e.target.id === 'add-group') { draft.groups.push(''); drawSetup('setup'); const ins = document.querySelectorAll('#setup-groups input'); if (ins.length) ins[ins.length - 1].focus(); }
     });
-    document.getElementById('setup-cancel').addEventListener('click', () => { pane = 'list'; draft = null; showError(''); render(true); });
-    document.getElementById('setup-save').addEventListener('click', async () => {
-      const b = document.getElementById('setup-save');
-      b.disabled = true; b.textContent = 'Saving…';
-      try {
-        await save('saveProductSetup', { facilityId: plant, areas: draft.areas.filter(a => a.name.trim()), groups: draft.groups.filter(g => g.trim()) });
-        pane = 'list'; draft = null; note = ''; showError('');
-      } catch (err) { showError('Areas and groups not saved (' + (err.message || err) + ').'); }
-      b.disabled = false; b.textContent = 'Save Areas & Groups';
-      render(true);
-    });
+    // Batch 5 (10/23): no Save Areas & Groups button; a box saves when it is left and Remove saves at once, one save after
+    // another. A new area keeps the ID the server gave it, so renaming it later renames the same area.
+    let setupSaving = Promise.resolve();
+    function saveSetup() {
+      const d = draft;
+      setupSaving = setupSaving.then(async () => {
+        if (!d) return;
+        const own = ownOf().areas;
+        d.areas.forEach(a => { if (!a.id) { const m = own.find(x => x.name.toUpperCase() === a.name.trim().toUpperCase()); if (m) a.id = m.id; } });
+        try {
+          await save('saveProductSetup', { facilityId: plant, areas: d.areas.filter(a => a.name.trim()), groups: d.groups.filter(g => g.trim()) });
+          showError('');
+        } catch (err) { showError('Areas and groups not saved (' + (err.message || err) + ').'); }
+      });
+      return setupSaving;
+    }
+    document.getElementById('setup-pane').addEventListener('change', e => { if (e.target.closest('[data-s]')) saveSetup(); });
+    document.getElementById('setup-close').addEventListener('click', async () => { await setupSaving; pane = 'list'; draft = null; note = ''; render(true); });
 
     /* ---------- Download Product List and Upload ---------- */
     // Joe 10/13: "download the complete list of products we have": one workbook, a tab per plant, a line per product with an X under
