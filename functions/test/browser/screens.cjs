@@ -745,29 +745,34 @@ async function noScroll(page) {
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
     // Driver Weekly Template: a manager makes ADAMS Available on Monday and Off on Tuesday, copies ADAMS's week onto CASEY's line
-    // (review item 12: one Copy / Paste per driver line), and Save Template saves every changed cell. (BROOK was removed above.)
+    // (review item 12: one Copy / Paste per driver line); each day saves as soon as it changes (batch 5: no Save Template).
+    // (BROOK was removed above.)
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
     const day = (d, p) => '.tcell[data-driver="' + d + '"][data-day="' + p + '"] select[data-status]';
     await tpl.waitForSelector(day('drv_test_adams', 'tue'));
-    assert.equal(await tpl.isDisabled('#save'), true, 'nothing to save yet');
+    assert.equal(await tpl.$('#save'), null, 'batch 5: no Save Template button');
     await tpl.selectOption(day('drv_test_adams', 'mon'), 'AVAILABLE');
     await tpl.selectOption(day('drv_test_adams', 'tue'), 'OFF');
     await tpl.click('tr[data-line="drv_test_adams"] td.tpl-name [data-copy]');
     await tpl.click('tr[data-line="drv_test_casey"] td.tpl-name [data-paste]');
     // ADAMS Monday and Tuesday; CASEY Monday (802 comes off: Available like ADAMS) and Tuesday (Off like ADAMS).
-    assert.equal(await tpl.textContent('#dirty'), '4 unsaved changes');
     if (SHOTS) await tpl.screenshot({ path: path.join(SHOTS, 'template-1920.png') });
-    await tpl.click('#save');
-    await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
     const tplCells = await tpl.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
-      return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
+      const read = async () => [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
+      for (let i = 0; i < 100; i++) {
+        const c = await read();
+        if (c[0].tue_available === 'FALSE' && c[1].tue_available === 'FALSE' && JSON.parse(c[1].mon_assignments_json || '[]').length === 0) return c;
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return read();
     });
     assert.equal(tplCells[0].tue_available, 'FALSE');
     assert.equal(tplCells[1].tue_available, 'FALSE');
     assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like ADAMS');
+    await tpl.waitForFunction(() => !document.querySelector('.tcell.changed'), null, { timeout: 10000 });
     assert.deepEqual(tpl.errors, []);
     const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
@@ -1324,7 +1329,7 @@ async function noScroll(page) {
     assert.deepEqual(tl.errors, []);
     await tl.close();
     results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run on every day, Copy / Paste / Paste + Add once per driver line');
-    results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
+    results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and each day saved to Driver Master as it changed; a dispatcher sees it read only');
 
     // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to see and change which screens
     // are switched on. Joe 10/12 later ("remove the old stuff like new app current app"): the cards carry no tags at all.
