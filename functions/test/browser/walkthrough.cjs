@@ -80,14 +80,15 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     for (const [w, h, touch] of [[390, 844, true], [600, 960, true], [800, 1280, true], [1536, 730, false], [1920, 950, false]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && w < 700 }, '/walkthrough.html?' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['yard.html?walk=1', 'temps.html?walk=1', 'quality.html?walk=1']);
+      // Joe 10/23 (pictures, option 1): Pictures is the 4th stop.
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production', 'Pictures']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['yard.html?walk=1', 'temps.html?walk=1', 'quality.html?walk=1', null]);
       assert.equal(await page.textContent('.wk-row:nth-child(3) .wk-choice .wk-n'), '2of 5 · 1 past due');
       assert.match(await page.textContent('.wk-row:nth-child(2) .wk-choice .wk-n span'), /^1 out of range$/);
       assert.ok(await page.$eval('.wk-row:nth-child(3) .wk-choice', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Production flashes');
       // Joe 10/18: beside each card a button in its colour: Yard done (no trucks), Coolers and Production past due (red).
       assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.className + ' ' + x.getAttribute('href') + ' ' + getComputedStyle(x).backgroundColor)),
-        ['DONE wk-act ok yard.html?walk=1 rgb(31, 122, 77)', 'PAST DUE wk-act late temps.html?walk=1 rgb(198, 40, 40)', 'PAST DUE wk-act late quality.html?walk=1 rgb(198, 40, 40)']);
+        ['DONE wk-act ok yard.html?walk=1 rgb(31, 122, 77)', 'PAST DUE wk-act late temps.html?walk=1 rgb(198, 40, 40)', 'PAST DUE wk-act late quality.html?walk=1 rgb(198, 40, 40)', 'TAKE PICTURE wk-act take null rgb(11, 79, 138)']);
       assert.ok(await page.$$eval('.wk-row', r => r.every(x => { const a = x.querySelector('.wk-choice').getBoundingClientRect(), b = x.querySelector('.wk-act').getBoundingClientRect(); return b.left >= a.right && Math.abs(b.top - a.top) < 2; })), 'each button sits beside its card');
       // Who did each area's newest check, or done automatically.
       assert.deepEqual(await page.$$eval('.wk-who', a => a.map(x => x.textContent.replace(/\d{1,2}:\d\d [AP]M/, 'T'))), ['Done automatically', 'Last T · Supervisor Test', 'Last T · Supervisor Test']);
@@ -102,6 +103,66 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
       await page.context().close();
     }
     results.push('Walkthrough: Yard, Coolers, Production with big numbers, what each holds and who checked it last, a DONE / DUE / PAST DUE button beside each (green, yellow, red), past due flashes red, the last walkthrough check line, at 390/600/800/1536/1920');
+
+    // Joe 10/23 (pictures, option 1): TAKE PICTURE opens the camera; the picture shows on the 4th stop on the phone and on Manager
+    // Center, waiting for the next report, and can be removed until it is sent.
+    {
+      const page = await openPage(browser, phone390(), '/walkthrough.html?' + MANAGER);
+      await page.waitForSelector('.wk-act.take');
+      assert.equal(await page.getAttribute('.wp-input', 'capture'), 'environment', 'the back camera opens');
+      assert.equal(await page.textContent('.wp-choice .wk-n'), '0none waiting');
+      const jpeg = Buffer.from((await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1800; const g = c.getContext('2d'); g.fillStyle = '#4a7fa8'; g.fillRect(0, 0, 2400, 1800); g.fillStyle = '#fff'; g.font = '200px sans-serif'; g.fillText('Dock 4', 300, 900); return c.toDataURL('image/jpeg', 0.95); })).split(',')[1], 'base64');
+      const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wk-act.take')]);
+      await chooser.setFiles({ name: 'dock.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+      await page.waitForFunction(() => document.querySelectorAll('.wp-thumbs img').length === 1, null, { timeout: 20000 });
+      assert.equal(await page.textContent('.wp-choice .wk-n'), '1waiting for the next report');
+      const kept = (await db().collection('walkPhotos').get()).docs.map(x => x.data());
+      assert.equal(kept.length, 1);
+      assert.ok(kept[0].width <= 1600 && kept[0].height <= 1600 && kept[0].sentAt === '', 'the phone makes the picture smaller: ' + kept[0].width + 'x' + kept[0].height);
+      // Joe 10/23 (later): a caption for the picture, saved as it is typed; the screen keeps it after opening again.
+      await page.fill('.wp-cap', 'Cleaned the dock 4 area');
+      await page.waitForFunction(() => true);
+      const until = Date.now() + 20000;
+      while (((await db().collection('walkPhotos').get()).docs[0].data().note || '') !== 'Cleaned the dock 4 area') { assert.ok(Date.now() < until, 'the caption saves'); await page.waitForTimeout(300); }
+      await page.reload();
+      await page.waitForSelector('.wp-cap');
+      assert.equal(await page.inputValue('.wp-cap'), 'Cleaned the dock 4 area');
+      await tidy(page, 'Walkthrough with a picture');
+      // A second picture: the phone lists both, each with its own caption box.
+      const [chooser2] = await Promise.all([page.waitForEvent('filechooser'), page.click('.wk-act.take')]);
+      await chooser2.setFiles({ name: 'cooler.jpg', mimeType: 'image/jpeg', buffer: jpeg });
+      await page.waitForFunction(() => document.querySelectorAll('.wp-thumbs img').length === 2, null, { timeout: 20000 });
+      assert.deepEqual(await page.$$eval('.wp-cap', b => b.map(x => x.value)), ['Cleaned the dock 4 area', '']);
+      await page.$eval('.wp-choice', el => el.scrollIntoView({ block: 'end' }));
+      await shot(page, 'walkthrough-pictures-390');
+      // Manager Center: the same picture on the 4th stop, with Take Picture.
+      const mc = await openPage(browser, { viewport: { width: 1536, height: 886 } }, '/manager.html?' + MANAGER);
+      await mc.waitForFunction(() => document.querySelectorAll('[data-card="walk"] .wp-tile .wp-thumbs img').length === 1, null, { timeout: 20000 });
+      // The newest picture with its caption box, Remove and Take Picture; the other one is on the walkthrough.
+      assert.match(await mc.textContent('[data-card="walk"] .wp-tile'), /^4 · Pictures2waitingfor the next reportRemoveTake Picture\+ 1 more · see them all$/);
+      assert.equal(await mc.inputValue('[data-card="walk"] .wp-cap'), '');
+      await mc.waitForTimeout(500);
+      await shot(mc, 'manager-pictures-1536');
+      for (const [w, h] of [[1536, 886], [1366, 768], [1920, 950], [390, 844]]) {
+        await mc.setViewportSize({ width: w, height: h });
+        await mc.waitForTimeout(400);
+        // Every walkthrough tile shows its whole label (Joe: tiles show the whole wording).
+        // Joe 10/19: at 1536 x 886 (his laptop) and 1920 every card still shows with no scrolling, a picture waiting included.
+        if (w === 1536 || w === 1920) assert.ok(await mc.$eval('#grid', g => g.scrollHeight <= g.clientHeight + 1), 'Manager Center ' + w + ' shows every card with a picture waiting');
+        if (w > 760) assert.deepEqual(await mc.$$eval('[data-card="walk"] .mc-tile > span', sp => sp.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), [], 'whole labels at ' + w);
+        if (SHOTS) { await mc.$eval('[data-card="walk"]', el => el.scrollIntoView({ block: 'end' })); await shot(mc, 'manager-pictures-' + w); }
+      }
+      assert.deepEqual(mc.errors, []);
+      await mc.context().close();
+      for (const left of [1, 0]) {
+        await page.click('.wp-remove');
+        await page.waitForFunction((n) => document.querySelectorAll('.wp-thumbs img').length === n, left, { timeout: 20000 });
+      }
+      assert.equal((await db().collection('walkPhotos').get()).size, 0);
+      assert.deepEqual(page.errors, []);
+      await page.context().close();
+    }
+    results.push('Pictures: TAKE PICTURE on the 4th stop opens the camera, the picture is made smaller, its caption saves as typed, it shows on the phone and on Manager Center (newest, with + more) waiting for the next report, every card still fits at 1536 x 886, and a picture can be removed');
 
     // The phone and tablet start screen: four choices (Joe 10/18: Send Report).
     for (const [w, h] of [[390, 844], [800, 1280]]) {

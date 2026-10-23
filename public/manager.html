@@ -83,12 +83,13 @@
     import { watchProduction, lineView, shiftText } from './js/production.js';
     import { plantFor } from './js/pmaint.js';
     import { readForecastNights } from './js/forecast.js';
+    import { savePicture, removePicture, watchPictures, cameraInput, thumbsHtml, wireCaptions, keepCaretIn } from './js/walk-photos.js';
     cardClicks(document.getElementById('grid'));
 
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     let date = today();
-    const data = { history: [], sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], routes: [], roundStart: '' };
+    const data = { history: [], sensors: [], tempLocs: [], runs: [], journal: [], shift: [], wash: [], appWash: [], setup: [], lineStatus: [], pickups: [], ship: [], recv: [], routes: [], roundStart: '', pics: [] };
     let person = null, app = {}, report = null, note = '', fsdb = null, watchSent = null, prod = null, stopProd = null;
     // Joe 10/14 follow-on (end-of-shift production report): each line's shift from the line tablets rides on the Current Report.
     const lineOutput = () => {
@@ -111,6 +112,31 @@
       return '<a class="mc-tile' + (kind ? ' ' + kind : '') + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span><b' + (/[AP]M$|^None$/.test(String(n)) ? ' class="time"' : '') + '>' + escapeHtml(String(n)) +
         (unit ? '<small>' + escapeHtml(unit) + '</small>' : '') + '</b><i>' + escapeHtml(line || '') + '</i>' + (bar == null ? '' : '<u><s style="width:' + bar + '%"></s></u>') + '</a>';
     }
+    // Joe 10/23: the walkthrough pictures still to go with a report, this plant's only.
+    let taking = false;
+    const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
+    function picTile() {
+      // The newest picture with its caption box; the rest are on the walkthrough screen.
+      const pics = myPics(), SHOWN = 1;
+      const take = canSend() ? '<button type="button" class="mc-btn wp-take"' + (taking ? ' disabled' : '') + '>' + (taking ? 'Saving the picture…' : 'Take Picture') + '</button>' : '';
+      return '<div class="mc-tile wk-tile wp-tile' + (pics.length ? ' warn' : '') + '"><span>4 · Pictures</span><b>' + pics.length + '<small>waiting</small></b><i>' + (pics.length ? 'for the next report' : 'none waiting') + '</i>' +
+        '<div class="wp-box">' + (pics.length ? thumbsHtml(pics.slice(-SHOWN), { remove: canSend(), time: false, after: take }) + (pics.length > SHOWN ? '<a class="wp-more" href="walkthrough.html">+ ' + (pics.length - SHOWN) + ' more · see them all</a>' : '') : take) + '</div></div>';
+    }
+    const camera = cameraInput(async (file) => {
+      taking = true; render();
+      try { await savePicture(file, { facilityId: plantFor(person, null).id }); showError(''); }
+      catch (e) { showError('The picture was not saved: ' + (e.message || e)); }
+      finally { taking = false; render(); }
+    });
+    wireCaptions(document.getElementById('grid'), e => showError('The caption was not saved: ' + (e.message || e)));
+    document.getElementById('grid').addEventListener('click', async (e) => {
+      if (e.target.closest('.wp-take')) { e.preventDefault(); if (!taking) camera.click(); return; }
+      const rm = e.target.closest('.wp-remove');
+      if (!rm) return;
+      e.preventDefault(); rm.disabled = true;
+      try { await removePicture(rm.dataset.photo); } catch (err) { rm.disabled = false; showError('The picture was not removed: ' + (err.message || err)); }
+    });
+
     // Review item 57 (Joe 10/13): a card's heading is words only; the icon argument is no longer drawn.
     function card(icon, title, desc, href, tiles) {
       return '<a class="mc-bar" href="' + href + '"><strong>' + escapeHtml(title) + '</strong><em>Open</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
@@ -175,9 +201,12 @@
           '<p class="wk-who">' + escapeHtml(who) + '</p>' +
           '<ul class="wk-items">' + (items.length ? items.slice(0, SHOW).map(item).join('') + (items.length > SHOW ? '<li class="more">+ ' + (items.length - SHOW) + ' more</li>' : '') : '<li class="ok">Nothing to check</li>') + '</ul></a>';
       };
-      put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Production every 2 to 3 hours · yellow at 2 hours, red at 3 · the same checks as the phone app', 'walkthrough.html', [
+      keepCaretIn(grid.querySelector('[data-card="walk"]'), () => put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Production every 2 to 3 hours · yellow at 2 hours, red at 3 · the same checks as the phone app', 'walkthrough.html', [
         walkTile('yard.html?walk=1', '1 · Yard', W.yard, 'trailers to check'), walkTile('temps.html?walk=1', '2 · Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', '3 · Production', W.quality, 'lines due', true),
-        tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : '')]));
+        tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : ''),
+        // Joe 10/23 (pictures, option 1): the 4th stop. Take Picture opens the camera (a picture file on a computer); the pictures go
+        // with the next Send Current Report and never again after that.
+        picTile()])));
       if (late) grid.querySelector('[data-card="walk"] .mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + late + ' past due</span>');
       // Shift Notes option A (Joe 10/10): open breakdowns stay until resolved; carried over = logged before the last report.
       // Joe 10/15: the card turns red while any note is not resolved by hand and lists them (a line opens that note); handoff
@@ -346,6 +375,7 @@
       onSnapshot(collection(db, 'gpsReefer'), s => { data.gps = {}; s.docs.forEach(d => { const r = d.data(); data.gps[U.yardTrailer(r.trailer || d.id)] = r; }); later(); }, () => {});
       onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
       watchRound(db, at => { data.roundStart = at; later(); });
+      watchPictures(db, pics => { data.pics = pics; later(); });
       watchWashRequests(db, L.weekStart(today()), r => { data.wash = r; later(); }, fail('the wash list'), 'plantWash');
       // Joe 10/18 (screen speed): the open wash requests and the week's finished ones, not every one ever made.
       watchWashRequests(db, L.weekStart(today()), r => { data.appWash = r; later(); }, fail('the wash requests'));
