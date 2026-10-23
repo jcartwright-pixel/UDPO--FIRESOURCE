@@ -939,7 +939,7 @@
 }
 /* Temperatures: the range under each cooler, its status and the last reading stay readable. */
 .temp-page .tp-table small, .temp-page .tp-status, .plant-page .as-last, .plant-page .as-note { font-size: 16px; }
-.plant-page button.pu { white-space: nowrap; padding: 0 6px; max-width: 100%; }
+.plant-page button.pu { white-space: nowrap; padding: 0 4px; max-width: 100%; }
 .temp-page .tp-pill { font-size: 16px; }
 .plant-page table.loadout td:has(> button.pu) { padding-left: 3px; padding-right: 3px; }
 .plant-page table.loadout td button { overflow-wrap: normal !important; }

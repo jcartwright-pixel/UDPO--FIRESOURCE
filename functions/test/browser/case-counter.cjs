@@ -81,8 +81,11 @@ const cell = (page, route) => page.$eval('#rows tr[data-row^="' + (route === '63
   const results = [];
   try {
     // Before the counter is set up: no Counted column.
-    const plain = await openPage(browser, 1536, 790, '/loadout.html?date=' + DATE + '&area=CASE&' + MANAGER);
+    const plain = await openPage(browser, 1280, 800, '/loadout.html?date=' + DATE + '&area=CASE&' + MANAGER);
     await plain.waitForSelector('#rows tr[data-row]');
+    // Found on the way (Joe 10/23 "fix any of the bugs you found"): "Completed" on the P/U button was cut off on the 1280 tablet.
+    const cutPu = (p) => p.$$eval('#rows button.pu', bs => bs.filter(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > b.parentElement.getBoundingClientRect().right + 1).map(b => b.textContent));
+    assert.deepEqual(await cutPu(plain), [], 'every P/U button shows whole at 1280');
     assert.doesNotMatch(await plain.textContent('#head-row'), /Counted/, 'no Counted column until a counter is set up');
     await plain.close();
 
@@ -131,6 +134,7 @@ const cell = (page, route) => page.$eval('#rows tr[data-row^="' + (route === '63
       await lo.waitForSelector('#rows td.lo-counted.run');
       await fits(lo, 'Daily Case Loadout at ' + w);
       await whole(lo, 'Daily Case Loadout at ' + w);
+      if (w === 1280) assert.deepEqual(await cutPu(lo), [], 'every P/U button shows whole at 1280 with the Counted column');
       if (w === 390) assert.equal(await lo.$eval('#rows tr[data-row^="2026-10-04__run_p802|fri"] td.lo-counted', td => td.dataset.l), 'Counted', 'the phone card names the box');
       await shot(lo, 'after-case-loadout-' + name);
       assert.deepEqual(lo.errors, []);

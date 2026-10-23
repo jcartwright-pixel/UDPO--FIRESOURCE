@@ -72,7 +72,8 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.ok(drivers.length >= 12 && drivers.every(d => d.fits && d.size >= 16), 'every driver\'s whole name shows at 16px or more at ' + w + ': ' + JSON.stringify(drivers.filter(d => !d.fits || d.size < 16)));
       assert.ok(drivers.some(d => /ALESANTRINO, DAVID/.test(d.name)), 'the long name is on the list');
       const widths = await page.$$eval('#cols col', c => c.map(x => parseFloat(x.style.width)));
-      assert.deepEqual(widths.slice(0, 6), [5.6, 18.4, 10.9, 6.5, 6.5, 5.1], 'Truck, Trailer and Cases Out 20% narrower, Driver 30%; Route and Run wider');
+      // Joe 10/23: Run gave 1.5 points to P/U so "Completed" shows whole on the 1280 tablet.
+      assert.deepEqual(widths.slice(0, 6), [5.6, 16.9, 10.9, 6.5, 6.5, 5.1], 'Truck, Trailer and Cases Out 20% narrower, Driver 30%; Route and Run wider');
       const runs = await page.$$eval('#rows tr[data-row] td:nth-child(2)', tds => tds.filter(td => td.classList.contains('fit-wrap')).map(td => td.textContent));
       assert.deepEqual(runs, [], 'every run on one line at ' + w);
       // Review item 22 (Joe 10/13): the Start / End column has its heading, and Wednesday's 6303 (still loading, End forgotten)
