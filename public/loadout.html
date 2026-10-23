@@ -138,6 +138,9 @@
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     const today = () => L.operatingDay(new Date());
     let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [];
+    // Case counters (Joe 10/23): what the palletizer's counter counted on each Case load, beside the Cases Out typed before loading.
+    let caseCounts = {}, palletizer = null;
+    const counting = () => area === 'CASE' && !!(palletizer && palletizer.controller && palletizer.controller.ip);
     const schedPending = {};
     const schedGone = {};         // Scheduler loads deleted here, off the screen before the server has them (Joe 10/20)      // Scheduler load id -> its work and trailer shown before the server has them
     const pending = {};           // row id -> fields shown before the server has them
@@ -198,6 +201,23 @@
       normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 7], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
+    // Joe 10/23: with the palletizer's case counter set up, Daily Case Loadout gets a Counted column beside Cases Out (Run gives the room).
+    const COUNTED_COLS = COLS.normal.slice(0, 6).concat([['Counted', 7.5]], COLS.normal.slice(6)).map(c => c[0] === 'Run' ? ['Run', c[1] - 7.5] : c);
+    // Joe 10/23 (found with the case counter): on the 1280 Plant Station tablet "Completed" on the P/U button was cut off, so on
+    // screens under 1400 wide P/U takes 3.5 points from Run (a long run name may wrap there; at 1536 and 1920 it stays one line).
+    let shownCols = [];
+    function setCols(cols) {
+      shownCols = cols;
+      const narrow = innerWidth < 1400 && cols !== COLS.TANKER;
+      document.getElementById('cols').innerHTML = cols.map(([h, w]) => '<col style="width:' + Math.round((narrow && h === 'Run' ? w - 3.5 : narrow && h === 'P/U' ? w + 3.5 : w) * 100) / 100 + '%">').join('');
+    }
+    addEventListener('resize', () => { if (shownCols.length) setCols(shownCols); });
+    // What the counter counted on a load against its Cases Out: counting while it loads, then matches, short or over (red).
+    function countedCell(r) {
+      const c = caseCounts[r.runDocId + '|' + r.day], cmp = R.caseCompare(r.quantity, c ? c.counted : null, r.state === 'LOADING' && !r.paused ? 'RUNNING' : r.state === 'DONE' ? 'DONE' : '');
+      if (!cmp || (r.state !== 'LOADING' && r.state !== 'DONE' && !c)) return '<td class="lo-counted"></td>';
+      return '<td class="lo-counted ' + cmp.kind + '"' + (c && c.lastAt ? ' title="Last case counted ' + escapeHtml(new Date(c.lastAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '"' : '') + '><b>' + escapeHtml(cmp.number) + '</b><small>' + escapeHtml(cmp.word) + '</small></td>';
+    }
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
     function fitDrivers() {
       document.querySelectorAll('#rows td.lo-driver').forEach(td => {
@@ -216,6 +236,23 @@
     // (Case, Totes, Boxes, Tanker), every load of the day, an added one too; a past day stays as loaded.
     const canOrder = () => canLoad() && date >= today();
     const LOAD_LIMIT = { CASE: 2, BOXING: 3 };
+    // The top line with the case counter on: the cases it counted on the day's loads, how many loads match, and the loads that are
+    // off (red). Red too when a load is loading and the counter's PC has not sent anything for 2 minutes.
+    function countStrip(rows) {
+      if (!counting()) return '';
+      let total = 0, ok = 0, off = 0;
+      rows.forEach(r => {
+        const c = caseCounts[r.runDocId + '|' + r.day], cmp = c ? R.caseCompare(r.quantity, c.counted, r.state === 'DONE' ? 'DONE' : 'RUNNING') : null;
+        if (!c) return;
+        total += Number(c.counted) || 0;
+        if (r.state === 'DONE' && cmp.kind === 'ok') ok++;
+        if (cmp.kind === 'bad') off++;
+      });
+      const quiet = rows.some(r => r.state === 'LOADING' && !r.paused) && (!palletizer.heardAt || Date.now() - Date.parse(palletizer.heardAt) > 120000);
+      return '<span class="green">Counted <b>' + total.toLocaleString() + '</b> · matches <b>' + ok + '</b></span>' +
+        (off ? '<span class="red">Off <b>' + off + ' load' + (off === 1 ? '' : 's') + '</b></span>' : '') +
+        (quiet ? '<span class="red">Case counter not sending</span>' : '');
+    }
     const orderRows = (rows) => rows.filter(r => !r.prior && r.loadDate === date);
     // A load already loaded does not move (no line to drag); the others move around it, which keeps its place.
     let heldMove = null;
@@ -258,10 +295,10 @@
         (c.paused ? '<span>Paused <b>' + c.paused + '</b></span>' : '') +
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
-        '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>';
+        '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>' + countStrip(rows);
       const movable = canOrder() ? orderRows(rows).filter(r => r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
-      const cols = COLS[area === 'TANKER' ? area : 'normal'];
-      document.getElementById('cols').innerHTML = cols.map(([, w]) => '<col style="width:' + w + '%">').join('');
+      const cols = counting() ? COUNTED_COLS : COLS[area === 'TANKER' ? area : 'normal'];
+      setCols(cols);
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
       const orderIds = ordering ? movable.map(r => r.id) : [];
@@ -309,7 +346,7 @@
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
-            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' + (counting() ? countedCell(r) : '') +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         }
@@ -845,6 +882,11 @@
       // Joe 10/18 (screen speed): the Shipping schedule's entries from 14 days before the shown day on, as the Plant Station
       // reads them (review item 73), not every entry ever made, so the screen does not slow down as the schedule grows.
       unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING), where('date', '>=', L.addDays(date, -14))), s => { schedDocs = s.docs.map(d => d.data()); render(); }, () => { schedDocs = []; }));
+      unsubs.push(onSnapshot(query(collection(db, 'caseCounts'), where('date', 'in', [L.addDays(date, -1), date])), s => {
+        caseCounts = {};
+        s.docs.forEach(d => { const c = d.data(); if (c.kind === 'LOAD') caseCounts[c.runDocId + '|' + c.day] = c; });
+        render();
+      }, () => { caseCounts = {}; }));
     }
 
     // The truck and trailer boxes offer the fleet's units, as Daily Dispatch does (Joe 10/10): open ones first, then those on a
@@ -877,6 +919,7 @@
         if (key !== askedRights) { askedRights = key; allowedSaves(['savePlantLoad', 'savePlantSchedule']).then(a => { allowed = a; render(); }); }
       });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(doc(db, 'caseCounters', 'palletizer'), s => { palletizer = s.data() || null; render(); }, () => { palletizer = null; });
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
         const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));

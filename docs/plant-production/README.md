@@ -10,6 +10,7 @@ Notes for building our own production tracking (Joe, 10/11/2026).
 | [Gallon-Filler-Copy-Paste-List.md](Gallon-Filler-Copy-Paste-List.md) | The short list for both options, who to ask for quotes and what to tell them, in one block to copy and paste. |
 | [How-The-Reader-Connects.md](How-The-Reader-Connects.md) | In plain words: how a jug read on the line reaches the tablet, the board and the TV, and why we do not need to wait for the reader model. Ends with Room to grow: how a Receiving scanner plugs in later. |
 | [How-The-Blow-Mold-Controller-Connects.md](How-The-Blow-Mold-Controller-Connects.md) | In plain words: reading the Blow Mold's jug count, speed and temperature straight from its own controller, read-only, and what we need from the nameplate. |
+| [How-The-Case-Counter-Connects.md](How-The-Case-Counter-Connects.md) | In plain words: the case counters before the palletizer and on the case returns (Joe, 10/22 and 10/23): Cases Out typed before loading, the counter counts, and the screens compare. What the PLC needs to keep, the setup in Administration > Case Counters, and starting the plant PC. |
 | [Reader-For-Each-Machine.md](Reader-For-Each-Machine.md) | Every Uniontown machine: which reader fits it, where it mounts, and the sandbox test feed each line already has. The Gallon Filler is the only line marked for real hardware so far. |
 
 The screens are in the app under Plant Production: Production Lines (`public/production.html`, with `?tv=1` for the TV), Line Tablet (`public/line.html`) and Line Targets (`public/linetargets.html`).

@@ -76,8 +76,8 @@ function startController(o, deps) {
       }
       const out = await post(config ? { controller: Object.assign(reading, { errors }) } : { op: 'config' });
       config = out.config || null;
-      if (!config) say('Waiting for the controller setup on Line Targets (brand, IP address and the tags).');
-      else say('Reading ' + config.brand + ' at ' + config.ip + (Object.keys(errors).length ? ': ' + Object.values(errors).join(' ') : ', shift count ' + out.count));
+      if (!config) say('Waiting for the setup on Line Targets, or Administration > Case Counters for a case counter (brand, IP address and the tags).');
+      else say('Reading ' + config.brand + ' at ' + config.ip + (Object.keys(errors).length ? ': ' + Object.values(errors).join(' ') : ', count ' + out.count));
       // A Test read asked on Line Targets: read that one reading now and send back the number (or why not).
       if (out.testAsk && out.testAsk.at !== answered) {
         answered = out.testAsk.at;

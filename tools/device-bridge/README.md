@@ -47,3 +47,14 @@ node bridge.cjs --address <address> --device ut_prod_gallon_filler --key <the la
 ```
 
 When the motor switch goes off, a stop opens on the tablet (by "motor switch"), and it ends when the motor runs again. Rejects and spills = jugs in minus jugs the label reader counted. The add-on sensors never count jugs themselves, and nothing is written to the module.
+
+## Case counters (read-only)
+
+For the case counter boxes (Joe 10/22: right before the palletizer, and later on the case returns), run with `--controller` and the counter's id as the device:
+
+```
+node bridge.cjs --address <address> --device palletizer --key <the counter key> --controller
+node bridge.cjs --address <address> --device case_returns --key <the counter key> --controller
+```
+
+The setup and the key are on **Administration > Case Counters**: brand (Modbus TCP for the CLICK PLC), IP address and where the running case total is, with a **Test read**. The program reads the total every 5 seconds; the server puts the new cases on the Case load being loaded or the trailer being unloaded, beside Cases Out or Cases In (`functions/src/casecounter.js`). The plain-words version is in [docs/plant-production/How-The-Case-Counter-Connects.md](../../docs/plant-production/How-The-Case-Counter-Connects.md).

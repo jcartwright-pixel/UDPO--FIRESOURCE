@@ -154,7 +154,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/18: Plant Managers App added under Links & Codes (the Plant Managers link and its code).
     // Batch 8, mock-up 2 (10/23): Operational Assignments, Print Layouts, Dispatch Settings, Route Editor and Go-Live Switches
     // are on the Dispatch Administration page; the list keeps one Dispatch Administration line, and Find a setting still finds them.
-    assert.equal(all, 34, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    // Joe 10/22: Case Counters added under Connections & Keys (the palletizer and case returns counter boxes).
+    assert.equal(all, 35, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
     assert.deepEqual(await adm.$$eval('.adm-nav-group:has(h2:text-is("Dispatch")) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');

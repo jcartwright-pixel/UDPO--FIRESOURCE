@@ -1408,7 +1408,27 @@
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff">' + H.join('') + '</table></body></html>';
   }
 
-  return { pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
+  // Case counters (Joe 10/23: "the cases need to be put in prior to loading. And then the case counter counts and does a
+  // comparison"): what the counter counted on a load or unload against the number typed (Cases Out or Cases In). While the
+  // load is going on it counts up (red only once it is over what was typed); once it is done it matches, or is short or over.
+  // state: 'RUNNING' (loading / unloading), 'DONE', or anything else (not started). Returns null when there is nothing to show.
+  function caseCompare(typed, counted, state) {
+    var t = typed === null || typed === undefined || text(typed) === '' ? null : Number(String(typed).replace(/,/g, ''));
+    var c = counted === null || counted === undefined || text(counted) === '' ? null : Number(counted);
+    if (t !== null && !isFinite(t)) t = null;
+    if (state === 'RUNNING') {
+      var n = c || 0;
+      if (t !== null && n > t) return { kind: 'bad', counted: n, number: String(n), word: 'over ' + (n - t), off: n - t };
+      return { kind: 'run', counted: n, number: t === null ? String(n) : n + ' of ' + t, word: 'counting', off: 0 };
+    }
+    if (c === null) return null;
+    if (state !== 'DONE') return { kind: 'run', counted: c, number: String(c), word: 'counted', off: 0 };
+    if (t === null) return { kind: 'plain', counted: c, number: String(c), word: 'counted', off: 0 };
+    if (c === t) return { kind: 'ok', counted: c, number: String(c), word: 'matches', off: 0 };
+    return { kind: 'bad', counted: c, number: String(c), word: (c < t ? 'short ' + (t - c) : 'over ' + (c - t)), off: c - t };
+  }
+
+  return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
