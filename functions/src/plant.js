@@ -435,7 +435,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (req.action === 'completePickup' && /^note:/.test(req.pickupId)) {
     // Completing a load note's pickup saves it as a pickup record (the note is the item), complete, so the note's listing goes.
     const runSnap = await tx.get(db.collection('runs').doc(req.runDocId));
-    if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
+    if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in this week\'s loads. Refresh the screen.');
     const run = Object.assign({}, runSnap.data(), { id: req.runDocId });
     const id = 'pu_note_' + docId(req.runDocId + '_' + req.day + '_' + req.date);
     const ref = db.collection('pickups').doc(id), already = await tx.get(ref);
@@ -467,7 +467,7 @@ async function savePickup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     return result;
   }
   const runSnap = await tx.get(db.collection('runs').doc(req.runDocId));
-  if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
+  if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in this week\'s loads. Refresh the screen.');
   const run = runSnap.data();
   const id = 'pu_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 18);
   const p = { pickupId: id, date: req.date, routeId: run.routeId || '', runId: run.runId || '', route: run.route || '', run: run.run || '', runDocId: req.runDocId, day: req.day,

@@ -1,7 +1,7 @@
 # Production: what has to exist, and who makes it
 
-The new app's production copy is a **separate Firebase project** from the sandbox. Nothing below exists yet. Once it
-does, one release step puts the app live: merge the release into `main`, then run **Deploy distribution app
+The app's production copy is a **separate Firebase project** from the sandbox (ud-distribution, live since 10/12). One
+release step puts a release live: merge the release into `main`, then run **Deploy distribution app
 (Firebase)** with target `production` and `DEPLOY PRODUCTION` typed in the confirm box.
 
 ## What production does on day one
@@ -10,11 +10,12 @@ does, one release step puts the app live: merge the release into `main`, then ru
   (`11beWtlO848OyZI_Bom9y2WCZn2vnw4mLm24pf-rO1Cg`), Route, Driver, Equipment and Users Master, day offs, vacations
   (`functions/src/sources.js`, the same IDs as the current app), and the Plant Operations workbook
   (`1to7JVLHCqkIiU4uuIKP1ogjPBi_52eSS-b7TBKMBed0`).
-- Writes to **one sheet only**, and only dispatch changes and plant loading: Joe typed *"Let the new app write dispatch
-  changes to the real Live sheet."* and *"Let the new app write plant loading to the real Live sheet"* on 10/12. `production-settings.json` names the real Uniontown Live workbook as the write-back
-  target; `tools/production-env.cjs` stops the deploy if it names anything else (or any master list), and
-  `functions/src/writeback.js` refuses every other production sheet in code. Nothing is written until an
-  administrator turns the write-back on (see *Writing dispatch changes to the real Live sheet* below).
+- Writes the real Live week tabs (Joe 10/12: *"Let the new app write dispatch changes to the real Live sheet."* and
+  *"... plant loading to the real Live sheet"*), the six real master lists (Joe 10/12: *"Let the new app write Route
+  Master, Driver Master, Equipment Master, Users, Exceptions and Vacations to the real sheets."*) and the check-in problem
+  tabs of the Live workbook (`index.js writeBackIfOn`, `writeback.js REAL_MASTER_LISTS`). `tools/production-env.cjs`
+  stops the deploy if the write-back names anything else, and `functions/src/writeback.js` refuses every other
+  production sheet in code. The copy still reads every sheet each minute, because people still type in them (Joe 10/23).
 - Plant check screens (Quality, Temperatures, Yard, Shift Notes, Current Report) keep their own records in the new
   app's database, as on the sandbox.
 - No Diagnostics: the deploy runs `tools/sandbox-diagnostics.cjs check` and stops if any of it is there.
@@ -43,8 +44,9 @@ To turn it on: share the Live workbook with the server account `<project number>
 as **Editor**; then an Administrator turns the write-back on in the app and moves Daily Dispatch and Weekly Dispatch to
 the new app (the other screens then show the board without saving).
 
-To turn it off: move those screens back to the current app, then turn the write-back off (the app refuses the other
-order). To be sure nothing more can be written, set the server account's share on the Live workbook back to Viewer.
+To stop it (audit batch 2, 10/23): Administration > Go-Live Switches > **Pause writing to the sheets** (press twice).
+Every screen keeps saving; the saves wait and Resume writes them in order. Screens are never switched back to view only.
+To be sure nothing more can be written, also set the server account's share on the Live workbook back to Viewer.
 
 Turned on and checked on live, 10/12 (Release 6.1, `main` 0f37e9d): Joe set the server account to Editor on the Live
 workbook, turned the write-back on, and moved Daily Dispatch and Weekly Dispatch to the new app. His test save (driver
