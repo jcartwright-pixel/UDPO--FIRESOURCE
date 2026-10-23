@@ -284,7 +284,7 @@ async function phoneCall(db, input, now) {
     // Only a load Dispatch gave this driver, for today or yesterday.
     if (!d || !d.runs || !who.mine(run, req.runDocId, req.day, d) || dates.indexOf(date) < 0) throw new SaveError('NOT_ALLOWED', 'That load is not yours today; ask Dispatch');
     const equipment = (await tx.get(db.collection(C.equipment))).docs.map(x => x.data());
-    const after = Object.assign({}, req.checkIn, checkinExtras(input.fields || {}, d, equipment), { checkinCompletedAt: stamp });
+    const after = Object.assign({}, req.checkIn, checkinExtras(input.fields || {}, d, equipment), { checkinCompletedAt: stamp, checkinVia: 'PHONE' });
     const by = 'phone:' + who.by, name = who.name || d.driver || coverageName(run);
     // The write-ups go on the units the driver says they had (a corrected truck or trailer, the jack, each drop-and-hook trailer).
     const units = Object.assign({}, d, after);

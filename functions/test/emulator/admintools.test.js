@@ -205,6 +205,7 @@ test('Driver Check-In Email (Joe 10/14): the driver\'s name finds the run when t
   await T.checkinRun(db(), { by: ADMIN.email, readMail: async () => [mail('casey1', 'Name +(UT): Lee Casey\nRoute Number: 2\nHow Many Cases: 300\nHow Many Returned: 12')], now: () => new Date('2026-10-05T20:00:00Z') });
   const casey = (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.mon;
   assert.ok(casey.checkinCompletedAt, 'Casey is checked in');
+  assert.equal(casey.checkinVia, 'EMAIL', 'Joe 10/23: an emailed check-in is marked as one');
   assert.deepEqual([casey.casesDelivered, casey.driverCaseReturn], [300, 12]);
   // An email read before this change, kept with no run: the one-time load credits Pat Adams on 801.
   await db().collection('mailSeen').doc('adams1').set({ at: '2026-10-05T19:05:00.000Z', route: '1', driver: 'Pat Adams', run: '', made: [] });
@@ -212,6 +213,7 @@ test('Driver Check-In Email (Joe 10/14): the driver\'s name finds the run when t
   const out = await T.recreditMailCheckins(db(), { now: () => new Date('2026-10-14T02:00:00Z') });
   assert.deepEqual(out, { credited: ['adams1 ' + RUN + '|mon'], still: [] });
   assert.equal((await db().collection('runs').doc(RUN).get()).data().days.mon.checkinCompletedAt, '2026-10-05T19:00:00.000Z');
+  assert.equal((await db().collection('runs').doc(RUN).get()).data().days.mon.checkinVia, 'EMAIL');
   assert.equal((await db().collection('mailSeen').doc('adams1').get()).data().run, RUN + '|mon');
   assert.deepEqual(await T.recreditMailCheckins(db(), {}), { credited: [], still: [] }, 'once credited, never again');
 });
