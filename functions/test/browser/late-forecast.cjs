@@ -81,6 +81,7 @@ async function openPage(browser, url, w, h, opts) {
     const tile = await mc.textContent('.mc-tile[href="forecast.html"]');
     // Joe 10/22 (option az): the time says its day.
     assert.match(tile, /Late Forecast\s*1\s*late\s*All done est\. Tue \d+:\d\d AM/);
+    const tileDone = tile.match(/All done est\. (Tue \d+:\d\d AM)/)[1];
     const cut = await mc.$$eval('[data-card="dept"] .mc-tile span, [data-card="dept"] .mc-tile i', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
     assert.deepEqual(cut, [], 'every tile keeps its whole wording');
     if (SHOTS) await mc.screenshot({ path: path.join(SHOTS, 'late-forecast-manager-1536.png') });
@@ -93,6 +94,12 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(reports[0].testOnly, true);
     assert.match(JSON.parse(reports[0].reportJson).forecast.paceText, /^today's speed \(6 loads\) \+ 10% past nights \(Mon 10-5-26, Mon 10-12-26\)$/);
     assert.doesNotMatch(await mc.textContent('#rp-body'), /\bpace\b|cases an hour|cushion|Mon 10-12-26/i, 'the report window shows no formula');
+    // Audit batch 7: the tile, the shift report and its window give the same answer (one late load, the same all-done time).
+    const sent = JSON.parse(reports[0].reportJson).forecast;
+    assert.equal(sent.late, 1, 'the report counts the same one late load as the tile');
+    assert.equal(sent.allDoneWhen, tileDone, 'the report has the tile\'s all-done time');
+    assert.deepEqual(sent.loads.filter(x => x.late).map(x => String(x.route).split('_')[0]), ['6301']);
+    assert.match(await mc.textContent('#rp-body'), new RegExp('All loads done\\s*est\\. ' + tileDone));
     assert.deepEqual(mc.errors, []);
 
     await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.mc-tile[href="forecast.html"]')]);
@@ -106,6 +113,7 @@ async function openPage(browser, url, w, h, opts) {
     assert.deepEqual(late.map(t => t.split(' ')[0]), ['6301']);
     late.forEach(t => assert.match(t, / late: misses dispatch$/));
     assert.match(await mc.textContent('#band'), /1 load late[\s\S]*Due by 5:00 AM\s*10 loads\s*4,691 cases/);
+    assert.match(await mc.textContent('#band'), new RegExp('All loads done\\s*est\\. ' + tileDone), 'the screen has the tile\'s all-done time');
     assert.equal(await mc.$$eval('.fc-row:not(.fc-head)', r => r.length), 15);
     assert.deepEqual(await mc.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [1536, 790], 'fits without scrolling');
     await mc.selectOption('#due-by', '180');
@@ -119,6 +127,12 @@ async function openPage(browser, url, w, h, opts) {
     assert.match(await phone.textContent('.fc-row.late'), /Late: misses dispatch by/);
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'late-forecast-390.png'), fullPage: true });
     assert.deepEqual(phone.errors, []);
+    // Audit batch 7: the Loadout Center's Behind count agrees: no load is past its own dispatch yet, so none is Behind,
+    // and the one late load (6301, 5:00 AM) is late only on the forecast.
+    const lo = await openPage(browser, '/loadout.html?' + MANAGER, 1536, 790);
+    await lo.waitForFunction(() => /Behind \d/.test((document.getElementById('strip') || {}).textContent || ''), null, { timeout: 20000 });
+    assert.match((await lo.textContent('#strip')).replace(/\s+/g, ' '), /Behind 0\b/);
+    assert.deepEqual(lo.errors, []);
     console.log('late-forecast: ok');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

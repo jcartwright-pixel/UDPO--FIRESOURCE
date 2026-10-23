@@ -865,7 +865,7 @@ async function applyAction(db, user, input, now, deps) {
 
     const runRef = db.collection(C.runs).doc(req.runDocId);
     const runSnap = await tx.get(runRef);
-    if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
+    if (!runSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in this week\'s loads. Refresh the screen.');
     const run = runSnap.data();
     const day = run.days && run.days[req.day];
     // RUNS / Add Route / Run may turn a day back on; every other save needs a day that runs.

@@ -1,33 +1,22 @@
-# United Dairy Distribution app (new, Firebase)
+# Operations (United Dairy, Firebase)
 
-The new distribution app that runs **beside** the current Apps Script app (route B in
-`SPEED_REVIEW_7.0.278.md`). Nothing in this folder changes the current app, its Installer, its releases or the
-Google Sheets.
+The Operations app: dispatch, the plant screens, fleet and administration. It replaced the old Apps Script app, which is
+switched off; the Google Sheets are kept and never deleted.
 
-## Where it stands (phase 2)
+## Where it stands (audit 10/23)
 
-Built and tested on Google's local test database with made-up data. **Nothing is live**: there is no Firebase
-project yet, so nobody can open it until the steps under "What Joe provides" are done.
-
-| Piece | State |
-|---|---|
-| Database layout (Firestore) | Built |
-| One-way copy from the sheets (every minute) | Built, tested with made-up sheets in the real column layout |
-| Daily Dispatch screen | Built, test copy: the current columns and buttons (RUNS?, OVR, depart time, jack, Edit box, move to another day, Print, Down Trucks / Trailers, Driver Call-Off, Add Route / Run); managers drag the load order |
-| Weekly Dispatch screen | Built, test copy: pick driver, truck, trailer per day, CARRIER / OPEN / NOT RUNNING, Override, legend colours, Route Run Days, Driver Assignment Board, Publish record. Reset Week (managers); Save Draft not needed (every pick saves) |
-| Vacation Schedule | Built, test copy: Time Off list, Calendar with the day-off box, Eligibility by years of service, Print Year; a day off takes the driver off that day's runs |
-| Route Editor | Built, test copy (managers): start times, miles, hours, load day, default truck / trailer / jack, Route Days, Load Order drag, Route Details, Recap, Add Route / Run. Ctrl+D fill-down, Shift+click block copy, block paste from Excel or Sheets |
-| Equipment | Built, test copy: trucks and trailers, put down / back in service, the run each unit is on today. Fleet service and work orders stay in the current app |
-| Sign-in | Built: United Dairy Google accounts only |
-| Saves (driver, truck, trailer, driver note, load order) | Built, one call each; shown on screen at once, saved in the background |
-| Writing saves back to a **sandbox copy** of the Live sheet | Built, off until switched on; the production sheet is refused in code |
-| Sheet Conflicts screen | Built: saves the write-back did not write, with both values |
-| Route Distribution home | Built: eight cards with live numbers (loads, needs driver, covered, week, drivers, check-ins, time off, units, routes, conflicts) |
-| Drivers screen | Built, test copy: seniority order, vacation weeks, assigned truck, relief, available; add, edit (name, dates, truck, relief) and Remove Selected (managers) |
-| Master tabs (Driver, Route, Equipment Master, day offs, vacations) | Built: with the write-back on, saves go to **sandbox copies** of the lists, found by their ID column; new entries become new rows; production sheets refused in code |
-| Driver Check-ins screen | Built, test copy: what drivers reported per delivery day; a dispatcher can enter or fix one (same Live columns as the phone check-in). The drivers' phone Check-In is `route.html` (plant code once, name once, today's or yesterday's loads); DVIR, plant journal and maintenance queue still on the current app |
-| Per-screen switch | Built: each home card says which app runs that screen (Current app / New app). An administrator clicks the tag twice to move a screen; a screen can move only while the write-back is on, and the write-back cannot go off while any screen is on the new app. Once one screen moves, the others are view only in the new app and the copy keeps reading the sheet (saves not yet in the sheet are held) |
-| Writing to the production sheet | Not built (only after Joe says go); the write-back refuses any sheet but the sandbox copies |
+- **Live** at ud-distribution.web.app; the practice copy is ud-distribution-sandbox.web.app. A release goes live only
+  after the full browser test on the practice copy passes and Joe presses Approve.
+- **Every screen is switched on and saves.** A screen that is on stays on (no view-only switch). The emergency stop is
+  Administration > Go-Live Switches > **Pause writing to the sheets**: every screen keeps saving, the saves wait, and
+  Resume writes them to the sheets in order. Publish waits while it is paused.
+- **The sheets stay in step both ways.** Each save is written to the real Live week tabs and the six real master lists
+  (Route, Driver, Equipment Master, Users, Exceptions, Vacations) and the check-in problem tabs (`index.js
+  writeBackIfOn`). People still type in the sheets (Joe 10/23), so the copy reads them every minute and brings a sheet
+  change into the app; a cell changed on both sides goes on Sheet Conflicts.
+- Plant check screens (Quality, Temperatures, Yard, Shift Notes, Current Report) keep their own records in the app.
+- Shared rules live in `functions/src` and are copied to `public/js` by `npm run sync-logic`; a check fails if the copies
+  differ.
 
 **Why Firestore and not SQL.** Joe asked for "the SQL package". Google's SQL database (Cloud SQL) is an
 always-on server: about $30 to $50 a month for us against about $10 to $20 for Firestore, and at our size it
@@ -50,7 +39,7 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
 ## How it works, in plain words
 
 1. **The copy.** Every minute the server reads the three Live week tabs (previous, current, next) and Route,
-   Driver, Equipment and Users Master. It has read-only permission, so it cannot change a sheet. Only rows that
+   Driver, Equipment and Users Master, so a change someone types in a sheet reaches the app. Only rows that
    changed since the last copy are written, which keeps the bill small.
 2. **Each run keeps its own ID.** A run is stored under its week and the sheet's `run_id`, never under a row
    number, so sorting or inserting rows in a Live tab cannot put a driver on the wrong run. A run listed on two
@@ -61,21 +50,20 @@ the production deploy runs `tools/sandbox-diagnostics.cjs check` and stops if an
    Both fit on one page, no scrolling, at 1920x950 and 1366x650, even with 32 loads in a day.
 5. **Saves** are one call each. The server checks the person is allowed, checks nobody changed that run since
    their screen showed it, saves, and writes who, when, before and after to a save log. A retry after a dropped
-   connection saves once. In phase 1 saves only change the new app's test copy. A test save stays until that run
-   changes in the sheet; then the sheet wins.
+   connection saves once.
 6. **Who can save.** From USERS_MASTER: Administrator, Manager, Supervisor or Dispatcher can assign drivers,
    trucks and trailers; only Administrator and Manager can change the load order (the same rule as today).
-7. **Writing back to the sheet (sandbox only for now).** When the write-back is switched on, each save also
+7. **Writing back to the sheets.** With the write-back on (it is on in production), each save also
    queues the sheet cells it changes, in the same database step, so a save can never miss its sheet update. The
    server writes them into the Live tab, finding the row by `run_id`, never by row number. A cell is written only
    if the sheet still holds what the new app last saw there; if someone typed something else in the meantime, the
    sheet value is kept and the cell goes on the **Sheet Conflicts** screen with both values, until someone marks
    it checked. While a save is waiting to be written, the minute copy leaves that run alone, so the copy cannot
-   undo the save. In this phase only a sandbox copy of the Live workbook can be written: the production Live
-   workbook and the master sheets are refused in code, whatever the settings say.
-8. **Safety stops.** The copy stops itself if any screen has been switched to the new app (that needs the
-   write-back, not built yet) or if two Live tabs claim the same week. Saves stop if the app is ever taken out of
-   test mode.
+   undo the save. Production writes only the real Live workbook, the six master lists Joe named on 10/12 and the
+   check-in problem tabs; every other production sheet is refused in code. Pause writing to the sheets (Go-Live
+   Switches) holds the saves until Resume.
+8. **Safety stops.** The copy stops itself if a screen is on while the write-back is off, or if two Live tabs
+   claim the same week.
 
 ### Things the copy found in the real sheets (read 2026-10-09, read only)
 
