@@ -334,11 +334,20 @@
 .yard-page .yd-gps { font-size: 18px; font-weight: 800; }
 .yard-page .yd-gps.none { color: var(--muted); font-weight: 400; }
 .yard-page .yd-gps.bad { background: #fde8e8; color: #bf2020; }
+/* Joe 10/22: All Trailers in Yard (look only): a red or green bar on each row and its status, with why under it. */
+.yard-page table.yd-all td { font-size: 17px; }
+.yard-page table.yd-all td.yd-route { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yard-page table.yd-all tr.yd-bad td:first-child { box-shadow: inset 5px 0 0 #d33; }
+.yard-page table.yd-all tr.yd-ok td:first-child { box-shadow: inset 5px 0 0 #2a9a55; }
+.yard-page .yd-st { font-weight: 800; line-height: 1.25; white-space: nowrap; }
+.yard-page .yd-st small { display: block; font-size: 16px; font-weight: 700; color: var(--muted); }
+.yard-page .yd-st.ok { color: #157a3a; }
+.yard-page .yd-st.bad { color: #bf2020; }
 @media (max-width: 1500px) { .yard-page .yd-cycle { display: none; } }
 /* Phone (the yard hands): one row per trailer like the old app (Trailer, Temp, Set, Fuel, GPS, Action), each box saves as it is left; no notes, no history. */
 .yard-page .yd-cards { display: none; }
 @media (max-width: 760px) {
-  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page .foot { display: none !important; }
+  .yard-page .head .hstats, .yard-page .head .dayname, .yard-page .head .tabs, .yard-page .head .yd-refresh, .yard-page .head .badge-test span, .yard-page .yd-bar, .yard-page #pane-current, .yard-page #pane-history, .yard-page #pane-all, .yard-page .foot { display: none !important; }
   .yard-page .yd-cards { display: block; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 8px 16px; }
   .yard-page table.yd-ptable { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
   .yard-page table.yd-ptable th { position: sticky; top: 0; z-index: 1; padding: 8px 3px; background: #eaf3fc; color: var(--ud-blue-dark); font-size: 16px; line-height: 1.15; text-align: center; border-bottom: 1px solid var(--line); }
