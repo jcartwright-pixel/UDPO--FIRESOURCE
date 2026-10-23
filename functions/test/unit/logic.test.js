@@ -295,6 +295,10 @@ test('Weekly: a carrier pickup on the Scheduler for a day the run does not run s
   ctx.plant['run_849|2026-10-30'].pop();
   row.days.fri.plantLoadOff = true;
   assert.equal(L.weeklyCellClass(row, 'fri', ctx), 'off');
+  // Joe 10/23 ("no matter who is running it"): a United Dairy load on a run an outside carrier covers shows too, as the carrier's.
+  row.days.fri.plantLoadOff = false;
+  ctx.plant['run_849|2026-10-30'] = [{ runId: 'run_849' }];
+  assert.equal(L.weeklyCellClass(Object.assign({}, row, { coverageType: 'SUN VALLEY TRUCKING' }), 'fri', ctx), 'carrier');
 });
 
 test('Weekly: a day dispatch has a driver on never shows PLANT LOAD (Joe 10/20, 844 Ohio Processor)', () => {

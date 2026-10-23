@@ -1048,8 +1048,10 @@
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
     // Joe 10/13 (836 PECK): a plant load marked Not running on Weekly (plantLoadOff) is off like any other day.
     // Joe 10/20 (844 Ohio Processor): a day dispatch has a driver on never shows PLANT LOAD; the driver shows instead.
-    // Joe 10/23 (849 Sun Valley, Friday): a customer's carrier pickup on the Scheduler for a day the run does not run shows CARRIER.
-    if (!d.runs) { var pl = plantFor(ctx, row, prefix); return pl && !coveredRoute(row) && d.plantLoadOff !== true && !dispatchDriver(d) ? (plantCarrier(pl) ? 'carrier' : 'plant') : 'off'; }
+    // Joe 10/23 (849 Sun Valley, Friday: "if it's visible, my rule overrides no matter who is running it"): any Scheduler load on a
+    // day the run does not run shows: a customer's carrier pickup, or a run an owner or outside carrier covers, as CARRIER (the
+    // covering name on screen); a United Dairy or Branch load as PLANT LOAD, needing a driver.
+    if (!d.runs) { var pl = plantFor(ctx, row, prefix); return pl && d.plantLoadOff !== true && !dispatchDriver(d) ? (coveredRoute(row) || plantCarrier(pl) ? 'carrier' : 'plant') : 'off'; }
     if (coveredRoute(row)) return 'coverage';
     // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
     if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';

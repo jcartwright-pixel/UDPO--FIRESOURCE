@@ -182,7 +182,7 @@
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + (d.plantLoadOff && L.plantFor(ctx, r, p) ? 'Plant load marked not running' : 'Does not run') + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
-          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : cls === 'carrier' ? 'CARRIER' : '\u2014 NEEDS DRIVER \u2014');
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : cls === 'carrier' ? (L.coveredRoute(r) ? String(r.coverageType).toUpperCase() : 'CARRIER') : '\u2014 NEEDS DRIVER \u2014');
           const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : cls === 'vacation-needs' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           // Joe 10/20 ("Donnie Rugg is off, but it's not pronounced good enough"): a run whose driver is off reads NEEDS DRIVER in
           // white on solid red, with who is off and why under it, until someone picks a driver.
@@ -217,7 +217,7 @@
       rows.forEach(r => { const x = r.days[day]; if (r !== row && x.runs && x.driverId) busy[x.driverId] = 'on ' + r.route; });
       const who = String(d.driver || '').toUpperCase();
       // Joe 10/13 (836 PECK): a plant load can be marked Not running here too, and put back to needing a driver.
-      const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && L.plantCarrier(plant);
+      const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && (L.plantCarrier(plant) || L.coveredRoute(row));
       const plantText = pickup ? 'CARRIER PICKUP' : 'PLANT LOAD &mdash; NEEDS DRIVER';
       let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : plantOpen ? '&mdash; ' + plantText + ' &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
         '<option value="__CARRIER__"' + (who === 'CARRIER' ? ' selected' : '') + '>CARRIER</option><option value="__OPEN__"' + (who === 'OPEN' ? ' selected' : '') + '>OPEN</option>' +
