@@ -18,6 +18,10 @@
     .legend i.backup { background: #ffe45c; }
     .weekly-page .board td.b-backup, .weekly-page .board tr.relief td.b-backup { background: #ffe45c !important; color: #3d2f00 !important; }
     .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #e4d8fb !important; color: #4b2a91 !important; }
+    /* Joe 10/23: a Day Note ("riding with ...") shows the note in teal in place of AVAILABLE. */
+    .legend i.daynote { background: #1f7a8c; }
+    .weekly-page .board td.b-daynote, .weekly-page .board tr.relief td.b-daynote { background: #1f7a8c !important; color: #fff !important; }
+    .modal .daynote-help { grid-column: 1 / -1; margin: -4px 0 0; font-size: 16px; font-weight: 600; color: #3d4b5a; }
   </style>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -60,7 +64,7 @@
       </div>
       <div class="legend" id="legend">
         <span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
-        <span><i class="vacation-needs"></i>Driver Off &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span><span><i class="backup"></i>Backup Driver</span>
+        <span><i class="vacation-needs"></i>Driver Off &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span><span><i class="backup"></i>Backup Driver</span><span><i class="daynote"></i>Day Note &mdash; No Route</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
@@ -94,8 +98,9 @@
     <h2 id="avail-title">Driver availability</h2>
     <p id="avail-context" class="modal-context"></p>
     <div class="modal-grid">
-      <label class="wide">Availability<select id="avail-reason"><option value="AVAILABLE">Available</option><option value="BACKUP">Backup</option><option value="VACATION">Vacation</option><option value="SICK DAY">Sick Day</option><option value="PERSONAL DAY">Personal Day</option><option value="BEREAVEMENT">Bereavement Day</option><option value="UNPAID DAY">Unpaid Day</option><option value="OFF">Off</option></select></label>
+      <label class="wide">Availability<select id="avail-reason"><option value="AVAILABLE">Available</option><option value="BACKUP">Backup</option><option value="DAYNOTE">Day Note &mdash; No Route</option><option value="VACATION">Vacation</option><option value="SICK DAY">Sick Day</option><option value="PERSONAL DAY">Personal Day</option><option value="BEREAVEMENT">Bereavement Day</option><option value="UNPAID DAY">Unpaid Day</option><option value="OFF">Off</option></select></label>
       <label class="wide">Note<input id="avail-note" maxlength="300" placeholder="Optional"></label>
+      <p class="daynote-help" id="daynote-help" hidden>Day Note shows the note on the driver's day instead of AVAILABLE. It does not put the driver on a route and does not count as needing a driver.</p>
     </div>
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="avail-save">Save availability</button></div>
   </section>
@@ -226,7 +231,9 @@
       L.driverRosterRows(lists.allDrivers, today).forEach(x => {
         const off = L.exceptionOn(lists.exceptions, x.id, date), why = !x.active ? x.status : off ? L.exceptionLabel(off) : busy[x.id] ? busy[x.id] : '';
         // Joe 10/16: a driver marked Backup that day is offered as usual, marked BACKUP.
-        const item = { id: x.id, label: x.name + (!why && L.backupOn(lists.backups, x.id, date) ? ' — BACKUP' : ''), why };
+        // Joe 10/23: a driver with a Day Note that day is offered too, with the note, so nobody puts him on a route by mistake.
+        const dayNote = !why && L.dayNoteOn(lists.backups, x.id, date);
+        const item = { id: x.id, label: x.name + (dayNote ? ' — ' + dayNote.toUpperCase() : !why && L.backupOn(lists.backups, x.id, date) ? ' — BACKUP' : ''), why };
         if (why && x.id !== d.driverId) blocked.push(item); else (x.reliefDriver ? relief : regular).push(item);
       });
       const group = (name, items) => items.length ? '<optgroup label="' + escapeHtml(name) + '">' + items.map(x => '<option value="' + escapeHtml(x.id) + '"' + (x.id === d.driverId ? ' selected' : '') + '>' +
@@ -322,23 +329,34 @@
       sel.value = [...sel.options].some(o => o.value === reason) ? reason : 'OFF';
       // Joe 10/17: on his regular day off the box starts at Off (as the board shows), so picking Available is a change.
       const shown = L.driverBoardRows([driver], [], lists.exceptions, week, lists.backups)[0];
-      if (!off) sel.value = L.backupOn(lists.backups, driver.id, avail.date) ? 'BACKUP' : shown && shown.days[L.dayPrefix(avail.date)].kind === 'off' ? 'OFF' : 'AVAILABLE';
-      document.getElementById('avail-note').value = '';
+      const dayNote = !off && L.dayNoteOn(lists.backups, driver.id, avail.date);
+      if (!off) sel.value = dayNote ? 'DAYNOTE' : L.backupOn(lists.backups, driver.id, avail.date) ? 'BACKUP' : shown && shown.days[L.dayPrefix(avail.date)].kind === 'off' ? 'OFF' : 'AVAILABLE';
+      document.getElementById('avail-note').value = dayNote || '';
+      showDayNoteHelp();
       openModal('avail-modal');
       sel.focus();
     });
+    function showDayNoteHelp() {
+      const on = document.getElementById('avail-reason').value === 'DAYNOTE', note = document.getElementById('avail-note');
+      document.getElementById('daynote-help').hidden = !on;
+      note.placeholder = on ? 'Example: Riding with Tom Miller' : 'Optional';
+      note.required = on;
+    }
+    document.getElementById('avail-reason').addEventListener('change', showDayNoteHelp);
     document.getElementById('avail-save').onclick = () => {
       if (!avail) return;
-      const choice = document.getElementById('avail-reason').value, a = avail;
-      // Backup (Joe 10/16): available and on call; the server keeps it in the app only.
-      const freeDay = choice === 'AVAILABLE' || choice === 'BACKUP';
-      const fields = { driverId: a.driverId, startDate: a.date, endDate: a.date, reason: freeDay ? '' : choice, status: freeDay ? choice : 'UNAVAILABLE', note: document.getElementById('avail-note').value.trim() };
+      const choice = document.getElementById('avail-reason').value, a = avail, noteText = document.getElementById('avail-note').value.trim();
+      // A Day Note needs its note: the box asks for it and nothing is saved yet.
+      if (choice === 'DAYNOTE' && !noteText) { document.getElementById('avail-note').reportValidity(); document.getElementById('avail-note').focus(); return; }
+      // Backup (Joe 10/16): available and on call; the server keeps it in the app only. Day Note (Joe 10/23) the same, with its note.
+      const freeDay = choice === 'AVAILABLE' || choice === 'BACKUP' || choice === 'DAYNOTE';
+      const fields = { driverId: a.driverId, startDate: a.date, endDate: a.date, reason: freeDay ? '' : choice, status: freeDay ? choice : 'UNAVAILABLE', note: noteText };
       closeModals();
       // Shown at once: the day off on the board, and the driver's runs that day turn to Needs Driver (the server does the same).
       const temp = { driverId: a.driverId, startDate: a.date, endDate: a.date, type: choice === 'VACATION' ? 'VACATION' : 'UNAVAILABLE', status: 'UNAVAILABLE', reasonCode: choice };
       const removed = [], hidden = [], backupsBefore = lists.backups;
       saveOptimistic('saveDriverException', fields, () => {
-        lists.backups = lists.backups.filter(x => !(x.driverId === a.driverId && x.date === a.date)).concat(choice === 'BACKUP' ? [{ driverId: a.driverId, date: a.date }] : choice === 'AVAILABLE' ? [{ driverId: a.driverId, date: a.date, kind: 'AVAILABLE' }] : []);
+        lists.backups = lists.backups.filter(x => !(x.driverId === a.driverId && x.date === a.date)).concat(choice === 'BACKUP' ? [{ driverId: a.driverId, date: a.date }] : choice === 'DAYNOTE' ? [{ driverId: a.driverId, date: a.date, kind: 'DAYNOTE', note: noteText }] : choice === 'AVAILABLE' ? [{ driverId: a.driverId, date: a.date, kind: 'AVAILABLE' }] : []);
         if (freeDay) {
           lists.exceptions.forEach(x => { if (x.driverId === a.driverId && x.startDate <= a.date && (x.endDate || x.startDate) >= a.date && !x.hiddenByScreen) { x.hiddenByScreen = true; x.status = 'CANCELLED'; hidden.push(x); } });
           return;

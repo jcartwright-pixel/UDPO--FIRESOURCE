@@ -1011,7 +1011,12 @@
   }
   // Joe 10/16: a driver marked Backup for a day (Weekly board's availability; driverBackups, app only, never the sheets).
   function backupOn(backups, driverId, day) {
-    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day && b.kind !== 'AVAILABLE'; });
+    return (backups || []).some(function (b) { return b && b.driverId === driverId && b.date === day && b.kind !== 'AVAILABLE' && b.kind !== 'DAYNOTE'; });
+  }
+  // Joe 10/23: a Day Note ("riding with ...") on a driver's day (same list, kind DAYNOTE; app only). Returns the note, else ''.
+  function dayNoteOn(backups, driverId, day) {
+    var hit = (backups || []).filter(function (b) { return b && b.driverId === driverId && b.date === day && b.kind === 'DAYNOTE'; })[0];
+    return hit ? String(hit.note || '').trim() || 'DAY NOTE' : '';
   }
   // Joe 10/17: a driver made Available on his regular day off (same list, kind AVAILABLE; app only, never the sheets).
   function availableOn(backups, driverId, day) {
@@ -1196,7 +1201,9 @@
         var scheduled = !!driver.cells && (p + '_available') in driver.cells && !regularOff;
         // Backup (Joe 10/16): not on a route, on call to cover one; shows BACKUP even on his regular day off. A route or a day off wins.
         var backup = backupOn(backups, driver.id, date);
-        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : backup ? 'backup' : dayOff ? 'off' : 'available';
+        // Day Note (Joe 10/23): not on a route and not off; the day shows the note. A route or a day off wins.
+        var dayNote = dayNoteOn(backups, driver.id, date);
+        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayNote ? 'daynote' : backup ? 'backup' : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
         // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
         // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (purple on the board, Joe 10/17): his Driver
@@ -1212,7 +1219,7 @@
         var lines = [], seen = {};
         routes.forEach(function (n) { if (seen[n]) seen[n].n++; else { seen[n] = { name: n, n: 1 }; lines.push(seen[n]); } });
         lines = lines.map(function (x) { return x.n > 1 ? x.name + ' \u00d7' + x.n : x.name; });
-        driver.days[p] = { date: date, routes: routes, lines: lines, kind: kind, extra: extra && routes.length > 0, added: added, backup: backup, text: routes.length ? lines.join(' / ') : off ? exceptionLabel(off) : backup ? 'BACKUP' : dayOff ? 'OFF' : 'AVAILABLE' };
+        driver.days[p] = { date: date, routes: routes, lines: lines, kind: kind, extra: extra && routes.length > 0, added: added, backup: backup, note: dayNote, text: routes.length ? lines.join(' / ') : off ? exceptionLabel(off) : dayNote ? dayNote.toUpperCase() : backup ? 'BACKUP' : dayOff ? 'OFF' : 'AVAILABLE' };
       });
     });
     return list;
@@ -1483,7 +1490,7 @@
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
-    exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
+    exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,

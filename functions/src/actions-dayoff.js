@@ -76,7 +76,8 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
   const result = { ok: true, requestId: req.requestId, runs: [] };
   const mine = await tx.get(db.collection(C.exceptions).where('driverId', '==', driver.id));
   const runSnaps = await runsForDays(tx, db, req.startDate, req.endDate);
-  freeRunsForDayOff(tx, db, req, runSnaps, driver, req.status === 'UNAVAILABLE' ? exceptionValues(req.reason).reasonCode : '', stamp, email, mode, result);
+  // A Day Note (Joe 10/23) never puts the driver back on a route.
+  if (req.status !== 'DAYNOTE') freeRunsForDayOff(tx, db, req, runSnaps, driver, req.status === 'UNAVAILABLE' ? exceptionValues(req.reason).reasonCode : '', stamp, email, mode, result);
   // Joe 10/16: Backup is kept in the app only (driverBackups, one per driver and day). Any other choice for those days takes it off.
   const backupDays = [];
   for (let day = req.startDate; day <= req.endDate && backupDays.length < 100; day = L.addDays(day, 1)) backupDays.push(day);
@@ -84,10 +85,13 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
     const ref = db.collection(C.backups).doc(driver.id + '__' + day);
     if (req.status === 'BACKUP') tx.set(ref, { driverId: driver.id, date: day, note: req.note || '', setAt: stamp, setBy: email });
     // Joe 10/17: Available on a day Driver Master has him off (<day>_available) is kept here too, kind AVAILABLE, so the board shows it.
+    // Joe 10/23: a Day Note is kept here too, kind DAYNOTE with the note; the board and My Schedule show the note for the day.
+    else if (req.status === 'DAYNOTE') tx.set(ref, { driverId: driver.id, date: day, kind: 'DAYNOTE', note: req.note, setAt: stamp, setBy: email });
     else if (req.status === 'AVAILABLE' && regularOff(driver, day)) tx.set(ref, { driverId: driver.id, date: day, kind: 'AVAILABLE', note: req.note || '', setAt: stamp, setBy: email });
     else tx.delete(ref);
   });
   if (req.status === 'BACKUP') result.backup = backupDays;
+  if (req.status === 'DAYNOTE') result.dayNote = backupDays;
   if (req.status === 'UNAVAILABLE') {
     const id = 'dav_' + req.requestId.slice(-12).toLowerCase();
     const v = exceptionValues(req.reason);
@@ -123,7 +127,7 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
     }
     changed.push({ id: snap.id, startDate: a, endDate: z, status: e.status });
   });
-  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: changed, after: req.status === 'BACKUP' ? { backup: [req.startDate, req.endDate] } : { available: [req.startDate, req.endDate] }, result });
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before: changed, after: req.status === 'BACKUP' ? { backup: [req.startDate, req.endDate] } : req.status === 'DAYNOTE' ? { dayNote: [req.startDate, req.endDate], note: req.note } : { available: [req.startDate, req.endDate] }, result });
   return result;
 }
 
