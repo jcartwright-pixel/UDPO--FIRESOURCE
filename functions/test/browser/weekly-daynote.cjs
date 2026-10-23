@@ -34,7 +34,13 @@ async function openPage(browser, width, height, url) {
 }
 // CASEY, LEE: Wednesday (his regular day off) and Thursday.
 const cell = (n) => '#board-rows tr[data-driver="drv_test_casey"] td:nth-child(' + n + ')';
-const countText = (page) => page.textContent('#count');
+// The footer count settles once every list has loaded (plant loads can add a Needs Driver day a moment later): read it
+// once it has stayed the same for a second.
+async function countText(page) {
+  let last = await page.textContent('#count'), same = 0;
+  for (let i = 0; i < 40 && same < 4; i++) { await page.waitForTimeout(250); const now = await page.textContent('#count'); same = now === last ? same + 1 : 0; last = now; }
+  return last;
+}
 
 (async () => {
   await clear();
