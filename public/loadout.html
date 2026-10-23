@@ -198,12 +198,13 @@
     // Run get the room, so a run like "ALDI - CHARLESTON Load 1" is one line. (Before, Joe 10/11: Driver / CVG had that room.)
     const COLS = {
       // Review item 22 (Joe 10/13): the Start / End column has its heading.
-      // Joe 10/23 (found with the case counter): P/U takes 1.5 points from Run so "Completed" shows whole on the 1280 Plant Station tablet.
-      normal: [['Route', 5.6], ['Run', 16.9], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 11], ['Total Time', 7], ['P/U', 8.5], ['', 6]],
+      // Joe 10/23 (found with the case counter): P/U takes 1.5 points from Start / End so "Completed" shows whole on the 1280 Plant
+      // Station tablet; Run keeps its room (Joe 10/14: the run name on one line).
+      normal: [['Route', 5.6], ['Run', 18.4], ['Driver / CVG', 10.9], ['Truck', 6.5], ['Trailer', 6.5], ['', 5.1], ['Depart', 7], ['Status', 9], ['Start / End', 9.5], ['Total Time', 7], ['P/U', 8.5], ['', 6]],
       TANKER: [['Route', 5.6], ['Run', 15], ['Driver / CVG', 20], ['Truck', 8.1], ['Trailer', 8.1], ['Quantity Out', 7.2], ['Status', 10], ['Shift', 10], ['Pickup', 8], ['', 8]]
     };
     // Joe 10/23: with the palletizer's case counter set up, Daily Case Loadout gets a Counted column beside Cases Out (Run gives the room).
-    const COUNTED_COLS = COLS.normal.slice(0, 6).concat([['Counted', 7.5]], COLS.normal.slice(6)).map(c => c[0] === 'Run' ? ['Run', 9.4] : c);
+    const COUNTED_COLS = COLS.normal.slice(0, 6).concat([['Counted', 7.5]], COLS.normal.slice(6)).map(c => c[0] === 'Run' ? ['Run', 10.9] : c);
     // What the counter counted on a load against its Cases Out: counting while it loads, then matches, short or over (red).
     function countedCell(r) {
       const c = caseCounts[r.runDocId + '|' + r.day], cmp = R.caseCompare(r.quantity, c ? c.counted : null, r.state === 'LOADING' && !r.paused ? 'RUNNING' : r.state === 'DONE' ? 'DONE' : '');
