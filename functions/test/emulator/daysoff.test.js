@@ -109,6 +109,25 @@ test('Backup (Joe 10/16): kept in the app only, clears a day off for that day, a
   assert.equal((await all('masterOutbox')).filter(x => JSON.stringify(x).includes('AVAILABLE') && JSON.stringify(x).includes('2026-10-07')).length, 0, 'nothing for the sheets');
 });
 
+test('Day Note (Joe 10/23): kept in the app only with its note, never touches a run, and any other choice takes it off', async () => {
+  const kinds = async () => (await all('driverBackups')).map(b => b.docId + ':' + (b.kind || '') + ':' + (b.note || '')).sort();
+  const run802 = async () => (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.mon;
+  const before = await run802();
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_brook', startDate: '2026-10-05', endDate: '2026-10-05', status: 'DAYNOTE', note: '  ' }), /Type the note/);
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_brook', startDate: '2026-10-05', endDate: '2026-10-05', reason: 'VACATION', status: 'UNAVAILABLE' });
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_brook', startDate: '2026-10-05', endDate: '2026-10-05', status: 'DAYNOTE', note: 'Riding with Casey' });
+  assert.deepEqual(await kinds(), ['drv_test_brook__2026-10-05:DAYNOTE:Riding with Casey']);
+  assert.equal(L.exceptionOn(await all('exceptions'), 'drv_test_brook', '2026-10-05'), null, 'not off that day');
+  assert.deepEqual(await run802(), before, 'no run changed');
+  assert.equal((await all('masterOutbox')).filter(x => JSON.stringify(x).includes('Riding with Casey')).length, 0, 'nothing for the sheets');
+  // A day his own run was taken from him (day off) stays needing a driver: a Day Note never puts him on a route.
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', reason: 'SICK DAY', status: 'UNAVAILABLE' });
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', status: 'DAYNOTE', note: 'Training' });
+  assert.equal((await run802()).driver, '');
+  await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_brook', startDate: '2026-10-05', endDate: '2026-10-05', status: 'BACKUP' });
+  assert.deepEqual(await kinds(), ['drv_test_brook__2026-10-05::', 'drv_test_casey__2026-10-05:DAYNOTE:Training']);
+});
+
 test('Weekly: CARRIER and OPEN are saved as words; Publish is recorded and kept by the minute copy', async () => {
   const RUN = '2026-10-04__run_t802';
   await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'mon', driverId: '__CARRIER__' });

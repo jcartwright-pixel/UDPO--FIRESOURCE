@@ -59,8 +59,12 @@ async function bigText(page, sel, what) {
   assert.deepEqual(small, [], what + ': text 16px or larger');
 }
 // Every Counted cell shows its whole wording (Joe: nothing cut off).
+// The table settles (column widths, fonts) after the first Counted cell appears, so it is measured once the layout stops moving.
 async function whole(page, what) {
-  const cut = await page.$$eval('td.lo-counted', tds => tds.filter(td => td.offsetParent && [...td.children].some(c => c.scrollWidth > td.clientWidth + 1)).map(td => td.textContent));
+  const measure = () => page.$$eval('td.lo-counted', tds => tds.filter(td => td.offsetParent && [...td.children].some(c => c.scrollWidth > td.clientWidth + 1)).map(td => td.textContent));
+  await page.evaluate(() => document.fonts && document.fonts.ready);
+  let cut = await measure();
+  for (let i = 0; i < 10 && cut.length; i++) { await page.waitForTimeout(200); cut = await measure(); }
   assert.deepEqual(cut, [], what + ': every Counted cell shows whole');
 }
 const admin = (fields) => RD.readerAll(db(), { email: 'admin.test@uniteddairy.com' }, fields, { now: tick, key: () => 'key-' + fields.counter });

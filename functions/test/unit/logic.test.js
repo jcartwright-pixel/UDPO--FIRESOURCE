@@ -143,6 +143,20 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   assert.equal(madeAvailable.days.wed.text, 'OFF', 'only the day marked');
   assert.equal(L.backupOn(marks, 'c', '2026-10-06'), false, 'Available is not Backup');
   assert.equal(L.availableOn(marks, 'c', '2026-10-06'), true);
+  // Joe 10/23: a Day Note shows the note in place of AVAILABLE (and of OFF on his regular day off); a route or a day off wins.
+  const notes = [{ driverId: 'c', date: '2026-10-06', kind: 'DAYNOTE', note: 'Riding with Tom Miller' }, { driverId: 'c', date: '2026-10-05', kind: 'DAYNOTE', note: 'x' },
+    { driverId: 'b', date: '2026-10-06', kind: 'DAYNOTE', note: 'Training' }];
+  const noted = L.driverBoardRows(offTue, rows, exceptions, '2026-10-04', notes);
+  assert.deepEqual([noted[2].days.tue.text, noted[2].days.tue.kind, noted[2].days.tue.note], ['RIDING WITH TOM MILLER', 'daynote', 'Riding with Tom Miller']);
+  assert.deepEqual([noted[2].days.mon.kind, noted[2].days.wed.text], ['conflict', 'OFF']);
+  assert.deepEqual([noted[0].days.tue.text, noted[0].days.tue.kind], ['TRAINING', 'daynote'], 'relief drivers too');
+  assert.equal(L.backupOn(notes, 'c', '2026-10-06'), false, 'a Day Note is not Backup');
+  assert.equal(L.availableOn(notes, 'c', '2026-10-06'), false);
+  assert.equal(L.dayNoteOn(notes, 'c', '2026-10-06'), 'Riding with Tom Miller');
+  assert.equal(L.dayNoteOn(notes, 'c', '2026-10-07'), '');
+  // Nothing about runs changes: no route for him, and no extra day needing a driver.
+  const ctxNoted = L.weeklyContext(rows, drivers, exceptions);
+  assert.deepEqual(rows.map(r => L.weeklyCellClass(r, 'mon', ctxNoted)), ['booked', 'booked', 'vacation-needs', 'carrier', 'relief', 'conflict', 'coverage', 'needs']);
 });
 
 test('Driver Assignment Board names a repeated run once with its count, one line each', () => {

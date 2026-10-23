@@ -200,8 +200,10 @@ function scheduleDays(driver, rows, exceptions, week, backups) {
     // Off on a day with a run (the exception wins on the board too): the run still shows, marked off.
     const off = c && (c.kind === 'vacation' || c.kind === 'unavailable' || c.kind === 'conflict') ? titleWord(L.exceptionLabel(L.exceptionOn(exceptions, driver.id, date)) || 'Off') : '';
     // Joe 10/16: a Backup day reads Backup (on call to cover a route).
-    const status = runs.length ? (off ? 'Off: ' + off : '') : off ? 'Off: ' + off : c && c.kind === 'backup' ? 'Backup' : c && c.kind === 'off' ? 'Off' : 'Not scheduled';
-    return { day: p, date, runs, status, kind: runs.length ? (off ? 'conflict' : 'work') : c && (c.kind === 'available' || c.kind === 'backup') || !c ? 'none' : 'off' };
+    // Joe 10/23: a Day Note day reads the note, as Dispatch typed it.
+    const note = c && c.note && !off ? c.note : '';
+    const status = runs.length ? (off ? 'Off: ' + off : note) : off ? 'Off: ' + off : note || (c && c.kind === 'backup' ? 'Backup' : c && c.kind === 'off' ? 'Off' : 'Not scheduled');
+    return { day: p, date, runs, status, kind: runs.length ? (off ? 'conflict' : 'work') : note ? 'daynote' : c && (c.kind === 'available' || c.kind === 'backup') || !c ? 'none' : 'off' };
   });
 }
 async function mySchedule(db, input, stamp) {

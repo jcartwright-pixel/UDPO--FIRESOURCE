@@ -211,11 +211,13 @@ function validate(input) {
     if (out.endDate < out.startDate) throw new SaveError('BAD_REQUEST', 'End Date cannot be before Start Date');
     const status = text(input.status, 20).toUpperCase();
     // Joe 10/16: BACKUP marks the driver Backup on those days (available, on call to cover a route).
-    out.status = status === 'AVAILABLE' || status === 'CLEAR' ? 'AVAILABLE' : status === 'BACKUP' ? 'BACKUP' : 'UNAVAILABLE';
-    if (out.status === 'BACKUP' && L.daysBetween(out.startDate, out.endDate) > 62) throw new SaveError('BAD_REQUEST', 'Backup can be set for at most two months at a time');
+    // Joe 10/23: DAYNOTE puts a short note on the driver's day ("riding with ...") instead of AVAILABLE; no route, no day off.
+    out.status = status === 'AVAILABLE' || status === 'CLEAR' ? 'AVAILABLE' : status === 'BACKUP' ? 'BACKUP' : status === 'DAYNOTE' ? 'DAYNOTE' : 'UNAVAILABLE';
+    if ((out.status === 'BACKUP' || out.status === 'DAYNOTE') && L.daysBetween(out.startDate, out.endDate) > 62) throw new SaveError('BAD_REQUEST', (out.status === 'BACKUP' ? 'Backup' : 'A Day Note') + ' can be set for at most two months at a time');
     out.reason = text(input.reason, 40).toUpperCase() || 'OTHER';
     if (EXCEPTION_REASONS.indexOf(out.reason) < 0) out.reason = 'OTHER';
     out.note = text(input.note, 300);
+    if (out.status === 'DAYNOTE' && !out.note) throw new SaveError('BAD_REQUEST', 'Type the note for the day');
     return out;
   }
   if (action === 'saveVacation') {
