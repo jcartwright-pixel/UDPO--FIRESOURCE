@@ -1607,7 +1607,12 @@ a.wp-more { color: var(--ud-blue); }
   .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; padding-top: 6px; }
   .manager-page [data-card="walk"] .wp-tile b { font-size: 30px; }
   .manager-page [data-card="walk"] .mc-tiles > .mc-tile:not(.wk-tile) b { font-size: 34px; }
-  .manager-page [data-card="walk"] .wp-tile { padding-top: 4px; padding-bottom: 6px; }
+  .manager-page [data-card="walk"] .wp-tile { padding-top: 4px; padding-bottom: 4px; }
+  /* Kept a little short of the 1536 x 886 screen so a slightly taller font elsewhere still fits with no scrolling. */
+  .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { margin-top: 0; padding-top: 4px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-side { gap: 3px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-cap { min-height: 34px; padding: 4px 8px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-take { height: 36px; min-height: 36px; }
 }
 .manager-page [data-card="walk"] .wp-tile .wp-box { grid-area: list; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); min-width: 0; }
 .manager-page [data-card="walk"] .wp-tile .wp-thumbs { gap: 6px; flex: 1 1 100%; }
