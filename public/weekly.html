@@ -20,6 +20,7 @@
     .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #e4d8fb !important; color: #4b2a91 !important; }
   </style>
   <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
 </head>
 <body data-view="routes" class="fill weekly-page">
   <div class="signin" id="signin" hidden>
@@ -117,19 +118,19 @@
     // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
     const coverText = (c) => c ? String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '') : '\u2014 NEEDS DRIVER \u2014';
 
-    const L = window.UDLogic;
+    const L = window.UDLogic, R = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
     let rowDrag = null, held = false, who = '';
-    let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, plantLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
+    let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
     let live = {}, routeList = null, unsubscribeRoutes = null, loaded = false;
     const weekKind = () => (!live.previous ? 'live' : week < live.previous ? 'old' : live.next && week > live.next ? 'future' : 'live');
     function previewRuns() {
       if (!routeList) return [];
-      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers), routeList, plantLoads);
+      const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers), routeList, routeLoads);
       return routeList.slice().sort((a, b) => (a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder) - (b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }))
         .map(r => Object.assign(L.buildWeekRun(r, week, ctx), { id: week + '__' + r.id, rev: 0 }));
     }
@@ -181,7 +182,7 @@
           if (cls === 'off') return '<td class="day off' + (can ? ' editable' : '') + '" data-day="' + p + '" title="' + (d.plantLoadOff && L.plantFor(ctx, r, p) ? 'Plant load marked not running' : 'Does not run') + (can ? ': click to assign a driver or carrier' : '') + '"></td>';
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
-          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : '\u2014 NEEDS DRIVER \u2014');
+          const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : cls === 'carrier' ? 'CARRIER' : '\u2014 NEEDS DRIVER \u2014');
           const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : cls === 'vacation-needs' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           // Joe 10/20 ("Donnie Rugg is off, but it's not pronounced good enough"): a run whose driver is off reads NEEDS DRIVER in
           // white on solid red, with who is off and why under it, until someone picks a driver.
@@ -216,10 +217,11 @@
       rows.forEach(r => { const x = r.days[day]; if (r !== row && x.runs && x.driverId) busy[x.driverId] = 'on ' + r.route; });
       const who = String(d.driver || '').toUpperCase();
       // Joe 10/13 (836 PECK): a plant load can be marked Not running here too, and put back to needing a driver.
-      const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true;
-      let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : plantOpen ? '&mdash; PLANT LOAD &mdash; NEEDS DRIVER &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
+      const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && L.plantCarrier(plant);
+      const plantText = pickup ? 'CARRIER PICKUP' : 'PLANT LOAD &mdash; NEEDS DRIVER';
+      let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : plantOpen ? '&mdash; ' + plantText + ' &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
         '<option value="__CARRIER__"' + (who === 'CARRIER' ? ' selected' : '') + '>CARRIER</option><option value="__OPEN__"' + (who === 'OPEN' ? ' selected' : '') + '>OPEN</option>' +
-        (d.runs || plantOpen ? '<option value="__OFF__">NOT RUNNING</option>' : '') + (plantOff ? '<option value="__PLANT__">PLANT LOAD &mdash; NEEDS DRIVER</option>' : '');
+        (d.runs || plantOpen ? '<option value="__OFF__">NOT RUNNING</option>' : '') + (plantOff ? '<option value="__PLANT__">' + plantText + '</option>' : '');
       const relief = [], regular = [], blocked = [];
       L.driverRosterRows(lists.allDrivers, today).forEach(x => {
         const off = L.exceptionOn(lists.exceptions, x.id, date), why = !x.active ? x.status : off ? L.exceptionLabel(off) : busy[x.id] ? busy[x.id] : '';
@@ -497,8 +499,16 @@
       // Plant Route loads on the Plant Operations Scheduler for this week (copied from PLANT_OPERATIONS).
       if (unsubscribePlant) unsubscribePlant();
       unsubscribePlant = onSnapshot(query(collection(db, 'plantLoads'), where('date', '>=', week), where('date', '<=', L.addDays(week, 6))), snap => {
-        plantLoads = snap.docs.map(d => d.data()); render();
+        routeLoads = snap.docs.map(d => d.data()); plantLoads = routeLoads.concat(carrierLoads); render();
       }, e => showError('Could not read the plant scheduler loads: ' + e.message));
+      // Joe 10/23 (849 Sun Valley, Friday): a customer's carrier pickup on the Scheduler (left off plantLoads, it needs no driver)
+      // shows CARRIER on a day the run does not run, read from the Scheduler's own records.
+      if (unsubscribeCarrier) unsubscribeCarrier();
+      unsubscribeCarrier = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING), where('date', '>=', week), where('date', '<=', L.addDays(week, 6))), snap => {
+        carrierLoads = R.scheduleEntries(snap.docs.map(d => d.data()), 'SHIPPING').filter(e => e.scheduleType === 'CARRIER' && e.runId)
+          .map(e => ({ runId: e.runId, route: e.route, run: e.run, date: e.date, pickupTime: e.pickupTime, loadDate: e.loadDate, trailer: e.trailer, poNumber: e.poNumber, carrier: true }));
+        plantLoads = routeLoads.concat(carrierLoads); render();
+      }, () => { carrierLoads = []; plantLoads = routeLoads; render(); });
     }
     // Route Master, read only while a week after Next is open (its preview).
     function watchRoutes(db) {

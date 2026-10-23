@@ -281,6 +281,22 @@ test('Weekly: a plant load marked Not running (plantLoadOff) is off; without the
   assert.equal(L.weeklyCellClass(shown, 'wed', ctx), 'off');
 });
 
+test('Weekly: a carrier pickup on the Scheduler for a day the run does not run shows CARRIER (Joe 10/23, 849 Sun Valley Friday)', () => {
+  const row = { runId: 'run_849', coverageType: 'UNITED DAIRY', days: { fri: { runs: false, date: '2026-10-30' } } };
+  const ctx = { plant: { 'run_849|2026-10-30': [{ runId: 'run_849', carrier: true, poNumber: '46020' }] }, dup: {}, relief: {}, exceptions: [] };
+  assert.equal(L.weeklyCellClass(row, 'fri', ctx), 'carrier', 'not black, and not counted as needing a driver');
+  assert.equal(L.plantCarrier(ctx.plant['run_849|2026-10-30']), true);
+  assert.equal(L.carrierLoad({ scheduleType: 'CARRIER' }), true);
+  // A United Dairy load on the same day still needs a driver.
+  ctx.plant['run_849|2026-10-30'].push({ runId: 'run_849' });
+  assert.equal(L.weeklyCellClass(row, 'fri', ctx), 'plant');
+  assert.equal(L.plantCarrier([]), false);
+  // Marked Not running on Weekly, it is off like any other plant load.
+  ctx.plant['run_849|2026-10-30'].pop();
+  row.days.fri.plantLoadOff = true;
+  assert.equal(L.weeklyCellClass(row, 'fri', ctx), 'off');
+});
+
 test('Weekly: a day dispatch has a driver on never shows PLANT LOAD (Joe 10/20, 844 Ohio Processor)', () => {
   const row = { runId: 'run_844', coverageType: 'UNITED DAIRY', days: { wed: { runs: false, date: '2026-10-21', driverId: 'drv_jacobs', driver: 'JACOBS, JOEL' } } };
   const ctx = { plant: { 'run_844|2026-10-21': [{ runId: 'run_844' }] }, dup: {}, relief: {}, exceptions: [] };

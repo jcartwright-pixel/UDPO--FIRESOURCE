@@ -1048,7 +1048,8 @@
     // A plant load on the Plant Operations Scheduler for a day the run does not run: it needs a driver (current Weekly).
     // Joe 10/13 (836 PECK): a plant load marked Not running on Weekly (plantLoadOff) is off like any other day.
     // Joe 10/20 (844 Ohio Processor): a day dispatch has a driver on never shows PLANT LOAD; the driver shows instead.
-    if (!d.runs) return plantFor(ctx, row, prefix) && !coveredRoute(row) && d.plantLoadOff !== true && !dispatchDriver(d) ? 'plant' : 'off';
+    // Joe 10/23 (849 Sun Valley, Friday): a customer's carrier pickup on the Scheduler for a day the run does not run shows CARRIER.
+    if (!d.runs) { var pl = plantFor(ctx, row, prefix); return pl && !coveredRoute(row) && d.plantLoadOff !== true && !dispatchDriver(d) ? (plantCarrier(pl) ? 'carrier' : 'plant') : 'off'; }
     if (coveredRoute(row)) return 'coverage';
     // Joe 10/11: a run with no driver because its regular driver is off that day (any reason) is red, so the cover shows.
     if (!who) return offCover(row, prefix, d.date, ctx) ? 'vacation-needs' : 'needs';
@@ -1066,6 +1067,10 @@
     var who = String((day && day.driver) || '').trim();
     return who && who.toUpperCase() !== 'OPEN' ? who : (day && day.driverId ? String(day.driverId) : '');
   }
+  // A Scheduler load the customer's own carrier picks up (needs no United Dairy driver).
+  function carrierLoad(e) { return !!e && (e.carrier === true || String(e.scheduleType || '').trim().toUpperCase() === 'CARRIER'); }
+  // Every Scheduler load on the list is a carrier pickup.
+  function plantCarrier(list) { return !!(list && list.length) && list.every(carrierLoad); }
   function plantFor(ctx, row, prefix) {
     var list = ctx && ctx.plant ? ctx.plant[row.runId + '|' + row.days[prefix].date] : null;
     return list && list.length ? list : null;
@@ -1471,7 +1476,7 @@
     SCREEN_AREAS: SCREEN_AREAS, SCREEN_KEYS: SCREEN_KEYS, SCREEN_JOBS: SCREEN_JOBS, pageName: pageName, pageGated: pageGated, screenLimited: screenLimited, screensFor: screensFor,
     areaAllowed: areaAllowed, pageAllowed: pageAllowed,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
-    plantFor: plantFor, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
+    plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
