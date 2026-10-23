@@ -1297,6 +1297,9 @@ async function noScroll(page) {
     await mq.waitForSelector('.sidemenu a.side-name', { state: 'attached' });
     assert.equal(await mq.$eval('.sidemenu a.side-name', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
     assert.equal(await mq.getAttribute('.sidemenu a.side-name', 'href'), 'maint.html');
+    // Audit batch 8 (mock-up 2): the same eight lines under Fleet, Issues and Garage; none removed.
+    assert.deepEqual(await mq.$$eval('.sidemenu .side-group, .sidemenu a:not(.side-name)', x => x.map(e => (e.classList.contains('side-group') ? '# ' : '') + e.textContent.trim())),
+      ['# Fleet', 'Equipment', 'Fleet Service', '# Issues', 'Equipment Issues', 'Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', '# Garage', 'Garage Work Orders', 'Garage Station']);
     await mq.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
     // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.
