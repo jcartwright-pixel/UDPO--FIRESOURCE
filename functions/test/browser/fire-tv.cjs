@@ -2,7 +2,8 @@
 /*
  * Browser check of the Driver's Kiosk Station TV with no UD account (Joe 10/16, a Fire Stick; Google's sign-in does not open
  * in a TV's kiosk browser): the TV link (?tv=1) asks for the TV's code, a wrong code and a Driver Room tablet's code are
- * refused, the TV's code opens the board with no Google sign-in, a reload keeps it, and a new code signs the TV out.
+ * refused, the TV's code opens the board with no Google sign-in, a silent keep-awake video plays behind it (Joe 10/23, LG TV
+ * screen saver), a reload keeps it, and a new code signs the TV out.
  * Pictures at 1920 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -63,6 +64,12 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await page.waitForFunction(() => /\d+ routes?/.test(document.getElementById('foot').textContent));
     await shot(page, 'fire-tv-2-board-1920.png');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
+
+    // Joe 10/23 (LG TV): a silent video plays behind the board so the TV's screen saver stays away.
+    await page.waitForFunction(() => { const v = document.getElementById('ds-awake'); return v && !v.paused && v.muted && v.loop && v.currentTime > 0.5; }, null, { timeout: 15000 });
+    assert.equal(await page.evaluate(() => document.elementFromPoint(500, 300).closest('#screen') !== null), true, 'behind the board');
+    await shot(page, 'fire-tv-3-board-awake-1920.png');
+    results.push('TV link: a silent video plays behind the board, over and over, to keep the TV\'s screen saver away');
 
     await page.reload();
     await page.waitForSelector('.ds-row:not(.ds-headrow):has-text("805")', { timeout: 20000 });
