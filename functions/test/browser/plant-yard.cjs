@@ -109,7 +109,7 @@ async function seed() {
       assert.equal(await page.$eval('#rows tr[data-trailer="T-702"] .yd-gps', x => x.classList.contains('bad')), true, '44.6° against a set point of 34 is red');
       assert.match(await page.getAttribute('#rows tr[data-trailer="T-702"] .yd-gps', 'title'), /10\.6° above the set point/);
       assert.equal((await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps')).trim(), '—');
-      assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History'], 'no new tab');
+      assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History', 'All Trailers in Yard'], 'Joe 10/22: one more tab, All Trailers in Yard');
       // Joe 10/20: no list of the trailers that left the yard under the queue (it was kept until they came back).
       assert.equal(await page.$('#road'), null, 'no left-the-yard list');
       assert.equal(await page.$('#rows tr[data-trailer="T-707"]'), null, 'the GPS shows T-707 gone: not on the yard list though its dispatch time has not come');
@@ -122,6 +122,19 @@ async function seed() {
       assert.equal(await page.$$eval('#history tr', r => r.length), 3, 'the two seeded checks and T-706\'s check before it left');
       await fits(page, 'Yard history ' + w + 'x' + h);
       await shots(page, 'yard-history', w);
+      // Joe 10/22: All Trailers in Yard lists every loaded trailer until it leaves (the checked one too), by when it leaves,
+      // red when it needs a check and green when it is checked; look only, no boxes or buttons.
+      await page.click('[data-pane="all"]');
+      await page.waitForSelector('#pane-all:not([hidden]) #all-rows tr[data-trailer]');
+      assert.deepEqual(await page.$$eval('#all-rows tr[data-trailer]', r => r.map(x => [x.dataset.trailer, x.className, x.querySelector('.yd-st').textContent])),
+        [['T-701', 'yd-bad', 'Needs a checkNot checked yet'], ['T-702', 'yd-bad', 'Needs a checkLast check over 2 hours ago'], ['T-703', 'yd-ok', 'Checked' + 'Due again ' + await page.$eval('#all-rows tr[data-trailer="T-703"] .yd-st small', x => x.textContent.replace('Due again ', ''))],
+          ['T-704', 'yd-bad', 'Needs a checkNot checked yet']]);
+      assert.match(await page.textContent('#all-rows tr[data-trailer="T-703"] .yd-st small'), /^Due again \d{1,2}:\d{2} (AM|PM)$/);
+      assert.match(await page.textContent('#all-rows tr[data-trailer="T-703"]'), /SUNSHINE[\s\S]*10:00 AM[\s\S]*34° \/ —/);
+      assert.equal(await page.$$eval('#pane-all input, #pane-all select, #pane-all button', x => x.length), 0, 'look only');
+      assert.equal(await page.$('#all-rows tr[data-trailer="T-707"]'), null, 'T-707 has left: not listed');
+      await fits(page, 'All Trailers in Yard ' + w + 'x' + h);
+      await shots(page, 'yard-all', w);
       assert.deepEqual(page.errors, []);
       await page.close();
     }
