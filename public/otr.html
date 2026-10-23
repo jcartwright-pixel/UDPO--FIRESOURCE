@@ -279,7 +279,7 @@
           '<p>The workbook\'s ' + CORE.DESTINATIONS.length + ' columns always stay. A column you added can be renamed or removed while no run uses it.</p>' +
           (own.length ? '<table><tbody>' + own.map(c => '<tr><td>' + (renaming === c.id ? '<input class="otr-col-in" data-fk="cr|' + escapeHtml(c.id) + '" data-rename="' + escapeHtml(c.id) + '" value="' + escapeHtml(c.name) + '" maxlength="40" aria-label="' + escapeHtml('New name for ' + c.name) + '">' : '<b>' + escapeHtml(c.name) + '</b>') + '</td><td>' +
             (used[c.name] ? 'Used by ' + used[c.name] + (used[c.name] === 1 ? ' run' : ' runs') : 'Not used yet') + '</td><td>' +
-            (renaming === c.id ? '<button type="button" class="primary" data-col-save="' + escapeHtml(c.id) + '">Save</button> <button type="button" data-col-cancel>Cancel</button>'
+            (renaming === c.id ? '<button type="button" data-col-cancel>Cancel</button>'
               : used[c.name] ? '' : '<button type="button" data-col-rename="' + escapeHtml(c.id) + '">Rename</button> <button type="button" data-col-remove="' + escapeHtml(c.id) + '">Remove</button>') + '</td></tr>').join('') + '</tbody></table>'
             : '<p>None yet.</p>') +
           '<div class="otr-col-add"><label for="otr-col-new">New column' + (colFor ? ' for ' + escapeHtml((list.find(x => x.runId === colFor) || {}).run || '') : '') + '</label><input id="otr-col-new" class="otr-col-in" data-fk="cn" maxlength="40" placeholder="Name, like Darden" autocomplete="off">' +
@@ -288,7 +288,7 @@
           const shown = r.miles ? n0(r.miles) : r.draftMiles ? n0(r.draftMiles) + ' <span class="pill warn">DRAFT</span>' : '';
           if (!milesEdit) return shown;
           if (milesFor === r.runId) return '<span class="otr-miles-edit"><input class="otr-miles-in" inputmode="numeric" data-fk="m|' + escapeHtml(r.runId) + '" data-miles-in="' + escapeHtml(r.runId) + '" value="' + (r.miles || r.draftMiles || '') + '" aria-label="' + escapeHtml('Round-trip miles for ' + r.route + ' ' + r.run) + '">' +
-            '<button type="button" class="primary" data-miles-save="' + escapeHtml(r.runId) + '">Save</button><button type="button" data-miles-cancel>Cancel</button></span>';
+            '<button type="button" data-miles-cancel>Cancel</button></span>';
           return '<button type="button" class="otr-miles" data-miles="' + escapeHtml(r.runId) + '" title="' + escapeHtml('Fix the round-trip miles for ' + r.route + ' ' + r.run + ' (saved in Route Master)') + '">' + (shown || 'Add miles') + '</button>';
         };
         sheet.innerHTML = panel + '<table class="issues otr-setup"><colgroup><col style="width:7%"><col style="width:9%"><col style="width:22%"><col style="width:21%"><col style="width:21%"><col style="width:20%"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Run</th><th>Delivered By</th><th>By Date column</th><th>Round-trip miles</th></tr></thead><tbody>' +
@@ -334,7 +334,9 @@
         const newBox = document.getElementById('otr-col-new');
         if (newBox) newBox.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addCol(); } if (e.key === 'Escape') { colPanel = false; colFor = ''; render(); } };
         sheet.querySelectorAll('[data-col-rename]').forEach(b => { b.onclick = () => { renaming = b.dataset.colRename; render(); const i = sheet.querySelector('[data-rename]'); if (i) { i.focus(); i.select(); } }; });
-        sheet.querySelectorAll('[data-col-cancel]').forEach(b => { b.onclick = () => { renaming = ''; render(); }; });
+        // Batch 5 (10/23): no Save button; the new name saves when the box is left or Enter is pressed. Cancel (pressed without
+        // leaving the box first) puts the name back.
+        sheet.querySelectorAll('[data-col-cancel]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { renaming = ''; render(); }; });
         const renameCol = (id) => {
           const c = extraCols.find(x => x.id === id), box = sheet.querySelector('[data-rename="' + CSS.escape(id) + '"]'), newName = box ? box.value.trim().replace(/\s+/g, ' ') : '';
           if (!c) return;
@@ -345,16 +347,15 @@
           const old = c.name;
           colSave({ verb: 'rename', name: old, newName }, () => { c.name = newName; }, () => { c.name = old; });
         };
-        sheet.querySelectorAll('[data-col-save]').forEach(b => { b.onclick = () => renameCol(b.dataset.colSave); });
-        sheet.querySelectorAll('[data-rename]').forEach(i => { i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); renameCol(i.dataset.rename); } if (e.key === 'Escape') { renaming = ''; render(); } }; });
+        sheet.querySelectorAll('[data-rename]').forEach(i => { i.onchange = () => { if (renaming === i.dataset.rename) renameCol(i.dataset.rename); }; i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); renameCol(i.dataset.rename); } if (e.key === 'Escape') { renaming = ''; render(); } }; });
         sheet.querySelectorAll('[data-col-remove]').forEach(b => { b.onclick = () => {
           const c = extraCols.find(x => x.id === b.dataset.colRemove), at = extraCols.indexOf(c);
           if (!c) return;
           colSave({ verb: 'remove', name: c.name }, () => { extraCols = extraCols.filter(x => x !== c); }, () => { extraCols.splice(at, 0, c); });
         }; });
-        // Round-trip miles: a click opens the box; Save writes the miles on every day the run runs in Route Master.
+        // Round-trip miles: a click opens the box; leaving it (or Enter) writes the miles on every day the run runs in Route Master.
         sheet.querySelectorAll('[data-miles]').forEach(b => { b.onclick = () => { milesFor = b.dataset.miles; render(); const i = sheet.querySelector('[data-miles-in]'); if (i) { i.focus(); i.select(); } }; });
-        sheet.querySelectorAll('[data-miles-cancel]').forEach(b => { b.onclick = () => { milesFor = ''; showError(''); render(); }; });
+        sheet.querySelectorAll('[data-miles-cancel]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { milesFor = ''; showError(''); render(); }; });
         const saveMiles = (runId) => {
           const r = list.find(x => x.runId === runId), box = sheet.querySelector('[data-miles-in="' + CSS.escape(runId) + '"]'), t = box ? box.value.trim().replace(/,/g, '') : '';
           const m = Number(t);
@@ -372,8 +373,7 @@
           saveOptimistic('saveRoute', { runId, fields: {}, days: want, from: 'otr' }, () => { route.days = route.days || {}; days.forEach(d => { route.days[d] = Object.assign({}, route.days[d], { miles: m }); }); },
             () => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; route.days = before; }, render).then(() => { if (pendingMiles[runId] === mine) delete pendingMiles[runId]; });
         };
-        sheet.querySelectorAll('[data-miles-save]').forEach(b => { b.onclick = () => saveMiles(b.dataset.milesSave); });
-        sheet.querySelectorAll('[data-miles-in]').forEach(i => { i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveMiles(i.dataset.milesIn); } if (e.key === 'Escape') { milesFor = ''; render(); } }; });
+        sheet.querySelectorAll('[data-miles-in]').forEach(i => { i.onchange = () => { if (milesFor === i.dataset.milesIn) saveMiles(i.dataset.milesIn); }; i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveMiles(i.dataset.milesIn); } if (e.key === 'Escape') { milesFor = ''; render(); } }; });
       }
       bar.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });
       sheet.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { view = b.dataset.go; render(); }; });

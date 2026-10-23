@@ -36,7 +36,6 @@
         <span class="tpl-dirty" id="dirty" data-top></span>
         <button type="button" id="refresh" data-top>Refresh</button>
         <span class="tpl-copy" id="copy-state" data-top>Nothing copied</span>
-        <button type="button" class="go" id="save" data-top>Save Template</button>
       </div>
       <div class="sheet scroll-list">
         <table class="tpl">
@@ -54,7 +53,7 @@
     import { collection, onSnapshot } from './js/firebase.js';
 
     // The current app's Driver Weekly Template (DriverWeeklyTemplate.html): Available, Off or Assigned runs per driver and day,
-    // Copy / Paste / Paste + Add for a driver's week, one Save Template. Each changed cell is one saveDriverTemplate, which also updates the copied Live weeks.
+    // Copy / Paste / Paste + Add for a driver's week, each changed cell saves on its own. Each is one saveDriverTemplate, which also updates the copied Live weeks.
     forScreen('drivers');
     const L = window.UDLogic, DAYS = L.DAYS;
     let drivers = [], routes = [], edits = {}, copied = null, saving = false, note = '';
@@ -106,12 +105,14 @@
       });
       document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="empty">No active drivers.</td></tr>';
       const n = Object.keys(edits).length;
-      document.getElementById('dirty').textContent = saving ? 'Saving...' : n ? n + ' unsaved change' + (n === 1 ? '' : 's') : note;
-      document.getElementById('save').disabled = !edit || !n || saving;
+      // Batch 5 (10/23): no Save Template button; a cell saves as soon as it is changed. Only a run box left empty waits.
+      const waiting = Object.keys(edits).filter(k => blankRun(edits[k])).length;
+      document.getElementById('dirty').textContent = waiting ? waiting + ' day' + (waiting === 1 ? '' : 's') + ' waiting for a run to be picked' : note;
       document.getElementById('refresh').disabled = saving;
     }
 
-    function setCell(td, next) { setDay(td.dataset.driver, td.dataset.day, next); render(); }
+    function setCell(td, next) { setDay(td.dataset.driver, td.dataset.day, next); render(); flush(); }
+    const blankRun = (c) => c.status === 'ASSIGNMENT' && c.runs.some(id => !id);
     function setDay(driverId, p, next) {
       const d = drivers.find(x => x.id === driverId), now = saved(d, p);
       next.runs = [...new Set(next.runs.filter(Boolean))].slice(0, 6);
@@ -153,6 +154,7 @@
             setDay(d.id, p, add ? { status: from.runs.length ? 'ASSIGNMENT' : c.status, runs: c.runs.filter(Boolean).concat(from.runs) } : { status: from.status, runs: from.runs.slice() });
           });
           render();
+          flush();
         }
         return;
       }
@@ -162,30 +164,29 @@
       else if (b.matches('[data-add]')) { c.runs.push(''); c.status = 'ASSIGNMENT'; c.keep = true; setCell(td, c); }
     });
 
-    // One save per changed cell, in order. A cell that saves leaves the list; one that fails stays changed with the reason.
-    document.getElementById('save').onclick = async () => {
-      if (saving) return;
-      const keys = Object.keys(edits), problems = [];
-      const blank = keys.find(k => edits[k].status === 'ASSIGNMENT' && edits[k].runs.some(id => !id));
-      if (blank) { const [id, p] = blank.split('|'); showError((drivers.find(x => x.id === id) || {}).name + ' on ' + L.DAY_NAMES[DAYS.indexOf(p)] + ' has an empty run box. Pick a run or remove it.'); return; }
-      saving = true; showError(''); render();
-      let liveDays = 0;
+    // One save per changed cell, in order, as soon as it changes (a cell with an empty run box waits for its run). A cell that
+    // saves leaves the list; one that fails stays changed with the reason, and the next change tries it again.
+    let again = false;
+    async function flush() {
+      if (saving) { again = true; return; }
+      const keys = Object.keys(edits).filter(k => !blankRun(edits[k])), problems = [];
+      if (!keys.length) return;
+      saving = true; showError('');
       for (const k of keys) {
         const [driverId, day] = k.split('|'), c = edits[k];
+        if (!c) continue;
         try {
-          const r = await save('saveDriverTemplate', { driverId, day, status: c.status, runIds: c.runs });
-          liveDays += (r && r.liveDays || []).length;
+          await save('saveDriverTemplate', { driverId, day, status: c.status, runIds: c.runs });
           const d = drivers.find(x => x.id === driverId);
           if (d) { d.cells = Object.assign({}, d.cells, { [day + '_available']: c.status === 'OFF' ? 'FALSE' : 'TRUE', [day + '_assignments_json']: JSON.stringify(c.runs.map(runId => ({ runId }))) }); }
-          delete edits[k];
+          if (edits[k] === c) delete edits[k];
         } catch (e) { problems.push(((drivers.find(x => x.id === driverId) || {}).name || driverId) + ' ' + L.DAY_NAMES[DAYS.indexOf(day)] + ': ' + (e.message || e)); }
-        render();
       }
       saving = false;
-      if (problems.length) showError('Not saved: ' + problems.join('; ') + '. Those cells stay marked; press Save Template to try again.');
-      note = problems.length ? '' : 'Template saved. ' + (liveDays ? liveDays + ' day' + (liveDays === 1 ? '' : 's') + ' in the Live weeks now follow it.' : 'No Live week days needed to change.');
+      if (problems.length) showError('Not saved: ' + problems.join('; ') + '. Change the day again to retry.');
       render();
-    };
+      if (again) { again = false; flush(); }
+    }
     // Refresh drops unsaved changes and shows the saved template again.
     // With unsaved changes it asks once more first ("Drop 3? Press again").
     let refreshArmed = null;

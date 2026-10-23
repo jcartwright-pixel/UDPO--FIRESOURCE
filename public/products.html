@@ -49,12 +49,12 @@
       </section>
       <!-- Areas & Groups: the plant's machines (from Plant Operations), the areas it adds itself, and its group list. -->
       <section class="qc-form pm-form" id="setup-pane" hidden>
-        <div class="qc-top"><h2 id="setup-title">Areas &amp; Groups</h2><span class="qc-last">Machines come from Plant Operations. Add, rename or remove this plant's own areas and groups.</span></div>
+        <div class="qc-top"><h2 id="setup-title">Areas &amp; Groups</h2><span class="qc-last">Machines come from Plant Operations. Add, rename or remove this plant's own areas and groups. Each box saves when you leave it.</span></div>
         <div class="pm-setup">
           <div><h3>Areas</h3><div id="setup-areas"></div><button type="button" class="rp-btn" id="add-area">+ Add Area</button></div>
           <div><h3>Groups</h3><div id="setup-groups"></div><button type="button" class="rp-btn" id="add-group">+ Add Group</button></div>
         </div>
-        <div class="pm-acts"><button type="button" class="rp-btn" id="setup-cancel">Cancel</button><button type="button" class="rp-btn primary" id="setup-save">Save Areas &amp; Groups</button></div>
+        <div class="pm-acts"><button type="button" class="rp-btn" id="setup-close">Close</button></div>
       </section>
       <!-- Upload: what the file will add, change and remove, before anything is saved. -->
       <section class="qc-form pm-form" id="preview-pane" hidden>
@@ -87,7 +87,6 @@
     import { collection, doc, onSnapshot } from './js/firebase.js';
     import { watchProducts, watchProductSetup, watchLoose, plantSetupOf, groupsOf, typesFrom, TEMPLATE, FIELDS, KEEP_FIELDS, cleanProduct, rowsByHeading, parseCsv,
       sheetRows, machineValues, shownValue, keyOf, sameList, SHARED_FIELDS, MACHINE_FIELDS, SHEET_HEAD, SHEET_TAIL, isChecked } from './js/products.js';
-    import { savedText } from './js/autosave.js';
 
     // Joe 10/10: the products each machine runs are the product drop-down on the Quality check. Joe 10/11: products are plant by
     // plant (a plant's machines plus the areas it adds itself, Uniontown's CASES and TANKER), each plant keeps its own groups.
@@ -200,12 +199,13 @@
     function send(lists, loose, what) {
       Object.keys(lists).forEach(id => { mine[id] = lists[id]; });
       if (loose) mineLoose[plant] = loose;
-      note = 'Saving…';
+      note = '';
       render(what ? true : 'keep');
       const pid = plant, areasOut = Object.keys(lists).map(id => ({ areaId: id, products: lists[id].map(cleanProduct) }));
       const run = busy.then(() => save('saveProductSheet', Object.assign({ facilityId: pid, areas: areasOut }, loose ? { loose: loose.map(cleanProduct) } : {})));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); editNote(savedText(), false); },
+      // Audit batch 4 (Joe's rule: no save messages): a save that worked says nothing; one that failed says so.
+      return run.then(() => { note = ''; showError(''); editNote('', false); },
         err => { const msg = (what || 'The change') + ' not saved (' + (err.message || err) + '). Try it again.'; note = 'Not saved.'; showError(msg); editNote(msg, true); Object.keys(lists).forEach(id => { delete mine[id]; }); if (loose) delete mineLoose[pid]; })
         .then(() => render(true));
     }
@@ -326,7 +326,7 @@
       if (box.tagName === 'SELECT' && box.value === '__other__') { const o = box.parentNode.querySelector('.pm-other'); o.hidden = false; o.focus(); return; }
       if (box.tagName === 'SELECT' && box.dataset.k === 'mfgType') { const o = box.parentNode.querySelector('.pm-other'); if (o) o.hidden = true; }
       const v = box.value.trim(), r = editRow();
-      if (box.dataset.n) { if (r) { editNote('Saving…', false); changeNumber(r, box.dataset.area, box.dataset.n, v); } return; }
+      if (box.dataset.n) { if (r) { editNote('', false); changeNumber(r, box.dataset.area, box.dataset.n, v); } return; }
       const k = box.dataset.k, rows = rowsOf();
       if (k === 'name') {
         if (!v) { if (r) { box.value = r.p.name; editNote('A product needs a name. Remove takes a product off the sheet.', true); } return; }
@@ -337,21 +337,21 @@
         editing.draft[k] = v;
         if (!String(editing.draft.name || '').trim()) return;
         const p = cleanProduct(editing.draft), key = keyOf(p.name);
-        editNote('Saving…', false);
+        editNote('', false);
         if (editing.areaId) send({ [editing.areaId]: listOf(editing.areaId).concat([p]) }, null, p.name + ' added');
         else send({}, looseOf().concat([p]), p.name + ' added');
         editing = { key };
         drawEdit();
         return;
       }
-      editNote('Saving…', false);
+      editNote('', false);
       changeShared(r, k, v);
       if (k === 'name') { editing.key = keyOf(v); document.getElementById('edit-title').textContent = 'Edit ' + v; }
     });
     document.getElementById('edit-machines').addEventListener('click', e => {
       const b = e.target.closest('[data-eck]'), r = editRow();
       if (!b || !r || !canSave()) return;
-      editNote('Saving…', false);
+      editNote('', false);
       toggle(r, b.dataset.eck);
       drawEdit(true);
     });
@@ -392,21 +392,28 @@
     });
     document.getElementById('setup-pane').addEventListener('click', e => {
       const r = e.target.closest('[data-sremove]');
-      if (r) { const [k, i] = r.dataset.sremove.split('|'); (k === 'area' ? draft.areas : draft.groups).splice(Number(i), 1); drawSetup('setup'); return; }
+      if (r) { const [k, i] = r.dataset.sremove.split('|'); (k === 'area' ? draft.areas : draft.groups).splice(Number(i), 1); drawSetup('setup'); saveSetup(); return; }
       if (e.target.id === 'add-area') { draft.areas.push({ id: '', name: '' }); drawSetup('setup'); const ins = document.querySelectorAll('#setup-areas input'); if (ins.length) ins[ins.length - 1].focus(); }
       if (e.target.id === 'add-group') { draft.groups.push(''); drawSetup('setup'); const ins = document.querySelectorAll('#setup-groups input'); if (ins.length) ins[ins.length - 1].focus(); }
     });
-    document.getElementById('setup-cancel').addEventListener('click', () => { pane = 'list'; draft = null; showError(''); render(true); });
-    document.getElementById('setup-save').addEventListener('click', async () => {
-      const b = document.getElementById('setup-save');
-      b.disabled = true; b.textContent = 'Saving…';
-      try {
-        await save('saveProductSetup', { facilityId: plant, areas: draft.areas.filter(a => a.name.trim()), groups: draft.groups.filter(g => g.trim()) });
-        pane = 'list'; draft = null; note = 'Areas and groups saved · ' + savedText(); showError('');
-      } catch (err) { showError('Areas and groups not saved (' + (err.message || err) + ').'); }
-      b.disabled = false; b.textContent = 'Save Areas & Groups';
-      render(true);
-    });
+    // Batch 5 (10/23): no Save Areas & Groups button; a box saves when it is left and Remove saves at once, one save after
+    // another. A new area keeps the ID the server gave it, so renaming it later renames the same area.
+    let setupSaving = Promise.resolve();
+    function saveSetup() {
+      const d = draft;
+      setupSaving = setupSaving.then(async () => {
+        if (!d) return;
+        const own = ownOf().areas;
+        d.areas.forEach(a => { if (!a.id) { const m = own.find(x => x.name.toUpperCase() === a.name.trim().toUpperCase()); if (m) a.id = m.id; } });
+        try {
+          await save('saveProductSetup', { facilityId: plant, areas: d.areas.filter(a => a.name.trim()), groups: d.groups.filter(g => g.trim()) });
+          showError('');
+        } catch (err) { showError('Areas and groups not saved (' + (err.message || err) + ').'); }
+      });
+      return setupSaving;
+    }
+    document.getElementById('setup-pane').addEventListener('change', e => { if (e.target.closest('[data-s]')) saveSetup(); });
+    document.getElementById('setup-close').addEventListener('click', async () => { await setupSaving; pane = 'list'; draft = null; note = ''; render(true); });
 
     /* ---------- Download Product List and Upload ---------- */
     // Joe 10/13: "download the complete list of products we have": one workbook, a tab per plant, a line per product with an X under
@@ -655,7 +662,7 @@
           b.disabled = false; b.textContent = 'Save Upload'; render(true); return;
         }
       }
-      pane = 'list'; upload = null; note = said.join(' ') + ' · ' + savedText(); showError('');
+      pane = 'list'; upload = null; note = said.join(' '); showError('');
       render(true);
     });
 

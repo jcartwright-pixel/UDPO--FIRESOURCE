@@ -148,3 +148,13 @@ test('the cells keep the types the current app writes', () => {
   assert.deepEqual(LR.cellData('route', '800'), { userEnteredValue: { stringValue: '800' }, userEnteredFormat: { numberFormat: { type: 'TEXT', pattern: '@' } } });
   assert.deepEqual(LR.cellData('mon_truck', ''), {});
 });
+
+// Audit batch 2: Publish moves the Live sheet's weeks, so it waits while writing to the sheets is paused.
+test('Publish waits while writing to the sheets is paused, and moves nothing', async () => {
+  await db().collection('config').doc('app').set({ sheetWrites: { paused: true } }, { merge: true });
+  const before = copyOf(tabs);
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT, deps()), /Writing to the sheets is paused/);
+  assert.deepEqual(tabs, before, 'the Live sheet is not touched');
+  assert.equal(flushed, 0);
+  assert.deepEqual((await config()).liveWeeks, { previous: '2026-09-27', current: '2026-10-04', next: '2026-10-11' });
+});

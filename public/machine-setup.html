@@ -67,7 +67,6 @@
     import { collection, doc, onSnapshot } from './js/firebase.js';
     import { watchProducts, watchProductSetup, watchLoose, plantSetupOf, groupsOf, cleanProduct, sheetRows, keyOf, sameList, SHARED_FIELDS, MACHINE_FIELDS } from './js/products.js';
     import { mountRowDrag } from './js/row-drag.js';
-    import { savedText } from './js/autosave.js';
 
     // Machine Setup (Joe 10/13, mock-up MB): the plant's machines down the left (the same production lines Quality Checks and the
     // Product Sheet use, then the plant's own areas). Pick one: its products (the Product drop-down on its Quality Check) on the left,
@@ -134,12 +133,12 @@
     function send(line, list, loose, what) {
       mine[line.id] = list;
       if (loose) mineLoose[plant] = loose;
-      note = 'Saving…';
+      note = '';
       render();
       const pid = plant;
       const run = busy.then(() => save('saveProductSheet', Object.assign({ facilityId: pid, areas: [{ areaId: line.id, products: list.map(cleanProduct) }] }, loose ? { loose: loose.map(cleanProduct) } : {})));
       busy = run.catch(() => {});
-      return run.then(() => { note = (what ? what + ' · ' : '') + savedText(); showError(''); },
+      return run.then(() => { note = ''; showError(''); },
         err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Try it again.'); delete mine[line.id]; if (loose) delete mineLoose[pid]; }).then(render);
     }
     document.getElementById('machines').addEventListener('click', e => {

@@ -204,7 +204,7 @@
         // listed but leave the Due list. One click saves it.
         const ours = (u) => '<input type="checkbox" class="fs-ours" data-ours="' + escapeHtml(u.unit) + '" data-type="' + u.type + '" aria-label="' + escapeHtml(u.unit) + ' is ours"' + (u.tracked ? ' checked' : '') + (boss ? '' : ' disabled') + '>';
         bar.innerHTML = '<input type="search" id="search" placeholder="Find a truck or trailer" aria-label="Find" value="' + escapeHtml(search) + '"><span class="spacer"></span>' +
-          (boss ? '<button type="button" class="primary" id="rules-save">Save Rules</button>' : '<span class="hint">Managers and administrators change the setup.</span>');
+          (boss ? '<span class="hint">Each box saves when you leave it.</span>' : '<span class="hint">Managers and administrators change the setup.</span>');
         sheet.shown = null;
         sheet.innerHTML = '<div class="fleet-split fs-setup"><div><h2>Units · ' + escapeHtml(plant.name) + '</h2>' + table([10, 7, 9, 9, 11, 11, 14, 11, 10, 8], ['Unit', 'Ours', 'Type', 'Track due dates', 'Last service', 'Miles / hours now', 'Annual inspection due', 'Plate expires', 'Notes', ''],
           due.units.filter(u => hit(u.unit)).map(u => '<tr><td class="strong">' + escapeHtml(u.unit) + '</td><td>' + ours(u) + '</td><td>' + (u.type === 'TRAILER' ? 'Trailer' : 'Truck') + '</td><td>' + (u.trackSet ? (u.tracked ? 'Yes' : 'No') : 'Default') + '</td><td>' + when(u.lastServiceDate) +
@@ -224,9 +224,9 @@
       if (s) s.oninput = (e) => { search = e.target.value.trim(); const at = e.target.selectionStart; render(); const n = document.getElementById('search'); n.focus(); n.setSelectionRange(at, at); };
       const p = document.getElementById('fs-print'); if (p) p.onclick = () => printReport(due, t);
       bar.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { kindFilter = b.dataset.kind; render(); }; });
-      const rs = document.getElementById('rules-save'); if (rs) rs.onclick = saveRules;
       const rt = document.getElementById('rule-type'); if (rt) rt.onchange = () => { ruleType = rt.value; render(); };
-      document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; });
+      // Batch 5 (10/23): no Save Rules button; a rule saves when its box is left.
+      document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; i.onchange = saveRules; });
       const ta = document.getElementById('tech-add'); if (ta) ta.onclick = addTech;
     }
 
@@ -272,13 +272,13 @@
         (canEdit() ? '<div class="gps-buttons"><button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit dates</button></div>' : '');
     }
 
-    // Save Rules saves what was typed for trucks and for trailers (switching the drop-down keeps both).
+    // A rule box left saves what was typed for trucks and for trailers (switching the drop-down keeps both).
     async function saveRules() {
       const out = {}; Object.keys(ruleDraft).forEach(k => { out[k] = Number(ruleDraft[k]); });
       document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
-      const b = document.getElementById('rules-save'); b.disabled = true; showError('');
-      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
-      catch (err) { b.disabled = false; showError(err.message); }
+      showError('');
+      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; }
+      catch (err) { showError(err.message + ' Change the box again to retry.'); }
     }
     async function addTech() {
       const name = document.getElementById('tech-name').value.trim(), loginId = document.getElementById('tech-login').value.trim();
@@ -297,15 +297,19 @@
           '<label>Last service reefer hours<input id="u-hours" inputmode="numeric" value="' + v(u.lastServiceHours) + '"></label>' + (u.hoursSource === 'GPS' ? '<label>Reefer hours now<input value="' + v(u.currentHours) + ' (from GPS)" disabled></label>' : '<label>Reefer hours now<input id="u-now" inputmode="numeric" value="' + v(u.currentHours) + '"></label>')) +
         '<label>Annual inspection due<input id="u-dot" type="date" value="' + v(u.dotDue) + '"></label><label>Plate expires<input id="u-plate" type="date" value="' + v(u.plateExpires) + '"></label>' +
         '<label class="wide">Notes<input id="u-notes" maxlength="300" value="' + v(u.notes) + '"></label></div>' +
-        '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="u-save">Save Unit</button></div>';
+        '<div class="modal-actions"><span class="hint">Each box saves when you leave it.</span><button type="button" data-close>Close</button></div>';
       m.hidden = document.getElementById('modal-back').hidden = false;
       m.querySelector('[data-close]').onclick = closeUnit;
-      document.getElementById('u-save').onclick = async () => {
-        const g = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : undefined; };
-        const fields = { track: g('u-track'), last_service_date: g('u-date'), dot_due: g('u-dot'), plate_expires: g('u-plate'), notes: g('u-notes') };
-        if (u.type === 'TRUCK') fields.last_service_miles = g('u-miles'); else { fields.last_service_hours = g('u-hours'); if (document.getElementById('u-now')) fields.current_hours = g('u-now'); }
-        const b = document.getElementById('u-save'); b.disabled = true; showError('');
-        try { await save('saveFleetUnit', { unit: u.unit, unitType: u.type, fields, facilityId: plant.id }); closeUnit(); } catch (err) { b.disabled = false; showError(err.message); }
+      // Batch 5 (10/23): no Save Unit button; each box saves on its own when it is left (one at a time, in order).
+      const FIELD = { 'u-track': 'track', 'u-date': 'last_service_date', 'u-dot': 'dot_due', 'u-plate': 'plate_expires', 'u-notes': 'notes', 'u-miles': 'last_service_miles', 'u-hours': 'last_service_hours', 'u-now': 'current_hours' };
+      let chain = Promise.resolve();
+      m.onchange = (e) => {
+        const k = FIELD[e.target.id]; if (!k) return;
+        // A date box fires while its year is still being typed; only a whole date (or a cleared box) saves.
+        if (e.target.type === 'date' && e.target.value && Number(e.target.value.slice(0, 4)) < 2000) return;
+        const v = e.target.value.trim(), fields = { [k]: /miles|hours/.test(k) ? v.replace(/,/g, '') : v };
+        showError('');
+        chain = chain.then(() => save('saveFleetUnit', { unit: u.unit, unitType: u.type, fields, facilityId: plant.id })).catch(err => showError(u.unit + ' not saved (' + err.message + '). Change the box again to retry.'));
       };
     }
     function closeUnit() { document.getElementById('unit-modal').hidden = document.getElementById('modal-back').hidden = true; }
@@ -370,8 +374,9 @@
       const note = ed.td.querySelector('.fs-cell-saved'), fields = {};
       if (input.dataset.f === 'dot_last') fields.dot_due = val ? L.addMonths(val, ed.months) : '';
       else fields[input.dataset.f] = val.replace(/,/g, '');
-      note.textContent = 'Saving...'; note.className = 'fs-cell-saved'; showError('');
-      try { await save('saveFleetUnit', { unit: ed.unit, unitType: ed.type, fields, facilityId: plant.id }); note.textContent = 'Saved'; note.className = 'fs-cell-saved ok'; }
+      // Audit batch 4 (Joe's rule: no save messages): the cell says something only when the save failed.
+      note.textContent = ''; note.className = 'fs-cell-saved'; showError('');
+      try { await save('saveFleetUnit', { unit: ed.unit, unitType: ed.type, fields, facilityId: plant.id }); note.textContent = ''; note.className = 'fs-cell-saved ok'; }
       catch (err) { note.textContent = err.message; note.className = 'fs-cell-saved bad'; }
     }
     document.getElementById('sheet').addEventListener('change', e => { const i = e.target.closest('[data-f]'); if (i && editing) saveCell(i); });

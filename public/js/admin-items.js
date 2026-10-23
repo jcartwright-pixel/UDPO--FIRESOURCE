@@ -1,6 +1,6 @@
 // Joe 10/10: everything the current app's Administration did, nothing left out, grouped the way it works. A screen the new
 // app has opens here; one not built yet opens the "being built" page inside the new app (never the old program).
-// [key, title, what it does, page (blank = being built), icon]
+// [key, title, what it does, page (blank = being built), icon, 'practice' = practice copy only / 'moved' = on another page's cards]
 export const ADMIN_GROUPS = [
   ['People & Access', 'Who signs in, their role, which plants they see and their rights', [
     ['people', 'People & Roles', 'Add a person; set their role, account status, allowed plants (All plants or each plant) and each right (use role, allow, deny).', '', 'people'],
@@ -21,16 +21,18 @@ export const ADMIN_GROUPS = [
     ['report-recipients', 'Manager Report Recipients', 'Who gets the plant report at each location: add and remove people (press twice to remove).', '', 'star'],
     ['sent-log', 'Sent Email Log', 'Every email the app sent, newest first.', '', 'day'],
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
-    ['refresh-rates', 'Refresh Rates', 'How often each background job runs, Save rate for each, and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
+    ['refresh-rates', 'Refresh Rates', 'How often each background job runs (each saves when it is picked), and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
   ]],
-  ['Dispatch Administration', 'Already in Operations', [
+  // Batch 8, mock-up 2 (10/23): dispatch set-up lives on the Dispatch Administration page; this list keeps one line for it.
+  // The other dispatch items stay here (Find a setting and ?item= still open them) but are left off the list ('moved').
+  ['Dispatch', 'Dispatch set-up is on the Dispatch Administration page', [
     ['dispatch-admin', 'Dispatch Administration', 'Dispatch rules, carriers and the dispatch administration cards.', 'admin.html', 'distribution-truck-v1-560.webp'],
-    ['ops', 'Operational Assignments', 'Branch, carrier and CVG assignments drivers can be given on Daily Dispatch.', 'ops.html', 'people'],
-    ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day'],
-    ['settings', 'Dispatch Settings', 'Dispatch defaults and options.', 'settings.html', 'gear'],
-    ['routes', 'Route Editor', 'Routes, runs, times and which days each run goes.', 'routes.html', 'map'],
+    ['ops', 'Operational Assignments', 'Branch, carrier and CVG assignments drivers can be given on Daily Dispatch.', 'ops.html', 'people', 'moved'],
+    ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day', 'moved'],
+    ['settings', 'Dispatch Settings', 'Dispatch defaults and options.', 'settings.html', 'gear', 'moved'],
+    ['routes', 'Route Editor', 'Routes, runs, times and which days each run goes.', 'routes.html', 'map', 'moved'],
     // Joe 10/12: switching screens lives here, not on the cards' tags (they can no longer be clicked).
-    ['switch', 'Go-Live Switches', 'Which screens are switched on, the write-back to the Live sheet, Mark fully live, and one button to turn on everything that is ready.', '', 'swap']
+    ['switch', 'Go-Live Switches', 'Which screens are switched on, Pause / Resume writing to the sheets, Mark fully live, and one button to turn on everything that is ready.', '', 'swap', 'moved']
   ]],
   ['Plant Setup', 'Set-up for the plant side', [
     // Joe 10/18: a new plant's data (Charleston, Martins Ferry) from one workbook, each person filling their own tabs; every row is
@@ -69,13 +71,18 @@ export const ADMIN_GROUPS = [
     ['update-live', 'Update Live Sheets', 'Rebuilds the Current and Next weeks from Route Master and the drivers\' standard runs, and adds missing runs (press twice).', '', 'swap'],
     ['refresh-home', 'Refresh Home Summary Now', 'Rebuilds the all-plants overview numbers right away.', '', 'factory'],
     ['plant-fresh', 'Start Plant Fresh From Today', 'Starts the plant screens over from today\'s loads.', '', 'factory'],
-    ['date-inventory', 'Date Inventory', 'Lists the dates each sheet holds.', '', 'day'],
-    ['date-convert', 'Date Column Dry Run / Convert', 'Tries a date-column fix on one sheet and column (Dry Run), then Convert Column once the dry run passes.', '', 'week'],
+    // Audit batch 6: the date tools work on the practice copy's sheets only, so the live app leaves them off the list.
+    ['date-inventory', 'Date Inventory', 'Lists the dates each sheet holds.', '', 'day', 'practice'],
+    ['date-convert', 'Date Column Dry Run / Convert', 'Tries a date-column fix on one sheet and column (Dry Run), then Convert Column once the dry run passes.', '', 'week', 'practice'],
     ['repair-items', 'Remaining Repair Items', 'The list of repairs still to do, and Add Item.', '', 'alert']
   ]]
 ];
 
+// On the live app (ud-distribution.web.app) the practice-copy-only items are left off.
+const LIVE = typeof location !== 'undefined' && /^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);
+if (LIVE) ADMIN_GROUPS.forEach(g => { g[2] = g[2].filter(it => it[5] !== 'practice'); });
+
 export function adminItem(key) {
-  for (const [group, , items] of ADMIN_GROUPS) for (const it of items) if (it[0] === key) return { group, key: it[0], title: it[1], what: it[2], page: it[3], icon: it[4] };
+  for (const [group, , items] of ADMIN_GROUPS) for (const it of items) if (it[0] === key) return { group, key: it[0], title: it[1], what: it[2], page: it[3], icon: it[4], moved: it[5] === 'moved' };
   return null;
 }

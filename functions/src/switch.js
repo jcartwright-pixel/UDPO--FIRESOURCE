@@ -13,6 +13,10 @@
  * tag comes off the cards), or "Turn on everything that is ready". A screen moves to the new app only when logic.js GO_LIVE
  * says it is ready (its sheet writing is built and Joe OK'd it).
  *
+ * Audit batch 2 (Joe 10/23, "build everything"): a screen that is on stays on, so a save is never turned into view only.
+ * The emergency stop is "Pause writing to the sheets" instead ({sheetsPaused: true}): every screen keeps saving, the saves wait
+ * in the outbox (and the copy keeps those rows as the app has them), and Resume writes them to the sheets in order.
+ *
  * Only an administrator flips the switch. Every flip is recorded in `actions`.
  */
 'use strict';
@@ -32,6 +36,7 @@ class SwitchError extends Error {
 const ownersOf = L.screenOwners;
 const anyNew = (config) => { const o = ownersOf(config); return Object.keys(o).some(k => o[k] === 'new'); };
 const writeBackOn = (config) => !!(config && config.writeBack && config.writeBack.enabled === true);
+const sheetsPaused = (config) => !!(config && config.sheetWrites && config.sheetWrites.paused === true);
 
 /*
  * Whether a save from `screen` may go ahead, given config/app. Returns {mode, owner, writeBack}; throws a
@@ -45,7 +50,7 @@ function screenMode(config, screen, makeError) {
 
 /*
  * input: {requestId, screen, owner: 'old'|'new'}, {requestId, screen, fullyLive: true|false}, {requestId, allReady: true}
- * or {requestId, writeBack: true|false}.
+ * {requestId, writeBack: true|false} or {requestId, sheetsPaused: true|false}.
  * ready: whether the server has a sandbox write-back target (WRITEBACK_JSON); the write-back cannot go on without one.
  */
 async function setSwitch(db, user, input, ready, now) {
@@ -55,11 +60,13 @@ async function setSwitch(db, user, input, ready, now) {
   const has = (k) => Object.prototype.hasOwnProperty.call(input, k);
   // Go-Live Switches (Joe 10/12): move one screen, mark it fully live (its tag comes off the cards), or turn on everything
   // that is ready (the write-back and every ready screen) in one press.
-  const kind = input.allReady === true ? 'allReady' : has('fullyLive') ? 'fullyLive' : has('screen') ? 'screen' : 'writeBack';
+  const kind = input.allReady === true ? 'allReady' : has('sheetsPaused') ? 'sheetsPaused' : has('fullyLive') ? 'fullyLive' : has('screen') ? 'screen' : 'writeBack';
   if (kind === 'screen' || kind === 'fullyLive') {
     if (!SCREENS[input.screen]) throw new SwitchError('BAD_REQUEST', 'Unknown screen ' + String(input.screen).slice(0, 40));
     if (kind === 'screen' && input.owner !== 'old' && input.owner !== 'new') throw new SwitchError('BAD_REQUEST', 'owner must be old or new');
     if (kind === 'fullyLive' && typeof input.fullyLive !== 'boolean') throw new SwitchError('BAD_REQUEST', 'fullyLive must be true or false');
+  } else if (kind === 'sheetsPaused' && typeof input.sheetsPaused !== 'boolean') {
+    throw new SwitchError('BAD_REQUEST', 'sheetsPaused must be true or false');
   } else if (kind === 'writeBack' && typeof input.writeBack !== 'boolean') {
     throw new SwitchError('BAD_REQUEST', 'Say which screen to switch, or whether the write-back is on');
   }
@@ -76,12 +83,13 @@ async function setSwitch(db, user, input, ready, now) {
     const config = configSnap.exists ? configSnap.data() : {};
     const owners = ownersOf(config);
     const fully = Object.assign({}, config.fullyLive || {});
-    const before = { screenOwners: owners, writeBack: writeBackOn(config), fullyLive: Object.assign({}, fully) };
-    const after = { screenOwners: Object.assign({}, owners), writeBack: before.writeBack, fullyLive: fully };
+    const before = { screenOwners: owners, writeBack: writeBackOn(config), fullyLive: Object.assign({}, fully), sheetsPaused: sheetsPaused(config) };
+    const after = { screenOwners: Object.assign({}, owners), writeBack: before.writeBack, fullyLive: fully, sheetsPaused: before.sheetsPaused };
     const notReady = (screen) => { const g = L.GO_LIVE[screen]; return g && !g.ready ? SCREENS[screen] + ' is not ready for Operations: ' + g.why : ''; };
     if (kind === 'screen') {
       if (input.owner === 'new' && notReady(input.screen)) throw new SwitchError('NOT_ALLOWED', notReady(input.screen));
       if (input.owner === 'new' && !before.writeBack) throw new SwitchError('NOT_ALLOWED', 'Turn the write-back on first, so the current app sees what the Operations app saves');
+      if (input.owner === 'old' && owners[input.screen] === 'new') throw new SwitchError('NOT_ALLOWED', SCREENS[input.screen] + ' stays on so it keeps saving. To stop the app writing to the sheets, press Pause writing to the sheets.');
       after.screenOwners[input.screen] = input.owner;
       if (input.owner === 'old') delete after.fullyLive[input.screen];
     } else if (kind === 'fullyLive') {
@@ -91,12 +99,20 @@ async function setSwitch(db, user, input, ready, now) {
       if (!before.writeBack && !ready) throw new SwitchError('NOT_ALLOWED', 'The server has no sandbox sheet to write to yet (WRITEBACK_JSON)');
       after.writeBack = true;
       Object.keys(SCREENS).forEach(k => { if (L.GO_LIVE[k] && L.GO_LIVE[k].ready) after.screenOwners[k] = 'new'; });
+    } else if (kind === 'sheetsPaused') {
+      if (!before.writeBack) throw new SwitchError('NOT_ALLOWED', 'The app is not writing to the sheets, so there is nothing to pause');
+      after.sheetsPaused = input.sheetsPaused;
     } else {
       if (input.writeBack && !ready) throw new SwitchError('NOT_ALLOWED', 'The server has no sandbox sheet to write to yet (WRITEBACK_JSON)');
-      if (!input.writeBack && anyNew(config)) throw new SwitchError('NOT_ALLOWED', 'Switch every screen off before turning the write-back off');
+      if (!input.writeBack && anyNew(config)) throw new SwitchError('NOT_ALLOWED', 'The screens that are on need the write-back. To stop the app writing to the sheets, press Pause writing to the sheets.');
       after.writeBack = input.writeBack;
     }
-    const result = { ok: true, requestId, screenOwners: after.screenOwners, writeBack: after.writeBack, fullyLive: after.fullyLive };
+    const result = { ok: true, requestId, screenOwners: after.screenOwners, writeBack: after.writeBack, fullyLive: after.fullyLive, sheetsPaused: after.sheetsPaused };
+    if (kind === 'sheetsPaused') {
+      tx.set(configRef, { sheetWrites: { paused: after.sheetsPaused, changedAt: stamp, changedBy: email } }, { merge: true });
+      tx.set(logRef, { action: after.sheetsPaused ? 'pauseSheetWrites' : 'resumeSheetWrites', by: email, at: stamp, screen: '', before, after, result });
+      return result;
+    }
     tx.set(configRef, { mode: Object.keys(after.screenOwners).some(k => after.screenOwners[k] === 'new') ? 'live' : 'test', screenOwners: after.screenOwners, fullyLive: after.fullyLive, writeBack: { enabled: after.writeBack, changedAt: stamp, changedBy: email } },
       // fullyLive is written whole, so a screen moved back or unmarked loses its mark; the rest of writeBack is kept.
       { mergeFields: ['mode', 'screenOwners', 'fullyLive', 'writeBack.enabled', 'writeBack.changedAt', 'writeBack.changedBy'] });
@@ -105,4 +121,4 @@ async function setSwitch(db, user, input, ready, now) {
   });
 }
 
-module.exports = { SCREENS, SWITCH_ROLES, SwitchError, screenMode, setSwitch, ownersOf, anyNew, writeBackOn };
+module.exports = { SCREENS, SWITCH_ROLES, SwitchError, screenMode, setSwitch, ownersOf, anyNew, writeBackOn, sheetsPaused };

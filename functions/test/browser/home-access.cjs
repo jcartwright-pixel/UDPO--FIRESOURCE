@@ -142,7 +142,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
-    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch Administration', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
+    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
     const all = await adm.$$eval('.adm-item', t => t.length);
     // Joe 10/12: Garage Station Codes added; Driver Station, Plant Station and Phone Screens moved from System Tools to Links & Codes.
     // Joe 10/12: Location Areas added under Plant Setup.
@@ -152,8 +152,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/16: Connections & Keys > RedZone back (the RedZone API, read only).
     // Joe 10/18: Upload Center added under Plant Setup (a new plant's data from one workbook).
     // Joe 10/18: Plant Managers App added under Links & Codes (the Plant Managers link and its code).
+    // Batch 8, mock-up 2 (10/23): Operational Assignments, Print Layouts, Dispatch Settings, Route Editor and Go-Live Switches
+    // are on the Dispatch Administration page; the list keeps one Dispatch Administration line, and Find a setting still finds them.
     // Joe 10/22: Case Counters added under Connections & Keys (the palletizer and case returns counter boxes).
-    assert.equal(all, 40, 'every item from the current app\'s Administration is in the menu');
+    assert.equal(all, 35, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(h2:text-is("Dispatch")) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -162,7 +165,9 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(await adm.$$eval('a[href*="script.google.com"], a[target="_blank"]', a => a.length), 0);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-people-1920.png') });
     // A screen already in the new app opens inside the panel, without its own header and menu; the page stays put.
+    await adm.fill('#find', 'Print Layouts');
     await adm.click('.adm-item[data-key="print"]');
+    await adm.fill('#find', '');
     const frame = await (await adm.waitForSelector('#frame')).contentFrame();
     await frame.waitForSelector('#screen:not([hidden])');
     assert.equal(await frame.evaluate(() => document.body.classList.contains('embed') && !document.querySelector('.topbar').getClientRects().length), true, 'no second header inside the panel');
@@ -178,6 +183,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.fill('#find', 'QR');
     assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes', 'Plant Managers App']);
     await adm.fill('#find', '');
+    await adm.fill('#find', 'Print Layouts');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();

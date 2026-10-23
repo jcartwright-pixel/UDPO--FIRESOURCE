@@ -14,7 +14,7 @@ const C = M.COLLECTIONS;
 // The Route Editor's switch (actions.js ACTIONS.saveRoute.screen), for the Live weeks' own step after the save.
 const ROUTES_SCREEN = 'routes';
 
-/* ---------- Route Editor (Route Master copy; ROUTES_MASTER itself is not written yet) ---------- */
+/* ---------- Route Editor (the app's Route Master; each save is also written to ROUTES_MASTER by the master write-back) ---------- */
 const ROUTE_FIELDS = { route: 'text', routeName: 'text', run: 'text', streamId: 'text', routeRunType: 'text', routeCode: 'text', loadType: 'text', movementType: 'text', coverageOwner: 'text', coverageType: 'text',
   departureDay: 'text', routeNotes: 'text', weekOrder: 'number', active: 'bool', sleeper: 'bool', dropAndHook: 'bool', displayDaily: 'bool',
   displayWeekly: 'bool', displayPlant: 'bool', displayMobile: 'bool', displayRouteMaster: 'bool', routeStatus: 'text' };

@@ -99,7 +99,6 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
         await lt.press(box('minSpeed'), 'Tab');
         await lt.waitForFunction(() => /lowest speed is higher/.test(document.getElementById('error').textContent));
         release();
-        await lt.waitForFunction(() => /Saved/.test(document.getElementById('foot').textContent));
         await lt.unroute('**/save', hold);
         for (let i = 0; i < 40; i++) { const p = (await gallon())[0] || {}; if (p.maxSpeed === 70) break; await lt.waitForTimeout(250); }
         const p = (await gallon())[0];

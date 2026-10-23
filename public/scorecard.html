@@ -325,7 +325,7 @@
         if (rateOpen !== r.driverKey) return '<div class="sc-rate">' + hist + ' <button type="button" class="sc-rate-open" data-rate="' + escapeHtml(r.driverKey) + '">Rate truck cleanliness</button></div>';
         return '<div class="sc-rate sc-rate-form" data-driver="' + escapeHtml(r.driverKey) + '" data-name="' + escapeHtml(r.driver) + '" data-truck="' + escapeHtml(r.truck || '') + '"><b>Rate truck cleanliness</b> ' +
           '<input type="date" class="sc-rate-date" value="' + today() + '"> ' + [1, 2, 3, 4, 5].map(v => '<button type="button" class="sc-star' + (rateValue === v ? ' on' : '') + '" data-v="' + v + '">' + v + '</button>').join('') +
-          ' <input type="text" class="sc-rate-note" maxlength="300" placeholder="Note (optional)"> <button type="button" class="primary sc-rate-save"' + (rateValue ? '' : ' disabled') + '>Save</button> <button type="button" class="sc-rate-cancel">Cancel</button>' +
+          ' <input type="text" class="sc-rate-note" maxlength="300" placeholder="Note (optional)"> <button type="button" class="primary sc-rate-save"' + (rateValue ? '' : ' disabled') + '>Add Rating</button> <button type="button" class="sc-rate-cancel">Cancel</button>' +
           '<small>1 = very dirty, 5 = spotless' + (r.truck ? ' · truck ' + escapeHtml(r.truck) : '') + '</small></div>';
       };
       // What each area earned: perfect days, streaks, early returns and good cleanliness ratings.

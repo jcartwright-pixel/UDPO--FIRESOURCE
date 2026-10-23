@@ -20,7 +20,7 @@ const C = M.COLLECTIONS;
 async function moveRun(tx, db, req, email, stamp, logRef, mode) {
   const fromRef = db.collection(C.runs).doc(req.runDocId);
   const fromSnap = await tx.get(fromRef);
-  if (!fromSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer on the Live sheet');
+  if (!fromSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in this week\'s loads. Refresh the screen.');
   const from = fromSnap.data();
   if (!from.days || !from.days[req.day] || !from.days[req.day].runs) throw new SaveError('NOT_FOUND', from.route + ' ' + from.run + ' does not run that day');
   if (req.expectedRev !== undefined && req.expectedRev !== from.rev) throw new SaveError('CHANGED', from.route + ' ' + from.run + ' was changed by someone else; the screen now shows the latest', { rev: from.rev });
@@ -176,7 +176,7 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
   const ids = Object.keys(refs);
   const snaps = await tx.getAll(...ids.map(id => refs[id]));
   snaps.forEach((snap, i) => {
-    if (!snap.exists) throw new SaveError('NOT_FOUND', 'A load in the list is no longer on the Live sheet');
+    if (!snap.exists) throw new SaveError('NOT_FOUND', 'A load in the list is no longer in this week\'s loads. Refresh the screen.');
     runs[ids[i]] = snap.data();
   });
   const targets = req.order.map(item => {

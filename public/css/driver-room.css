@@ -21,8 +21,8 @@
   body.room .phone-top b { font-size: 20px; }
   body.room .phone-card { margin: 12px 16px; padding: 14px 18px; }
   /* The small grey words a little bigger on the tablet. */
-  body.room .phone-card label { font-size: 15px; }
-  body.room .phone-card .drv-card small, body.room .phone-load small { font-size: 15px; }
+  body.room .phone-card label { font-size: 16px; }
+  body.room .phone-card .drv-card small, body.room .phone-load small { font-size: 16px; }
   /* The three choices side by side, big enough for a finger. */
   body.room #step-menu .drv-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
   body.room #step-menu .drv-choices .drv-card { min-height: 170px; align-content: center; padding: 20px 24px; }
