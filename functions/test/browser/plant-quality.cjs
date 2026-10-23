@@ -96,7 +96,7 @@ async function shots(page, name, w) {
         await page.waitForTimeout(4000);
         assert.equal(await gallonChecks(), 0, 'an undone pick is never saved');
         await page.selectOption('select.prod-product', pick);
-        await page.waitForFunction(() => /Saved \d/.test(document.querySelector('[data-note="prod-product"]').textContent), null, { timeout: 10000 });
+        await page.waitForFunction(() => /Checked \d/.test(document.querySelector('[data-note="prod-product"]').textContent), null, { timeout: 10000 });
         assert.equal(await gallonChecks(), 1, 'the pick saved once its 4 seconds were up');
         await shots(page, 'quality-product-saved', w);
         results.push('Product pick: "Saving in 4 seconds" with Undo; Undo puts the box back and saves nothing; left alone it saves after 4 seconds');
@@ -149,7 +149,7 @@ async function shots(page, name, w) {
     await desk.fill('.prod-temperature', '38');
     await desk.press('.prod-temperature', 'Tab');
     await desk.selectOption('.prod-status', 'REVIEW');
-    await desk.waitForFunction(() => /^Saved/.test(document.querySelector('[data-note="prod-status"]').textContent));
+    await desk.waitForFunction(() => /^Checked/.test(document.querySelector('[data-note="prod-status"]').textContent));
     const shown = Date.now() - t0;
     await desk.fill('.prod-notes', 'Cap torque low');
     await desk.press('.prod-notes', 'Tab');

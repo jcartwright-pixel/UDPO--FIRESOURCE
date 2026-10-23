@@ -68,7 +68,6 @@
     import { start, requireSignIn, save, callServer, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { doc, onSnapshot, collection, query, orderBy, limit } from './js/firebase.js';
     import { watchProduction, fmt } from './js/production.js';
-    import { savedText } from './js/autosave.js';
 
     // Line Targets (Joe 10/11, mock-up B): pick a line, see its products, and set each one's UPC, shelf life, full speed, Target %
     // and allowed speed range (Joe: a product run too fast or too slow flashes on the line tablet). Joe 10/11: everything about a
@@ -186,7 +185,7 @@
       try {
         const r = await callServer('lineReader', Object.assign({ operationId: line.operationId }, extra));
         if (r.key) shownKey = { line: line.operationId, key: r.key };
-        ctrlNote = r.message || savedText(); showError('');
+        ctrlNote = r.message || ''; showError('');
       } catch (err) { ctrlNote = 'Not saved.'; showError(line.name + ': ' + (err.message || err)); }
       document.activeElement && document.getElementById('controller').contains(document.activeElement) && document.activeElement.blur();
       render('keep');
@@ -307,8 +306,8 @@
       if (e.target.id !== 'rz-loc' || !line || !canSave()) return;
       const v = e.target.value;
       e.target.blur();
-      note = 'Saving…'; render('keep');
-      try { await save('saveLineSetup', { operationId: line.operationId, redzoneLocation: v }); note = savedText(); showError(''); }
+      note = ''; render('keep');
+      try { await save('saveLineSetup', { operationId: line.operationId, redzoneLocation: v }); note = ''; showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
       render(true);
     });
@@ -369,8 +368,8 @@
       const line = current();
       if (e.target.dataset.fedby !== undefined && line && canSave()) {
         const fedBy = [...document.querySelectorAll('#setup [data-fedby]')].filter(x => x.checked).map(x => x.dataset.fedby);
-        note = 'Saving…'; render('keep');
-        try { await save('saveLineSetup', { operationId: line.operationId, fedBy }); note = savedText(); showError(''); }
+        note = ''; render('keep');
+        try { await save('saveLineSetup', { operationId: line.operationId, fedBy }); note = ''; showError(''); }
         catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
         render(true);
         return;
@@ -382,8 +381,8 @@
         fillEveryN: 'How often', tareGrams: 'Empty jug weight', capGrams: 'Cap weight', fillUnder: 'Light when under target by', fillOver: 'Heavy when over target by', perBox: 'Jugs in each box' };
       if (k !== 'fillEvery' && v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
       if (k === 'fillEvery') box.blur();
-      note = 'Saving…'; render('keep');
-      try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = savedText(); showError(''); }
+      note = ''; render('keep');
+      try { await save('saveLineSetup', { operationId: line.operationId, [k]: v }); note = ''; showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
       render(true);
     });
@@ -395,11 +394,11 @@
     function send(line, list) {
       const at = refused;
       mine[line.operationId] = list;
-      note = 'Saving…';
+      note = '';
       render('keep');
       const run = busy.then(() => save('saveMachineProducts', { operationId: line.operationId, products: list.filter(p => String(p.name || '').trim()) }));
       busy = run.catch(() => {});
-      return run.then(() => { note = savedText(); if (refused === at) showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
+      return run.then(() => { note = ''; if (refused === at) showError(''); }, err => { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + '). Change the box again to retry.'); delete mine[line.operationId]; }).then(() => render());
     }
     document.getElementById('rows').addEventListener('change', e => {
       const box = e.target.closest('[data-k]'), line = current();
@@ -423,8 +422,8 @@
       if (!line || !canSave()) return;
       // Read the pick before drawing again: the drawing puts the saved choice back in the drop-down.
       const counter = e.target.value;
-      note = 'Saving…'; render('keep');
-      try { await save('saveLineCounter', { operationId: line.operationId, counter }); note = savedText(); showError(''); }
+      note = ''; render('keep');
+      try { await save('saveLineCounter', { operationId: line.operationId, counter }); note = ''; showError(''); }
       catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
       render(true);
     });

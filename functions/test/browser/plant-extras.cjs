@@ -89,10 +89,10 @@ const until = async (fn, what) => { for (let i = 0; i < 80; i++) { const v = awa
     const q = await openPage(browser, 1920, 1080, '/quality.html?line=ut_prod_htst_1&' + MANAGER);
     await q.waitForFunction(() => document.getElementById('form-title').textContent === 'HTST #1 Quality Check');
     await q.selectOption('.prod-status', 'CHANGEOVER');
-    await q.waitForFunction(() => /^Saved/.test(document.querySelector('[data-note="prod-status"]').textContent), null, { timeout: 8000 });
+    await q.waitForFunction(() => /^Checked/.test(document.querySelector('[data-note="prod-status"]').textContent), null, { timeout: 8000 });
     await q.fill('.prod-temperature', '38');
     await q.press('.prod-temperature', 'Tab');
-    await q.waitForFunction(() => /^Saved/.test(document.querySelector('[data-note="prod-temperature"]').textContent));
+    await q.waitForFunction(() => /^Checked/.test(document.querySelector('[data-note="prod-temperature"]').textContent));
     const checks = await until(async () => { const d = (await db().collection('plantJournal').where('type', '==', 'PRODUCTION_QUALITY').get()).docs.map(x => x.data()).filter(x => (x.payload || {}).area === 'HTST #1' && x.createdInApp); return d.length && d.every(x => x.payload.temperature === '38') && d; }, 'one HTST #1 check with both boxes');
     assert.equal(checks.length, 1, 'both boxes fill the same check');
     assert.equal(await q.getAttribute('.prod-temperature', 'inputmode'), 'decimal');

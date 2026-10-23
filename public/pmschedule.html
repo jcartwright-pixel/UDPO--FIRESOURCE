@@ -134,7 +134,8 @@
       if (key) doing.add(key);
       const run = busy.then(() => save(action, fields));
       busy = run.catch(() => {});
-      return run.then(r => { showError(''); flash((r && r.message) || 'Saved.'); return r; }, e => { showError((e.message || String(e)) + ' Change the box again to retry.'); return null; })
+      // Audit batch 4 (Joe's rule: no save messages): an edit says nothing once saved; Send to Maintenance says where it went.
+      return run.then(r => { showError(''); if (action !== 'savePmTask' && r && r.message) flash(r.message); return r; }, e => { showError((e.message || String(e)) + ' Change the box again to retry.'); return null; })
         .finally(() => { if (key) doing.delete(key); render(); });
     }
 

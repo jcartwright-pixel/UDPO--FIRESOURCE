@@ -63,7 +63,7 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
     await p.waitForSelector(box + ' input[data-f="last_service_date"]');
     assert.equal(await p.$$eval(box + ' button', b => b.length), 0, 'no Save button');
     await p.fill(box + ' input[data-f="last_service_date"]', '2026-04-01');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#sheet td.fs-cell.editing .fs-cell-saved').textContent), null, { timeout: 10000 });
+    await p.waitForSelector('#sheet td.fs-cell.editing .fs-cell-saved.ok', { timeout: 10000 });
     assert.equal((await setupOf(trailer)).last_service_date, '2026-04-01');
     await p.fill(box + ' input[data-f="last_service_hours"]', '20,500');
     await p.press(box + ' input[data-f="last_service_hours"]', 'Enter');
@@ -77,7 +77,7 @@ const cellText = (p, unit, key) => p.$eval('#sheet tr[data-unit="' + unit + '"] 
     await p.click('#sheet tr[data-unit="' + trailer + '"] td[data-cell="DOT"]');
     await p.waitForSelector(box + ' input[data-f="dot_last"]');
     await p.fill(box + ' input[data-f="dot_last"]', '2026-04-01');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#sheet td.fs-cell.editing .fs-cell-saved').textContent), null, { timeout: 10000 });
+    await p.waitForSelector('#sheet td.fs-cell.editing .fs-cell-saved.ok', { timeout: 10000 });
     assert.equal((await setupOf(trailer)).dot_due, L.addMonths('2026-04-01', L.fleetRule(L.FLEET_RULES, 'TRAILER', 'dotMonths')));
     assert.deepEqual(await p.$$eval(box + ' label, ' + box + ' input', a => a.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).length), 0, 'text 16px or larger');
     await shot(p, 'after-typing-1536.png');

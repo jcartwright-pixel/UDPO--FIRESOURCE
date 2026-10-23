@@ -277,7 +277,7 @@
       const out = {}; Object.keys(ruleDraft).forEach(k => { out[k] = Number(ruleDraft[k]); });
       document.querySelectorAll('[data-rule]').forEach(i => { out[i.dataset.rule] = Number(i.value); });
       const b = document.getElementById('rules-save'); b.disabled = true; showError('');
-      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; b.textContent = 'Saved'; setTimeout(() => { b.textContent = 'Save Rules'; b.disabled = false; }, 1500); }
+      try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; b.disabled = false; }
       catch (err) { b.disabled = false; showError(err.message); }
     }
     async function addTech() {
@@ -370,8 +370,9 @@
       const note = ed.td.querySelector('.fs-cell-saved'), fields = {};
       if (input.dataset.f === 'dot_last') fields.dot_due = val ? L.addMonths(val, ed.months) : '';
       else fields[input.dataset.f] = val.replace(/,/g, '');
-      note.textContent = 'Saving...'; note.className = 'fs-cell-saved'; showError('');
-      try { await save('saveFleetUnit', { unit: ed.unit, unitType: ed.type, fields, facilityId: plant.id }); note.textContent = 'Saved'; note.className = 'fs-cell-saved ok'; }
+      // Audit batch 4 (Joe's rule: no save messages): the cell says something only when the save failed.
+      note.textContent = ''; note.className = 'fs-cell-saved'; showError('');
+      try { await save('saveFleetUnit', { unit: ed.unit, unitType: ed.type, fields, facilityId: plant.id }); note.textContent = ''; note.className = 'fs-cell-saved ok'; }
       catch (err) { note.textContent = err.message; note.className = 'fs-cell-saved bad'; }
     }
     document.getElementById('sheet').addEventListener('change', e => { const i = e.target.closest('[data-f]'); if (i && editing) saveCell(i); });

@@ -56,7 +56,6 @@
     import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchMaint, plantFor } from './js/pmaint.js';
-    import { savedText } from './js/autosave.js';
 
     // Machinery (Joe 10/12, mock-up C): every machine of the plant, its production lines first coming in by themselves, and
     // + Add Machine for the rest. Click one to see its boxes (each saves when it is left), its PM schedule and its history:
@@ -140,13 +139,13 @@
     function saving(text, cls) { note = text; noteClass = cls || ''; const s = document.getElementById('saved'); if (s) { s.textContent = text; s.className = 'mach-saved ' + noteClass; } }
     function send(fields) {
       const m = adding ? null : machine();
-      saving('Saving…');
+      saving('');
       const run = busy.then(() => save('saveMachine', Object.assign({ facilityId: plant }, m ? { machineId: m.id } : {}, fields)));
       busy = run.catch(() => {});
       return run.then(done => {
         showError('');
         if (adding && done && done.machineId) { adding = false; chosen = done.machineId; setUrl(); }
-        saving('✓ ' + savedText(), 'done');
+        saving('');
         render(true);
       }, err => { saving('Not saved', 'bad'); showError((m ? m.name : 'The new machine') + ' was not saved (' + (err.message || err) + '). Change the box again to retry.'); render(true); });
     }

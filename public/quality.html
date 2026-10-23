@@ -64,7 +64,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, showError, dateTimeText, goLiveNote, optionTag, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot, orderBy, limit } from './js/firebase.js';
-    import { watchRound, fillIn, savedText, clockOf, inRound } from './js/autosave.js';
+    import { watchRound, fillIn, clockOf, inRound } from './js/autosave.js';
     import { walkBar } from './js/walk-bar.js';
     import { watchProducts, sizeFor, OTHER } from './js/products.js';
 
@@ -282,7 +282,7 @@
       mine.payload = Object.assign({ area: line.name }, fields);
       if (!form.started) form.started = mine.recordedAt;
       pending[line.operationId] = mine;
-      if (noteEl) { noteEl.textContent = 'Saving…'; noteEl.classList.remove('bad'); }
+      if (noteEl) { noteEl.textContent = ''; noteEl.classList.remove('bad'); }
       // While a box is saving the form is not drawn again (the check it is making can arrive first and would wipe the note).
       const mineForm = form;
       mineForm.busy = (mineForm.busy || 0) + 1;
@@ -295,7 +295,8 @@
         showError('');
         // The new check can arrive and redraw the form before the save answers: write to the box's note as it is now.
         const n = document.querySelector('[data-note="' + key + '"]');
-        form.notes[key] = savedText();
+        // Audit batch 4 (Joe's rule: no save messages): the box says the line is checked, and when, as on Cooler Temperature.
+        form.notes[key] = 'Checked ' + clockOf(Date.now());
         if (n) n.textContent = form.notes[key];
         // A typed "Other" product shows as its own choice once saved, as when the check is opened again.
         const sel = document.querySelector('#fields select.prod-product'), typed = fields.product;

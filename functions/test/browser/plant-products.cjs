@@ -63,7 +63,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     assert.equal(await page.inputValue('select.prod-product'), '', 'starts blank');
     await page.focus('select.prod-product'); // as a person does: the box is in use while it is picked
     await page.selectOption('select.prod-product', 'GV 2% Gallon');
-    await page.waitForFunction(() => /Saved/.test(document.querySelector("[data-note=\"prod-product\"]").textContent));
+    await page.waitForFunction(() => /Checked/.test(document.querySelector("[data-note=\"prod-product\"]").textContent));
     assert.equal(await page.inputValue('select.prod-size'), 'Gallon', 'the size follows the product');
     let saved = await lastQuality('ut_prod_gallon_filler');
     assert.deepEqual([saved.length, saved[0].payload.product, saved[0].payload.productSize], [1, 'GV 2% Gallon', 'Gallon']);
@@ -72,13 +72,13 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await page.waitForSelector('.prod-other:not([hidden])');
     await page.fill('.prod-other', 'Test run eggnog');
     await page.click('#form-title');
-    await page.waitForFunction(async () => /Saved/.test(document.querySelector('[data-note="prod-product"]').textContent));
+    await page.waitForFunction(async () => /Checked/.test(document.querySelector('[data-note="prod-product"]').textContent));
     await page.waitForFunction(() => document.querySelector('select.prod-product') && document.querySelector('select.prod-product').value === 'Test run eggnog');
     for (let i = 0; i < 40 && (saved = await lastQuality('ut_prod_gallon_filler'))[0].payload.product !== 'Test run eggnog'; i++) await page.waitForTimeout(250);
     assert.equal(saved[0].payload.product, 'Test run eggnog', 'Other saves what was typed and shows as its own choice');
     await page.focus('select.prod-product'); // as a person does: the box is in use while it is picked
     await page.selectOption('select.prod-product', 'GV 2% Gallon');
-    await page.waitForFunction(() => /Saved/.test(document.querySelector('[data-note="prod-product"]').textContent));
+    await page.waitForFunction(() => /Checked/.test(document.querySelector('[data-note="prod-product"]').textContent));
     await fits(page, 'Quality 1920');
     await shots(page, 'quality-product-dropdown', 1920);
     if (SHOTS) {
@@ -135,7 +135,8 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     const gvBox = box.products.find(p => p.name === 'GV 2% Gallon'), gvFill = startOf('ut_prod_gallon_filler').find(p => p.name === 'GV 2% Gallon');
     assert.deepEqual([gvBox.sku, gvBox.ratePerMin, gvBox.targetPct], [gvFill.sku, gvFill.ratePerMin, gvFill.targetPct], 'the numbers come with it');
     assert.equal(box.products[box.products.length - 1].name, 'GV 2% Gallon', 'it goes on the end of the machine\'s list');
-    await admin.waitForFunction(() => /GV 2% Gallon on BOXING/.test(document.getElementById('foot').textContent) && /Saved/.test(document.getElementById('foot').textContent));
+    // Audit batch 4 (Joe's rule: no save messages): the sheet says nothing once the check is saved.
+    assert.doesNotMatch(await admin.textContent('#foot'), /Saved|Saving/);
     assert.deepEqual(await checksOf('GV 2% Gallon'), ['ut_prod_boxing', 'ut_prod_htst_1', 'ut_prod_gallon_filler']);
     // BLOW MOLD's one product (the jug runs on nothing else) taken off its only machine stays on the sheet, on no machine.
     const jug = startOf('ut_prod_blow_mold')[0].name;
@@ -171,7 +172,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.click('#edit-title');
     await waitDoc('plantProducts', 'ut_prod_htst_1', d => (d.products || []).some(p => p.name === 'GV 2% Gallon' && p.shelfLifeDays === 14 && p.upc === '070852999001'));
     for (const id of ['ut_prod_boxing', 'ut_prod_gallon_filler']) assert.equal((await waitDoc('plantProducts', id, d => d.products.find(p => p.name === 'GV 2% Gallon').shelfLifeDays === 14)).products.find(p => p.name === 'GV 2% Gallon').upc, '070852999001');
-    await admin.waitForFunction(() => /Saved/.test(document.getElementById('edit-note').textContent));
+    assert.doesNotMatch(await admin.textContent('#edit-note'), /Saved|Saving/, 'no save message in the Edit panel');
     await fits(admin, 'Edit panel 1920');
     await shots(admin, 'products-edit', 1920);
     // A machine box in the panel works like the check on the sheet.
@@ -218,7 +219,8 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.click(rowOf('UD Whole Milk Tote') + ' [data-remove]');
     await admin.click(rowOf('UD Whole Milk Tote') + ' [data-remove]');
     await waitDoc('plantProducts', 'ut_prod_totes', d => d.products.length === 1);
-    await admin.waitForFunction(() => /removed/.test(document.getElementById('foot').textContent) && !document.querySelector('#rows tr[data-key="UD WHOLE MILK TOTE"]'));
+    // Audit batch 4 (Joe's rule: no save messages): the row going away is the answer.
+    await admin.waitForFunction(() => !document.querySelector('#rows tr[data-key="UD WHOLE MILK TOTE"]'));
 
     // Download Product List (Joe 10/13): the whole list, a tab per plant, an X under each machine, then the numbers.
     const [dl] = await Promise.all([admin.waitForEvent('download'), admin.click('#template')]);
