@@ -270,6 +270,21 @@
     // week's loads never go stale. The code and sign-in are kept on the Fire Stick, so nothing is retyped.
     let liveSinceLoad = false;
     const loadedDay = date;
+    // Joe 10/23 (LG TV, its own Web Browser): the TV's screen saver turned the board off after a few minutes. LG keeps the screen
+    // saver away only while a video plays, so the TV link plays a silent video the board's own color behind the whole screen,
+    // over and over. MP4 for the TV; WebM for a browser with no MP4.
+    if (full) {
+      const awake = document.createElement('video');
+      awake.id = 'ds-awake';
+      Object.assign(awake, { muted: true, loop: true, autoplay: true, playsInline: true });
+      awake.setAttribute('muted', ''); awake.setAttribute('aria-hidden', 'true');
+      awake.innerHTML = '<source src="img/keep-awake.mp4" type="video/mp4"><source src="img/keep-awake.webm" type="video/webm">';
+      document.body.prepend(awake);
+      document.body.classList.add('ds-awake');
+      const play = () => { if (awake.paused) awake.play().catch(() => {}); };
+      play(); awake.addEventListener('pause', () => setTimeout(play, 1000)); setInterval(play, 30000);
+      document.addEventListener('visibilitychange', play);
+    }
     if (full) {
       window.addEventListener('online', () => { if (!liveSinceLoad) setTimeout(() => location.reload(), 5000); });
       setInterval(() => { if (navigator.onLine && L.operatingDay(new Date()) !== loadedDay) location.reload(); }, 60000);

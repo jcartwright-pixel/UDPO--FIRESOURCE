@@ -765,14 +765,16 @@ export async function renderEmailSenders(box, ctx) {
   let saving = Promise.resolve();
   async function load() { await saving; try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
   // After a save the boxes are brought in line with what was saved (a name that was an email address comes back empty), without
-  // redrawing the table, so the box being typed in keeps its place.
-  function sync() {
+  // redrawing the table, so the box being typed in keeps its place. A box changed after that save was sent keeps the newer
+  // typing (its own save follows), so filling several boxes quickly never loses one.
+  function sync(sent) {
     data.plants.forEach(p => {
       const tr = box.querySelector('#es-rows tr[data-plant="' + p.id + '"]');
       if (!tr) return;
       [['addr', p.address], ['name', p.senderName]].forEach(([k, v]) => {
         const i = tr.querySelector('[data-' + k + ']');
-        if (i.value.trim() === i.dataset.saved || document.activeElement !== i) i.value = v;
+        const was = sent[p.id] ? sent[p.id][k === 'addr' ? 'address' : 'name'] : undefined;
+        if (i.value === was || (was === undefined && document.activeElement !== i)) i.value = v;
         i.dataset.saved = v;
         i.classList.toggle('es-unsaved', i.value.trim() !== v);
         i.nextElementSibling.hidden = !!i.value.trim();
@@ -794,7 +796,7 @@ export async function renderEmailSenders(box, ctx) {
       try {
         const out = await call('saveEmailSenders', { senders, fromWho });
         data = out;
-        if (box.isConnected) sync();
+        if (box.isConnected) sync(senders);
         const notes = String(out.message || '').replace(/^Saved\.\s*/, '');
         say(box, notes, notes ? 'warn' : '');
       } catch (err) { say(box, errText(err), 'bad'); }
