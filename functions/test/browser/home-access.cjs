@@ -152,7 +152,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/16: Connections & Keys > RedZone back (the RedZone API, read only).
     // Joe 10/18: Upload Center added under Plant Setup (a new plant's data from one workbook).
     // Joe 10/18: Plant Managers App added under Links & Codes (the Plant Managers link and its code).
-    assert.equal(all, 39, 'every item from the current app\'s Administration is in the menu');
+    // Joe 10/22: Case Counters added under Connections & Keys (the palletizer and case returns counter boxes).
+    assert.equal(all, 40, 'every item from the current app\'s Administration is in the menu');
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
