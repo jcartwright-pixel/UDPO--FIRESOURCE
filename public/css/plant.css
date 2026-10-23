@@ -334,6 +334,11 @@
 .yard-page .yd-gps { font-size: 18px; font-weight: 800; }
 .yard-page .yd-gps.none { color: var(--muted); font-weight: 400; }
 .yard-page .yd-gps.bad { background: #fde8e8; color: #bf2020; }
+/* Joe 10/22 (mock-up bl): with the third tab the counts go to the line below the buttons at every width, as under 1500, so
+   the tabs and Refresh stay on the top line whatever the font. */
+body.yard-page .head .hstats { order: 5; flex-basis: 100%; }
+body.yard-page .head .badge-test { order: 6; }
+.yard-page .head .tabs button { white-space: nowrap; }
 /* Joe 10/22: All Trailers in Yard (look only): a red or green bar on each row and its status, with why under it. */
 .yard-page table.yd-all td { font-size: 17px; }
 .yard-page table.yd-all td.yd-route { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
