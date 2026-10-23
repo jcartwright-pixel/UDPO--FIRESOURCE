@@ -44,7 +44,7 @@
     import { start, requireSignIn, escapeHtml, showError, shortDate } from './js/app.js';
     import { watchLists, lists } from './js/edit.js';
     import { collection, doc, onSnapshot, query, where } from './js/firebase.js';
-    import { NO_SIGNAL_MINUTES, unitKey, gpsIndex, truckState, workingToday } from './js/gps-state.js';
+    import { NO_SIGNAL_MINUTES, NEAR_YARD_MILES, unitKey, gpsIndex, truckState, yardSpots, workingToday } from './js/gps-state.js';
 
     // Trucks Today (the current app's screen A, Joe 10/9): every route on today's Daily Dispatch with where its truck is now,
     // read from Verizon Connect Fleet every 5 minutes (functions/src/fleetgps.js) and its miles today (every 15 minutes).
@@ -55,7 +55,8 @@
     const homeOf = (e) => nameCase(e.location) || nameCase(String(e.facilityId || '').replace(/^fac_/, ''));
     const opened = new Set(); // Alerts drop-downs left open, by Daily Dispatch line (kept through the 1-minute redraw)
     // Where each unit is now: js/gps-state.js (shared with the Route Distribution home's Manager card).
-    const key = unitKey, index = () => gpsIndex(gps), state = truckState;
+    let spotsFor = null, spots = [];
+    const key = unitKey, index = () => gpsIndex(gps), state = (t, u) => { if (spotsFor !== gps) { spotsFor = gps; spots = yardSpots(gps); } return truckState(t, u, spots); };
     const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
     const clock = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
     const ago = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return isNaN(m) ? '' : m < 1 ? 'now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago' : (m < 2880 ? '1 day ago' : Math.floor(m / 1440) + ' days ago'); };
@@ -156,7 +157,7 @@
               x.ev.map(e => '<tr><td>' + clock(e.at) + '</td><td>' + escapeHtml(e.name) + '</td><td>' + escapeHtml(e.detail) + '</td><td>' + escapeHtml(e.where) + '</td></tr>').join('') + '</tbody></table>'
               : '<div class="tt-none">' + (x.t ? 'Nothing from Verizon yet today for truck ' + escapeHtml(x.t.tag) + '.' : 'No Fleet truck on this line, so no Verizon alerts.') + '</div>') + '</td></tr>' : '')).join('') ||
             '<tr><td colspan="10" class="empty">No Daily Dispatch runs leave with one of our drivers on ' + escapeHtml(shortDate(today)) + '.</td></tr>') + '</tbody></table>';
-        foot.textContent = 'In yard = at the Fleet place Uniontown Branch, Uniontown Plant or Loading Dock · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · a driver with two runs on one truck is one line with both dispatch times · Time out = from the first yard leave until back, or until now; a sleeper route counts from the day it left · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
+        foot.textContent = 'In yard = at a Fleet place named Uniontown (Branch, Plant, Garage) or Loading Dock, or standing within ' + Math.round(NEAR_YARD_MILES * 5280) + ' feet of a truck there · Parked = engine off elsewhere · No signal = engine on and no report for ' + NO_SIGNAL_MINUTES + ' minutes, or nothing for a day · Not in Fleet = Fleet has no unit with that number · miles and first move come from the odometer, read every 5 minutes · a driver with two runs on one truck is one line with both dispatch times · Time out = from the first yard leave until back, or until now; a sleeper route counts from the day it left · Alerts = Verizon Fleet alerts today for that truck; click the number to see them with the yard leave and return times.';
         return;
       }
       // All Fleet units, matched to Equipment Master's trucks and trailers at every plant (Joe 10/20: Charleston's and Martins
