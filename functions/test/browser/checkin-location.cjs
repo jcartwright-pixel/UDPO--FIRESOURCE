@@ -52,8 +52,11 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
     await p.click('#ce-std');
     assert.equal(await p.inputValue('#ce-subject'), 'CHARLESTON DRIVER CHECK IN');
     await p.fill('#ce-to', 'chdrivercheckin@uniteddairy.com');
-    await p.click('#ce-save');
-    await p.waitForFunction(() => /Saved for Charleston/.test(document.querySelector('#view').textContent));
+    await p.press('#ce-to', 'Tab');
+    // Batch 5: no Save button; the box saves when it is left.
+    assert.equal(await p.$('#ce-save'), null, 'no Save button');
+    for (let i = 0; i < 100; i++) { const c = (await db().collection('private').doc('checkinEmail_fac_charleston').get()).data(); if (c && c.recipient === 'chdrivercheckin@uniteddairy.com') break; await new Promise(r => setTimeout(r, 200)); }
+    assert.equal((await db().collection('private').doc('checkinEmail_fac_charleston').get()).data().subject, 'CHARLESTON DRIVER CHECK IN');
     await shot(p, 'after-charleston-1920.png');
     await p.selectOption('#ce-plant', 'fac_uniontown');
     await p.waitForFunction(() => document.querySelector('#ce-to').value === 'utdrivercheckin@uniteddairy.com');

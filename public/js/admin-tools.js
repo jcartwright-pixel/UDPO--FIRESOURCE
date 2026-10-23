@@ -26,19 +26,25 @@ const MODE_TEXT = { SEND: 'Only when I press Send', IMMEDIATE: 'Immediately (new
 const LEASE_HELP = { IDEALEASE: 'Fleet List Lease says "Idealease"', PENSKE: 'Fleet List Lease says "PENSKE"', OWNED: 'Fleet List Lease is blank or "OWN"' };
 export async function renderRepairEmail(box, ctx) {
   let data = null;
-  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="re-save">Save</button><button type="button" class="ap-btn" id="re-send">Send now</button><button type="button" class="ap-btn" id="re-reload">Refresh</button>', '<span id="re-sending"></span>') +
+  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="re-send">Send now</button><button type="button" class="ap-btn" id="re-reload">Refresh</button>', '<span id="re-sending"></span>') +
     '<div class="ap-split"><section class="ap-card"><h3>Where Repair Emails Go</h3><p class="ap-note">The Lease column on the Fleet List decides who a truck or trailer belongs to. Each lessor gets its own address.</p><div id="re-where"></div>' +
     '<p class="ap-note">Owned units go straight to our garage list. Leave that address empty so nothing is emailed; add one only if you also want the garage emailed.</p>' +
     '<p class="ap-note">Any other Lease value, or a unit that is not on the Fleet List, is held and flagged. It is never sent to a guessed address.</p><div class="ap-tiles" id="re-open" style="grid-template-columns:repeat(4,1fr)"></div></section>' +
     '<section class="ap-card"><h3>How Often Repair Emails Are Sent</h3><p class="ap-note">Choose the rhythm for each lessor. Nothing is emailed while sending is turned off.</p><div id="re-how"></div>' +
     '<p class="ap-note">Immediately and Once a day only send repairs reported after you switch them on, so old repairs are never swept up. "Only when I press Send" is the Lessor button on each truck write-up (Equipment Issues).</p><div id="re-status" class="ap-list"></div></section></div></div>';
   const $ = (s) => box.querySelector(s);
+  // Batch 5 (10/23): no Save button; each box saves when it is left, each drop-down when it is picked.
   function render() {
     const s = data.settings;
-    $('#re-sending').innerHTML = data.sending.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
     $('#re-where').innerHTML = Object.keys(data.labels).map(k => '<label class="ap-field">' + e(data.labels[k]) + '<small>' + e(LEASE_HELP[k]) + '</small><input data-emails="' + k + '" value="' + e(s.routes[k].emails.join('; ')) + '" placeholder="name@company.com; second@company.com"></label>').join('');
     $('#re-how').innerHTML = '<div class="ap-grid2">' + Object.keys(data.labels).map(k => '<label class="ap-field">' + e(data.labels[k]) + '<select data-mode="' + k + '">' + data.modes.map(m => '<option value="' + m + '"' + (m === s.routes[k].mode ? ' selected' : '') + '>' + e(MODE_TEXT[m]) + '</option>').join('') + '</select></label>').join('') +
       '<label class="ap-field">Daily digest time<small>Used by "Once a day"</small><select id="re-hour">' + Array.from({ length: 24 }, (x, h) => '<option value="' + h + '"' + (h === s.digestHour ? ' selected' : '') + '>' + hourText(h) + '</option>').join('') + '</select></label></div>';
+    status();
+  }
+  // The status lines only, so a save never redraws the boxes being typed in.
+  function status() {
+    const s = data.settings;
+    $('#re-sending').innerHTML = data.sending.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
     const auto = Object.keys(s.routes).some(k => s.routes[k].mode === 'IMMEDIATE' || s.routes[k].mode === 'DAILY');
     $('#re-status').innerHTML = [s.updatedAt ? 'Last saved ' + when(s.updatedAt) + ' by ' + s.updatedBy + '.' : 'Not saved yet: these are the standard settings.',
       auto ? 'Automatic sending checks about every ' + data.every + ' minutes (change it in Refresh Rates).' : 'Nothing is sent automatically: no lessor is set to Immediately or Once a day.']
@@ -46,18 +52,24 @@ export async function renderRepairEmail(box, ctx) {
     const o = data.openByLessor;
     $('#re-open').innerHTML = [['Idealease', o.IDEALEASE], ['Penske', o.PENSKE], ['Owned', o.OWNED], ['Held', o.HELD]].map(([k, n]) => '<div><b>' + n + '</b><span>open ' + k + '</span></div>').join('');
   }
-  async function load() { try { data = await call('repairEmail'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  let saving = Promise.resolve();
+  async function load() { await saving; try { data = await call('repairEmail'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  // A change that is refused (an address that is not one, Immediately with no address) shows why in red and stays in the box.
+  box.addEventListener('change', ev => {
+    if (!data || !ev.target.closest('[data-emails], [data-mode], #re-hour')) return;
+    const routes = {};
+    Object.keys(data.labels).forEach(k => { routes[k] = { emails: box.querySelector('[data-emails="' + k + '"]').value, mode: box.querySelector('[data-mode="' + k + '"]').value }; });
+    const digestHour = Number($('#re-hour').value);
+    saving = saving.then(async () => {
+      try { data = await call('saveRepairEmail', { routes, digestHour }); say(box, ''); if (box.isConnected) status(); } catch (err) { say(box, errText(err), 'bad'); }
+    });
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.dataset.goto && ctx) { ctx.open(b.dataset.goto); return; }
     if (b.id === 're-reload') load();
-    if (b.id === 're-save') {
-      const routes = {};
-      Object.keys(data.labels).forEach(k => { routes[k] = { emails: box.querySelector('[data-emails="' + k + '"]').value, mode: box.querySelector('[data-mode="' + k + '"]').value }; });
-      busy(box, b, async () => { data = await call('saveRepairEmail', { routes, digestHour: Number($('#re-hour').value) }); render(); say(box, data.message, 'good'); });
-    }
-    if (b.id === 're-send') busy(box, b, async () => { const out = await call('repairEmailSendNow'); await load(); say(box, out.message, out.status === 'DONE' ? 'good' : ''); });
+    if (b.id === 're-send') busy(box, b, async () => { await saving; const out = await call('repairEmailSendNow'); await load(); say(box, out.message, out.status === 'DONE' ? 'good' : ''); });
   });
   await load();
 }
@@ -67,7 +79,7 @@ export async function renderRepairEmail(box, ctx) {
 // Joe 10/11: each location has its own check-in mailbox; the Location drop-down picks which one the page shows and saves.
 export async function renderCheckinEmail(box) {
   let data = null, plant = 'fac_uniontown';
-  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn main" id="ce-save">Save</button><button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Refresh</button>',
+  box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="ce-now">Check now</button><button type="button" class="ap-btn" id="ce-std">Use the standard addresses</button><button type="button" class="ap-btn" id="ce-reload">Refresh</button>',
     '<b style="color:#0b3d6b">Location</b><select id="ce-plant" aria-label="Location">' + window.UDLogic.PLANTS.map(p => '<option value="' + p.id + '">' + e(p.name) + '</option>').join('') + '</select>') +
     '<p class="ap-note">The phone check-in service emails each driver check-in. This check reads that mailbox (read-only), adds equipment issues, cleaning and returns to the maintenance lists and records cases delivered and returned.</p>' +
     '<div class="ap-split"><section class="ap-card"><h3>Mailbox</h3><label class="ap-checks"><label><input type="checkbox" id="ce-on"> Check the mailbox</label></label>' +
@@ -84,15 +96,26 @@ export async function renderCheckinEmail(box) {
       'Mailbox owner: ' + e(s.owner || 'set when the check is turned on (the administrator who saves it)')];
     $('#ce-status').innerHTML = lines.map(t => '<div class="ap-item"><div>' + t + '</div></div>').join('');
   }
-  async function load() { try { data = await call('checkinEmail', { plant }); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
-  box.addEventListener('change', ev => { if (ev.target.id === 'ce-plant') { plant = ev.target.value; say(box, ''); load(); } });
+  // Batch 5 (10/23): no Save button; the tick saves when it is changed and each box when it is left, for the location shown.
+  let saving = Promise.resolve();
+  function save() {
+    const fields = { plant, enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value };
+    saving = saving.then(async () => {
+      try { const out = await call('saveCheckinEmail', fields); say(box, ''); if (out.plant === plant) { data = out; if (box.isConnected) render(); } } catch (err) { say(box, errText(err), 'bad'); }
+    });
+    return saving;
+  }
+  async function load() { await saving; try { data = await call('checkinEmail', { plant }); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => {
+    if (ev.target.id === 'ce-plant') { plant = ev.target.value; say(box, ''); load(); return; }
+    if (data && ev.target.closest('#ce-on, #ce-from, #ce-to, #ce-subject')) save();
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'ce-reload') load();
-    if (b.id === 'ce-std') { $('#ce-from').value = data.standard.sender; $('#ce-to').value = data.standard.recipient; $('#ce-subject').value = data.standard.subject; say(box, 'Standard values filled in. Press Save to keep them.'); }
-    if (b.id === 'ce-save') busy(box, b, async () => { data = await call('saveCheckinEmail', { plant, enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value }); fill(data.settings); render(); say(box, data.message, 'good'); });
-    if (b.id === 'ce-now') busy(box, b, async () => { data = await call('checkinEmailNow', { plant }); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
+    if (b.id === 'ce-std') { $('#ce-from').value = data.standard.sender; $('#ce-to').value = data.standard.recipient; $('#ce-subject').value = data.standard.subject; save(); }
+    if (b.id === 'ce-now') busy(box, b, async () => { await saving; data = await call('checkinEmailNow', { plant }); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
   });
   await load();
 }
@@ -102,8 +125,8 @@ export async function renderCheckinEmail(box) {
 export async function renderRefreshRates(box) {
   let data = null;
   box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="rr2-reload">Reload schedules</button><button type="button" class="ap-btn" id="rr2-archive">Archive now</button>', '<span class="ap-help" id="rr2-tz"></span>') +
-    '<p class="ap-note">Change one job at a time. Saving changes its schedule; it does not run the job now. Each screen also updates by itself the moment the data changes.</p>' +
-    '<div class="ap-scroll"><table class="ap-t rr2-t"><thead><tr><th style="width:19%">Job</th><th style="width:28%">What it does</th><th style="width:22%">How often</th><th style="width:16%">Last run</th><th style="width:130px"></th></tr></thead><tbody id="rr2-rows"></tbody></table></div></div>';
+    '<p class="ap-note">A job\'s schedule saves as soon as it is picked; it does not run the job now. Each screen also updates by itself the moment the data changes.</p>' +
+    '<div class="ap-scroll"><table class="ap-t rr2-t"><thead><tr><th style="width:19%">Job</th><th style="width:28%">What it does</th><th style="width:22%">How often</th><th style="width:16%">Last run</th></tr></thead><tbody id="rr2-rows"></tbody></table></div></div>';
   const $ = (s) => box.querySelector(s);
   function control(j) {
     if (j.kind === 'interval') return '<select data-minutes="' + j.key + '">' + data.minutes.filter(m => m >= j.base).map(m => '<option value="' + m + '"' + (m === j.minutes ? ' selected' : '') + '>Every ' + minutesText(m) + '</option>').join('') + '</select>' + (j.warnOver && j.minutes > j.warnOver ? '<small class="ap-chip warn">Readings older than ' + j.warnOver + ' minutes</small>' : '');
@@ -114,20 +137,28 @@ export async function renderRefreshRates(box) {
   function render() {
     $('#rr2-tz').textContent = 'Times are ' + data.timeZone + '.';
     $('#rr2-rows').innerHTML = data.jobs.map(j => '<tr><td><b>' + e(j.label) + '</b>' + (j.updatedAt ? '<small>Saved ' + e(when(j.updatedAt)) + ' by ' + e(j.updatedBy) + '</small>' : j.kind === 'interval' || j.kind === 'weekly' ? '<small>Standard setting</small>' : '') + '</td>' +
-      '<td>' + e(j.what) + '</td><td>' + control(j) + '</td><td>' + e(j.lastRun ? when(j.lastRun) : '') + '</td>' +
-      '<td>' + (j.kind === 'interval' || j.kind === 'weekly' ? '<button type="button" class="ap-btn small" data-save="' + j.key + '">Save rate</button>' : '') + '</td></tr>').join('');
+      '<td>' + e(j.what) + '</td><td>' + control(j) + '</td><td>' + e(j.lastRun ? when(j.lastRun) : '') + '</td></tr>').join('');
   }
-  async function load() { try { data = await call('refreshRates'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  // Batch 5 (10/23): no Save rate button; a schedule saves when its drop-down is picked. A refused one goes back to what is saved.
+  let saving = Promise.resolve();
+  async function load() { await saving; try { data = await call('refreshRates'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => {
+    const key = ev.target.dataset.minutes || ev.target.dataset.day || ev.target.dataset.hour;
+    const j = key && data && data.jobs.find(x => x.key === key);
+    if (!j) return;
+    const q = (a) => box.querySelector('[' + a + '="' + j.key + '"]');
+    const fields = j.kind === 'interval' ? { minutes: Number(q('data-minutes').value) } : { day: q('data-day').value, hour: Number(q('data-hour').value) };
+    saving = saving.then(async () => {
+      const now = data.jobs.find(x => x.key === key);
+      try { data = await call('saveRefreshRate', Object.assign({ job: key, revision: now.revision }, fields)); say(box, ''); } catch (err) { say(box, errText(err), 'bad'); }
+      if (box.isConnected) render();
+    });
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'rr2-reload') load();
     if (b.id === 'rr2-archive') twice(b, 'Press again to archive', () => busy(box, b, async () => { const out = await call('archiveNow'); await load(); say(box, out.message, out.ok ? 'good' : 'bad'); }));
-    if (b.dataset.save) {
-      const j = data.jobs.find(x => x.key === b.dataset.save), q = (a) => box.querySelector('[' + a + '="' + j.key + '"]');
-      const fields = j.kind === 'interval' ? { minutes: Number(q('data-minutes').value) } : { day: q('data-day').value, hour: Number(q('data-hour').value) };
-      busy(box, b, async () => { data = await call('saveRefreshRate', Object.assign({ job: j.key, revision: j.revision }, fields)); render(); say(box, data.message, 'good'); });
-    }
   });
   await load();
 }

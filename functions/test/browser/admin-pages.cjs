@@ -40,6 +40,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
 const emailsWhole = (p) => p.$$eval('#people td.email', tds => tds.length > 0 && tds.every(td => [...td.childNodes].filter(n => n.nodeType === 3).every(n => { const r = document.createRange(); r.selectNodeContents(n); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size === 1; })));
 const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...bar.querySelectorAll(':scope > button, :scope > a, :scope > .ap-right')].map(b => Math.round(b.getBoundingClientRect().top)); return new Set(tops).size === 1; });
 
+async function until(check, what) {
+  for (let i = 0; i < 100; i++) { if (await check()) return; await new Promise(r => setTimeout(r, 200)); }
+  throw new Error(what + ': not seen in 20 seconds');
+}
+
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
@@ -255,10 +260,14 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
 
     // Batch 2: email, schedules and diagnostics (js/admin-tools.js).
     await open('repair-email', '#re-where input');
+    // Batch 5: no Save button; the box saves when it is left and the drop-down when it is picked.
+    assert.equal(await p.$('#re-save'), null, 'no Save button');
     await p.fill('[data-emails="PENSKE"]', 'repairs@penske.com');
+    await p.press('[data-emails="PENSKE"]', 'Tab');
     await p.selectOption('[data-mode="PENSKE"]', 'IMMEDIATE');
-    await p.click('#re-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await until(async () => { const r = (await db().collection('private').doc('repairEmail').get()).data(); return r && r.routes.PENSKE.mode === 'IMMEDIATE' && r.routes.PENSKE.emails[0] === 'repairs@penske.com'; }, 'Repair Email saved');
+    await p.waitForFunction(() => /Last saved/.test(document.getElementById('re-status').textContent));
+    assert.equal(await p.textContent('#view .ap-msg'), '', 'no saved message');
     assert.ok(await oneLine(p));
     await shot(p, 'repair-email-1920.png');
     await p.click('#re-send');
@@ -268,18 +277,19 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // The field shows before the saved settings load into it; wait for the load.
     await p.waitForFunction(() => document.getElementById('ce-from').value !== '', null, { timeout: 10000 }).catch(() => {});
     assert.equal(await p.inputValue('#ce-from'), 'callcenter@lauttamus.com');
+    assert.equal(await p.$('#ce-save'), null, 'no Save button');
     await p.check('#ce-on');
-    await p.click('#ce-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.waitForFunction(() => /^ON/.test(document.querySelector('#ce-status .ap-item').textContent));
     await p.click('#ce-now');
     // The emulator cannot reach Gmail: the page says why, plainly.
     await p.waitForFunction(() => /Checked|did not finish/.test(document.querySelector('#view .ap-msg').textContent), null, { timeout: 30000 });
     await shot(p, 'checkin-email-1920.png');
 
     await open('refresh-rates', '#rr2-rows tr');
+    assert.equal(await p.$('[data-save="checkinMail"]'), null, 'no Save rate button');
     await p.selectOption('[data-minutes="checkinMail"]', '30');
-    await p.click('[data-save="checkinMail"]');
-    await p.waitForFunction(() => /Schedule saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await until(async () => { const r = (await db().collection('private').doc('refreshRates').get()).data(); return r && r.jobs && r.jobs.checkinMail && r.jobs.checkinMail.minutes === 30; }, 'Refresh rate saved');
+    await p.waitForFunction(() => /Saved /.test(document.getElementById('rr2-rows').textContent));
     assert.ok(await oneLine(p));
     await shot(p, 'refresh-rates-1920.png');
 
