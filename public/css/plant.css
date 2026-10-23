@@ -1613,6 +1613,11 @@ a.wp-more { color: var(--ud-blue); }
   .manager-page [data-card="walk"] .wp-tile .wp-side { gap: 3px; }
   .manager-page [data-card="walk"] .wp-tile .wp-cap { min-height: 34px; padding: 4px 8px; }
   .manager-page [data-card="walk"] .wp-tile .wp-take { height: 36px; min-height: 36px; }
+  /* Four across leaves "3 · Production PAST DUE" little room beside its number: a slimmer badge, and if a screen's font is
+     still wider the badge drops under the name instead of being cut off. */
+  .manager-page [data-card="walk"] .wk-tile { padding-left: 10px; padding-right: 10px; column-gap: 6px; }
+  .manager-page [data-card="walk"] .wk-tile > span { white-space: normal; overflow-wrap: normal; }
+  .manager-page [data-card="walk"] .wk-tile .wk-state { margin-left: 4px; padding: 1px 6px; letter-spacing: 0; white-space: nowrap; }
 }
 .manager-page [data-card="walk"] .wp-tile .wp-box { grid-area: list; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); min-width: 0; }
 .manager-page [data-card="walk"] .wp-tile .wp-thumbs { gap: 6px; flex: 1 1 100%; }
