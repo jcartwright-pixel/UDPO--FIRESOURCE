@@ -120,6 +120,9 @@ service cloud.firestore {
     // Plant Production: each line's shift on the tablet, and how each line is counted (saved only through save).
     match /productionRuns/{id} { allow read: if activeUser(); }
     match /productionLines/{id} { allow read: if activeUser(); }
+    // Case counters (Joe 10/22): the counter's setup and what it counted on each load or unload; written by the server only.
+    match /caseCounters/{id} { allow read: if activeUserOrStation(); }
+    match /caseCounts/{id} { allow read: if activeUserOrStation(); }
     match /plantLineStatus/{id} { allow read: if activeUser(); }
     // Safety Walkthrough: the weekly walks, their open issues and photos, each plant's extinguishers and checklist (saved only through save).
     match /safetyWalks/{id} { allow read: if activeUser(); }

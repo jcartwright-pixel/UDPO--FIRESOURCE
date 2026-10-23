@@ -26,6 +26,7 @@ const crypto = require('crypto');
 const P = require('./production-rules');
 const L = require('./logic');
 const { safeIdPart } = require('./model');
+const CC = require('./casecounter');
 
 class ReaderError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -263,6 +264,13 @@ async function handleReads(db, headers, body, opts) {
   const devices = (await db.collection('private').doc('readDevices').get()).data() || {};
   const dev = devices[docId(id)];
   if (!id || !dev || !dev.hash || dev.hash !== hash(m[1])) return [403, { ok: false, error: 'That key is not this device\'s key. Make a new one on Line Targets.' }];
+  // A case counter (Joe 10/22): its running total, read like a machine controller (casecounter.js).
+  if (dev.area === 'CASE_COUNTER') {
+    try { return [200, Object.assign({ device: id, area: dev.area }, await CC.counterReads(db, dev.target, b, opts))]; } catch (e) {
+      if (e instanceof CC.CounterError) return [400, { ok: false, error: e.message }];
+      throw e;
+    }
+  }
   if (dev.area === 'PRODUCTION' && (b.controller || b.test || b.op === 'config')) {
     try { return [200, Object.assign({ device: id, area: dev.area }, await controllerReads(db, dev.target, b, opts))]; } catch (e) {
       if (e instanceof ReaderError) return [e.code === 'NOT_FOUND' ? 404 : 400, { ok: false, error: e.message }];
@@ -283,7 +291,7 @@ function sandboxOnly(project) { return project !== 'ud-distribution'; }
 
 async function mustBeAdmin(db, email) {
   const person = (await db.collection('users').doc(safeIdPart(email)).get()).data();
-  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new ReaderError('NOT_ALLOWED', 'Only an administrator can set up a line\'s label reader.');
+  if (!person || person.status !== 'ACTIVE' || !L.isAdmin(person)) throw new ReaderError('NOT_ALLOWED', 'Only an administrator can set up a line\'s label reader or a case counter.');
 }
 
 // Line Targets, administrators only.
@@ -291,6 +299,10 @@ async function readerCall(db, user, input, opts) {
   const o = Object.assign({ now: () => new Date(), project: '', key: () => crypto.randomBytes(24).toString('base64url') }, opts || {});
   const i = input || {}, email = text(user && user.email).toLowerCase();
   await mustBeAdmin(db, email);
+  // Administration > Case Counters (Joe 10/22) goes through this same call.
+  if (text(i.counter) || text(i.op) === 'counters') {
+    try { return await CC.counterCall(db, email, i, { now: o.now, key: o.key, hash }); } catch (e) { if (e instanceof CC.CounterError) throw new ReaderError(e.code, e.message); throw e; }
+  }
   const id = text(i.operationId), op = text(i.op);
   if (!/^[A-Za-z0-9_-]{1,120}$/.test(id)) throw new ReaderError('BAD_REQUEST', 'Pick a line.');
   const line = await lineOf((ref) => ref.get(), db, id), at = o.now().toISOString();

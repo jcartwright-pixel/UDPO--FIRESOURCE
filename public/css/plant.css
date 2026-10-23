@@ -30,6 +30,17 @@
 .plant-page .strip .amber b { color: #8a5a00; }
 .plant-page .strip .red { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
 .plant-page .strip .red b { color: var(--pickup); }
+/* Case counters (Joe 10/23): what the counter counted beside Cases Out / Cases In, and its line on the top strip. */
+.plant-page .strip .green { background: #e9f7ee; border-color: #9fd3b2; color: #0b5a2a; }
+.plant-page .strip .green b { color: #0b5a2a; }
+.plant-page td.lo-counted { text-align: center; line-height: 1.15; }
+.plant-page td.lo-counted b { display: block; font-size: 18px; white-space: nowrap; }
+.plant-page td.lo-counted small { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; }
+.plant-page td.lo-counted.run b, .plant-page td.lo-counted.run small { color: #0b4f8a; }
+.plant-page td.lo-counted.ok b, .plant-page td.lo-counted.ok small { color: #0b6a2f; }
+.plant-page td.lo-counted.plain small { color: var(--muted); }
+.plant-page td.lo-counted.bad { background: #fde1e1; }
+.plant-page td.lo-counted.bad b, .plant-page td.lo-counted.bad small { color: #b01c1c; }
 
 /* Loadout table. */
 .plant-page table.loadout td { height: 44px; }

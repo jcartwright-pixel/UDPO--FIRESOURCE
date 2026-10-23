@@ -49,6 +49,8 @@ export const ADMIN_GROUPS = [
     // Joe 10/15: built ready and kept Off; the drivers' mobile phones are typed on the Driver Roster.
     ['schedule-texts', 'Schedule Texts', 'Texts each driver when a new week is posted. Off until turned On here; the Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
     // Joe 10/11: RedZone's API sign-in (token, or client ID and secret), Test Connection; Products then gets Get from RedZone.
+    // Joe 10/22 (the case counter hookup guide): the palletizer's counter box, and the case returns one, read-only by the plant PC.
+    ['case-counters', 'Case Counters', 'The Palletizer and Case Returns counter boxes: brand, IP address and where the case total is, Test read, and the counter key for the plant PC. Read only: nothing is changed on the counter box.', '', 'factory'],
     ['redzone', 'RedZone', 'The RedZone API sign-in (never shown again once saved), Test Connection, and where to find it in RedZone. Read only: nothing is changed in RedZone.', 'redzone.html', 'production.webp']
   ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [

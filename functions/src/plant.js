@@ -1423,6 +1423,6 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-module.exports = { scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
+module.exports = { runAreaOf, dayLoadingNow, scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };
