@@ -537,3 +537,23 @@ test('yard checks: a check from before this load was loaded, or from an earlier 
   // History keeps the operating day of each check (Latest on the screen counts today's only).
   assert.deepEqual(R.yardHistory([old, now], '2026-10-20', at('2026-10-21T01:15:00Z')).map(h => h.date), ['2026-10-20', '2026-10-19']);
 });
+
+test('yard checks: All Trailers in Yard lists every loaded trailer until it leaves, by when it leaves, with its status (Joe 10/22)', () => {
+  const at = (s) => Date.parse(s);
+  const day = (t, disp, done) => ({ loadDate: '2026-10-22', departureDate: '2026-10-23', deliveryDate: '2026-10-23', trailer: t, dispatchTime: disp, completeTime: done, loadStatus: 'COMPLETE' });
+  const runs = [{ id: 'a', weekStart: '2026-10-18', sheetRow: 1, route: '870', run: 'COSTCO', days: { fri: day('T-921', 240, '2026-10-22T21:00:00Z') } },
+    { id: 'b', weekStart: '2026-10-18', sheetRow: 2, route: '845', run: 'I/W BALTIMORE', days: { fri: day('T-893', 120, '2026-10-22T21:10:00Z') } },
+    { id: 'c', weekStart: '2026-10-18', sheetRow: 3, route: '6303', run: 'UT WALMART', days: { fri: day('T-10314', 270, '2026-10-22T21:20:00Z') } },
+    { id: 'd', weekStart: '2026-10-18', sheetRow: 4, route: '880', run: 'VENTURA', days: { fri: day('T-888', 300, '2026-10-22T21:30:00Z') } }];
+  const now = at('2026-10-23T01:00:00Z'); // 9 PM
+  const check = { type: 'YARD_CHECK', date: '2026-10-22', recordedAt: '2026-10-23T00:30:00Z', recordedBy: 'gk@uniteddairy.com', payload: { trailer: 'T-893', temperature: '38', setPoint: '36', status: 'COMPLETE' } };
+  const g = (id, tempF, extra) => Object.assign({ id: id + '|fri', unitId: 'u', recording: true, out: '', tempF, readingAt: '2026-10-23T00:55:00Z', seenAt: '2026-10-23T00:55:00Z' }, extra);
+  const gps = { 'T-921': g('a', 53.4), 'T-10314': g('c', 36.1), 'T-888': g('d', 32, { flatSince: '2026-10-22T18:00:00Z' }) };
+  const all = R.yardAll(R.yardQueue(runs, [check], '2026-10-22', now, gps), now);
+  assert.deepEqual(all.map(x => [x.trailer, x.status.kind, x.status.text, x.status.why]), [
+    ['T-893', 'ok', 'Checked', 'Due again'], ['T-921', 'bad', 'Needs a check', 'GPS 53.4° out of range'],
+    ['T-10314', 'ok', 'GPS in range', 'No check needed'], ['T-888', 'bad', 'Needs a check', 'GPS stuck at 32°']], 'sorted by when they leave: 2, 4, 4:30 and 5 AM');
+  assert.equal(all[0].status.dueAt, '2026-10-23T02:30:00.000Z', 'due again 2 hours after its check');
+  // Once a trailer leaves (its dispatch time, or the GPS sees it out) it is not listed.
+  assert.deepEqual(R.yardAll(R.yardQueue(runs, [check], '2026-10-22', at('2026-10-23T06:10:00Z'), gps), at('2026-10-23T06:10:00Z')).map(x => x.trailer), ['T-921', 'T-10314', 'T-888'], '2:10 AM: T-893 (2 AM) has left');
+});

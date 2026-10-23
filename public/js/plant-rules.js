@@ -544,6 +544,24 @@
     covered.sort(function (a, b) { return a.index - b.index; });
     return { rows: rows, locked: locked, gps: covered };
   }
+  // Joe 10/22 (All Trailers in Yard tab): every loaded trailer on the yard until it leaves, from yardQueue() (due, checked and
+  // in range on the GPS), by when it leaves, each with its status: Checked (due again 2 hours after its check), GPS in range
+  // (no check needed) or Needs a check (with why). Look only: checks are still made on the Active Yard Queue.
+  function yardAll(q, nowMs) {
+    var list = (q.rows || []).concat(q.locked || [], q.gps || []);
+    list.sort(function (a, b) {
+      var ta = a.departureTime === null || a.departureTime === undefined ? 99999 : a.departureTime, tb = b.departureTime === null || b.departureTime === undefined ? 99999 : b.departureTime;
+      return text(a.departureDate).localeCompare(text(b.departureDate)) || ta - tb || a.index - b.index;
+    });
+    return list.map(function (x) {
+      var st;
+      if (x.locked) st = { kind: 'ok', text: 'Checked', why: 'Due again', dueAt: new Date(when(x.recordedAt) + YARD_LOCK_MINUTES * 60000).toISOString() };
+      else if (x.gpsOk) st = { kind: 'ok', text: 'GPS in range', why: 'No check needed' };
+      else st = { kind: 'bad', text: 'Needs a check', why: x.gpsStuck ? 'GPS stuck at ' + YARD_GPS_STUCK_F + '°' : x.gpsTempF !== null && x.gpsTempF !== undefined ? 'GPS ' + x.gpsTempF + '° out of range'
+        : x.recordedAt ? 'Last check over 2 hours ago' : 'Not checked yet' };
+      return Object.assign({}, x, { status: st });
+    });
+  }
   // Every yard check and Left Yard of the last 24 hours, newest first.
   function yardHistory(journal, date, nowMs) {
     return yardChecks(journal, date).filter(function (e) { var t = when(e.recordedAt); return !t || t >= nowMs - 86400000; }).map(function (e) {
@@ -1394,7 +1412,7 @@
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
-    yardQueue: yardQueue, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
+    yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
