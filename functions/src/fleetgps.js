@@ -99,7 +99,13 @@ const TEMPLATES = Object.freeze({
 // driving from the dock through Uniontown Branch on its way out was read as coming back).
 // 10/22 the Uniontown Garage (King St) too: a truck parked there for the night read as still out on its route.
 const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK', 'UNIONTOWN GARAGE'];
-const inYard = (t) => YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0;
+// Joe 10/22: "Uniontown Plant, Uniontown Garage, Uniontown Branch": every Fleet place named Uniontown ... is ours, and
+// ("Uniontown Plant should get everything") a unit standing still within NEAR_YARD_MILES of a unit at one of those places in
+// the same read is in the yard too, even when Fleet gives it only a street address. Same rule as public/js/gps-state.js.
+const NEAR_YARD_MILES = 0.15;
+const atYardPlace = (t) => { const p = String(t.place || '').trim().toUpperCase(); return YARD_PLACES.indexOf(p) >= 0 || /^UNIONTOWN\b/.test(p); };
+const yardSpots = (units) => Object.values(units || {}).filter(t => t && atYardPlace(t) && t.lat != null && t.lon != null).map(t => ({ lat: t.lat, lon: t.lon }));
+const inYard = (t, spots) => atYardPlace(t) || (t.lat != null && t.lon != null && !(t.speedMph > 3) && (spots || []).some(s => milesApart(s, t) <= NEAR_YARD_MILES));
 const TOKEN_HOURS = 23;          // Fleet keys last 24 hours; a fresh one is asked for an hour early.
 const ZONE = 'America/New_York';
 
@@ -256,13 +262,13 @@ function truckRow(r, at) {
  */
 function advanceDays(seen, trucks, at) {
   const date = nyDate(at), fresh = seen.date !== date, units = fresh ? {} : Object.assign({}, seen.units || {});
-  const changedTrucks = {}, days = {};
+  const changedTrucks = {}, days = {}, spots = yardSpots(trucks);
   Object.keys(trucks).forEach(k => {
     const t = trucks[k], u = units[k] || {}, prev = (seen.units || {})[k] || {};
     if (prev.lr !== t.lastReport || fresh) changedTrucks[k] = t;
     // Leaving and coming back to the yard (the Fleet place, read every 5 minutes): the first time today it was seen out after
     // being in the yard, and the last time it was seen back.
-    const yard = inYard(t), wasYard = u.yard === undefined ? null : u.yard;
+    const yard = inYard(t, spots), wasYard = u.yard === undefined ? null : u.yard;
     const yardOut = u.yardOut || (wasYard === true && !yard ? at : ''), yardIn = wasYard === false && yard ? at : (u.yardIn || '');
     const yardChanged = yardOut !== (u.yardOut || '') || yardIn !== (u.yardIn || '');
     if (t.odometerMiles === null) {
@@ -492,7 +498,7 @@ function runTrucks(runs) {
 /** The trips after this read: loaded = the loaded trailers on the yard now [{trailer, runDocId, day, routeRun, completedAt}],
  * units = the GPS units by trailer {trailer: {unitId, tag, place}}. Pure, for the tests. */
 function reeferTrips(prev, loaded, units, at) {
-  const trips = {}, now = Date.parse(at), was = (prev && prev.trips) || {};
+  const trips = {}, now = Date.parse(at), was = (prev && prev.trips) || {}, spots = yardSpots(units);
   Object.keys(was).forEach(k => { const t = was[k]; if (t.recording || now - Date.parse(t.stoppedAt || t.startedAt) < 2 * 86400000) trips[k] = Object.assign({}, t); });
   const listed = {};
   (loaded || []).forEach(x => {
@@ -510,7 +516,7 @@ function reeferTrips(prev, loaded, units, at) {
     const u = units[k], stop = (why) => Object.assign(t, { recording: false, stoppedAt: at, stopReason: why });
     if (u) {
       t.unitId = u.unitId || ''; t.tag = u.tag || ''; t.seenAt = u.lastReport || at;
-      const yard = inYard(u);
+      const yard = inYard(u, spots);
       if (!yard && !t.out) t.out = at;
       else if (yard && t.out) { t.back = at; return stop('BACK_IN_YARD'); }
       // Joe 10/18: out of the yard, keep where it is (Fleet's place name, such as a store, or the address) and whether it moves.
@@ -675,7 +681,7 @@ async function startHistory(db, at) {
     .filter(e => e.type === 'TRUCK' && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)))
     .map(e => byKey[truckKey(e.unit)]).filter(Boolean);
   const ids = [...new Set(units.map(t => t.unitId))].sort();
-  const yards = trucks.filter(t => inYard(t) && t.lat !== null && t.lon !== null && t.lat !== undefined).map(t => ({ lat: t.lat, lon: t.lon }));
+  const yards = trucks.filter(t => atYardPlace(t) && t.lat !== null && t.lon !== null && t.lat !== undefined).map(t => ({ lat: t.lat, lon: t.lon }));
   const days = weekDays(at), queue = [];
   days.forEach(date => { for (let i = 0; i < ids.length; i += HISTORY_UNITS) queue.push({ date, ids: ids.slice(i, i + HISTORY_UNITS) }); });
   return { startedAt: at, days, alertDays: days.slice(), queue, total: days.length + queue.length, done: 0, units: ids.length, yards: yards.slice(0, 40),

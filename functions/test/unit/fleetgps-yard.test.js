@@ -45,6 +45,21 @@ test('yard: coming back to the Uniontown Garage is a return', () => {
   assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-22T09:05:00.000Z', '2026-10-22T20:40:00.000Z']);
 });
 
+// Joe 10/22: every Fleet place named Uniontown ... is the yard, and so is standing still right next to a unit at one.
+test('yard: any Uniontown place, or standing still within 0.15 mile of a unit at one, is the yard; driving past is not', () => {
+  const at = (place, lat, lon, mph) => ({ tag: 'x', lastReport: String(Math.random()), place, lat, lon, speedMph: mph, odometerMiles: 100 });
+  let seen = {};
+  const step = (trucks, ts) => { const r = advanceDays(seen, trucks, ts); seen = r.seen; return r.days; };
+  const anchor = at('Uniontown Branch', 39.9, -79.72, 0);
+  step({ a: anchor, b: at('', 39.9, -79.72, 0), c: at('Uniontown Shop', 39.9, -79.72, 0) }, '2026-10-22T09:00:00.000Z');
+  let d = step({ a: anchor, b: at('', 39.95, -79.72, 40), c: at('', 39.95, -79.72, 40) }, '2026-10-22T09:05:00.000Z');
+  assert.equal(d['2026-10-22_b'].yardOut, '2026-10-22T09:05:00.000Z', 'standing next to the Branch counted as the yard, so this is a leave');
+  assert.equal(d['2026-10-22_c'].yardOut, '2026-10-22T09:05:00.000Z', 'any place named Uniontown ... is the yard');
+  d = step({ a: anchor, b: at('', 39.9005, -79.72, 30), c: at('', 39.90, -79.7215, 0) }, '2026-10-22T20:00:00.000Z');
+  assert.ok(!d['2026-10-22_b'] || !d['2026-10-22_b'].yardIn, 'driving past at 30 mph is not a return');
+  assert.equal(d['2026-10-22_c'].yardIn, '2026-10-22T20:00:00.000Z', 'parked about 400 feet from the Branch is a return');
+});
+
 test('alert kinds from the Fleet condition', () => {
   assert.equal(alertType({ name: 'Over 55', type: 'PostedSpeedCondition' }, {}), 'SPEEDING');
   assert.equal(alertType({ name: 'Hard stop', type: 'DiagnosticBooleanCondition' }, { TriggerName: 'HarshBraking' }), 'HARSH_BRAKING');
