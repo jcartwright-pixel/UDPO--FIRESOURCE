@@ -32,6 +32,13 @@ async function openPage(browser, width, height, url) {
   return page;
 }
 
+// Each line of a tile label (the full height of its letters, g and y included) sits inside the label and the tile, which clip.
+const LETTERS_CUT = () => [...document.querySelectorAll('.hub-tile span')].filter(x => {
+  const box = x.getBoundingClientRect(), tile = x.closest('.hub-tile').getBoundingClientRect(), r = document.createRange();
+  r.selectNodeContents(x);
+  return [...r.getClientRects()].some(l => l.top < box.top - 0.5 || l.bottom > box.bottom + 0.5 || l.top < tile.top || l.bottom > tile.bottom);
+}).map(x => x.textContent);
+
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date() });
@@ -55,10 +62,23 @@ async function openPage(browser, width, height, url) {
       assert.equal(await p.$$eval('.hub-card', d => d.length), 4, 'all four cards');
       assert.deepEqual(await p.$$eval('.hub-tile span, .hub-kpis span, .hub-big small, .hub-card-head strong', s => s.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).map(x => x.textContent)), [], 'labels 16px or larger');
       assert.deepEqual(await p.$$eval('.hub-tile span', s => s.filter(x => x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 1 || x.closest('.hub-tile').scrollHeight > x.closest('.hub-tile').clientHeight + 1).map(x => x.textContent)), [], 'tile labels show in full');
+      assert.deepEqual(await p.evaluate(LETTERS_CUT), [], 'no tile label has the bottoms or tops of its letters cut off');
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    if (!BEFORE) results.push('Fleet & Maintenance fits Joe\'s 1536x790 window and 1920x950 with no scrolling: six counts, four cards, labels 16px or larger and whole');
+    // Joe 10/23: "make these cards look a little bit bigger. You can see not all the words are going in." Tablets and phones too.
+    for (const [w, h] of [[1024, 768], [768, 1024], [390, 844]]) {
+      const p = await openPage(browser, w, h, '/maint.html?testEmail=manager.test@uniteddairy.com');
+      await p.waitForSelector('.hub-card[data-kind="GARAGE"] .hub-tile');
+      await p.waitForTimeout(500);
+      if (SHOTS) await p.screenshot({ path: path.join(SHOTS, (BEFORE ? 'before' : 'after') + '-' + w + '.png'), fullPage: true });
+      if (BEFORE) { await p.close(); continue; }
+      assert.deepEqual(await p.$$eval('.hub-tile span', s => s.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), [], w + ': tile labels 16px and whole');
+      assert.deepEqual(await p.evaluate(LETTERS_CUT), [], w + ': no tile label has its letters cut off');
+      assert.deepEqual(p.errors, []);
+      await p.close();
+    }
+    if (!BEFORE) results.push('Fleet & Maintenance fits Joe\'s 1536x790 window and 1920x950 with no scrolling: six counts, four cards, labels 16px or larger and whole, no letters cut off (also 1024, 768 and 390 wide)');
   } finally {
     await browser.close();
   }
