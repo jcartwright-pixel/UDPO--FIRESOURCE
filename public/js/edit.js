@@ -118,7 +118,8 @@ const KINDS = {
       const off = opts.date ? L.exceptionOn(lists.exceptions, d.id, opts.date) : null;
       if (off && !opts.override) return null;
       const why = !L.driverActive(d) ? d.status : off ? L.exceptionLabel(off) : '';
-      const backup = !why && opts.date && L.backupOn(lists.backups, d.id, opts.date) ? '  [BACKUP]' : '';
+      const dayNote = !why && opts.date && L.dayNoteOn(lists.backups, d.id, opts.date);
+      const backup = dayNote ? '  [' + dayNote.toUpperCase() + ']' : !why && opts.date && L.backupOn(lists.backups, d.id, opts.date) ? '  [BACKUP]' : '';
       return { id: d.id, text: d.name + (why && opts.override ? '  [' + why + ']' : '') + backup };
     }).filter(Boolean);
   } },

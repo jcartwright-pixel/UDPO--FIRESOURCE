@@ -1176,6 +1176,8 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .sched-status { font-size: 18px; font-weight: 800; color: #555f6b; }
 .sched-day.off { border-left-color: #9aa5b1; background: #f4f6f8; }
 .sched-day.none { border-left-color: #c8d0d8; }
+.sched-day.daynote { border-left-color: #1f7a8c; background: #e6f4f6; }
+.sched-day.daynote .sched-status { color: #1f5f6c; }
 .sched-day.none .sched-status { color: var(--muted); font-weight: 700; }
 .sched-day.conflict { border-left-color: #b3261e; }
 .sched-day.conflict .sched-status { color: #b3261e; }
