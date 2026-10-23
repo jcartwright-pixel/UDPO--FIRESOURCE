@@ -61,7 +61,7 @@
       document.getElementById('rows').innerHTML = rows.map((x, i) => '<tr data-name="' + escapeHtml(x.assignment) + '"' + (edit ? ' data-drag="' + escapeHtml(x.assignment) + '" tabindex="0"' : '') + ' class="' + (x.active === false ? 'off' : '') + '"><td class="strong">' + escapeHtml(x.assignment) + '</td>' +
         '<td><button type="button" class="toggle' + (x.active === false ? '' : ' on') + '" data-active aria-pressed="' + (x.active !== false) + '" aria-label="' + escapeHtml(x.assignment) + ' active"' + dis + '>' + (x.active === false ? 'NO' : 'YES') + '</button></td>' +
         '<td class="ops-seq">' + (i + 1) + '</td><td class="muted">' + escapeHtml(when(x)) + '</td></tr>').join('') +
-        (adding ? '<tr class="adding"><td><input id="new-name" maxlength="60" aria-label="New assignment name" placeholder="Name, for example Beckley"></td><td colspan="2"><button type="button" class="primary" id="new-save">Save</button> <button type="button" id="new-cancel">Cancel</button></td><td></td></tr>' : '');
+        (adding ? '<tr class="adding"><td><input id="new-name" maxlength="60" aria-label="New assignment name" placeholder="Name, for example Beckley"></td><td colspan="2"><button type="button" class="primary" id="new-save">Add</button> <button type="button" id="new-cancel">Cancel</button></td><td></td></tr>' : '');
       if (adding) { const box = document.getElementById('new-name'); box.value = typed; if (!typing || hadFocus) box.focus(); }
     }
     function put(x, change) {

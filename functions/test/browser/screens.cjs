@@ -615,10 +615,13 @@ async function noScroll(page) {
     await roster.fill('#d-name', 'Casey, Leigh');
     await roster.check('#d-relief');
     await roster.fill('#d-seniority', '2025-11-15');
-    await roster.click('#d-save');
+    // Batch 5: an existing driver has no Save Driver button; each box saves when it is left.
+    assert.equal(await roster.$('#d-save'), null, 'no Save Driver button on an existing driver');
+    await roster.press('#d-seniority', 'Tab');
     assert.match(await roster.textContent('#rows tr[data-id="drv_test_casey"] td.name'), /CASEY, LEIGH\s*RELIEF/, 'shown at once');
     const casey = async () => (await db().collection('drivers').doc('drv_test_casey').get()).data();
-    for (let i = 0; i < 50 && (await casey()).name !== 'CASEY, LEIGH'; i++) await roster.waitForTimeout(100);
+    // Each box saves in turn, so wait for the last one (the seniority date).
+    for (let i = 0; i < 100 && (await casey()).seniorityDate !== '2025-11-15'; i++) await roster.waitForTimeout(100);
     assert.equal((await casey()).name, 'CASEY, LEIGH');
     assert.equal((await casey()).reliefDriver, true);
     assert.equal((await casey()).seniorityDate, '2025-11-15');
@@ -631,6 +634,7 @@ async function noScroll(page) {
     await roster.fill('#d-hire', '2019-04-01');
     await roster.fill('#d-seniority', '2019-04-01');
     await roster.fill('#d-truck', '900002');
+    assert.equal(await roster.textContent('#d-save'), 'Add Driver');
     await roster.click('#d-save');
     await roster.waitForFunction(() => [...document.querySelectorAll('#rows td.name')].some(td => td.textContent === 'EVANS, KIM'));
     const kim = async () => (await db().collection('drivers').where('name', '==', 'EVANS, KIM').get()).docs.map(d => d.data())[0];
@@ -910,7 +914,9 @@ async function noScroll(page) {
     await otr.waitForSelector('[data-col-remove]', { timeout: 5000 });
     await otr.click('[data-miles="run_t801"]');
     await otr.fill('[data-miles-in="run_t801"]', '412');
-    await otr.click('[data-miles-save="run_t801"]');
+    // Batch 5: no Save button; the miles save when the box is left.
+    assert.equal(await otr.$('[data-miles-save]'), null, 'no Save button by the miles');
+    await otr.press('[data-miles-in="run_t801"]', 'Tab');
     // The routes table is drawn again after the save, so the button can be missing for a moment: wait until it is back with 412.
     await otr.waitForFunction(() => (document.querySelector('[data-miles="run_t801"]') || {}).textContent === '412', null, { timeout: 5000 });
     const otrMore = await otr.evaluate(async () => {
@@ -934,8 +940,14 @@ async function noScroll(page) {
     // The By Date Columns box stays open from before; the button opens or closes it.
     await otr.waitForSelector('#otr-cols');
     if (!(await otr.$('.otr-cols'))) await otr.click('#otr-cols');
+    // A rename saves when its box is left (batch 5: no Save button).
+    await otr.click('[data-col-rename]');
+    assert.equal(await otr.$('[data-col-save]'), null, 'no Save button by the new name');
+    await otr.fill('[data-rename]', 'Darden Foods');
+    await otr.press('[data-rename]', 'Tab');
+    await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden Foods'), null, { timeout: 5000 });
     await otr.click('[data-col-remove]');
-    await otr.waitForFunction(() => ![...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
+    await otr.waitForFunction(() => ![...document.querySelectorAll('[data-col="run_t801"] option')].some(o => /^Darden/.test(o.value)), null, { timeout: 5000 });
     assert.deepEqual(otr.errors, []);
     await otr.close();
     results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open; Darden column added and removed; 801 miles fixed to 412');

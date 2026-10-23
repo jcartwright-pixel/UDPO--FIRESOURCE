@@ -181,7 +181,7 @@
         (r ? '<div class="panel-facts"><span>Seniority: <b>' + years(r.seniorityDate) + '</b></span><span>Vacation: <b>' + r.vacationWeeks + ' wks</b></span></div>' : '') +
         '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
         (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
-        '<div class="panel-actions">' + (r && r.active ? '<button id="d-remove" class="danger" type="button">Remove</button>' : '') + '<button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Save Driver</button></div>' +
+        '<div class="panel-actions">' + (r && r.active ? '<button id="d-remove" class="danger" type="button">Remove</button>' : '') + (r ? '<button id="d-cancel" type="button">Close</button>' : '<button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Add Driver</button>') + '</div>' +
         (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA <a href="scorecard.html?tab=incidents">See all</a></h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
       incForm = '';
       render();
@@ -198,7 +198,9 @@
           () => Object.assign(d, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' }),
           () => Object.assign(d, { status: before.status, unavailableReason: before.reason }), render);
       };
-      document.getElementById('d-save').onclick = () => {
+      // Batch 5 (10/23): an existing driver has no Save Driver button; each box saves when it is left and Relief when it is ticked.
+      // A new driver keeps its one Add Driver button.
+      const read = () => {
         const fields = {
           name: document.getElementById('d-name').value.trim(), hireDate: document.getElementById('d-hire').value,
           seniorityDate: document.getElementById('d-seniority').value, truck: document.getElementById('d-truck').value.trim().toUpperCase(),
@@ -209,9 +211,29 @@
         if (!fields.name) { showError('Type the driver\'s name.'); document.getElementById('d-name').focus(); return; }
         if (fields.truck && !truck) { showError(fields.truck + ' is not a truck in Equipment Master. Pick one from the list or leave it blank.'); document.getElementById('d-truck').focus(); return; }
         showError('');
-        const values = { name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief };
+        return { fields, values: { name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief } };
+      };
+      if (r) {
+        document.getElementById('panel').onchange = (ev) => {
+          if (!ev.target.closest('#d-name, #d-hire, #d-seniority, #d-truck, #d-relief')) return;
+          const got = read(), d = drivers.find(x => x.id === r.id);
+          if (!got || !d) return;
+          if (Object.keys(got.values).every(k => String(d[k] == null ? '' : d[k]) === String(got.values[k]))) return;
+          // One save after another, each with every box, so a slower earlier save never lands after a later one.
+          // The change shows at once; a refused save puts back what was there before it.
+          const before = {};
+          Object.keys(got.values).forEach(k => { before[k] = d[k]; });
+          Object.assign(d, got.values); render();
+          driverSaving = driverSaving.then(() => saveOptimistic('saveDriver', Object.assign({ driverId: r.id }, got.fields), () => Object.assign(d, got.values), () => Object.assign(d, before), render).then(liveWarn)).catch(() => {});
+        };
+        return;
+      }
+      document.getElementById('panel').onchange = null;
+      document.getElementById('d-save').onclick = () => {
+        const got = read();
+        if (!got) return;
+        const { fields, values } = got;
         closePanel();
-        if (r) return change(r.id, 'saveDriver', Object.assign({ driverId: r.id }, fields), values);
         // A new driver shows at once; the live list replaces it with the saved one.
         const temp = Object.assign({ id: 'new-' + Date.now(), status: 'ACTIVE' }, values);
         saveOptimistic('saveDriver', fields, () => drivers.push(temp), () => { drivers = drivers.filter(x => x !== temp); }, render)
@@ -242,7 +264,7 @@
           '<label>Reason<input id="i-reason" type="text" list="i-reasons" maxlength="120" placeholder="Attendance, safety\u2026"></label>' +
           '<datalist id="i-reasons"><option value="Attendance"><option value="Safety"><option value="Late to dispatch"><option value="Paperwork"><option value="Conduct"><option value="Other"></datalist>' +
           '<label>Note<textarea id="i-note" maxlength="500"></textarea></label><p class="hint">A PDA is a manager\'s decision: it counts on the scorecard from the day it is entered.</p>' +
-          '<div class="panel-actions"><button type="button" id="i-cancel">Cancel</button><button type="button" class="primary" id="i-save">Save</button></div></div>';
+          '<div class="panel-actions"><button type="button" id="i-cancel">Cancel</button><button type="button" class="primary" id="i-save">Add PDA</button></div></div>';
         document.getElementById('i-cancel').onclick = () => { incForm = ''; box.innerHTML = ''; };
         document.getElementById('i-save').onclick = async () => {
           const v = (id) => document.getElementById(id).value.trim();
@@ -265,7 +287,7 @@
             '<label>Type<input id="i-type" type="text" list="i-types" maxlength="80" placeholder="Late delivery, damaged product\u2026"></label>' +
             '<datalist id="i-types"><option value="Late delivery"><option value="Damaged product"><option value="Wrong product"><option value="Short order"><option value="Driver conduct"><option value="Other"></datalist>') +
         '<label>Note<textarea id="i-note" maxlength="500"></textarea></label><p class="hint">Starts as Under review: it counts on the scorecard only once a manager marks it Reviewed \u2013 counts.</p>' +
-        '<div class="panel-actions"><button type="button" id="i-cancel">Cancel</button><button type="button" class="primary" id="i-save">Save</button></div></div>';
+        '<div class="panel-actions"><button type="button" id="i-cancel">Cancel</button><button type="button" class="primary" id="i-save">' + (acc ? 'Add Accident' : 'Add Complaint') + '</button></div></div>';
       document.getElementById('i-cancel').onclick = () => { incForm = ''; box.innerHTML = ''; };
       document.getElementById('i-save').onclick = async () => {
         const v = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -280,6 +302,7 @@
     }
     // Any truck on Equipment Master that is not INACTIVE (a down truck can still be someone's assigned truck), as the server allows.
     const findTruck = (unit) => unit ? lists.fleetTrucks.find(t => String(t.unit).toUpperCase() === unit && String(t.status).toUpperCase() !== 'INACTIVE') : null;
+    let driverSaving = Promise.resolve();
     function closePanel() { panelOpen = false; editingId = null; render(); }
     window.udBack = () => { if (!panelOpen) return false; closePanel(); return true; };
 
