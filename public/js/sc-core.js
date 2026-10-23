@@ -153,8 +153,7 @@ function scGrade_(score, s) { return score >= s.gradeA ? 'A' : score >= s.gradeB
 // ---------- one day ----------
 /**
  * One record per run a driver drove that day.
- * liveRows: [{runId, route, run, runs, driver, driverId, casesOut, plantCaseReturn, driverCaseReturn, phoneCheckin}] (that day's columns of the Live week;
- * phoneCheckin: the driver checked in on the phone, which counts as the inspection).
+ * liveRows: [{runId, route, run, runs, driver, driverId, casesOut, plantCaseReturn, driverCaseReturn}] (that day's columns of the Live week).
  * events: that day's PLANT_OPERATIONS events [{eventType, payload:{route, run, checks}}].
  * milesByRun: {runId: miles} from Route Master for that weekday.
  * who (optional, Joe 10/14: only our drivers, only on days they worked): {known: {driverKey: name} from Driver Master, so a
@@ -186,16 +185,17 @@ function scBuildDay_(dateKey, liveRows, events, milesByRun, who) {
       run: String(r.run || '').trim(), runId: String(r.runId || '').trim(), checkedIn: !!checkins[k], inspected: insp.done, defect: insp.defect,
       casesOut: scNum_(r.casesOut), casesIn: casesIn, miles: scNum_((milesByRun || {})[r.runId]) || 0,
       truck: String(r.truck == null ? '' : r.truck).trim(), startTime: String(r.startTime == null ? '' : r.startTime).trim(),
-      dispatchMinutes: scMinutesOf_(r.dispatchTime), routeHours: scHoursOf_(r.routeHours), sleeper: scTruthy_(r.sleeper),
-      phoneCheckin: scTruthy_(r.phoneCheckin)});
+      dispatchMinutes: scMinutesOf_(r.dispatchTime), routeHours: scHoursOf_(r.routeHours), sleeper: scTruthy_(r.sleeper)});
   });
   // Joe 10/23: one check-in a day is enough, in the app or by the answering-service email, so a driver who drove two runs that
-  // day and checked in once is checked in on both. A check-in made on the phone counts as the day's inspection.
-  var dayIn = {}, dayPhone = {};
-  out.forEach(function (d) { if (d.checkedIn) dayIn[d.driverKey] = true; if (d.phoneCheckin) dayPhone[d.driverKey] = true; });
+  // day and checked in once is checked in on both. The check-in (phone or email: both ask about the pre-trip) counts as the
+  // day's inspection; a DVIR still counts on its own.
+  var dayIn = {};
+  out.forEach(function (d) { if (d.checkedIn) dayIn[d.driverKey] = true; });
   out.forEach(function (d) {
-    if (dayIn[d.driverKey]) d.checkedIn = true;
-    if (dayPhone[d.driverKey] && !d.inspected) d.inspected = true;
+    if (!dayIn[d.driverKey]) return;
+    d.checkedIn = true;
+    d.inspected = true;
   });
   return out;
 }
