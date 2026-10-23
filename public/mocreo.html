@@ -241,12 +241,13 @@
       if (!tr) return;
       const sid = tr.dataset.sensor, pick = e.target.value, all = list();
       const name = (sensors.find(x => x.sensorId === sid) || {}).name || sid;
-      note = 'Saving…'; e.target.blur(); render();
+      note = ''; e.target.blur(); render();
       let ok = true;
       for (const l of all.filter(l => l.sensorId === sid && l.locationId !== pick)) ok = !!(await onSensor(l, '')) && ok;
       const to = all.find(l => l.locationId === pick);
       if (to) ok = !!(await onSensor(to, sid)) && ok;
-      note = ok ? (to ? to.location + ' is on ' + name : name + ' is on no location') + ', saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : 'Not saved.';
+      // Audit batch 4 (Joe's rule: no save messages): only a save that failed says so.
+      note = ok ? '' : 'Not saved.';
       render();
     });
     // Each box saves as it is left: the whole row goes, so the server keeps one record per thermometer.
@@ -258,12 +259,12 @@
         lowLimit: v('lowLimit').value, highLimit: v('highLimit').value, active: v('active').checked };
       if (!row.location.trim()) { note = tr.dataset.id ? 'A thermometer needs a location name; not saved.' : 'Type the location name first.'; render(); return; }
       if (row.locationId) sent[row.locationId] = { at: Date.now(), row: Object.assign({}, row, { lowLimit: row.lowLimit.trim() === '' ? '' : Number(row.lowLimit), highLimit: row.highLimit.trim() === '' ? '' : Number(row.highLimit), removed: false }) };
-      note = 'Saving…'; render();
+      note = ''; render();
       // Saves go one at a time, so a later box always wins.
       const run = busy.then(() => call(row));
       busy = run.catch(() => {});
       const r = await run;
-      if (r) { if (!tr.dataset.id) { draft = null; tr.dataset.id = r.location.locationId; sent[r.location.locationId] = { at: Date.now(), row: r.location }; } note = (row.location + ' saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })); }
+      if (r) { if (!tr.dataset.id) { draft = null; tr.dataset.id = r.location.locationId; sent[r.location.locationId] = { at: Date.now(), row: r.location }; } note = ''; }
       else { note = 'Not saved.'; delete sent[row.locationId]; }
       render();
     });

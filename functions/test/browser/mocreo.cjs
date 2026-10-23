@@ -75,7 +75,11 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
       [['Dock freezer sensor', 0, ''], ['Walk-in sensor A', 0, '']]);
     const coolerNorth = await page.getAttribute(row('Cooler North'), 'data-id');
     await page.selectOption('#srows tr[data-sensor="S1"] select', coolerNorth);
-    await page.waitForFunction(() => /saved/.test(document.getElementById('foot').textContent));
+    // Audit batch 4 (Joe's rule: no save messages): the pick saves quietly.
+    const locOf = async (id) => (await db().collection('tempLocations').doc(id).get()).data() || {};
+    for (let i = 0; i < 40 && (await locOf(coolerNorth)).sensorId !== 'S1'; i++) await page.waitForTimeout(250);
+    assert.equal((await locOf(coolerNorth)).sensorId, 'S1', 'Cooler North is on Walk-in sensor A');
+    assert.doesNotMatch(await page.textContent('#foot'), /saved|Saving/i);
     await page.click('#add');
     await page.fill('#rows tr:first-child input[data-k="location"]', 'Freezer 2');
     await page.press('#rows tr:first-child input[data-k="location"]', 'Tab');
@@ -83,11 +87,15 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     // Joe 10/17: one Location column; the Cooler / Area box that repeated it is gone.
     assert.deepEqual(await page.$$eval('.mc-table:not(.mc-sensors) th', t => t.map(x => x.textContent)), ['Location', 'Sensor', 'Now', 'Low °F', 'High °F', 'On', '']);
     await page.selectOption('#srows tr[data-sensor="S2"] select', await page.getAttribute(row('Freezer 2'), 'data-id'));
-    await page.waitForFunction(() => /Freezer 2 is on Dock freezer sensor/.test(document.getElementById('foot').textContent), null, { timeout: 8000 });
+    const freezer2 = await page.getAttribute(row('Freezer 2'), 'data-id');
+    for (let i = 0; i < 40 && (await locOf(freezer2)).sensorId !== 'S2'; i++) await page.waitForTimeout(250);
+    assert.equal((await locOf(freezer2)).sensorId, 'S2', 'Freezer 2 is on Dock freezer sensor');
     await page.fill(row('Freezer 2') + ' input[data-k="highLimit"]', '0');
     await page.press(row('Freezer 2') + ' input[data-k="highLimit"]', 'Tab');
     await page.uncheck(row('Cooler Middle') + ' input[data-k="active"]');
-    await page.waitForFunction(() => /Cooler Middle saved/.test(document.getElementById('foot').textContent), null, { timeout: 8000 });
+    const coolerMiddle = await page.getAttribute(row('Cooler Middle'), 'data-id');
+    for (let i = 0; i < 40 && (await locOf(coolerMiddle)).active !== false; i++) await page.waitForTimeout(250);
+    assert.equal((await locOf(coolerMiddle)).active, false, 'Cooler Middle saved as off');
     await page.click('.head h1');
     await page.waitForFunction(() => /2\.1°F/.test(document.querySelector('#rows').textContent) && /36\.4°F/.test(document.querySelector('#rows').textContent));
     assert.equal(await page.inputValue(row('Freezer 2') + ' input[data-k="highLimit"]'), '0', 'each box keeps what was typed');
@@ -144,7 +152,7 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     // A location goes on one sensor only: picking Cooler North for "Main Center" moves it off "Main North", and Cooler Middle,
     // which was on "Main Center", goes to manual.
     await page.selectOption('#srows tr[data-sensor="S4"] select', 'ut_temp_cooler_north');
-    await page.waitForFunction(() => /Cooler North is on Main Center/.test(document.getElementById('foot').textContent), null, { timeout: 10000 });
+    for (let i = 0; i < 40 && ((await locOf('ut_temp_cooler_north')).sensorId !== 'S4' || (await locOf('ut_temp_cooler_middle')).sensorId !== ''); i++) await page.waitForTimeout(250);
     const moved = {};
     for (const id of ['ut_temp_cooler_north', 'ut_temp_cooler_middle']) moved[id] = (await db().collection('tempLocations').doc(id).get()).data().sensorId;
     assert.deepEqual(moved, { ut_temp_cooler_north: 'S4', ut_temp_cooler_middle: '' });

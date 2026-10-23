@@ -32,6 +32,5 @@ export function fillIn(action, save, id) {
 
 const at = (v) => { const t = typeof v === 'number' ? v : Date.parse(v || ''); return isFinite(t) && t ? shortTime(t) : ''; };
 export const clockOf = at;
-export const savedText = () => 'Saved ' + at(Date.now());
 // True when a record belongs to the round that started at roundStart.
 export const inRound = (recordedAt, roundStart) => { const t = Date.parse(recordedAt || ''), r = Date.parse(roundStart || ''); return isFinite(t) && (!isFinite(r) || t > r); };

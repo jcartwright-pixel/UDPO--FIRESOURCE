@@ -64,7 +64,7 @@
   <script type="module">
     import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
-    import { fillIn, savedText, watchRound, clockOf } from './js/autosave.js';
+    import { fillIn, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
     import { nowMinutes } from './js/plant-core.js';
 
@@ -302,14 +302,10 @@
       const values = Object.assign({ Entry: note, Type: 'REVIEW', ParentId: id }, up || {}), mine = record(values, { followUpStatus: status });
       pending.push(mine);
       render();
-      const ok = document.getElementById('saved');
       try {
         const done = await save('saveShiftNote', { values, notes: '', readingTime: clockNow(), followUpStatus: status });
         if (done && done.entryId) { mine.payload.entryId = done.entryId; render(); }
         showError('');
-        ok.textContent = savedText() + ' · review on ' + (document.querySelector('[data-entry="' + CSS.escape(id) + '"] strong') || { textContent: 'the entry' }).textContent.split(' · ').slice(1).join(' · ');
-        ok.hidden = false;
-        setTimeout(() => { ok.hidden = true; }, 2500);
         setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0) pending.splice(i, 1); render(); }, 20000);
       } catch (e) {
         const i = pending.indexOf(mine);
@@ -384,7 +380,7 @@
       mine.status = fields.followUpStatus;
       if (!mine0) { cur.mine = mine; pending.push(mine); }
       const last = document.getElementById('form-last');
-      last.textContent = 'Saving…'; last.classList.remove('bad', 'done');
+      last.textContent = ''; last.classList.remove('bad', 'done');
       render();
       try {
         const done = await cur.fill.send(fields);
@@ -392,7 +388,7 @@
         if (done && done.shift) mine.payload.shift = done.shift;
         showError('');
         if (!mine0 && values.Type === 'Maintenance Request') writeDraft(null);
-        if (entry === cur) { last.textContent = '✓ ' + (sendNow ? 'Sent to maintenance ' + clockOf(Date.now()) : savedText() + ' · on the log'); last.classList.add('done'); document.getElementById('another').hidden = false; }
+        if (entry === cur) { last.textContent = '✓ ' + (sendNow ? 'Sent to maintenance ' + clockOf(Date.now()) : 'On the log ' + clockOf(Date.now())); last.classList.add('done'); document.getElementById('another').hidden = false; }
         sendRow();
         render();
         setTimeout(() => { const i = pending.indexOf(mine); if (i >= 0 && journal.some(d => d.recordId === mine.payload.entryId)) { pending.splice(i, 1); render(); } }, 20000);

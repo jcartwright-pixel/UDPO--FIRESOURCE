@@ -56,7 +56,7 @@
         row('Other CVG / Carriers', cvg || 'none active') + row('Leased trucks', 'Not on Fleet Service; their write-ups go to the lessor');
       document.getElementById('data').innerHTML = row('Saves', app.mode === 'live' ? 'Kept in Operations' : 'Test copy: saves stay in Operations') +
         row('Writing to the sheets', !wb ? 'Off' : paused ? 'Paused: saves wait and are written when it is resumed in Administration' : 'On: each save is written to the Google sheets') +
-        row('Fleet list', 'Read each night at 2 AM from the United Dairy Fleet List (read only)') + row('Route Master and Live weeks', 'Kept in Operations and written to the sheets; Sheet Conflicts shows anything that needs a look');
+        row('Fleet list', 'Read each night at 2 AM from the United Dairy Fleet List (read only)') + row('Route Master and Live weeks', 'Kept in Operations and in the sheets: a save here is written to the sheets, and a change typed into a sheet is copied in within a minute; Sheet Conflicts shows anything that needs a look');
     }
     requireSignIn(async (user) => { watchLists(user, render); render(); });
   </script>

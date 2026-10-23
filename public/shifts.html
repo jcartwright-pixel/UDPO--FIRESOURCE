@@ -82,7 +82,7 @@
         if (dirty) return;
         const d = s.exists() ? s.data() : null;
         rows = R.shiftsFor(d, plant, 'ALL').map(x => ({ name: x.name, side: x.side, start: x.start.padStart(5, '0'), end: x.end.padStart(5, '0') }));
-        document.getElementById('last').textContent = d && d.updatedAt ? 'Saved ' + dateTimeText(d.updatedAt) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
+        document.getElementById('last').textContent = d && d.updatedAt ? 'Last changed ' + dateTimeText(d.updatedAt) + ' by ' + (d.updatedBy || '') : 'Starting shifts (not changed yet)';
         draw();
       }, e => showError('Could not read the shifts: ' + e.message));
     }
@@ -98,9 +98,9 @@
       const run = chain.then(async () => {
         const ok = document.getElementById('saved');
         try {
-          const res = await save('savePlantShifts', { facilityId: plant, shifts });
+          await save('savePlantShifts', { facilityId: plant, shifts });
           showError('');
-          ok.textContent = (res && res.message) || 'Shifts saved.'; ok.hidden = false; setTimeout(() => { if (edits === mine) ok.hidden = true; }, 6000);
+          ok.hidden = true; // audit batch 4 (Joe's rule: no save messages)
           // Only the last change's save lets the database's list back in; an earlier one would undo a later box.
           if (edits === mine) { dirty = false; watch(); }
         } catch (err) { showError(err.message || String(err)); }

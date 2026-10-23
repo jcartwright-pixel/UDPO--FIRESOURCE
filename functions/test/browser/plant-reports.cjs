@@ -198,9 +198,12 @@ async function seed() {
     assert.equal(await ps.$('#save'), null, 'no Save Shifts button');
     assert.equal(await ps.textContent('#plant-name'), 'Uniontown');
     await ps.press(last + 'input[data-k="end"]', 'Tab');
-    await ps.waitForFunction(() => /4 shifts saved/.test(document.getElementById('saved').textContent));
+    // Audit batch 4 (Joe's rule: no save messages): the list saves quietly.
+    for (let i = 0; i < 40 && ((((await db().collection('plantShifts').doc('fac_uniontown').get()).data() || {}).shifts || []).length !== 4); i++) await ps.waitForTimeout(250);
+    assert.equal(((await db().collection('plantShifts').doc('fac_uniontown').get()).data().shifts || []).length, 4, 'the four shifts saved');
+    assert.equal(await ps.isVisible('#saved'), false, 'no save message');
     await ps.reload();
-    await ps.waitForFunction(() => document.querySelectorAll('#rows tr[data-i]').length === 4 && /Saved/.test(document.getElementById('last').textContent));
+    await ps.waitForFunction(() => document.querySelectorAll('#rows tr[data-i]').length === 4 && /Last changed/.test(document.getElementById('last').textContent));
     assert.deepEqual(await ps.$$eval('#rows select[data-k="side"]', s => s.map(x => x.value)), ['DISTRIBUTION', 'DISTRIBUTION', 'DISTRIBUTION', 'PRODUCTION']);
     assert.deepEqual(ps.errors, []);
     await ps.close();
