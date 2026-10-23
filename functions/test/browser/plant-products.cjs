@@ -180,7 +180,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await waitDoc('plantProducts', 'ut_prod_boxing', d => !d.products.some(p => p.name === 'GV 2% Gallon'));
     await admin.waitForFunction(() => document.querySelectorAll('#edit-machines .pm-speeds tbody th').length === 2);
     await admin.click('#edit-machines [data-eck="ut_prod_boxing"]');
-    await waitDoc('plantProducts', 'ut_prod_boxing', d => d.products.some(p => p.name === 'GV 2% Gallon'));
+    await waitDoc('plantProducts', 'ut_prod_boxing', d => (d.products || []).some(p => p.name === 'GV 2% Gallon'));
     await admin.fill('#edit-machines input[data-n="targetPct"][data-area="ut_prod_boxing"]', '60');
     await admin.click('#edit-title');
     await waitDoc('plantProducts', 'ut_prod_boxing', d => d.products.find(p => p.name === 'GV 2% Gallon').targetPct === 60);
@@ -204,7 +204,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.click('#edit-title');
     let added = (await waitDoc('productSheet', 'fac_uniontown', d => (d.products || []).some(p => p.name === 'UD Whole Milk Tote' && p.mfgType === 'Bag in Box' && p.sku === '999001'))).products;
     await admin.click('#edit-machines [data-eck="ut_prod_totes"]');
-    await waitDoc('plantProducts', 'ut_prod_totes', d => d.products.some(p => p.name === 'UD Whole Milk Tote'));
+    await waitDoc('plantProducts', 'ut_prod_totes', d => (d.products || []).some(p => p.name === 'UD Whole Milk Tote'));
     await admin.click('#edit-close');
     await admin.waitForFunction(() => document.querySelector('#area option[value="ut_prod_totes"]').textContent === 'TOTES (2)');
     // Group filter, find, and a SKU on two products marked to check.
