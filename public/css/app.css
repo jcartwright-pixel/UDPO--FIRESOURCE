@@ -157,6 +157,9 @@ td.name { font-weight: 800; }
 td small { color: var(--muted); font-weight: 500; }
 .chip { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; background: var(--pill-warn-bg); color: var(--pill-warn-ink); font-size: 16px; font-weight: 800; vertical-align: middle; }
 tr.off td { background: #fff8e6 !important; color: #7a8797; }
+/* Joe 10/23: a Plant Scheduler load on a day its run does not run (Daily Dispatch), shown until RUNS turns the day on. */
+tr.plant-only td { background: #f3ecff !important; color: #4b2a91; font-weight: 700; }
+tr.plant-only td:first-child { box-shadow: inset 4px 0 0 #7c3aed; }
 tr.editing td { background: #e4efff !important; }
 span.status { display: inline-block; padding: 0 10px; border-radius: 12px; background: #dcf3e4; color: #11703a; font-size: var(--font); }
 span.status.off { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }

@@ -257,6 +257,17 @@ async function noScroll(page) {
     // Plant Load: 801 does not run Thursdays, but the plant scheduler has a load for it on 10/8, so the day needs a driver.
     const thu801 = 'xpath=//tr[td[1][text()="801"]]/td[@data-day="thu"]';
     assert.deepEqual(await wkEdit.$eval(thu801, td => [td.classList.contains('c-plant'), td.classList.contains('plant-load'), td.textContent, /pickup 7:00 AM, T-902, PO 4411/.test(td.title)]), [true, true, 'PLANT LOAD', true]);
+    // Joe 10/23 (849 Sun Valley Friday): 802 does not run Saturdays, but the Scheduler has a carrier pickup for it on 10/10, so
+    // the day shows CARRIER (from the Scheduler, outlined) and is not counted as needing a driver.
+    const sat802 = 'xpath=//tr[td[1][text()="802"]]/td[@data-day="sat"]', pickupRef = db().collection('plantJournal').doc('PLANT_SCHEDULE_app_carrier_802');
+    assert.equal(await wkEdit.$eval(sat802, td => td.classList.contains('off')), true, '802 does not run Saturdays');
+    await pickupRef.set({ recordId: 'carrier_802', type: 'PLANT_SCHEDULE', date: '2026-10-10', status: 'SCHEDULED', routeId: 'rte_t802', runId: 'run_t802', route: '802', run: 'UT DSD MILK',
+      area: 'SCHEDULER', createdInApp: true, recordedAt: '2026-10-09T12:00:00Z', payload: { scheduleType: 'CARRIER', carrier: true, pickupTime: '16:00', loadDate: '2026-10-09', poNumber: '46020', trailer: 'T-922' } });
+    await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[8]; return td.classList.contains('c-carrier'); }, null, { timeout: 5000 });
+    assert.deepEqual(await wkEdit.$eval(sat802, td => [td.classList.contains('c-carrier'), td.classList.contains('plant-load'), td.textContent, /PO 46020/.test(td.title)]), [true, true, 'CARRIER', true]);
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-carrier-pickup-1920.png') });
+    await pickupRef.delete();
+    await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[8].classList.contains('off'), null, { timeout: 5000 });
     // Joe 10/13 (836 PECK): a plant load can be marked Not running (the day goes black) and put back to PLANT LOAD.
     await wkEdit.click(thu801);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', '__OFF__');
@@ -273,11 +284,23 @@ async function noScroll(page) {
     await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-plant-load-1920.png') });
+    // The grid shows ADAMS at once; leave the page only once both saves (day on, then the driver) are stored.
+    for (let i = 0; i < 50; i++) {
+      const thu = (await db().collection('runs').doc('2026-10-04__run_t801').get()).data().days.thu;
+      if (thu.runs === true && thu.driverId === 'drv_test_adams') break;
+      await new Promise(r => setTimeout(r, 200));
+    }
     // Route Run Days opens Route Week Override at this week (as in the current app); 802 Thursday turned on there needs a driver here.
     await Promise.all([wkEdit.waitForURL(/routeweek\.html\?week=2026-10-04/), wkEdit.click('#run-days')]);
     await wkEdit.click('xpath=//tbody[@id="rows"]/tr[td[1][text()="802"]]/td[2+5]/button');
     await wkEdit.waitForFunction(() => /RUNS/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent) && !/NOT/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
+    // Go back once the Thursday is stored (the box shows RUNS before the save comes back).
+    let thu802 = {};
+    for (let i = 0; i < 50 && thu802.runs !== true; i++) {
+      thu802 = (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.thu;
+      if (thu802.runs !== true) await new Promise(r => setTimeout(r, 200));
+    }
     await wkEdit.goBack();
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 8000 });
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
