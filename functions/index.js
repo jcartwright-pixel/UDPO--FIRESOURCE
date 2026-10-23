@@ -46,7 +46,7 @@ const { applyAction, checkSaves, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
 const FAILS = require('./src/fails');
 const { garageCall } = require('./src/garage');
-const { setSwitch, SwitchError } = require('./src/switch');
+const { setSwitch, SwitchError, sheetsPaused } = require('./src/switch');
 const { gpsCall, GpsError } = require('./src/gps');
 const SMS = require('./src/sms');
 const FLEETGPS = require('./src/fleetgps');
@@ -310,6 +310,8 @@ async function writeBackIfOn(part) {
   if (!process.env.WRITEBACK_JSON || process.env.DEMO_DATA === '1') return null;
   const config = (await db.collection('config').doc('app').get()).data() || {};
   const target = JSON.parse(process.env.WRITEBACK_JSON);
+  // Pause writing to the sheets (audit batch 2): the saves wait in the outbox, in order, until Resume.
+  if (sheetsPaused(config)) return null;
   // With the switch off, only People & Roles saves go out, and only to the sandbox's Users sheet copy (admin.js usersCopy).
   if (!config.writeBack || config.writeBack.enabled !== true) {
     if (part === 'live' || realLive() || !ADMIN.usersCopy(process.env)) return null;

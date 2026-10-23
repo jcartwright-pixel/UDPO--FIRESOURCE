@@ -42,7 +42,7 @@ test('only an administrator flips the switch, and a screen needs the write-back 
   assert.equal(out.screenOwners.dailyDispatch, 'new');
   assert.equal((await config()).writeBack.enabled, true);
   // The write-back stays on while any screen belongs to the new app.
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /Switch every screen off/);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /press Pause writing to the sheets/);
   const log = await db().collection('actions').where('action', '==', 'switchScreen').get();
   assert.equal(log.size, 1);
   assert.equal(log.docs[0].data().before.screenOwners.dailyDispatch, 'old');
@@ -55,9 +55,38 @@ test('once a screen is on the new app, only that screen saves there; the others 
   assert.equal(ok.ok, true);
   assert.equal((await db().collection('actions').doc(ok.requestId).get()).data().mode, 'live');
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick), /Weekly Dispatch is view only until it is switched on in Administration > Go-Live Switches/);
-  // Moving it back makes every screen a test copy again.
-  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
-  await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick);
+  // Audit batch 2: a screen that is on stays on, so its saves are never turned into view only.
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true), /Daily Dispatch stays on so it keeps saving/);
+  assert.equal((await config()).screenOwners.dailyDispatch, 'new');
+  assert.equal((await applyAction(db(), DISPATCHER, assign('drv_test_brook'), tick)).ok, true);
+});
+
+// Audit batch 2 (Joe 10/23): the emergency stop pauses writing to the sheets; every screen keeps saving and the saves wait.
+test('Pause writing to the sheets keeps every screen saving; Resume writes the waiting saves in order', async () => {
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), sheetsPaused: true }, true), /nothing to pause/);
+  await setSwitch(db(), ADMIN, { requestId: rid(), allReady: true }, true);
+  await assert.rejects(setSwitch(db(), MANAGER, { requestId: rid(), sheetsPaused: true }, true), /Only an administrator/);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), sheetsPaused: 'yes' }, true), /sheetsPaused must be true or false/);
+  const out = await setSwitch(db(), ADMIN, { requestId: rid(), sheetsPaused: true }, true);
+  assert.equal(out.sheetsPaused, true);
+  let c = await config();
+  assert.equal(c.sheetWrites.paused, true);
+  assert.equal(c.sheetWrites.changedBy, ADMIN.email);
+  assert.equal(c.writeBack.enabled, true, 'the write-back stays on, so saves keep queuing');
+  assert.equal(c.screenOwners.dailyDispatch, 'new', 'no screen is switched off');
+  // A save while paused goes ahead and waits in the outbox; the copy keeps the app's answer while it waits.
+  assert.equal((await applyAction(db(), DISPATCHER, assign('drv_test_adams'), tick)).ok, true);
+  const waiting = await db().collection('outbox').where('status', '==', 'pending').get();
+  assert.ok(waiting.size > 0, 'the save waits for the sheet');
+  await runTransfer({ db: db(), reader: sheets, sources: F.SOURCES, now: tick, force: true });
+  assert.equal((await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.tue.driverId, 'drv_test_adams');
+  assert.equal((await db().collection('actions').where('action', '==', 'pauseSheetWrites').get()).size, 1);
+  await setSwitch(db(), ADMIN, { requestId: rid(), sheetsPaused: false }, true);
+  c = await config();
+  assert.equal(c.sheetWrites.paused, false);
+  assert.equal((await db().collection('actions').where('action', '==', 'resumeSheetWrites').get()).size, 1);
+  await runWriteBack({ db: db(), sheets, target: SANDBOX, now: tick });
+  assert.equal((await db().collection('outbox').where('status', '==', 'pending').get()).size, 0, 'Resume writes the waiting saves');
 });
 
 // Joe 10/13 ("I can't select the routes"): Over the Road and Driver Scorecard write no sheet, so they save whatever the switches say.
@@ -143,13 +172,13 @@ test('a screen that is not ready cannot move to the new app', async () => {
   } finally { L.GO_LIVE.checkIns = kept; }
 });
 
-test('Fully live needs the new app, and moving a screen back clears it', async () => {
+test('Fully live needs the new app, and Undo fully live clears it', async () => {
   await setSwitch(db(), ADMIN, { requestId: rid(), writeBack: true }, true);
   await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', fullyLive: true }, true), /before marking it fully live/);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'new' }, true);
   await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', fullyLive: true }, true);
   assert.deepEqual((await config()).fullyLive, { dailyDispatch: true });
-  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
+  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', fullyLive: false }, true);
   assert.deepEqual((await config()).fullyLive, {});
   assert.equal((await config()).writeBack.enabled, true, 'the rest of the write-back setting is kept');
 });
@@ -167,6 +196,5 @@ test('Plant Loading moves on its own: refused while on the current app, saved an
   const v = tabs["'LIVE CURRENT WEEK'"], h = v[5];
   assert.equal(v.find((r, i) => i > 5 && r[h.indexOf('run_id')] === 'run_t802')[h.indexOf('tue_load_status')], 'LOADING');
   // The write-back cannot be turned off while Plant Loading is on the new app.
-  await setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true);
-  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /Switch every screen off/);
+  await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), writeBack: false }, true), /press Pause writing to the sheets/);
 });

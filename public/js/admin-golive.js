@@ -1,8 +1,10 @@
 /*
  * Administration > Go-Live Switches (Joe 10/12, mock-up A): the one place to see and change which screens are switched on
  * (Joe 10/12 later: the cards carry no tags at all). One row per screen: On / Off / Fully live, whether it is ready and why,
- * Switch on / Switch off, and Mark fully live.
+ * Switch on, and Mark fully live.
  * "Turn on everything that is ready" turns the write-back on and moves every ready screen. Every button is pressed twice.
+ * Audit batch 2 (Joe 10/23): a screen that is on stays on (no Switch off), so no screen ever turns view only. The emergency stop
+ * is "Pause writing to the sheets": the screens keep saving and the saves wait until Resume writes them.
  * The server (functions/src/switch.js) checks the same rules (logic.js GO_LIVE).
  */
 import { escapeHtml, callServer, start } from './app.js';
@@ -18,7 +20,7 @@ export async function renderGoLive(box) {
     '<div class="ap-bar"><button type="button" class="ap-btn gl-all" id="gl-all">Turn on everything that is ready</button><span class="gl-sum" id="gl-sum"></span>' +
     '<div class="ap-right"><span class="gl-wb" id="gl-wb"></span><button type="button" class="ap-btn" id="gl-wb-btn"></button></div></div><div class="ap-msg" hidden></div>' +
     '<div class="ap-scroll gl-scroll"><table class="gl-t"><thead><tr><th class="gl-c-name">Screen</th><th class="gl-c-own">Switched on?</th><th class="gl-c-ready">Ready?</th><th>Why</th><th class="gl-c-acts">Change (press twice)</th></tr></thead><tbody id="gl-rows"></tbody></table></div>' +
-    '<p class="ap-note">Every button here is pressed twice. A screen that is not switched on is view only and says so on the screen. Switch off still works from here in an emergency.</p></div>';
+    '<p class="ap-note">Every button here is pressed twice. A screen that is switched on stays on. To stop the app writing to the Google sheets, press Pause writing to the sheets: every screen keeps saving, and Resume writes the waiting saves to the sheets in order.</p></div>';
   const $ = (s) => box.querySelector(s);
   let config = null;
 
@@ -29,9 +31,10 @@ export async function renderGoLive(box) {
     const ready = keys.filter(k => L.GO_LIVE[k].ready), readyOn = ready.filter(k => owners[k] === 'new');
     $('#gl-sum').innerHTML = '<b>' + ready.length + ' of ' + (keys.length + L.GO_LIVE_LATER.length) + '</b> ready' + (ready.length && readyOn.length === ready.length ? ', ' + (ready.length === 2 ? 'both' : 'all') + ' on' : ', ' + readyOn.length + ' on');
     $('#gl-all').disabled = wb && readyOn.length === ready.length;
-    $('#gl-wb').textContent = 'Write-back to the Live sheet: ' + (wb ? 'On' : 'Off');
-    $('#gl-wb').classList.toggle('off', !wb);
-    $('#gl-wb-btn').textContent = wb ? 'Turn write-back off' : 'Turn write-back on';
+    const paused = !!(config.sheetWrites && config.sheetWrites.paused === true);
+    $('#gl-wb').textContent = 'Writing to the sheets: ' + (!wb ? 'Off' : paused ? 'Paused' : 'On');
+    $('#gl-wb').classList.toggle('off', !wb || paused);
+    $('#gl-wb-btn').textContent = !wb ? 'Turn write-back on' : paused ? 'Resume writing to the sheets' : 'Pause writing to the sheets';
     $('#gl-wb-btn').dataset.armed = '';
     $('#gl-wb-btn').disabled = false;
     let area = '';
@@ -41,8 +44,8 @@ export async function renderGoLive(box) {
       const chip = own === 'live' ? '<span class="gl-chip live">Fully live</span>' : own === 'new' ? '<span class="gl-chip new">On</span>' : '<span class="gl-chip old">Off</span>';
       const b = (act, label, main, off) => '<button type="button" class="ap-btn small' + (main ? ' main' : '') + '" data-act="' + act + '" data-key="' + r.key + '"' + (off ? ' disabled' : '') + '>' + label + '</button>';
       const acts = !r.ready ? b('new', 'Switch on', false, true) + b('live', 'Mark fully live', false, true)
-        : own === 'live' ? b('old', 'Switch off') + b('unlive', 'Undo fully live')
-        : own === 'new' ? b('old', 'Switch off') + b('live', 'Mark fully live', true)
+        : own === 'live' ? b('unlive', 'Undo fully live')
+        : own === 'new' ? b('live', 'Mark fully live', true)
         : b('new', 'Switch on', true) + b('live', 'Mark fully live', false, true);
       const head = r.area !== area ? '<tr class="gl-grp"><td colspan="5">' + e(area = r.area) + '</td></tr>' : '';
       return head + '<tr data-row="' + e(r.key || r.name) + '"><td class="gl-name">' + e(r.name) + '</td><td>' + chip + '</td><td>' + (r.ready ? '<span class="gl-chip ready">Ready</span>' : '<span class="gl-chip not">Not ready</span>') +
@@ -64,11 +67,11 @@ export async function renderGoLive(box) {
     if (!btn || btn.disabled || !config) return;
     const wb = !!(config.writeBack && config.writeBack.enabled === true);
     if (btn.id === 'gl-all') return send(btn, { allReady: true }, 'Press again to turn them on');
-    if (btn.id === 'gl-wb-btn') return send(btn, { writeBack: !wb }, 'Press again');
+    const paused = !!(config.sheetWrites && config.sheetWrites.paused === true);
+    if (btn.id === 'gl-wb-btn') return send(btn, wb ? { sheetsPaused: !paused } : { writeBack: true }, 'Press again');
     const key = btn.dataset.key, act = btn.dataset.act;
     if (!key) return;
     if (act === 'new') return send(btn, { screen: key, owner: 'new' }, 'Press again');
-    if (act === 'old') return send(btn, { screen: key, owner: 'old' }, 'Press again');
     if (act === 'live') return send(btn, { screen: key, fullyLive: true }, 'Press again');
     if (act === 'unlive') return send(btn, { screen: key, fullyLive: false }, 'Press again');
   });
