@@ -74,3 +74,23 @@
   /* A long label (Annual inspections this month) takes two lines in the same tile height when the tile is narrow. */
   .hub-page .hub-tile span { white-space: normal; line-height: 1.1; }
 }
+/* Joe 10/23: "make these cards look a little bit bigger. You can see not all the words are going in." On his Edge the bottoms
+   of letters like g and y were cut off in the small tiles (the label box was shorter than the letters). The tiles are a little
+   taller with a bigger number, and the label line is tall enough for the whole letter, on one line or two. */
+.hub-page .hub-tile span { line-height: 1.35; padding: 1px 0; white-space: normal; }
+@media (min-width: 1200px) {
+  .hub-page .hub-tile { min-height: 38px; padding: 2px 8px; }
+  .hub-page .hub-tile b { font-size: 24px; line-height: 1.15; }
+  .hub-page .hub-tile span { line-height: 1.25; }
+}
+/* Tablets and phones: the counts and cards drop to fewer columns so each tile keeps room for its whole words. */
+@media (max-width: 900px) {
+  .hub-page .hub-tiles { flex-wrap: wrap; }
+  .hub-page .hub-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hub-page .hub-cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .hub-page .hub-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hub-page .hub-body { margin: 0 8px; }
+  .hub-page .hub-tiles4 { grid-template-columns: minmax(0, 1fr); }
+}

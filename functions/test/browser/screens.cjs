@@ -1335,8 +1335,9 @@ async function noScroll(page) {
     // Review item 42 (Joe 10/13): Latest write-ups runs the full height (its own list scrolls); the small tiles are bigger, their labels 16px on one line.
     assert.ok(await hub.$$eval('#latest tr', r => r.length) <= 40);
     assert.ok(await hub.evaluate(() => { const v = document.querySelector('.hub-view').getBoundingClientRect(), l = document.querySelector('.hub-latest').getBoundingClientRect(), c = document.querySelector('.hub-cards').getBoundingClientRect(); return l.bottom >= v.bottom - 30 && l.bottom >= c.bottom - 2; }), 'Latest write-ups runs to the bottom');
-    // Joe 10/19: a long label (Annual inspections this month) may take two lines in its tile, but is never cut off.
-    assert.deepEqual(await hub.$$eval('.hub-tile span', s => s.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.scrollWidth > x.clientWidth + 1 || x.offsetHeight > 40 || x.closest('.hub-tile').scrollHeight > x.closest('.hub-tile').clientHeight + 1).map(x => x.textContent)), [], 'tile labels 16px and whole');
+    // Joe 10/19: a long label (Annual inspections this month) may take two lines in its tile, but is never cut off. Joe 10/23: the
+    // label lines are taller so the bottoms of letters show, so two lines are now up to 46px.
+    assert.deepEqual(await hub.$$eval('.hub-tile span', s => s.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.scrollWidth > x.clientWidth + 1 || x.offsetHeight > 46 || x.closest('.hub-tile').scrollHeight > x.closest('.hub-tile').clientHeight + 1).map(x => x.textContent)), [], 'tile labels 16px and whole');
     assert.ok(await hub.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && document.querySelector('.hub-view').scrollHeight <= document.querySelector('.hub-view').clientHeight), 'the hub fits 1920x950');
     await hub.waitForFunction(() => [...document.querySelectorAll('.hub-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
     await Promise.all([hub.waitForNavigation(), hub.click('.hub-card[data-kind="TRUCK"] .hub-card-head')]);
