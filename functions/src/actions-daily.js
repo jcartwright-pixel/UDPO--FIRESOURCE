@@ -86,7 +86,8 @@ async function setUnitDown(tx, db, req, email, stamp, logRef, mode) {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
       const d = run.days && run.days[p];
-      if (!d || d[idKey] !== unit.id || L.addDays(run.weekStart, i) < today) return;
+      // A load holding only the unit's number (no ID: typed in the sheet, or Route Master's default) loses it too (Joe 10/23, T-532).
+      if (!d || L.unitOnLoad([unit], unit.type === 'TRAILER' ? 'TRAILER' : 'TRUCK', d[idKey], d[textKey]) !== unit || L.addDays(run.weekStart, i) < today) return;
       // A load already loaded keeps its unit: the product is on that trailer (review item 71).
       if (BOARD.boardState(d) === 'LOADED') { kept.push({ route: String(run.route || ''), run: String(run.run || ''), date: L.addDays(run.weekStart, i) }); return; }
       update['days.' + p + '.' + idKey] = ''; update['days.' + p + '.' + textKey] = '';
