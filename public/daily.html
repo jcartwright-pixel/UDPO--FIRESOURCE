@@ -222,9 +222,9 @@
 
     // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a load shows red with DOWN,
     // so it is plain that the load needs another unit.
-    const unitById = (id) => id ? lists.fleetTrucks.concat(lists.fleetTrailers).find(e => String(e.id).toUpperCase() === String(id).toUpperCase()) : null;
     function unitCell(r, kind, live, needs) {
-      const text = kind === 'truck' ? r.truck || (noTractor(r) ? 'N/A' : '') : r.trailer, unit = unitById(kind === 'truck' ? r.truckId : r.trailerId);
+      // A unit held as its number only (no ID: typed in the sheet, or Route Master's default) is checked too (Joe 10/23, T-532).
+      const text = kind === 'truck' ? r.truck || (noTractor(r) ? 'N/A' : '') : r.trailer, unit = L.unitOnLoad(lists.fleetTrucks.concat(lists.fleetTrailers), kind === 'truck' ? 'TRUCK' : 'TRAILER', kind === 'truck' ? r.truckId : r.trailerId, kind === 'truck' ? r.truck : r.trailer);
       if (!r.off && unit && L.unitOff(unit)) {
         const why = L.unitOffWhy(unit);
         const reason = String(unit.notes || '').replace(/^DOWN:?\s*/i, '').split('|')[0].trim();
