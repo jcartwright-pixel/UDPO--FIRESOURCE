@@ -2,7 +2,8 @@
 // Joe's Fleet places for the Uniontown yard (10/13: "Uniontown Branch" and "Uniontown Plant"). Only these exact place names
 // count as In yard; a street address in the town of Uniontown does not. 10/14: trucks park at the Fleet place "Loading Dock"
 // too, so driving from the dock into Uniontown Branch on the way out was read as a yard return (Praster "back 11:40 PM").
-export const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK'], NO_SIGNAL_MINUTES = 30, DEAD_HOURS = 24;
+// 10/22: the Uniontown Garage (King St) is ours too: 524995 parked there showed "still out" all evening.
+export const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK', 'UNIONTOWN GARAGE'], NO_SIGNAL_MINUTES = 30, DEAD_HOURS = 24;
 export const unitKey = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const digits = (s) => String(s || '').replace(/\D/g, '');
 // Fleet names a truck "223876" and a trailer "T-635"; ours are the same numbers (trailers stored as T- plus number).
@@ -13,11 +14,27 @@ export function gpsIndex(gps) {
 }
 // A parked truck with the engine off reports rarely, so an old report is "No signal" only when the engine was on (or the
 // unit has been silent a whole day, like a unit taken out of service).
-export function truckState(t, truck) {
+// Joe 10/22 ("Uniontown Plant should get everything"): anywhere on the property counts, so a unit standing still within
+// NEAR_YARD_MILES of a unit Fleet shows at one of the yard places (spots, from the same read) is In yard too, even when
+// Fleet gives it a street address. Same rule as functions/src/fleetgps.js.
+export const NEAR_YARD_MILES = 0.15;
+// Joe 10/22: "Uniontown Plant, Uniontown Garage, Uniontown Branch": every Fleet place named Uniontown ... is ours.
+export const atYardPlace = (t) => { const p = String(t.place || '').trim().toUpperCase(); return YARD_PLACES.indexOf(p) >= 0 || /^UNIONTOWN\b/.test(p); };
+export function yardSpots(gps) { return (gps || []).filter(t => atYardPlace(t) && t.lat != null && t.lon != null).map(t => ({ lat: t.lat, lon: t.lon })); }
+function milesApart(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+export function inYard(t, spots) {
+  if (atYardPlace(t)) return true;
+  return t.lat != null && t.lon != null && !(t.speedMph > 3) && (spots || []).some(s => milesApart(s, t) <= NEAR_YARD_MILES);
+}
+export function truckState(t, truck, spots) {
   if (!t) return String(truck || '').trim() ? ['nogps', 'Not in Fleet'] : ['notruck', 'No truck'];
   const mins = t.lastReport ? (Date.now() - Date.parse(t.lastReport)) / 60000 : Infinity;
   if (!(mins < DEAD_HOURS * 60) || (t.ignitionOn && mins > NO_SIGNAL_MINUTES)) return ['nosignal', 'No signal'];
-  if (YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0 && !(t.speedMph > 3)) return ['yard', 'In yard'];
+  if (inYard(t, spots) && !(t.speedMph > 3)) return ['yard', 'In yard'];
   return t.speedMph > 3 ? ['road', 'Driving'] : t.ignitionOn ? ['stopped', 'Stopped'] : ['stopped', 'Parked'];
 }
 // Joe 10/14: who worked a truck today. Daily Dispatch lists the loads loaded today, which mostly leave tomorrow (a 4:00 AM

@@ -57,7 +57,7 @@
   <script type="module">
     import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
-    import { unitKey, gpsIndex, truckState, workingToday } from './js/gps-state.js';
+    import { unitKey, gpsIndex, truckState, yardSpots, workingToday } from './js/gps-state.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
@@ -87,7 +87,7 @@
       const find = gpsIndex(data.gps), sleepers = new Set(data.routes.filter(r => r.sleeper).map(r => r.id)),
         trucks = [...new Set(workingToday(L, data.runs, L.localDay(new Date().toISOString()), { sleeper: (r, run, day) => !!(day.sleeper || run.sleeper || sleepers.has(r.runId)) })
           .map(r => String(r.truck || '').trim()).filter(Boolean))], // one truck on two runs (Joe 10/14, RUGG 855 and 856) counts once
-        states = trucks.map(t => truckState(find(t), t)[0]);
+        spots = yardSpots(data.gps), states = trucks.map(t => truckState(find(t), t, spots)[0]);
       n.mgr = { review: data.review, alerts: data.alerts.filter(a => window.UDScore.scAlertKind_(a.type) && ours.has(unitKey(a.tag))).length,
         road: states.filter(x => x === 'road').length, yard: states.filter(x => x === 'yard').length };
       // Joe 10/12: no "New app" / "Current app" tags on the cards (confusing). Which screens are switched on is seen and
