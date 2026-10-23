@@ -28,7 +28,7 @@
     </div>
     <div class="head">
       <div class="title"><span class="eyebrow">Live Trailer Monitoring · Timestamped Checks</span><h1>Yard Checks</h1></div>
-      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button></div>
+      <div class="tabs" id="panes" role="tablist" aria-label="Yard view"><button type="button" role="tab" data-pane="current">Active Yard Queue</button><button type="button" role="tab" data-pane="history">24-Hour History</button><button type="button" role="tab" data-pane="all">All Trailers in Yard</button></div>
       <button type="button" class="yd-refresh" id="refresh" data-top>&#8635; Refresh</button><button type="button" class="yd-refresh" id="refresh-history" data-top hidden>&#8635; Refresh History</button>
       <div class="dayname" id="dayname"></div>
       <div class="hstats" id="hstats"></div>
@@ -41,6 +41,11 @@
         <div><h2>Active Yard Queue</h2><p>Trailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.</p></div>
         <span class="yd-cycle"><b>2-hour recheck cycle</b> · Trailers past dispatch time will not reappear.</span>
       </div>
+      <div class="yd-bar" id="bar-all" hidden>
+        <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
+        <div><h2>All Trailers in Yard</h2><p>Every loaded trailer still on the yard, until it leaves. Look only: checks are made on the Active Yard Queue.</p></div>
+        <span class="yd-grow"></span>
+      </div>
       <div class="yd-bar" id="bar-history" hidden>
         <img class="yd-icon" src="img/library/yard-checks.webp" alt="">
         <div><h2>24-Hour History</h2><p>All recorded yard checks with timestamps.</p></div>
@@ -52,6 +57,13 @@
           <colgroup><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:18%"><col style="width:10%"><col style="width:12%"><col style="width:14%"></colgroup>
           <thead><tr><th><span class="l">Trailer #</span><span class="s">Trailer</span></th><th><span class="l">Actual Temp (°F)</span><span class="s">Temp °F</span></th><th><span class="l">Temp Set Point (°F)</span><span class="s">Set °F</span></th><th><span class="l">Fuel Level</span><span class="s">Fuel</span></th><th><span class="l">GPS Temp (°F)</span><span class="s">GPS °F</span></th><th>Notes</th><th>Last Check</th><th>Next Recheck</th><th>Action</th></tr></thead>
           <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="sheet scroll-list" id="pane-all" hidden>
+        <table class="loadout yd-table yd-all">
+          <colgroup><col style="width:10%"><col style="width:22%"><col style="width:11%"><col style="width:11%"><col style="width:15%"><col style="width:13%"><col style="width:18%"></colgroup>
+          <thead><tr><th>Trailer #</th><th>Route</th><th>Leaves</th><th><span class="l">GPS Temp (°F)</span><span class="s">GPS °F</span></th><th>Last Check</th><th><span class="l">Checked Temp / Set</span><span class="s">Temp / Set</span></th><th>Status</th></tr></thead>
+          <tbody id="all-rows"></tbody>
         </table>
       </div>
       <div class="sheet scroll-list" id="pane-history" hidden>
@@ -77,7 +89,7 @@
     const FUEL = [['', ''], ['FULL', 'FULL'], ['3/4', '3/4'], ['1/2', '1/2'], ['EMPTY', 'EMPTY']];
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
-    let date = today(), pane = params.get('view') === 'history' ? 'history' : 'current';
+    let date = today(), pane = ['history', 'all'].indexOf(params.get('view')) >= 0 ? params.get('view') : 'current';
     let runs = [], journal = [], person = null, app = {};
     let reefer = {};           // trailer -> gpsReefer: the GPS temperature while the trailer is recorded (Joe 10/18)
     const drafts = {};          // trailer -> what was typed and not recorded yet
@@ -125,7 +137,7 @@
       document.getElementById('hstats').innerHTML = [['Active', q.rows.length + q.locked.length + q.gps.length, ''], ['Due', q.rows.length, q.rows.length ? 'warn' : ''], ['Checked', q.locked.length, q.locked.length ? 'good' : ''],
         ['Latest', latest ? clock(latest.recordedAt) : '—', '', latest ? '' : 'no check yet']].map(([l, n, k, why]) => '<div class="' + k + '"><b>' + escapeHtml(String(n)) + '</b><span>' + (why || l) + '</span></div>').join('');
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
-      ['current', 'history'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane !== 'current'; document.getElementById('refresh-history').hidden = pane !== 'history';
+      ['current', 'history', 'all'].forEach(p => { document.getElementById('pane-' + p).hidden = p !== pane; document.getElementById('bar-' + p).hidden = p !== pane; }); document.getElementById('refresh').hidden = pane === 'history'; document.getElementById('refresh-history').hidden = pane !== 'history';
       // Joe 10/10: no Record button on the desktop either. Each box saves as it is left; a trailer checked here stays on the list
       // while it is filled in, and a trailer due again starts with empty boxes (its last check is in Last Check).
       // Joe 10/22: a trailer whose GPS temperature is in range (30 to 42°F) is not due; it stays on the list, green. One stuck at
@@ -150,7 +162,19 @@
       document.getElementById('history').innerHTML = hist.map(h => '<tr><td>' + escapeHtml(dateTime(h.recordedAt)) + '</td><td class="yd-trailer"><b>' + escapeHtml(h.trailer) + '</b></td><td>' + escapeHtml(h.temperature) + '</td><td>' + escapeHtml(h.setPoint) + '</td>' +
         '<td>' + escapeHtml(h.fuelLevel) + '</td><td class="detail">' + escapeHtml(h.notes) + '</td><td>' + escapeHtml(initials(h.recordedBy)) + ' <span class="yd-status' + (h.status === 'DEPARTED' ? ' left' : '') + '">' + escapeHtml(STATUS[h.status] || h.status) + '</span></td></tr>').join('') ||
         '<tr><td colspan="7" class="empty">No yard checks in the last 24 hours.</td></tr>';
-      document.getElementById('foot').textContent = pane === 'current'
+      // Joe 10/22: All Trailers in Yard, every loaded trailer until it leaves, by when it leaves (look only).
+      const everyone = U.yardAll(q, Date.now());
+      document.getElementById('all-rows').innerHTML = everyone.map(x => {
+        const s = x.status, why = s.dueAt ? s.why + ' ' + clock(s.dueAt) : s.why;
+        const leaves = x.departureTime === null || x.departureTime === undefined ? '—' : (x.departureDate !== date && x.departureDate !== L.addDays(date, 1) ? shortDate(x.departureDate) + ' ' : '') + L.timeText(x.departureTime);
+        return '<tr class="yd-' + s.kind + '" data-trailer="' + escapeHtml(x.trailer) + '"><td class="yd-trailer"><b>' + escapeHtml(x.trailer) + '</b></td><td class="yd-route">' + escapeHtml([x.route, x.routeRun].filter(Boolean).join(' · ')) + '</td>' +
+          '<td>' + escapeHtml(leaves) + '</td>' + (s.kind === 'bad' && x.gpsTempF !== null && x.gpsTempF !== undefined ? '<td class="yd-gps bad">' + escapeHtml(deg(x.gpsTempF)) + '°</td>' : gpsCell(x.trailer, x.setPoint || '')) + '<td class="yd-last">' + (x.recordedAt ? escapeHtml(clock(x.recordedAt)) + ' · ' + escapeHtml(initials(x.recordedBy)) : '—') + '</td>' +
+          '<td>' + (x.temperature ? escapeHtml(x.temperature) + '° / ' + (x.setPoint ? escapeHtml(x.setPoint) + '°' : '—') : '—') + '</td>' +
+          '<td class="yd-st ' + s.kind + '">' + escapeHtml(s.text) + '<small>' + escapeHtml(why) + '</small></td></tr>';
+      }).join('') || (got.runs && got.journal ? '<tr><td colspan="7" class="empty">No loaded trailers on the yard.</td></tr>' : '<tr><td colspan="7" class="empty">Loading the trailers&hellip;</td></tr>');
+      document.getElementById('foot').textContent = pane === 'all'
+        ? everyone.length + ' loaded trailer' + (everyone.length === 1 ? '' : 's') + ' on the yard until they leave: ' + everyone.filter(x => x.status.kind === 'bad').length + ' need a check. The Active Yard Queue lists only the ones that need a check.'
+        : pane === 'current'
         ? q.rows.length + ' trailer' + (q.rows.length === 1 ? '' : 's') + ' due, ' + q.locked.length + ' checked in the last 2 hours' + (q.gps.length ? ', ' + q.gps.length + ' in range on the GPS (30 to 42°F, no check needed)' : '') + '. ' + (ck ? 'Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.' : 'View only.')
         : hist.length + ' record' + (hist.length === 1 ? '' : 's') + ' in the last 24 hours.';
       const st = L.screenState(app, 'plant');
@@ -322,7 +346,7 @@
       const b = e.target.closest('[data-pane]');
       if (!b) return;
       pane = b.dataset.pane;
-      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      history.replaceState(null, '', pane !== 'current' ? '?view=' + pane : location.pathname);
       render();
     });
     document.getElementById('refresh').onclick = () => render();
