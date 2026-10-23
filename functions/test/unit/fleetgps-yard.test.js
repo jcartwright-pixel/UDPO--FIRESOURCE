@@ -34,6 +34,17 @@ test('yard: parked at the Loading Dock, through Uniontown Branch on the way out,
   assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-14T23:45:00.000Z', '']);
 });
 
+// Joe 10/22 (524995 parked at the Uniontown Garage showed "still out"): the Garage is the yard too.
+test('yard: coming back to the Uniontown Garage is a return', () => {
+  const truck = (place) => ({ '524995': { tag: '524995', lastReport: String(Math.random()), place, odometerMiles: 100 } });
+  let seen = {};
+  const step = (place, at) => { const r = advanceDays(seen, truck(place), at); seen = r.seen; return r.days['2026-10-22_524995']; };
+  step('Uniontown Branch', '2026-10-22T09:00:00.000Z');
+  step('', '2026-10-22T09:05:00.000Z');
+  const d = step('Uniontown Garage', '2026-10-22T20:40:00.000Z');
+  assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-22T09:05:00.000Z', '2026-10-22T20:40:00.000Z']);
+});
+
 test('alert kinds from the Fleet condition', () => {
   assert.equal(alertType({ name: 'Over 55', type: 'PostedSpeedCondition' }, {}), 'SPEEDING');
   assert.equal(alertType({ name: 'Hard stop', type: 'DiagnosticBooleanCondition' }, { TriggerName: 'HarshBraking' }), 'HARSH_BRAKING');

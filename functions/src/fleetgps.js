@@ -97,7 +97,8 @@ const TEMPLATES = Object.freeze({
 });
 // Joe's Fleet places for the Uniontown yard (10/13); 10/14 the Loading Dock, where trucks park, is the yard too (a truck
 // driving from the dock through Uniontown Branch on its way out was read as coming back).
-const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK'];
+// 10/22 the Uniontown Garage (King St) too: a truck parked there for the night read as still out on its route.
+const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK', 'UNIONTOWN GARAGE'];
 const inYard = (t) => YARD_PLACES.indexOf(String(t.place || '').trim().toUpperCase()) >= 0;
 const TOKEN_HOURS = 23;          // Fleet keys last 24 hours; a fresh one is asked for an hour early.
 const ZONE = 'America/New_York';
@@ -632,7 +633,7 @@ async function pullTemps(db, d, o, token, trucks, at, cache) {
  * Days before today are written whole. Today is joined to the live read: the miles and first move from before the live read
  * started are added to it (private/gpsFleetSeen), so the live read carries on from the whole day's total.
  * Progress is kept in private/gpsFleetHistory {days, alertDays, queue, total, done, error, finishedAt}; GPS Setup shows it.
- * The yard is where the trucks Fleet now shows at Uniontown Branch / Uniontown Plant / Loading Dock stand (points carry no place name),
+ * The yard is where the trucks Fleet now shows at Uniontown Branch / Uniontown Plant / Loading Dock / Uniontown Garage stand (points carry no place name),
  * within YARD_MILES of them.
  */
 const HISTORY_UNITS = 5, YARD_MILES = 0.25, HISTORY_TRIES = 3;
