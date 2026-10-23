@@ -615,10 +615,13 @@ async function noScroll(page) {
     await roster.fill('#d-name', 'Casey, Leigh');
     await roster.check('#d-relief');
     await roster.fill('#d-seniority', '2025-11-15');
-    await roster.click('#d-save');
+    // Batch 5: an existing driver has no Save Driver button; each box saves when it is left.
+    assert.equal(await roster.$('#d-save'), null, 'no Save Driver button on an existing driver');
+    await roster.press('#d-seniority', 'Tab');
     assert.match(await roster.textContent('#rows tr[data-id="drv_test_casey"] td.name'), /CASEY, LEIGH\s*RELIEF/, 'shown at once');
     const casey = async () => (await db().collection('drivers').doc('drv_test_casey').get()).data();
-    for (let i = 0; i < 50 && (await casey()).name !== 'CASEY, LEIGH'; i++) await roster.waitForTimeout(100);
+    // Each box saves in turn, so wait for the last one (the seniority date).
+    for (let i = 0; i < 100 && (await casey()).seniorityDate !== '2025-11-15'; i++) await roster.waitForTimeout(100);
     assert.equal((await casey()).name, 'CASEY, LEIGH');
     assert.equal((await casey()).reliefDriver, true);
     assert.equal((await casey()).seniorityDate, '2025-11-15');
@@ -631,6 +634,7 @@ async function noScroll(page) {
     await roster.fill('#d-hire', '2019-04-01');
     await roster.fill('#d-seniority', '2019-04-01');
     await roster.fill('#d-truck', '900002');
+    assert.equal(await roster.textContent('#d-save'), 'Add Driver');
     await roster.click('#d-save');
     await roster.waitForFunction(() => [...document.querySelectorAll('#rows td.name')].some(td => td.textContent === 'EVANS, KIM'));
     const kim = async () => (await db().collection('drivers').where('name', '==', 'EVANS, KIM').get()).docs.map(d => d.data())[0];
@@ -745,29 +749,34 @@ async function noScroll(page) {
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
     // Driver Weekly Template: a manager makes ADAMS Available on Monday and Off on Tuesday, copies ADAMS's week onto CASEY's line
-    // (review item 12: one Copy / Paste per driver line), and Save Template saves every changed cell. (BROOK was removed above.)
+    // (review item 12: one Copy / Paste per driver line); each day saves as soon as it changes (batch 5: no Save Template).
+    // (BROOK was removed above.)
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
     const day = (d, p) => '.tcell[data-driver="' + d + '"][data-day="' + p + '"] select[data-status]';
     await tpl.waitForSelector(day('drv_test_adams', 'tue'));
-    assert.equal(await tpl.isDisabled('#save'), true, 'nothing to save yet');
+    assert.equal(await tpl.$('#save'), null, 'batch 5: no Save Template button');
     await tpl.selectOption(day('drv_test_adams', 'mon'), 'AVAILABLE');
     await tpl.selectOption(day('drv_test_adams', 'tue'), 'OFF');
     await tpl.click('tr[data-line="drv_test_adams"] td.tpl-name [data-copy]');
     await tpl.click('tr[data-line="drv_test_casey"] td.tpl-name [data-paste]');
     // ADAMS Monday and Tuesday; CASEY Monday (802 comes off: Available like ADAMS) and Tuesday (Off like ADAMS).
-    assert.equal(await tpl.textContent('#dirty'), '4 unsaved changes');
     if (SHOTS) await tpl.screenshot({ path: path.join(SHOTS, 'template-1920.png') });
-    await tpl.click('#save');
-    await tpl.waitForFunction(() => /^Template saved/.test(document.getElementById('dirty').textContent), null, { timeout: 10000 });
     const tplCells = await tpl.evaluate(async () => {
       const { start } = await import('./js/app.js');
       const { doc, getDoc } = await import('/js/firebase.js');
       const { db } = await start();
-      return [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
+      const read = async () => [(await getDoc(doc(db, 'drivers', 'drv_test_adams'))).data().cells, (await getDoc(doc(db, 'drivers', 'drv_test_casey'))).data().cells];
+      for (let i = 0; i < 100; i++) {
+        const c = await read();
+        if (c[0].tue_available === 'FALSE' && c[1].tue_available === 'FALSE' && JSON.parse(c[1].mon_assignments_json || '[]').length === 0) return c;
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return read();
     });
     assert.equal(tplCells[0].tue_available, 'FALSE');
     assert.equal(tplCells[1].tue_available, 'FALSE');
     assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like ADAMS');
+    await tpl.waitForFunction(() => !document.querySelector('.tcell.changed'), null, { timeout: 10000 });
     assert.deepEqual(tpl.errors, []);
     const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
@@ -905,7 +914,9 @@ async function noScroll(page) {
     await otr.waitForSelector('[data-col-remove]', { timeout: 5000 });
     await otr.click('[data-miles="run_t801"]');
     await otr.fill('[data-miles-in="run_t801"]', '412');
-    await otr.click('[data-miles-save="run_t801"]');
+    // Batch 5: no Save button; the miles save when the box is left.
+    assert.equal(await otr.$('[data-miles-save]'), null, 'no Save button by the miles');
+    await otr.press('[data-miles-in="run_t801"]', 'Tab');
     // The routes table is drawn again after the save, so the button can be missing for a moment: wait until it is back with 412.
     await otr.waitForFunction(() => (document.querySelector('[data-miles="run_t801"]') || {}).textContent === '412', null, { timeout: 5000 });
     const otrMore = await otr.evaluate(async () => {
@@ -929,8 +940,14 @@ async function noScroll(page) {
     // The By Date Columns box stays open from before; the button opens or closes it.
     await otr.waitForSelector('#otr-cols');
     if (!(await otr.$('.otr-cols'))) await otr.click('#otr-cols');
+    // A rename saves when its box is left (batch 5: no Save button).
+    await otr.click('[data-col-rename]');
+    assert.equal(await otr.$('[data-col-save]'), null, 'no Save button by the new name');
+    await otr.fill('[data-rename]', 'Darden Foods');
+    await otr.press('[data-rename]', 'Tab');
+    await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden Foods'), null, { timeout: 5000 });
     await otr.click('[data-col-remove]');
-    await otr.waitForFunction(() => ![...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
+    await otr.waitForFunction(() => ![...document.querySelectorAll('[data-col="run_t801"] option')].some(o => /^Darden/.test(o.value)), null, { timeout: 5000 });
     assert.deepEqual(otr.errors, []);
     await otr.close();
     results.push('Over the Road: a manager ticked 801 (Carrier Pickup) and typed September figures (cost per gallon $0.400); Dashboard and Report open; Darden column added and removed; 801 miles fixed to 412');
@@ -1280,6 +1297,9 @@ async function noScroll(page) {
     await mq.waitForSelector('.sidemenu a.side-name', { state: 'attached' });
     assert.equal(await mq.$eval('.sidemenu a.side-name', a => a.textContent.trim()), 'Fleet & Maintenance', 'the maintenance side starts on the hub');
     assert.equal(await mq.getAttribute('.sidemenu a.side-name', 'href'), 'maint.html');
+    // Audit batch 8 (mock-up 2): the same eight lines under Fleet, Issues and Garage; none removed.
+    assert.deepEqual(await mq.$$eval('.sidemenu .side-group, .sidemenu a:not(.side-name)', x => x.map(e => (e.classList.contains('side-group') ? '# ' : '') + e.textContent.trim())),
+      ['# Fleet', 'Equipment', 'Fleet Service', '# Issues', 'Equipment Issues', 'Truck Issues', 'Trailer Issues', 'Fork Truck / Pallet Jack Issues', '# Garage', 'Garage Work Orders', 'Garage Station']);
     await mq.close();
     // Joe 10/10 (old hub picture): Fleet & Maintenance shows the six counts, four cards with the icon library pictures and the
     // latest write-ups; a card opens its list in this window, with the old columns and Lessor | Garage on trucks.
@@ -1324,7 +1344,7 @@ async function noScroll(page) {
     assert.deepEqual(tl.errors, []);
     await tl.close();
     results.push('Menu: Administration holds Dispatch Administration; Driver Weekly Template is under Drivers only. Template: relief first, + Add Run on every day, Copy / Paste / Paste + Add once per driver line');
-    results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and Save Template saved both cells to Driver Master; a dispatcher sees it read only');
+    results.push('Driver Weekly Template: a manager set Off, copied and pasted it, and each day saved to Driver Master as it changed; a dispatcher sees it read only');
 
     // The per-screen switch (Joe 10/12): Administration > Go-Live Switches is the only place to see and change which screens
     // are switched on. Joe 10/12 later ("remove the old stuff like new app current app"): the cards carry no tags at all.

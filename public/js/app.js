@@ -66,9 +66,10 @@ export const MENU = [
   ['Drivers', [['Driver Roster', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
   // An icon name ending .webp is a picture from the United Dairy icon library (img/library).
-  ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck'], ['Equipment Issues', 'issues.html', 'issue'],
-    ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
-    ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench'], ['Fleet Service', 'fleet.html', 'gear'],
+  // Audit batch 8 (10/23, mock-up 2): the same lines under three headings (a 4th field starts a heading); nothing removed.
+  ['Equipment', [['Fleet & Maintenance', 'maint.html', 'maintenance-tractor-v1-560.webp'], ['Equipment', 'equipment.html', 'truck', 'Fleet'], ['Fleet Service', 'fleet.html', 'gear'],
+    ['Equipment Issues', 'issues.html', 'issue', 'Issues'], ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
+    ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench', 'Garage'],
     ['Garage Station', 'garage-station.html', 'wrench']]],
   // Joe 10/10: Over the Road and Trucks Today (GPS) are manager reports (he prints Over the Road), so they sit here only.
   // Joe 10/10 evening: GPS / Fleet is not a Fleet & Maintenance section; GPS Setup and Driver Scorecard sit in Manager Reports.
@@ -306,6 +307,7 @@ function addSideMenu() {
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
       '>' + svg(icon) + '<span>' + label + '</span>' + '</a>';
   };
+  const headed = (it) => (it[3] ? '<div class="side-group">' + it[3] + '</div>' : '') + link(it);
   const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
   // lists only the plants; each plant opens its Plant Distribution, Route Distribution and Fleet & Maintenance beside it.
@@ -323,10 +325,10 @@ function addSideMenu() {
   const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sideLink(s)).join('') :
     sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (isHome(side, here) ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
-    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(link).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
+    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(headed).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
       '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
-      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(link).join('') + '</div></div>').join(''));
+      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(headed).join('') + '</div></div>').join(''));
   // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
   nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
   showVersion();

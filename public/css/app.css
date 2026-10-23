@@ -772,7 +772,7 @@ td.eq-day.busy { color: #b3261e; font-weight: 800; }
 .day-table td.day-notes { min-width: 160px; }
 
 /* Driver Weekly Template laid out like the current app's (Joe 10/10, old-screen picture): relief drivers first, names bold on
-   the left, section lines on the left, every day shows + Add Run and Copy / Paste / Paste + Add, Save Template green top right. */
+   the left, section lines on the left, every day shows + Add Run and Copy / Paste / Paste + Add. */
 .template-page button.go:disabled { background: #8fbf9e; border-color: #8fbf9e; color: #fff; }
 .template-page .tpl tr.tpl-group td { text-align: left; text-transform: uppercase; letter-spacing: .04em; font-size: 16px; }
 

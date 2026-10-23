@@ -294,7 +294,11 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.click('#add-area');
     await admin.fill('#setup-areas input:last-of-type >> nth=-1', 'DOCK');
     await shots(admin, 'products-areas-groups', 1920);
-    await admin.click('#setup-save');
+    // Batch 5: no Save Areas & Groups button; the box saves when it is left, and Close goes back to the list.
+    assert.equal(await admin.$('#setup-save'), null, 'no Save Areas & Groups button');
+    await admin.press('#setup-areas input:last-of-type >> nth=-1', 'Tab');
+    await admin.waitForFunction(() => [...document.querySelectorAll('#area option')].some(o => /^DOCK/.test(o.textContent)));
+    await admin.click('#setup-close');
     await admin.waitForFunction(() => [...document.querySelectorAll('#area option')].some(o => /^DOCK/.test(o.textContent)) && !document.getElementById('list-pane').hidden && [...document.querySelectorAll('#sheet th.pm-m')].some(t => t.textContent === 'DOCK'));
     assert.deepEqual(admin.errors, []);
     for (const w of [1536]) {

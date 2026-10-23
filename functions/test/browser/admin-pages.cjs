@@ -40,6 +40,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
 const emailsWhole = (p) => p.$$eval('#people td.email', tds => tds.length > 0 && tds.every(td => [...td.childNodes].filter(n => n.nodeType === 3).every(n => { const r = document.createRange(); r.selectNodeContents(n); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size === 1; })));
 const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...bar.querySelectorAll(':scope > button, :scope > a, :scope > .ap-right')].map(b => Math.round(b.getBoundingClientRect().top)); return new Set(tops).size === 1; });
 
+async function until(check, what) {
+  for (let i = 0; i < 100; i++) { if (await check()) return; await new Promise(r => setTimeout(r, 200)); }
+  throw new Error(what + ': not seen in 20 seconds');
+}
+
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
@@ -115,6 +120,15 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     assert.ok((await p.$$eval('#rt-role option', o => o.map(x => x.value))).indexOf('YARD_LEAD') >= 0);
     assert.ok(await oneLine(p));
     await shot(p, 'role-templates-1920.png');
+    // Batch 5: no Save Role Template button; a tick saves as soon as it is changed, and unticking it puts the role back.
+    assert.equal(await p.$('#rt-save'), null, 'no Save Role Template button');
+    const tick = await p.$eval('#rt-body input[data-code]:not(:checked)', i => i.dataset.code);
+    const rtDoc = async () => ((await db().collection('private').doc('roleTemplates').get()).data() || {}).templates || {};
+    await p.check('#rt-body input[data-code="' + tick + '"]');
+    await until(async () => ((await rtDoc()).SUPERVISOR || []).indexOf(tick) >= 0, 'Role template tick saved');
+    await p.waitForFunction(() => /^Last saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.uncheck('#rt-body input[data-code="' + tick + '"]');
+    await until(async () => !(await rtDoc()).SUPERVISOR, 'Role template back to the standard rights');
 
     await open('access-codes', '#ac-rows tr');
     await p.click('#ac-rows [data-gen="super.test@uniteddairy.com"]');
@@ -170,8 +184,14 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await open('report-recipients', '#rr-list');
     await p.fill('#rr-new-name', 'Plant Management');
     await p.fill('#rr-new-to', 'mgr@uniteddairy.com, gm@uniteddairy.com');
-    await p.click('#rr-save');
+    // Batch 5: a new group keeps one Add Group button; a group already there saves when its box is left.
+    assert.equal(await p.$('#rr-save'), null, 'no Save button');
+    await p.click('#rr-add');
     await p.waitForSelector('#rr-list [data-group="Plant Management"]');
+    assert.equal(await p.inputValue('#rr-new-name'), '');
+    await p.fill('#rr-list [data-group="Plant Management"]', 'mgr@uniteddairy.com, gm@uniteddairy.com, ops@uniteddairy.com');
+    await p.press('#rr-list [data-group="Plant Management"]', 'Tab');
+    await until(async () => { const g = await db().collection('reportGroups').where('name', '==', 'Plant Management').get(); return !g.empty && g.docs[0].data().recipients.length === 3; }, 'Report group saved');
     await shot(p, 'report-recipients-1920.png');
 
     await open('sent-log', '#sl-rows tr');
@@ -183,7 +203,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
 
     // Joe 10/11: each plant's email comes from its own mailbox.
     await open('email-senders', '#es-rows tr');
-    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['Save', 'Refresh']);
+    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['Refresh'], 'batch 5: no Save button');
     assert.ok(await oneLine(p));
     assert.deepEqual(await p.$$eval('#es-rows td:first-child', t => t.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
     assert.equal(await p.inputValue('#es-who'), 'PERSON', 'the standard: from whoever presses Send');
@@ -191,12 +211,13 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // Joe 10/14: no gray hint text inside the boxes (it looked like a saved address); an empty box says what it means under it.
     assert.equal(await p.$$eval('#es-rows input', x => x.filter(i => i.placeholder).length), 0);
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] small[data-empty="addr"]'), true);
-    // Only a name, and an email address typed as the name: Save works, with a note, and a changed box is marked until Save.
+    // Only a name, and an email address typed as the name: it saves when the box is left, with a note, and a changed box is
+    // marked until then.
     await p.fill('[data-name="fac_uniontown"]', 'utplantmgmt@uniteddairy.com');
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), true);
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_charleston"] [data-unsaved]'), false);
-    await p.click('#es-save');
-    await p.waitForFunction(() => /^Saved\. Uniontown: "Name people see" takes a name/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.press('[data-name="fac_uniontown"]', 'Tab');
+    await p.waitForFunction(() => /^Uniontown: "Name people see" takes a name/.test(document.querySelector('#view .ap-msg').textContent));
     assert.equal(await p.inputValue('[data-name="fac_uniontown"]'), '');
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), false);
     await p.fill('[data-addr="fac_uniontown"]', 'uniontown.operations@uniteddairy.com');
@@ -204,9 +225,9 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await p.fill('[data-addr="fac_charleston"]', 'charleston.operations@uniteddairy.com');
     await p.fill('[data-name="fac_charleston"]', 'United Dairy Charleston Operations');
     await p.selectOption('#es-who', 'PLANT');
-    await p.click('#es-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
-    await p.waitForSelector('#es-rows td:last-child small');
+    await until(async () => { const x = (await db().collection('private').doc('emailSettings').get()).data(); return x.fromWho === 'PLANT' && x.senders.fac_charleston.name === 'United Dairy Charleston Operations'; }, 'Email senders saved');
+    await p.waitForSelector('#es-rows tr[data-plant="fac_charleston"] td:last-child small');
+    assert.equal(await p.textContent('#view .ap-msg'), '', 'no saved message');
     assert.equal(await p.inputValue('[data-addr="fac_uniontown"]'), 'uniontown.operations@uniteddairy.com');
     assert.equal(await p.inputValue('#es-who'), 'PLANT');
     const es = (await db().collection('private').doc('emailSettings').get()).data();
@@ -214,7 +235,7 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     await shot(p, 'email-senders-1920.png');
     await shot(p, 'email-senders-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
     await p.fill('[data-addr="fac_martins_ferry"]', 'someone@gmail.com');
-    await p.click('#es-save');
+    await p.press('[data-addr="fac_martins_ferry"]', 'Tab');
     await p.waitForFunction(() => /not a United Dairy email address/.test(document.querySelector('#view .ap-msg').textContent));
 
     await open('repair-items', '#ri-list');
@@ -255,10 +276,14 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
 
     // Batch 2: email, schedules and diagnostics (js/admin-tools.js).
     await open('repair-email', '#re-where input');
+    // Batch 5: no Save button; the box saves when it is left and the drop-down when it is picked.
+    assert.equal(await p.$('#re-save'), null, 'no Save button');
     await p.fill('[data-emails="PENSKE"]', 'repairs@penske.com');
+    await p.press('[data-emails="PENSKE"]', 'Tab');
     await p.selectOption('[data-mode="PENSKE"]', 'IMMEDIATE');
-    await p.click('#re-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await until(async () => { const r = (await db().collection('private').doc('repairEmail').get()).data(); return r && r.routes.PENSKE.mode === 'IMMEDIATE' && r.routes.PENSKE.emails[0] === 'repairs@penske.com'; }, 'Repair Email saved');
+    await p.waitForFunction(() => /Last saved/.test(document.getElementById('re-status').textContent));
+    assert.equal(await p.textContent('#view .ap-msg'), '', 'no saved message');
     assert.ok(await oneLine(p));
     await shot(p, 'repair-email-1920.png');
     await p.click('#re-send');
@@ -268,18 +293,19 @@ const oneLine = (p) => p.$eval('#view .ap > .ap-bar', bar => { const tops = [...
     // The field shows before the saved settings load into it; wait for the load.
     await p.waitForFunction(() => document.getElementById('ce-from').value !== '', null, { timeout: 10000 }).catch(() => {});
     assert.equal(await p.inputValue('#ce-from'), 'callcenter@lauttamus.com');
+    assert.equal(await p.$('#ce-save'), null, 'no Save button');
     await p.check('#ce-on');
-    await p.click('#ce-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.waitForFunction(() => /^ON/.test(document.querySelector('#ce-status .ap-item').textContent));
     await p.click('#ce-now');
     // The emulator cannot reach Gmail: the page says why, plainly.
     await p.waitForFunction(() => /Checked|did not finish/.test(document.querySelector('#view .ap-msg').textContent), null, { timeout: 30000 });
     await shot(p, 'checkin-email-1920.png');
 
     await open('refresh-rates', '#rr2-rows tr');
+    assert.equal(await p.$('[data-save="checkinMail"]'), null, 'no Save rate button');
     await p.selectOption('[data-minutes="checkinMail"]', '30');
-    await p.click('[data-save="checkinMail"]');
-    await p.waitForFunction(() => /Schedule saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await until(async () => { const r = (await db().collection('private').doc('refreshRates').get()).data(); return r && r.jobs && r.jobs.checkinMail && r.jobs.checkinMail.minutes === 30; }, 'Refresh rate saved');
+    await p.waitForFunction(() => /Saved /.test(document.getElementById('rr2-rows').textContent));
     assert.ok(await oneLine(p));
     await shot(p, 'refresh-rates-1920.png');
 

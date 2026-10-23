@@ -21,7 +21,7 @@ export const ADMIN_GROUPS = [
     ['report-recipients', 'Manager Report Recipients', 'Who gets the plant report at each location: add and remove people (press twice to remove).', '', 'star'],
     ['sent-log', 'Sent Email Log', 'Every email the app sent, newest first.', '', 'day'],
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
-    ['refresh-rates', 'Refresh Rates', 'How often each background job runs, Save rate for each, and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
+    ['refresh-rates', 'Refresh Rates', 'How often each background job runs (each saves when it is picked), and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
   ]],
   // Batch 8, mock-up 2 (10/23): dispatch set-up lives on the Dispatch Administration page; this list keeps one line for it.
   // The other dispatch items stay here (Find a setting and ?item= still open them) but are left off the list ('moved').
