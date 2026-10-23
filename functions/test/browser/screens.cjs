@@ -968,13 +968,14 @@ async function noScroll(page) {
     await adm.waitForSelector('.side-flyouts .flyout.open a[href="admin.html"]', { state: 'visible' });
     await Promise.all([adm.waitForURL(/admin\.html/), adm.click('.side-flyouts .flyout.open a[href="admin.html"]')]);
     await adm.waitForSelector('.admin-card');
-    assert.equal(await adm.$$eval('.admin-card', a => a.length), 12, 'one card per screen (review item 13)');
-    assert.equal(await adm.$$eval('.admin-card[target]', a => a.length), 0, 'no card opens a new window');
+    assert.equal(await adm.$$eval('.admin-card', a => a.length), 13, 'one card per screen (review item 13), Go-Live Switches too (batch 8)');
+    assert.equal(await adm.$$eval('.admin-card:not([hidden])', a => a.length), 12, 'Go-Live Switches shows only to Administrators');
+    assert.equal(await adm.$$eval('.admin-card[target="_blank"]', a => a.length), 0, 'no card opens a new window');
     await Promise.all([adm.waitForURL(/template\.html/), adm.click('.admin-card[href="template.html"]')]);
     await adm.waitForSelector('.tcell');
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('Dispatch Administration: 12 cards, one per screen, opened from the menu; Driver Weekly Template opens in the same window');
+    results.push('Dispatch Administration: 13 cards, one per screen, opened from the menu; Driver Weekly Template opens in the same window');
     // Joe 10/10: Print Layouts took him into the old program. Every Dispatch Administration card opens a new-app screen; Operational
     // Assignments, Print Layouts and Dispatch Settings are built here, and an active assignment is a driver choice on Daily.
     const ops = await openPage(browser, 1920, 950, '/admin.html?testEmail=manager.test@uniteddairy.com');
@@ -1331,21 +1332,21 @@ async function noScroll(page) {
     await adminHome.waitForSelector('#card-daily');
     assert.equal(await adminHome.$('[data-owner]'), null, 'no New app / Current app tags on the cards');
     assert.doesNotMatch(await adminHome.innerText('body'), /New app|Current app/);
-    const gl = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com');
-    await gl.waitForSelector('.adm-item[data-key="switch"]');
+    // Batch 8, mock-up 2 (10/23): Go-Live Switches is a card on Dispatch Administration; it opens in Administration.
+    const gl = await openPage(browser, 1536, 730, '/admin.html?testEmail=admin.test@uniteddairy.com');
+    await gl.waitForSelector('.admin-card');
+    await Promise.all([gl.waitForURL(/administration\.html\?item=switch/), gl.click('.admin-card:has-text("Go-Live Switches")')]);
+    await gl.waitForSelector('.adm-item.on[data-key="switch"]');
     assert.equal(await gl.textContent('.adm-item[data-key="switch"] .adm-name'), 'Go-Live Switches');
-    await gl.click('.adm-item[data-key="switch"]');
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"]');
     // Joe 10/12 ("... and make Driver Check-ins ready"): every screen is ready now. A screen that is not ready still cannot be
     // moved: checked on a second page where Driver Check-ins is marked not ready for this test only.
     assert.equal(await gl.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), false, 'Driver Check-ins is ready');
     {
-      const nr = await openPage(browser, 1536, 730, '/administration.html?testEmail=admin.test@uniteddairy.com', () => {
+      const nr = await openPage(browser, 1536, 730, '/administration.html?item=switch&testEmail=admin.test@uniteddairy.com', () => {
         let v;
         Object.defineProperty(window, 'UDLogic', { configurable: true, get: () => v, set: (x) => { v = x; if (x && x.GO_LIVE && x.GO_LIVE.checkIns) x.GO_LIVE.checkIns = Object.assign({}, x.GO_LIVE.checkIns, { ready: false, why: 'Not built yet.' }); } });
       });
-      await nr.waitForSelector('.adm-item[data-key="switch"]');
-      await nr.click('.adm-item[data-key="switch"]');
       await nr.waitForSelector('#gl-rows tr[data-row="checkIns"]');
       assert.equal(await nr.isDisabled('#gl-rows tr[data-row="checkIns"] [data-act="new"]'), true, 'a screen that is not ready cannot be moved');
       assert.match(await nr.textContent('#gl-rows tr[data-row="checkIns"]'), /Not built yet/);

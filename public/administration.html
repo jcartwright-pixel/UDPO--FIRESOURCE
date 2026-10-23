@@ -60,7 +60,8 @@
     function renderNav() {
       const q = find.trim().toLowerCase();
       document.getElementById('nav').innerHTML = ADMIN_GROUPS.map(([group, , items]) => {
-        const shown = items.map(i => adminItem(i[0])).filter(it => !q || (it.title + ' ' + it.what + ' ' + group).toLowerCase().indexOf(q) >= 0);
+        // Batch 8 (10/23): an item that moved onto the Dispatch Administration page shows here only when searched for or open.
+        const shown = items.map(i => adminItem(i[0])).filter(it => q ? (it.title + ' ' + it.what + ' ' + group).toLowerCase().indexOf(q) >= 0 : !it.moved || it.key === current);
         if (!shown.length) return '';
         return '<div class="adm-nav-group"><h2>' + escapeHtml(group) + '</h2>' + shown.map(it => {
           const st = state(it);
