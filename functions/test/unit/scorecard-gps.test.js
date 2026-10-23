@@ -424,3 +424,24 @@ test('Joe 10/14 (live): call-offs before Scorecard counted from do not count, so
   const rows = S.scScoreMonth_([], offs, S.scSettings_({}), { D8: 'LATE, CALL', D9: 'OLD, CALL' }, { start: '2026-10-01', asOf: '2026-10-20' });
   assert.deepEqual(rows.filter(r => r.callOffs).map(r => r.driver), ['LATE, CALL']);
 });
+
+// Joe 10/23: "They have to do one or the other. They don't have to do both. And inspection, if they did the phone check-in, then that counts."
+test('Joe 10/23: one check-in a day (app or email) covers every run the driver drove that day; a phone check-in counts as the inspection', () => {
+  const s = S.scSettings_({ countFrom: '2026-01-01' });
+  // ZIDEK drove 8302_1 and 8302_2 on Monday and phoned the answering service once (credited on 8302_1).
+  const rows = [run({ runId: 'a', route: '8302_1', run: '8302_1', driver: 'ZIDEK, MARK', driverId: 'dz', checkedIn: true }),
+    run({ runId: 'b', route: '8302_2', run: '8302_2', driver: 'ZIDEK, MARK', driverId: 'dz' })];
+  const ev = [checkedIn('8302_1', '8302_1')];
+  let r = S.scScoreMonth_(S.scBuildDay_(DAY, rows, ev, {}), [], s, {})[0];
+  assert.deepEqual([r.checkins, r.missedCheckins, r.areas.checkin.points], [2, 0, 1], 'both runs checked in; the clean day earns 1');
+  // An email check-in is not an inspection: with no DVIR, no inspection.
+  assert.deepEqual([r.inspected, r.notInspected], [0, 2]);
+  // A phone check-in (any run that day) counts as the inspection for the day.
+  const phone = rows.map((x, i) => Object.assign({}, x, { phoneCheckin: i === 0 ? 'TRUE' : '' }));
+  r = S.scScoreMonth_(S.scBuildDay_(DAY, phone, ev, {}), [], s, {})[0];
+  assert.deepEqual([r.inspected, r.notInspected, r.areas.inspection.score], [2, 0, 100]);
+  // Another driver's check-in never covers this driver.
+  const two = [run({ runId: 'c', route: '855', run: 'SAL', driver: 'ADAMS, PAT', driverId: 'd1', phoneCheckin: 'TRUE' }), run({ runId: 'd', route: '856', run: 'BEL', driver: 'BAKER, LEE', driverId: 'd2' })];
+  const out = S.scBuildDay_(DAY, two, [checkedIn('855', 'SAL')], {});
+  assert.deepEqual(out.map(d => [d.driver, d.checkedIn, d.inspected]), [['ADAMS, PAT', true, true], ['BAKER, LEE', false, false]]);
+});

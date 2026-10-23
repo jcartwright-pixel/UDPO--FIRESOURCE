@@ -734,7 +734,8 @@ async function resolveAssignment(tx, db, req, stamp, run) {
   if (req.action === 'setJack') return { palletJack: req.jack };
   // Blank goes back to the route's own type (Route Editor's Loadout Type).
   if (req.action === 'setLoadType') return { loadType: req.loadType, loadTypeByHand: !!req.loadType };
-  if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp });
+  // Joe 10/23: a check-in typed on Driver Check-ins keeps how the driver first checked in (phone or email), else DESK.
+  if (req.action === 'saveCheckIn') return Object.assign({}, req.checkIn, { checkinCompletedAt: stamp, checkinVia: ((run.days && run.days[req.day]) || {}).checkinVia || 'DESK' });
   if (req.action === 'savePlantLoad') return PLANT.loadValues(tx, db, req, (run.days && run.days[req.day]) || {}, stamp, SaveError, run);
   return { driverNotes: req.note };
 }
