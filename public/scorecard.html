@@ -88,9 +88,6 @@
           casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, // Joe 10/14: checked in the same way Driver Check-ins counts it: a check-in made in the app (phone, Driver Room station,
           // the answering-service email the app read) or the cases delivered the driver reported (the current app's email intake).
           checkedIn: !!(d.checkinCompletedAt || (d.casesDelivered !== null && d.casesDelivered !== undefined && d.casesDelivered !== '')),
-          // Joe 10/23: a phone check-in counts as the inspection. Check-ins from before the app noted how they came: the phone's
-          // always answered "Was your truck loaded correctly?" (the email never does).
-          phoneCheckin: d.checkinVia === 'PHONE' || (!d.checkinVia && !!d.checkinCompletedAt && (d.loadedCorrectly === 'YES' || d.loadedCorrectly === 'NO')) ? 'TRUE' : '',
           truck: d.truck || '', startTime: d.startTime || '', departure: L.dateKey(d.departureDate) || '',
           // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
           dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours,

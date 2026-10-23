@@ -84,7 +84,7 @@ const DAY_FIELDS = Object.freeze([
 const APP_ONLY_DAY_FIELDS = Object.freeze(['intendedDriverId', 'intendedDriver', 'driverExceptionStatus', 'checkinTruck', 'checkinTrailer', 'moreTrailers',
   // Joe 10/13: the Check-In's "Was your truck loaded correctly?" has no Live sheet column; it stays in the app.
   'loadedCorrectly', 'loadingProblem',
-  // Joe 10/23: how the driver checked in (PHONE, EMAIL or DESK); a phone check-in counts as the day's inspection on the Driver Scorecard.
+  // Joe 10/23: how the driver checked in (PHONE, EMAIL or DESK).
   'checkinVia',
   // Joe 10/13 (836 PECK): a Plant Operations Scheduler load marked Not running on Weekly Dispatch; the sheet's <day>_runs is already FALSE.
   'plantLoadOff',
