@@ -1381,12 +1381,12 @@ async function noScroll(page) {
     await loNew.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE');
     assert.deepEqual(loNew.errors, []);
     await loNew.close();
-    // A screen not switched on is view only and says where to switch it on. Every screen is ready now (Joe 10/12), so Driver
-    // Check-ins is moved back to the current app first (pressed twice).
-    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
-    await gl.click('#gl-rows tr[data-row="checkIns"] [data-act="old"]');
-    for (let i = 0; i < 50 && (await db().collection('config').doc('app').get()).data().screenOwners.checkIns !== 'old'; i++) await gl.waitForTimeout(100);
-    assert.equal((await db().collection('config').doc('app').get()).data().screenOwners.checkIns, 'old', 'Driver Check-ins moved back');
+    // A screen that is on has no Switch off (audit batch 2): it stays on so it keeps saving.
+    assert.equal(await gl.$('#gl-rows [data-act="old"]'), null, 'no Switch off button on any screen');
+    // A screen not switched on is view only and says where to switch it on. Every screen is ready now (Joe 10/12) and can no
+    // longer be moved back, so Driver Check-ins is set back to the current app straight in the app's settings.
+    await db().collection('config').doc('app').set({ screenOwners: { checkIns: 'old' } }, { merge: true });
+    await gl.waitForSelector('#gl-rows tr[data-row="checkIns"] .gl-chip.old');
     const onOld = await openPage(browser, 1366, 650, '/checkins.html?testEmail=dispatch.test@uniteddairy.com');
     await onOld.waitForFunction(() => document.getElementById('mode-text').textContent === 'VIEW ONLY UNTIL SWITCHED ON IN GO-LIVE SWITCHES');
     assert.equal(await onOld.textContent('#golive-note'), 'View only until switched on in Go-Live Switches.', 'the screen itself says it is not switched on');
@@ -1403,26 +1403,32 @@ async function noScroll(page) {
     const homeSize = await noScroll(adminHome);
     assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home fits 1366x650');
     if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });
-    // The write-back cannot go off while a screen is on the new app.
+    // Pause writing to the sheets (audit batch 2): the screens stay on and keep saving; Resume writes the waiting saves.
+    assert.equal(await gl.textContent('#gl-wb-btn'), 'Pause writing to the sheets');
     await gl.click('#gl-wb-btn');
     await gl.click('#gl-wb-btn');
-    await gl.waitForSelector('#view .ap-msg.bad:not([hidden])');
-    assert.match(await gl.textContent('#view .ap-msg'), /Switch every screen off/);
-    // Move back clears fully live; with every screen that went over back, every screen is a test copy again.
-    for (const k of ['dailyDispatch', 'weeklyDispatch', 'plantLoading', 'drivers', 'vacations', 'routes', 'plant']) {
-      await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
-      await gl.click('#gl-rows tr[data-row="' + k + '"] [data-act="old"]');
-      await gl.waitForSelector('#gl-rows tr[data-row="' + k + '"] .gl-chip.old');
-    }
+    await gl.waitForFunction(() => document.getElementById('gl-wb').textContent === 'Writing to the sheets: Paused');
     cfg = (await db().collection('config').doc('app').get()).data();
-    assert.equal(cfg.mode, 'test');
-    assert.deepEqual(cfg.fullyLive, {});
-    await adminHome.waitForFunction(() => document.getElementById('mode-text').textContent === 'Test copy');
+    assert.equal(cfg.sheetWrites.paused, true);
+    assert.equal(cfg.writeBack.enabled, true, 'the write-back stays on, so saves keep queuing');
+    assert.equal(cfg.screenOwners.dailyDispatch, 'new', 'the screens stay on');
+    const whilePaused = await openPage(browser, 1366, 650, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
+    await whilePaused.waitForFunction(() => document.getElementById('mode-text').textContent === 'LIVE: SAVES GO TO THE SHEET');
+    await whilePaused.close();
+    assert.equal(await gl.textContent('#gl-wb-btn'), 'Resume writing to the sheets');
+    await gl.click('#gl-wb-btn');
+    await gl.click('#gl-wb-btn');
+    await gl.waitForFunction(() => document.getElementById('gl-wb').textContent === 'Writing to the sheets: On');
+    assert.equal((await db().collection('config').doc('app').get()).data().sheetWrites.paused, false);
+    // Undo fully live still works.
+    await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="unlive"]');
+    await gl.click('#gl-rows tr[data-row="dailyDispatch"] [data-act="unlive"]');
+    await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"] .gl-chip.new');
     assert.deepEqual(adminHome.errors, []);
     assert.deepEqual(gl.errors, []);
     await adminHome.close();
     await gl.close();
-    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch, Plant Loading and Plant Operations only; Mark fully live takes the tag off the card; card tags are plain labels; the write-back stays on while a screen is on the new app');
+    results.push('Go-Live Switches: Turn on everything that is ready (pressed twice) moves Daily and Weekly Dispatch, Plant Loading and Plant Operations only; Mark fully live takes the tag off the card; card tags are plain labels; no screen can be switched off; Pause writing to the sheets keeps every screen saving and Resume undoes it');
 
     // Someone outside United Dairy is signed straight back out.
     const outsider = await openPage(browser, 1366, 650, '/daily.html?testEmail=someone@gmail.com');
