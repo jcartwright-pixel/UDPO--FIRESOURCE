@@ -120,6 +120,15 @@ async function until(check, what) {
     assert.ok((await p.$$eval('#rt-role option', o => o.map(x => x.value))).indexOf('YARD_LEAD') >= 0);
     assert.ok(await oneLine(p));
     await shot(p, 'role-templates-1920.png');
+    // Batch 5: no Save Role Template button; a tick saves as soon as it is changed, and unticking it puts the role back.
+    assert.equal(await p.$('#rt-save'), null, 'no Save Role Template button');
+    const tick = await p.$eval('#rt-body input[data-code]:not(:checked)', i => i.dataset.code);
+    const rtDoc = async () => ((await db().collection('private').doc('roleTemplates').get()).data() || {}).templates || {};
+    await p.check('#rt-body input[data-code="' + tick + '"]');
+    await until(async () => ((await rtDoc()).SUPERVISOR || []).indexOf(tick) >= 0, 'Role template tick saved');
+    await p.waitForFunction(() => /^Last saved/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.uncheck('#rt-body input[data-code="' + tick + '"]');
+    await until(async () => !(await rtDoc()).SUPERVISOR, 'Role template back to the standard rights');
 
     await open('access-codes', '#ac-rows tr');
     await p.click('#ac-rows [data-gen="super.test@uniteddairy.com"]');
@@ -175,8 +184,14 @@ async function until(check, what) {
     await open('report-recipients', '#rr-list');
     await p.fill('#rr-new-name', 'Plant Management');
     await p.fill('#rr-new-to', 'mgr@uniteddairy.com, gm@uniteddairy.com');
-    await p.click('#rr-save');
+    // Batch 5: a new group keeps one Add Group button; a group already there saves when its box is left.
+    assert.equal(await p.$('#rr-save'), null, 'no Save button');
+    await p.click('#rr-add');
     await p.waitForSelector('#rr-list [data-group="Plant Management"]');
+    assert.equal(await p.inputValue('#rr-new-name'), '');
+    await p.fill('#rr-list [data-group="Plant Management"]', 'mgr@uniteddairy.com, gm@uniteddairy.com, ops@uniteddairy.com');
+    await p.press('#rr-list [data-group="Plant Management"]', 'Tab');
+    await until(async () => { const g = await db().collection('reportGroups').where('name', '==', 'Plant Management').get(); return !g.empty && g.docs[0].data().recipients.length === 3; }, 'Report group saved');
     await shot(p, 'report-recipients-1920.png');
 
     await open('sent-log', '#sl-rows tr');
@@ -188,7 +203,7 @@ async function until(check, what) {
 
     // Joe 10/11: each plant's email comes from its own mailbox.
     await open('email-senders', '#es-rows tr');
-    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['Save', 'Refresh']);
+    assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['Refresh'], 'batch 5: no Save button');
     assert.ok(await oneLine(p));
     assert.deepEqual(await p.$$eval('#es-rows td:first-child', t => t.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
     assert.equal(await p.inputValue('#es-who'), 'PERSON', 'the standard: from whoever presses Send');
@@ -196,12 +211,13 @@ async function until(check, what) {
     // Joe 10/14: no gray hint text inside the boxes (it looked like a saved address); an empty box says what it means under it.
     assert.equal(await p.$$eval('#es-rows input', x => x.filter(i => i.placeholder).length), 0);
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] small[data-empty="addr"]'), true);
-    // Only a name, and an email address typed as the name: Save works, with a note, and a changed box is marked until Save.
+    // Only a name, and an email address typed as the name: it saves when the box is left, with a note, and a changed box is
+    // marked until then.
     await p.fill('[data-name="fac_uniontown"]', 'utplantmgmt@uniteddairy.com');
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), true);
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_charleston"] [data-unsaved]'), false);
-    await p.click('#es-save');
-    await p.waitForFunction(() => /^Saved\. Uniontown: "Name people see" takes a name/.test(document.querySelector('#view .ap-msg').textContent));
+    await p.press('[data-name="fac_uniontown"]', 'Tab');
+    await p.waitForFunction(() => /^Uniontown: "Name people see" takes a name/.test(document.querySelector('#view .ap-msg').textContent));
     assert.equal(await p.inputValue('[data-name="fac_uniontown"]'), '');
     assert.equal(await p.isVisible('#es-rows tr[data-plant="fac_uniontown"] [data-unsaved]'), false);
     await p.fill('[data-addr="fac_uniontown"]', 'uniontown.operations@uniteddairy.com');
@@ -209,9 +225,9 @@ async function until(check, what) {
     await p.fill('[data-addr="fac_charleston"]', 'charleston.operations@uniteddairy.com');
     await p.fill('[data-name="fac_charleston"]', 'United Dairy Charleston Operations');
     await p.selectOption('#es-who', 'PLANT');
-    await p.click('#es-save');
-    await p.waitForFunction(() => /Saved/.test(document.querySelector('#view .ap-msg').textContent));
-    await p.waitForSelector('#es-rows td:last-child small');
+    await until(async () => { const x = (await db().collection('private').doc('emailSettings').get()).data(); return x.fromWho === 'PLANT' && x.senders.fac_charleston.name === 'United Dairy Charleston Operations'; }, 'Email senders saved');
+    await p.waitForSelector('#es-rows tr[data-plant="fac_charleston"] td:last-child small');
+    assert.equal(await p.textContent('#view .ap-msg'), '', 'no saved message');
     assert.equal(await p.inputValue('[data-addr="fac_uniontown"]'), 'uniontown.operations@uniteddairy.com');
     assert.equal(await p.inputValue('#es-who'), 'PLANT');
     const es = (await db().collection('private').doc('emailSettings').get()).data();
@@ -219,7 +235,7 @@ async function until(check, what) {
     await shot(p, 'email-senders-1920.png');
     await shot(p, 'email-senders-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
     await p.fill('[data-addr="fac_martins_ferry"]', 'someone@gmail.com');
-    await p.click('#es-save');
+    await p.press('[data-addr="fac_martins_ferry"]', 'Tab');
     await p.waitForFunction(() => /not a United Dairy email address/.test(document.querySelector('#view .ap-msg').textContent));
 
     await open('repair-items', '#ri-list');

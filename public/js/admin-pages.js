@@ -341,42 +341,58 @@ export async function renderPeople(box) {
 /* ---------- Role Templates ---------- */
 
 export async function renderRoleTemplates(box) {
-  let data = null, role = 'SUPERVISOR', draft = [], dirty = false;
+  let data = null, role = 'SUPERVISOR', draft = [];
   box.innerHTML = '<div class="ap"><div class="ap-bar"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Role <select id="rt-role"></select></label>' +
-    '<button type="button" class="ap-btn main" id="rt-save">Save Role Template</button><button type="button" class="ap-btn" id="rt-reload">Reload Templates</button></div>' +
-    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in Operations.</p><div class="ap-scroll" id="rt-body"></div></div>';
+    '<button type="button" class="ap-btn" id="rt-reload">Reload Templates</button></div>' +
+    '<div class="ap-msg" hidden></div><p class="ap-note">Define each role once. Individual exceptions stay on the person (People &amp; Roles). A role\'s template changes what its people may save in Operations. Each tick saves as soon as it is changed.</p><div class="ap-scroll" id="rt-body"></div></div>';
   const $ = (s) => box.querySelector(s);
   const current = () => (data.templates[role] || data.defaults[role] || []).slice();
   function render() {
     $('#rt-role').innerHTML = data.roles.map(r => '<option value="' + r + '"' + (r === role ? ' selected' : '') + '>' + e(prettyRole(r)) + '</option>').join('');
-    $('#rt-save').disabled = role === 'ADMINISTRATOR';
     if (role === 'ADMINISTRATOR') {
       $('#rt-body').innerHTML = '<div class="ap-empty">Administrator has unrestricted access. Use People &amp; Roles to change the person\'s assignment.<br><small>Administrator has protected full access. Assign or remove that role on a person, not here.</small></div>';
       return;
     }
     let group = '';
-    const meta = data.meta[role];
     $('#rt-body').innerHTML = '<table class="ap-t"><thead><tr><th>Action</th><th>Role access</th></tr></thead><tbody>' + data.catalog.filter(r => !/^admin\./.test(r.code) && r.code !== 'audit.full').map(r =>
       (r.group !== group ? '<tr class="ap-group"><td colspan="2">' + e(group = r.group) + '</td></tr>' : '') + '<tr><td>' + e(r.label) + '</td><td><label class="ap-checks"><label><input type="checkbox" data-code="' + r.code + '"' +
       (draft.indexOf(r.code) >= 0 ? ' checked' : '') + '> Allowed</label></label></td></tr>').join('') + '</tbody></table>';
-    say(box, dirty ? 'Unsaved role-template changes.' : meta ? 'Last saved ' + when(meta.updatedAt) + ' by ' + meta.updatedBy + (data.templates[role] ? '' : ' (back to the standard rights).') : data.templates[role] ? '' : 'Standard rights for this role (never changed).');
+    note();
   }
+  function note() {
+    const meta = data.meta[role];
+    say(box, meta ? 'Last saved ' + when(meta.updatedAt) + ' by ' + meta.updatedBy + (data.templates[role] ? '' : ' (back to the standard rights).') : data.templates[role] ? '' : 'Standard rights for this role (never changed).');
+  }
+  // Batch 5 (10/23): no Save Role Template button; each tick saves as soon as it is changed, one after another. The table is
+  // not redrawn after a save, so the page stays where it is; a refused save shows why and puts the ticks back.
+  let saving = Promise.resolve();
   async function load() {
-    try { data = await call('roleTemplates'); if (!box.isConnected) return; draft = current(); dirty = false; render(); } catch (err) { say(box, errText(err), 'bad'); }
+    await saving;
+    try { data = await call('roleTemplates'); if (!box.isConnected) return; draft = current(); render(); } catch (err) { say(box, errText(err), 'bad'); }
   }
   box.addEventListener('change', ev => {
-    if (ev.target.id === 'rt-role') { role = ev.target.value; draft = current(); dirty = false; render(); return; }
+    if (ev.target.id === 'rt-role') { saving.then(() => { role = ev.target.value; draft = current(); render(); }); return; }
     const c = ev.target.dataset.code;
     if (!c) return;
     draft = draft.filter(x => x !== c);
     if (ev.target.checked) draft.push(c);
-    dirty = true; say(box, 'Unsaved role-template changes.');
+    const rights = draft.slice(), forRole = role;
+    saving = saving.then(async () => {
+      try {
+        await call('saveRoleTemplate', { role: forRole, rights, expected: (data.templates[forRole] || data.defaults[forRole] || []).slice() });
+        data = await call('roleTemplates');
+        if (box.isConnected && role === forRole) note();
+      } catch (err) {
+        try { data = await call('roleTemplates'); } catch (e2) { /* keep what is shown */ }
+        if (box.isConnected && role === forRole) { draft = current(); render(); }
+        say(box, errText(err), 'bad');
+      }
+    });
   });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'rt-reload') load();
-    if (b.id === 'rt-save') busy(box, b, async () => { await call('saveRoleTemplate', { role, rights: draft, expected: current() }); await load(); say(box, 'Role template saved.', 'good'); });
   });
   await load();
 }
@@ -630,12 +646,13 @@ export async function renderDriverCodes(box, ctx) { await Promise.all([renderApp
 
 export async function renderReportRecipients(box) {
   let data = null, fac = 'fac_uniontown';
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="rr-save">Save</button><button type="button" class="ap-btn" id="rr-reload">Refresh</button>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="rr-reload">Refresh</button>' +
     '<div class="ap-right"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Location <select id="rr-loc"></select></label></div></div><div class="ap-msg" hidden></div>' +
-    '<p class="ap-note">The Send Current Report card in Manager Center emails one of these groups. Type the addresses separated by commas, then Save. Each location has its own groups.</p>' +
+    '<p class="ap-note">The Send Current Report card in Manager Center emails one of these groups. Type the addresses separated by commas; a group saves when you leave its box. Each location has its own groups.</p>' +
     '<div id="rr-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-list" id="rr-list"></div>' +
     '<div class="ap-section" style="margin-top:10px"><h3>New group</h3><div class="ap-grid2"><label class="ap-field">Group name<small>Name it, e.g. Plant Management</small><input id="rr-new-name" maxlength="100"></label>' +
-    '<label class="ap-field">Addresses<small>Separated by commas</small><input id="rr-new-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label></div></div></div></div>';
+    '<label class="ap-field">Addresses<small>Separated by commas</small><input id="rr-new-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label></div>' +
+    '<button type="button" class="ap-btn main" id="rr-add" style="margin-top:8px">Add Group</button></div></div></div>';
   const $ = (s) => box.querySelector(s);
   function render() {
     $('#rr-loc').innerHTML = data.locations.map(l => '<option value="' + l.id + '"' + (l.id === fac ? ' selected' : '') + '>' + e(l.name) + '</option>').join('');
@@ -645,26 +662,35 @@ export async function renderReportRecipients(box) {
       '<small>Changed ' + e(when(g.updatedAt)) + ' by ' + e(g.updatedBy) + '</small></div><button type="button" class="ap-btn" data-remove="' + e(g.name) + '">Remove</button></div>').join('') ||
       '<div class="ap-empty">No group yet. Add one below so the report card has someone to send to.</div>';
   }
-  async function load() { try { data = await call('reportGroups', { facilityId: fac }); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
-  box.addEventListener('change', ev => { if (ev.target.id === 'rr-loc') { fac = ev.target.value; load(); } });
+  // Batch 5 (10/23): no Save button; a group's addresses save when its box is left. A new group keeps its one Add Group button.
+  let saving = Promise.resolve();
+  async function load() { await saving; try { data = await call('reportGroups', { facilityId: fac }); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => {
+    if (ev.target.id === 'rr-loc') { fac = ev.target.value; load(); return; }
+    const i = ev.target.closest('[data-group]');
+    if (!i || i.value.trim() === i.dataset.was) return;
+    const fields = { facilityId: fac, name: i.dataset.group, recipients: i.value };
+    saving = saving.then(async () => {
+      try { await call('saveReportGroup', fields); i.dataset.was = i.value.trim(); say(box, ''); } catch (err) { say(box, errText(err), 'bad'); }
+    });
+  });
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'rr-reload') load();
     if (b.dataset.remove) {
       const g = data.groups.find(x => x.name === b.dataset.remove);
-      twice(b, 'Press again to remove', () => busy(box, b, async () => { const out = await call('saveReportGroup', { facilityId: fac, name: g.name, recipients: g.recipients.join(','), active: false }); await load(); say(box, out.message, 'good'); }));
+      twice(b, 'Press again to remove', () => busy(box, b, async () => { await saving; await call('saveReportGroup', { facilityId: fac, name: g.name, recipients: g.recipients.join(','), active: false }); await load(); say(box, ''); }));
     }
-    if (b.id === 'rr-save') {
-      const changed = [...box.querySelectorAll('[data-group]')].filter(i => i.value.trim() !== i.dataset.was);
+    if (b.id === 'rr-add') {
       const name = $('#rr-new-name').value.trim(), to = $('#rr-new-to').value.trim();
-      if ((name && !to) || (!name && to)) { say(box, 'A new group needs a name and at least one address.', 'bad'); return; }
-      if (!changed.length && !name) { say(box, 'Nothing changed.'); return; }
+      if (!name || !to) { say(box, 'A new group needs a name and at least one address.', 'bad'); return; }
       busy(box, b, async () => {
-        for (const i of changed) await call('saveReportGroup', { facilityId: fac, name: i.dataset.group, recipients: i.value });
-        if (name) await call('saveReportGroup', { facilityId: fac, name, recipients: to });
+        await saving;
+        await call('saveReportGroup', { facilityId: fac, name, recipients: to });
+        $('#rr-new-name').value = ''; $('#rr-new-to').value = '';
+        say(box, '');
         await load();
-        say(box, 'Saved.', 'good');
       });
     }
   });
@@ -718,7 +744,7 @@ export async function renderSentLog(box) {
 // Joe 10/11: an email someone sends comes from their own United Dairy email; one no one pressed comes from the plant's mailbox.
 export async function renderEmailSenders(box, ctx) {
   let data = null;
-  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="es-save">Save</button><button type="button" class="ap-btn" id="es-reload">Refresh</button>' +
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="es-reload">Refresh</button>' +
     '<div class="ap-right"><span id="es-sending"></span></div></div><div class="ap-msg" hidden></div>' +
     '<div class="ap-scroll"><div class="ap-section" style="margin:10px"><h3>Emails someone sends</h3><p class="ap-note">Send Current Report, the Lessor button on a truck write-up, Send now and access links.</p>' +
     '<label class="ap-field" style="max-width:620px">Come from<select id="es-who"><option value="PERSON">The person who presses Send (their own United Dairy email)</option><option value="PLANT">The plant\'s address below</option></select></label></div>' +
@@ -728,7 +754,7 @@ export async function renderEmailSenders(box, ctx) {
   function render() {
     $('#es-sending').innerHTML = data.sending ? '<span class="ap-chip good">Sending is ON</span>' : '<button type="button" class="ap-btn small" data-goto="sent-log">Sending is OFF: turn it on</button>';
     // Joe 10/14: no gray hint text inside the boxes, so a box that looks filled is filled. What an empty box means is
-    // written under it, and a box changed but not saved yet is marked until Save.
+    // written under it, and a box changed but not saved yet is marked until it is left (batch 5: it saves then).
     const std = data.standard, empty = std ? 'Empty: sends as the standard sender, ' + e(std) : 'Empty: no email goes out for this plant until an address is set';
     $('#es-rows').innerHTML = data.plants.map(p => '<tr data-plant="' + e(p.id) + '"><td><b>' + e(p.plant) + '</b></td>' +
       '<td><input data-addr="' + e(p.id) + '" data-saved="' + e(p.address) + '" value="' + e(p.address) + '" maxlength="120" style="width:100%"><small data-empty="addr"' + (p.address ? ' hidden' : '') + '>' + empty + '</small></td>' +
@@ -736,7 +762,44 @@ export async function renderEmailSenders(box, ctx) {
       '<td><span class="ap-chip warn" data-unsaved hidden>Not saved yet</span>' + (p.changedAt ? e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>' : '') + '</td></tr>').join('');
     $('#es-who').value = data.fromWho;
   }
-  async function load() { try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  let saving = Promise.resolve();
+  async function load() { await saving; try { data = await call('emailSenders'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }
+  // After a save the boxes are brought in line with what was saved (a name that was an email address comes back empty), without
+  // redrawing the table, so the box being typed in keeps its place.
+  function sync() {
+    data.plants.forEach(p => {
+      const tr = box.querySelector('#es-rows tr[data-plant="' + p.id + '"]');
+      if (!tr) return;
+      [['addr', p.address], ['name', p.senderName]].forEach(([k, v]) => {
+        const i = tr.querySelector('[data-' + k + ']');
+        if (i.value.trim() === i.dataset.saved || document.activeElement !== i) i.value = v;
+        i.dataset.saved = v;
+        i.classList.toggle('es-unsaved', i.value.trim() !== v);
+        i.nextElementSibling.hidden = !!i.value.trim();
+      });
+      tr.querySelector('[data-unsaved]').hidden = !tr.querySelector('.es-unsaved');
+      const cell = tr.lastElementChild, chip = cell.querySelector('[data-unsaved]');
+      cell.innerHTML = '';
+      cell.appendChild(chip);
+      if (p.changedAt) cell.insertAdjacentHTML('beforeend', e(when(p.changedAt)) + '<small>' + e(p.changedBy) + '</small>');
+    });
+  }
+  // Batch 5 (10/23): no Save button; a box saves when it is left and the Come from drop-down when it is picked.
+  box.addEventListener('change', ev => {
+    if (!data || !ev.target.closest('#es-rows input, #es-who')) return;
+    const senders = {};
+    data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
+    const fromWho = $('#es-who').value;
+    saving = saving.then(async () => {
+      try {
+        const out = await call('saveEmailSenders', { senders, fromWho });
+        data = out;
+        if (box.isConnected) sync();
+        const notes = String(out.message || '').replace(/^Saved\.\s*/, '');
+        say(box, notes, notes ? 'warn' : '');
+      } catch (err) { say(box, errText(err), 'bad'); }
+    });
+  });
   box.addEventListener('input', ev => {
     const tr = ev.target.closest('#es-rows tr');
     if (!tr) return;
@@ -749,11 +812,6 @@ export async function renderEmailSenders(box, ctx) {
     if (!b) return;
     if (b.dataset.goto && ctx) { ctx.open(b.dataset.goto); return; }
     if (b.id === 'es-reload') load();
-    if (b.id === 'es-save') {
-      const senders = {};
-      data.plants.forEach(p => { senders[p.id] = { address: box.querySelector('[data-addr="' + p.id + '"]').value, name: box.querySelector('[data-name="' + p.id + '"]').value }; });
-      busy(box, b, async () => { const out = await call('saveEmailSenders', { senders, fromWho: $('#es-who').value }); await load(); say(box, out.message, out.message === 'Saved.' ? 'good' : 'warn'); });
-    }
   });
   await load();
 }
