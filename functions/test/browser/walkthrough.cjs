@@ -139,8 +139,9 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
       const mc = await openPage(browser, { viewport: { width: 1536, height: 886 } }, '/manager.html?' + MANAGER);
       await mc.waitForFunction(() => document.querySelectorAll('[data-card="walk"] .wp-tile .wp-thumbs img').length === 1, null, { timeout: 20000 });
       // The newest picture with its caption box, Remove and Take Picture; the other one is on the walkthrough.
-      assert.match(await mc.textContent('[data-card="walk"] .wp-tile'), /^4 · Pictures2waitingfor the next reportRemoveTake Picture\+ 1 more · see them all$/);
+      assert.match(await mc.textContent('[data-card="walk"] .wp-tile'), /^4 · Pictures2waitingfor the next reportRemoveTake Picture$/);
       assert.equal(await mc.inputValue('[data-card="walk"] .wp-cap'), '');
+      assert.equal(await mc.getAttribute('[data-card="walk"] .wp-count', 'href'), 'walkthrough.html', 'with two waiting, the count opens the walkthrough, which lists them all');
       await mc.waitForTimeout(500);
       await shot(mc, 'manager-pictures-1536');
       for (const [w, h] of [[1536, 886], [1366, 768], [1920, 950], [390, 844]]) {
@@ -148,7 +149,7 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
         await mc.waitForTimeout(400);
         // Every walkthrough tile shows its whole label (Joe: tiles show the whole wording).
         // Joe 10/19: at 1536 x 886 (his laptop) and 1920 every card still shows with no scrolling, a picture waiting included.
-        if (w === 1536 || w === 1920) assert.ok(await mc.$eval('#grid', g => g.scrollHeight <= g.clientHeight + 1), 'Manager Center ' + w + ' shows every card with a picture waiting');
+        if (w === 1536 || w === 1920) { const g = await mc.$eval('#grid', x => [x.scrollHeight, x.clientHeight]); assert.ok(g[0] <= g[1] + 1, 'Manager Center ' + w + ' shows every card with a picture waiting ' + g); }
         if (w > 760) assert.deepEqual(await mc.$$eval('[data-card="walk"] .mc-tile > span', sp => sp.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), [], 'whole labels at ' + w);
         if (SHOTS) { await mc.$eval('[data-card="walk"]', el => el.scrollIntoView({ block: 'end' })); await shot(mc, 'manager-pictures-' + w); }
       }

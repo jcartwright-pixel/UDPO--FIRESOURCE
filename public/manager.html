@@ -116,11 +116,11 @@
     let taking = false;
     const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
     function picTile() {
-      // The newest picture with its caption box; the rest are on the walkthrough screen.
+      // The newest picture with its caption box; with more than one, the count opens the walkthrough, which lists them all.
       const pics = myPics(), SHOWN = 1;
       const take = canSend() ? '<button type="button" class="mc-btn wp-take"' + (taking ? ' disabled' : '') + '>' + (taking ? 'Saving the picture…' : 'Take Picture') + '</button>' : '';
-      return '<div class="mc-tile wk-tile wp-tile' + (pics.length ? ' warn' : '') + '"><span>4 · Pictures</span><b>' + pics.length + '<small>waiting</small></b><i>' + (pics.length ? 'for the next report' : 'none waiting') + '</i>' +
-        '<div class="wp-box">' + (pics.length ? thumbsHtml(pics.slice(-SHOWN), { remove: canSend(), time: false, after: take }) + (pics.length > SHOWN ? '<a class="wp-more" href="walkthrough.html">+ ' + (pics.length - SHOWN) + ' more · see them all</a>' : '') : take) + '</div></div>';
+      return '<div class="mc-tile wk-tile wp-tile' + (pics.length ? ' warn' : '') + '"><span>4 · Pictures</span>' + (pics.length > SHOWN ? '<a class="wp-count" href="walkthrough.html" title="See every picture on the walkthrough">' : '') + '<b>' + pics.length + '<small>waiting</small></b>' + (pics.length > SHOWN ? '</a>' : '') + '<i>' + (pics.length ? 'for the next report' : 'none waiting') + '</i>' +
+        '<div class="wp-box">' + (pics.length ? thumbsHtml(pics.slice(-SHOWN), { remove: canSend(), time: false, after: take }) : take) + '</div></div>';
     }
     const camera = cameraInput(async (file) => {
       taking = true; render();
