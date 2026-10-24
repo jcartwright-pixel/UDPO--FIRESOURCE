@@ -248,6 +248,23 @@ test('yard checks: a loaded trailer is on the yard until its dispatch time; a ch
   assert.equal(R.wallMinutes('10/7/2026 11:33:00 AM') % 1440, 11 * 60 + 33);
 });
 
+test('yard checks: the 2-hour lock counts only checks made after the trailer\'s current load was loaded, as the screen does', () => {
+  const at = (s) => Date.parse(s);
+  // T-955 checked at 1:00 PM (EDT) on its last load, then reloaded at 1:30 PM on a new load: the screen shows it due.
+  const check = { type: 'YARD_CHECK', date: '2026-10-07', recordedAt: '2026-10-07T17:00:00Z', payload: { trailer: 'T-955', temperature: '35', status: 'COMPLETE' } };
+  const now = at('2026-10-07T17:40:00Z');
+  assert.equal(R.yardLockLeft([check], '2026-10-07', '955', now), 80, 'no load given: the newest check locks, as before');
+  assert.equal(R.yardLockLeft([check], '2026-10-07', '955', now, '10/7/2026 12:30:00 PM'), 80, 'checked after this load was loaded: locked');
+  assert.equal(R.yardLockLeft([check], '2026-10-07', '955', now, '10/7/2026 1:30:00 PM'), 0, 'checked before this load was loaded: not locked');
+  const runs = [{ id: 'r1', weekStart: '2026-10-04', route: '852', run: 'JERSEY 1', sheetRow: 5, days: { thu: { trailer: '955', loadDate: '2026-10-07', deliveryDate: '2026-10-08', completeTime: '10/7/2026 1:30:00 PM', dispatchTime: '11:00 PM' } } }];
+  const q = R.yardQueue(runs, [check], '2026-10-07', now);
+  assert.deepEqual([q.rows.length, q.locked.length, q.rows[0].runDocId, q.rows[0].day], [1, 0, 'r1', 'thu'], 'the screen shows it due, and sends its load');
+  const v = P.validateYard({ date: '2026-10-07', trailer: '955', runDocId: 'r1', day: 'thu' }, SaveError);
+  assert.deepEqual([v.runDocId, v.day], ['r1', 'thu']);
+  const bad = P.validateYard({ date: '2026-10-07', trailer: '955', runDocId: 'a/b', day: 'thu' }, SaveError);
+  assert.deepEqual([bad.runDocId, bad.day], ['', '']);
+});
+
 test('yard checks save: trailer required, fuel Full, 3/4, 1/2 or Empty', () => {
   assert.throws(() => P.validateYard({ date: '2026-10-07', trailer: '' }, SaveError), /Trailer is required/);
   assert.throws(() => P.validateYard({ date: '2026-10-07', trailer: '955', fuelLevel: '1/4' }, SaveError), /Fuel level/);

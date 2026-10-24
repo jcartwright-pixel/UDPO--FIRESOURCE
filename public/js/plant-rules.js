@@ -593,8 +593,11 @@
       since: stopped ? text(r.stillSince) : '', text: stopped ? 'Stopped at ' + (text(r.where) || 'an unknown place') : known || still ? 'Moving' : 'Out of the yard' };
   }
   // Minutes until a trailer can be checked again (the save's own check: that operating day's newest record of the trailer).
-  function yardLockLeft(journal, date, trailer, nowMs) {
-    var k = yardTrailer(trailer), last = (journal || []).filter(function (d) { return String(d.type || '').toUpperCase() === 'YARD_CHECK' && d.date === date && yardOf(d) === k; })
+  // Full test 10/24: completedAt = when the trailer's load on the yard was marked loaded; a check made before that belongs to
+  // the trailer's last load and does not lock this one, as on the screen (yardForLoad), so a reloaded trailer shown due can be saved.
+  function yardLockLeft(journal, date, trailer, nowMs, completedAt) {
+    var k = yardTrailer(trailer), load = { completedAt: completedAt || '' };
+    var last = (journal || []).filter(function (d) { return String(d.type || '').toUpperCase() === 'YARD_CHECK' && d.date === date && yardOf(d) === k && yardForLoad(d, load, date, nowMs); })
       .sort(function (a, b) { return when(b.recordedAt) - when(a.recordedAt); })[0];
     if (!last || !when(last.recordedAt)) return 0;
     var age = Math.max(0, (nowMs - when(last.recordedAt)) / 60000);
