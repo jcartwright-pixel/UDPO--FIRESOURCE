@@ -1,0 +1,295 @@
+{
+ "today": "2026-10-24",
+ "weeks": [
+  "2026-10-18",
+  "2026-10-25"
+ ],
+ "runs": 158,
+ "problems": [
+  {
+   "kind": "Running load with no driver",
+   "what": "950_1 CHARLESTON TRANSFER 2026-10-24 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_1 8303_1 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_1 8303_1 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_1 8303_1 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "847 PALS SHAKE MIX 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "847 PALS SHAKE MIX 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "845 KATIES CORNER 2026-10-26 (mon)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "950_1 CHARLESTON TRANSFER 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "950_1 CHARLESTON TRANSFER 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "950_1 CHARLESTON TRANSFER 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "880 VENTURA 2026-10-26 (mon)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "880 VENTURA 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "880 VENTURA 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "827 UT WALMART 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "836 PECK 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "836 PECK 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "812 DSD 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "812 DSD 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "812 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8302_1 8302_1 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8302_1 8302_1 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "857 SAVE-A-LOT 3 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_2 8303_2 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8305 USDA 2026-10-26 (mon)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "855 SAVE-A-LOT 1 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_1 PRODUCT 1 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_1 PRODUCT 1 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_1 PRODUCT 1 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "906 LANCASTER TRANSFER 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "906 LANCASTER TRANSFER 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_3 MARIETTA LOAD 3 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "980 PORTSMOUTH TRANSFER 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "980 PORTSMOUTH TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_1 MARIETTA LOAD 1 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_1 MARIETTA LOAD 1 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_1 MARIETTA LOAD 1 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_1 MARIETTA LOAD 1 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_3 JUG 2026-10-26 (mon)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_3 JUG 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_3 JUG 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_3 JUG 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "844 2026-10-26 (mon)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "844 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_2 MARIETTA LOAD 2 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_2 MARIETTA LOAD 2 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_2 MARIETTA LOAD 2 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "971 PAINTSVILLE TRANSFER 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "971 PAINTSVILLE TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "848 I/W COLUMBUS 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "848 I/W COLUMBUS 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "848 I/W COLUMBUS 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8301 UT WALMART 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "805 DSD 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "805 DSD 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "805 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "856 SAVE-A-LOT 2 2026-10-25 (sun)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8302_2 8302_2 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_2 PRODUCT 2 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "808 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "822 DSD 2026-10-28 (wed)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "822 DSD 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Leaving time differs from Route Master",
+   "what": "822 DSD 2026-10-30 (fri): load 4:45 AM, Route Master 5:15 AM"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "849 SUN VALLEY 2026-10-27 (tue)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "849 SUN VALLEY 2026-10-29 (thu)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "854 CREAMOLAND 2026-10-27 (tue)"
+  }
+ ],
+ "plantLoads": 23,
+ "counts": {
+  "Running load with no driver": 69,
+  "Leaving time differs from Route Master": 1
+ }
+}
