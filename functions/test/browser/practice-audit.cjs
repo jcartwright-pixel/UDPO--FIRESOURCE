@@ -325,8 +325,9 @@ async function writes() {
     const sel = await p.evaluate(() => {
       // A load with no Skipped/Moved tag yet, so the new tag (who and when) can be read.
       // The next load must not be one skipped earlier either: skipping past it would only put both back in their own order (no tag).
+      // Nor the load just under a skipped one: that skip moved it up, so skipping it only puts it back (no tag, as since 6.47).
       const all = [...document.querySelectorAll('#rows tr[data-row]')];
-      const tr = all.find((t, i) => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.skip') && !t.querySelector('.moved-tag') && all[i + 1] && !all[i + 1].querySelector('.moved-tag') && !all[i + 1].classList.contains('moved'));
+      const tr = all.find((t, i) => !t.classList.contains('loading') && !t.classList.contains('done') && t.querySelector('button.skip') && !t.querySelector('.moved-tag') && all[i + 1] && !all[i + 1].querySelector('.moved-tag') && !all[i + 1].classList.contains('moved') && !(all[i - 1] && all[i - 1].querySelector('.moved-tag')));
       return tr ? { row: tr.dataset.row, route: tr.children[0].textContent.trim(), order: [...document.querySelectorAll('#rows tr[data-row]')].map(x => x.children[0].textContent.trim()).join(' ') } : null;
     });
     if (!sel) throw new Error('no load to skip');
