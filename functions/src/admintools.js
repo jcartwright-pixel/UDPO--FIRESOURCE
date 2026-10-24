@@ -430,7 +430,8 @@ async function saveMailCheckin(db, msg, c, sender, stamp) {
       if (c.casesDelivered !== null && (d.casesDelivered === null || d.casesDelivered === undefined)) after.casesDelivered = c.casesDelivered;
       if (c.driverCaseReturn !== null && (d.driverCaseReturn === null || d.driverCaseReturn === undefined)) after.driverCaseReturn = c.driverCaseReturn;
       ['tractorIssues', 'trailerIssues', 'palletJackIssues', 'refusedReturned', 'refusedReturnedSource'].forEach(k => { if (fields[k] && !d[k]) after[k] = fields[k]; });
-      if (!d.checkinCompletedAt) after.checkinCompletedAt = stamp;
+      // Joe 10/23: how the driver checked in (the phone's counts as the inspection too).
+      if (!d.checkinCompletedAt) { after.checkinCompletedAt = stamp; after.checkinVia = 'EMAIL'; }
       if (Object.keys(after).length) {
         const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
         Object.keys(after).forEach(k => { update['days.' + hit.day + '.' + k] = after[k]; });
@@ -481,7 +482,7 @@ async function creditCheckin(db, hit, c, at, stamp, seenRef, seen, isNew) {
     const run = runSnap.data(), d = run.days[hit.day] || {}, after = {};
     if (c.casesDelivered !== null && (d.casesDelivered === null || d.casesDelivered === undefined)) after.casesDelivered = c.casesDelivered;
     if (c.driverCaseReturn !== null && (d.driverCaseReturn === null || d.driverCaseReturn === undefined)) after.driverCaseReturn = c.driverCaseReturn;
-    if (!d.checkinCompletedAt) after.checkinCompletedAt = at;
+    if (!d.checkinCompletedAt) { after.checkinCompletedAt = at; after.checkinVia = 'EMAIL'; }
     if (Object.keys(after).length) {
       const update = { rev: run.rev + 1, testEdited: true, editedAt: stamp };
       Object.keys(after).forEach(k => { update['days.' + hit.day + '.' + k] = after[k]; });

@@ -187,6 +187,16 @@ function scBuildDay_(dateKey, liveRows, events, milesByRun, who) {
       truck: String(r.truck == null ? '' : r.truck).trim(), startTime: String(r.startTime == null ? '' : r.startTime).trim(),
       dispatchMinutes: scMinutesOf_(r.dispatchTime), routeHours: scHoursOf_(r.routeHours), sleeper: scTruthy_(r.sleeper)});
   });
+  // Joe 10/23: one check-in a day is enough, in the app or by the answering-service email, so a driver who drove two runs that
+  // day and checked in once is checked in on both. The check-in (phone or email: both ask about the pre-trip) counts as the
+  // day's inspection; a DVIR still counts on its own.
+  var dayIn = {};
+  out.forEach(function (d) { if (d.checkedIn) dayIn[d.driverKey] = true; });
+  out.forEach(function (d) {
+    if (!dayIn[d.driverKey]) return;
+    d.checkedIn = true;
+    d.inspected = true;
+  });
   return out;
 }
 

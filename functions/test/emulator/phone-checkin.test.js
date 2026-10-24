@@ -37,6 +37,7 @@ test('over / short, a corrected truck, the jack and two trailers: saved for the 
       moreTrailers: [{ trailer: '901', issues: 'Light out', needsCleaned: true }] } }, at(1));
   const d = await day('801', 'tue');
   assert.equal(d.overageShortage, 'TRUE');
+  assert.equal(d.checkinVia, 'PHONE', 'Joe 10/23: how the driver checked in is kept');
   assert.equal(d.overageShortageDetails, 'SHORT 2 cs · 2% gallon · Store: Giant Eagle');
   assert.equal(d.checkinTruck, '900001', 'a short number finds the truck');
   assert.equal(d.checkinTrailer, '', 'the same trailer as Dispatch is not a correction');
