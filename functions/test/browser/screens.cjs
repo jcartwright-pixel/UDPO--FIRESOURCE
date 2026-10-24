@@ -950,7 +950,8 @@ async function noScroll(page) {
     await otr.click('#otr-col-add');
     await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
     await otr.waitForSelector('[data-col-remove]', { timeout: 5000 });
-    await otr.click('[data-miles="run_t801"]');
+    // The table can redraw once more after the column is added, closing the miles box; click again until it stays open.
+    for (let i = 0; i < 10 && !(await otr.$('[data-miles-in="run_t801"]')); i++) { await otr.click('[data-miles="run_t801"]'); await otr.waitForTimeout(300); }
     await otr.fill('[data-miles-in="run_t801"]', '412');
     // Batch 5: no Save button; the miles save when the box is left.
     assert.equal(await otr.$('[data-miles-save]'), null, 'no Save button by the miles');
