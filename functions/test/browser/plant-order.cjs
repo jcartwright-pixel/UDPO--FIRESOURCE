@@ -281,12 +281,14 @@ async function keyMove(page, route, dir) {
     // whole unit number, Status and Start / End are on the card (nothing runs off the edge), and there is no side-menu strip.
     const tab800 = await openPage(browser, { viewport: { width: 800, height: 1280 }, hasTouch: true }, '/loadout.html?date=' + DATE + '&testEmail=viewer.test@uniteddairy.com');
     await tab800.waitForSelector(row('811') + '[data-drag]');
-    const c800 = await tab800.$eval(row('811'), tr => {
-      const truck = tr.querySelector('input[data-k="truck"]');
+    // Read the row once the list has finished drawing (as on the phone above): a row taken off the page by a redraw reads display ''.
+    const c800 = await (await tab800.waitForFunction((sel) => {
+      const tr = document.querySelector(sel), truck = tr && tr.querySelector('input[data-k="truck"]');
+      if (!truck || !tr.isConnected || !tr.getBoundingClientRect().width) return null;
       return { display: getComputedStyle(tr).display, cols: getComputedStyle(tr).gridTemplateColumns.split(' ').length, truck: truck.scrollWidth <= truck.clientWidth + 1 && truck.value.length >= 6,
         labels: [...tr.children].map(td => td.dataset.l || '').filter(Boolean), off: [...tr.children].filter(td => td.getBoundingClientRect().right > window.innerWidth + 1).length,
         menu: getComputedStyle(document.querySelector('.sidemenu')).display };
-    });
+    }, row('811'), { timeout: 8000 })).jsonValue();
     assert.deepEqual([c800.display, c800.cols, c800.truck, c800.off, c800.menu], ['grid', 4, true, 0, 'none'], 'a load is a four-across card at 800, the whole truck number shows, nothing off the edge, no menu strip ' + JSON.stringify(c800));
     assert.ok(c800.labels.includes('Status') && c800.labels.includes('Start / End'), 'Status and Start / End are named on the card ' + JSON.stringify(c800));
     assert.ok(await tab800.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'nothing slides sideways at 800');

@@ -272,3 +272,42 @@ test('The Blow Mold makes only gallon jugs (Joe 10/14): a new shift starts on it
   await save('saveLineEntry', { operationId: LINE, op: 'stop', shift: RD.plantShift(null, T0) });
   assert.equal((await run()).product, '');
 });
+
+test('The Blow Mold (Joe 10/23, mock-up 2): shots and belt turns counted, the room read, each resin lot and color a run', async () => {
+  await save('saveMachineProducts', { operationId: BLOW, products: [{ name: 'Gallon Jug', sku: 'Gallon Jug', ratePerMin: 50, targetPct: 75.05 }] });
+  await save('saveLineCounter', { operationId: BLOW, counter: 'CONTROLLER' });
+  await setup({ brand: 'MODBUS', ip: '192.168.10.40', countTag: '40001', shotsTag: '40031', turnsTag: '40041', pulsesPerTurn: '2', tempTag: '40012', jugsPerShot: '6', roomSensor: 'blow-room', roomHigh: '95' });
+  await db().collection('sensors').doc('blow-room').set({ sensorId: 'blow-room', name: 'Blow Mold Room', temperatureF: 88, lastReadingAt: new Date(T0).toISOString() });
+  const shift = RD.plantShift(null, T0);
+  // Last shift ended on lot R-1 White (kept on the line); this shift's first reading marks where each counter is.
+  await db().collection('productionLines').doc(BLOW).set({ lot: 'R-1', color: 'WHITE' }, { merge: true });
+  await RD.applyMachine(db(), BLOW, { count: 1000, shots: 500, turns: 10000, temp: 1180 }, { now: at(0) });
+  let r = await blowRun();
+  assert.deepEqual([r.count, r.shots, r.shotsBase, r.machine.room, r.machineLog[0].room], [0, 0, 0, 88, 88]);
+  // A minute: 20 shots (120 jugs molded), 117 jugs on the Alpine, 140 pulses = 70 turns = 70 RPM.
+  await RD.applyMachine(db(), BLOW, { count: 1117, shots: 520, turns: 10140, temp: 1182 }, { now: at(1) });
+  r = await blowRun();
+  assert.deepEqual([r.count, r.shots, r.machine.speed, r.machine.speedFrom], [117, 20, 70, 'TURNS']);
+  // Under half a minute later the RPM is not worked out again; it keeps the last one.
+  await RD.applyMachine(db(), BLOW, { count: 1120, shots: 521, turns: 10150 }, { now: () => new Date(T0 + 70000) });
+  r = await blowRun();
+  assert.deepEqual([r.machine.speed, r.machine.speedFrom], [70, 'TURNS']);
+  let m = P.machineNow(r, await blowLine(), T0 + 70000, 'BLOWMOLD');
+  assert.deepEqual([m.molded, m.through, m.kicked, m.rpm, m.speedName], [126, 120, 6, true, 'Annealer belt speed']);
+  // The operator scans lot R-2 and picks Clear: two new runs; scanning R-2 again starts none.
+  const entry = (op, f) => save('saveLineEntry', Object.assign({ operationId: BLOW, op, shift }, f));
+  await entry('lot', { lot: 'R-2' });
+  await entry('lot', { lot: ' R-2 ' });
+  await entry('color', { color: 'clear' });
+  await assert.rejects(entry('color', { color: 'BLUE' }), /White or Clear/);
+  await assert.rejects(entry('lot', { lot: '  ' }), /resin lot/);
+  r = await blowRun();
+  assert.deepEqual(r.lotFrom, { lot: 'R-1', color: 'WHITE' });
+  assert.deepEqual(r.lotLog.map(x => [x.lot, x.color, x.count, x.shots]), [['R-2', 'WHITE', 120, 21], ['R-2', 'CLEAR', 120, 21]]);
+  assert.deepEqual([r.lot, r.color], ['R-2', 'CLEAR']);
+  const line = await blowLine();
+  assert.deepEqual([line.lot, line.color], ['R-2', 'CLEAR'], 'the next shift starts on them');
+  await RD.applyMachine(db(), BLOW, { count: 1180, shots: 532, turns: 10300 }, { now: at(3) });
+  const runs = P.lotRuns(await blowRun(), line, T0 + 3 * 60000);
+  assert.deepEqual(runs.map(x => [x.lot, x.colorName, x.carried, x.through, x.molded, x.kicked]), [['R-1', 'White', true, 120, 126, 6], ['R-2', 'White', false, 0, 0, 0], ['R-2', 'Clear', false, 60, 66, 6]]);
+});

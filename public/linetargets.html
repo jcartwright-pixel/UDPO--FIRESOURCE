@@ -101,6 +101,8 @@
     const SANDBOX = !/^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);
     const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/deviceReads';
     let shownKey = null, readerNote = '';
+    // The MOCREO sensors (Administration > MOCREO & Sensors), for the Blow Mold's room temperature (Joe 10/23).
+    let sensors = [];
     function drawReader(line, counter) {
       const box = document.getElementById('reader');
       const reader = counter === 'READER';
@@ -129,11 +131,11 @@
     function drawController(line, counter) {
       const box = document.getElementById('controller');
       // Joe 10/14 (Gallon Filler add-on sensors, B): every filler can read a motor switch and an infeed eye, however it is counted.
-      const kind = R.lineKind(line.name), keys = R.readingsFor(kind, counter);
+      const info = data.lineInfo[line.operationId] || {}, c = info.controller || {}, brand = c.brand || '', port = R.CONTROLLER_PORTS[brand];
+      const kind = R.lineKind(line.name), keys = R.readingsFor(kind, counter, c), blow = kind === 'BLOWMOLD';
       if (!L.isAdmin(person) || (counter !== 'CONTROLLER' && kind !== 'FILLER')) { box.hidden = true; return; }
       box.hidden = false;
       if (box.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
-      const info = data.lineInfo[line.operationId] || {}, c = info.controller || {}, brand = c.brand || '', port = R.CONTROLLER_PORTS[brand];
       const inp = (k, label, cls) => '<label' + (cls ? ' class="' + cls + '"' : '') + '>' + label + '<input data-c="' + k + '" value="' + escapeHtml(ctrlVal(c, k)) + '" aria-label="' + escapeHtml(label) + '"></label>';
       const sel = (k, label, opts) => '<label>' + label + '<select data-c="' + k + '" aria-label="' + escapeHtml(label) + '"><option value=""></option>' + opts.map(o => opt(o[0], String(ctrlVal(c, k)), o[1])).join('') + '</select></label>';
       const ask = c.testAsk || null, res = c.testResult || null;
@@ -145,16 +147,20 @@
       const shown = (r, k) => {
         if (r.error) return '<span class="lt-bad">' + escapeHtml(r.error) + '</span>';
         if (k === 'running') return '<span class="lt-good"><b>' + (Number(r.value) ? 'ON: running' : 'OFF: stopped') + '</b> (read ' + fmt(r.value) + ') · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
-        const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : k === 'infeed' ? ' on the infeed eye\'s counter' : ' on the machine\'s counter';
+        const d = Number(c[k + 'Divide']) > 0 ? Number(c[k + 'Divide']) : 1, unit = k === 'temp' ? '°F' : k === 'speed' ? ' a minute' : k === 'infeed' ? ' on the infeed eye\'s counter' : k === 'shots' ? ' on the shot counter' : k === 'turns' ? ' on the belt\'s turn counter' : ' on the machine\'s counter';
         return '<span class="lt-good"><b>' + fmt(r.value) + '</b>' + (d !== 1 ? ' ÷ ' + d + ' = <b>' + (Math.round(r.value / d * 10) / 10) + '</b>' : '') + escapeHtml(unit) + ' · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
       };
       const speedDefault = R.speedNameFor(kind, {});
-      const names = { count: 'Jug count', speed: R.speedNameFor(kind, c), temp: 'Temperature (°F)', running: 'Motor running', infeed: 'Jugs in (infeed eye)' };
-      const what = { count: 'Counts the jugs made since the last read', running: 'The motor current switch: on = running; off opens a stop on the tablet', infeed: 'Jugs in less jugs counted out = rejects and spills' };
+      // Joe 10/23 (Blow Mold): the jug count is the one eye, on the Alpine after the annealer; the lever's shots and the belt's turns are counted.
+      const names = { count: blow ? 'Jugs on the Alpine' : 'Jug count', speed: blow ? 'Speed control' : R.speedNameFor(kind, c), temp: blow ? 'Annealer temperature (°F)' : 'Temperature (°F)', running: 'Motor running', infeed: 'Jugs in (infeed eye)',
+        shots: 'Shots (lever switch)', turns: 'Belt turns (shaft switch)' };
+      const what = { count: blow ? 'The eye on the Alpine after the annealer: the good jugs' : 'Counts the jugs made since the last read', running: 'The motor current switch: on = running; off opens a stop on the tablet', infeed: 'Jugs in less jugs counted out = rejects and spills',
+        shots: 'Shots × jugs each shot = jugs molded; jugs molded less jugs on the Alpine = kick-outs' };
       const modbus = brand === 'MODBUS';
       const row = (k) => '<tr><th>' + escapeHtml(names[k]) + '</th><td><input data-c="' + k + 'Tag" value="' + escapeHtml(ctrlVal(c, k + 'Tag')) + '" aria-label="Where the ' + escapeHtml(names[k].toLowerCase()) + ' is"' + (brand ? '' : ' disabled') + '></td>' +
         (modbus ? (k === 'running' ? '<td class="lt-mut">on/off</td>' : '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>') : '') +
-        (what[k] ? '<td colspan="3" class="lt-mut">' + escapeHtml(what[k]) + '</td>' : '<td><input data-c="' + k + 'Divide" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Divide')) + '" aria-label="Divide the ' + escapeHtml(names[k].toLowerCase()) + ' by"></td><td><input data-c="' + k + 'Low" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Low')) + '" aria-label="Lowest ' + escapeHtml(names[k].toLowerCase()) + '"></td><td><input data-c="' + k + 'High" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'High')) + '" aria-label="Highest ' + escapeHtml(names[k].toLowerCase()) + '"></td>') +
+        (k === 'turns' ? '<td><input data-c="pulsesPerTurn" inputmode="numeric" value="' + escapeHtml(ctrlVal(c, 'pulsesPerTurn')) + '" placeholder="1" aria-label="Pulses each turn of the belt shaft"></td><td><input data-c="speedLow" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, 'speedLow')) + '" aria-label="Lowest belt RPM"></td><td><input data-c="speedHigh" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, 'speedHigh')) + '" aria-label="Highest belt RPM"></td>' :
+          what[k] ? '<td colspan="3" class="lt-mut">' + escapeHtml(what[k]) + '</td>' : '<td><input data-c="' + k + 'Divide" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Divide')) + '" aria-label="Divide the ' + escapeHtml(names[k].toLowerCase()) + ' by"></td><td><input data-c="' + k + 'Low" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'Low')) + '" aria-label="Lowest ' + escapeHtml(names[k].toLowerCase()) + '"></td><td><input data-c="' + k + 'High" inputmode="decimal" value="' + escapeHtml(ctrlVal(c, k + 'High')) + '" aria-label="Highest ' + escapeHtml(names[k].toLowerCase()) + '"></td>') +
         '<td class="lt-test"><button type="button" data-test="' + k + '"' + (c[k + 'Tag'] && c.ip ? '' : ' disabled') + '>Test read</button><div>' + result(k) + '</div></td></tr>';
       const heard = info.machineHeardAt ? 'The line PC last sent readings ' + dateTimeText(info.machineHeardAt) + (info.machineLast ? '; the machine\'s counter read ' + fmt(info.machineLast.value) : '') + '.' : 'The line PC has not sent anything yet.';
       const addOn = counter !== 'CONTROLLER';
@@ -163,10 +169,15 @@
         '<div class="lt-cgrid">' + sel('brand', 'Brand', R.CONTROLLER_BRANDS) + inp('ip', 'IP address') + inp('port', 'Port' + (port ? ' (empty = ' + port + ')' : '')) +
           (brand === 'AB' ? inp('slot', 'Slot (empty = 0)') : '') + (brand === 'S7' ? inp('rack', 'Rack (empty = 0)') + inp('slot', 'Slot (empty = 1)') : '') +
           (modbus ? inp('unit', 'Unit id (empty = 1)') + sel('wordOrder', 'Word order (empty = high first)', [['HIGH_FIRST', 'High word first'], ['LOW_FIRST', 'Low word first']]) : '') +
-          (keys.indexOf('speed') >= 0 ? inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') : '') + '</div>' +
+          (keys.indexOf('speed') >= 0 && !blow ? inp('speedName', 'Speed is called (empty = ' + speedDefault + ')', 'wide') : '') + '</div>' +
+        // Joe 10/23 (Blow Mold): jugs each shot, when kick-outs turn red, and the room's MOCREO sensor with its range.
+        (blow ? '<div class="lt-cgrid">' + inp('jugsPerShot', 'Jugs each shot (empty = ' + R.JUGS_PER_SHOT + ')') + inp('kickHigh', 'Kick-outs red over % (empty = ' + R.KICK_HIGH + ')') +
+          sel('roomSensor', 'Room temperature sensor', sensors.map(x => [x.sensorId, x.name + (x.temperatureF !== null && x.temperatureF !== undefined ? ' · ' + x.temperatureF + '°F now' : '')])) +
+          inp('roomLow', 'Room lowest °F') + inp('roomHigh', 'Room highest °F') + '</div>' : '') +
         '<div class="lt-scroll"><table class="loadout lt-ctable"><colgroup><col style="width:15%"><col style="width:16%">' + (modbus ? '<col style="width:9%">' : '') + '<col style="width:9%"><col style="width:9%"><col style="width:9%"><col></colgroup><thead><tr><th>Reading</th><th>Where it is</th>' + (modbus ? '<th>Size</th>' : '') + '<th>Divide by</th><th>Low</th><th>High</th><th>Test read</th></tr></thead><tbody>' +
           keys.map(row).join('') + '</tbody></table></div>' +
         '<p class="lt-note">' + (brand ? 'Where it is: ' + escapeHtml(R.TAG_HELP[brand]) + '. ' : (addOn ? 'Pick the brand first (Modbus TCP for the I/O module). ' : 'Pick the brand first (it is on the controller\'s nameplate). ')) + 'Divide by: 10 when the controller sends 4312 for 431.2. Low and high: the line tablet flashes the reading red outside them. Empty boxes are left out.' +
+          (blow ? ' Belt turns: the switch at the belt\'s drive shaft counts each turn; type how many pulses it sends each turn (empty = 1) and the lowest and highest RPM. The app works out the RPM every half minute. The room sensor comes from MOCREO & Sensors.' : '') +
           (R.DEFAULT_RANGES[kind] && R.DEFAULT_RANGES[kind].temp ? ' Temperature with Low and High empty: ' + fmt(R.DEFAULT_RANGES[kind].temp[0]) + '°F to ' + fmt(R.DEFAULT_RANGES[kind].temp[1]) + '°F (what the plant runs at).' : '') + '</p>' +
         '<p' + (info.machineError ? ' class="lt-bad"' : '') + '>' + escapeHtml(heard) + (info.machineError ? ' Last read problem: ' + escapeHtml(info.machineError) : '') + '</p>' +
         '<p>The line PC sends to <b class="lt-mono">' + escapeHtml(readsAddress()) + '</b> with this line\'s key. ' + (info.readerKeyAt ? 'Key made ' + escapeHtml(dateTimeText(info.readerKeyAt)) + '.' : 'No key yet.') + '</p>' +
@@ -459,6 +470,11 @@
         if (!stop) follow(); else if (data) render(true);
       }, { withEmail: true });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
+      onSnapshot(collection(db, 'sensors'), s => {
+        sensors = s.docs.map(d => Object.assign({ sensorId: d.id }, d.data())).filter(x => !x.removed).map(x => ({ sensorId: x.sensorId, name: String(x.name || x.sensorId), temperatureF: x.temperatureF }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        if (data) render('keep');
+      }, () => {});
       document.getElementById('lines').addEventListener('click', () => { rzNote = ''; });
     });
   </script>
