@@ -114,3 +114,5 @@ body.daily-look #delivers { display: none; }
 body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #c81e1e !important; color: #fff; box-shadow: inset 0 0 0 2px #8f1010; }
 table.daily td.offcover::before { content: "NEEDS DRIVER"; font-size: 16px; font-weight: 900; letter-spacing: .03em; color: #fff; white-space: nowrap; overflow: visible; }
 table.daily td.offcover::after { content: attr(data-off-who) "\A" attr(data-off-why); display: block; font-size: 16px; font-weight: 700; line-height: 1.15; color: #fff; white-space: pre-line; }
+/* Joe 10/23: a down truck or trailer says "T-532 DOWN" only; the driver cell's NEEDS DRIVER words are not put on it. */
+table.daily td.unit-down::before, table.daily td.unit-down::after { content: none; display: none; }

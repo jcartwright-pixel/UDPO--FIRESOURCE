@@ -1580,3 +1580,58 @@ body.yard-page .head .badge-test { order: 6; }
    on a second line, and By has room for "Sensor". */
 .temp-page table.tp-table .as-last { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; }
 .temp-page table.tp-table td { overflow-wrap: normal; }
+
+/* Joe 10/23: walkthrough pictures (js/walk-photos.js). Manager Center: the 4th walkthrough stop, a tile with the newest picture still to
+   go with a report, its caption box, Remove and Take Picture. The phone walkthrough: a 4th card with every picture and a TAKE PICTURE button beside it. */
+.wp-input { display: none; }
+.wp-thumbs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.wp-thumbs li { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.wp-thumbs img { flex: none; width: 96px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); background: #e3ebf2; display: block; }
+.wp-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wp-cap { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); padding: 8px 10px; border: 1px solid #9fb3c6; border-radius: 8px; background: #fff; min-height: 40px; }
+.wp-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.wp-line > span { font-size: 16px; font-weight: 700; color: var(--muted); }
+.wp-remove { font: inherit; font-size: 16px; font-weight: 800; color: #c62828; background: none; border: 0; padding: 2px 0; cursor: pointer; text-decoration: underline; }
+.wp-remove:disabled { opacity: .5; cursor: default; }
+.wp-none, .wp-more { margin: 0; font-size: 16px; font-weight: 700; color: var(--muted); }
+a.wp-more { color: var(--ud-blue); }
+.manager-page [data-card="walk"] .wp-count { grid-area: num; text-decoration: none; align-self: center; }
+.manager-page [data-card="walk"] .wp-count b { text-decoration: underline; }
+/* Wide screens: the four columns stay as they were; Last Walkthrough and Pictures share the fourth, one above the other. */
+@media (min-width: 1501px) {
+  .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto; }
+  .manager-page [data-card="walk"] .mc-tiles > .wk-tile:not(.wp-tile) { grid-row: span 2; }
+  .manager-page [data-card="walk"] .mc-tiles > .mc-tile:not(.wk-tile) { padding-top: 4px; padding-bottom: 4px; }
+  .manager-page .mc-grid [data-card="walk"] .wp-tile { grid-template-areas: "label num" "list list"; }
+  .manager-page [data-card="walk"] .wp-tile i { display: none; }
+  .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; padding-top: 6px; }
+  .manager-page [data-card="walk"] .wp-tile b { font-size: 30px; }
+  .manager-page [data-card="walk"] .mc-tiles > .mc-tile:not(.wk-tile) b { font-size: 34px; }
+  .manager-page [data-card="walk"] .wp-tile { padding-top: 4px; padding-bottom: 4px; }
+  /* Kept a little short of the 1536 x 886 screen so a slightly taller font elsewhere still fits with no scrolling. */
+  .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { margin-top: 0; padding-top: 4px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-side { gap: 3px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-cap { min-height: 34px; padding: 4px 8px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-take { height: 36px; min-height: 36px; }
+  /* Four across leaves "3 · Production PAST DUE" little room beside its number: the names at 16px and a slimmer badge,
+     so the whole name shows on one line even where a screen's font runs wider. */
+  .manager-page [data-card="walk"] .wk-tile { padding-left: 10px; padding-right: 10px; column-gap: 6px; }
+  .manager-page [data-card="walk"] .mc-tiles > .mc-tile > span { font-size: 16px; }
+  .manager-page [data-card="walk"] .wk-tile .wk-state { margin-left: 4px; padding: 1px 6px; letter-spacing: 0; white-space: nowrap; }
+}
+.manager-page [data-card="walk"] .wp-tile .wp-box { grid-area: list; display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); min-width: 0; }
+.manager-page [data-card="walk"] .wp-tile .wp-thumbs { gap: 6px; flex: 1 1 100%; }
+.manager-page [data-card="walk"] .wp-tile .wp-side { gap: 4px; }
+.manager-page [data-card="walk"] .wp-tile .wp-thumbs img { width: 64px; height: 48px; }
+.manager-page [data-card="walk"] .wp-tile .wp-take { min-height: 40px; background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+@media (max-width: 1500px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .manager-page [data-card="walk"] .wp-tile { grid-column: span 2; } }
+@media (max-width: 760px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .manager-page [data-card="walk"] .wp-tile { grid-column: 1 / -1; } }
+.walk-page .wp-choice { cursor: default; }
+.walk-page .wp-choice .wp-box { flex: 1 1 100%; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.walk-page button.wk-act { border: 0; font-family: inherit; cursor: pointer; }
+.walk-page .wk-act.take { background: var(--ud-blue); }
+.walk-page .wk-act.take:disabled { opacity: .6; cursor: default; }
+/* On a phone the caption box takes the whole width under its picture. */
+.walk-page .wp-thumbs li { flex-wrap: wrap; }
+.walk-page .wp-side { flex: 1 1 200px; }
+.walk-page .wp-thumbs img { width: 120px; height: 90px; }

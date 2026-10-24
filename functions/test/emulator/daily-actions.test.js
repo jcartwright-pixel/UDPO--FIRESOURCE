@@ -128,6 +128,19 @@ test('Down Trucks: a unit already down but still on loads (the current app put i
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_truck_900002', clearOnly: true }, () => new Date('2026-10-06T16:00:00Z')), /not on the down list/);
 });
 
+// Joe 10/23 (T-532 on 815, T-537 on 824): a down trailer held by its number only (no trailer ID) is still found and taken off.
+test('Down Trucks: a down trailer held on a load by its number only is listed and taken off it (Joe 10/23)', async () => {
+  await notLoaded();
+  await db().collection('equipment').doc('veh_trailer_t_902').update({ status: 'DOWN', notes: 'DOWN: Down' });
+  await db().collection('runs').doc('2026-10-04__run_t801').update({ 'days.tue.trailerId': '', 'days.tue.trailer': 'T-902' });
+  const equipment = (await db().collection('equipment').get()).docs.map(s => s.data());
+  assert.deepEqual(L.offUnitLoads(await runs(), equipment, '2026-10-06').filter(x => x.unitId === 'veh_trailer_t_902').map(x => [x.route, x.date]), [['801', '2026-10-06'], ['801', '2026-10-13']], 'this week by number, next week by ID');
+  const out = await applyAction(db(), DISPATCHER, { action: 'setUnitDown', requestId: rid(), equipmentId: 'veh_trailer_t_902', clearOnly: true }, () => new Date('2026-10-06T16:00:00Z'));
+  assert.deepEqual(out.taken.map(t => [t.route, t.date]), [['801', '2026-10-06'], ['801', '2026-10-13']]);
+  assert.equal((await run('2026-10-04__run_t801')).days.tue.trailer, '');
+  await applyAction(db(), DISPATCHER, { action: 'setUnitUp', requestId: rid(), equipmentId: 'veh_trailer_t_902' });
+});
+
 test("a driver put on a day takes his own truck, also when his other load that day has it; a hand-picked or down one stays (Joe 10/12, Joel Jacobs; Joe 10/19, Kemp and Yoder)", async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
   const T1 = '2026-10-04__run_t801';

@@ -105,6 +105,9 @@ function seedValue(key, cells, week, built) {
   if (day && built) {
     const d = (built.days || {})[day[1]] || {}, f = Object.keys(UNIT_COLUMNS).find(k => UNIT_COLUMNS[k] === day[2]);
     if (f && d.runs && text(d[f])) return text(d[f]);
+    // Joe 10/23 (T-532 on 815, T-537 on 824): a truck or trailer Operations left off (down, out of service, or on another run
+    // that day) stays off: Route Master's default number is not written in its place.
+    if (f && f !== 'driverId' && f !== 'driver') return '';
   }
   if (direct) return direct;
   if (BASE_ALIASES[key]) return masterFirst(cells, BASE_ALIASES[key]);

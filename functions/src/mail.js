@@ -16,6 +16,8 @@ const { GoogleAuth } = require('google-auth-library');
 const GMAIL_SEND = 'https://www.googleapis.com/auth/gmail.send';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
+// An email with pictures goes to Gmail's upload address (whole messages up to 35 MB; the plain address takes far less).
+const UPLOAD_URL = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media';
 
 class MailError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -41,17 +43,13 @@ function addresses(list) {
   return out;
 }
 
-// The message as Gmail takes it: text and HTML versions of the same email, both UTF-8.
-function buildMime({ from, fromName, to, subject, text, html, boundary }) {
+// The message as Gmail takes it: text and HTML versions of the same email, both UTF-8. Joe 10/23: with attachments
+// (walkthrough pictures, [{filename, contentType, base64}]) the two versions go first and each attachment after them.
+function buildMime({ from, fromName, to, subject, text, html, boundary, attachments }) {
   const b = boundary || 'udpo_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+  const files = (attachments || []).filter(a => a && a.base64);
   const sender = fromName ? headerText(fromName) + ' <' + from + '>' : from;
-  const lines = [
-    'From: ' + sender,
-    'To: ' + to.join(', '),
-    'Subject: ' + headerText(subject),
-    'MIME-Version: 1.0',
-    'Content-Type: multipart/alternative; boundary="' + b + '"',
-    '',
+  const body = [
     '--' + b,
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
@@ -62,9 +60,22 @@ function buildMime({ from, fromName, to, subject, text, html, boundary }) {
     'Content-Transfer-Encoding: base64',
     '',
     wrap(b64(html || '')),
-    '--' + b + '--',
-    ''
+    '--' + b + '--'
   ];
+  const head = ['From: ' + sender, 'To: ' + to.join(', '), 'Subject: ' + headerText(subject), 'MIME-Version: 1.0'];
+  if (!files.length) return head.concat(['Content-Type: multipart/alternative; boundary="' + b + '"', ''], body, ['']).join('\r\n');
+  // A picture with a contentId shows in the email itself (the HTML's <img src="cid:...">), so the email is multipart/related;
+  // Gmail still offers each one to download.
+  const inline = files.some(a => a.contentId), m = (inline ? 'rel_' : 'mix_') + b;
+  const lines = head.concat([inline ? 'Content-Type: multipart/related; type="multipart/alternative"; boundary="' + m + '"' : 'Content-Type: multipart/mixed; boundary="' + m + '"', '', '--' + m, 'Content-Type: multipart/alternative; boundary="' + b + '"', ''], body);
+  files.forEach(a => {
+    const name = String(a.filename || 'picture.jpg').replace(/["\\\r\n]+/g, ' ');
+    const id = a.contentId ? String(a.contentId).replace(/[^A-Za-z0-9_.@-]/g, '') : '';
+    lines.push('--' + m, 'Content-Type: ' + (a.contentType || 'application/octet-stream') + '; name="' + name + '"', (id ? 'Content-Disposition: inline' : 'Content-Disposition: attachment') + '; filename="' + name + '"');
+    if (id) lines.push('Content-ID: <' + id + '>');
+    lines.push('Content-Transfer-Encoding: base64', '', wrap(String(a.base64).replace(/\s+/g, '')));
+  });
+  lines.push('--' + m + '--', '');
   return lines.join('\r\n');
 }
 
@@ -167,12 +178,15 @@ async function sendMail(message, deps) {
   const from = addresses([message.from])[0];
   if (!from) throw new MailError('NO_SENDER', 'No sender address is set (MAIL_FROM)');
   const token = await gmailToken(from, GMAIL_SEND, d);
-  const raw = buildMime({ from, fromName: message.fromName, to, subject: message.subject, text: message.text, html: message.html });
-  const sendRes = await fetchFn(SEND_URL, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: b64url(raw) })
-  });
+  const files = (message.attachments || []).filter(a => a && a.base64);
+  const raw = buildMime({ from, fromName: message.fromName, to, subject: message.subject, text: message.text, html: message.html, attachments: files });
+  const sendRes = files.length
+    ? await fetchFn(UPLOAD_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'message/rfc822' }, body: raw })
+    : await fetchFn(SEND_URL, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw: b64url(raw) })
+    });
   const sent = await readJson(sendRes);
   if (!sendRes.ok) {
     const why = (sent.error && sent.error.message) || sent.raw || sendRes.status;

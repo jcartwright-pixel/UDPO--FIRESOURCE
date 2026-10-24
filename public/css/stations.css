@@ -194,6 +194,10 @@
 body.ds-tv { background: #071d30; }
 /* The sign-in card's top margin shows the page behind it: the TV is dark all the way up (Joe 10/16, Fire Stick code screen). */
 html:has(body.ds-tv) { background: #071d30; }
+/* Joe 10/23: the TV link's silent keep-awake video (driver-station.html) fills the screen behind the board. */
+body.ds-awake { background: transparent; }
+body.ds-awake > #signin, body.ds-awake > #screen { position: relative; z-index: 1; }
+#ds-awake { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 0; pointer-events: none; background: #071d30; }
 body.ds-tv .sidemenu, body.ds-tv .side-flyouts { display: none !important; }
 /* The TV itself (?tv=1): no header and no buttons, the board only. */
 body.ds-full .topbar, body.ds-full .actions.in-head { display: none !important; }
