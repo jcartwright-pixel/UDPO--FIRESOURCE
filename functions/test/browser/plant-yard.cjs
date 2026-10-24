@@ -240,6 +240,18 @@ async function seed() {
     await db().collection('gpsReefer').doc('T-702').update({ id: wk + '__yard702|' + pp, out: new Date().toISOString(), seenAt: new Date().toISOString() });
     await phone.waitForFunction((c) => !document.querySelector(c), card, { timeout: 8000 });
     results.push('Phone: T-702 leaves the list when the GPS shows it gone');
+    // Full test 10/24: T-703 (checked 30 minutes ago) is loaded again on a new load 10 minutes ago. The screen shows it due (the
+    // old check was its last load's), and the save must take the new check, not say "already checked".
+    await db().collection('runs').doc(wk + '__yard703').update({ ['days.' + pp + '.completeTime']: new Date(Date.now() - 10 * 60000).toISOString() });
+    await desk.waitForSelector(row('T-703') + ' .yd-temp', { timeout: 15000 });
+    await desk.fill(row('T-703') + ' .yd-temp', '33');
+    await desk.press(row('T-703') + ' .yd-temp', 'Tab');
+    await desk.waitForFunction(() => /Checked|Not saved/.test((document.querySelector('#rows tr[data-trailer="T-703"] .yd-tick') || {}).textContent || ''));
+    assert.match(await desk.textContent(row('T-703') + ' .yd-tick'), /Checked/, 'the reloaded trailer\'s check is saved');
+    assert.equal(await desk.isVisible('#error'), false, 'no "already checked" message');
+    const again = (await db().collection('plantJournal').where('type', '==', 'YARD_CHECK').get()).docs.map(x => x.data()).filter(x => x.createdInApp && x.payload.trailer === 'T-703');
+    assert.deepEqual(again.map(x => x.payload.temperature), ['33']);
+    results.push('T-703 reloaded on a new load after its last check: due on the screen, and the save takes the new check');
     assert.deepEqual(phone.errors, []);
     assert.deepEqual(desk.errors, []);
     assert.deepEqual(watcher.errors, []);

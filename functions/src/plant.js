@@ -925,6 +925,10 @@ function validateYard(input, SaveError) {
   // The phone saves each box as it is left: the first save is the check, later ones fill in the same check.
   out.checkId = text(input.checkId).slice(0, 150);
   if (out.checkId && !/^YARD_CHECK_app_[A-Za-z0-9]+$/.test(out.checkId)) throw new SaveError('BAD_REQUEST', 'checkId is not a yard check');
+  // The load on the yard the check is for (runDays/{runDocId}__{day}), so the 2-hour lock counts only checks made after it was loaded.
+  out.runDocId = text(input.runDocId).slice(0, 200);
+  out.day = text(input.day).slice(0, 10);
+  if (/[/]/.test(out.runDocId) || (out.day && L.DAYS.indexOf(out.day) < 0)) { out.runDocId = ''; out.day = ''; }
   return out;
 }
 
@@ -943,7 +947,15 @@ async function saveYard(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (!req.departed) {
     // Joe 10/19 (yard saves slow): only that day's yard checks, not every plant record of the day (the lock reads no others).
     const same = (await tx.get(journal.where('type', '==', 'YARD_CHECK').where('date', '==', req.date))).docs.map(d => d.data());
-    const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp));
+    // Full test 10/24: a trailer reloaded on a new load showed due but the save said "already checked": the lock counted the
+    // check of its last load. Only checks made after this load was marked loaded count, as on the screen.
+    let completedAt = '';
+    if (req.runDocId && req.day) {
+      const rd = await tx.get(db.collection('runDays').doc(req.runDocId + '__' + req.day));
+      const day = rd.exists && rd.data().days ? rd.data().days[req.day] : null;
+      if (day && R.yardTrailer(day.trailer || day.trailerId) === req.trailer) completedAt = text(day.completeTime);
+    }
+    const left = R.yardLockLeft(same, req.date, req.trailer, Date.parse(stamp), completedAt);
     if (left) throw new SaveError('CONFLICT', 'Trailer ' + req.trailer + ' was already checked. It can be checked again in ' + left + ' minutes.');
   }
   // Joe 10/18: a check keeps the trailer's GPS temperature at that time (gpsReefer, while it is recorded), for the 24-Hour History.

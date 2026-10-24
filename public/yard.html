@@ -253,7 +253,7 @@
       tick(trailer);
       const pick = (k) => d[k] !== undefined ? d[k] : (m.checkId ? x[k] || '' : '');
       const run = async () => {
-        const fields = { date, trailer, routeRun, temperature: pick('temperature'), setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
+        const fields = { date, trailer, routeRun, runDocId: x.runDocId || '', day: x.day || '', temperature: pick('temperature'), setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: pick('fuelLevel'), notes: pick('notes') };
         if (m.checkId) fields.checkId = m.checkId;
         let mineRec = null;
         if (!m.checkId) {
@@ -313,7 +313,7 @@
     async function send(trailer, routeRun, departed) {
       const d = drafts[trailer] || {}, x = queue().rows.find(r => r.trailer === trailer) || {};
       const fields = departed ? { date, trailer, routeRun, departed: true }
-        : { date, trailer, routeRun, temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
+        : { date, trailer, routeRun, runDocId: x.runDocId || '', day: x.day || '', temperature: d.temperature !== undefined ? d.temperature : x.temperature || '', setPoint: d.setPoint !== undefined ? d.setPoint : x.setPoint || '', fuelLevel: d.fuelLevel !== undefined ? d.fuelLevel : x.fuelLevel || '', notes: d.notes !== undefined ? d.notes : x.notes || '' };
       const mine = { type: 'YARD_CHECK', date, recordedAt: new Date().toISOString(), recordedBy: person && person.email || '', createdInApp: true, run: routeRun,
         payload: departed ? { route: routeRun, run: routeRun, trailer, notes: 'Left the yard', status: 'DEPARTED' } : Object.assign({ route: routeRun, run: routeRun, status: 'COMPLETE' }, fields) };
       pending.push(mine);
