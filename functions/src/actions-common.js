@@ -45,6 +45,8 @@ function queueSheetCells(tx, db, requestId, part, run, runDocId, day, values, st
 }
 // One queued row: `cells` may hold several days and the run's own columns; extra.append = a run new to the Live tab.
 function queueCells(tx, db, requestId, part, run, runDocId, cells, stamp, email, extra) {
+  // A one-week extra line (actions-weekly.js addExtraRun) has no Live sheet row: its saves stay in Operations.
+  if (run && run.extraRun) return;
   const days = L.DAYS.filter(p => run.days && run.days[p] && run.days[p].runs);
   tx.set(db.collection(C.outbox).doc(requestId + (part ? '-' + part : '')), Object.assign({
     status: 'pending', at: stamp, by: email, requestId, runDocId, tab: run.sourceTab, weekStart: run.weekStart,
@@ -58,6 +60,7 @@ function queueCells(tx, db, requestId, part, run, runDocId, cells, stamp, email,
  */
 const HISTORY_FIELDS = ['completeTime', 'loadStatus', 'casesOut', 'loadTemperature', 'plantStartedAt'];
 function queueLoadoutHistory(tx, db, req, run, d, after, stamp, email) {
+  if (run && run.extraRun) return;
   const t = (v) => v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
   const complete = t(d.completeTime), status = t(d.loadStatus).toUpperCase();
   if (!complete && status !== 'COMPLETE') return;

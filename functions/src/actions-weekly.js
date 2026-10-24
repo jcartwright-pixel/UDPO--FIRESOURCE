@@ -29,7 +29,8 @@ async function reorderWeek(tx, db, req, email, stamp, logRef, mode) {
     queueMaster(tx, db, mode, req.requestId, String(i), r, snaps[i].data().id || req.runIds[i], { weekOrder: (i + 1) * 10 }, false, stamp, email);
   });
   runSnap.docs.forEach(d => {
-    const id = M.safeIdPart(String(d.data().runId || ''));
+    // A one-week extra line (Joe 10/23) moves with the run it was added for.
+    const id = M.safeIdPart(String(d.data().extraOfRunId || d.data().runId || ''));
     if (order[id] !== undefined && d.data().weekOrder !== order[id]) tx.update(d.ref, { weekOrder: order[id] });
   });
   const result = { ok: true, requestId: req.requestId, runs: [] };
@@ -118,4 +119,65 @@ async function resetWeek(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { reorderWeek, publishWeek, setWeekReason, resetWeek };
+/*
+ * Joe 10/23 ("this week I have an extra Ventura, so I actually have two on the same day ... a temporary, one-time thing"): a second
+ * line for a run, for this week only, added from the run's name on Weekly Dispatch. It is a run of its own (own run_id), so it gets
+ * its own driver on every screen, the double-booking check counts it, and it never picks up the first line's Plant Scheduler
+ * loads. It is not in Route Master, so Reset Week, Route Master saves and Publish's new Next week leave it alone and it does not
+ * come back the next week. It is kept in Operations only: the Live sheet has no row for it (actions-common.js skips its cells).
+ * It starts with every day off (no driver); picking a driver on a day turns that day on. Times and load days come from the run.
+ */
+const EXTRA_KEEP = ['loadSequence', 'deliveryDate', 'loadDayOffset', 'loadDate', 'departureDate', 'startTime', 'dispatchTime', 'routeHours', 'miles'];
+function extraName(base, n) {
+  const name = L.runText(base);
+  return /\d$/.test(name) ? name + ' EXTRA' + (n > 2 ? ' ' + (n - 1) : '') : name + ' ' + n;
+}
+async function addExtraRun(tx, db, req, email, stamp, logRef, mode) {
+  const baseRef = db.collection(C.runs).doc(req.runDocId), baseSnap = await tx.get(baseRef);
+  if (!baseSnap.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in this week');
+  const base = baseSnap.data();
+  if (base.extraRun) throw new SaveError('BAD_REQUEST', 'Add the extra line from the run\'s own line');
+  const weekSnap = await tx.get(db.collection(C.runs).where('weekStart', '==', base.weekStart));
+  const taken = new Set(weekSnap.docs.map(d => d.id)), runIds = new Set(weekSnap.docs.map(d => d.data().runId));
+  let n = 2 + weekSnap.docs.filter(d => d.data().extraOf === req.runDocId).length, runId, id;
+  for (;; n++) { runId = base.runId + '__extra' + n; id = M.runDocId(base.weekStart, runId); if (!taken.has(id) && !runIds.has(runId)) break; }
+  // A day the run does not run has no time or load day of its own: the first day it does run lends them.
+  const lend = L.DAYS.map(p => (base.days || {})[p] || {}).find(d => d.runs && (d.dispatchTime !== null && d.dispatchTime !== undefined)) || {};
+  const days = {};
+  L.DAYS.forEach((p, i) => {
+    const was = (base.days || {})[p] || {}, day = {};
+    M.DAY_FIELDS.forEach(([f, , kind]) => { day[f] = kind === 'yes' ? false : kind === 'text' ? '' : null; });
+    EXTRA_KEEP.forEach(f => { if (was[f] !== undefined && was[f] !== null && was[f] !== '') day[f] = was[f]; });
+    ['dispatchTime', 'startTime', 'routeHours', 'miles', 'loadDayOffset'].forEach(f => { if ((day[f] === null || day[f] === undefined) && lend[f] !== undefined) day[f] = lend[f]; });
+    day.deliveryDate = day.deliveryDate || L.addDays(base.weekStart, i);
+    if (!day.loadDate) day.loadDate = L.addDays(day.deliveryDate, day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : Number(day.loadDayOffset));
+    day.runs = false;
+    days[p] = day;
+  });
+  const run = {};
+  M.RUN_FIELDS.forEach(([f]) => { run[f] = base[f] === undefined ? null : base[f]; });
+  Object.assign(run, {
+    weekStart: base.weekStart, sourceTab: base.sourceTab || '', sheetRow: null, runId, run: extraName(base, n), extraRun: true, extraOf: req.runDocId, extraOfRunId: base.runId || '',
+    weekOrder: base.weekOrder === undefined ? null : base.weekOrder, weeklyShowMaster: base.weeklyShowMaster === undefined ? null : base.weeklyShowMaster,
+    masterShow: base.masterShow || null, days, cells: {}, rev: Date.parse(stamp), testEdited: true, editedAt: stamp, editedBy: email, addedBy: email, addedAt: stamp
+  });
+  tx.set(db.collection(C.runs).doc(id), run);
+  const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: id, rev: run.rev }], runDocId: id, name: run.run };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: base.weekStart, runDocId: id, before: null, after: { extraOf: req.runDocId, run: run.run }, result });
+  return result;
+}
+// Takes a one-week extra line off again, unless a day of it was already loaded.
+async function removeExtraRun(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.runs).doc(req.runDocId), snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That line is already gone');
+  const run = snap.data();
+  if (!run.extraRun) throw new SaveError('NOT_ALLOWED', 'Only a line added for this week can be removed here');
+  const loaded = L.DAYS.filter(p => { const d = (run.days || {})[p] || {}; return d.runs && (d.completeTime || d.loadedComplete === true || String(d.loadStatus || '').toUpperCase() === 'COMPLETE'); });
+  if (loaded.length) throw new SaveError('NOT_ALLOWED', L.runText(run) + ' was already loaded on ' + loaded.map(p => L.DAY_NAMES[L.DAYS.indexOf(p)]).join(', ') + ', so it stays');
+  tx.delete(ref);
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: run.weekStart, runDocId: req.runDocId, before: { run: run.run, extraOf: run.extraOf || '', days: run.days }, after: null, result });
+  return result;
+}
+
+module.exports = { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun };

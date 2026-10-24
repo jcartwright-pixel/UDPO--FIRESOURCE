@@ -461,7 +461,7 @@
 
   // The Weekly Dispatch grid for one week: one line per run, seven day cells.
   function weeklyRows(runs, week) {
-    return (runs || []).filter(function (run) {
+    var rows = (runs || []).filter(function (run) {
       return run.weekStart === week && weeklyShown(run);
     }).map(function (run) {
       var days = {};
@@ -475,12 +475,23 @@
           plantLoadOff: d.plantLoadOff === true
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0,
+        extraRun: run.extraRun === true, extraOf: run.extraOf || '' };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;
       return x - y || compareRoute(a, b);
     });
+    // Joe 10/23: a one-week extra line sits right under the run it was added for.
+    var extras = rows.filter(function (r) { return r.extraRun && rows.some(function (b) { return b.runDocId === r.extraOf; }); });
+    if (!extras.length) return rows;
+    var out = [];
+    rows.forEach(function (r) {
+      if (extras.indexOf(r) >= 0) return;
+      out.push(r);
+      extras.forEach(function (x) { if (x.extraOf === r.runDocId) out.push(x); });
+    });
+    return out;
   }
 
   // Who may save (USERS_MASTER roles). Changing the load order needs a manager, the same rule as the current app

@@ -31,7 +31,7 @@ const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily'
 const { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
-const { reorderWeek, publishWeek, setWeekReason, resetWeek } = require('./actions-weekly');
+const { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
 const LIVEROLL = require('./liveroll');
 const { saveOtr, otrColumnKey } = require('./actions-otr');
 
@@ -75,6 +75,9 @@ const ACTIONS = Object.freeze({
   reorderWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  // Joe 10/23 (two Venturas one day): a second line for a run, this week only (not in Route Master), and taking it off again.
+  addExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  removeExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   saveDriverTemplate: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveOtr: { roles: DRIVER_ROLES, screen: 'otr' },
   saveScorecard: { roles: DRIVER_ROLES, screen: 'scorecard' },
@@ -469,6 +472,11 @@ function validate(input) {
     if (String(input.value).trim() === '' || !isFinite(out.value) || out.value < 0 || out.value > 100) throw new SaveError('BAD_REQUEST', 'Type a number from 0 to 100');
     return out;
   }
+  if (action === 'addExtraRun' || action === 'removeExtraRun') {
+    out.runDocId = text(input.runDocId);
+    if (!out.runDocId) throw new SaveError('BAD_REQUEST', 'Pick the run');
+    return out;
+  }
   if (action === 'setWeekReason') {
     out.weekStart = text(input.weekStart);
     if (!L.isDateKey(out.weekStart)) throw new SaveError('BAD_REQUEST', 'weekStart must be yyyy-mm-dd');
@@ -827,6 +835,8 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveVacation') return saveVacation(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'addExtraRun') return addExtraRun(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'removeExtraRun') return removeExtraRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveScorecard') return saveScorecard(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'rateTruckClean') return rateTruckClean(tx, db, req, email, stamp, logRef, mode);
