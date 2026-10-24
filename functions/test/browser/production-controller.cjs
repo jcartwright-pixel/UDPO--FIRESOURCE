@@ -5,8 +5,10 @@
  *   - Line Targets: Counted by Machine controller; brand, IP address and where each reading is, each box saved as it is left;
  *     the line key; Test read shows the number the line PC read;
  *   - the line PC program (tools/device-bridge, --controller) reading a pretend Modbus controller on this computer;
- *   - the Blow Mold tablet: From the machine with the jug count, annealer speed and temperature, red outside the range; the
- *     bottle check weighs a jug from each of the six heads in grams, flagged outside the range on Line Targets;
+ *   - the Blow Mold tablet: From the sensors with the annealer temperature and the belt's RPM counted from its turns (Joe 10/23),
+ *     the room's MOCREO sensor, red outside the range; jugs molded from the shot counter (6 a shot), jugs through the tester
+ *     and the kick-outs; the resin lot scanned and White or Clear, each a run on Runs this shift; the bottle check weighs a
+ *     jug from each of the six heads in grams, flagged outside the range on Line Targets;
  *   - Production Lines: the readings on the card, and the line's shift view with the hour by hour.
  * Pictures go to SHOTS_DIR.
  */
@@ -58,10 +60,11 @@ async function until(what, fn) {
   throw new Error('Timed out waiting for ' + what);
 }
 
-// A pretend Modbus controller: holding registers 0-1 the jug count (32 bits), 10 the speed, 11 the temperature in tenths.
+// A pretend Modbus controller: holding registers 0-1 the jug count (32 bits), 10 the speed, 11 the temperature in tenths,
+// 30-31 the lever's shots and 40-41 the annealer belt's turns (32 bits each).
 // It answers read requests only; anything else is refused and remembered, so the test can show nothing was ever written.
 function controller() {
-  const regs = { 0: 19, 1: 39978, 10: 70, 11: 4312 }, writes = [];
+  const regs = { 0: 19, 1: 39978, 10: 70, 11: 4312, 30: 3, 31: 1000, 40: 0, 41: 5000 }, writes = [];
   const server = net.createServer(sock => {
     let buf = Buffer.alloc(0);
     sock.on('data', d => {
@@ -78,8 +81,14 @@ function controller() {
     });
     sock.on('error', () => {});
   });
-  // The machine makes about 40 jugs every 5 seconds.
-  const jugs = setInterval(() => { let n = regs[0] * 65536 + regs[1] + 8; regs[0] = Math.floor(n / 65536); regs[1] = n % 65536; }, 1000);
+  // The machine makes about 40 jugs every 5 seconds, with about 4% more molded (the tester's kick-outs); the belt turns 70 a minute.
+  const add = (hi, by) => { const n = regs[hi] * 65536 + regs[hi + 1] + by; regs[hi] = Math.floor(n / 65536); regs[hi + 1] = n % 65536; };
+  let shots = 0, turns = 0;
+  const jugs = setInterval(() => {
+    add(0, 8);
+    shots += 8 * 1.04 / 6; add(30, Math.floor(shots)); shots -= Math.floor(shots);
+    turns += 70 / 60; add(40, Math.floor(turns)); turns -= Math.floor(turns);
+  }, 1000);
   return new Promise(res => server.listen(0, '127.0.0.1', () => res({ port: server.address().port, regs, writes, close: () => { clearInterval(jugs); server.close(); } })));
 }
 
@@ -100,7 +109,9 @@ function controller() {
     await lt.waitForSelector('#controller:not([hidden]) [data-c="brand"]');
     assert.equal(await lt.inputValue('#controller [data-c="brand"]'), '', 'the brand starts blank');
     assert.equal(await lt.textContent('#counter-pill'), 'Counts from the machine');
-    assert.match(await lt.textContent('#controller'), /Speed is called \(empty = Annealer speed\)/, 'Joe 10/14: the Blow Mold\'s speed is the annealer speed');
+    // Joe 10/23: the Blow Mold's belt speed is counted from its turns, not read from the speed control.
+    assert.deepEqual(await lt.$$eval('#controller .lt-ctable tbody th', t => t.map(x => x.textContent)), ['Jugs through tester', 'Shots (lever switch)', 'Belt turns (shaft switch)', 'Annealer temperature (°F)']);
+    await db().collection('sensors').doc('blow-room').set({ sensorId: 'blow-room', name: 'Blow Mold Room', temperatureF: 96, lastReadingAt: new Date().toISOString() });
     await lt.selectOption('#controller [data-c="brand"]', 'MODBUS');
     await until('brand saved', async () => ((await lineDoc()).controller || {}).brand === 'MODBUS');
     const type = async (k, v) => {
@@ -109,8 +120,11 @@ function controller() {
       await lt.press('#controller [data-c="' + k + '"]', 'Tab');
       await until(k + ' saved', async () => String(((await lineDoc()).controller || {})[k]) === v);
     };
-    for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(plc.port)], ['countTag', '40001'], ['speedTag', '40011'], ['speedLow', '65'], ['speedHigh', '75'],
-      ['tempTag', '40012'], ['tempDivide', '10'], ['tempLow', '395'], ['tempHigh', '425']]) await type(k, v);
+    for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(plc.port)], ['countTag', '40001'], ['shotsTag', '40031'], ['turnsTag', '40041'], ['pulsesPerTurn', '1'], ['speedLow', '65'], ['speedHigh', '75'],
+      ['tempTag', '40012'], ['tempDivide', '10'], ['tempLow', '395'], ['tempHigh', '425'], ['jugsPerShot', '6'], ['roomHigh', '95']]) await type(k, v);
+    await lt.waitForFunction(() => !!document.querySelector('#controller [data-c="roomSensor"] option[value="blow-room"]'));
+    await lt.selectOption('#controller [data-c="roomSensor"]', 'blow-room');
+    await until('room sensor saved', async () => ((await lineDoc()).controller || {}).roomSensor === 'blow-room');
     // The Blow Mold's jug weight range (Joe 10/14: six heads, in grams), with the changeover and CIP boxes.
     for (const [k, v] of [['jugWeightTarget', '57'], ['jugWeightLow', '55'], ['jugWeightHigh', '59']]) {
       await lt.fill('#setup-' + k, v);
@@ -130,6 +144,8 @@ function controller() {
     assert.match(await lt.textContent('#controller'), /--controller/);
     results.push('Line Targets: Counted by Machine controller; brand, IP address, port and where the jug count, speed and temperature are, saved box by box; a wrong IP address refused; the line key and the line PC command');
 
+    // The belt's last turn count 40 seconds ago (so its first RPM shows without waiting the half minute).
+    await db().collection('productionLines').doc(BLOW).set({ turnsLast: { value: plc.regs[40] * 65536 + plc.regs[41] - 47, at: new Date(Date.now() - 40000).toISOString() } }, { merge: true });
     // The line PC program, reading the pretend controller every second.
     bridge = spawn(process.execPath, [path.join(__dirname, '../../../tools/device-bridge/bridge.cjs'), '--address', DOOR, '--device', BLOW, '--key', key, '--controller', '--every', '1'], { stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
@@ -158,21 +174,25 @@ function controller() {
     await lt.close();
     results.push('Test read: the line PC read the temperature (4,312 ÷ 10 = 431.2°F) and the jug counter from the pretend controller, shown on Line Targets');
 
-    // The Blow Mold tablet: From the machine; the temperature is over its range and flashes red; the speed is in range.
+    // The Blow Mold tablet: From the sensors; the temperature and the room are over their ranges and flash red; the belt RPM is in range.
     for (const [w, h] of [[1024, 1180], [800, 1180]]) {
       const bm = await openPage(browser, w, h, '/line.html?line=' + BLOW + '&' + ADMIN);
       await bm.waitForSelector('#machine:not([hidden])');
-      await bm.waitForFunction(() => /TOO HOT/.test(document.getElementById('machine').textContent) && /IN RANGE/.test(document.getElementById('machine').textContent));
+      await bm.waitForFunction(() => /TOO HOT/.test(document.getElementById('machine').textContent) && /IN RANGE/.test(document.getElementById('machine').textContent) && /RPM/.test(document.getElementById('machine').textContent));
       const tiles = await bm.$$eval('#machine .lb-card', cs => cs.map(c => [c.querySelector('.eyebrow').textContent, c.classList.contains('lb-flash')]));
-      assert.deepEqual(tiles, [['Jug count', false], ['Annealer speed', false], ['Temperature', true]]);
+      assert.deepEqual(tiles, [['Annealer temperature', true], ['Annealer belt speed', false], ['Room temperature', true], ['Jugs ahead of filler', false]]);
       assert.match(await bm.textContent('#machine'), /431\.2°F/);
-      await bm.waitForFunction(() => /COUNTING/.test(document.getElementById('machine').textContent), null, { timeout: 15000 });
       assert.match(await bm.textContent('#machine'), /Range 395°F to 425°F/);
-      assert.match(await bm.textContent('#kind-cards'), /FROM THE MACHINE/);
+      assert.match(await bm.textContent('#machine'), /\d+(\.\d)? RPM\s*Range 65 to 75 · counted from the belt/);
+      assert.match(await bm.textContent('#machine'), /96°F\s*Range up to 95°F/);
+      // Joe 10/23: jugs molded = shots x 6; jugs through the tester; the difference is the kick-outs, red over 2%.
+      await bm.waitForFunction(() => /FROM THE SHOT COUNTER/.test(document.getElementById('kind-cards').textContent) && /% OF JUGS MOLDED/.test(document.getElementById('kind-cards').textContent));
+      assert.deepEqual(await bm.$$eval('#kind-cards .lb-card .eyebrow', e => e.map(x => x.textContent)), ['Making now', 'Jugs molded', 'Jugs through tester', 'Tester kick-outs']);
+      assert.match(await bm.textContent('#kind-cards'), /shots × 6 jugs/);
       assert.equal(await bm.$('#kind-cards [data-act="count"]'), null, 'no Enter Count: the machine counts');
       assert.match(await bm.textContent('#live'), /Counts from the machine/);
       // Joe 10/14: the Blow Mold makes only gallon jugs, so its one product is running with nothing to pick.
-      assert.match(await bm.textContent('#kind-cards'), /Gallon Jug\s*The only product made here/);
+      assert.match(await bm.textContent('#kind-cards'), /Making now\s*Gallon Jug/);
       assert.equal(await bm.$('#kind-cards [data-act="product"]'), null, 'no Pick Product on the Blow Mold');
       assert.doesNotMatch(await bm.textContent('#status-text'), /pick the product/);
       // The bottle check: one jug from each of the six heads, in grams; a head outside 55 to 59 g is flagged.
@@ -189,6 +209,24 @@ function controller() {
       assert.match(await bm.textContent('#check-inline'), /Target 57 g\. Range 55 to 59 g\./);
       await fits(bm, 'the Blow Mold tablet at ' + w);
       await bigText(bm, '#machine', 'From the machine');
+      if (w === 1024) {
+        // Joe 10/23 (mock-up 2): the scanner types the resin lot and presses Enter; White or Clear; each change is a new run.
+        await bm.fill('#lot-scan', 'R-24097');
+        await bm.press('#lot-scan', 'Enter');
+        await bm.waitForFunction(() => /Resin lot R-24097/.test(document.getElementById('kind-cards').textContent));
+        assert.equal(await bm.inputValue('#lot-scan'), '', 'the scan box clears for the next bag');
+        await bm.click('#kind-cards [data-color="WHITE"]');
+        await bm.waitForFunction(() => /Gallon Jug · WHITE/.test(document.getElementById('kind-cards').textContent));
+        await bm.fill('#lot-scan', 'R-24118');
+        await bm.press('#lot-scan', 'Enter');
+        await bm.waitForFunction(() => document.querySelectorAll('#lot-runs tbody tr').length === 3 && /R-24118/.test(document.querySelector('#lot-runs tr.now').textContent));
+        assert.deepEqual(await bm.$$eval('#lot-runs tbody tr', r => r.map(x => [x.children[1].textContent, x.children[2].textContent])), [['R-24097', '—'], ['R-24097', 'White'], ['R-24118', 'White']]);
+        assert.deepEqual(await bm.$$eval('#lot-runs thead th', t => t.map(x => x.textContent)), ['Started', 'Resin lot', 'Color', 'Jugs molded', 'Through tester', 'Kick-outs', 'Annealer temp', 'Belt speed', 'Room temp']);
+        const r = (await db().collection('productionRuns').where('operationId', '==', BLOW).get()).docs[0].data();
+        assert.deepEqual([r.lot, r.color, r.lotLog.length], ['R-24118', 'WHITE', 3]);
+        assert.deepEqual([(await lineDoc()).lot, (await lineDoc()).color], ['R-24118', 'WHITE'], 'the next shift starts on them');
+        await bigText(bm, '#kind-cards, #lot-runs', 'Making now and Runs this shift');
+      }
       await bm.evaluate(() => document.querySelectorAll('.lb-flash').forEach(c => { c.style.animation = 'none'; c.style.background = '#fde1e1'; }));
       await shot(bm, 'controller-tablet-blow-mold-' + w);
       assert.deepEqual(bm.errors, []);
@@ -210,7 +248,7 @@ function controller() {
     assert.deepEqual(rec.errors, []);
     await rec.close();
     results.push('Blow Mold check recorded: Last check · Head 2, Head 5 OUT · next check due, read-only; the numbers only in Earlier this shift');
-    results.push('Blow Mold tablet (1024 and 800): From the machine with the jug count, annealer speed in range and the temperature flashing TOO HOT; Jugs this shift FROM THE MACHINE with no Enter Count; Gallon Jug running with no Pick Product; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
+    results.push('Blow Mold tablet (1024 and 800): From the sensors with the annealer temperature and the room flashing TOO HOT and the belt RPM counted from its turns in range; jugs molded from the shot counter, through the tester and the kick-outs, with no Enter Count; the resin lot scanned and White picked, each a run on Runs this shift; Gallon Jug running with no Pick Product; the bottle check has Head 1 to Head 6 in grams with 60.2 HEAVY and 54.6 LIGHT against 55 to 59 g');
 
     // Production Lines: the card and the line's shift view.
     const pl = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);

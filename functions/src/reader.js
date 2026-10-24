@@ -142,7 +142,12 @@ const KINDS = ['LINE_READER', 'CAMERA', 'HANDHELD', 'CONTROLLER'], READS = ['UPC
 
 // ---------- A machine's own controller (Joe 10/14) ----------
 const BY_MACHINE = 'machine controller';
-const READ_KEYS = ['count', 'speed', 'temp', 'running', 'infeed'];
+const READ_KEYS = ['count', 'speed', 'temp', 'running', 'infeed', 'shots', 'turns'];
+// Running totals the controller keeps (32 bits unless Line Targets says 16).
+const TOTALS = ['count', 'infeed', 'shots', 'turns'];
+// Joe 10/23 (Blow Mold): the belt's RPM is worked out from its shaft's turns over at least this long, so a few turns in a few
+// seconds do not swing it; a gap longer than RPM_GAP_MS starts over.
+const RPM_MIN_MS = 30000, RPM_GAP_MS = 600000;
 // Joe 10/14 (Gallon Filler add-on sensors, B): a stop the motor current switch opened is ended by it too.
 const BY_SWITCH = 'motor switch';
 const LOG_LIMIT = 720, BIG_JUMP = 50000;
@@ -151,7 +156,7 @@ const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? t : 0;
 // What the line PC needs from Line Targets: where the controller is and which tag or register holds each reading.
 function configOut(cfg) {
   const c = cfg || {}, readings = {};
-  READ_KEYS.forEach(k => { if (text(c[k + 'Tag'])) readings[k] = { tag: text(c[k + 'Tag']), size: numOrNull(c[k + 'Size']) || (k === 'count' || k === 'infeed' ? 32 : 16) }; });
+  READ_KEYS.forEach(k => { if (text(c[k + 'Tag'])) readings[k] = { tag: text(c[k + 'Tag']), size: numOrNull(c[k + 'Size']) || (TOTALS.indexOf(k) >= 0 ? 32 : 16) }; });
   if (!text(c.brand) || !text(c.ip)) return null;
   return { brand: text(c.brand), ip: text(c.ip), port: numOrNull(c.port), slot: numOrNull(c.slot), rack: numOrNull(c.rack), unit: numOrNull(c.unit), wordOrder: text(c.wordOrder) || 'HIGH_FIRST', readings };
 }
@@ -172,7 +177,8 @@ async function applyMachine(db, id, r, opts) {
     const ref = db.collection('productionRuns').doc(docId(P.runId(id, shift.key))), had = await tx.get(ref);
     const productsSnap = had.exists ? null : await tx.get(db.collection('plantProducts').doc(docId(id)));
     const scale = (v, d) => (v === null ? null : Math.round(v / (numOrNull(d) > 0 ? numOrNull(d) : 1) * 10) / 10);
-    const value = numOrNull(r.count), speed = scale(numOrNull(r.speed), cfg.speedDivide), temp = scale(numOrNull(r.temp), cfg.tempDivide);
+    const value = numOrNull(r.count), temp = scale(numOrNull(r.temp), cfg.tempDivide);
+    let speed = scale(numOrNull(r.speed), cfg.speedDivide), speedFrom = speed === null ? '' : 'CONTROL';
     const last = ld.machineLast && numOrNull(ld.machineLast.value) !== null ? numOrNull(ld.machineLast.value) : null;
     let delta = 0;
     if (ld.counter === 'CONTROLLER' && value !== null && value >= 0 && last !== null) {
@@ -185,25 +191,55 @@ async function applyMachine(db, id, r, opts) {
     const inLast = ld.infeedLast && numOrNull(ld.infeedLast.value) !== null ? numOrNull(ld.infeedLast.value) : null;
     let inDelta = 0;
     if (inV !== null && inV >= 0 && inLast !== null) { inDelta = inV >= inLast ? inV - inLast : inV; if (inDelta > BIG_JUMP) inDelta = 0; }
+    // Joe 10/23 (Blow Mold): the lever's shots (its own running total, like the infeed eye), and the belt's turns: RPM = turns
+    // since the last worked-out reading ÷ pulses each turn ÷ minutes between them. The counted RPM is the belt speed.
+    const shV = numOrNull(r.shots), shLast = ld.shotsLast && numOrNull(ld.shotsLast.value) !== null ? numOrNull(ld.shotsLast.value) : null;
+    let shDelta = 0;
+    if (shV !== null && shV >= 0 && shLast !== null) { shDelta = shV >= shLast ? shV - shLast : shV; if (shDelta > BIG_JUMP) shDelta = 0; }
+    const tuV = numOrNull(r.turns), tuLast = ld.turnsLast && numOrNull(ld.turnsLast.value) !== null ? ld.turnsLast : null;
+    let tuSet = null;
+    if (tuV !== null && tuV >= 0) {
+      const gap = tuLast ? ms - when(tuLast.at) : 0;
+      if (!tuLast || gap > RPM_GAP_MS || gap < 0) tuSet = { value: tuV, at: stamp };
+      else if (gap >= RPM_MIN_MS) {
+        const turned = tuV >= numOrNull(tuLast.value) ? tuV - numOrNull(tuLast.value) : tuV;
+        speed = Math.round(turned / (numOrNull(cfg.pulsesPerTurn) > 0 ? numOrNull(cfg.pulsesPerTurn) : 1) / (gap / 60000) * 10) / 10;
+        speedFrom = 'TURNS'; tuSet = { value: tuV, at: stamp };
+      }
+    }
+    // The room's temperature (a MOCREO sensor picked on Line Targets), read once a minute with the machine's log.
+    let room = null, roomAt = '';
+    const roomId = /^[^/]{1,200}$/.test(text(cfg.roomSensor)) && !/^\.{1,2}$/.test(text(cfg.roomSensor)) ? text(cfg.roomSensor) : '';
+    if (roomId) {
+      const runNow = had.exists ? had.data() : {}, ml = Array.isArray(runNow.machineLog) ? runNow.machineLog : [], ll = ml[ml.length - 1];
+      if (!ll || ms - when(ll.at) >= 60000) {
+        const sn = await tx.get(db.collection('sensors').doc(roomId)), sd = sn.exists ? sn.data() : {};
+        room = numOrNull(sd.temperatureF); roomAt = text(sd.lastReadingAt || sd.readingAt || sd.lastSyncAt);
+      }
+    }
     const errors = r.errors && typeof r.errors === 'object' ? READ_KEYS.filter(k => text(r.errors[k])).map(k => k + ': ' + text(r.errors[k]).slice(0, 200)).join(' · ') : '';
     const lineUpd = {};
     if (value !== null && last !== value) lineUpd.machineLast = { value, at: stamp };
     if (inV !== null && inLast !== inV) lineUpd.infeedLast = { value: inV, at: stamp };
+    if (shV !== null && shLast !== shV) lineUpd.shotsLast = { value: shV, at: stamp };
+    if (tuSet) lineUpd.turnsLast = tuSet;
     if (!when(ld.machineHeardAt) || ms - when(ld.machineHeardAt) >= 60000 || errors !== text(ld.machineError)) { lineUpd.machineHeardAt = stamp; lineUpd.machineError = errors; }
     let count = had.exists ? numOrNull(had.data().count) : null;
-    if (had.exists || delta > 0 || speed !== null || temp !== null || running !== null || inDelta > 0) {
+    if (had.exists || delta > 0 || speed !== null || temp !== null || running !== null || inDelta > 0 || shDelta > 0) {
       const run = had.exists ? had.data() : machineRun(id, line, shift, stamp);
       ['counts', 'runs', 'stops'].forEach(k => { if (!Array.isArray(run[k])) run[k] = []; });
       // Joe 10/14: the Blow Mold makes only gallon jugs, so a new shift starts on its one product.
       const only = productsSnap ? P.targetsFor(productsSnap.exists ? productsSnap.data().products : []) : [];
       if (!had.exists && only.length === 1 && P.lineKind(line.name) === 'BLOWMOLD') { run.product = only[0].name; run.sku = text(only[0].sku); run.runs.push({ product: run.product, sku: run.sku, from: stamp, by: 'only product' }); }
       const m = Object.assign({}, run.machine || {}), log = Array.isArray(run.machineLog) ? run.machineLog : [];
+      // Between worked-out RPMs the belt keeps its last one.
+      if (speed === null && tuV !== null && m.speedFrom === 'TURNS') { speed = numOrNull(m.speed); speedFrom = 'TURNS'; }
       const kind = P.lineKind(line.name), sr = P.machineRange(kind, cfg, 'speed'), tr = P.machineRange(kind, cfg, 'temp'), sf = P.machineFlag(speed, sr[0], sr[1]), tf = P.machineFlag(temp, tr[0], tr[1]);
       const lastLog = log[log.length - 1], logDue = !lastLog || ms - when(lastLog.at) >= 60000;
       const switched = running !== null && running !== (m.running === undefined ? null : m.running);
-      const write = !had.exists || delta > 0 || inDelta > 0 || switched || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
+      const write = !had.exists || delta > 0 || inDelta > 0 || shDelta > 0 || room !== null || switched || logDue || sf !== (m.speedFlag || '') || tf !== (m.tempFlag || '') || ms - when(m.at) >= 15000;
       if (write) {
-        Object.assign(m, { at: stamp, counter: value, speed, temp, speedFlag: sf, tempFlag: tf,
+        Object.assign(m, { at: stamp, counter: value, speed, speedFrom, temp, speedFlag: sf, tempFlag: tf,
           speedOutSince: sf ? (m.speedFlag === sf && m.speedOutSince ? m.speedOutSince : stamp) : '', tempOutSince: tf ? (m.tempFlag === tf && m.tempOutSince ? m.tempOutSince : stamp) : '' });
         if (delta > 0) {
           run.count = (Number(run.count) || 0) + delta;
@@ -227,7 +263,17 @@ async function applyMachine(db, id, r, opts) {
           if (run.infeed === undefined || run.infeed === null) run.infeedBase = Number(run.count) || 0;
           run.infeed = (Number(run.infeed) || 0) + inDelta;
         } else if (inV !== null && (run.infeed === undefined || run.infeed === null)) { run.infeed = 0; run.infeedBase = Number(run.count) || 0; }
-        if (logDue && (speed !== null || temp !== null || value !== null)) { log.push({ at: stamp, speed, temp, count: Number(run.count) || 0 }); }
+        if (shDelta > 0) {
+          if (run.shots === undefined || run.shots === null) run.shotsBase = Number(run.count) || 0;
+          run.shots = (Number(run.shots) || 0) + shDelta;
+        } else if (shV !== null && (run.shots === undefined || run.shots === null)) { run.shots = 0; run.shotsBase = Number(run.count) || 0; }
+        if (room !== null) { m.room = room; m.roomAt = roomAt || stamp; }
+        if (logDue && (speed !== null || temp !== null || value !== null || room !== null)) {
+          const entry = { at: stamp, speed, temp, count: Number(run.count) || 0 };
+          if (run.shots !== undefined && run.shots !== null) entry.shots = Number(run.shots) || 0;
+          if (room !== null) entry.room = room;
+          log.push(entry);
+        }
         run.machine = m; run.machineLog = log.length > LOG_LIMIT ? log.slice(-LOG_LIMIT) : log;
         run.updatedAt = stamp; run.updatedBy = BY_MACHINE;
         tx.set(ref, run);

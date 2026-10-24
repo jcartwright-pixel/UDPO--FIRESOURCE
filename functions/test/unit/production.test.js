@@ -69,6 +69,7 @@ test('Joe 10/14: each line has a kind that picks its waste reasons, checklist an
     P.CHECK_FIELDS[k].forEach(f => assert.match(f[0], /^[A-Za-z0-9]+$/));
   });
   assert.equal(P.CHECK_EVERY.HTST, 1, 'the HTST chart check is every hour');
+  assert.equal(P.CHECK_EVERY.BLOWMOLD, 1, 'Joe 10/23: the Blow Mold\'s bottle weights every hour');
 });
 
 test('Joe 10/14: a changeover or CIP wash is its own state, not stopped; a stop still wins', () => {
@@ -243,8 +244,10 @@ test('Fill weight check: the shift\'s giveaway is the average over target on eve
   assert.equal(P.fillTotals({ fills: [{ tare: 57, jug1: 3850 }] }, 100).noTarget, true);
 });
 
-test('Gallon Filler add-on sensors (Joe 10/14, B): a filler reads its motor switch and infeed eye; the Blow Mold keeps its three', () => {
-  assert.deepEqual(P.readingsFor('BLOWMOLD', 'CONTROLLER'), ['count', 'speed', 'temp']);
+test('Gallon Filler add-on sensors (Joe 10/14, B): a filler reads its motor switch and infeed eye; the Blow Mold keeps its own', () => {
+  // Joe 10/23: the Blow Mold counts its shots and its belt's turns; its speed control shows only when one was already set up.
+  assert.deepEqual(P.readingsFor('BLOWMOLD', 'CONTROLLER'), ['count', 'shots', 'turns', 'temp']);
+  assert.deepEqual(P.readingsFor('BLOWMOLD', 'CONTROLLER', { speedTag: '40011' }), ['count', 'shots', 'turns', 'speed', 'temp']);
   assert.deepEqual(P.readingsFor('FILLER', 'READER'), ['running', 'infeed']);
   assert.deepEqual(P.readingsFor('FILLER', 'CONTROLLER'), ['count', 'speed', 'temp', 'running', 'infeed']);
   assert.ok(P.tagOk('MODBUS', '10001') && P.tagOk('MODBUS', 'DI 0') && P.tagOk('S7', 'I0.3') && P.tagOk('S7', 'DB10.DBX4.0'));
@@ -314,4 +317,37 @@ test('rzEfficiency: a RedZone run\'s count against its standard speed for the mi
   assert.equal(P.rzEfficiency({ startTime: t0, countAt: t0 + 1800000, ratePerMin: 0, count: 600 }), null, 'no standard speed');
   assert.equal(P.rzEfficiency({ startTime: t0, ratePerMin: 20, count: 600 }), null, 'no end or count time');
   assert.equal(P.rzEfficiency({ startTime: t0, countAt: t0 + 60000, ratePerMin: 20 }), null, 'no count');
+});
+
+test('Blow Mold (Joe 10/23, mock-up 2): shots x 6 = jugs molded, the tester count, kick-outs; belt RPM; room; a run for each resin lot and color', () => {
+  const ld = { controller: { turnsTag: '40021', roomLow: 60, roomHigh: 95 } };
+  const run = { shiftStart: '2026-10-23T02:00:00.000Z', shiftEnd: '2026-10-23T09:30:00.000Z', count: 4170, shots: 702, shotsBase: 0,
+    machine: { at: '2026-10-23T03:58:00.000Z', speed: 70, speedFrom: 'TURNS', temp: 1182, room: 96, roomAt: '2026-10-23T03:57:00.000Z' } };
+  const m = P.machineNow(run, ld, Date.parse('2026-10-23T03:58:10.000Z'), 'BLOWMOLD');
+  assert.deepEqual([m.perShot, m.molded, m.through, m.kicked, m.kickPct, m.kickHigh, m.kickFlag], [6, 4212, 4170, 42, 1, 2, '']);
+  assert.deepEqual([m.rpm, m.speedName, m.room, m.roomFlag], [true, 'Annealer belt speed', 96, 'HIGH']);
+  assert.equal(P.machineNow(Object.assign({}, run, { count: 4000 }), { controller: { jugsPerShot: 6, kickHigh: 3 } }, Date.parse('2026-10-23T03:58:10.000Z'), 'BLOWMOLD').kickFlag, 'HIGH', '212 of 4,212 is over 3%');
+  assert.equal(P.machineNow({ machine: { at: 'x' } }, {}, 0, 'BLOWMOLD').molded, null, 'no shot counter, no jugs molded');
+  // Line Targets' new boxes.
+  assert.deepEqual(P.controllerField('jugsPerShot', '6'), { value: 6 });
+  assert.ok(P.controllerField('jugsPerShot', '0').error);
+  assert.deepEqual(P.controllerField('pulsesPerTurn', '4'), { value: 4 });
+  assert.deepEqual(P.controllerField('kickHigh', '2.5'), { value: 2.5 });
+  assert.deepEqual(P.controllerField('roomSensor', 'mocreo-12'), { value: 'mocreo-12' });
+  assert.ok(P.controllerField('roomSensor', 'a/b').error);
+  assert.deepEqual(P.controllerField('shotsTag', '40031', 'MODBUS'), { value: '40031' });
+  // Runs: the shift started on last shift's lot (kept on the run at the first scan), then a new lot at 3:00.
+  const runs = P.lotRuns({ shiftStart: '2026-10-23T02:00:00.000Z', shiftEnd: '2026-10-23T09:30:00.000Z', count: 100, shots: 20, lotFrom: { lot: 'R-1', color: 'WHITE' },
+    lotLog: [{ at: '2026-10-23T03:00:00.000Z', lot: 'R-2', color: 'CLEAR', count: 40, shots: 8 }],
+    machineLog: [{ at: '2026-10-23T02:30:00.000Z', temp: 1100, speed: 70, room: 80 }, { at: '2026-10-23T02:40:00.000Z', temp: 1150, speed: 71, room: 82 }, { at: '2026-10-23T03:30:00.000Z', temp: 1200 }] },
+    { lot: 'R-2', color: 'CLEAR' }, Date.parse('2026-10-23T04:00:00.000Z'));
+  assert.deepEqual(runs.map(x => [x.lot, x.colorName, x.carried, x.now, x.molded, x.through, x.kicked, x.kickPct]),
+    [['R-1', 'White', true, false, 48, 40, 8, 16.7], ['R-2', 'Clear', false, true, 72, 60, 12, 16.7]]);
+  assert.deepEqual([runs[0].temp, runs[0].speed, runs[0].room, runs[1].temp, runs[1].room], [[1100, 1150], [70, 71], [80, 82], [1200, 1200], null]);
+  // No scan yet this shift: the line's last lot and color run from the shift's start. Nothing at all: no run.
+  assert.deepEqual(P.lotRuns({ shiftStart: '2026-10-23T02:00:00.000Z', count: 5 }, { lot: 'R-9', color: 'WHITE' }, Date.parse('2026-10-23T03:00:00.000Z')).map(x => [x.lot, x.carried, x.through, x.molded]), [['R-9', true, 5, null]]);
+  assert.deepEqual(P.lotRuns({ shiftStart: '2026-10-23T02:00:00.000Z' }, {}, Date.parse('2026-10-23T03:00:00.000Z')), []);
+  const more = P.lineMore({ shiftStart: '2026-10-23T02:00:00.000Z', lot: 'R-2', color: 'CLEAR', lotAt: '2026-10-23T03:00:00.000Z' }, [], Date.parse('2026-10-23T03:00:00.000Z'), 'BLOWMOLD', {}, { lineName: 'BLOW MOLD' });
+  assert.deepEqual([more.lot, more.jugColor, more.lotCarried, more.lotRuns.length], ['R-2', 'CLEAR', false, 1]);
+  assert.equal(P.colorName('clear'), 'Clear');
 });

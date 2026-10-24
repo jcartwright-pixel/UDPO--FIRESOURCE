@@ -288,7 +288,7 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lt-cgrid label.wide input { width: 240px; }
 .lt-ctable { width: 100%; min-width: 760px; }
 .lt-ctable th, .lt-ctable td { font-size: 16px; vertical-align: middle; }
-.lt-ctable tbody th { text-align: left; white-space: nowrap; color: var(--ud-blue-dark); }
+.lt-ctable tbody th { text-align: left; white-space: normal; overflow: visible; text-overflow: clip; color: var(--ud-blue-dark); }
 .lt-ctable input { width: 100%; min-width: 70px; }
 .lt-ctable td:nth-child(2) input { min-width: 160px; }
 .lt-ctable .lt-mut { color: var(--muted); font-weight: 600; white-space: normal; overflow: visible; text-overflow: clip; }
@@ -339,3 +339,27 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lt-rzpick select { font-size: 16px; min-height: 40px; }
 .lt-rztable { width: 100%; font-size: 16px; }
 .lt-rz .lt-mut { color: var(--muted); }
+/* Joe 10/23 (Blow Mold, mock-up 2): White or Clear, the resin lot scan box, and Runs this shift. */
+.lb-mach-row.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lb-tog { display: flex; gap: 8px; }
+.lb-tog button { flex: 1; min-height: 48px; border: 2px solid #0b4f8a; border-radius: 10px; background: #fff; color: #0b4f8a; font: inherit; font-size: 18px; font-weight: 900; cursor: pointer; touch-action: manipulation; }
+.lb-tog button.on { background: #0b4f8a; color: #fff; }
+.lb-tog button.on.clear { background: #5b6b7c; border-color: #5b6b7c; }
+.lb-scan { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.lb-scan .lb-in { flex: 1; min-width: 0; width: auto; height: 48px; font-size: 18px; font-weight: 700; }
+.lb-scan .lb-btn { margin-top: 0; white-space: nowrap; }
+.lb-runs { margin-top: 12px; background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 12px 16px; }
+.lb-runs[hidden] { display: none; }
+.lb-runs h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: .06em; color: #0b2f55; text-transform: uppercase; }
+.lb-runs h3 span { margin-left: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #5b6b7c; }
+.lb-runs-scroll { overflow-x: auto; }
+.lb-runs table { width: 100%; border-collapse: collapse; font-size: 17px; }
+.lb-runs th { position: sticky; top: 0; background: #0b4f8a; color: #fff; text-align: left; padding: 8px 10px; font-size: 16px; white-space: nowrap; }
+.lb-runs td { padding: 8px 10px; border-bottom: 1px solid #e3eaf1; color: #0b2f55; white-space: nowrap; }
+.lb-runs .num { text-align: right; }
+.lb-runs tr.now td { background: #eef6ee; font-weight: 800; }
+.lb-runs .lb-red { font-weight: 800; }
+@media (max-width: 900px) { .lb-mach-row.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+#lot-runs table { min-width: 980px; }
+#lot-runs th, #lot-runs td { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+@media (max-width: 600px) { .lb-scan { flex-wrap: wrap; } .lb-scan .lb-in { flex-basis: 100%; } }

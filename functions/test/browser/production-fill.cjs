@@ -104,7 +104,7 @@ function ioModule() {
   try {
     // The Blow Mold's heads typed on its station: the Quality screen's Blow Mold check, and the Gallon Filler's empty jug.
     const shift = RD.plantShift(null, Date.now());
-    for (const [h, g] of [[1, '57.1'], [2, '57.3'], [3, '56.8'], [4, '57.4'], [5, '57.2'], [6, '57.0']]) await save('saveLineEntry', { operationId: BLOW, shift, op: 'check', slot: Math.max(0, Math.floor((Date.now() - Date.parse(shift.start)) / 7200000)), field: 'head' + h, value: g });
+    for (const [h, g] of [[1, '57.1'], [2, '57.3'], [3, '56.8'], [4, '57.4'], [5, '57.2'], [6, '57.0']]) await save('saveLineEntry', { operationId: BLOW, shift, op: 'check', slot: Math.max(0, Math.floor((Date.now() - Date.parse(shift.start)) / 3600000)), field: 'head' + h, value: g });
     assert.equal((await lineDoc(BLOW)).headsLast.avg, 57.1);
     const qa = await openPage(browser, 1536, 960, '/quality.html?line=' + BLOW + '&' + ADMIN);
     await qa.waitForFunction(() => [...document.querySelectorAll('.prod-head')].map(x => x.value).join(',') === '57.1,57.3,56.8,57.4,57.2,57.0');
