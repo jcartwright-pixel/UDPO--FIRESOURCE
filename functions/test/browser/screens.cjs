@@ -328,7 +328,10 @@ async function noScroll(page) {
     // Joe 10/24: no "Published ..." line under the title once published (more board rows); when and who is on the Publish button's hover.
     await wkEdit.waitForFunction(() => /^Last published .* by dispatch\.test$/.test(document.getElementById('publish').title) && document.getElementById('published').hidden, null, { timeout: 5000 });
     await wkEdit.setViewportSize({ width: 1536, height: 790 });
-    const headRow = await wkEdit.evaluate(() => { const t = document.querySelector('.head h1').getBoundingClientRect(), a = document.querySelector('.head .actions.in-head').getBoundingClientRect(); return { titleBottom: t.bottom, actionsTop: a.top }; });
+    // The buttons are measured again a frame after the window changes size, so give the row a moment to settle.
+    const sameRow = () => { const t = document.querySelector('.head h1').getBoundingClientRect(), a = document.querySelector('.head .actions.in-head').getBoundingClientRect(); return a.top < t.bottom; };
+    await wkEdit.waitForFunction(sameRow, null, { timeout: 3000 }).catch(() => {});
+    const headRow = await wkEdit.evaluate(() => { const t = document.querySelector('.head h1').getBoundingClientRect(), a = document.querySelector('.head .actions.in-head').getBoundingClientRect(); return { titleBottom: t.bottom, actionsTop: a.top, title: [t.left, t.right], actions: [a.left, a.right], buttons: [...document.querySelectorAll('.head .actions.in-head button, .head .actions.in-head a.button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().width)), head: document.querySelector('.head').clientWidth }; });
     assert.ok(headRow.actionsTop < headRow.titleBottom, 'at 1536 the Weekly buttons sit on the title row: ' + JSON.stringify(headRow));
     await wkEdit.setViewportSize({ width: 1920, height: 950 });
     // Reset Week (managers): the dispatcher's button is off; a manager's second click rebuilds the week from the masters.
