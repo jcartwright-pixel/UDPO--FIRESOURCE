@@ -130,7 +130,8 @@
 .lb-crew button small { display: block; font-size: 16px; color: #5b6b7c; font-weight: 600; }
 .lb-crew button.on { border-color: #1d7a3e; background: #eef8f1; }
 table.lb-t { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }
-table.lb-t th { text-align: left; color: #5b6b7c; font-weight: 800; border-bottom: 2px solid #c9d6e4; padding: 5px 6px; white-space: nowrap; }
+/* Joe 10/23: the table headings are white on blue so they can be read. */
+table.lb-t th { text-align: left; background: #0b4f8a; color: #fff; font-weight: 800; border-bottom: 2px solid #0b4f8a; padding: 5px 6px; white-space: nowrap; }
 table.lb-t td { border-bottom: 1px solid #e3eaf1; padding: 5px 6px; white-space: nowrap; }
 table.lb-t .n { text-align: right; }
 .lb-status.co, .lb-status.cip { background: #0b4f8a; }
@@ -360,6 +361,12 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lb-runs tr.now td { background: #eef6ee; font-weight: 800; }
 .lb-runs .lb-red { font-weight: 800; }
 @media (max-width: 900px) { .lb-mach-row.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-#lot-runs table { min-width: 980px; }
+#lot-runs table { min-width: 760px; table-layout: auto; }
 #lot-runs th, #lot-runs td { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
 @media (max-width: 600px) { .lb-scan { flex-wrap: wrap; } .lb-scan .lb-in { flex-basis: 100%; } }
+/* Joe 10/23: the Blow Mold's bottle check takes the whole row (no Earlier this shift box). */
+.lb-strip.lb-one { grid-template-columns: minmax(0, 1fr); }
+.lb-one table.lb-t { margin-top: 10px; }
+#lot-runs th, #lot-runs td { overflow: visible; text-overflow: clip; }
+#lot-runs th { color: #fff; white-space: normal; padding: 6px 8px; }
+#lot-runs td { padding: 8px 8px; }

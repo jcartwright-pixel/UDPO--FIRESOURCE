@@ -151,11 +151,11 @@
         return '<span class="lt-good"><b>' + fmt(r.value) + '</b>' + (d !== 1 ? ' ÷ ' + d + ' = <b>' + (Math.round(r.value / d * 10) / 10) + '</b>' : '') + escapeHtml(unit) + ' · read ' + escapeHtml(dateTimeText(r.at)) + '</span>';
       };
       const speedDefault = R.speedNameFor(kind, {});
-      // Joe 10/23 (Blow Mold): the jug count is the eye right after the leak tester; the lever's shots and the belt's turns are counted.
-      const names = { count: blow ? 'Jugs through tester' : 'Jug count', speed: blow ? 'Speed control' : R.speedNameFor(kind, c), temp: blow ? 'Annealer temperature (°F)' : 'Temperature (°F)', running: 'Motor running', infeed: 'Jugs in (infeed eye)',
+      // Joe 10/23 (Blow Mold): the jug count is the one eye, on the Alpine after the annealer; the lever's shots and the belt's turns are counted.
+      const names = { count: blow ? 'Jugs on the Alpine' : 'Jug count', speed: blow ? 'Speed control' : R.speedNameFor(kind, c), temp: blow ? 'Annealer temperature (°F)' : 'Temperature (°F)', running: 'Motor running', infeed: 'Jugs in (infeed eye)',
         shots: 'Shots (lever switch)', turns: 'Belt turns (shaft switch)' };
-      const what = { count: blow ? 'The eye right after the leak tester: the good jugs' : 'Counts the jugs made since the last read', running: 'The motor current switch: on = running; off opens a stop on the tablet', infeed: 'Jugs in less jugs counted out = rejects and spills',
-        shots: 'Shots × jugs each shot = jugs molded; jugs molded less jugs through the tester = kick-outs' };
+      const what = { count: blow ? 'The eye on the Alpine after the annealer: the good jugs' : 'Counts the jugs made since the last read', running: 'The motor current switch: on = running; off opens a stop on the tablet', infeed: 'Jugs in less jugs counted out = rejects and spills',
+        shots: 'Shots × jugs each shot = jugs molded; jugs molded less jugs on the Alpine = kick-outs' };
       const modbus = brand === 'MODBUS';
       const row = (k) => '<tr><th>' + escapeHtml(names[k]) + '</th><td><input data-c="' + k + 'Tag" value="' + escapeHtml(ctrlVal(c, k + 'Tag')) + '" aria-label="Where the ' + escapeHtml(names[k].toLowerCase()) + ' is"' + (brand ? '' : ' disabled') + '></td>' +
         (modbus ? (k === 'running' ? '<td class="lt-mut">on/off</td>' : '<td><select data-c="' + k + 'Size" aria-label="Size of the ' + escapeHtml(names[k].toLowerCase()) + '"><option value=""></option>' + [['16', '16 bits'], ['32', '32 bits']].map(o => opt(o[0], String(ctrlVal(c, k + 'Size')), o[1])).join('') + '</select></td>') : '') +

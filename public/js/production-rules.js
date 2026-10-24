@@ -199,7 +199,7 @@
   // on the infeed (jugs in: jugs in less jugs counted out are the rejects and spills), on a small I/O module the line PC reads the
   // same way. The Blow Mold keeps only its three.
   // Joe 10/23 (Blow Mold, mock-up 2): a shot counter on the lever (each shot makes a set of jugs, 6 here), the jug count is the
-  // eye right after the leak tester, and the annealer belt's speed is COUNTED: a switch at the drive shaft sends its turns and the
+  // eye on the Alpine after the annealer (no eye at the kicker), and the annealer belt's speed is COUNTED: a switch at the drive shaft sends its turns and the
   // app works out the RPM ("I'd rather have the RPMs counted" than read the speed control). The annealer's own temperature stays.
   var READINGS = [['count', 'Jug count'], ['speed', 'Speed'], ['temp', 'Temperature'], ['running', 'Motor running (current switch)'], ['infeed', 'Jugs in (infeed eye)'],
     ['shots', 'Shots (lever switch)'], ['turns', 'Belt turns (shaft switch)']];

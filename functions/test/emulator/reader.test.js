@@ -284,7 +284,7 @@ test('The Blow Mold (Joe 10/23, mock-up 2): shots and belt turns counted, the ro
   await RD.applyMachine(db(), BLOW, { count: 1000, shots: 500, turns: 10000, temp: 1180 }, { now: at(0) });
   let r = await blowRun();
   assert.deepEqual([r.count, r.shots, r.shotsBase, r.machine.room, r.machineLog[0].room], [0, 0, 0, 88, 88]);
-  // A minute: 20 shots (120 jugs molded), 117 jugs through the tester, 140 pulses = 70 turns = 70 RPM.
+  // A minute: 20 shots (120 jugs molded), 117 jugs on the Alpine, 140 pulses = 70 turns = 70 RPM.
   await RD.applyMachine(db(), BLOW, { count: 1117, shots: 520, turns: 10140, temp: 1182 }, { now: at(1) });
   r = await blowRun();
   assert.deepEqual([r.count, r.shots, r.machine.speed, r.machine.speedFrom], [117, 20, 70, 'TURNS']);

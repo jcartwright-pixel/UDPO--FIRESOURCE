@@ -310,11 +310,11 @@
         const t = (r[0] === r[1] ? fmt(r[0]) : fmt(r[0]) + ' to ' + fmt(r[1])) + unit;
         return out ? '<span class="lb-red">' + t + '</span>' : t;
       };
-      const rows = v.lotRuns.map(x => '<tr' + (x.now ? ' class="now"' : '') + '><td>' + escapeHtml(clock(x.at)) + (x.carried ? ' · from last shift' : '') + (x.now ? ' · now' : '') + '</td><td>' + escapeHtml(x.lot || '—') + '</td><td>' + escapeHtml(x.colorName || '—') + '</td>' +
+      const rows = v.lotRuns.map(x => '<tr' + (x.now ? ' class="now"' : '') + '><td>' + escapeHtml(clock(x.at)) + (x.carried ? ' · last shift' : '') + (x.now ? ' · now' : '') + '</td><td>' + escapeHtml(x.lot || '—') + '</td><td>' + escapeHtml(x.colorName || '—') + '</td>' +
         '<td class="num">' + (x.molded === null ? '—' : fmt(x.molded)) + '</td><td class="num">' + fmt(x.through) + '</td><td class="num">' + (x.kicked === null ? '—' : (x.kickPct !== null && x.kickPct > (m.kickHigh === undefined ? R.KICK_HIGH : m.kickHigh) ? '<span class="lb-red">' : '<span>') + fmt(x.kicked) + (x.kickPct === null ? '' : ' · ' + x.kickPct + '%') + '</span>') + '</td>' +
-        '<td class="num">' + span(x.temp, '°F', m.tempLow, m.tempHigh) + '</td><td class="num">' + span(x.speed, m.rpm ? ' RPM' : '', m.speedLow, m.speedHigh) + '</td><td class="num">' + span(x.room, '°F', m.roomLow, m.roomHigh) + '</td></tr>').join('');
+        '<td class="num">' + span(x.temp, '°F', m.tempLow, m.tempHigh) + '</td><td class="num">' + span(x.speed, '', m.speedLow, m.speedHigh) + '</td><td class="num">' + span(x.room, '°F', m.roomLow, m.roomHigh) + '</td></tr>').join('');
       draw('lot-runs', '<h3>Runs this shift <span>A new run starts each time a resin lot is scanned or the color changes.</span></h3>' +
-        '<div class="lb-runs-scroll"><table><thead><tr><th>Started</th><th>Resin lot</th><th>Color</th><th class="num">Jugs molded</th><th class="num">Through tester</th><th class="num">Kick-outs</th><th class="num">Annealer temp</th><th class="num">Belt speed</th><th class="num">Room temp</th></tr></thead><tbody>' +
+        '<div class="lb-runs-scroll"><table><thead><tr><th>Started</th><th>Resin lot</th><th>Color</th><th class="num">Jugs molded</th><th class="num">On the Alpine</th><th class="num">Kick-outs</th><th class="num">Annealer temp</th><th class="num">Belt RPM</th><th class="num">Room temp</th></tr></thead><tbody>' +
         (rows || '<tr><td colspan="9" class="lb-mut">No run yet. Scan the resin lot and pick White or Clear to start the first one.</td></tr>') + '</tbody></table></div>');
     }
     function drawMoreBoard(v) {
@@ -336,10 +336,11 @@
           '<div class="lb-scan"><input id="lot-scan" class="lb-in" maxlength="40" autocomplete="off" enterkeyhint="done" placeholder="Scan the resin bag\'s lot" aria-label="Scan the resin lot"><button type="button" class="lb-btn" data-act="lot">Type It</button></div>' +
           (v.targets.length === 1 ? '' : '<button type="button" class="lb-btn" data-act="product">' + (v.product ? 'Change Product' : 'Pick Product') + '</button>') + '</div>';
         draw('kind-cards', making + (counted ?
-          // Joe 10/23: shots x jugs each shot = jugs molded; the eye after the leak tester counts the good jugs; the difference is kick-outs.
+          // Joe 10/23: shots x jugs each shot = jugs molded (no eye at the kicker); the one eye is on the Alpine after the annealer;
+          // jugs molded less jugs on the Alpine = the tester's kick-outs.
           '<div class="lb-card"><span class="eyebrow">Jugs molded</span><div class="lb-big">' + fmt(m.molded) + '</div><div class="lb-mut">' + fmt(m.shots) + ' shots × ' + m.perShot + ' jugs</div><div><span class="lb-pill g">FROM THE SHOT COUNTER</span></div></div>' +
-          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs through tester</span><div class="lb-big">' + fmt(m.through) + '</div><div class="lb-mut">counted after the leak tester</div>' + madeBits + speedLine + '</div>' +
-          '<div class="lb-card' + (m.kickFlag ? ' lb-flash' : '') + '"><span class="eyebrow">Tester kick-outs</span><div class="lb-big">' + fmt(m.kicked) + '</div><div class="lb-mut">molded − through tester</div>' +
+          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs on the Alpine</span><div class="lb-big">' + fmt(m.through) + '</div><div class="lb-mut">counted on the Alpine after the annealer</div>' + madeBits + speedLine + '</div>' +
+          '<div class="lb-card' + (m.kickFlag ? ' lb-flash' : '') + '"><span class="eyebrow">Tester kick-outs</span><div class="lb-big">' + fmt(m.kicked) + '</div><div class="lb-mut">molded − on the Alpine</div>' +
             (m.kickPct === null ? '' : '<div><span class="lb-pill ' + (m.kickFlag ? 'r' : 'g') + '">' + m.kickPct + '% OF JUGS MOLDED</span></div>') + '<div class="lb-mut">Turns red over ' + m.kickHigh + '%</div></div>' :
           '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
           '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
@@ -370,7 +371,10 @@
       // The HTST's hourly chart check and the Blow Mold's bottle check, on the board (mock-ups G and H).
       const ci = document.getElementById('check-inline');
       ci.hidden = !special || !v.check;
-      if (!ci.hidden) draw('check-inline', '<div class="lb-box' + (v.check.done ? '' : ' lb-flashbox') + '"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + '</div><div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>');
+      // Joe 10/23: the Blow Mold has no Earlier this shift box; its bottle check takes the whole row, with the last 3 checks' weights.
+      ci.classList.toggle('lb-one', k === 'BLOWMOLD');
+      if (!ci.hidden) draw('check-inline', '<div class="lb-box' + (v.check.done ? '' : ' lb-flashbox') + '"><h3>' + (k === 'HTST' ? 'Hourly chart check' : 'Bottle check') + ' · ' + clock(v.check.at) + (v.check.done ? ' done' : ' due') + '</h3>' + checkForm(v) + (k === 'BLOWMOLD' && v.check.done ? checkTable(v, 3) : '') + '</div>' +
+        (k === 'BLOWMOLD' ? '' : '<div class="lb-box"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>'));
       // Up next and each hour (mock-up C).
       const sp = document.getElementById('strip');
       sp.hidden = special;
@@ -459,7 +463,7 @@
       if (c.done) {
         const bad = (R.CHECK_FIELDS[v.kind] || []).filter(f => { const x = String(c.values[f[0]] === undefined ? '' : c.values[f[0]]); return /NOT OK|LATE/.test(x) || (f[2] === 'num' && R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high })); });
         return '<p class="lb-last">Last check ' + clock(c.values.at || c.at) + (c.values.by ? ' by ' + escapeHtml(who(c.values.by)) : '') + ': ' + (bad.length ? '<b class="lb-pill r">' + escapeHtml(bad.map(f => f[1].replace(/ g$/, '')).join(', ')) + ' OUT</b>' : '<b class="lb-pill g">PASSED</b>') +
-          ' · next check due ' + clock(c.next) + '</p><p class="lb-mut">The numbers are in Earlier this shift and on the Quality screen.</p>';
+          ' · next check due ' + clock(c.next) + '</p><p class="lb-mut">' + (v.kind === 'BLOWMOLD' ? 'The last 3 checks are below. All of them are on the Quality screen.' : 'The numbers are in Earlier this shift and on the Quality screen.') + '</p>';
       }
       return '<div class="lb-fields">' + (R.CHECK_FIELDS[v.kind] || []).map(f => {
         const got = c.values[f[0]] === undefined ? '' : String(c.values[f[0]]);
@@ -472,13 +476,14 @@
         return '<label class="lb-field' + (wf ? ' lb-off' : '') + '">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '">' + (wf ? '<b class="lb-pill r">' + wf + '</b>' : '') + '</label>';
       }).join('') + '</div>' + (v.kind === 'BLOWMOLD' && v.jugWeight && (v.jugWeight.low !== null || v.jugWeight.high !== null || v.jugWeight.target !== null) ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.' + (v.jugWeight.target !== null ? ' Target ' + v.jugWeight.target + ' g.' : '') + (v.jugWeight.low !== null || v.jugWeight.high !== null ? ' Range ' + (v.jugWeight.low !== null ? v.jugWeight.low : 'up') + ' to ' + (v.jugWeight.high !== null ? v.jugWeight.high : 'any') + ' g.' : '') + '</p>' : v.kind === 'BLOWMOLD' ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.</p>' : '');
     }
-    function checkTable(v) {
+    // last = only the newest that many checks, newest first (the Blow Mold's bottle check box).
+    function checkTable(v, last) {
       const c = (v.run && v.run.checks) || {}, every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
       // A filler's checks saved before the jug weights moved to the fill weight check (Joe 10/14) still show their pounds.
       const all = (R.CHECK_FIELDS[v.kind] || []).concat((R.OLD_CHECK_FIELDS[v.kind] || []).filter(f => Object.values(c).some(x => x && String(x[f[0]] === undefined ? '' : x[f[0]]) !== '')));
       // Joe 10/23: on the Blow Mold, Earlier this shift is just the head weights.
       const blow = v.kind === 'BLOWMOLD', fields = blow ? all.filter(f => f[2] === 'num') : all;
-      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot || v.check.done).sort((a, b) => a - b);
+      const slots = Object.keys(c).map(Number).filter(n => !v.check || n !== v.check.slot || v.check.done).sort((a, b) => last ? b - a : a - b).slice(0, last || undefined);
       if (!slots.length) return '<p class="lb-mut">No checks yet this shift.</p>';
       return '<table class="lb-t"><thead><tr><th>Time</th>' + fields.map(f => '<th' + (f[2] === 'num' ? ' class="n"' : '') + '>' + escapeHtml(f[1]) + '</th>').join('') + (blow ? '' : '<th>By</th>') + '</tr></thead><tbody>' +
         slots.map(n => '<tr><td>' + clock(new Date(start + n * every).toISOString()) + '</td>' + fields.map(f => { const x = String(c[n][f[0]] === undefined ? '' : c[n][f[0]]), wf = R.weightFlag(f[0], x, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high }); return '<td class="' + (f[2] === 'num' ? 'n' + (wf ? ' lb-bad' : '') : /NOT OK|LATE/.test(x) ? 'lb-bad' : x ? 'lb-ok' : '') + '">' + escapeHtml(x) + (wf ? ' ' + wf : '') + '</td>'; }).join('') + (blow ? '' : '<td>' + escapeHtml(who(c[n].by)) + '</td>') + '</tr>').join('') + '</tbody></table>';
