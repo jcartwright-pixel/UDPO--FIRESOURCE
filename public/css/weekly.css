@@ -74,3 +74,8 @@
 .weekly-page #routes-sheet td.day.c-vacation-needs .off-who, .weekly-page #routes-sheet td.day.c-vacation-needs .off-why { display: block; color: #fff; font-size: 16px; font-weight: 700; line-height: 1.1; white-space: normal; }
 .weekly-page #routes-sheet td.day.c-vacation-needs .off-why { font-weight: 600; opacity: .92; }
 .weekly-page #routes-sheet td.day.c-vacation-needs.editable::after { color: #fff; }
+/* Joe 10/24: the title and its buttons sit on one tight row (no "Published ..." line under the title) so the board shows more rows. */
+.weekly-page .head { padding-top: 6px; padding-bottom: 4px; }
+.weekly-page .head .title small[hidden] { display: none; }
+.weekly-page .head .title small { display: block; line-height: 1.15; }
+.weekly-page .wk-summary { margin-bottom: 6px; }
