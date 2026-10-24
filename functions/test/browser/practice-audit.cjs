@@ -628,6 +628,11 @@ async function writes() {
       await load(picks[0], 'first load');
       await check('first load', '35');
       await putBack(picks[0], 'first load');
+      // Load times are kept to the minute: a reload in the same minute as the check cannot be told apart from before it. A real
+      // reload is minutes later, so wait into the next minute.
+      const checkedAt = Date.now() - 4000;
+      while (Math.floor(Date.now() / 60000) <= Math.floor(checkedAt / 60000)) await p.waitForTimeout(1000);
+      await p.waitForTimeout(3000);
       await load(picks[1], 'reloaded');
       await check('reloaded', '36');
       await shot(p, 'yard-reloaded');
