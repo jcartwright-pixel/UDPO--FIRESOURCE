@@ -79,3 +79,6 @@
 .weekly-page .head .title small[hidden] { display: none; }
 .weekly-page .head .title small { display: block; line-height: 1.15; }
 .weekly-page .wk-summary { margin-bottom: 6px; }
+/* At 1500 wide and up (Joe's 1536 window) the buttons stay beside the title: when equal-width buttons do not fit there, each button keeps its own
+   width (evenTopButtons) instead of the whole row dropping under the title. Narrower windows still wrap. */
+@media (min-width: 1500px) { .weekly-page .head:has(.actions.in-head) { flex-wrap: nowrap; } }
