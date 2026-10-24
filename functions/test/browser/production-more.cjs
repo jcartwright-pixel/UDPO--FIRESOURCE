@@ -283,7 +283,10 @@ async function pickFirstProduct(tb) {
       await fits(pl, 'one line\'s shift at ' + w);
       await bigText(pl, '#detail, #totals, #filters', 'Production Lines');
       await shot(pl, 'more-line-shift-' + w);
-      await pl.click('#tabs [data-tab="' + HTST + '"]');
+      // Joe 10/24: every machine is in the menu down the left (as the Quality screen); picking one shows its page on the right.
+      assert.deepEqual(await pl.$$eval('#menu button[data-tab] b', b => b.map(x => x.firstChild.textContent.trim())), ['All Machines', 'BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD']);
+      assert.match(await pl.textContent('#detail .pd-live'), /Live from the machine.*Count.*Speed.*Temperature.*Running or stopped/s);
+      await pl.click('#menu [data-tab="' + HTST + '"]');
       await pl.waitForFunction(() => document.getElementById('page-title').textContent === 'HTST #1');
       await pl.goBack();
       await pl.waitForFunction(() => !document.getElementById('tiles').hidden && document.querySelectorAll('.pd-tile').length === 5);
