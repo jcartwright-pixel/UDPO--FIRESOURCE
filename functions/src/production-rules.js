@@ -178,7 +178,8 @@
     BLOWMOLD: [['head1', 'Head 1 g', 'num'], ['head2', 'Head 2 g', 'num'], ['head3', 'Head 3 g', 'num'], ['head4', 'Head 4 g', 'num'], ['head5', 'Head 5 g', 'num'], ['head6', 'Head 6 g', 'num'], ['topLoad', 'Top load', 'ok']]
   };
   var OLD_CHECK_FIELDS = { FILLER: [['w1', 'Jug 1 lb', 'num'], ['w2', 'Jug 2 lb', 'num'], ['w3', 'Jug 3 lb', 'num'], ['w4', 'Jug 4 lb', 'num'], ['w5', 'Jug 5 lb', 'num']] };
-  var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 2 };
+  // Joe 10/23: the Blow Mold's bottle weights are checked every hour of running.
+  var CHECK_EVERY = { FILLER: 2, PACK: 2, HTST: 1, BLOWMOLD: 1 };
   // Why a line stopped, for each kind of line (Joe 10/14 follow-on: "stop reasons for each kind of line"). The fillers keep the
   // first twelve (REASONS); each list is twelve, the tablet's four rows of three.
   var STOP_REASONS = {
@@ -197,15 +198,23 @@
   // Joe 10/14 (Gallon Filler add-on sensors, B): a filler can also read a motor current switch (on = running) and a second photo-eye
   // on the infeed (jugs in: jugs in less jugs counted out are the rejects and spills), on a small I/O module the line PC reads the
   // same way. The Blow Mold keeps only its three.
-  var READINGS = [['count', 'Jug count'], ['speed', 'Speed'], ['temp', 'Temperature'], ['running', 'Motor running (current switch)'], ['infeed', 'Jugs in (infeed eye)']];
+  // Joe 10/23 (Blow Mold, mock-up 2): a shot counter on the lever (each shot makes a set of jugs, 6 here), the jug count is the
+  // eye on the Alpine after the annealer (no eye at the kicker), and the annealer belt's speed is COUNTED: a switch at the drive shaft sends its turns and the
+  // app works out the RPM ("I'd rather have the RPMs counted" than read the speed control). The annealer's own temperature stays.
+  var READINGS = [['count', 'Jug count'], ['speed', 'Speed'], ['temp', 'Temperature'], ['running', 'Motor running (current switch)'], ['infeed', 'Jugs in (infeed eye)'],
+    ['shots', 'Shots (lever switch)'], ['turns', 'Belt turns (shaft switch)']];
   // The readings Line Targets shows for a line: a filler counted another way (its label reader) shows only its add-on sensors.
-  function readingsFor(kind, counter) {
+  // The Blow Mold's speed control reading shows only when one was already set up (its belt is counted by turns now).
+  function readingsFor(kind, counter, cfg) {
+    if (kind === 'BLOWMOLD') return text((cfg || {}).speedTag) ? ['count', 'shots', 'turns', 'speed', 'temp'] : ['count', 'shots', 'turns', 'temp'];
     if (kind !== 'FILLER') return ['count', 'speed', 'temp'];
     return counter === 'CONTROLLER' ? ['count', 'speed', 'temp', 'running', 'infeed'] : ['running', 'infeed'];
   }
   var TAG_HELP = { AB: 'the tag name as it shows in the controller program, like Jug_Count or Counter1.ACC', AB_MICRO: 'the tag name as it shows in the controller program, like Jug_Count',
     MODBUS: 'the register number, like 40001, 30001 or HR 100 (an on/off input like the motor switch: 10001 or DI 0)', S7: 'the address, like DB10.DBD4 (4 bytes) or DB10.DBW2 (2 bytes), or an on/off bit like I0.3 or DB10.DBX4.0' };
-  var CONTROLLER_FIELDS = ['brand', 'ip', 'port', 'slot', 'rack', 'unit', 'wordOrder', 'countTag', 'countSize', 'speedName', 'speedTag', 'speedSize', 'speedDivide', 'speedLow', 'speedHigh', 'tempTag', 'tempSize', 'tempDivide', 'tempLow', 'tempHigh', 'runningTag', 'infeedTag', 'infeedSize'];
+  var CONTROLLER_FIELDS = ['brand', 'ip', 'port', 'slot', 'rack', 'unit', 'wordOrder', 'countTag', 'countSize', 'speedName', 'speedTag', 'speedSize', 'speedDivide', 'speedLow', 'speedHigh', 'tempTag', 'tempSize', 'tempDivide', 'tempLow', 'tempHigh', 'runningTag', 'infeedTag', 'infeedSize',
+    'shotsTag', 'shotsSize', 'jugsPerShot', 'turnsTag', 'turnsSize', 'pulsesPerTurn', 'kickHigh', 'roomSensor', 'roomLow', 'roomHigh'];
+  var JUGS_PER_SHOT = 6, KICK_HIGH = 2;
   function tagOk(brand, tag) {
     var t = text(tag);
     if (brand === 'MODBUS') return /^(HR|IR|DI|COIL)\s*:?\s*\d{1,5}$/i.test(t) || /^[0134]\d{4,5}$/.test(t) || /^\d{1,5}$/.test(t);
@@ -226,6 +235,10 @@
     if (field === 'slot') return whole(0, 31, 'The slot');
     if (field === 'rack') return whole(0, 7, 'The rack');
     if (field === 'unit') return whole(0, 255, 'The unit id');
+    if (field === 'jugsPerShot') return whole(1, 24, 'Jugs each shot');
+    if (field === 'pulsesPerTurn') return whole(1, 1000, 'Pulses each turn');
+    if (field === 'roomSensor') return v.length <= 120 && v.indexOf('/') < 0 ? { value: v || null } : { error: 'Pick the room\'s sensor.' };
+    if (field === 'kickHigh') return v === '' ? { value: null } : isFinite(n) && n >= 0 && n <= 100 ? { value: n } : { error: 'Type the kick-out percent, like 2.' };
     if (field === 'speedName') return v.length <= 30 ? { value: v || null } : { error: 'Keep the speed\'s name to 30 letters, like Annealer speed.' };
     if (field === 'wordOrder') return v === '' || v === 'HIGH_FIRST' || v === 'LOW_FIRST' ? { value: v || null } : { error: 'Pick the word order.' };
     if (/Size$/.test(field)) return v === '' || v === '16' || v === '32' ? { value: v ? Number(v) : null } : { error: 'Pick 16 or 32 bits.' };
@@ -338,7 +351,7 @@
   // What the controller last sent this shift (run.machine), with the line's ranges (lineDoc.controller). Stale after 2 minutes.
   // Joe 10/14: on the Blow Mold the speed is the annealer speed (like 70), unless Line Targets names it otherwise.
   function r0(run) { return run || {}; }
-  function speedNameFor(kind, c) { return text((c || {}).speedName) || (kind === 'BLOWMOLD' ? 'Annealer speed' : 'Speed'); }
+  function speedNameFor(kind, c) { return text((c || {}).speedName) || (kind === 'BLOWMOLD' ? (text((c || {}).turnsTag) ? 'Annealer belt speed' : 'Annealer speed') : 'Speed'); }
   // Joe 10/16: "we run it right around 1,000 and 1,350 degrees" on the Blow Mold. Low and High on Line Targets change it.
   var DEFAULT_RANGES = { BLOWMOLD: { temp: [1000, 1350] } };
   function machineRange(kind, c, k) {
@@ -359,14 +372,59 @@
     o.rejects = o.infeed === null ? null : Math.max(0, o.infeed - Math.max(0, (num(r0(run).count) || 0) - (num(r0(run).infeedBase) || 0)));
     o.speedFlag = machineFlag(o.speed, o.speedLow, o.speedHigh);
     o.tempFlag = machineFlag(o.temp, o.tempLow, o.tempHigh);
+    // Joe 10/23 (Blow Mold): the belt speed counted from the shaft's turns is RPM; jugs molded = shots x jugs each shot, the jug
+    // count is the jugs through the leak tester since the shot counter started, and the difference is the tester's kick-outs.
+    o.rpm = text(m.speedFrom) === 'TURNS';
+    o.perShot = num(c.jugsPerShot) || JUGS_PER_SHOT;
+    o.shots = num(r0(run).shots);
+    o.molded = o.shots === null ? null : o.shots * o.perShot;
+    o.through = o.shots === null ? null : Math.max(0, (num(r0(run).count) || 0) - (num(r0(run).shotsBase) || 0));
+    o.kicked = o.molded === null ? null : Math.max(0, o.molded - o.through);
+    o.kickPct = o.molded ? Math.round(o.kicked / o.molded * 1000) / 10 : null;
+    o.kickHigh = num(c.kickHigh) === null ? KICK_HIGH : num(c.kickHigh);
+    o.kickFlag = o.kickPct !== null && o.kickPct > o.kickHigh ? 'HIGH' : '';
+    // The room's temperature (a MOCREO sensor picked on Line Targets), logged with the machine's readings each minute.
+    o.room = num(m.room); o.roomAt = text(m.roomAt); o.roomLow = num(c.roomLow); o.roomHigh = num(c.roomHigh);
+    o.roomFlag = machineFlag(o.room, o.roomLow, o.roomHigh);
     var log = Array.isArray(run.machineLog) ? run.machineLog : [];
-    ['speed', 'temp'].forEach(function (k) {
+    ['speed', 'temp', 'room'].forEach(function (k) {
       var vals = log.map(function (x) { return num(x && x[k]); }).filter(function (x) { return x !== null; });
       o[k + 'Min'] = vals.length ? Math.min.apply(null, vals) : null;
       o[k + 'Max'] = vals.length ? Math.max.apply(null, vals) : null;
       o[k + 'OutMin'] = log.filter(function (x) { return machineFlag(x && x[k], o[k + 'Low'], o[k + 'High']); }).length;
     });
     return o;
+  }
+
+  // Joe 10/23 (Blow Mold, mock-up 2): a run for each resin lot and color. A new run starts each time a lot is scanned or the
+  // color changes (run.lotLog: { at, lot, color, count, shots } with the counts at that moment). A shift that starts with no
+  // scan carries the line's last lot and color from its start. Each run: jugs molded, through the
+  // tester and kicked out, and the annealer temperature, belt speed and room temperature, lowest to highest, from the minute log.
+  var COLORS = [['WHITE', 'White'], ['CLEAR', 'Clear']];
+  function colorName(c) { var f = COLORS.filter(function (x) { return x[0] === text(c).toUpperCase(); })[0]; return f ? f[1] : ''; }
+  function lotRuns(run, lineDoc, nowMs) {
+    var r = run || {}, ld = lineDoc || {}, c = ld.controller || {}, per = num(c.jugsPerShot) || JUGS_PER_SHOT;
+    var log = (Array.isArray(r.lotLog) ? r.lotLog : []).filter(function (x) { return x && when(x.at); }).slice().sort(function (a, b) { return when(a.at) - when(b.at); });
+    var start = when(r.shiftStart), segs = [];
+    // The lot and color the shift started on: kept on the run at its first scan (run.lotFrom), else the line's last ones.
+    var from = r.lotFrom && typeof r.lotFrom === 'object' ? r.lotFrom : { lot: text(ld.lot) || text(r.lot), color: text(ld.color) || text(r.color) };
+    if ((!log.length || when(log[0].at) > start) && (text(from.lot) || text(from.color)) && start) {
+      segs.push({ at: r.shiftStart, lot: text(from.lot), color: text(from.color), count: 0, shots: 0, carried: true });
+    }
+    log.forEach(function (x) { segs.push({ at: x.at, lot: text(x.lot), color: text(x.color), count: num(x.count) || 0, shots: num(x.shots) || 0, carried: false }); });
+    var hasShots = num(r.shots) !== null, mlog = Array.isArray(r.machineLog) ? r.machineLog : [], end = Math.min(nowMs, when(r.shiftEnd) || nowMs);
+    var range = function (k, a, b) {
+      var vals = mlog.filter(function (x) { var t = when(x && x.at); return t >= a && t < b && num(x[k]) !== null; }).map(function (x) { return num(x[k]); });
+      return vals.length ? [Math.min.apply(null, vals), Math.max.apply(null, vals)] : null;
+    };
+    return segs.map(function (s, i) {
+      var nx = segs[i + 1], a = when(s.at), b = nx ? when(nx.at) : end;
+      var cEnd = nx ? nx.count : num(r.count) || 0, sEnd = nx ? nx.shots : num(r.shots) || 0;
+      var through = Math.max(0, cEnd - s.count), molded = hasShots ? Math.max(0, sEnd - s.shots) * per : null;
+      var kicked = molded === null ? null : Math.max(0, molded - through);
+      return { at: s.at, lot: s.lot, color: s.color, colorName: colorName(s.color), carried: s.carried, now: !nx, molded: molded, through: through, kicked: kicked,
+        kickPct: molded ? Math.round(kicked / molded * 1000) / 10 : null, temp: range('temp', a, b), speed: range('speed', a, b), room: range('room', a, b) };
+    });
   }
 
   var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30, FILLS: 120, GRAMS: 30000 };
@@ -457,7 +515,8 @@
         target: base.target ? num(base.target.fillGrams) : null, under: num(ld.fillUnder), over: num(ld.fillOver), totals: fillTotals(r, base.made),
         checks: (r.fills || []).map(fillOf), words: fillWords(lname) } : null,
       boxing: boxingOf(ld, base.made, (plant || {}).feeders),
-      lot: text(r.lot), stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
+      lot: text(r.lot) || text(ld.lot), jugColor: text(r.color) || text(ld.color), lotAt: text(r.lotAt), lotCarried: !text(r.lot) && !!text(ld.lot),
+      lotRuns: kind === 'BLOWMOLD' ? lotRuns(r, ld, nowMs) : [], stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
   }
 
@@ -610,7 +669,7 @@
   return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, rzEfficiency: rzEfficiency, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
-    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
     usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };

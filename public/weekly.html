@@ -22,6 +22,17 @@
     .legend i.daynote { background: #1f7a8c; }
     .weekly-page .board td.b-daynote, .weekly-page .board tr.relief td.b-daynote { background: #1f7a8c !important; color: #fff !important; }
     .modal .daynote-help { grid-column: 1 / -1; margin: -4px 0 0; font-size: 16px; font-weight: 600; color: #3d4b5a; }
+    /* Joe 10/23 (two Venturas one day): click a run's name for "+ Extra this week"; the extra line reads THIS WEEK ONLY. */
+    .weekly-page #routes-sheet td.run-name { height: auto; padding: 3px 4px; white-space: normal; overflow: visible; line-height: 1.15; }
+    .weekly-page #routes-sheet td.run-name.pickable { cursor: pointer; }
+    .weekly-page #routes-sheet td.run-name.picked { box-shadow: inset 0 0 0 3px #0b6a2d; }
+    .weekly-page #routes-sheet tr.extra-run td:nth-child(-n+2) { background: #f3ecff !important; }
+    .weekly-page #routes-sheet td.run-name .xr-name { display: block; }
+    .weekly-page #routes-sheet td.run-name .xr-tag { display: block; font-size: 16px; font-weight: 800; color: #5b2db3; letter-spacing: .02em; line-height: 1.1; }
+    .weekly-page #routes-sheet td.run-name button { display: block; margin: 3px auto 0; font: inherit; font-size: 16px; font-weight: 800; padding: 1px 5px; border-radius: 6px; white-space: nowrap !important; cursor: pointer; }
+    .weekly-page #routes-sheet td.run-name .xr-plus { border: 2px solid #0b6a2d; background: #e8f6ec; color: #0b5a26; }
+    .weekly-page #routes-sheet td.run-name .xr-remove { border: 2px solid #a21313; background: #fff; color: #a21313; }
+    .weekly-page #routes-sheet td.run-name .xr-remove.armed { background: #a21313; color: #fff; }
   </style>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -128,6 +139,8 @@
     const today = L.operatingDay(new Date());
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
     let rowDrag = null, held = false, who = '';
+    // Joe 10/23: the run whose name was clicked (shows "+ Extra this week", or Remove on an extra line), and a Remove waiting for its second click.
+    let pickedLine = '', removeArmed = '';
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
@@ -169,15 +182,29 @@
       ob.setAttribute('aria-pressed', String(override));
       rows = L.weeklyRows(preview ? previewRuns() : runs, week);
       // Joe 10/12 ("537 is on the list being down but shows on dispatch"): a down truck or trailer still on a run says DOWN in red.
-      const fleet = lists.fleetTrucks.concat(lists.fleetTrailers), offOf = (id) => { const e = id && fleet.find(x => String(x.id).toUpperCase() === String(id).toUpperCase()); return e ? L.unitOffWhy(e) : ''; };
-      const unitParts = (d) => [[d.truck, d.truckId], [d.trailer, d.trailerId]].filter(x => x[0]).map(x => ({ text: x[0], off: offOf(x[1]) }));
+      const fleet = lists.fleetTrucks.concat(lists.fleetTrailers), offOf = (type, id, unit) => { const e = L.unitOnLoad(fleet, type, id, unit); return e ? L.unitOffWhy(e) : ''; };
+      const unitParts = (d) => [[d.truck, d.truckId, 'TRUCK'], [d.trailer, d.trailerId, 'TRAILER']].filter(x => x[0]).map(x => ({ text: x[0], off: offOf(x[2], x[1], x[0]) }));
       const unitsText = (d) => unitParts(d).map(u => u.text + (u.off ? ' (' + u.off + ')' : '')).join(' / ');
       const unitsHtml = (d) => unitParts(d).map(u => escapeHtml(u.text) + (u.off ? ' <b class="unit-down">' + escapeHtml(u.off) + '</b>' : '')).join(' / ');
       const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
-      document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"' + (move && r.runId ? ' class="mover" data-drag="' + i + '" tabindex="0" title="Drag the line up or down to change the order"' : '') + '>' +
-        '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td><td class="strong">' + escapeHtml(L.runText(r)) + '</td>' +
+      // Joe 10/23: clicking a run's name shows "+ Extra this week" (a second line for this week only); an extra line reads THIS WEEK ONLY
+      // and its name shows Remove (a second click confirms). An extra line moves with its run, so it is not dragged on its own.
+      const nameCell = (r, i) => {
+        const pick = edit && pickedLine === r.runDocId;
+        let body = escapeHtml(L.runText(r)), tip = '';
+        if (r.extraRun) {
+          body = '<span class="xr-name">' + body + '</span><span class="xr-tag">THIS WEEK ONLY</span>' + (pick ? '<button type="button" class="xr-remove' + (removeArmed === r.runDocId ? ' armed' : '') + '" data-remove="' + i + '">' + (removeArmed === r.runDocId ? 'Click again' : 'Remove') + '</button>' : '');
+          tip = 'Added for this week only' + (edit ? ': click to remove it' : '');
+        } else if (edit) {
+          if (pick) body += '<button type="button" class="xr-plus" data-extra="' + i + '">+ Extra this week</button>';
+          tip = 'Click to add an extra ' + L.runText(r) + ' line for this week only';
+        }
+        return '<td class="strong run-name' + (edit ? ' pickable' : '') + (pick ? ' picked' : '') + '"' + (tip ? ' title="' + escapeHtml(tip) + '"' : '') + '>' + body + '</td>';
+      };
+      document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"' + (move && r.runId && !r.extraRun ? ' class="mover" data-drag="' + i + '" tabindex="0" title="Drag the line up or down to change the order"' : r.extraRun ? ' class="extra-run"' : '') + '>' +
+        '<td class="strong" title="' + escapeHtml(r.route) + '">' + escapeHtml(routeNumber(r.route)) + '</td>' + nameCell(r, i) +
         L.DAYS.map(p => {
           const d = r.days[p], cls = L.weeklyCellClass(r, p, ctx), locked = cls === 'coverage' && !override;
           const can = edit && !locked;
@@ -264,7 +291,38 @@
     }
 
     function closePopover() { if (popover) { popover.remove(); popover = null; render(); } }
+    // Joe 10/23 ("I have an extra Ventura, so I actually have two on the same day ... a one-time thing"): the run's name, its
+    // "+ Extra this week" button and an extra line's Remove. Returns true when the click was one of them.
+    function extraClick(e) {
+      const plus = e.target.closest('button[data-extra]'), rm = e.target.closest('button[data-remove]'), name = e.target.closest('td.run-name.pickable');
+      if (plus) {
+        const row = rows[Number(plus.dataset.extra)];
+        saveOptimistic('addExtraRun', { runDocId: row.runDocId }, () => { pickedLine = ''; }, () => {}, render);
+        return true;
+      }
+      if (rm) {
+        const row = rows[Number(rm.dataset.remove)], id = row.runDocId;
+        if (removeArmed !== id) {
+          removeArmed = id; render();
+          setTimeout(() => { if (removeArmed === id) { removeArmed = ''; render(); } }, 7000);
+          return true;
+        }
+        const gone = runs.find(x => x.id === id);
+        saveOptimistic('removeExtraRun', { runDocId: id }, () => { runs = runs.filter(x => x.id !== id); pickedLine = ''; removeArmed = ''; },
+          () => { if (gone && !runs.some(x => x.id === id)) runs.push(gone); }, render);
+        return true;
+      }
+      if (name && !popover) {
+        const row = rows[Number(name.parentElement.dataset.index)];
+        pickedLine = pickedLine === row.runDocId ? '' : row.runDocId;
+        removeArmed = '';
+        render();
+        return true;
+      }
+      return false;
+    }
     document.getElementById('rows').addEventListener('click', e => {
+      if (extraClick(e)) return;
       const td = e.target.closest('td.editable[data-day]');
       if (!td || popover) return;
       const row = rows[Number(td.parentElement.dataset.index)], day = td.dataset.day, d = row.days[day];
@@ -307,7 +365,10 @@
     weekBody.addEventListener('click', e => { if (dropClick) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 
     // A click anywhere outside the editor closes it (and a click on another day opens that day).
-    document.addEventListener('mousedown', e => { if (popover && !popover.contains(e.target)) closePopover(); }, true);
+    document.addEventListener('mousedown', e => {
+      if (popover && !popover.contains(e.target)) closePopover();
+      if (pickedLine && !e.target.closest('td.run-name')) { pickedLine = ''; removeArmed = ''; render(); }
+    }, true);
 
     /* ---------- Driver Assignment Board: availability for one driver and day ---------- */
     const modals = ['avail-modal', 'days-modal'];

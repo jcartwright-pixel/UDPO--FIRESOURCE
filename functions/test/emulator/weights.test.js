@@ -61,12 +61,12 @@ test('Blow Mold heads typed on the station are the Quality screen\'s Blow Mold c
 });
 
 test('A Blow Mold check typed only on the Quality screen goes on the station\'s check due now', async () => {
-  // 11:00 a.m. is the third 2-hour check of the shift (6:00 start): slot 2.
+  // 11:00 a.m. is the sixth hourly check of the shift (6:00 start; Joe 10/23: every hour): slot 5.
   const q = await save('saveQualityCheck', { operationId: BLOW, product: 'Gallon Jug', status: 'REVIEW', weights: { head1: '55', head2: '56' } }, 0);
   const r = await runOf(BLOW);
-  assert.deepEqual([r.checks['2'].head1, r.checks['2'].head2, r.checks['2'].qualityId], ['55', '56', q.checkId]);
+  assert.deepEqual([r.checks['5'].head1, r.checks['5'].head2, r.checks['5'].qualityId], ['55', '56', q.checkId]);
   // The station's next head keeps the Quality screen's status (Review), on the same check.
-  await entry(BLOW, { op: 'check', slot: 2, field: 'head3', value: '57' }, 1);
+  await entry(BLOW, { op: 'check', slot: 5, field: 'head3', value: '57' }, 1);
   const all = await quality(BLOW);
   assert.equal(all.length, 1);
   assert.equal(all[0].payload.status, 'REVIEW');

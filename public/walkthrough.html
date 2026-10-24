@@ -55,6 +55,8 @@
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { WALK_ROLES } from './js/walk-bar.js';
+    import { savePicture, removePicture, watchPictures, cameraInput, thumbsHtml, wireCaptions, keepCaretIn } from './js/walk-photos.js';
+    import { plantFor } from './js/pmaint.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search), home = params.get('view') === 'home';
@@ -65,7 +67,7 @@
     let codeOk = !appMode;
     const today = () => L.operatingDay(new Date());
     let date = today(), app = {}, person = null;
-    const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [], lastReport: '' }, loaded = { runs: false, journal: false };
+    const data = { runs: [], journal: [], setup: [], tempLocs: [], sensors: [], lineStatus: [], lastReport: '', pics: [] }, loaded = { runs: false, journal: false };
     // The person who made a check, from their sign-in (mike.adams@… reads Mike Adams).
     const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 
@@ -83,6 +85,31 @@
         '<span class="wk-t"><b>' + escapeHtml(title) + '</b><span>' + escapeHtml(desc) + '</span></span>' +
         '<span class="wk-n"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(line) + '</span></span>' + (who ? '<span class="wk-who">' + escapeHtml(who) + '</span>' : '') + list + '</a>';
     }
+    // Joe 10/23 (pictures, option 1): the 4th stop. TAKE PICTURE opens the camera; the pictures go with the next Send Current Report
+    // and never again after that (kept 30 days). A picture not sent yet can be removed.
+    let taking = false;
+    const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
+    function picRow() {
+      const pics = myPics();
+      return '<div class="wk-row"><div class="wk-choice plain wp-choice"><span class="wk-num">4</span><span class="wk-t"><b>Pictures</b><span>Anything worth showing in the report</span></span>' +
+        '<span class="wk-n"><b>' + pics.length + '</b><span>' + (pics.length ? 'waiting for the next report' : 'none waiting') + '</span></span>' +
+        '<div class="wp-box">' + thumbsHtml(pics, { remove: true, none: 'Pictures you take go with the next report.' }) + '</div></div>' +
+        '<button type="button" class="wk-act take"' + (taking ? ' disabled' : '') + '>' + (taking ? 'SAVING…' : 'TAKE PICTURE') + '</button></div>';
+    }
+    const camera = cameraInput(async (file) => {
+      taking = true; render();
+      try { await savePicture(file, { facilityId: plantFor(person, null).id }); showError(''); }
+      catch (e) { showError('The picture was not saved: ' + (e.message || e)); }
+      finally { taking = false; render(); }
+    });
+    wireCaptions(document.getElementById('list'), e => showError('The caption was not saved: ' + (e.message || e)));
+    document.getElementById('list').addEventListener('click', async (e) => {
+      if (e.target.closest('.wk-act.take')) { if (!taking) camera.click(); return; }
+      const rm = e.target.closest('.wp-remove');
+      if (!rm) return;
+      rm.disabled = true;
+      try { await removePicture(rm.dataset.photo); } catch (err) { rm.disabled = false; showError('The picture was not removed: ' + (err.message || err)); }
+    });
     // A step's tile: red when past due or out of range, amber when due, green "OK" when all checked.
     const kindOf = (z) => z.late || z.out ? 'bad' + (z.late ? ' late' : '') : z.due ? 'due' : 'good';
     const lineOf = (z, what) => z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : z.auto || 'all checked';
@@ -126,9 +153,10 @@
       } else {
         html = row(Y.state, 'yard.html?walk=1', choice('yard.html?walk=1', '1', 'Yard', 'Loaded trailers on the yard', Y.due, lineOf(Y, 'to check'), kindOf(Y), Y.items, whoOf(Y))) +
           row(C.state, 'temps.html?walk=1', choice('temps.html?walk=1', '2', 'Coolers', 'Cooler and freezer temperatures', C.due, lineOf(C, 'to check'), kindOf(C), C.items, whoOf(C))) +
-          row(Q.state, 'quality.html?walk=1', choice('quality.html?walk=1', '3', 'Production', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q), Q.items, whoOf(Q)));
+          row(Q.state, 'quality.html?walk=1', choice('quality.html?walk=1', '3', 'Production', 'Production line checks', Q.due, Q.total ? 'of ' + Q.total + ' · ' + lineOf(Q, 'lines due') : lineOf(Q, 'lines due'), kindOf(Q), Q.items, whoOf(Q))) + picRow();
       }
-      document.getElementById('list').innerHTML = html;
+      const list = document.getElementById('list');
+      keepCaretIn(list, () => { list.innerHTML = html; });
       document.getElementById('last').textContent = W.last ? 'Last walkthrough check: ' + shortTime(Date.parse(W.last.at)) + ' · ' + personName(W.last.by) : 'No walkthrough checks yet today.';
     }
 
@@ -164,6 +192,7 @@
       const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
       watchPerson(db, user, p => { person = p || { roles: [] }; later(); if (appMode && !codeOk && L.hasRole(person, WALK_ROLES)) gate(); }, { withEmail: true });
       watchRound(db, at => { data.lastReport = at; later(); });
+      watchPictures(db, pics => { data.pics = pics; later(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; later(); });
       onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
       onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});

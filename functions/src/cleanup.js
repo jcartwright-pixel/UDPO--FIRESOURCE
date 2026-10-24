@@ -1,6 +1,6 @@
 /*
- * How long data is kept (Joe 10/18). Behind-the-scenes logs are kept 90 days and Shift Notes 6 months, then deleted once a
- * day. Everything else people enter (loads, check-ins, inspections, work orders, the Sent Email Log, the Text Log, ...) is
+ * How long data is kept (Joe 10/18). Behind-the-scenes logs are kept 90 days, Shift Notes 6 months and walkthrough pictures
+ * 30 days (Joe 10/23), then deleted once a day. Everything else people enter (loads, check-ins, inspections, work orders, the Sent Email Log, the Text Log, ...) is
  * kept. Each list is cleaned on its own, so one that cannot be read or deleted does not stop the others; the next day picks
  * up whatever is left. Each read is bounded (oldest past the cut-off, a page at a time), never the whole list.
  *
@@ -18,7 +18,10 @@ const RULES = [
   { key: 'mailCopies', label: 'Check-in email copies', collection: 'mailCopies', field: 'savedAt', days: 90 },
   { key: 'mailSeen', label: 'Check-in emails handled', collection: 'mailSeen', field: 'at', days: 90 },
   // Shift Notes entries and the review notes under them, by their plant day.
-  { key: 'shiftNotes', label: 'Shift Notes', collection: 'plantJournal', where: ['type', '==', 'SHIFT_REPORT'], field: 'date', months: 6, day: true }
+  { key: 'shiftNotes', label: 'Shift Notes', collection: 'plantJournal', where: ['type', '==', 'SHIFT_REPORT'], field: 'date', months: 6, day: true },
+  // Joe 10/23: walkthrough pictures (the list and the pictures themselves) are kept 30 days, sent or not (walkphotos.js).
+  { key: 'walkPhotos', label: 'Walkthrough pictures', collection: 'walkPhotos', field: 'takenAt', days: 30 },
+  { key: 'walkPhotoData', label: 'Walkthrough pictures (the pictures)', collection: 'walkPhotoData', field: 'takenAt', days: 30 }
 ];
 const PAGE = 400, MAX_PER_LIST = 20000;
 

@@ -15,7 +15,8 @@
  *   check       one box of the quality check due now (slot = which check of the shift, field, value);
  *   crew        a name signed on or off the line;  note  the note for the next shift;
  *   divert      the HTST went to divert (with why) or back to forward flow (sub 'forward');
- *   source      the HTST's silo or tank and where it goes;  lot  the Blow Mold's resin lot;  stock  jugs ahead of the filler;
+ *   source      the HTST's silo or tank and where it goes;  lot  the Blow Mold's resin lot (typed or scanned);  color  its jugs White or Clear (Joe 10/23: each lot or color
+ *               change starts a new run on the tablet's Runs this shift, run.lotLog);  stock  jugs ahead of the filler;
  *   next        what runs next on the line (kept on productionLines, not the shift);
  *   fill        one filled jug's weight in grams on the fill weight check (index = which check; none starts the one due now, with the
  *               empty jug, cap and product target of that moment: production-rules fillOf works out the product in each jug).
@@ -32,8 +33,8 @@ const W = require('./weightjoin');
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
-const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'stock', 'next', 'fill'];
-const STOP_LIMIT = 300, COUNT_LIMIT = 400, RUN_LIMIT = 100;
+const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'color', 'stock', 'next', 'fill'];
+const STOP_LIMIT = 300, COUNT_LIMIT = 400, RUN_LIMIT = 100, LOT_LIMIT = 100;
 
 function lineId(v, SaveError) {
   const id = text(v).slice(0, 120);
@@ -117,7 +118,14 @@ function validateLineEntry(input, SaveError) {
     out.reason = text(input.reason).slice(0, 60);
   }
   if (op === 'source') { out.from = text(input.from).slice(0, 60); out.to = text(input.to).slice(0, 120); }
-  if (op === 'lot') out.lot = text(input.lot).slice(0, 40);
+  if (op === 'lot') {
+    out.lot = text(input.lot).replace(/\s+/g, ' ').slice(0, 40);
+    if (!out.lot) throw new SaveError('BAD_REQUEST', 'Scan or type the resin lot.');
+  }
+  if (op === 'color') {
+    out.color = text(input.color).toUpperCase();
+    if (!P.colorName(out.color)) throw new SaveError('BAD_REQUEST', 'Pick White or Clear.');
+  }
   if (op === 'stock') {
     const n = Number(input.count);
     if (text(input.count) === '' || !Number.isInteger(n) || n < 0 || n > 9999999) throw new SaveError('BAD_REQUEST', 'Type how many jugs, a whole number.');
@@ -176,6 +184,8 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   const get = (r) => tx.get(r), kind = P.lineKind(line.name);
   if (!Array.isArray(run.fills)) run.fills = [];
   let headPlan = null, fillPlan = null, fillCtx = null;
+  // The line's last lot and color, kept on the run at its first scan or pick: the run the shift started on (production-rules lotRuns).
+  const lotLine = req.op === 'lot' || req.op === 'color' ? ((await tx.get(lineRef)).data() || {}) : null;
   if (req.op === 'check' && kind === 'BLOWMOLD' && W.HEADS.indexOf(req.field) >= 0) headPlan = await W.planHeads(get, db, run, req.slot, stamp);
   if (req.op === 'fill') {
     if (!P.hasFill(line.name)) throw new SaveError('BAD_REQUEST', line.name + ' has no fill weight check.');
@@ -297,9 +307,19 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   } else if (req.op === 'source') {
     run.source = { from: req.from, to: req.to };
     message = line.name + ': silo and tanks saved.';
-  } else if (req.op === 'lot') {
-    run.lot = req.lot;
-    message = line.name + ': resin lot ' + req.lot + '.';
+  } else if (req.op === 'lot' || req.op === 'color') {
+    if (!Array.isArray(run.lotLog)) run.lotLog = [];
+    const lot = req.op === 'lot' ? req.lot : text(run.lot) || text(lotLine.lot), color = req.op === 'color' ? req.color : text(run.color) || text(lotLine.color);
+    const same = lot === (text(run.lot) || text(lotLine.lot)) && color === (text(run.color) || text(lotLine.color));
+    if (!run.lotLog.length && !run.lotFrom) run.lotFrom = { lot: text(lotLine.lot), color: text(lotLine.color) };
+    // Scanning the same lot again (or picking the same color) does not start a new run.
+    if (!same) {
+      if (run.lotLog.length >= LOT_LIMIT) throw new SaveError('BAD_REQUEST', 'This shift has too many resin lot changes to keep.');
+      run.lotLog.push({ at: stamp, lot, color, count: Number(run.count) || 0, shots: Number(run.shots) || 0, by: email });
+    }
+    run.lot = lot; run.color = color; run.lotAt = stamp;
+    lineSet = { lot, color };
+    message = req.op === 'lot' ? line.name + ': resin lot ' + lot + '.' : line.name + ': ' + P.colorName(color) + ' jugs.';
   } else if (req.op === 'stock') {
     run.stock = req.count; run.stockAt = stamp;
     message = line.name + ': ' + req.count.toLocaleString('en-US') + ' jugs ahead of the filler.';

@@ -461,7 +461,7 @@
 
   // The Weekly Dispatch grid for one week: one line per run, seven day cells.
   function weeklyRows(runs, week) {
-    return (runs || []).filter(function (run) {
+    var rows = (runs || []).filter(function (run) {
       return run.weekStart === week && weeklyShown(run);
     }).map(function (run) {
       var days = {};
@@ -475,12 +475,23 @@
           plantLoadOff: d.plantLoadOff === true
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0 };
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0,
+        extraRun: run.extraRun === true, extraOf: run.extraOf || '' };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
       var y = b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder;
       return x - y || compareRoute(a, b);
     });
+    // Joe 10/23: a one-week extra line sits right under the run it was added for.
+    var extras = rows.filter(function (r) { return r.extraRun && rows.some(function (b) { return b.runDocId === r.extraOf; }); });
+    if (!extras.length) return rows;
+    var out = [];
+    rows.forEach(function (r) {
+      if (extras.indexOf(r) >= 0) return;
+      out.push(r);
+      extras.forEach(function (x) { if (x.extraOf === r.runDocId) out.push(x); });
+    });
+    return out;
   }
 
   // Who may save (USERS_MASTER roles). Changing the load order needs a manager, the same rule as the current app
@@ -934,17 +945,32 @@
     if (UNIT_ON_STATUSES.indexOf(status) < 0) return status.replace(/_/g, ' ') || 'NOT USABLE';
     return 'NOT ON THE FLEET LIST';
   }
+  // The Equipment Master unit on a load: by its ID, or, when the load holds only the number (a Live row whose trailer was
+  // typed in the sheet, or seeded from Route Master's default, with no trailer_id), by that number. Joe 10/23 (T-532 on 815,
+  // T-537 on 824): a down trailer held as a number only was shown as if usable. type: 'TRUCK' | 'TRAILER'.
+  function unitOnLoad(equipment, type, id, unitText) {
+    var list = equipment || [], kindOf = function (e) { var t = String(e.type || '').toUpperCase(); return t === 'TRACTOR' ? 'TRUCK' : t; };
+    if (id) {
+      var k = String(id).toUpperCase();
+      for (var i = 0; i < list.length; i++) if (list[i] && String(list[i].id).toUpperCase() === k) return list[i];
+      return null;
+    }
+    var key = function (v) { var c = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, ''); return type === 'TRAILER' ? trailerNumber(c) : c; };
+    var want = key(unitText);
+    if (!want || want === 'N/A' || want === 'TBA') return null;
+    for (var j = 0; j < list.length; j++) if (list[j] && kindOf(list[j]) === type && key(list[j].unit) === want) return list[j];
+    return null;
+  }
   // Joe 10/12 ("537 is on the list being down but shows on dispatch"): running loads from fromDate on that still carry a down,
   // inactive or out-of-service truck or trailer (the current app's week roll can put a down unit back on a route).
   function offUnitLoads(runs, equipment, fromDate) {
-    var byId = {}, out = [];
-    (equipment || []).forEach(function (e) { if (e && e.id) byId[String(e.id).toUpperCase()] = e; });
+    var out = [];
     (runs || []).forEach(function (run) {
       DAYS.forEach(function (p, i) {
         var d = run.days && run.days[p], date = addDays(run.weekStart, i);
         if (!d || !d.runs || (fromDate && date < fromDate)) return;
         [['truckId', 'truck'], ['trailerId', 'trailer']].forEach(function (k) {
-          var e = d[k[0]] && byId[String(d[k[0]]).toUpperCase()];
+          var e = unitOnLoad(equipment, k[0] === 'truckId' ? 'TRUCK' : 'TRAILER', d[k[0]], d[k[1]]);
           if (e && unitOff(e)) out.push({ unitId: e.id, unit: e.unit, type: e.type, status: String(e.status || ''), why: unitOffWhy(e), notes: String(e.notes || ''), route: String(run.route || ''), run: String(run.run || ''), date: date, runDocId: run.id, day: p });
         });
       });
@@ -1488,7 +1514,7 @@
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,

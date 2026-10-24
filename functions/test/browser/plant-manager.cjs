@@ -127,11 +127,11 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile:nth-child(3) .wk-items li', l => l.map(x => x.className + ' ' + (x.className === 'more' ? x.textContent : x.textContent.split(' · ')[0].replace(/^.*?(PAST DUE|DUE|NOT RUNNING)$/, '$1')))), ['bad PAST DUE', 'warn DUE', 'ok NOT RUNNING', 'ok NOT RUNNING', 'more + 1 more']);
       assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-items li', l => l.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).length), 0);
       assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html' && (await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href')))).join() ===
-        'yard.html?walk=1,temps.html?walk=1,quality.html?walk=1,walkthrough.html', 'the card and its tiles open the walkthrough');
+        'yard.html?walk=1,temps.html?walk=1,quality.html?walk=1,walkthrough.html,', 'the card and its tiles open the walkthrough (Joe 10/23: the Pictures stop is not a link; it has Take Picture)');
       // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
       assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
       assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.firstChild.textContent.trim())), ['1 · Yard', '2 · Coolers', '3 · Production', 'Last Walkthrough']);
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.firstChild.textContent.trim())), ['1 · Yard', '2 · Coolers', '3 · Production', 'Last Walkthrough', '4 · Pictures']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
       // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
       const bigSize = () => page.$eval('[data-card="walk"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
