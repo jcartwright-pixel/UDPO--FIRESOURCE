@@ -509,11 +509,14 @@
       watch();
       render();
     };
+    // Joe 10/24: the "Published ... by ..." line under the title is gone so the board gets more rows; only the
+    // "Not published yet this week" warning still shows there. When and who published is on the Publish button's hover.
     function showPublished() {
       const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
-      const el = document.getElementById('published');
-      el.textContent = at && !isNaN(at) ? 'Published ' + shortDate(at) + ' ' + shortTime(at) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : 'Not published yet this week';
-      el.title = weekDoc && weekDoc.publishedBy ? 'Published to Daily Dispatch by ' + weekDoc.publishedBy : '';
+      const done = at && !isNaN(at), el = document.getElementById('published');
+      el.textContent = done ? '' : 'Not published yet this week';
+      el.hidden = !!done;
+      document.getElementById('publish').title = done ? 'Last published ' + shortDate(at) + ' ' + shortTime(at) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : '';
     }
     // Print Layouts opens Weekly with #print: the week prints once its runs are on screen.
     // An empty day or week still prints (a blank sheet) once the runs have been read, instead of waiting forever.

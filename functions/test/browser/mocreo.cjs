@@ -156,6 +156,8 @@ const row = (name) => '#rows tr:has(input[data-k="location"][value="' + name + '
     const moved = {};
     for (const id of ['ut_temp_cooler_north', 'ut_temp_cooler_middle']) moved[id] = (await db().collection('tempLocations').doc(id).get()).data().sensorId;
     assert.deepEqual(moved, { ut_temp_cooler_north: 'S4', ut_temp_cooler_middle: '' });
+    // The list redraws from the saved locations a moment after the save, so wait for Main North's box to catch up.
+    await page.waitForFunction(() => document.querySelector('#srows tr[data-sensor="S3"] select').value === '', null, { timeout: 5000 }).catch(() => {});
     assert.equal(await page.inputValue('#srows tr[data-sensor="S3"] select'), '', 'Main North is left with no location');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'mocreo-sensor-list-1920.png'), scale: 'css' });
     await narrow.waitForFunction(() => /Cooler North/.test(document.querySelector('#srows tr[data-sensor="S4"] select').selectedOptions[0].textContent));
