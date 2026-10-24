@@ -15,6 +15,7 @@ const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
 const PLANT = require('./plant');
+const PHOTOS = require('./walkphotos');
 const PROD = require('./production');
 const OTR = require('./otr-core');
 const SC = require('./sc-core');
@@ -101,6 +102,10 @@ const ACTIONS = Object.freeze({
   saveShiftNote: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveTemperatureCheck: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   sendPlantReport: { roles: L.SAVE_ROLES, screen: 'plant' },
+  // Joe 10/23: walkthrough pictures, which go with the next Send Current Report (walkphotos.js).
+  saveWalkPhoto: { roles: L.SAVE_ROLES, screen: 'plant' },
+  removeWalkPhoto: { roles: L.SAVE_ROLES, screen: 'plant' },
+  captionWalkPhoto: { roles: L.SAVE_ROLES, screen: 'plant' },
   // Administration > Products: each plant's products by area, its own areas and groups, and the template upload.
   saveMachineProducts: { roles: REORDER_ROLES, screen: 'plant' },
   saveProductSetup: { roles: REORDER_ROLES, screen: 'plant' },
@@ -500,6 +505,7 @@ function validate(input) {
   if (action === 'saveShiftNote') return Object.assign(out, PLANT.validateShiftNote(input, SaveError));
   if (action === 'saveTemperatureCheck') return Object.assign(out, PLANT.validateTemperature(input, SaveError));
   if (action === 'sendPlantReport') return Object.assign(out, PLANT.validateReport(input, SaveError));
+  if (action === 'saveWalkPhoto' || action === 'removeWalkPhoto' || action === 'captionWalkPhoto') return Object.assign(out, PHOTOS.validatePhoto(action, input, SaveError));
   if (action === 'saveMachineProducts') return Object.assign(out, PLANT.validateMachineProducts(input, SaveError));
   if (action === 'saveProductSetup') return Object.assign(out, PLANT.validateProductSetup(input, SaveError));
   if (action === 'saveProductUpload') return Object.assign(out, PLANT.validateProductUpload(input, SaveError));
@@ -842,6 +848,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveShiftNote') return PLANT.saveShiftNote(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveTemperatureCheck') return PLANT.saveTemperature(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPlantReport') return PLANT.sendReport(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveWalkPhoto' || req.action === 'removeWalkPhoto' || req.action === 'captionWalkPhoto') return PHOTOS.savePhoto(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachineProducts') return PLANT.saveMachineProducts(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductSetup') return PLANT.saveProductSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveProductUpload') return PLANT.saveProductUpload(tx, db, req, email, stamp, logRef, mode, SaveError);

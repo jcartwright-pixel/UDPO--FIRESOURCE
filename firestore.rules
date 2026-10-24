@@ -138,6 +138,8 @@ service cloud.firestore {
     match /plantPmTasks/{id} { allow read: if activeUser(); }
     // Plant reports sent from the Manager Center, and whether each was emailed.
     match /plantReports/{id} { allow read: if activeUser(); }
+    // Walkthrough pictures (Joe 10/23): the list with a small copy of each; the pictures themselves (walkPhotoData) only the server reads.
+    match /walkPhotos/{id} { allow read: if activeUser(); }
     // Sheet cells the write-back did not write, so a dispatcher can check them.
     match /conflicts/{id} { allow read: if activeUser(); }
     match /{other=**} { allow read, write: if false; }

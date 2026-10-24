@@ -9,12 +9,14 @@
  * so the sandbox can never email the managers. Send Test to Me (testOnly, Joe 10/19) goes only to that person on live too.
  * The Late Forecast box goes only to that person until Administration > Sent Email Log switches it to everyone. The report's status says what happened: SENT (sentTo), HELD or FAILED
  * (reason in plain words); the Manager Center shows it.
+ * The walkthrough pictures not sent yet go with it as attachments (walkphotos.js, Joe 10/23).
  */
 'use strict';
 
 const R = require('./plant-rules');
 const { sendMail, addresses } = require('./mail');
 const { emailSettings, senderFor, personFor } = require('./adminmail');
+const PHOTOS = require('./walkphotos');
 
 const REASON = {
   NOT_DELEGATED: 'Email is waiting on one Google Workspace step (letting the app send Gmail as United Dairy).',
@@ -28,6 +30,9 @@ function recipients(report, env) {
   if (report.mode === 'live' && group.length && !report.testOnly) return { to: group, copy: false };
   return { to: addresses([report.by]), copy: true };
 }
+
+// mike.adams@uniteddairy.com reads Mike Adams.
+const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 // Joe 10/19 (Late Forecast): an email to the groups leaves the forecast box out until it is switched on for everyone.
 function withoutForecast(report) {
@@ -94,9 +99,29 @@ async function mailReport(ref, report, deps) {
     await ref.update({ status: 'FAILED', emailed: false, reason: 'No email address to send to.' });
     return 'FAILED';
   }
+  // Joe 10/23: the walkthrough pictures not sent yet go with the email. Send Current Report marks them sent (on the practice
+  // copy too, where it goes only to the sender); Send Test to Me does not, so a test never keeps them from the managers.
+  // Pictures that cannot be read never stop the report.
+  let pics = { attachments: [], used: [], left: 0 };
+  if (db) {
+    try { pics = await PHOTOS.photoAttachments(db, report.facilityId, report.at); } catch (e) { console.error('Walkthrough pictures', e.message || e); }
+  }
+  let html = reportHtml(report), body = report.text;
+  if (pics.attachments.length) {
+    // Each picture in the email with its caption under it (Joe 10/23), the plain-text version listing the captions.
+    const words = pics.attachments.length + ' walkthrough picture' + (pics.attachments.length === 1 ? '' : 's') + ' attached' + (pics.left ? ' (' + pics.left + ' more go with the next report)' : '') + '.';
+    const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const when = (a) => { const t = Date.parse(a.takenAt); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    body = body + '\n\nWALKTHROUGH PICTURES\n' + pics.attachments.map((a, i) => (i + 1) + '. ' + (a.note || 'No caption') + (when(a) ? ' (' + when(a) + ')' : '')).join('\n') + '\n' + words;
+    html = html.replace(/<\/body>/i, '<div style="font:16px Arial,sans-serif;color:#33475b;margin:20px 0"><h2 style="font:bold 18px Arial,sans-serif;color:#0b4f8a;margin:0 0 10px">WALKTHROUGH PICTURES (' + pics.attachments.length + ')</h2>' +
+      pics.attachments.map((a, i) => '<div style="margin:0 0 18px"><img src="cid:' + esc(a.contentId) + '" alt="Picture ' + (i + 1) + '" style="display:block;max-width:100%;width:560px;height:auto;border:1px solid #c7d3de;border-radius:6px">' +
+        '<p style="margin:6px 0 0;font:bold 16px Arial,sans-serif;color:#13293d">' + (i + 1) + '. ' + esc(a.note || 'No caption') + '</p><p style="margin:2px 0 0;font:14px Arial,sans-serif;color:#5a6b7b">' + esc([when(a), personName(a.by)].filter(Boolean).join(' · ')) + '</p></div>').join('') +
+      '<p style="margin:0">' + esc(words) + '</p></div></body>');
+  }
   try {
-    const sent = await send({ from: sender.from, fromName: sender.fromName, to, subject: report.subject, text: report.text, html: reportHtml(report) });
-    await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, groupName: report.group || report.groupName || '', sentAt: Date.now(), gmailId: sent.id || '', reason: '' });
+    const sent = await send({ from: sender.from, fromName: sender.fromName, to, subject: report.subject, text: body, html, attachments: pics.attachments });
+    if (!report.testOnly && pics.used.length) await PHOTOS.markSent(db, pics.used, ref.id, new Date().toISOString()).catch(e => console.error('Walkthrough pictures sent mark', e.message || e));
+    await ref.update({ status: 'SENT', emailed: true, sentTo: sent.to, testCopy: copy, groupName: report.group || report.groupName || '', sentAt: Date.now(), gmailId: sent.id || '', reason: '', pictures: pics.used.length });
     if (db) await logReport(db, report, 'SENT', sent.to, report.testOnly ? 'Send Test to Me: sent only to ' + sent.to.join(', ') + '.' : copy ? 'Test copy: sent only to ' + sent.to.join(', ') + '.' : '', sender.from);
     return 'SENT';
   } catch (e) {
