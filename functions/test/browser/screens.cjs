@@ -333,6 +333,13 @@ async function noScroll(page) {
     await wkEdit.waitForFunction(sameRow, null, { timeout: 3000 }).catch(() => {});
     const headRow = await wkEdit.evaluate(() => { const t = document.querySelector('.head h1').getBoundingClientRect(), a = document.querySelector('.head .actions.in-head').getBoundingClientRect(); return { titleBottom: t.bottom, actionsTop: a.top, title: [t.left, t.right], actions: [a.left, a.right], buttons: [...document.querySelectorAll('.head .actions.in-head button, .head .actions.in-head a.button')].map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().width)), head: document.querySelector('.head').clientWidth }; });
     assert.ok(headRow.actionsTop < headRow.titleBottom, 'at 1536 the Weekly buttons sit on the title row: ' + JSON.stringify(headRow));
+    // Joe's 16px rule on phones and tablets: driver names in the day boxes never shrink below 16px there (they wrap instead).
+    for (const [w, h] of [[390, 844], [1024, 768]]) {
+      await wkEdit.setViewportSize({ width: w, height: h });
+      await wkEdit.waitForTimeout(400);
+      const tiny = await wkEdit.$$eval('#rows td.day .nm, #board-rows td.day .run', els => els.filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent + ' ' + getComputedStyle(e).fontSize));
+      assert.deepEqual(tiny, [], 'Weekly day boxes at ' + w + ' wide keep 16px names');
+    }
     await wkEdit.setViewportSize({ width: 1920, height: 950 });
     // Reset Week (managers): the dispatcher's button is off; a manager's second click rebuilds the week from the masters.
     assert.equal(await wkEdit.$eval('#reset', b => b.disabled), true, 'a dispatcher cannot Reset Week');
@@ -943,7 +950,8 @@ async function noScroll(page) {
     await otr.click('#otr-col-add');
     await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden'), null, { timeout: 5000 });
     await otr.waitForSelector('[data-col-remove]', { timeout: 5000 });
-    await otr.click('[data-miles="run_t801"]');
+    // The table can redraw once more after the column is added, closing the miles box; click again until it stays open.
+    for (let i = 0; i < 10 && !(await otr.$('[data-miles-in="run_t801"]')); i++) { await otr.click('[data-miles="run_t801"]'); await otr.waitForTimeout(300); }
     await otr.fill('[data-miles-in="run_t801"]', '412');
     // Batch 5: no Save button; the miles save when the box is left.
     assert.equal(await otr.$('[data-miles-save]'), null, 'no Save button by the miles');

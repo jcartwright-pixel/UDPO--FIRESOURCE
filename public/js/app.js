@@ -1186,8 +1186,10 @@ function tooWide(td) {
 // Joe 10/13 (review item 3): Weekly Dispatch shrinks a driver's name to fit its day box (down to 12px) so the whole week shows
 // with every name on one line; only a name that still does not fit wraps.
 const WEEKLY_FIT_MIN = 12;
+// Joe's 16px rule: on phones and tablets (1024 wide or less) the names never shrink below 16px; a long one wraps instead.
+const weeklyFitMin = () => window.innerWidth <= 1024 ? 16 : WEEKLY_FIT_MIN;
 // Joe 10/20: a day whose driver is off (NEEDS DRIVER on red) keeps 16px print and wraps instead.
-function fitMin(td) { return td.classList.contains('day') && !td.classList.contains('c-vacation-needs') && td.closest('.weekly-page .sheet.week') ? WEEKLY_FIT_MIN : FIT_MIN; }
+function fitMin(td) { return td.classList.contains('day') && !td.classList.contains('c-vacation-needs') && td.closest('.weekly-page .sheet.week') ? weeklyFitMin() : FIT_MIN; }
 function fitCells() {
   fitQueued = false;
   const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
