@@ -188,7 +188,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
       assert.ok(await pl.$('.pd-tile.flash[data-line="' + LINE + '"]'), 'the Gallon Filler flashes');
       assert.match(await pl.textContent('.pd-tile[data-line="' + LINE + '"] .pd-speed'), /TOO FAST 80\/MIN/);
       assert.equal(await pl.$('#plant'), null, 'no plant drop-down on Production Lines (review item 31)');
-      assert.deepEqual(await pl.$$eval('.sidemenu > a:not(.side-name)', a => a.map(x => x.textContent.trim())), ['Line Tablet', 'Line Targets', 'Production TV']);
+      assert.deepEqual(await pl.$$eval('.sidemenu > a:not(.side-name)', a => a.map(x => x.textContent.trim())), ['Line Tablet', 'Line Targets', 'Production TV', 'Quality Checks', 'Cooler Temperature', 'Shift Notes']); // Joe 10/25: moved in
       await fits(pl, 'Production Lines at ' + w);
       await shot(pl, 'production-lines-' + w);
       assert.deepEqual(pl.errors, []);

@@ -58,9 +58,10 @@ const SCREENS = [
     assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Distribution opens Manager Center');
     assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Distribution screen');
     assert.deepEqual(await side.$$eval('.sidemenu > a:not(.side-name):not(#go-home), .sidemenu > .side-sec > .side-sec-btn', x => x.map(e => e.textContent.replace(/[\u25b8]/g, '').trim())),
-      ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks']);
+      ['Send Report', 'Plant Distribution Departments', 'Plant Distribution Scheduler', 'Shift Notes', 'Yard Checks']);
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
-    for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
+    // Joe 10/25: Quality Checks and Cooler Temperature moved to Plant Production's menu.
+    for (const [page] of SCREENS) if (['quality.html', 'temps.html'].indexOf(page) < 0) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
