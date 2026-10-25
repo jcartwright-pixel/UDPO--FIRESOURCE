@@ -847,6 +847,8 @@ table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; }
 .launch-card small { color: #4a6b8d; font-size: 16px; min-height: 2.6em; }
 /* A side's name sits under Back and Home, so it is plain which side the menu belongs to. */
 .sidemenu a.side-name { margin-bottom: 6px; border-bottom: 1px solid #ffffff33; border-radius: 9px 9px 0 0; font-size: 16px; font-weight: 900; }
+/* Joe 10/25: a line between the plant's own sides and Route Distribution, in the plant home menu and the plant's fly-out. */
+.side-sep { height: 0; margin: 8px 16px; border-top: 2px solid #ffffff59; }
 /* Long screen names wrap onto a second line instead of being cut off. */
 body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
 body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
