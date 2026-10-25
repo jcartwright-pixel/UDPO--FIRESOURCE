@@ -165,6 +165,28 @@ async function buttonsFit(p, label) {
       assert.deepEqual(p.errors, []);
       await p.close();
     }
+    // Joe 10/25 (6.62 practice test): the whole lessor name and every column heading fit on a phone, a tablet and both desktops.
+    // Each width twice: in the page's own font, and in DejaVu Sans (the wider letters the practice test's computer draws).
+    for (const [w, h, font] of [390, 768, 1024, 1366, 1536, 1920].flatMap(w => [[w, w < 1024 ? 844 : 790, ''], [w, w < 1024 ? 844 : 790, 'DejaVu Sans']])) {
+      const p = await openPage(browser, w, h, '/issues.html?testEmail=manager.test@uniteddairy.com');
+      if (font) await p.addStyleTag({ content: 'body, body * { font-family: "' + font + '" !important; }' });
+      await p.waitForSelector('tr[data-id="MAIL_m15_tractor"] .pill');
+      await p.waitForTimeout(300);
+      const bad = await p.evaluate(() => {
+        const out = [];
+        document.querySelectorAll('#head th').forEach(th => { if (th.scrollWidth > th.clientWidth + 1) out.push('heading ' + th.textContent.trim() + ' is cut off'); });
+        document.querySelectorAll('#rows .pill').forEach(pill => {
+          const td = pill.closest('td').getBoundingClientRect(), r = pill.getBoundingClientRect();
+          if (r.left < td.left - 0.5 || r.right > td.right + 0.5 || pill.scrollWidth > pill.clientWidth + 1) out.push(pill.closest('tr').dataset.id + ' ' + pill.textContent + ' sticks out of its cell');
+        });
+        return out;
+      });
+      await shot(p, 'emailed-fit-' + w + (font ? '-dejavu' : '') + '.png');
+      assert.deepEqual(bad, [], 'at ' + w + (font ? ' in ' + font : ''));
+      assert.deepEqual(p.errors, []);
+      await p.close();
+    }
+    results.push('Truck Issues at 390, 768, 1024, 1366, 1536 and 1920, in the page font and in DejaVu Sans: every column heading and the whole lessor name under Emailed fit their cells');
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('A write-up sent to Idealease shows Idealease whole under Emailed (green once emailed, red while not) and a dash under Garage, at 1536 and 1920');

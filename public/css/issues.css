@@ -83,3 +83,9 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
 .trucks-page table.tt-units td.tt-where { text-align: left; }
 .trucks-page table.tt-units .tt-muted { color: var(--muted); white-space: nowrap; }
 .trucks-page table.tt-units td small { display: inline; }
+/* Joe 10/25 (6.62 practice test): below Joe's 1536 window the issue lists keep their desktop columns and slide sideways in their
+   box, so every heading and the whole lessor name under Emailed stay readable on a phone or tablet. */
+@media (max-width: 1500px) {
+  .issues-page .sheet.scroll-list { overflow: auto; }
+  .issues-page table.old-issues { min-width: 1400px; }
+}
