@@ -72,3 +72,20 @@ body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
 .sc-pop .sc-pop-foot { border: 0; text-align: right; padding-top: 10px; }
 .sc-pop button { height: 32px; padding: 0 10px; font-size: 16px; }
 .sc-pop .sc-excused .sc-what { text-decoration: line-through; color: #7a8a99; }
+/* Joe 10/25: a grade on the board opens the report of that driver's days in that area. */
+.sc-board button.sc-go { border: 0; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.sc-board button.sc-go:hover, .sc-board button.sc-go:focus-visible { outline: 3px solid var(--ud-blue); outline-offset: 1px; }
+.sc-report { padding: 4px; }
+.sc-report h2 { font-size: 24px; color: var(--ud-blue); margin: 6px 0; }
+.sc-report .sc-report-back { height: 40px; padding: 0 14px; font-size: 16px; font-weight: 700; }
+.sc-report .sc-report-tiles { margin: 0 0 8px; }
+.sc-report .sc-report-tiles div { background: #fff; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.sc-report .sc-report-tiles b { color: var(--ud-blue); }
+.sc-report .sc-report-tiles .warn b { color: #b42318; }
+.sc-report .sc-report-tiles .good b { color: #1d7a3e; }
+.sc-report .sc-report-tiles span { font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.sc-board.sc-report-table td { font-size: 16px; }
+.sc-board.sc-report-table td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
+.sc-board.sc-report-table tr.sc-r-bad td { background: var(--pill-red-bg); color: var(--pill-red-ink); }
+.sc-board.sc-report-table tr.sc-r-good td { background: #e3f3e8; color: #1c6b3a; }
+.sc-board.sc-report-table tr.sc-r-total td { font-weight: 800; border-top: 2px solid var(--ud-blue); background: #f2f6fa; }
