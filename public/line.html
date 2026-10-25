@@ -258,16 +258,20 @@
       const box = document.getElementById('machine'), blow = v.kind === 'BLOWMOLD', ld = (data.lineInfo || {})[lineId] || {}, c = ld.controller || {};
       if (blow) followRoom(String(c.roomSensor || ''));
       // Joe 10/23: the Blow Mold's room temperature shows even before the machine sends anything.
-      const roomOnly = blow && !v.machine && room.id && room.value;
-      const m = v.machine || (roomOnly ? { stale: false, at: '', counter: null, speed: null, temp: null, running: null, rejects: null, shots: null, roomLow: c.roomLow === undefined ? null : c.roomLow, roomHigh: c.roomHigh === undefined ? null : c.roomHigh } : null);
+      // Joe 10/24: the Blow Mold always shows mock-up 2's sensor tiles; one with nothing to read yet says WAITING FOR SENSOR.
+      const roomOnly = blow && !v.machine;
+      const cfg = (k) => c[k] === undefined || c[k] === '' ? null : Number(c[k]);
+      const m = v.machine || (roomOnly ? { stale: false, at: '', counter: null, speed: null, temp: null, running: null, rejects: null, shots: null, speedName: 'Annealer belt speed', rpm: true,
+        speedLow: cfg('speedLow'), speedHigh: cfg('speedHigh'), tempLow: cfg('tempLow'), tempHigh: cfg('tempHigh'), roomLow: cfg('roomLow'), roomHigh: cfg('roomHigh') } : null);
+      const waiting = '<span class="lb-pill n">WAITING FOR SENSOR</span>';
       box.hidden = !m;
       if (!m) return;
       const range = (lo, hi, unit) => lo === null && hi === null ? 'No range set on Line Targets' : 'Range ' + (lo === null ? 'up' : fmt(lo) + unit) + ' to ' + (hi === null ? 'any' : fmt(hi) + unit);
       const flagged = (f) => f === 'HIGH' || f === 'LOW';
       const tile = (name, big, sub, pill, flag) => '<div class="lb-card' + (flagged(flag) ? ' lb-flash' : '') + '"><span class="eyebrow">' + escapeHtml(name) + '</span><div class="lb-big">' + big + '</div><div class="lb-mut">' + sub + '</div><div>' + pill + '</div></div>';
       const tiles = [];
-      // Joe 10/23 (Blow Mold): with the shot counter on, the jugs are on the cards above.
-      if ((v.counter === 'CONTROLLER' || m.counter !== null) && !(blow && m.shots !== null) && !roomOnly) {
+      // Joe 10/24 (Blow Mold): the jugs are on the cards above (Jugs on the Alpine).
+      if ((v.counter === 'CONTROLLER' || m.counter !== null) && !blow) {
         const moving = m.lastMoveAt && Date.now() - Date.parse(m.lastMoveAt) < 180000;
         tiles.push(tile('Jug count', fmt(v.counter === 'CONTROLLER' ? v.made : m.counter), escapeHtml(v.counter === 'CONTROLLER' ? 'this shift' + (m.counter !== null ? ' · machine counter ' + fmt(m.counter) : '') : 'machine counter'),
           v.counter === 'CONTROLLER' ? (moving ? '<span class="lb-pill g">COUNTING</span>' : '<span class="lb-pill a">NO JUGS IN 3 MIN</span>') : '', ''));
@@ -279,21 +283,24 @@
       const speedTile = () => tile(m.speedName, fmt(m.speed) + (m.rpm ? ' RPM' : ''), escapeHtml(range(m.speedLow, m.speedHigh, '')) + (m.rpm ? ' · counted from the belt' : '') + (m.speedOutSince ? ' · ' + (m.speedFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.speedOutSince) : ''),
         m.speedFlag === 'HIGH' ? '<span class="lb-pill r">TOO FAST</span>' : m.speedFlag === 'LOW' ? '<span class="lb-pill r">TOO SLOW</span>' : m.speedLow !== null || m.speedHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.speedFlag);
       if (m.speed !== null && !blow) tiles.push(speedTile());
+      if (blow && m.temp === null) tiles.push(tile('Annealer temperature', '—', escapeHtml(range(m.tempLow, m.tempHigh, '°F')), waiting, ''));
       if (m.temp !== null) tiles.push(tile(blow ? 'Annealer temperature' : 'Temperature', fmt(m.temp) + '°F', escapeHtml(range(m.tempLow, m.tempHigh, '°F')) + (m.tempOutSince ? ' · ' + (m.tempFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clock(m.tempOutSince) : ''),
         m.tempFlag === 'HIGH' ? '<span class="lb-pill r">TOO HOT</span>' : m.tempFlag === 'LOW' ? '<span class="lb-pill r">TOO COLD</span>' : m.tempLow !== null || m.tempHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', m.tempFlag));
       if (blow) {
         // Joe 10/23 (mock-up 2): the annealer's temperature, the belt's counted RPM, the room, and the jugs ahead of the filler.
         if (m.speed !== null) tiles.push(speedTile());
+        else tiles.push(tile('Annealer belt speed', '—', escapeHtml(range(m.speedLow, m.speedHigh, '')) + ' · RPM counted from the belt', waiting, ''));
         const rv = room.value && room.value.temperatureF !== null && room.value.temperatureF !== undefined ? Number(room.value.temperatureF) : m.room === undefined ? null : m.room;
-        if (room.id || rv !== null) {
+        if (!room.id && rv === null) tiles.push(tile('Room temperature', '—', escapeHtml(range(m.roomLow, m.roomHigh, '°F')) + ' · pick the room sensor on Line Targets', waiting, ''));
+        else {
           const rf = R.machineFlag(rv, m.roomLow, m.roomHigh), rAt = room.value ? room.value.lastReadingAt : m.roomAt;
           tiles.push(tile('Room temperature', rv === null ? '—' : fmt(rv) + '°F', escapeHtml(range(m.roomLow, m.roomHigh, '°F')) + (rAt ? ' · read ' + escapeHtml(clock(rAt)) : ''),
-            rf === 'HIGH' ? '<span class="lb-pill r">TOO HOT</span>' : rf === 'LOW' ? '<span class="lb-pill r">TOO COLD</span>' : rv !== null && (m.roomLow !== null || m.roomHigh !== null) ? '<span class="lb-pill g">IN RANGE</span>' : '', rf));
+            rf === 'HIGH' ? '<span class="lb-pill r">TOO HOT</span>' : rf === 'LOW' ? '<span class="lb-pill r">TOO COLD</span>' : rv === null ? waiting : m.roomLow !== null || m.roomHigh !== null ? '<span class="lb-pill g">IN RANGE</span>' : '', rf));
         }
-        if (m.shots !== null) tiles.push(tile('Jugs ahead of filler', v.stock === null ? '—' : fmt(v.stock), v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift', '<button type="button" class="lb-btn" data-act="stock">Enter Jugs</button>', ''));
+        tiles.push(tile('Jugs ahead of filler', v.stock === null ? '—' : fmt(v.stock), v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift', '<button type="button" class="lb-btn" data-act="stock">Enter Jugs</button>', ''));
       }
       if (roomOnly) {
-        box.innerHTML = '<div class="lb-mach-head">From the sensors <span>MOCREO room sensor</span></div><div class="lb-mach-row n' + tiles.length + '">' + tiles.join('') + '</div>';
+        box.innerHTML = '<div class="lb-mach-head">From the sensors <span>' + (room.value && room.value.temperatureF !== null && room.value.temperatureF !== undefined ? 'MOCREO room sensor · the rest are waiting for their sensors' : 'waiting for the sensors to be wired') + '</span></div><div class="lb-mach-row n' + tiles.length + '">' + tiles.join('') + '</div>';
         return;
       }
       box.innerHTML = '<div class="lb-mach-head">' + (blow ? 'From the sensors' : 'From the machine') + ' <span' + (m.stale ? ' class="stale"' : '') + '>' + (m.stale ? 'NOT READING · last read ' + escapeHtml(clock(m.at)) : 'read ' + escapeHtml(clock(m.at)) + ' · every 5 seconds') + '</span></div>' +
@@ -342,9 +349,11 @@
           '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs on the Alpine</span><div class="lb-big">' + fmt(m.through) + '</div><div class="lb-mut">counted on the Alpine after the annealer</div>' + madeBits + speedLine + '</div>' +
           '<div class="lb-card' + (m.kickFlag ? ' lb-flash' : '') + '"><span class="eyebrow">Tester kick-outs</span><div class="lb-big">' + fmt(m.kicked) + '</div><div class="lb-mut">molded − on the Alpine</div>' +
             (m.kickPct === null ? '' : '<div><span class="lb-pill ' + (m.kickFlag ? 'r' : 'g') + '">' + m.kickPct + '% OF JUGS MOLDED</span></div>') + '<div class="lb-mut">Turns red over ' + m.kickHigh + '%</div></div>' :
-          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs this shift</span><div class="lb-big">' + fmt(v.made) + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
-          '<div class="lb-card"><span class="eyebrow">Leak tester rejects</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs made' : 'this shift') + '</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Rejects</button></div>' +
-          '<div class="lb-card"><span class="eyebrow">Jugs ahead of filler</span><div class="lb-big">' + (v.stock === null ? '—' : fmt(v.stock)) + '</div><div class="lb-mut">' + (v.run && v.run.stockAt ? 'counted ' + clock(v.run.stockAt) : 'not counted this shift') + '</div><button type="button" class="lb-btn" data-act="stock">Enter Jugs</button></div>'));
+          // Joe 10/24: the same three cards before the sensors are wired. Jugs molded waits for the shot counter; the Alpine count and
+          // the kick-outs are typed on this tablet until then (the leak tester rejects, as before).
+          '<div class="lb-card"><span class="eyebrow">Jugs molded</span><div class="lb-big">—</div><div class="lb-mut">shots × ' + (m && m.perShot ? m.perShot : R.JUGS_PER_SHOT) + ' jugs, from the shot counter</div><div><span class="lb-pill n">WAITING FOR SENSOR</span></div></div>' +
+          '<div class="lb-card' + (v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' ? ' lb-flash' : '') + '"><span class="eyebrow">Jugs on the Alpine</span><div class="lb-big">' + fmt(v.made) + '</div><div class="lb-mut">' + (v.counter === 'TABLET' ? 'typed here until the Alpine eye is wired' : 'counted on the Alpine after the annealer') + '</div>' + madeBits + speedLine + fromMachine + countBtn + '</div>' +
+          '<div class="lb-card"><span class="eyebrow">Tester kick-outs</span><div class="lb-big">' + fmt(rej) + '</div><div class="lb-mut">' + (v.made ? (Math.round(rej / v.made * 1000) / 10) + '% of jugs · ' : '') + 'typed until the shot counter is wired</div><button type="button" class="lb-btn" data-act="waste" data-reason="Leak tester">Enter Kick-outs</button></div>'));
       } else if (k === 'HTST') {
         const temp = latest(v, 'recorder'), ind = latest(v, 'indicating'), flow = latest(v, 'flow');
         drawn['kind-cards'] = null;

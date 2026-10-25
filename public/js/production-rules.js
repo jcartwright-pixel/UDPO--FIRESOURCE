@@ -427,6 +427,29 @@
     });
   }
 
+  // The Blow Mold's hour by hour (Joe 10/25, desk mock-up 2): each hour of hourly() with the jugs molded (the shots logged that
+  // hour × jugs a shot), the jugs on the Alpine (the hour's count), the kick-outs, the annealer temperature, belt RPM and room
+  // ranges, and the resin lots and colors run in it.
+  function blowHours(run, lineDoc, targets, nowMs) {
+    var r = run || {}, c = (lineDoc || {}).controller || {}, per = num(c.jugsPerShot) || JUGS_PER_SHOT, hasShots = num(r.shots) !== null;
+    var mlog = (Array.isArray(r.machineLog) ? r.machineLog : []).filter(function (x) { return x && when(x.at); });
+    var shotsAt = function (t) { var n = 0; mlog.forEach(function (x) { if (when(x.at) <= t && num(x.shots) !== null) n = num(x.shots); }); return n; };
+    var range = function (k, a, b) {
+      var vals = mlog.filter(function (x) { var t = when(x.at); return t >= a && t < b && num(x[k]) !== null; }).map(function (x) { return num(x[k]); });
+      return vals.length ? [Math.min.apply(null, vals), Math.max.apply(null, vals)] : null;
+    };
+    var segs = lotRuns(r, lineDoc, nowMs), shiftEnd = Math.min(nowMs, when(r.shiftEnd) || nowMs);
+    return hourly(r, targets, nowMs).filter(function (h) { return h.past; }).map(function (h) {
+      var a = when(h.from), b = Math.min(when(h.to), nowMs);
+      var molded = hasShots ? Math.max(0, (b >= shiftEnd && num(r.shots) !== null ? num(r.shots) : shotsAt(b)) - shotsAt(a)) * per : null;
+      var kicked = molded === null ? null : Math.max(0, molded - h.made);
+      var lots = segs.filter(function (s, i) { var sa = when(s.at), sb = i + 1 < segs.length ? when(segs[i + 1].at) : shiftEnd; return overlap(sa, sb, a, b) > 0 || (sa >= a && sa < b); })
+        .map(function (s) { return [s.lot, s.colorName].filter(Boolean).join(' · '); }).filter(Boolean);
+      return Object.assign({}, h, { through: h.made, molded: molded, kicked: kicked, kickPct: molded ? Math.round(kicked / molded * 1000) / 10 : null,
+        tempRange: range('temp', a, b), speedRange: range('speed', a, b), roomRange: range('room', a, b), lots: lots.filter(function (x, i) { return lots.indexOf(x) === i; }) });
+    });
+  }
+
   var LIMITS = { WASTE: 999999, CREW: 30, NOTE: 1000, DIVERTS: 200, CHANGEOVERS: 60, CIPS: 20, CHECK_SLOTS: 30, FILLS: 120, GRAMS: 30000 };
 
   function overlap(a, b, c, d) { return Math.max(0, Math.min(b, d) - Math.max(a, c)); }
@@ -669,7 +692,7 @@
   return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, rzEfficiency: rzEfficiency, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
-    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
+    CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, blowHours: blowHours, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
     usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };

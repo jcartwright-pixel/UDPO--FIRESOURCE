@@ -258,17 +258,24 @@ function controller() {
     await pl.close();
     for (const w of [1536, 1920]) {
       const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BLOW + '&' + ADMIN);
-      await dv.waitForFunction(() => /From the machine/.test(document.getElementById('detail').textContent) && /Machine counter/.test(document.getElementById('detail').textContent));
-      assert.match(await dv.textContent('#detail'), /Temperature: 431\.2°F now/);
+      // Joe 10/25 (desk mock-up 2): the Blow Mold's own page: its numbers up top, Making now and the sensors, Runs this shift and every reading by the hour.
+      await dv.waitForFunction(() => /Making now and the sensors/i.test(document.getElementById('detail').textContent) && (document.querySelector('#detail .pd-bm table.pd-t') || { rows: [] }).rows.length === 4);
+      assert.deepEqual(await dv.$$eval('#hstats span', s => s.map(x => x.textContent.replace(/ [\d.]+%$/, ''))), ['Jugs molded', 'On the Alpine', 'Kick-outs', 'Target so far', 'Efficiency', 'Stopped']);
+      assert.deepEqual(await dv.$$eval('#detail .pd-box h3', h => h.map(x => x.childNodes[0].textContent.trim()).slice(0, 4)), ['BLOW MOLD · this shift', 'Making now and the sensors', 'Runs this shift', 'Hour by hour']);
+      assert.deepEqual(await dv.$$eval('#detail .pd-bm-tile', t => t.map(x => [x.querySelector('.pd-bm-eb').textContent, x.classList.contains('bad')])), [['Annealer temperature', true], ['Annealer belt speed', false], ['Room temperature', true], ['Jugs ahead of filler', false]]);
+      assert.match(await dv.textContent('#detail'), /431\.2°F/);
+      assert.match(await dv.textContent('#detail'), /White/);
       assert.match(await dv.textContent('#detail'), /60\.2 HEAVY/, 'the quality checks show the heavy head');
-      assert.deepEqual(await dv.$$eval('#detail .pd-box h3', h => h.map(x => x.textContent).filter(t => /Hour by hour|From the machine/.test(t))), ['Hour by hour', 'From the machine']);
-      assert.ok((await dv.$$eval('#detail table.pd-t thead th', t => t.map(x => x.textContent))).includes('Temp'), 'the hour by hour has the hour\'s temperature');
+      const tables = await dv.$$eval('#detail .pd-bm table.pd-t', ts => ts.map(t => ({ heads: [...t.querySelectorAll('thead th')].map(x => x.textContent), rows: t.querySelectorAll('tbody tr').length })));
+      assert.deepEqual(tables[0], { heads: ['Started', 'Resin lot', 'Color', 'Jugs molded', 'On the Alpine', 'Kick-outs', 'Annealer temp', 'Belt RPM', 'Room temp'], rows: 3 });
+      assert.deepEqual(tables[1].heads, ['Hour', 'Resin lot · color', 'Jugs molded', 'On the Alpine', 'Target', '%', 'Kick-outs', 'Annealer temp', 'Belt RPM', 'Room temp', 'Stopped']);
+      assert.equal(await dv.$('#detail .pd-pill.n'), null, 'every sensor is reading: nothing says WAITING FOR SENSOR');
       await fits(dv, 'the line shift view at ' + w);
       await shot(dv, 'controller-line-shift-' + w);
       assert.deepEqual(dv.errors, []);
       await dv.close();
     }
-    results.push('Production Lines: Temp 431.2°F TOO HOT on the Blow Mold card, which is under Needs attention; the shift view has From the machine and the hour\'s speed and temperature');
+    results.push('Production Lines: Temp 431.2°F TOO HOT on the Blow Mold card, which is under Needs attention; the Blow Mold page has jugs molded, on the Alpine and kick-outs up top, Making now and the sensors (temperature and room TOO HOT), Runs this shift and every reading by the hour');
     assert.deepEqual(plc.writes, [], 'nothing but reads was ever sent to the controller');
 
     // The Gallon Filler (Joe 10/14: a counter and a UPC scanner): the label confirms the product running, a wrong label is flagged.
