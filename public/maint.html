@@ -61,6 +61,8 @@
     const KINDS = [['TRUCK', 'Truck Issues', 'maintenance-tractor-v1-560.webp', 'Truck'], ['TRAILER', 'Trailer Issues', 'maintenance-trailer-v1-560.webp', 'Trailer'],
       ['FORK_TRUCK', 'Fork Truck / Pallet Jack Issues', 'forklift-truck-v1-560.webp', 'Fork truck']];
     const data = { maintenance: [], workOrders: [], equipment: [], fleetSetup: [], odometers: [], gpsTrucks: [] };
+    // Joe 10/25: owned or leased is the fleet list's LEASE column (config/fleetOwnership), as on Fleet Service.
+    let ownership = null;
     let rules = null; // Fleet Service Setup's rules (config/fleetRules), over the defaults
     const now = () => Date.now();
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
@@ -68,7 +70,7 @@
     function units() {
       const seen = {};
       return data.equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') &&
-        e.sourcePresent !== false && !L.unitLeased(e) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
+        e.sourcePresent !== false && L.fleetOwnedHere(e, 'fac_uniontown', ownership) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true));
     }
     const miles = () => L.latestReadings(data.odometers, data.gpsTrucks);
@@ -128,6 +130,7 @@
     requireSignIn(async () => {
       const { db } = await start();
       onSnapshot(doc(db, 'config', 'fleetRules'), s => { rules = s.exists() ? s.data() : null; render(); }, () => {});
+      onSnapshot(doc(db, 'config', 'fleetOwnership'), d => { const o = d.exists() ? d.data() : null; ownership = o && o.units ? o : null; render(); }, () => {});
       // Joe 10/18 (screen speed): the open write-ups and the recent ones the counts need, not every write-up ever made.
       watchIssueRecords(db, r => { data.maintenance = r; render(); }, e => showError('Could not read the write-ups (' + e.message + '). Some counts may be short; check the network and reload the page.'));
       // The open work orders and this week's finished ones (the Garage card), not every work order ever made.

@@ -708,16 +708,19 @@
     });
   }
 
-  function unitLessor(units, unitText) {
-    var key = issueUnitKey(unitText), list = units || [];
+  // Joe 10/25 ("This is actually a lease company"): ownership (config/fleetOwnership, the fleet list's LEASE column read every
+  // half hour) decides first; the "Lease:" fleet text is only a fallback, since Equipment Master's copy can be older than the list.
+  function unitLessor(units, unitText, ownership) {
+    var key = issueUnitKey(unitText), list = units || [], own = ownership && ownership.units || null;
     var hit = list.filter(function (u) { return issueUnitKey(u.unit) === key; });
     if (!hit.length && /^\d{2,5}$/.test(key)) {
       hit = list.filter(function (u) { var d = String(u.unit || '').replace(/\D/g, ''); return d.length > key.length && d.slice(-key.length) === key; });
       if (hit.length > 1) return { unit: '', lessor: '', why: 'Truck ' + unitText + ' matches ' + hit.map(function (u) { return u.unit; }).join(', ') };
     }
     if (!hit.length) return { unit: '', lessor: '', why: 'Truck ' + unitText + ' is not on the fleet list' };
-    var m = /\bLease:\s*([^|\n]+)/i.exec(String(hit[0].notes || ''));
-    return { unit: hit[0].unit, lessor: m ? m[1].trim() : '', why: m ? '' : 'Owned truck: our garage fixes it' };
+    var rec = own ? own[fleetUnitKey(hit[0].unit)] : null, m = /\bLease:\s*([^|\n]+)/i.exec(String(hit[0].notes || ''));
+    var lessor = rec ? (rec.own === true ? '' : String(rec.lease || '').trim()) : m ? m[1].trim() : '';
+    return { unit: hit[0].unit, lessor: lessor, why: lessor ? '' : 'Owned truck: our garage fixes it' };
   }
 
   // Joe 10/18: "I only want to see UD owned vehicles here ... only the Uniontown vehicles assigned is what I'm responsible for."

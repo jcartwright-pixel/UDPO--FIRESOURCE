@@ -4,6 +4,8 @@
  * service's Pre Trip / Post Trip answers ("YES-NO", "yes-no", "YS") say nothing is wrong and make no row. Each row's What's
  * Wrong starts with one View link (no "From email" tag, no "View email"): it opens the answering-service email or the driver's
  * check-in in the app, whichever the write-up came from.
+ * Joe 10/25: a truck the fleet list has as Idealease is leased (its Lessor button works, "Leased from Idealease") even when
+ * Equipment Master's old fleet text has no Lease, and the open write-up shows the route number, not the route's inside code.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -84,6 +86,13 @@ async function buttonsFit(p, label) {
   await db().collection('mailCopies').doc('m2').set({ id: 'm2', from: 'Lauttamus Answering Service <CallCenter@lauttamus.com>', subject: 'UNIONTOWN DRIVER CHECK IN', receivedAt: at(2),
     body: 'Name +(UT): Rob Miles\nTractor #: 223880\nRoute #: 8\nPre Trip: yes\nPost Trip: yes-no\nConcerns/Issues: air conditioner in tractor don\'t work- screw where load bar hooks up is coming off' });
   const appId = 'APP_' + run.id + '_' + day + '_tractor';
+  // The fleet list (read every half hour) says 900002 is an Idealease truck and 900001 is ours; the app's write-up keeps the route's code.
+  await db().collection('config').doc('fleetOwnership').set({ ok: true, at: new Date().toISOString(), units: {
+    '900001': { own: true, lease: 'OWN', facilityId: 'fac_uniontown' }, '900002': { own: false, lease: 'Idealease', facilityId: 'fac_uniontown' } } });
+  const route802 = (await db().collection('routes').get()).docs.map(d => d.data()).find(r => r.route === '802' && /^rte_/.test(r.routeId || ''));
+  assert.ok(route802, 'route 802 is in Route Master');
+  await db().collection('maintenance').doc(appId).update({ route_id: route802.routeId });
+  await db().collection('maintenance').doc('MAIL_m13_tractor').set(mail('m13', '900001', 'ADAMS, PAT', 'Mirror cracked', 0.3));
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -102,6 +111,17 @@ async function buttonsFit(p, label) {
       // One View link at the front of What's Wrong, then the problem.
       assert.match(await p.textContent('tr[data-id="MAIL_m2_tractor"] td.wrong'), /^View air conditioner/);
       assert.match(await p.textContent('tr[data-id="' + appId + '"] td.wrong'), /^View Flat tire/);
+      // Joe 10/25: the leased truck's Lessor button works; an owned truck's stays off.
+      assert.equal(await p.locator('tr[data-id="' + appId + '"] [data-step="lessor"]').isDisabled(), false, 'the Idealease truck can go to the lessor');
+      assert.match(await p.getAttribute('tr[data-id="' + appId + '"] [data-step="lessor"]', 'title'), /Send to Idealease/);
+      assert.equal(await p.locator('tr[data-id="MAIL_m13_tractor"] [data-step="lessor"]').isDisabled(), true, 'an owned truck goes to our garage');
+      await p.click('tr[data-id="' + appId + '"] [data-open]');
+      const more = await p.textContent('tr.issue-more');
+      assert.match(more, /route 802 ·/);
+      assert.doesNotMatch(more, /rte_/);
+      assert.match(more, /Leased from Idealease/);
+      await shot(p, 'leased-open-' + width + '.png');
+      await p.click('tr[data-id="' + appId + '"] [data-open]');
       if (width === 1536) {
         await p.click('tr[data-id="MAIL_m2_tractor"] [data-source]');
         await p.waitForSelector('#mail-modal:not([hidden]) .mail-text');
@@ -133,6 +153,7 @@ async function buttonsFit(p, label) {
     }
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
+    results.push('A truck the fleet list has as Idealease can go to the lessor and says Leased from Idealease; an owned one cannot; the open write-up shows route 802, not its code');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {
     await browser.close();
