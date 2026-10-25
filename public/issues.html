@@ -99,13 +99,15 @@
       const q = search.toUpperCase();
       const shown = rows.filter(r => match(r, filter) && (!q || [r.unit, r.driver, r.text, routeText(r)].join(' ').toUpperCase().indexOf(q) >= 0));
       document.getElementById('cols').innerHTML = truck
-        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:18%"><col style="width:6%"><col style="width:6%"><col style="width:8.5%"><col style="width:5.5%"><col style="width:31%">'
+        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:17%"><col style="width:6%"><col style="width:7.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:30%">'
         : '<col style="width:7%"><col style="width:8%"><col style="width:36%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:28%">';
       document.getElementById('head').innerHTML = '<tr><th>' + KINDS[i][2] + '</th>' + (truck ? '<th>Driver</th>' : '') + '<th>Date Reported</th><th>What\'s Wrong</th><th>Report Count</th><th>Reviewed</th>' + (truck ? '<th>Emailed</th>' : '') + '<th>Garage</th><th>Work Actions</th></tr>';
       const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
       document.getElementById('rows').innerHTML = shown.map(r => {
         const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit, ownership) : null;
-        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || sent || !who.lessor ? ' disabled' : '') + ' title="' + escapeHtml(who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
+        // Joe 10/25: a write-up marked for the lessor whose email never went can be emailed again with Lessor.
+        const again = truck && r.toLessor && !r.emailed && !r.atGarage;
+        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || (sent && !again) || !(again ? r.lessor : who.lessor) ? ' disabled' : '') + ' title="' + escapeHtml(again ? 'The email to ' + r.lessor + ' did not go. Press to email it again.' : who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
         // Review item 57 (Joe 10/13): the work buttons are words only (View, Repaired), no envelope or tick.
         const actions = removeFor === r.id
@@ -182,7 +184,7 @@
         if (name === 'repaired') Object.assign(doc, { status: 'COMPLETE', completed_at: at });
         if (name === 'remove') Object.assign(doc, { status: 'REMOVED' });
         if (name === 'garage') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to garage ' + at + ' by ' + me;
-        if (name === 'lessor') doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
+        if (name === 'lessor' && String(doc.notes || '').indexOf('Sent to lessor') < 0) doc.notes = (doc.notes ? doc.notes + '\n' : '') + 'Sent to lessor ' + note + ' ' + at + ' by ' + me;
         if (name === 'reviewed') Object.assign(doc, { status: 'OPEN', notes: (doc.notes ? doc.notes + '\n' : '') + 'Reviewed by ' + me + ' at ' + at });
       };
       return saveOptimistic('updateIssue', { recordId: doc.record_id, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
@@ -206,7 +208,7 @@
       if (!r) return;
       if (e.target.closest('[data-review]')) { step(r, 'reviewed'); return; }
       const b = e.target.closest('[data-step]');
-      if (b) { step(r, b.dataset.step, b.dataset.step === 'lessor' ? L.unitLessor(lists.fleetTrucks, r.unit, ownership).lessor : ''); return; }
+      if (b) { step(r, b.dataset.step, b.dataset.step === 'lessor' ? (r.toLessor ? r.lessor : L.unitLessor(lists.fleetTrucks, r.unit, ownership).lessor) : ''); return; }
       if (e.target.closest('[data-source]')) { showSource(r); return; }
       if (e.target.closest('[data-open]')) { openFor = openFor === r.id ? null : r.id; render(); return; }
       if (e.target.closest('[data-remove]')) { removeFor = r.id; render(); return; }

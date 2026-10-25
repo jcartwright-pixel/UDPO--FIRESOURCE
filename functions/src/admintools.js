@@ -47,6 +47,7 @@ const DONE = ['COMPLETE', 'COMPLETED', 'CLOSED', 'RESOLVED', 'REPAIRED', 'REMOVE
 /* ---------- Repair Email ---------- */
 
 const ROUTES = ['IDEALEASE', 'PENSKE', 'OWNED'];
+const EMAIL_ROUTES = ['IDEALEASE', 'PENSKE'];
 const ROUTE_LABEL = { IDEALEASE: 'Idealease', PENSKE: 'Penske', OWNED: 'Owned (our garage)' };
 const MODES = ['SEND', 'IMMEDIATE', 'DAILY', 'NONE'];
 const AUTO = (m) => m === 'IMMEDIATE' || m === 'DAILY';
@@ -57,6 +58,8 @@ async function repairSettings(db) {
   const d = (await read(priv(db, 'repairEmail'))) || {};
   const routes = {};
   ROUTES.forEach(k => { const r = (d.routes || {})[k] || {}; routes[k] = { emails: r.emails || [], mode: MODES.indexOf(r.mode) >= 0 ? r.mode : REPAIR_DEFAULTS[k], since: r.since || '' }; });
+  // Joe 10/25: "I don't need to email the garage. The garage is going to be sent by a work order." Owned units are never emailed.
+  routes.OWNED = { emails: [], mode: 'NONE', since: '' };
   return { routes, digestHour: Number.isInteger(d.digestHour) ? d.digestHour : 7, updatedAt: d.updatedAt || '', updatedBy: d.updatedBy || '' };
 }
 
@@ -184,12 +187,12 @@ async function repairEmail(db, deps) {
   maint.docs.map(d => d.data()).filter(r => DONE.indexOf(String(r.status || 'OPEN').toUpperCase()) < 0 && !L.noWriteUp(r.issue_details)).forEach(r => {
     const d = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r), ownership); where[d.held ? 'HELD' : d.route]++;
   });
-  return { settings: s, labels: ROUTE_LABEL, modes: MODES, sending, lastDigest: (state && state.lastDigest) || {}, every: rates.jobs.repairEmail.minutes, openByLessor: where };
+  return { settings: s, labels: { IDEALEASE: ROUTE_LABEL.IDEALEASE, PENSKE: ROUTE_LABEL.PENSKE }, modes: MODES, sending, lastDigest: (state && state.lastDigest) || {}, every: rates.jobs.repairEmail.minutes, openByLessor: where };
 }
 
 async function saveRepairEmail(db, email, input, stamp) {
   const before = await repairSettings(db), routes = {};
-  ROUTES.forEach(k => {
+  EMAIL_ROUTES.forEach(k => {
     const r = (input.routes || {})[k] || {};
     const raw = Array.isArray(r.emails) ? r.emails.join(';') : String(r.emails || '');
     const parts = raw.split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(Boolean), emails = [];
@@ -201,8 +204,14 @@ async function saveRepairEmail(db, email, input, stamp) {
     // "Immediately" and "Once a day" only send repairs reported after they are switched on, so old repairs are never swept up.
     routes[k] = { emails, mode, since: AUTO(mode) ? (AUTO(before.routes[k].mode) && before.routes[k].since ? before.routes[k].since : stamp) : '' };
   });
+  routes.OWNED = { emails: [], mode: 'NONE', since: '' };
   const hour = input.digestHour === undefined ? before.digestHour : Number(input.digestHour);
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) fail('BAD_REQUEST', 'Pick the digest hour.');
+  // Joe 10/25 ("the emails got removed"): every save keeps the settings it replaced (the last 30), so an address that goes
+  // missing shows who saved over it and when, and can be put back.
+  const hist = priv(db, 'repairEmailHistory'), old = ((await read(hist)) || {}).saves || [];
+  const was = (await read(priv(db, 'repairEmail'))) || null;
+  if (was) await hist.set({ saves: [{ replacedAt: stamp, replacedBy: email, before: was }].concat(old).slice(0, 30) });
   await priv(db, 'repairEmail').set({ routes, digestHour: hour, updatedAt: stamp, updatedBy: email, configured: true });
   return Object.assign({ ok: true, message: 'Saved.' }, await repairEmail(db));
 }
@@ -218,7 +227,7 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
   const dest = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r), await fleetOwnershipOf(db)), at = new Date().toISOString();
   if (dest.held) { await logHeld(db, at, by, r, '', dest.held, dest.why); return { status: 'HELD', message: dest.why + '. It was not emailed.' }; }
   const route = s.routes[dest.route];
-  if (dest.route === 'OWNED' && !route.emails.length) return { status: 'GARAGE', message: unitOf(r) + ' is ours, so this repair stays on the garage list. No email is sent.' };
+  if (dest.route === 'OWNED') return { status: 'GARAGE', message: unitOf(r) + ' is ours: press Garage to make its work order. No email is sent.' };
   if (route.mode === 'NONE') return { status: 'OFF', message: 'Email is turned off for ' + ROUTE_LABEL[dest.route] + ' in Administration > Repair Email.' };
   if (!route.emails.length) return { status: 'NO_ADDRESS', message: ROUTE_LABEL[dest.route] + ' has no email address yet (Administration > Repair Email).' };
   // Review item 32 (Joe 10/11): "Once a day" puts it in that lessor's daily email instead of sending it now.
