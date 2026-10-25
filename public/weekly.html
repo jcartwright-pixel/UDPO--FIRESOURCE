@@ -141,6 +141,14 @@
     let rowDrag = null, held = false, who = '';
     // Joe 10/23: the run whose name was clicked (shows "+ Extra this week", or Remove on an extra line), and a Remove waiting for its second click.
     let pickedLine = '', removeArmed = '';
+    // 6.62 practice test ("+ Extra this week" saved but the line did not show): a line just added shows from the save's answer, and a
+    // line just removed stays off, until a live update agrees, so the screen never waits on the update alone.
+    const addedLines = new Map(), removedLines = new Set();
+    function withExtraLines(list) {
+      addedLines.forEach((run, id) => { if (run.weekStart !== week || list.some(r => r.id === id)) addedLines.delete(id); else list.push(run); });
+      removedLines.forEach(id => { if (list.some(r => r.id === id)) list = list.filter(r => r.id !== id); else removedLines.delete(id); });
+      return list;
+    }
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
@@ -297,7 +305,13 @@
       const plus = e.target.closest('button[data-extra]'), rm = e.target.closest('button[data-remove]'), name = e.target.closest('td.run-name.pickable');
       if (plus) {
         const row = rows[Number(plus.dataset.extra)];
-        saveOptimistic('addExtraRun', { runDocId: row.runDocId }, () => { pickedLine = ''; }, () => {}, render);
+        saveOptimistic('addExtraRun', { runDocId: row.runDocId }, () => { pickedLine = ''; }, () => {}, render).then(out => {
+          const run = out && out.run;
+          if (!run || !run.id || runs.some(r => r.id === run.id)) return;
+          addedLines.set(run.id, run);
+          runs = withExtraLines(runs);
+          render();
+        });
         return true;
       }
       if (rm) {
@@ -308,8 +322,8 @@
           return true;
         }
         const gone = runs.find(x => x.id === id);
-        saveOptimistic('removeExtraRun', { runDocId: id }, () => { runs = runs.filter(x => x.id !== id); pickedLine = ''; removeArmed = ''; },
-          () => { if (gone && !runs.some(x => x.id === id)) runs.push(gone); }, render);
+        saveOptimistic('removeExtraRun', { runDocId: id }, () => { removedLines.add(id); addedLines.delete(id); runs = runs.filter(x => x.id !== id); pickedLine = ''; removeArmed = ''; },
+          () => { removedLines.delete(id); if (gone && !runs.some(x => x.id === id)) runs.push(gone); }, render);
         return true;
       }
       if (name && !popover) {
@@ -571,7 +585,7 @@
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         // Picks still saving stay on screen until the update holds them, as on Daily: an update from another save used to put the
         // old value back for a moment (a plant load marked Not running showed PLANT LOAD again until its own save came back).
-        runs = withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data())));
+        runs = withExtraLines(withUnsaved(snap.docs.map(d => Object.assign({ id: d.id }, d.data()))));
         runsRead = true;
         loaded = true;
         render();
