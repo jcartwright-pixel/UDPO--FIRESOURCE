@@ -93,6 +93,40 @@ const extras = async () => (await db().collection('runs').where('extraRun', '=='
       assert.deepEqual(page.errors, []);
       await page.close();
     }
+    // 6.62 practice test: the line saved but did not show, because the screen waited on the live update to bring it. The line
+    // now shows from the save's answer. Here the answer names a line the database never gets (so no live update brings it): it
+    // still shows, under its run, and a later update (another save) does not take it off again.
+    {
+      const page = await openPage(browser, 1536, 790, WEEKLY);
+      await page.waitForSelector('#rows td.run-name.pickable');
+      await page.route(/\/save(\?|$)/, async (route) => {
+        const body = route.request().postDataJSON() || {};
+        if (!body.data || body.data.action !== 'addExtraRun') return route.continue();
+        const res = await route.fetch(), out = await res.json();
+        const ghost = out.result.run.id.replace(/__extra\d+$/, '__extra9');
+        out.result.run = Object.assign({}, out.result.run, { id: ghost, runId: out.result.run.runId.replace(/__extra\d+$/, '__extra9'), run: 'GHOST LINE' });
+        out.result.runDocId = ghost;
+        route.fulfill({ response: res, json: out });
+      });
+      await page.click(line('802', '') + '/td[2]');
+      await page.click('#rows .xr-plus');
+      await page.waitForFunction(() => [...document.querySelectorAll('#rows tr.extra-run')].some(tr => tr.children[1].textContent.startsWith('GHOST LINE')), null, { timeout: 8000 });
+      await page.waitForFunction(() => document.querySelectorAll('#rows tr.extra-run').length === 2, null, { timeout: 8000 });
+      const placed = await page.$$eval('#rows tr', trs => trs.map(t => t.children[0].textContent + ' ' + (t.classList.contains('extra-run') ? 'extra' : t.children[1].textContent)).slice(0, 3).join(' / '));
+      assert.equal(placed, '802 UT DSD MILK / 802 extra / 802 extra', 'under its run, with the real line the database got');
+      // Another save brings a live update without the ghost line: it stays on.
+      await page.click(line('801', 'UT DSD MILK') + '/td[@data-day="thu"]');
+      await page.waitForSelector('.popover select[data-kind="driver"]');
+      await page.selectOption('.popover select[data-kind="driver"]', 'drv_test_casey');
+      for (let i = 0; i < 50; i++) { await page.waitForTimeout(200); const d = (await db().collection('runs').where('runId', '==', 'run_t801').where('weekStart', '==', '2026-10-04').get()).docs[0].data().days.thu; if (d.driverId === 'drv_test_casey') break; }
+      await page.waitForTimeout(1500);
+      assert.ok(await page.$$eval('#rows tr.extra-run', trs => trs.some(tr => tr.children[1].textContent.startsWith('GHOST LINE'))), 'still on after a live update');
+      assert.deepEqual(page.errors, []);
+      await page.close();
+      await clear();
+      await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
+      for (const id of ['run_t801', 'run_t802', 'run_t810']) await db().collection('routes').doc(id).update({ displayDaily: true, displayWeekly: true });
+    }
     // Daily Dispatch: an extra line's load shows for its load day (Thursday's delivery loads Wednesday).
     let page = await openPage(browser, 1536, 790, WEEKLY);
     await page.click(line('801', 'UT DSD MILK') + '/td[2]');

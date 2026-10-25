@@ -164,7 +164,9 @@ async function addExtraRun(tx, db, req, email, stamp, logRef, mode) {
   tx.set(db.collection(C.runs).doc(id), run);
   const result = { ok: true, requestId: req.requestId, runs: [{ runDocId: id, rev: run.rev }], runDocId: id, name: run.run };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: base.weekStart, runDocId: id, before: null, after: { extraOf: req.runDocId, run: run.run }, result });
-  return result;
+  // The new line itself goes back too, so Weekly shows it at once instead of waiting for the live update to bring it (6.62 practice
+  // test: on the practice copy the update sometimes never brought it, and the line did not show).
+  return Object.assign({ run: Object.assign({ id }, run) }, result);
 }
 // Takes a one-week extra line off again, unless a day of it was already loaded.
 async function removeExtraRun(tx, db, req, email, stamp, logRef, mode) {
