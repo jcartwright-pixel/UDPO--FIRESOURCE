@@ -33,10 +33,6 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Production</span><h1 id="page-title">Production Lines</h1></div>
       <div class="hstats" id="hstats"></div>
-      <a class="lt-top" id="week-link" href="production.html?view=week" data-top>This Week</a>
-      <a class="lt-top" id="tv" href="production.html?tv=1" data-top>TV Display</a>
-      <a class="lt-top" href="line.html" data-top>Line Tablet</a>
-      <a class="lt-top" href="linetargets.html" data-top>Line Targets</a>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view" id="view">
@@ -44,14 +40,19 @@
       <div class="pd-tvh"><img src="img/ud-logo.webp" alt="United Dairy"><div><b id="tv-plant">PRODUCTION</b><span id="tv-shift"></span></div><div class="pd-clock" id="tv-clock"></div></div>
       <div class="pd-sub" id="sub"></div>
       <!-- Joe 10/14 (mock-up A): the kinds of line, the plant's totals; (mock-up B) one line's shift, opened by clicking its card. -->
-      <div class="pd-filters chips" id="filters"></div>
-      <div class="pd-totals" id="totals"></div>
-      <div class="pd-tabs chips" id="tabs" hidden></div>
-      <div class="pd-detail" id="detail" hidden></div>
-      <!-- Joe 10/14 follow-on: the weekly line scorecard (production.html?view=week). -->
-      <div class="pd-week" id="week" hidden></div>
-      <div class="pd-tiles" id="tiles"></div>
-      <div class="pd-legend" id="legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span><span class="b">&#9679; Changeover or CIP wash</span></div>
+      <!-- Joe 10/24: every machine in a menu down the left (as the Quality screen); the right side is everything for the one picked. -->
+      <div class="pd-split" id="split">
+        <aside class="pd-menu" id="menu" aria-label="Machines"></aside>
+        <div class="pd-right" id="right">
+          <div class="pd-filters chips" id="filters"></div>
+          <div class="pd-totals" id="totals"></div>
+          <div class="pd-detail" id="detail" hidden></div>
+          <!-- Joe 10/14 follow-on: the weekly line scorecard (production.html?view=week). -->
+          <div class="pd-week" id="week" hidden></div>
+          <div class="pd-tiles" id="tiles"></div>
+          <div class="pd-legend" id="legend"><span class="g">&#9679; At or ahead</span><span class="a">&#9679; Up to 10% behind</span><span class="r">&#9679; More than 10% behind or stopped</span><span class="f">&#9679; Speed outside its range</span><span class="b">&#9679; Changeover or CIP wash</span></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -81,12 +82,41 @@
     const attention = (v) => v.state === 'STOPPED' || v.needReason.length > 0 || v.speedFlag === 'OVER' || v.speedFlag === 'UNDER' || (v.pct !== null && v.pct < 90) || (v.check && !v.check.done && v.state !== 'IDLE') || (v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours) || !!v.diverting || !!(v.machine && (v.machine.speedFlag || v.machine.tempFlag)) || !!(v.reader && v.reader.lastUpc && v.reader.lastUpc === v.reader.lastUnknownUpc)
       || !!(v.fill && v.fill.checks.length && v.fill.checks[v.fill.checks.length - 1].flag === 'LIGHT') || !!(v.machine && v.machine.running === false);
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
+    const STATE_WORD = (v) => v.state === 'IDLE' ? 'Not started' : v.state === 'STOPPED' ? 'Stopped ' + v.stoppedMin + ' min' : v.state === 'CHANGEOVER' ? 'Changeover' : v.state === 'CIP' ? 'CIP wash' : v.kind === 'HTST' && v.diverting ? 'In divert' : 'Running';
+    const COUNTED = { TABLET: 'Typed', SENSOR: 'Sensor', READER: 'Label reader', CONTROLLER: 'Machine' };
+    // The machine menu (Joe 10/24, picked dd): every machine set up for the plant, whether or not its sensors are in yet, grouped by
+    // kind, with its color, whether it is running and what it made against target; the reports (This Week, the TV, the line
+    // tablet and Line Targets) are at the bottom of the menu.
+    function drawMenu(views) {
+      const item = (v) => '<button type="button" data-tab="' + escapeHtml(v.line.operationId) + '"' + (!weekView && v.line.operationId === lineId ? ' class="on"' : '') + '>' +
+        '<i class="pd-dot ' + (v.color || 'x') + '"></i><span><b>' + escapeHtml(v.line.name) + (v.counter && v.counter !== 'TABLET' ? ' <i class="pd-sensor">Sensor</i>' : '') + '</b>' +
+        '<small class="' + (v.state === 'STOPPED' ? 'pd-bad' : '') + '">' + escapeHtml(STATE_WORD(v)) + (v.state === 'IDLE' ? '' : ' · ' + fmt(v.made) + (v.soFar ? ' of ' + fmt(v.soFar) : '')) + '</small></span>' + (attention(v) ? '<em title="Needs attention">!</em>' : '') + '</button>';
+      const all = '<button type="button" data-tab="" class="pd-all' + (!weekView && !lineId ? ' on' : '') + '"><span><b>All Machines</b><small>' + views.filter(attention).length + ' need attention</small></span></button>';
+      const groups = [['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold']];
+      document.getElementById('menu').innerHTML = all + groups.map(g => { const vs = views.filter(v => v.kind === g[0]); return vs.length ? '<h3>' + g[1] + '</h3>' + vs.map(item).join('') : ''; }).join('') +
+        '<h3>Reports</h3><a id="week-link" href="production.html?view=week&plant=' + encodeURIComponent(plant) + '"' + (weekView ? ' class="on"' : '') + '>This Week</a><a id="tv" href="production.html?tv=1&plant=' + encodeURIComponent(plant) + '">TV Display</a><a href="line.html">Line Tablet</a><a href="linetargets.html">Line Targets</a>';
+    }
+    // Live from the machine (Joe 10/24: every machine will have its RedZone sensors): what the machine itself reports, and
+    // "Waiting for sensor" for each reading not wired yet.
+    function liveBox(v) {
+      const m = v.machine, auto = v.counter && v.counter !== 'TABLET', wait = '<b class="pd-wait">Waiting for sensor</b>';
+      const cell = (name, val, note) => '<div class="pd-live-c"><span>' + name + '</span>' + val + (note ? '<small>' + note + '</small>' : '') + '</div>';
+      const cells = [
+        cell('Count', auto ? '<b>' + fmt(v.made) + '</b>' : wait, auto ? 'From the ' + escapeHtml((COUNTED[v.counter] || '').toLowerCase()) : 'Typed on the line tablet for now: ' + fmt(v.made)),
+        cell('Speed', m && m.speed !== null ? '<b' + (m.speedFlag ? ' class="pd-bad"' : '') + '>' + fmt(m.speed) + (m.rpm ? ' RPM' : '/min') + '</b>' : auto && v.speed !== null ? '<b>' + v.speed + '/min</b>' : wait, m && m.speed !== null ? escapeHtml(m.speedName || '') : v.speed !== null ? 'Worked out from the counts: ' + v.speed + '/min' : ''),
+        cell(v.kind === 'BLOWMOLD' ? 'Annealer temp' : 'Temperature', m && m.temp !== null ? '<b' + (m.tempFlag ? ' class="pd-bad"' : '') + '>' + fmt(m.temp) + '°F</b>' : wait, ''),
+        cell('Running or stopped', m && m.running !== null ? (m.running ? '<b class="pd-good">Running</b>' : '<b class="pd-bad">Stopped</b>') : wait, 'Line tablet says: ' + escapeHtml(STATE_WORD(v)))
+      ];
+      if (v.kind === 'FILLER') cells.push(cell('Label reader', v.reader ? (v.reader.dateOk === false ? '<b class="pd-bad">Wrong date</b>' : '<b class="pd-good">Reading</b>') : wait, v.reader ? fmt(v.reader.read) + ' read' : 'UPC and code date on each jug'));
+      const last = m && m.at ? 'Last reading ' + clockOf(m.at) + (m.stale ? ' · not reading now' : '') : 'No sensors wired on this machine yet';
+      return '<section class="pd-box wide pd-live"><div class="pd-live-h"><h3>Live from the machine</h3><span class="pd-none">' + escapeHtml(last) + '</span>' +
+        '<a class="lt-top" href="line.html?line=' + encodeURIComponent(v.line.operationId) + '">Line Tablet</a><a class="lt-top" href="linetargets.html?line=' + encodeURIComponent(v.line.operationId) + '">Targets and Sensors</a></div>' +
+        '<div class="pd-live-g">' + cells.join('') + '</div></section>';
+    }
 
     function render() {
       if (!data) return;
       const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
-      document.getElementById('tv').href = 'production.html?tv=1&plant=' + encodeURIComponent(plant);
-      document.getElementById('week-link').href = 'production.html?view=week&plant=' + encodeURIComponent(plant);
       document.getElementById('tv-plant').textContent = plantName(plant).toUpperCase() + ' PRODUCTION';
       document.getElementById('tv-shift').textContent = shiftText(s) + ' · ' + shortDate(s.date);
       document.getElementById('tv-clock').textContent = new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -95,6 +125,7 @@
       const cos = views.filter(v => v.state === 'CHANGEOVER').length, cips = views.filter(v => v.state === 'CIP').length;
       document.getElementById('hstats').innerHTML = [['Lines', views.length, ''], ['Running', running, 'good'], ['Stopped', stopped, stopped ? 'bad' : ''], ['Speed off', flagged, flagged ? 'bad' : ''], ['Changeover', cos, cos ? 'blue' : ''], ['CIP wash', cips, cips ? 'blue' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       drawTop(views, t);
+      if (!tv) drawMenu(views);
       const shown = views.filter(v => kindFilter === 'ALL' || (kindFilter === 'ATTN' ? attention(v) : v.kind === kindFilter));
       document.getElementById('tiles').innerHTML = shown.map(v => {
         const word = v.state === 'IDLE' ? 'NOT STARTED' : v.state === 'STOPPED' ? 'STOPPED ' + v.stoppedMin + ' MIN' : v.state === 'CHANGEOVER' ? 'CHANGEOVER ' + v.changeover.minutes + ' MIN' : v.state === 'CIP' ? 'CIP WASH ' + v.cip.minutes + ' MIN' : v.kind === 'HTST' && v.diverting ? 'IN DIVERT' : 'RUNNING';
@@ -155,7 +186,7 @@
       const one = !weekView && !!lineId && views.some(v => v.line.operationId === lineId);
       document.getElementById('week').hidden = !weekView;
       if (weekView) {
-        ['filters', 'totals', 'tiles', 'legend', 'tabs', 'detail'].forEach(id => { document.getElementById(id).hidden = true; });
+        ['filters', 'totals', 'tiles', 'legend', 'detail'].forEach(id => { document.getElementById(id).hidden = true; });
         document.getElementById('page-title').textContent = 'This Week';
         return drawWeek(t);
       }
@@ -163,7 +194,6 @@
       document.getElementById('totals').hidden = tv || one;
       document.getElementById('tiles').hidden = one;
       document.getElementById('legend').hidden = one;
-      document.getElementById('tabs').hidden = !one;
       document.getElementById('detail').hidden = !one;
       document.getElementById('page-title').textContent = one ? views.find(v => v.line.operationId === lineId).line.name : 'Production Lines';
       if (tv) return;
@@ -183,7 +213,6 @@
       const run = v.run || {}, mgr = manager();
       document.getElementById('hstats').innerHTML = [['Made', fmt(v.made), ''], ['Target so far', fmt(v.soFar), ''], mgr ? ['Efficiency', v.efficiency && v.efficiency.oee !== null ? v.efficiency.oee + '%' : '—', 'good'] : null, ['Stopped', v.downMin + ' min', v.downMin ? 'bad' : '']]
         .filter(Boolean).map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
-      document.getElementById('tabs').innerHTML = '<button type="button" data-tab="">All lines</button>' + views.map(x => '<button type="button" data-tab="' + escapeHtml(x.line.operationId) + '"' + (x.line.operationId === lineId ? ' class="on"' : '') + '>' + escapeHtml(x.line.name) + '</button>').join('');
       const box = (title, inner, cls) => '<section class="pd-box' + (cls ? ' ' + cls : '') + '"><h3>' + title + '</h3>' + inner + '</section>';
       // heads: [title, 1 = a number on the right, or 'w' = words that may wrap].
       const cls = (h) => h[1] === 'w' ? ' class="w"' : h[1] ? ' class="n"' : '';
@@ -232,7 +261,7 @@
       const notes = '<p><b>Crew:</b> ' + crew + '</p>' + (v.prevNote ? '<p><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</p>' : '') + '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' +
         (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + (v.kind === 'BLOWMOLD' ? '<p><b>Resin lot:</b> ' + escapeHtml(v.lot || '—') + ' &nbsp; <b>Jugs ahead:</b> ' + (v.stock === null ? '—' : fmt(v.stock)) + '</p>' : '') +
         (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : '');
-      document.getElementById('detail').innerHTML = box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide') +
+      document.getElementById('detail').innerHTML = liveBox(v) + box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide') +
         '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]].concat(hasM ? [[escapeHtml(mach.speedName), 1], ['Temp', 1]] : []), hourRows, 'No hours yet this shift.')) +
         box('Stops and why', table([['From'], ['Min', 1], ['Why', 'w'], ['Who']], stopRows, 'No stops this shift.')) + box('Waste and rejects', table([['Why', 'w'], ['How many', 1]], wasteRows, 'No waste entered this shift.')) + '</div>' +
         '<div class="pd-col">' + machBox + fillBox + boxBox + effBox + box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.')) +
@@ -288,12 +317,12 @@
       history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
       render(); document.getElementById('view').scrollTop = 0; window.scrollTo(0, 0);
     });
-    document.getElementById('tabs').addEventListener('click', e => {
-      const b = e.target.closest('[data-tab]');
+    document.getElementById('menu').addEventListener('click', e => {
+      const b = e.target.closest('button[data-tab]');
       if (!b) return;
-      lineId = b.dataset.tab;
+      lineId = b.dataset.tab; weekView = false;
       history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
-      render();
+      render(); document.getElementById('right').scrollTop = 0;
     });
     window.addEventListener('popstate', () => { lineId = new URLSearchParams(location.search).get('line') || ''; render(); });
     function follow() {

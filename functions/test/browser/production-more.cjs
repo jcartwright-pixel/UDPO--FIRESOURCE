@@ -283,7 +283,13 @@ async function pickFirstProduct(tb) {
       await fits(pl, 'one line\'s shift at ' + w);
       await bigText(pl, '#detail, #totals, #filters', 'Production Lines');
       await shot(pl, 'more-line-shift-' + w);
-      await pl.click('#tabs [data-tab="' + HTST + '"]');
+      // Joe 10/24 (dd): every machine is in the menu down the left, grouped by kind, with the reports at the bottom; picking one
+      // shows its page on the right.
+      assert.deepEqual(await pl.$$eval('#menu button[data-tab] b', b => b.map(x => x.firstChild.textContent.trim())), ['All Machines', 'GALLON FILLER', 'HTST #1', 'BOXING', 'TOTES', 'BLOW MOLD']);
+      assert.deepEqual(await pl.$$eval('#menu h3', h => h.map(x => x.textContent)), ['Fillers', 'HTST', 'Boxing & Totes', 'Blow Mold', 'Reports']);
+      assert.deepEqual(await pl.$$eval('#menu a', a => a.map(x => x.textContent)), ['This Week', 'TV Display', 'Line Tablet', 'Line Targets']);
+      assert.match(await pl.textContent('#detail .pd-live'), /Live from the machine.*Count.*Speed.*Temperature.*Running or stopped/s);
+      await pl.click('#menu [data-tab="' + HTST + '"]');
       await pl.waitForFunction(() => document.getElementById('page-title').textContent === 'HTST #1');
       await pl.goBack();
       await pl.waitForFunction(() => !document.getElementById('tiles').hidden && document.querySelectorAll('.pd-tile').length === 5);
