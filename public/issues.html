@@ -99,7 +99,7 @@
       const q = search.toUpperCase();
       const shown = rows.filter(r => match(r, filter) && (!q || [r.unit, r.driver, r.text, routeText(r)].join(' ').toUpperCase().indexOf(q) >= 0));
       document.getElementById('cols').innerHTML = truck
-        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:21%"><col style="width:6%"><col style="width:6%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:31%">'
+        ? '<col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:18%"><col style="width:6%"><col style="width:6%"><col style="width:8.5%"><col style="width:5.5%"><col style="width:31%">'
         : '<col style="width:7%"><col style="width:8%"><col style="width:36%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:28%">';
       document.getElementById('head').innerHTML = '<tr><th>' + KINDS[i][2] + '</th>' + (truck ? '<th>Driver</th>' : '') + '<th>Date Reported</th><th>What\'s Wrong</th><th>Report Count</th><th>Reviewed</th>' + (truck ? '<th>Emailed</th>' : '') + '<th>Garage</th><th>Work Actions</th></tr>';
       const typed = document.querySelector('[data-why]') ? document.querySelector('[data-why]').value : '', cols = truck ? 9 : 7, d = edit ? '' : ' disabled';
@@ -115,13 +115,17 @@
             '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>Repaired</button>' +
             '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>';
         const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
-        const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : r.toLessor ? '<span class="pill yes" title="Sent ' + escapeHtml(localWhen(r.lessorAt) + ' by ' + r.lessorBy) + '">' + escapeHtml(r.lessor) + '</span>' : dash;
+        // Joe 10/25: a write-up sent to the lessor shows the lessor under Emailed (green once the email went, red while it has not);
+        // Garage is only for our own garage.
+        const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : dash;
+        const emailed = r.toLessor ? '<span class="pill ' + (r.emailed ? 'yes' : 'bad') + '" title="' + escapeHtml(r.emailed ? 'Emailed to ' + r.lessor + ' ' + localWhen(r.emailedAt) + ' (sent by ' + r.lessorBy + ')' : 'Marked for ' + r.lessor + ' ' + localWhen(r.lessorAt) + ' by ' + r.lessorBy + ', but the email has not gone. See Administration > Repair Email.') + '">' + escapeHtml(r.lessor) + '</span>'
+          : r.emailed ? tick('Emailed ' + r.emailedAt) : dash;
         const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (routeText(r) ? ' · route ' + escapeHtml(routeText(r)) : '') +
           ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
         return '<tr data-id="' + escapeHtml(r.id) + '"' + (r.needsReview ? ' class="review"' : '') + '><td class="strong">' + escapeHtml(r.unit || '?') + '</td>' + (truck ? '<td>' + escapeHtml(r.driver) + '</td>' : '') +
           '<td>' + dateText(r.reported) + '</td><td class="left wrong" title="' + escapeHtml(r.text) + '">' + (r.emailId || r.checkinId ? '<button type="button" class="link-btn" data-source title="' + (r.emailId ? 'See the answering-service email it came from' : 'See the driver\'s check-in in the app') + '">View</button> ' : '') + (r.text ? escapeHtml(r.text) : '<i>No detail: needs review</i>') + '</td>' +
           '<td><span class="count' + (r.occurrences > 1 ? ' repeat' : '') + '">' + r.occurrences + '</span></td><td>' + reviewed + '</td>' +
-          (truck ? '<td>' + (r.emailed ? tick('Emailed ' + r.emailedAt) : dash) + '</td>' : '') + '<td>' + garage + '</td><td>' + actions + '</td></tr>' + more;
+          (truck ? '<td>' + emailed + '</td>' : '') + '<td>' + garage + '</td><td>' + actions + '</td></tr>' + more;
       }).join('') || '<tr><td colspan="' + cols + '" class="empty">No open write-ups' + (filter === 'all' && !q ? '' : ' match') + '.</td></tr>';
       document.getElementById('foot').textContent = shown.length + ' of ' + rows.length + ' open · repaired write-ups stay in the sheet until the weekly archive';
       const box = document.querySelector('[data-why]');
