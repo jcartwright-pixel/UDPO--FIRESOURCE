@@ -153,3 +153,20 @@ test('report email: loads grouped by type, Case then Box, Tote, Tanker, each wit
   const box = html.slice(html.indexOf('Box (1)'), html.indexOf('Tote (1)'));
   assert.doesNotMatch(box, /Not loaded/, 'a list with no loads is left out');
 });
+
+// Joe 10/25 ("Gmail report is not showing the boxing loading"): Scheduler box loads are on Daily Box Loadout, so they are in the email too.
+test('report email: Scheduler box loads are listed under Box, with their pickup time on their load day', () => {
+  const now = Date.parse('2026-10-24T14:00:00Z'); // Saturday 10 AM at the plant
+  const live = [{ id: 'r827', route: '827', run: 'UT WALMART', routeName: '', area: 'CASE', state: 'WAITING', dispatchTime: '17:00', loadDate: '2026-10-24', deliveryDate: '2026-10-25', departureDate: '2026-10-25', loadSequence: 1, completedAt: '', truck: '', trailer: '' }];
+  const todays = [
+    { id: 'S1', date: '2026-10-25', loadDate: '2026-10-24', route: '950', run: 'ALDI - CHARLESTON', loadNo: 1, pickupTime: '08:00', loadType: 'BOXING', trailer: '', work: { state: 'COMPLETE', completedAt: '2026-10-24T12:30:00Z' } },
+    { id: 'S2', date: '2026-10-25', loadDate: '2026-10-24', route: '950', run: 'ALDI - CHARLESTON', loadNo: 2, pickupTime: '13:00', loadType: 'BOXING', trailer: '', work: {} }];
+  const loads = R.reportLoads(live, todays, []);
+  assert.equal(loads.length, 3, 'the case load and both Scheduler box loads');
+  const r = R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
+  assert.equal(r.totalLoads, 3);
+  assert.deepEqual(r.areas.map(a => a.area), ['CASE', 'BOXING']);
+  assert.equal(r.behind.length, 0, 'Load 2 picks up at 1:00 PM, so it is not behind at 10 AM');
+  const html = R.reportHtml(r, '');
+  assert.match(html, /Case \(1\)[\s\S]*>827<[\s\S]*Box \(2\)[\s\S]*Loaded \(1\)[\s\S]*>950<[\s\S]*Not loaded \(1\)[\s\S]*>950<[\s\S]*1:00 PM/, 'both box loads under Box, Load 2 with its 1:00 PM pickup');
+});

@@ -148,7 +148,8 @@
       const yard = U.yardQueue(data.runs, journal, date, now, data.gps);
       // Joe 10/22 (practice test): the Loadout Center tile counts what the loadouts show, Scheduler loads included.
       const customers = U.scheduleCustomers(U.scheduleRoutes(data.routes, data.runs));
-      const done = P.counts(U.withScheduleLoads(loads, U.scheduleLoadsOn(data.ship, customers, date), customers)), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
+      const todaysShip = U.scheduleLoadsOn(data.ship, customers, date);
+      const done = P.counts(U.withScheduleLoads(loads, todaysShip, customers)), returns = P.returnsFor(data.runs, date, todays), urows = P.unloadRows(data.runs, date, todays, returns, loads), uc = P.unloadCounts(urows);
       const wash = P.washItems(date, data.wash, data.appWash, todays), seen = {};
       let repeat = 0;
       wash.forEach(w => { const k = String(w.trailer || '').toUpperCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] === 2) repeat++; });
@@ -162,7 +163,8 @@
       const forecast = U.loadForecast({ date, loads, history: data.history }, now);
       const openPickups = P.withNotePickups(loads, data.pickups).filter(P.pickupOpen).filter(p => loads.some(r => P.pickupsFor(r, [p]).length));
       // Joe 10/10: only what was checked since the last report was sent goes in; the rest is "Not checked".
-      report = U.plantReport({ loads, pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '', forecast }, now);
+      // Joe 10/25: the report lists every loadout's loads, Scheduler loads included, so Box loads are in the email.
+      report = U.plantReport({ loads: U.reportLoads(loads, todaysShip, customers), pickups: openPickups, shiftLog: week, lines, temps, roundStart: data.roundStart, output: lineOutput(), outputShift: prod && prod.shift ? shiftText(prod.shift) : '', forecast }, now);
       const S = U.shiftReport(week, data.roundStart);
       // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
       const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
