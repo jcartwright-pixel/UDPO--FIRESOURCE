@@ -56,8 +56,7 @@ async function seed(d) {
     r.days[DAYS[new Date(date + 'T12:00:00Z').getUTCDay()]] = { runs: true, driver: c.name, driverId: c.id, truck: c.truck, startTime: '05:00',
       // Time grade: EVANS leaves about half an hour before a 6:15 dispatch; FOX's route is due back by 1:15 PM.
       dispatchTime: i === 4 ? '06:15' : '05:45', routeHours: i === 5 ? 7.5 : 8.5,
-      // Joe 10/25 cases by the 54: DIAZ is 120 short on 10-1 (-2), 60 over on 10-6 (+1) and 30 short on 10-8 (nothing).
-      casesOut: 600, plantCaseReturn: i === 4 && j === 5 ? 594 : i === 3 && j === 0 ? 480 : i === 3 && j === 4 ? 660 : i === 3 && j === 6 ? 570 : 600, checkinCompletedAt: missed ? '' : iso(date, 5, 2) };
+      casesOut: 600, plantCaseReturn: i === 4 && j === 5 ? 594 : 600, checkinCompletedAt: missed ? '' : iso(date, 5, 2) };
     b.set(d.collection('plantEvents').doc('sample_dvir_' + c.route + '_' + date), { type: 'DVIR', date, route: c.route, run: 'DAY', defect: i === 2 && j === 3 });
     b.set(d.collection('gpsDays').doc(date + '_' + c.truck), { tag: c.truck, date, miles: 160 + i * 9 + (j % 3) * 4, firstMove: iso(date, 5, 30 + i * 3), lastMove: iso(date, 14, 10 + i * 6),
       yardOut: iso(date, 5, 34 + i * 3), yardIn: iso(date, 14, 5 + i * 6), fuelGallons: Math.round((160 + i * 9) / (6.6 + (i % 3) * 0.4)) });
@@ -142,7 +141,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       assert.equal(fit.small, 0, 'no text under 16px');
       assert.equal(await sc.$eval('.sc-board thead th', th => getComputedStyle(th).position), 'sticky', 'the table header stays at the top');
       // A driver's misses list each alert with its points.
-      await sc.click('tr[data-key="DRV_S_DIAZ"] td.strong'); // the driver's name (Joe 10/25: a grade opens its own report)
+      await sc.click('tr[data-key="DRV_S_DIAZ"]');
       await sc.waitForSelector('tr.sc-misses');
       assert.match(await sc.textContent('tr.sc-misses'), /Speeding \(71 mph in a 55, 9:14 AM, truck 223896, US-40 W\)\s*−2/);
       assert.match(await sc.textContent('.sc-facts'), /Truck 223896 · Route 858[\s\S]*2 speeding, 2 hard stops[\s\S]*GPS miles[\s\S]*MPG 6\.8[\s\S]*yard out \d+:\d\d AM, in \d+:\d\d PM/, 'the GPS details are one click away');
@@ -159,41 +158,6 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       assert.equal(await sc.$eval('.sc-rate-save', b => b.disabled), false);
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-rate-cleanliness-' + w + '.png') });
       await sc.click('.sc-rate-cancel');
-      // Joe 10/25: "click their score for that particular item and see why": the grade opens a report of that driver's days in that
-      // area, every day he drove, red where it cost points and green where it earned extra.
-      await sc.click('tr[data-key="DRV_S_DIAZ"] .sc-go[data-area="cases"]');
-      await sc.waitForSelector('.sc-report');
-      const text = (sel) => sc.$eval(sel, e => e.innerText.replace(/\s+/g, ' '));
-      const rep = await text('.sc-report');
-      assert.match(rep, /DIAZ, RAY · Cases · Oct 26/);
-      assert.match(rep, /A Cases grade 100 Score 10 Days counted 9 Days with no miss 1 Days that cost points 150 Cases short 60 Cases over \+12 Points earned −2 Points off/i, rep);
-      assert.match(rep, /10-1-26 858 223896 600 480 120 short 120 cases short \(out 600, in 480\) −2/);
-      assert.match(rep, /10-6-26 858 223896 600 660 60 over 60 cases over \(out 600, in 660\) \+1/);
-      assert.match(rep, /10-8-26 858 223896 600 570 30 short Under 54 either way: no points 0/);
-      assert.match(rep, /Total 6,000 5,910 90 short \+10/);
-      assert.deepEqual(await sc.$$eval('.sc-report-table tbody tr', t => t.map(x => x.className)), ['sc-r-bad', '', '', '', 'sc-r-good', '', '', '', '', '', 'sc-r-total']);
-      const rfit = await sc.evaluate(() => ({ table: document.querySelector('.sc-report-table').scrollWidth, box: document.querySelector('#sheet').clientWidth,
-        small: [...document.querySelectorAll('.sc-report *')].filter(e => e.offsetParent && e.childNodes.length && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 16).length }));
-      assert.ok(rfit.table <= rfit.box + 1 && rfit.small === 0, 'the report fits across with 16px text at ' + w + ': ' + JSON.stringify(rfit));
-      if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-report-cases-' + w + '.png') });
-      await sc.click('.sc-report-back');
-      await sc.waitForSelector('tr[data-key="DRV_S_DIAZ"] .sc-go');
-      assert.equal(await sc.$('.sc-report'), null, 'Back returns to the board');
-      // Any area: the speeding grade lists each alert; the screen's Back button closes the report first.
-      await sc.click('tr[data-key="DRV_S_DIAZ"] .sc-go[data-area="speeding"]');
-      await sc.waitForSelector('.sc-report');
-      assert.match(await text('.sc-report'), /10-2-26 858 223896 Speeding \(71 mph in a 55, 9:14 AM, truck 223896, US-40 W\)( Excuse)? −2/);
-      if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-report-speeding-' + w + '.png') });
-      assert.equal(await sc.evaluate(() => window.udBack()), true);
-      await sc.waitForSelector('tr[data-key="DRV_S_DIAZ"] .sc-go');
-      // Accidents: one row per accident that counted.
-      await sc.click('tr[data-key="DRV_S_DIAZ"] .sc-go[data-area="accidents"]');
-      await sc.waitForSelector('.sc-report');
-      assert.match(await text('.sc-report'), /9-20-26 Accident, 1st degree \(Minor\): Backing, truck 223896, preventable −15/);
-      await sc.click('.sc-report-back');
-      await sc.waitForSelector('tr[data-key="DRV_S_DIAZ"] .sc-go');
-      await sc.click('tr[data-key="DRV_S_DIAZ"] td.strong');
-      await sc.waitForSelector('tr.sc-misses');
       // Excuse opens a reason box (the save itself: driver-incidents.test.js).
       await sc.click('tr.sc-misses .sc-excuse');
       await sc.waitForSelector('.sc-ex-form .sc-ex-reason');
@@ -201,7 +165,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       if (SHOTS && w === 1536) await sc.screenshot({ path: path.join(SHOTS, 'after-excuse-' + w + '.png') });
       await sc.click('.sc-ex-cancel');
       // FOX's idling on his sleeper route costs a quarter point.
-      await sc.click('tr[data-key="DRV_S_FOX"] td.strong');
+      await sc.click('tr[data-key="DRV_S_FOX"]');
       await sc.waitForFunction(() => /sleeper/.test((document.querySelector('tr.sc-misses') || {}).textContent || ''));
       // Joe 10/14: idling is one line a day with the total minutes and how many times.
       assert.match(await sc.textContent('tr.sc-misses'), /Idling 30 min total, 1 time, truck 223898, sleeper\s*−0\.25/);
@@ -443,7 +407,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         await sc.click('.sc-ex-cancel');
         assert.equal(await sc.$eval('#error', e => e.hidden), true, 'Cancel clears the message');
         await sc.click('#cats [data-tab="overall"]');
-        await sc.click('tr[data-key="DRV_S_DIAZ"] td.strong'); // the driver's name (Joe 10/25: a grade opens its own report)
+        await sc.click('tr[data-key="DRV_S_DIAZ"]');
         await sc.waitForFunction(() => /this year, 4 allowed/.test(document.body.textContent));
         assert.match(await sc.textContent('#sheet'), /6 call-offs \(5 this year, 4 allowed\)/);
         assert.deepEqual(sc.errors.filter(e => !/Type a note/.test(e)), []);
