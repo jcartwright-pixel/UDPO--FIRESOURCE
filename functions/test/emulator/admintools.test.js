@@ -52,6 +52,10 @@ test('Repair Email: settings are checked; Immediately sends new repairs to the l
   assert.equal(T.lessorOf([{ type: 'TRUCK', unit: '900001', notes: 'Lease: Ryder' }], 'TRUCK', '900001').held, 'LESSOR_NOT_SET_UP');
   assert.equal(T.lessorOf([], 'TRUCK', '555').held, 'UNIT_NOT_IN_FLEET_LIST');
   assert.equal(T.lessorOf([{ type: 'TRUCK', unit: '900001', notes: '' }], 'TRUCK', '900001').route, 'OWNED');
+  // Joe 10/25: the fleet list's LEASE column (config/fleetOwnership) decides a truck's lessor; trailers stay ours.
+  const own = { units: { 223876: { own: false, lease: 'Idealease', facilityId: 'fac_uniontown' }, 'T-77': { own: false, lease: 'First', facilityId: 'fac_uniontown' } } };
+  assert.equal(T.lessorOf([{ type: 'TRUCK', unit: '223876', notes: 'External Fleet: 2023' }], 'TRUCK', '223876', own).route, 'IDEALEASE');
+  assert.equal(T.lessorOf([{ type: 'TRAILER', unit: 'T-77', notes: '' }], 'TRAILER', 'T-77', own).route, 'OWNED');
 });
 
 test('Repair Email: the Lessor button emails after the save, and says why not when email is off for that lessor', async () => {

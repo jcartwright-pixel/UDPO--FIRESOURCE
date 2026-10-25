@@ -60,12 +60,14 @@ async function repairSettings(db) {
   return { routes, digestHour: Number.isInteger(d.digestHour) ? d.digestHour : 7, updatedAt: d.updatedAt || '', updatedBy: d.updatedBy || '' };
 }
 
-// Which company a unit's repair goes to: the Fleet List's Lease (kept in Equipment Master notes as "Lease: ..."), as 213_V7255.
-function lessorOf(equipment, kind, unitText) {
+// Which company a unit's repair goes to: the Fleet List's Lease, as 213_V7255. Joe 10/25: a truck's comes from
+// config/fleetOwnership (the fleet list read every half hour), else Equipment Master's "Lease: ..." text.
+const fleetOwnershipOf = async (db) => { const d = await db.collection('config').doc('fleetOwnership').get(); const o = d.exists ? d.data() : null; return o && o.units ? o : null; };
+function lessorOf(equipment, kind, unitText, ownership) {
   if (kind === 'FORK_TRUCK') return { route: 'OWNED', unit: unitText };
   const type = kind === 'TRAILER' ? 'TRAILER' : 'TRUCK', word = type === 'TRAILER' ? 'Trailer' : 'Truck';
   const units = (equipment || []).filter(e => (L.fleetKind(e.type) || String(e.type || '').toUpperCase()) === type);
-  const u = L.unitLessor(units, unitText);
+  const u = L.unitLessor(units, unitText, type === 'TRUCK' ? ownership : null);
   if (!u.unit) return { held: /matches/.test(u.why) ? 'UNIT_AMBIGUOUS' : 'UNIT_NOT_IN_FLEET_LIST', why: String(u.why).replace(/^Truck/, word), unit: unitText };
   const lease = String(u.lessor || '').trim().toUpperCase();
   if (!lease || lease === 'OWN' || lease === 'OWNED') return { route: 'OWNED', unit: u.unit };
@@ -124,7 +126,7 @@ async function repairSweep(db, opts) {
   try {
     const by = o.by || 'SCHEDULE', testTo = o.by ? '' : s.updatedBy;
     const stateRef = priv(db, 'repairSweepState'), state = Object.assign({ lastDigest: {}, retryAfter: {} }, await read(stateRef));
-    const [maint, equip] = await Promise.all([db.collection(C.maintenance).where('kind', 'in', ['TRUCK', 'TRAILER']).get(), db.collection(C.equipment).get()]);
+    const [maint, equip, ownership] = await Promise.all([db.collection(C.maintenance).where('kind', 'in', ['TRUCK', 'TRAILER']).get(), db.collection(C.equipment).get(), fleetOwnershipOf(db)]);
     const equipment = equip.docs.map(d => d.data());
     const earliest = autos.map(k => s.routes[k].since).filter(Boolean).sort()[0] || at;
     const open = maint.docs.map(d => d.data()).filter(r => {
@@ -134,7 +136,7 @@ async function repairSweep(db, opts) {
     const out = { sent: 0, digests: 0, held: 0, failed: 0 }, digest = {};
     let immediate = 0, stop = '';
     for (const r of open) {
-      const dest = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r));
+      const dest = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r), ownership);
       if (dest.held) {
         await addNote(db, r.record_id, 'Repair email held ' + at + ': ' + dest.held, by, at);
         await logHeld(db, at, by, r, '', dest.held, dest.why);
@@ -175,12 +177,12 @@ async function repairSweep(db, opts) {
 }
 
 async function repairEmail(db, deps) {
-  const [s, sending, state, rates, maint, equip] = await Promise.all([repairSettings(db), emailSettings(db), read(priv(db, 'repairSweepState')), rateSettings(db),
-    db.collection(C.maintenance).where('kind', 'in', ['TRUCK', 'TRAILER']).get(), db.collection(C.equipment).get()]);
+  const [s, sending, state, rates, maint, equip, ownership] = await Promise.all([repairSettings(db), emailSettings(db), read(priv(db, 'repairSweepState')), rateSettings(db),
+    db.collection(C.maintenance).where('kind', 'in', ['TRUCK', 'TRAILER']).get(), db.collection(C.equipment).get(), fleetOwnershipOf(db)]);
   // Where each open write-up would go today, so the page shows what Send now would do.
   const equipment = equip.docs.map(d => d.data()), where = { IDEALEASE: 0, PENSKE: 0, OWNED: 0, HELD: 0 };
   maint.docs.map(d => d.data()).filter(r => DONE.indexOf(String(r.status || 'OPEN').toUpperCase()) < 0 && !L.noWriteUp(r.issue_details)).forEach(r => {
-    const d = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r)); where[d.held ? 'HELD' : d.route]++;
+    const d = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r), ownership); where[d.held ? 'HELD' : d.route]++;
   });
   return { settings: s, labels: ROUTE_LABEL, modes: MODES, sending, lastDigest: (state && state.lastDigest) || {}, every: rates.jobs.repairEmail.minutes, openByLessor: where };
 }
@@ -213,7 +215,7 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
   const r = await read(db.collection(C.maintenance).doc(MAINT.docId(recordId)));
   if (!r) return { status: 'NOT_FOUND', message: 'That write-up is no longer on the list.' };
   const s = await repairSettings(db), equipment = (await db.collection(C.equipment).get()).docs.map(d => d.data());
-  const dest = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r)), at = new Date().toISOString();
+  const dest = lessorOf(equipment, String(r.kind).toUpperCase(), unitOf(r), await fleetOwnershipOf(db)), at = new Date().toISOString();
   if (dest.held) { await logHeld(db, at, by, r, '', dest.held, dest.why); return { status: 'HELD', message: dest.why + '. It was not emailed.' }; }
   const route = s.routes[dest.route];
   if (dest.route === 'OWNED' && !route.emails.length) return { status: 'GARAGE', message: unitOf(r) + ' is ours, so this repair stays on the garage list. No email is sent.' };

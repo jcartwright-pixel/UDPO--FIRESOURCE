@@ -221,6 +221,20 @@ test('unitLessor: the lease company from the fleet text, a short number when one
   assert.match(L.unitLessor(units, '999').why, /not on the fleet list/);
 });
 
+test('unitLessor: the fleet list ownership wins over old fleet text (Joe 10/25: 223876 is an Idealease truck)', () => {
+  // Equipment Master's copy was made before the Lease text was added, so it has none; the fleet list says Idealease.
+  const units = [{ unit: '223876', notes: 'External Fleet: 2023 | INTERNATIONAL | LT 625 | 3HCDZAPR0PL327144 | PXC9072 | OH' }, { unit: '493', notes: 'External Fleet: 2015' },
+    { unit: '123876', notes: 'External Fleet: Lease: PENSKE' }];
+  const ownership = { units: { 223876: { own: false, lease: 'Idealease', facilityId: 'fac_uniontown' }, 493: { own: true, lease: 'OWN', facilityId: 'fac_uniontown' },
+    123876: { own: true, lease: 'OWN', facilityId: 'fac_uniontown' } } };
+  assert.deepEqual(L.unitLessor(units, '223876', ownership), { unit: '223876', lessor: 'Idealease', why: '' });
+  assert.equal(L.unitLessor(units, '223876').lessor, '', 'without the fleet list, the old text alone says owned');
+  assert.match(L.unitLessor(units, '493', ownership).why, /Owned/);
+  assert.equal(L.unitLessor(units, '123876', ownership).lessor, '', 'the fleet list saying OWN wins over old Lease text');
+  assert.equal(L.unitLessor(units, '493', { units: {} }).lessor, '', 'a unit missing from the fleet list falls back to its text');
+  assert.equal(L.unitLessor(units, '123876', { units: {} }).lessor, 'PENSKE');
+});
+
 test('Daily and the phone follow the Live flag, and a blank Live flag falls back to Route Master like the current app', () => {
   const show = (run) => L.liveFlagShown(run, 'displayDaily', 'daily');
   assert.equal(show({ displayDaily: true, masterShow: { daily: false } }), true);
