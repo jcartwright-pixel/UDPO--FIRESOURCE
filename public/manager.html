@@ -176,7 +176,7 @@
       const x = build(), r = report;
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
-      put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
+      put('sched', card('&#128467;', 'Plant Distribution Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
         // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
         tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
       put('dept', card('&#9638;', 'Plant Distribution Departments', 'Loading, unloading, returns, washing and live workboards', 'plant.html', [
