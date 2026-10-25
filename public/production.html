@@ -259,15 +259,86 @@
       const cipRows = v.cips.map(c => [clockOf(c.start), c.end ? clockOf(c.end) : 'washing', c.minutes, c.result === 'FAIL' ? '<b class="pd-bad">Failed</b>' : c.result ? 'Passed' : '']);
       const crew = v.crew.length ? v.crew.map(c => escapeHtml(c.name) + (c.on ? '' : ' (off)')).join(', ') : 'No one signed on.';
       const notes = '<p><b>Crew:</b> ' + crew + '</p>' + (v.prevNote ? '<p><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</p>' : '') + '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' +
-        (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + (v.kind === 'BLOWMOLD' ? '<p><b>Resin lot:</b> ' + escapeHtml(v.lot || '—') + ' &nbsp; <b>Jugs ahead:</b> ' + (v.stock === null ? '—' : fmt(v.stock)) + '</p>' : '') +
+        (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + 
         (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : '');
-      document.getElementById('detail').innerHTML = liveBox(v) + box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide') +
+      const tlBox = box(escapeHtml(v.line.name) + ' · this shift', tl, 'wide');
+      const stopsBox = box('Stops and why', table([['From'], ['Min', 1], ['Why', 'w'], ['Who']], stopRows, 'No stops this shift.')), wasteBox = box('Waste and rejects', table([['Why', 'w'], ['How many', 1]], wasteRows, 'No waste entered this shift.'));
+      const coBox = box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.'));
+      const cipBox = box('CIP washes', table([['Started'], ['Done'], ['Min', 1], ['Result']], cipRows, v.lastCipAt ? 'None this shift. Last one that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clockOf(v.lastCipAt) + '.' : 'None this shift.'));
+      const qualityBox = box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
+      // Joe 10/25 (desk mock-up 2): the Blow Mold's own page, drawn into #detail with its own numbers up top.
+      if (v.kind === 'BLOWMOLD') {
+        const bm = drawBlowDetail(v, t, { box, table, mgr });
+        document.getElementById('hstats').innerHTML = bm.stats;
+        document.getElementById('detail').innerHTML = tlBox + bm.top + '<div class="pd-col">' + stopsBox + wasteBox + '</div>' +
+          '<div class="pd-col">' + fillBox + effBox + coBox + cipBox + box('Crew and notes', notes) + '</div>' + qualityBox;
+        return;
+      }
+      document.getElementById('detail').innerHTML = liveBox(v) + tlBox +
         '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]].concat(hasM ? [[escapeHtml(mach.speedName), 1], ['Temp', 1]] : []), hourRows, 'No hours yet this shift.')) +
-        box('Stops and why', table([['From'], ['Min', 1], ['Why', 'w'], ['Who']], stopRows, 'No stops this shift.')) + box('Waste and rejects', table([['Why', 'w'], ['How many', 1]], wasteRows, 'No waste entered this shift.')) + '</div>' +
-        '<div class="pd-col">' + machBox + fillBox + boxBox + effBox + box('Changeovers', table([['From → to', 'w'], ['Started'], ['Min', 1], ['Standard', 1]], coRows, 'No changeovers this shift.')) +
-        box('CIP washes', table([['Started'], ['Done'], ['Min', 1], ['Result']], cipRows, v.lastCipAt ? 'None this shift. Last one that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clockOf(v.lastCipAt) + '.' : 'None this shift.')) +
-        box('Crew and notes', notes) + '</div>' +
-        box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
+        stopsBox + wasteBox + '</div>' +
+        '<div class="pd-col">' + machBox + fillBox + boxBox + effBox + coBox + cipBox + box('Crew and notes', notes) + '</div>' + qualityBox;
+    }
+    // The Blow Mold's room sensor (a MOCREO sensor picked on Line Targets), read live as the tablet does.
+    let room = { id: '', value: null, stop: null };
+    function followRoom(id) {
+      if (room.id === id) return;
+      if (room.stop) room.stop();
+      room = { id, value: null, stop: null };
+      if (id && db) room.stop = onSnapshot(doc(db, 'sensors', id), d => { room.value = d.exists() ? d.data() : null; render(); }, () => {});
+    }
+    // The Blow Mold page (Joe 10/25, desk mock-up 2): jugs molded, on the Alpine and kick-outs up top; what is being made with the
+    // sensors; Runs this shift (one line for each resin lot and color); and an hour by hour with every reading. Every reading is from
+    // the machine's sensors; one not wired yet says WAITING FOR SENSOR. Returns the top numbers and the boxes for #detail.
+    function drawBlowDetail(v, t, h) {
+      const { box, table, mgr } = h, m = v.machine, c = ((data.lineInfo || {})[v.line.operationId] || {}).controller || {};
+      followRoom(String(c.roomSensor || ''));
+      const cfg = (k) => m && m[k] !== undefined ? m[k] : c[k] === undefined || c[k] === '' ? null : Number(c[k]);
+      const lim = { tempLow: cfg('tempLow'), tempHigh: cfg('tempHigh'), speedLow: cfg('speedLow'), speedHigh: cfg('speedHigh'), roomLow: cfg('roomLow'), roomHigh: cfg('roomHigh') };
+      const kickHigh = m && m.kickHigh !== undefined ? m.kickHigh : c.kickHigh === undefined || c.kickHigh === '' ? R.KICK_HIGH : Number(c.kickHigh);
+      const counted = !!(m && m.shots !== null && m.shots !== undefined);
+      // Until the shot counter is wired, the kick-outs are the leak tester rejects typed on the tablet.
+      const kicked = counted ? m.kicked : Number(v.waste['Leak tester'] || 0), kickPct = counted ? m.kickPct : v.made ? Math.round(kicked / v.made * 1000) / 10 : null;
+      const stat = (l, n, k) => '<div class="' + (k || '') + '"><b>' + n + '</b><span>' + l + '</span></div>';
+      const stats = stat('Jugs molded', counted ? fmt(m.molded) : '—', counted ? 'good' : '') + stat('On the Alpine', fmt(v.made), 'good') +
+        stat('Kick-outs' + (kickPct === null ? '' : ' ' + kickPct + '%'), fmt(kicked), kickPct !== null && kickPct > kickHigh ? 'bad' : '') + stat('Target so far', fmt(v.soFar), '') +
+        (mgr ? stat('Efficiency', v.efficiency && v.efficiency.oee !== null ? v.efficiency.oee + '%' : '—', 'good') : '') + stat('Stopped', v.downMin + ' min', v.downMin ? 'bad' : '');
+      const range = (lo, hi, u) => lo === null && hi === null ? 'No range set on Line Targets' : 'Range ' + (lo === null ? 'up' : fmt(lo) + u) + ' to ' + (hi === null ? 'any' : fmt(hi) + u);
+      const waiting = '<span class="pd-pill n">WAITING FOR SENSOR</span>';
+      const flagPill = (f, hi, lo, has) => f === 'HIGH' ? '<span class="pd-pill r">' + hi + '</span>' : f === 'LOW' ? '<span class="pd-pill r">' + lo + '</span>' : has ? '<span class="pd-pill g">IN RANGE</span>' : '';
+      const tile = (name, big, sub, pill, bad) => '<div class="pd-bm-tile' + (bad ? ' bad' : '') + '"><span class="pd-bm-eb">' + escapeHtml(name) + '</span><b>' + big + '</b><span class="pd-bm-mut">' + sub + '</span>' + (pill ? '<div>' + pill + '</div>' : '') + '</div>';
+      const tiles = [];
+      if (m && m.temp !== null) tiles.push(tile('Annealer temperature', fmt(m.temp) + '°F', escapeHtml(range(lim.tempLow, lim.tempHigh, '°F')) + (m.tempOutSince ? ' · ' + (m.tempFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clockOf(m.tempOutSince) : ''),
+        flagPill(m.tempFlag, 'TOO HOT', 'TOO COLD', lim.tempLow !== null || lim.tempHigh !== null), m.tempFlag === 'HIGH' || m.tempFlag === 'LOW'));
+      else tiles.push(tile('Annealer temperature', '—', escapeHtml(range(lim.tempLow, lim.tempHigh, '°F')), waiting));
+      if (m && m.speed !== null) tiles.push(tile('Annealer belt speed', fmt(m.speed) + (m.rpm ? ' RPM' : ''), escapeHtml(range(lim.speedLow, lim.speedHigh, '')) + (m.rpm ? ' · counted from the belt' : '') + (m.speedOutSince ? ' · ' + (m.speedFlag === 'HIGH' ? 'high' : 'low') + ' since ' + clockOf(m.speedOutSince) : ''),
+        flagPill(m.speedFlag, 'TOO FAST', 'TOO SLOW', lim.speedLow !== null || lim.speedHigh !== null), m.speedFlag === 'HIGH' || m.speedFlag === 'LOW'));
+      else tiles.push(tile('Annealer belt speed', '—', escapeHtml(range(lim.speedLow, lim.speedHigh, '')) + ' · RPM counted from the belt', waiting));
+      const rv = room.value && room.value.temperatureF !== null && room.value.temperatureF !== undefined ? Number(room.value.temperatureF) : m && m.room !== undefined && m.room !== null ? m.room : null;
+      const rf = R.machineFlag(rv, lim.roomLow, lim.roomHigh), rAt = room.value ? room.value.lastReadingAt : m ? m.roomAt : '';
+      tiles.push(tile('Room temperature', rv === null ? '—' : fmt(rv) + '°F', escapeHtml(range(lim.roomLow, lim.roomHigh, '°F')) + (rv !== null && rAt ? ' · read ' + clockOf(rAt) : ''),
+        rv === null ? waiting : flagPill(rf, 'TOO HOT', 'TOO COLD', lim.roomLow !== null || lim.roomHigh !== null), rf === 'HIGH' || rf === 'LOW'));
+      tiles.push(tile('Jugs ahead of filler', v.stock === null ? '—' : fmt(v.stock), v.run && v.run.stockAt ? 'counted ' + clockOf(v.run.stockAt) : 'not counted this shift', ''));
+      const color = R.colorName(v.jugColor);
+      const making = '<div class="pd-bm-making"><div><span class="pd-bm-eb">Making now</span><b class="pd-bm-prod">' + escapeHtml((v.product || (v.targets.length === 1 ? v.targets[0].name : 'No product picked')) + (color ? ' · ' + color.toUpperCase() : '')) + '</b></div>' +
+        '<div class="pd-bm-tog">' + R.COLORS.map(x => '<span class="' + (v.jugColor === x[0] ? 'on ' + x[0].toLowerCase() : '') + '">' + x[1] + '</span>').join('') + '</div>' +
+        '<div><span class="pd-bm-eb">Resin lot</span><span>' + (v.lot ? '<b>' + escapeHtml(v.lot) + '</b>' + (v.lotCarried ? ' · from last shift' : v.lotAt ? ' · scanned ' + clockOf(v.lotAt) : '') : 'No resin lot scanned') + '</span></div>' +
+        '<div class="pd-bm-mut">Color and lot are scanned or picked<br>on the Blow Mold tablet</div></div>';
+      const head = m ? '<p class="pd-none">' + (m.stale ? '<b class="pd-bad">Not reading: last read ' + clockOf(m.at) + '</b>' : 'Read ' + clockOf(m.at)) + ' from the machine\'s sensors (read-only).</p>' : '';
+      // A range [low, high] in red when any of it is outside the range set on Line Targets.
+      const span = (r, u, lo, hi) => { if (!r) return '—'; const x = (r[0] === r[1] ? fmt(r[0]) : fmt(r[0]) + ' to ' + fmt(r[1])) + u; return (lo !== null && r[0] < lo) || (hi !== null && r[1] > hi) ? '<b class="pd-bad">' + x + '</b>' : x; };
+      const kick = (n, p) => n === null ? '—' : p !== null && p > kickHigh ? '<b class="pd-bad">' + fmt(n) + ' · ' + p + '%</b>' : fmt(n) + (p === null ? '' : ' · ' + p + '%');
+      const runRows = v.lotRuns.map(x => { const b = (y) => x.now ? '<b>' + y + '</b>' : y; return [b(clockOf(x.at) + (x.carried ? ' · from last shift' : '') + (x.now ? ' · now' : '')), b(escapeHtml(x.lot || '—')), b(escapeHtml(x.colorName || '—')),
+        b(x.molded === null ? '—' : fmt(x.molded)), b(fmt(x.through)), kick(x.kicked, x.kickPct), span(x.temp, '°F', lim.tempLow, lim.tempHigh), span(x.speed, '', lim.speedLow, lim.speedHigh), span(x.room, '°F', lim.roomLow, lim.roomHigh)]; });
+      const hours = R.blowHours(v.run, (data.lineInfo || {})[v.line.operationId] || {}, v.targets, t);
+      const hourRows = hours.map(x => [clockOf(x.from).replace(':00', '') + '–' + clockOf(x.to).replace(':00', ''), (x.lots.length ? x.lots.map(l => '<span class="pd-nw">' + escapeHtml(l) + '</span>').join(' → ') : escapeHtml(x.products.join(' → ') || '—')), x.molded === null ? '—' : fmt(x.molded), fmt(x.through), fmt(x.target), x.pct === null ? '–' : x.pct,
+        kick(x.kicked, x.kickPct), span(x.tempRange, '°F', lim.tempLow, lim.tempHigh), span(x.speedRange, '', lim.speedLow, lim.speedHigh), span(x.roomRange, '°F', lim.roomLow, lim.roomHigh), x.stopped]);
+      const links = '<div class="pd-bm-links"><a class="lt-top" href="line.html?line=' + encodeURIComponent(v.line.operationId) + '">Line Tablet</a><a class="lt-top" href="linetargets.html?line=' + encodeURIComponent(v.line.operationId) + '">Targets and Sensors</a></div>';
+      const top = box('Making now and the sensors', links + making + '<div class="pd-bm-tiles">' + tiles.join('') + '</div>' + head, 'wide pd-bm') +
+        box('Runs this shift <span class="pd-bm-sub">a new run starts each time a resin lot is scanned or the color changes</span>', table([['Started'], ['Resin lot'], ['Color'], ['Jugs molded', 1], ['On the Alpine', 1], ['Kick-outs', 1], ['Annealer temp', 1], ['Belt RPM', 1], ['Room temp', 1]], runRows,
+          'No run yet. Scan the resin lot and pick White or Clear on the Blow Mold tablet to start the first one.'), 'wide pd-bm') +
+        box('Hour by hour', table([['Hour'], ['Resin lot · color', 'w'], ['Jugs molded', 1], ['On the Alpine', 1], ['Target', 1], ['%', 1], ['Kick-outs', 1], ['Annealer temp', 1], ['Belt RPM', 1], ['Room temp', 1], ['Stopped', 1]], hourRows, 'No hours yet this shift.'), 'wide pd-bm');
+      return { stats, top };
     }
     // The weekly line scorecard (Joe 10/14 follow-on): each line's week, Sunday to Saturday, and the plant's biggest losses.
     function weekStartOf() { return L.weekStart(weekOf || (data.shift ? data.shift.date : L.operatingDay(new Date()))); }

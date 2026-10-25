@@ -232,13 +232,19 @@ async function pickFirstProduct(tb) {
     const bm = await openPage(browser, 1024, 768, '/line.html?line=' + BLOW + '&' + ADMIN);
     await bm.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');
     assert.deepEqual(await acts(bm), ['Mold Change', 'Resin Lot', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
+    // Joe 10/24: mock-up 2's screen shows before any sensor is wired, each sensor saying WAITING FOR SENSOR.
+    const eyebrows = (sel) => bm.$$eval(sel + ' .lb-card > .eyebrow', es => es.map(e => e.textContent));
+    assert.deepEqual(await eyebrows('#kind-cards'), ['Making now', 'Jugs molded', 'Jugs on the Alpine', 'Tester kick-outs']);
+    assert.deepEqual(await eyebrows('#machine'), ['Annealer temperature', 'Annealer belt speed', 'Room temperature', 'Jugs ahead of filler']);
+    assert.equal(await bm.$$eval('#kind-cards .lb-pill, #machine .lb-pill', es => es.filter(e => e.textContent === 'WAITING FOR SENSOR').length), 4, 'jugs molded and the three sensors wait for their sensors');
+    assert.ok(await bm.$eval('#lot-runs', e => !e.hidden && /Runs this shift/.test(e.textContent)), 'Runs this shift shows');
     await bm.click('#kind-cards [data-act="waste"]');
-    assert.equal(await bm.$eval('#mp-body [data-reason="Leak tester"]', e => e.className), 'on', 'Enter Rejects opens on the leak tester');
+    assert.equal(await bm.$eval('#mp-body [data-reason="Leak tester"]', e => e.className), 'on', 'Enter Kick-outs opens on the leak tester');
     await bm.fill('#waste-box', '46');
     await bm.press('#waste-box', 'Tab');
     await bm.waitForFunction(() => /46 THIS SHIFT/.test(document.getElementById('mp-badge').textContent));
     await bm.click('#mp-close');
-    await bm.click('#kind-cards [data-act="stock"]');
+    await bm.click('#machine [data-act="stock"]');
     await bm.fill('#mp-body input[data-save="stock"]', '2300');
     await bm.press('#mp-body input[data-save="stock"]', 'Tab');
     await bm.click('#mp-close');
@@ -246,7 +252,7 @@ async function pickFirstProduct(tb) {
     await bm.fill('#mp-body input[data-save="lot"]', 'R-2291');
     await bm.press('#mp-body input[data-save="lot"]', 'Tab');
     await bm.click('#mp-close');
-    await bm.waitForFunction(() => /2,300/.test(document.getElementById('kind-cards').textContent) && /R-2291/.test(document.getElementById('kind-cards').textContent));
+    await bm.waitForFunction(() => /2,300/.test(document.getElementById('machine').textContent) && /R-2291/.test(document.getElementById('kind-cards').textContent) && /46/.test(document.getElementById('kind-cards').textContent));
     await bm.click('#status-btn');
     await bm.waitForFunction(() => document.querySelectorAll('#reasons button').length === 12 && !!document.querySelector('#reasons [data-reason="Leak tester down"]'));
     await shot(bm, 'more-tablet-blow-mold-stopped-1024');
@@ -255,6 +261,15 @@ async function pickFirstProduct(tb) {
     await bm.click('#status-btn');
     await bm.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
     await fits(bm, 'the Blow Mold tablet at 1024');
+    // Joe 10/25: Plant Production's Blow Mold page before any sensor is wired: each sensor WAITING FOR SENSOR, R-2291 on Making now.
+    const bd = await openPage(browser, 1536, 960, '/production.html?line=' + BLOW + '&' + ADMIN);
+    await bd.waitForFunction(() => /R-2291/.test((document.querySelector('#detail .pd-bm-making') || {}).textContent || ''));
+    assert.equal(await bd.$$eval('#detail .pd-pill.n', es => es.filter(e => e.textContent === 'WAITING FOR SENSOR').length), 3, 'the annealer temperature, belt RPM and room wait for their sensors');
+    assert.match(await bd.textContent('#detail .pd-bm-tiles'), /2,300/, 'the jugs ahead of the filler typed on the tablet');
+    assert.match(await bd.textContent('#hstats'), /46Kick-outs/, 'the kick-outs are the leak tester rejects typed on the tablet until the shot counter is wired');
+    await fits(bd, 'the Blow Mold page at 1536');
+    assert.deepEqual(bd.errors, []);
+    await bd.close();
     await shot(bm, 'more-tablet-blow-mold-1024');
     assert.deepEqual(bm.errors, []);
     await bm.close();

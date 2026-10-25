@@ -350,4 +350,13 @@ test('Blow Mold (Joe 10/23, mock-up 2): shots x 6 = jugs molded, the tester coun
   const more = P.lineMore({ shiftStart: '2026-10-23T02:00:00.000Z', lot: 'R-2', color: 'CLEAR', lotAt: '2026-10-23T03:00:00.000Z' }, [], Date.parse('2026-10-23T03:00:00.000Z'), 'BLOWMOLD', {}, { lineName: 'BLOW MOLD' });
   assert.deepEqual([more.lot, more.jugColor, more.lotCarried, more.lotRuns.length], ['R-2', 'CLEAR', false, 1]);
   assert.equal(P.colorName('clear'), 'Clear');
+  // Hour by hour (Joe 10/25, desk mock-up 2): shots logged each hour × 6 = jugs molded, less the hour's count = kick-outs.
+  const hrs = P.blowHours({ shiftStart: '2026-10-23T02:00:00.000Z', shiftEnd: '2026-10-23T09:30:00.000Z', count: 100, shots: 20, lotFrom: { lot: 'R-1', color: 'WHITE' },
+    counts: [{ at: '2026-10-23T02:59:00.000Z', count: 40 }, { at: '2026-10-23T03:30:00.000Z', count: 100 }],
+    lotLog: [{ at: '2026-10-23T03:00:00.000Z', lot: 'R-2', color: 'CLEAR', count: 40, shots: 8 }],
+    machineLog: [{ at: '2026-10-23T02:30:00.000Z', temp: 1100, speed: 70, room: 80, shots: 4 }, { at: '2026-10-23T02:59:00.000Z', temp: 1150, speed: 71, room: 82, shots: 8 }, { at: '2026-10-23T03:30:00.000Z', temp: 1200, shots: 20 }] },
+    { lot: 'R-2', color: 'CLEAR' }, [], Date.parse('2026-10-23T03:45:00.000Z'));
+  assert.deepEqual(hrs.map(h => [h.molded, h.through, h.kicked, h.kickPct, h.lots]), [[48, 40, 8, 16.7, ['R-1 · White']], [72, 60, 12, 16.7, ['R-2 · Clear']]]);
+  assert.deepEqual([hrs[0].tempRange, hrs[0].speedRange, hrs[0].roomRange, hrs[1].tempRange, hrs[1].roomRange], [[1100, 1150], [70, 71], [80, 82], [1200, 1200], null]);
+  assert.equal(P.blowHours({ shiftStart: '2026-10-23T02:00:00.000Z', shiftEnd: '2026-10-23T09:30:00.000Z', count: 5, counts: [{ at: '2026-10-23T02:30:00.000Z', count: 5 }] }, {}, [], Date.parse('2026-10-23T02:45:00.000Z'))[0].molded, null, 'no shot counter, no jugs molded');
 });

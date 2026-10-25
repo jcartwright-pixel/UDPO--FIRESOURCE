@@ -370,6 +370,30 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 #lot-runs th, #lot-runs td { overflow: visible; text-overflow: clip; }
 #lot-runs th { color: #fff; white-space: normal; padding: 6px 8px; }
 #lot-runs td { padding: 8px 8px; }
+/* Joe 10/25 (desk mock-up 2): the Blow Mold page on Plant Production: what is being made, the sensors, Runs this shift, every reading by the hour. */
+.pd-pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 16px; font-weight: 900; letter-spacing: .02em; }
+.pd-pill.g { background: var(--pill-good-bg); color: var(--pill-good-ink); } .pd-pill.r { background: #c62828; color: #fff; } .pd-pill.n { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
+.pd-bm-sub { margin-left: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.pd-bm-making { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; padding: 2px 0 10px; font-size: 18px; }
+.pd-bm-making > div { display: flex; flex-direction: column; }
+.pd-bm-eb { font-size: 16px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.pd-bm-prod { font-size: 22px; color: var(--ud-blue-dark); }
+.pd-bm-mut { color: var(--muted); font-size: 16px; }
+.pd-bm-making .pd-bm-tog { flex-direction: row; gap: 6px; }
+.pd-bm-tog span { border: 2px solid #0b4f8a; border-radius: 8px; padding: 4px 14px; font-weight: 900; color: #0b4f8a; }
+.pd-bm-tog span.on { background: #0b4f8a; color: #fff; }
+.pd-bm-tog span.on.clear { background: #5b6b7c; border-color: #5b6b7c; }
+.pd-bm-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pd-bm-tile { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-bm-tile > b { font-size: 28px; color: var(--ud-blue-dark); }
+.pd-bm-tile.bad { background: #fde1e1; border-color: #c62828; }
+.pd-bm-tile.bad > b { color: #c62828; }
+.pd-bm table.pd-t { table-layout: auto; }
+.pd-bm table.pd-t th, .pd-bm table.pd-t td { overflow: visible; text-overflow: clip; }
+.pd-bm table.pd-t th { white-space: normal; vertical-align: bottom; }
+@media (max-width: 900px) { .pd-bm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .pd-bm table.pd-t { min-width: 900px; } }
+.pd-bm table.pd-t th, .pd-bm table.pd-t td { padding: 5px 6px; }
 
 /* ---------- Production Lines: the machine menu (Joe 10/24, as the Quality screen) ---------- */
 .pd-page:not(.pd-tv) .view { overflow: hidden; }
@@ -416,3 +440,7 @@ body.pd-tv .pd-right .pd-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)
 .pd-menu > * { flex-shrink: 0; }
 .pd-menu button b .pd-sensor { font-style: normal; font-size: 16px; font-weight: 800; color: #1d6b3a; background: #e2f4ea; border-radius: 999px; padding: 0 8px; margin-left: 4px; }
 .pd-menu button.on b .pd-sensor { background: #ffffff33; color: #fff; }
+.pd-box.pd-bm { position: relative; }
+.pd-bm-links { position: absolute; top: 8px; right: 16px; display: flex; gap: 8px; }
+@media (max-width: 700px) { .pd-bm-links { position: static; margin: 0 0 8px; flex-wrap: wrap; } }
+.pd-nw { white-space: nowrap; }
