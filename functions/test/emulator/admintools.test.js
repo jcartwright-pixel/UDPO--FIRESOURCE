@@ -72,6 +72,30 @@ test('Repair Email: the Lessor button emails after the save, and says why not wh
   assert.match(sent[0].text, /Manager note:\nPlease call/);
 });
 
+test('Repair Email (Joe 10/25): Lessor again sends an email that never went; owned units are never emailed; each save keeps what it replaced', async () => {
+  await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Tires bald' });
+  const truck = L.issueRows(await records(), 'TRUCK')[0];
+  const press = async (sent) => { const input = { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'PENSKE' }; return T.afterSave(db(), DISPATCHER, input, await applyAction(db(), DISPATCHER, input), mailDeps(sent)); };
+  // No address yet: marked for Penske, nothing sent.
+  assert.match((await press([])).message, /no email address yet/);
+  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'SEND' }, OWNED: { emails: 'garage@uniteddairy.com', mode: 'IMMEDIATE' } } });
+  const sent = [];
+  const again = await press(sent);
+  assert.equal(again.email, 'SENT');
+  assert.equal(sent.length, 1);
+  assert.match((await press(sent)).message, /Already sent/);
+  assert.equal(sent.length, 1, 'once emailed, never again');
+  const page = await call({ op: 'repairEmail' });
+  assert.deepEqual(page.settings.routes.OWNED, { emails: [], mode: 'NONE', since: '' }, 'the garage is never emailed');
+  assert.deepEqual(Object.keys(page.labels), ['IDEALEASE', 'PENSKE'], 'the page has no garage email box');
+  assert.equal((await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent), null)).status, 'SENT');
+  // Each save keeps the settings it replaced.
+  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: '', mode: 'SEND' } } });
+  const hist = (await db().collection('private').doc('repairEmailHistory').get()).data().saves;
+  assert.deepEqual(hist[0].before.routes.PENSKE.emails, ['repairs@penske.com']);
+  assert.equal(hist[0].replacedBy, ADMIN.email);
+});
+
 test('Email Senders: the Lessor email comes from the person who pressed it, or the plant address when set so (Joe 10/11)', async () => {
   await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Mirror cracked' });
   const truck = L.issueRows(await records(), 'TRUCK')[0];

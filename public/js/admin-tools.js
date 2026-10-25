@@ -28,7 +28,7 @@ export async function renderRepairEmail(box, ctx) {
   let data = null;
   box.innerHTML = '<div class="ap">' + bar('<button type="button" class="ap-btn" id="re-send">Send now</button><button type="button" class="ap-btn" id="re-reload">Refresh</button>', '<span id="re-sending"></span>') +
     '<div class="ap-split"><section class="ap-card"><h3>Where Repair Emails Go</h3><p class="ap-note">The Lease column on the Fleet List decides who a truck or trailer belongs to. Each lessor gets its own address.</p><div id="re-where"></div>' +
-    '<p class="ap-note">Owned units go straight to our garage list. Leave that address empty so nothing is emailed; add one only if you also want the garage emailed.</p>' +
+    '<p class="ap-note">Owned trucks and trailers are never emailed: the Garage button makes a work order for our garage.</p>' +
     '<p class="ap-note">Any other Lease value, or a unit that is not on the Fleet List, is held and flagged. It is never sent to a guessed address.</p><div class="ap-tiles" id="re-open" style="grid-template-columns:repeat(4,1fr)"></div></section>' +
     '<section class="ap-card"><h3>How Often Repair Emails Are Sent</h3><p class="ap-note">Choose the rhythm for each lessor. Nothing is emailed while sending is turned off.</p><div id="re-how"></div>' +
     '<p class="ap-note">Immediately and Once a day only send repairs reported after you switch them on, so old repairs are never swept up. "Only when I press Send" is the Lessor button on each truck write-up (Equipment Issues).</p><div id="re-status" class="ap-list"></div></section></div></div>';
@@ -50,7 +50,7 @@ export async function renderRepairEmail(box, ctx) {
       auto ? 'Automatic sending checks about every ' + data.every + ' minutes (change it in Refresh Rates).' : 'Nothing is sent automatically: no lessor is set to Immediately or Once a day.']
       .concat(Object.keys(data.lastDigest).map(k => data.labels[k] + ' digest last sent ' + data.lastDigest[k] + '.')).map(t => '<div class="ap-help">' + e(t) + '</div>').join('');
     const o = data.openByLessor;
-    $('#re-open').innerHTML = [['Idealease', o.IDEALEASE], ['Penske', o.PENSKE], ['Owned', o.OWNED], ['Held', o.HELD]].map(([k, n]) => '<div><b>' + n + '</b><span>open ' + k + '</span></div>').join('');
+    $('#re-open').innerHTML = [['Idealease', o.IDEALEASE], ['Penske', o.PENSKE], ['ours (Garage)', o.OWNED], ['Held', o.HELD]].map(([k, n]) => '<div><b>' + n + '</b><span>open ' + k + '</span></div>').join('');
   }
   let saving = Promise.resolve();
   async function load() { await saving; try { data = await call('repairEmail'); if (box.isConnected) render(); } catch (err) { say(box, errText(err), 'bad'); } }

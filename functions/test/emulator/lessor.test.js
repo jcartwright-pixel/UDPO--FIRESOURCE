@@ -26,8 +26,14 @@ test('Truck Issues: Lessor marks a truck write-up sent to its lessor once; it is
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: '' }), /which lessor/);
   await assert.rejects(applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: jack.recordId, step: 'lessor', note: 'Idealease' }), /Only a truck/);
   await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'Idealease' });
+  // Joe 10/25: pressed again while its email never went, it emails again (the note is not added twice); once emailed, it is already sent.
   const twice = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'Idealease' });
-  assert.match(twice.message, /Already sent/);
+  assert.match(twice.message, /Emailing the lessor again/);
+  assert.equal(((await records()).find(r => r.record_id === truck.recordId).notes.match(/Sent to lessor/g) || []).length, 1);
+  const doc = (await db().collection('maintenance').get()).docs.find(d => d.data().record_id === truck.recordId);
+  await doc.ref.update({ notes: doc.data().notes + '\nRepair email sent 2026-10-09T12:00:00Z to repairs@idealease.test' });
+  const third = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'Idealease' });
+  assert.match(third.message, /Already sent/);
   const after = L.issueRows(await records(), 'TRUCK')[0];
   assert.equal(after.toLessor, true);
   assert.equal(after.lessor, 'Idealease');

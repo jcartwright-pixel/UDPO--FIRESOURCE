@@ -147,7 +147,9 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
     if (String(r.kind || '').toUpperCase() !== 'TRUCK') throw new SaveError('NOT_ALLOWED', 'Only a truck write-up goes to a lessor');
     const lessor = String(req.note || '').replace(/[\n|]+/g, ' ').trim().slice(0, 40);
     if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
-    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: 'Already sent to the lessor.' };
+    // Joe 10/25 ("the 876 email didn't get sent ... How can I send it now?"): pressing Lessor again on one whose email never
+    // went sends the email again (afterSave); once the email went, it is already sent.
+    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: /Repair email sent|Repair email queued/.test(notes) ? 'Already sent to the lessor.' : 'Emailing the lessor again.' };
     change = { notes: add('Sent to lessor ' + lessor + ' ' + stamp + ' by ' + email) };
   } else {
     if (String(r.status || '').toUpperCase() !== 'NEEDS_REVIEW') throw new SaveError('NOT_ALLOWED', 'Only a write-up that needs review can be marked reviewed');
