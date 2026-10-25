@@ -233,11 +233,11 @@
       const counts = days.map(d => { const hol = R.holidayName(d); return '<div class="sc-count' + (d === t ? ' today' : '') + (hol ? ' holiday' : '') + '"' + (hol ? ' title="' + escapeHtml(hol) + '"' : '') + '><span>' + DAYS[at(d).getDay()] + ' ' + md(d) + '</span><strong>' + (map[d] || []).length + '</strong></div>'; }).join('');
       const cols = days.map(d => {
         const items = (map[d] || []).slice().sort(sortTime);
-        return '<div class="sc-col' + (d === t ? ' today' : '') + '">' + (items.length ? items.map(x => {
-          const moved = x.loadDate && x.loadDate !== x.date;
-          return '<button type="button" class="sc-load by-' + hauler(x) + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" title="' + HAULERS[hauler(x)] + '" data-edit="' + escapeHtml(x.id) + '"><strong>' + escapeHtml(entryName(x)) + '</strong><span>' +
-            escapeHtml([clock(x.pickupTime), x.poNumber ? 'PO ' + x.poNumber : '', x.trailer].filter(Boolean).join(' · ')) + '</span>' + (moved ? '<small>Load ' + escapeHtml(md(x.loadDate)) + ' → Deliver ' + escapeHtml(md(x.date)) + '</small>' : '') + '</button>';
-        }).join('') : '<p class="sc-none">No loads</p>') + (ck ? '<button type="button" class="sc-add" data-new="' + d + '">＋ Add</button>' : '') + '</div>';
+        // Joe 10/25: a week card shows only the load's name and time; the PO, trailer and load/deliver dates are in the box it opens.
+        return '<div class="sc-col' + (d === t ? ' today' : '') + '">' + (items.length ? items.map(x =>
+          '<button type="button" class="sc-load by-' + hauler(x) + (x.scheduleType === 'CARRIER' ? ' car' : '') + '" title="' + HAULERS[hauler(x)] + '" data-edit="' + escapeHtml(x.id) + '"><strong>' + escapeHtml(entryName(x)) + '</strong><span>' +
+            escapeHtml(clock(x.pickupTime)) + '</span></button>'
+        ).join('') : '<p class="sc-none">No loads</p>') + (ck ? '<button type="button" class="sc-add" data-new="' + d + '">＋ Add</button>' : '') + '</div>';
       }).join('');
       return side + '<div class="sc-weekgrid">' + counts + cols + '</div>';
     }
