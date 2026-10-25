@@ -75,8 +75,8 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
       await p.close();
     }
     const saved = (await db().collection('personRights').doc(MAINT).get()).data().screenAccess;
-    assert.deepEqual(saved, { fac_uniontown: ['pmCenter', 'machinery', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'plantReports', 'shiftReports'] });
-    results.push('Start from a job ticks the maintenance screens and two reports; Save keeps them for Uniontown');
+    assert.deepEqual(saved, { fac_uniontown: ['pmCenter', 'machinery', 'pmEquipment', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'pmCrew', 'plantReports', 'shiftReports'] });
+    results.push('Start from a job ticks the maintenance screens (Equipment and the Maintenance Schedule too, Joe 10/25) and two reports; Save keeps them for Uniontown');
 
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       m = await openPage(browser, w, h, '/index.html?testEmail=' + MAINT);
