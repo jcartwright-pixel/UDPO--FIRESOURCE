@@ -93,6 +93,12 @@ async function buttonsFit(p, label) {
   assert.ok(route802, 'route 802 is in Route Master');
   await db().collection('maintenance').doc(appId).update({ route_id: route802.routeId });
   await db().collection('maintenance').doc('MAIL_m13_tractor').set(mail('m13', '900001', 'ADAMS, PAT', 'Mirror cracked', 0.3));
+  // Joe 10/25: two write-ups sent to Idealease, one whose email went and one whose email has not.
+  const sentAt = new Date(Date.now() - 1800000).toISOString();
+  await db().collection('maintenance').doc('MAIL_m14_tractor').set(Object.assign(mail('m14', '223876', 'PRASTER, JEREMY', 'Tires bald', 0.2), { status: 'OPEN',
+    notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com\nRepair email sent ' + sentAt + ' to repairs@idealease.test' }));
+  await db().collection('maintenance').doc('MAIL_m15_tractor').set(Object.assign(mail('m15', '223877', 'Chad Herman', 'Wiper blades', 0.1), { status: 'OPEN',
+    notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com' }));
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -115,6 +121,14 @@ async function buttonsFit(p, label) {
       assert.equal(await p.locator('tr[data-id="' + appId + '"] [data-step="lessor"]').isDisabled(), false, 'the Idealease truck can go to the lessor');
       assert.match(await p.getAttribute('tr[data-id="' + appId + '"] [data-step="lessor"]', 'title'), /Send to Idealease/);
       assert.equal(await p.locator('tr[data-id="MAIL_m13_tractor"] [data-step="lessor"]').isDisabled(), true, 'an owned truck goes to our garage');
+      // Sent to the lessor: the lessor shows whole under Emailed (green once emailed, red while not), and Garage stays a dash.
+      const sentCells = await p.$$eval('tr[data-id="MAIL_m14_tractor"], tr[data-id="MAIL_m15_tractor"]', trs => trs.map(tr => {
+        const td = tr.children, pill = td[6].querySelector('.pill'), box = td[6].getBoundingClientRect(), r = pill ? pill.getBoundingClientRect() : null;
+        return { id: tr.dataset.id, emailed: td[6].textContent.trim(), cls: pill ? pill.className : '', garage: td[7].textContent.trim(), fits: !!r && r.left >= box.left && r.right <= box.right && pill.scrollWidth <= pill.clientWidth };
+      }));
+      assert.deepEqual(sentCells.sort((a, b) => a.id.localeCompare(b.id)), [
+        { id: 'MAIL_m14_tractor', emailed: 'Idealease', cls: 'pill yes', garage: '\u2014', fits: true },
+        { id: 'MAIL_m15_tractor', emailed: 'Idealease', cls: 'pill bad', garage: '\u2014', fits: true }], 'at ' + width);
       await p.click('tr[data-id="' + appId + '"] [data-open]');
       const more = await p.textContent('tr.issue-more');
       assert.match(more, /route 802 ·/);
@@ -153,6 +167,7 @@ async function buttonsFit(p, label) {
     }
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
+    results.push('A write-up sent to Idealease shows Idealease whole under Emailed (green once emailed, red while not) and a dash under Garage, at 1536 and 1920');
     results.push('A truck the fleet list has as Idealease can go to the lessor and says Leased from Idealease; an owned one cannot; the open write-up shows route 802, not its code');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {

@@ -520,6 +520,7 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .pill.yes { background: var(--pill-green-bg); color: var(--pill-green-ink); }
 .issues-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .issues-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
+.issues-page .pill.bad { background: var(--pill-red-bg); color: var(--pill-red-ink); }
 .issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
