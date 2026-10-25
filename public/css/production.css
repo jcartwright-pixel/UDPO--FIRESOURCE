@@ -393,4 +393,54 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .pd-bm table.pd-t th { white-space: normal; vertical-align: bottom; }
 @media (max-width: 900px) { .pd-bm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .pd-bm table.pd-t { min-width: 900px; } }
-.pd-bm table.pd-t td.w { white-space: nowrap; }
+.pd-bm table.pd-t th, .pd-bm table.pd-t td { padding: 5px 6px; }
+
+/* ---------- Production Lines: the machine menu (Joe 10/24, as the Quality screen) ---------- */
+.pd-page:not(.pd-tv) .view { overflow: hidden; }
+.pd-split { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; }
+.pd-menu { flex: 0 0 270px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.pd-menu h3 { margin: 6px 4px 0; font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ud-blue); }
+.pd-menu h3:first-child { margin-top: 0; }
+.pd-menu button, .pd-menu a { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: inherit; font-size: 16px; padding: 6px 10px; cursor: pointer; text-align: left; text-decoration: none; box-sizing: border-box; }
+.pd-menu a { font-weight: 800; color: var(--ud-blue); }
+.pd-menu button span { flex: 1; min-width: 0; }
+.pd-menu button b { display: block; font-size: 17px; font-weight: 900; color: var(--ud-blue-dark); }
+.pd-menu button small { display: block; font-size: 16px; font-weight: 700; color: var(--muted); }
+.pd-menu button small.pd-bad { color: #c62828; }
+.pd-menu button em { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #c62828; color: #fff; font-style: normal; font-weight: 900; display: grid; place-items: center; }
+.pd-menu button.on, .pd-menu a.on { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.pd-menu button.on b, .pd-menu button.on small, .pd-menu button.on small.pd-bad { color: #fff; }
+.pd-menu button.pd-all { border-width: 2px; }
+.pd-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; background: #a9b6c3; }
+.pd-dot.g { background: #1d7a3e; } .pd-dot.a { background: #e0a100; } .pd-dot.r { background: #c62828; } .pd-dot.b { background: #0b4f8a; }
+.pd-menu button.on .pd-dot { box-shadow: 0 0 0 2px #fff; }
+.pd-right { flex: 1 1 auto; min-width: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 2px; }
+.pd-right .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pd-live-h { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.pd-live-h h3 { margin: 0; }
+.pd-live-h .pd-none { flex: 1; }
+.pd-live-g { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.pd-live-c { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: #f7fafc; min-width: 0; }
+.pd-live-c span { display: block; font-size: 16px; font-weight: 700; color: var(--muted); }
+.pd-live-c b { display: block; font-size: 26px; color: var(--ud-blue-dark); }
+.pd-live-c b.pd-wait { font-size: 18px; color: #8a6d00; padding: 6px 0; }
+.pd-live-c small { display: block; font-size: 16px; color: var(--muted); }
+body.pd-tv .pd-menu { display: none; }
+body.pd-tv .pd-split, body.pd-tv .pd-right { display: block; overflow: visible; }
+body.pd-tv .pd-right .pd-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .pd-page:not(.pd-tv) .view { overflow: auto; }
+  .pd-split { flex-direction: column; flex: none; }
+  .pd-menu { flex: none; flex-direction: row; flex-wrap: wrap; }
+  .pd-menu h3 { flex: 0 0 100%; }
+  .pd-menu button, .pd-menu a { width: auto; flex: 1 1 200px; }
+  .pd-right { overflow: visible; }
+  .pd-right .pd-tiles { grid-template-columns: 1fr; }
+}
+.pd-menu > * { flex-shrink: 0; }
+.pd-menu button b .pd-sensor { font-style: normal; font-size: 16px; font-weight: 800; color: #1d6b3a; background: #e2f4ea; border-radius: 999px; padding: 0 8px; margin-left: 4px; }
+.pd-menu button.on b .pd-sensor { background: #ffffff33; color: #fff; }
+.pd-box.pd-bm { position: relative; }
+.pd-bm-links { position: absolute; top: 8px; right: 16px; display: flex; gap: 8px; }
+@media (max-width: 700px) { .pd-bm-links { position: static; margin: 0 0 8px; flex-wrap: wrap; } }
+.pd-nw { white-space: nowrap; }
