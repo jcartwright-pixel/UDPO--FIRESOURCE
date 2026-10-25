@@ -31,7 +31,11 @@ test('Truck Issues: Lessor marks a truck write-up sent to its lessor once; it is
   assert.match(twice.message, /Emailing the lessor again/);
   assert.equal(((await records()).find(r => r.record_id === truck.recordId).notes.match(/Sent to lessor/g) || []).length, 1);
   const doc = (await db().collection('maintenance').get()).docs.find(d => d.data().record_id === truck.recordId);
+  // Joe 10/25 (223877): an email sent before the blank-body fix (its time ends in Z) went out blank, so Lessor sends it again.
   await doc.ref.update({ notes: doc.data().notes + '\nRepair email sent 2026-10-09T12:00:00Z to repairs@idealease.test' });
+  const blank = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'Idealease' });
+  assert.match(blank.message, /Emailing the lessor again/);
+  await doc.ref.update({ notes: (await doc.ref.get()).data().notes + '\nRepair email sent 2026-10-26T08:00:00-04:00 to repairs@idealease.test' });
   const third = await applyAction(db(), DISPATCHER, { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'Idealease' });
   assert.match(third.message, /Already sent/);
   const after = L.issueRows(await records(), 'TRUCK')[0];

@@ -43,6 +43,11 @@ function addresses(list) {
   return out;
 }
 
+// Joe 10/25: an email sent with text only (repair emails, the access link) showed a subject and a blank body, since
+// mail programs show the HTML version and it went out empty. With no HTML given, the HTML version is the text itself.
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const textHtml = t => '<div style="font-family:Arial,sans-serif;font-size:14px;white-space:pre-wrap">' + esc(t || '').replace(/\r?\n/g, '<br>') + '</div>';
+
 // The message as Gmail takes it: text and HTML versions of the same email, both UTF-8. Joe 10/23: with attachments
 // (walkthrough pictures, [{filename, contentType, base64}]) the two versions go first and each attachment after them.
 function buildMime({ from, fromName, to, subject, text, html, boundary, attachments }) {
@@ -59,7 +64,7 @@ function buildMime({ from, fromName, to, subject, text, html, boundary, attachme
     'Content-Type: text/html; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    wrap(b64(html || '')),
+    wrap(b64(html || textHtml(text))),
     '--' + b + '--'
   ];
   const head = ['From: ' + sender, 'To: ' + to.join(', '), 'Subject: ' + headerText(subject), 'MIME-Version: 1.0'];
@@ -195,4 +200,4 @@ async function sendMail(message, deps) {
   return { id: sent.id || '', to };
 }
 
-module.exports = { sendMail, readMail, bodyText, buildMime, addresses, headerText, MailError, GMAIL_SEND, GMAIL_READ };
+module.exports = { sendMail, readMail, bodyText, buildMime, textHtml, addresses, headerText, MailError, GMAIL_SEND, GMAIL_READ };

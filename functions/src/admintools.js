@@ -41,6 +41,14 @@ const nyParts = (d) => {
     .formatToParts(d).forEach(p => { parts[p.type] = p.value; });
   return { date: parts.year + '-' + parts.month + '-' + parts.day, hour: Number(parts.hour), minute: Number(parts.minute), weekday: String(parts.weekday).toUpperCase(), mdy: Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year };
 };
+// Eastern time with its offset, as the old app wrote it (2026-10-25T15:24:17-04:00). Joe 10/25: a "Repair email sent" time
+// ending in Z was written by the app before the blank-body fix (L.repairEmailSent counts it as never sent).
+const nyIso = (d) => {
+  const n = nyParts(d), sec = String(d.getUTCSeconds()).padStart(2, '0');
+  const off = Math.round((Date.UTC(+n.date.slice(0, 4), +n.date.slice(5, 7) - 1, +n.date.slice(8, 10), n.hour, n.minute) - Math.floor(d.getTime() / 60000) * 60000) / 60000);
+  const a = Math.abs(off);
+  return n.date + 'T' + String(n.hour).padStart(2, '0') + ':' + String(n.minute).padStart(2, '0') + ':' + sec + (off < 0 ? '-' : '+') + String(Math.floor(a / 60)).padStart(2, '0') + ':' + String(a % 60).padStart(2, '0');
+};
 const writeBackOn = async (db) => { const c = (await read(db.collection(C.config).doc('app'))) || {}; return !!(c.writeBack && c.writeBack.enabled === true); };
 const DONE = ['COMPLETE', 'COMPLETED', 'CLOSED', 'RESOLVED', 'REPAIRED', 'REMOVED', 'CLEANED'];
 
@@ -81,8 +89,17 @@ function lessorOf(equipment, kind, unitText, ownership) {
 
 const unitOf = (r) => String(r.truck_number || r.trailer_number || r.unit_number || '').trim();
 const kindWord = (k) => (k === 'TRAILER' ? 'Trailer' : k === 'FORK_TRUCK' ? 'Fork Truck / Pallet Jack' : 'Truck');
+// When it was reported, as 10-24-26 2:28 PM (Joe's date style), not the stored 2026-10-24T18:28:46.000Z.
+function reportedText(v) {
+  const s = String(v || '').trim(), day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s), d = new Date(s);
+  const mdy = (y, m, dd) => Number(m) + '-' + Number(dd) + '-' + String(y).slice(2);
+  if (day) return mdy(day[1], day[2], day[3]);
+  if (!s || isNaN(d)) return s;
+  const n = nyParts(d), h = n.hour % 12 || 12;
+  return mdy(n.date.slice(0, 4), n.date.slice(5, 7), n.date.slice(8, 10)) + ' ' + h + ':' + String(n.minute).padStart(2, '0') + (n.hour < 12 ? ' AM' : ' PM');
+}
 function repairLines(r) {
-  return [kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), 'Issue: ' + String(r.issue_details || '').trim(), 'Reported: ' + String(r.opened_at || r.service_date || ''), 'Driver: ' + String(r.driver || '')];
+  return [kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), 'Issue: ' + String(r.issue_details || '').trim(), 'Reported: ' + reportedText(r.opened_at || r.service_date), 'Driver: ' + String(r.driver || '')];
 }
 function repairMessage(r, note) {
   const body = ['United Dairy Plant Operations', ''].concat(repairLines(r), ['', 'Please review this repair request.']).join('\n') + (note ? '\n\nManager note:\n' + note : '');
@@ -154,7 +171,7 @@ async function repairSweep(db, opts) {
       immediate++;
       const msg = repairMessage(r);
       const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · immediate · ' + by, by: o.by, testTo, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, o.mailDeps);
-      if (res.status === 'SENT') { out.sent++; await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + ' (automatic)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at); }
+      if (res.status === 'SENT') { out.sent++; await addNote(db, r.record_id, 'Repair email sent ' + nyIso(new Date(at)) + ' to ' + route.emails.join('; ') + ' (automatic)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at); }
       else if (res.status === 'FAILED') { out.failed++; state.retryAfter[dest.route] = new Date(now.getTime() + 3600000).toISOString(); }
       else stop = res.reason;
     }
@@ -167,7 +184,7 @@ async function repairSweep(db, opts) {
       const res = await appMail(db, { kind: 'Repair email', label: 'Daily digest', detail: ROUTE_LABEL[key] + ' · daily · ' + by, by: o.by, testTo, to: route.emails, subject: 'United Dairy repair requests - ' + ROUTE_LABEL[key] + ' (' + items.length + ') - ' + ny.mdy, text: body, fromName: 'United Dairy Plant Operations', facilityId: items[0].facility_id }, o.mailDeps);
       if (res.status === 'SENT') {
         out.digests++; out.sent += items.length; state.lastDigest[key] = ny.date;
-        for (const r of items) await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + ' (daily digest)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
+        for (const r of items) await addNote(db, r.record_id, 'Repair email sent ' + nyIso(new Date(at)) + ' to ' + route.emails.join('; ') + ' (daily digest)' + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
       } else if (res.status === 'FAILED') { out.failed++; state.retryAfter[key] = new Date(now.getTime() + 3600000).toISOString(); }
       else stop = res.reason;
     }
@@ -238,7 +255,7 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
   const msg = repairMessage(r, note);
   const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, mailDeps);
   if (res.status === 'SENT') {
-    await addNote(db, r.record_id, 'Repair email sent ' + at + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
+    await addNote(db, r.record_id, 'Repair email sent ' + nyIso(new Date(at)) + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };
   }
   return { status: res.status, message: 'Not emailed: ' + res.reason, reason: res.reason };
@@ -1174,4 +1191,4 @@ const OPS = {
   dateConvert: (db, email, input, stamp, d) => dateConvert(db, email, input, stamp, { sheets: d.sheets && d.sheets(), sources: d.sources })
 };
 
-module.exports = { OPS, repairSweep, sendOneRepair, afterSave, lessorOf, checkinRun, parseCheckinEmail, digestEntries, takenAt, pickMailRun, recreditMailCheckins, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };
+module.exports = { OPS, repairSweep, sendOneRepair, repairMessage, reportedText, nyIso, afterSave, lessorOf, checkinRun, parseCheckinEmail, digestEntries, takenAt, pickMailRun, recreditMailCheckins, jobDue, archiveCompleted, preflight, updateLive, toSerial, cellKind, sheetCatalog, JOBS, CHECKIN_STANDARD };

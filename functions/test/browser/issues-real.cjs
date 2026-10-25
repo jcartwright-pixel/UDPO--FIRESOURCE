@@ -96,7 +96,7 @@ async function buttonsFit(p, label) {
   // Joe 10/25: two write-ups sent to Idealease, one whose email went and one whose email has not.
   const sentAt = new Date(Date.now() - 1800000).toISOString();
   await db().collection('maintenance').doc('MAIL_m14_tractor').set(Object.assign(mail('m14', '223876', 'PRASTER, JEREMY', 'Tires bald', 0.2), { status: 'OPEN',
-    notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com\nRepair email sent ' + sentAt + ' to repairs@idealease.test' }));
+    notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com\nRepair email sent ' + sentAt.replace(/\.\d+Z$/, '-00:00') + ' to repairs@idealease.test' }));
   await db().collection('maintenance').doc('MAIL_m15_tractor').set(Object.assign(mail('m15', '223877', 'Chad Herman', 'Wiper blades', 0.1), { status: 'OPEN',
     notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com' }));
   const browser = await chromium.launch();
