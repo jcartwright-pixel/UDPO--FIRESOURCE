@@ -1,0 +1,19 @@
+/* menu-setup.html (Joe 10/25, mock-up 7): each plant puts its plant sides' menus in its own order. */
+.ms-view { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 12px; overflow: auto; min-height: 0; flex: 1; }
+.ms-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.ms-card { background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; overflow: hidden; }
+.ms-card h2 { margin: 0; padding: 10px 14px; font-size: 18px; color: var(--ud-blue-dark); border-bottom: 1px solid var(--line); }
+.ms-item { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 8px 14px; border-bottom: 1px solid #e3eaf1; font-size: 16px; }
+.ms-item:last-child { border-bottom: 0; }
+.ms-item b { display: block; color: var(--ud-blue-dark); }
+.ms-item small { display: block; color: var(--muted); font-size: 16px; }
+.ms-item.fixed { background: var(--band); }
+.ms-tools { display: flex; gap: 6px; align-items: center; position: static; }
+.ms-tools button { width: 44px !important; min-width: 44px; flex: none; position: static; }
+.ms-tools select { width: auto !important; flex: 1; max-width: 260px; position: static; }
+.ms-tools button, .ms-btn { font: inherit; font-weight: 700; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); cursor: pointer; }
+.ms-tools button:disabled { opacity: .35; cursor: default; }
+.ms-tools select, .ms-pick { font: inherit; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 8px; }
+.ms-pick { font-weight: 700; color: var(--ud-blue-dark); min-height: 40px; }
+.ms-btn.armed { background: #b3261e; border-color: #b3261e; color: #fff; }
+.menu-setup-page .foot { color: var(--muted); font-size: 16px; }

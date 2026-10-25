@@ -82,7 +82,8 @@ export const MENU = [
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
   // Joe 10/11: production first, then shift notes and quality, then temperatures and yard (as the Manager Center cards).
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
-  ['Plant Operations Scheduler', [['Plant Operations Scheduler', 'scheduler.html', 'week']]],
+  // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
+  ['Plant Distribution Scheduler', [['Plant Distribution Scheduler', 'scheduler.html', 'week']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
@@ -100,7 +101,10 @@ export const MENU = [
   // the PM schedule and the mechanics' tablet.
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
-  ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]]
+  ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
+  // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
+  ['Plant Schedule & Vacations', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
+  ['Maintenance Schedule', [['Schedule Board', 'maint-crew.html', 'week'], ['Vacations', 'maint-crew.html?view=vacations', 'vacation'], ['Setup', 'maint-crew.html?view=setup', 'gear']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
 // lists only that side's screens. A screen listed on two sides stays on the side it was opened from.
@@ -108,10 +112,12 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 // Joe 10/12: the plant side is Plant Distribution (it was Plant Operations, which covers all three plant sides).
 export const SIDES = [
-  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'] },
+  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Plant Distribution Scheduler', 'Shift Notes', 'Yard Checks'] },
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
-  { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines'], building: true, bannerInPic: true },
-  { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance'], building: true, bannerInPic: true },
+  { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
+  // Joe 10/25 (mock-up 1): Plant Schedule & Vacations sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
+  { key: 'crew', menuOnly: true, short: 'Plant Schedule', name: 'Plant Schedule & Vacations', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Schedule & Vacations'], flatFirst: true },
+  { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
@@ -122,6 +128,22 @@ export const SIDES = [
   { key: 'inventory', name: 'Inventory', home: 'inventory.html', pic: 'box-v1.webp', note: 'Receiving scan-in: every case and pallet scanned in, by lot', sections: ['Inventory'], building: true }
 ];
 const pageOf = (href) => String(href).split(/[?#]/)[0];
+// Joe 10/25 (mock-up 7): each plant's own menu order from Administration > Menu Setup (logic.js menuArrange), kept on this
+// computer so the menu draws at once; it is read again after sign-in and a change shows on the next screen opened.
+// baseSections is where the app puts each section, which decides what is Under Construction wherever a plant moves it.
+SIDES.forEach(s => { s.baseSections = s.sections.slice(); });
+const menuKey = (plant) => 'udMenu_' + plant;
+export function keepMenuSetup(plant, sides) {
+  try { if (sides) localStorage.setItem(menuKey(plant), JSON.stringify(sides)); else localStorage.removeItem(menuKey(plant)); } catch (e) { /* no storage */ }
+}
+function useMenuSetup() {
+  const L = window.UDLogic;
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(menuKey(currentPlant())) || 'null'); } catch (e) { /* no storage */ }
+  if (!L || !L.menuArrange || !saved) return;
+  const got = L.menuArrange(saved);
+  SIDES.forEach(s => { if (got[s.key]) s.sections = got[s.key]; });
+}
 // Pages opened from inside a side (not from its menu) that still belong to it, e.g. Plant Reports from a bookmark or the TV.
 // Joe 10/19: the Late Forecast opens from its tile on Manager Center.
 const SIDE_PAGES = { plant: ['forecast.html'] };
@@ -131,7 +153,10 @@ const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || [
 // Joe 10/11: a module Under Construction (building: true) opens only for Administrators, so Joe can watch it being built;
 // everyone else sees its card with the banner but cannot open it. requireSignIn refuses every screen of such a module to
 // anyone else, so a bookmark or typed address is refused too, not just the card. Any new module marked building uses this.
-export const buildingSideFor = (page) => SIDES.find(s => s.building && sideHas(s, page)) || null;
+// Joe 10/25: Quality Checks, Cooler Temperature and Shift Notes moved into Plant Production (and Shift Notes into Plant Maintenance
+// too) stay open to everyone while those sides are being built (openSections).
+const builtHas = (side, page) => sideHas(Object.assign({}, side, { sections: side.baseSections.filter(g => (side.openSections || []).indexOf(g) < 0) }), page);
+export const buildingSideFor = (page) => SIDES.find(s => s.building && builtHas(s, page)) || null;
 export const mayOpenBuilding = (person) => !!(person && window.UDLogic && window.UDLogic.isAdmin(person));
 function refuseBuilding(side) {
   if (document.getElementById('uc-refused')) return;
@@ -302,14 +327,21 @@ function addSideMenu() {
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
   // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
-  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Operations Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
+  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Distribution Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
       '>' + svg(icon) + '<span>' + label + '</span>' + '</a>';
   };
   const headed = (it) => (it[3] ? '<div class="side-group">' + it[3] + '</div>' : '') + link(it);
-  const side = sideFor(here), groups = side ? MENU.filter(([g]) => side.sections.indexOf(g) >= 0) : [];
+  // A side's sections in its own order. Joe 10/25: Plant Production and Plant Maintenance keep their own screens straight in the
+  // menu (the first section, flatFirst) with the sections moved in (Quality Checks, Cooler Temperature, Shift Notes, Maintenance
+  // Schedule) under them.
+  const side = sideFor(here), groups = side ? side.sections.map(g => MENU.find(([m]) => m === g)).filter(Boolean) : [];
+  const section = ([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
+      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
+      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
+      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(headed).join('') + '</div></div>';
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
   // lists only the plants; each plant opens its Plant Distribution, Route Distribution and Fleet & Maintenance beside it.
   // A plant's home lists its three sides; a side shows its name (back to its first page), then only its own sections.
@@ -327,10 +359,7 @@ function addSideMenu() {
   const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sep(s) + sideLink(s)).join('') :
     sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (isHome(side, here) ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
-    (groups.length === 1 ? groups[0][1].filter(([, href]) => href !== side.home).map(headed).join('') : groups.map(([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
-      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
-      svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
-      '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(headed).join('') + '</div></div>').join(''));
+    (groups.length === 1 || (side && side.flatFirst) ? groups[0][1].filter(([, href]) => href !== side.home).map(headed).join('') + groups.slice(1).map(section).join('') : groups.map(section).join(''));
   // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
   nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
   showVersion();
@@ -426,13 +455,14 @@ function addSideMenu() {
     location.reload();
   }));
 }
+useMenuSetup();
 addSideMenu();
 // The header's second line names the side the screen is on (just United Dairy above the sides).
 (function headerSide() {
   const small = document.querySelector('#screen > .topbar .brand small');
   if (!small || !document.body.classList.contains('has-side')) return;
   const side = sideFor(location.pathname.split('/').pop() || 'index.html');
-  small.innerHTML = 'UNITED DAIRY' + (side ? ' &middot; ' + side.name.toUpperCase() : '');
+  small.innerHTML = 'UNITED DAIRY' + (side ? ' &middot; ' + (side.key === 'crew' ? side.short : side.name).toUpperCase() : '');
 })();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
    filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and
@@ -896,6 +926,7 @@ export async function requireSignIn(ready) {
     // the server still refuses saves on a screen not ticked.
     const ticks = await getDoc(doc(db, 'personRights', email)).then(d => (d.exists() && d.data().screenAccess) || null).catch(() => undefined);
     noteAccess(Object.assign({ email }, entry.data()), ticks);
+    { const plant = currentPlant(); getDoc(doc(db, 'menuSetup', plant)).then(d => keepMenuSetup(plant, d.exists() ? d.data().sides || null : null)).catch(() => {}); }
     if (!mayOpenPage(here)) {
       gate.hidden = true;
       screen.hidden = false;

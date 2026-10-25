@@ -1,0 +1,67 @@
+/* crew.html and maint-crew.html (Joe 10/25, mock-ups 1 and 3): Schedule Board, Vacations and Setup. */
+.crew-view { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 10px; min-height: 0; flex: 1; }
+.crew-page .head .title small { display: block; color: var(--muted); font-size: 16px; }
+.crew-page .stepper input { width: 160px; }
+.crew-page .sheet.scroll-list { flex: 1; min-height: 0; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.crew-page table { width: 100%; border-collapse: collapse; }
+.crew-page thead th { position: sticky; top: 0; z-index: 2; }
+.crew-page td { border-bottom: 1px solid #e3eaf1; padding: 6px 8px; text-align: center; font-size: 16px; }
+.crew-page td.left, .crew-page th.left { text-align: left; }
+.crew-page td.empty { color: var(--muted); padding: 16px; text-align: left; }
+.crew-page p.empty { color: var(--muted); margin: 12px 0; }
+.crew-page tr.group td { background: var(--band); color: var(--ud-blue); font-weight: 900; text-transform: uppercase; letter-spacing: .04em; text-align: center; }
+.crew-board col.who { width: 19%; }
+.crew-board td { border-right: 1px solid #e3eaf1; }
+.crew-board td.left small { display: block; color: var(--muted); font-weight: 600; font-size: 16px; }
+.crew-board th.today { background: var(--ud-blue-dark); box-shadow: inset 0 -4px 0 var(--ud-gold); }
+.crew-board td.pick { cursor: pointer; }
+.crew-board td.pick:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
+.crew-board td.changed { box-shadow: inset 4px 0 0 var(--ud-blue); }
+.crew-board td.c-edit select { width: 100%; font: inherit; min-height: 34px; }
+.crew-board tr.open-row td { color: #b3261e; font-weight: 800; background: #fff6f5; }
+.c-off { background: #ffe2bd; color: #7a3f00; }
+.c-vac { background: #e4d8fb; color: #4b2a91; }
+.c-relief { background: #fff4cc; color: #7a5600; }
+.crew-legend { display: flex; gap: 10px; flex-wrap: wrap; }
+.crew-legend span { border-radius: 999px; padding: 2px 12px; font-size: 16px; font-weight: 800; }
+.crew-legend .open-key { background: #fff6f5; color: #b3261e; }
+.crew-legend .changed-key { background: #fff; box-shadow: inset 4px 0 0 var(--ud-blue); border: 1px solid var(--line); }
+.crew-type { display: inline-block; border-radius: 999px; padding: 1px 10px; background: #dcecff; color: #0b4f8a; font-size: 16px; }
+.crew-pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 16px; font-weight: 800; }
+.crew-pill.approved { background: #e7f6ec; color: #1d7a3e; }
+.crew-pill.pending { background: #fff1dc; color: #a35b00; }
+.crew-pill.denied, .crew-pill.cancelled { background: #e6e9ee; color: #3b4652; }
+.crew-page button.link { border: 1px solid var(--line); background: #fff; color: var(--ud-blue); border-radius: 6px; padding: 2px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.crew-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; align-items: end; background: #fff; border: 1px solid var(--line); border-top: 5px solid var(--ud-blue); border-radius: 10px; padding: 10px 12px; }
+.crew-form label { display: grid; gap: 4px; font-size: 16px; color: var(--muted); font-weight: 700; }
+.crew-form :is(input, select) { font: inherit; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; }
+.crew-form .form-buttons { display: flex; gap: 6px; }
+.crew-form .form-buttons button { min-height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.crew-form .form-buttons button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.crew-setup :is(input:not([type=checkbox]), select) { font: inherit; min-height: 34px; border: 1px solid var(--line); border-radius: 7px; padding: 0 6px; max-width: 100%; }
+.crew-setup td.left input { width: 100%; min-width: 160px; }
+.crew-setup input.num { width: 70px; text-align: center; }
+.crew-setup input.short { width: 120px; }
+.crew-setup input[type=time] { width: 130px; }
+.crew-days { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.crew-days label { display: inline-flex; align-items: center; gap: 2px; font-size: 16px; font-weight: 700; }
+.crew-limits { display: grid; gap: 14px; padding: 16px; max-width: 900px; }
+.crew-limits label { display: flex; justify-content: space-between; gap: 16px; align-items: center; font-weight: 700; }
+.crew-limits input { width: 90px; font: inherit; min-height: 36px; text-align: center; border: 1px solid var(--line); border-radius: 8px; }
+.crew-starter { background: var(--test-bg); color: var(--test-ink); border-radius: 10px; padding: 8px 12px; font-weight: 700; }
+.crew-starter button { font: inherit; font-weight: 800; border: 1px solid var(--test-ink); background: #fff; color: var(--test-ink); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
+.crew-page .foot { color: var(--muted); font-size: 16px; }
+@media (max-width: 1100px) { .crew-form { grid-template-columns: 1fr 1fr; } .crew-board col.who { width: 28%; } }
+@media print { .crew-page .crew-legend, .crew-page .foot { display: none; } .crew-page .sheet.scroll-list { overflow: visible; border: 0; } }
+.crew-page .head select.crew-pick { font: inherit; font-weight: 700; color: var(--ud-blue-dark); min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 10px; }
+.crew-board td.c-edit select { min-width: 170px; }
+.crew-page .head .tabs button { width: auto !important; white-space: nowrap; }
+.crew-form label:first-child { grid-column: span 2; }
+.crew-form .form-buttons { align-self: end; }
+.crew-setup td { white-space: nowrap; }
+.crew-days { flex-wrap: nowrap; gap: 8px; }
+.crew-board table { min-width: 980px; }
+.crew-board td.left { position: sticky; left: 0; z-index: 1; background: #fff; }
+.crew-board th.left { position: sticky; left: 0; z-index: 3; }
+.crew-board tr.open-row td.left { background: #fff6f5; }
+.crew-page table { table-layout: auto; }

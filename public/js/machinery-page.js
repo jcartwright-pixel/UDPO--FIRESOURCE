@@ -1,0 +1,134 @@
+import { start, requireSignIn, save, escapeHtml, shortDate, showError, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './app.js';
+import { doc, onSnapshot } from './firebase.js';
+import { watchMaint, plantFor } from './pmaint.js';
+
+// Machinery (Joe 10/12, mock-up C): every machine of the plant, its production lines first coming in by themselves, and
+// + Add Machine for the rest. Click one to see its boxes (each saves when it is left), its PM schedule and its history:
+// the breakdowns the plant sent, the work orders and the PMs done.
+// Equipment (Joe 10/25): the same page for the other things maintenance looks after (refrigeration, boilers, compressors, the
+// building), on its own list; plant-equipment.html says so with data-list="equipment".
+const L = window.UDLogic, R = window.UDPlantMaint;
+const EQ = document.body.dataset.list === 'equipment';
+const W = EQ ? { one: 'equipment', list: 'equipment list', add: '+ Add Equipment', kinds: R.EQUIP_KINDS, group: 'EQUIPMENT' } : { one: 'machine', list: 'machinery list', add: '+ Add Machine', kinds: R.KINDS, group: 'MACHINERY' };
+const mine = (list) => (list || []).filter(m => (m.group === 'EQUIPMENT') === EQ);
+const params = new URLSearchParams(location.search);
+let plant = params.get('plant') || '', chosen = params.get('machine') || '', area = '', person = null, app = {}, data = null, db = null, stop = null, adding = false, note = '', noteClass = '';
+let busy = Promise.resolve();
+const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
+const opt = (v, cur, label) => optionTag(v, cur, label);
+const day = (k) => (/^\d{4}-\d\d-\d\d/.test(String(k || '')) ? shortDate(String(k).slice(0, 10)) : '');
+const when = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(t) : ''; };
+const setUrl = () => history.replaceState(null, '', '?plant=' + encodeURIComponent(plant) + (chosen ? '&machine=' + encodeURIComponent(chosen) : ''));
+const machine = () => (data ? data.all.find(m => m.id === chosen) : null);
+const status = (m) => m.status === 'RETIRED' ? ['Retired', 'gray'] : m.down ? ['Down', 'red'] : m.parts ? ['Waiting on parts', 'amber'] : m.open ? ['Open work order', 'blue'] : ['In service', 'green'];
+const nextPm = (m) => !m.nextPm ? '' : m.nextPm.state === 'LATE' ? '<span class="pm-late">' + m.nextPm.late + ' day' + (m.nextPm.late === 1 ? '' : 's') + ' late</span>' : day(m.nextPm.due);
+
+function drawTop() {
+  const pl = plantFor(person, plant);
+  if (plant !== pl.id) { plant = pl.id; const u = new URL(location.href); u.searchParams.set('plant', plant); history.replaceState(null, '', u); }
+  document.getElementById('plant-name').textContent = pl.name;
+  const areas = data ? [...new Set(mine(data.machines).map(m => m.area).filter(Boolean))].sort() : [];
+  if (area && areas.indexOf(area) < 0) area = '';
+  document.getElementById('area').innerHTML = opt('', area, 'All Areas') + areas.map(a => opt(a, area, a)).join('') + opt('-', area, 'No area yet');
+  document.getElementById('add').disabled = !canSave();
+  const st = L.screenState(app, 'plant');
+  goLiveNote(st.live && st.owner !== 'new');
+  document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
+}
+
+function drawList() {
+  const list = (data ? mine(data.machines) : []).filter(m => !area || (area === '-' ? !m.area : m.area === area));
+  document.getElementById('rows').innerHTML = list.map(m => {
+    const s = status(m);
+    return '<tr class="pick' + (m.id === chosen && !adding ? ' on' : '') + '" data-id="' + escapeHtml(m.id) + '"><td>' + escapeHtml(m.area || '') + '</td><td><b>' + escapeHtml(m.name) + '</b></td>' +
+      '<td>' + escapeHtml([m.make, m.model].filter(Boolean).join(' ')) + '</td><td class="nowrap"><span class="pm-pill ' + s[1] + '">' + s[0] + '</span></td>' +
+      '<td class="num">' + (m.open || '') + '</td><td class="nowrap">' + nextPm(m) + '</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">' + (!data || !data.read.setup ? 'Reading the ' + W.list + '…' : EQ ? 'No equipment yet. + Add Equipment puts the first one on the list.' : 'No machines yet. + Add Machine puts one on the list.') + '</td></tr>';
+}
+
+// The machine picked (or a new one being added): its boxes, its PM schedule and its history.
+function drawCard(force) {
+  const card = document.getElementById('card');
+  if (force !== true && card.contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
+  const ck = canSave(), dis = ck ? '' : ' disabled', m = adding ? null : machine();
+  if (!adding && !m) { card.innerHTML = '<p class="pm-muted">Pick ' + (EQ ? 'something' : 'a machine') + ' on the list to see its details, its PM schedule and its history.</p>'; return; }
+  const v = (k) => escapeHtml(m ? m[k] || '' : '');
+  const box = (k, label, extra) => '<label' + (k === 'notes' ? ' class="wide"' : '') + '>' + label + (k === 'notes' ? '<textarea data-k="notes" maxlength="500"' + dis + '>' + v('notes') + '</textarea>' : '<input data-k="' + k + '" value="' + v(k) + '"' + (extra || '') + dis + '>') + '</label>';
+  const areas = data ? [...new Set(mine(data.all).map(x => x.area).filter(Boolean))].sort() : [];
+  const s = m ? status(m) : null;
+  let html = '<div class="mach-title"><h2>' + (m ? escapeHtml(m.name) : EQ ? 'New equipment' : 'New machine') + '</h2>' + (s ? '<span class="pm-pill ' + s[1] + '">' + s[0] + '</span>' : '') +
+    '<span class="mach-saved ' + noteClass + '" id="saved">' + escapeHtml(note) + '</span></div>' +
+    '<div class="mach-from">' + (m ? (m.line ? 'From your Production Lines list' : EQ ? 'Added on Equipment' : 'Added on Machinery') + (ck ? ' · every box saves when you leave it' : ' · view only') : 'Type its name and leave the box to add it; then fill in the rest.') + '</div>' +
+    '<div class="mach-fields">' +
+    (m && m.line ? '<label>Name<input value="' + v('name') + '" disabled title="A production line\'s name comes from Plant Operations"></label>' : box('name', 'Name', ' maxlength="60"' + (m ? '' : ' autofocus'))) +
+    '<label>Kind<select data-k="kind"' + dis + '>' + (m ? '' : opt('', '', '')) + W.kinds.concat(m && m.kind && W.kinds.indexOf(m.kind) < 0 ? [m.kind] : []).map(k => opt(k, m ? m.kind : '', k)).join('') + '</select></label>' +
+    box('area', 'Area', ' maxlength="60" list="area-list"') + box('make', 'Make', ' maxlength="60"') + box('model', 'Model', ' maxlength="60"') + box('serial', 'Serial number', ' maxlength="60"') +
+    box('installed', 'Installed', ' type="date"') + box('location', 'Location', ' maxlength="80"') +
+    (m ? '<label>In service<select data-status="1"' + dis + '>' + opt('ACTIVE', m.status, 'In service') + opt('RETIRED', m.status, 'Retired (kept on file)') + '</select></label>' : '<label></label>') +
+    box('notes', 'Notes') + '</div><datalist id="area-list">' + areas.map(a => '<option value="' + escapeHtml(a) + '">').join('') + '</datalist>';
+  if (m) {
+    const tasks = data.tasks.filter(t => t.machineId === m.id);
+    html += '<h3>PM schedule <small>' + (tasks.length ? '' : 'none yet · add them on PM Schedule') + '</small><a class="pm-btn" style="margin-left:auto" href="pmschedule.html?plant=' + encodeURIComponent(plant) + '&machine=' + encodeURIComponent(m.id) + '">PM Schedule</a></h3>' +
+      (tasks.length ? '<table class="pm-table"><thead><tr><th>Task</th><th>How often</th><th>Last done</th><th>Next due</th></tr></thead><tbody>' + tasks.map(t => '<tr><td>' + escapeHtml(t.task) + '</td><td class="nowrap">' + escapeHtml(R.everyText(t.every, t.unit)) + '</td><td class="nowrap">' + day(t.lastDone) + '</td><td class="nowrap">' +
+        (t.state === 'LATE' ? '<span class="pm-pill red">' + day(t.due) + ' late</span>' : day(t.due)) + '</td></tr>').join('') + '</tbody></table>' : '');
+    // History: breakdowns recorded on Shift Notes, requests, work orders and PMs, newest first.
+    const hm = (n) => hoursMinutesText(n, { unit: 'm', short: 'min' });
+    const hist = data.breakdowns.filter(b => b.machineId === m.id).map(b => ({ at: b.recordedAt, from: 'Breakdown', what: b.entry + (b.fix ? ' · fix: ' + b.fix : ''), who: b.stillDown ? 'still down' + (b.down !== null ? ' · ' + hm(b.down) : '') : (b.down !== null ? hm(b.down) + ' down' : 'recorded') }))
+      .concat(data.requests.filter(r => r.machineId === m.id && !r.workOrder).map(r => ({ at: r.recordedAt, from: 'Request', what: r.entry, who: r.status === 'RESOLVED' ? 'fixed' : 'waiting' })))
+      .concat(data.workOrders.filter(w => w.machineId === m.id).map(w => ({ at: w.createdAt, from: w.source === 'PM' ? 'PM' : w.source === 'SHIFT_NOTES' ? 'Request' : 'Work order', what: (w.problem || '') + (w.fixedNote ? ' · fixed: ' + w.fixedNote : ''), who: (w.woNumber || '') + ' · ' + R.statusWord(w.status) })))
+      .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const downMonth = data.breakdowns.filter(b => b.machineId === m.id && String(b.recordedAt) >= new Date(Date.now() - 30 * 86400000).toISOString()).reduce((n, b) => n + (b.down || 0), 0);
+    html += '<h3>History <small>breakdowns, requests, work orders and PMs' + (downMonth ? ' · down ' + hm(downMonth) + ' in the last 30 days' : '') + '</small></h3>' + (hist.length ? '<table class="pm-table"><thead><tr><th>Date</th><th>From</th><th>What</th><th>Work order / time down</th></tr></thead><tbody>' + hist.map(h =>
+      '<tr><td class="nowrap">' + when(h.at) + '</td><td class="nowrap">' + h.from + '</td><td>' + escapeHtml(h.what) + '</td><td class="nowrap">' + escapeHtml(h.who) + '</td></tr>').join('') + '</tbody></table>' : '<p class="pm-muted">Nothing yet. Breakdowns recorded on Shift Notes, requests and every work order on this ' + W.one + ' show here.</p>');
+  }
+  card.innerHTML = html;
+  if (!m) { const n = card.querySelector('[data-k="name"]'); if (n) n.focus(); }
+}
+function render(force) { drawTop(); drawList(); drawCard(force); document.getElementById('foot').textContent = (canSave() ? 'Each box saves when you leave it. ' : 'View only: a manager or administrator changes the ' + W.list + '. ') + (EQ ? 'Equipment is what maintenance looks after besides the production machines; work orders and PMs work the same as on Machinery.' : 'Production lines come from Plant Operations; every other machine is added here. A machine is Down while a work order says its line is down.'); }
+
+function saving(text, cls) { note = text; noteClass = cls || ''; const s = document.getElementById('saved'); if (s) { s.textContent = text; s.className = 'mach-saved ' + noteClass; } }
+function send(fields) {
+  const m = adding ? null : machine();
+  saving('');
+  const run = busy.then(() => save('saveMachine', Object.assign({ facilityId: plant }, m ? { machineId: m.id } : { group: W.group }, fields)));
+  busy = run.catch(() => {});
+  return run.then(done => {
+    showError('');
+    if (adding && done && done.machineId) { adding = false; chosen = done.machineId; setUrl(); }
+    saving('');
+    render(true);
+  }, err => { saving('Not saved', 'bad'); showError((m ? m.name : EQ ? 'The new equipment' : 'The new machine') + ' was not saved (' + (err.message || err) + '). Change the box again to retry.'); render(true); });
+}
+document.getElementById('card').addEventListener('change', e => {
+  if (!canSave()) return;
+  const t = e.target;
+  if (t.matches('[data-status]')) return send({ status: t.value });
+  const k = t.dataset.k;
+  if (!k) return;
+  if (adding) {
+    // A new machine is made once it has a name; the boxes filled in before that go with it.
+    const fields = {};
+    document.querySelectorAll('#card [data-k]').forEach(b => { if (b.value.trim()) fields[b.dataset.k] = b.value.trim(); });
+    if (!fields.name) return;
+    return send({ fields });
+  }
+  send({ fields: { [k]: t.value.trim() } });
+});
+document.getElementById('card').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
+document.getElementById('rows').addEventListener('click', e => { const r = e.target.closest('[data-id]'); if (!r) return; adding = false; chosen = r.dataset.id; note = ''; setUrl(); render(true); });
+document.getElementById('add').addEventListener('click', () => { if (!canSave()) return; adding = true; note = ''; render(true); });
+document.getElementById('area').addEventListener('change', e => { area = e.target.value; render(); });
+window.udBack = () => { if (adding) { adding = false; render(true); return true; } return false; };
+
+function follow() {
+  if (stop) stop();
+  data = null;
+  render(true);
+  stop = watchMaint(db, plant, d => { data = d; if (!chosen && mine(d.machines).length && !adding) { chosen = mine(d.machines)[0].id; setUrl(); } render(); },
+    e => showError('Could not read the ' + W.list + ' (' + e.message + '). Check the network and reload the page.'));
+}
+requireSignIn(async (user) => {
+  ({ db } = await start());
+  watchPerson(db, user, p => { person = p; drawTop(); if (!stop) follow(); else render(true); }, { withEmail: true });
+  onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; if (data) render(true); });
+});

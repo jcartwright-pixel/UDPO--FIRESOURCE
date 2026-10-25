@@ -575,7 +575,7 @@ table.day-table td { height: 42px; padding: 3px 5px; }
 
 /* Side menu (Joe 10/9): only the sections; each opens a fly-out with its screens on hover or tap. */
 .sidemenu { --side: 200px; }
-.sidemenu .side-sec-btn { display: flex; align-items: center; gap: 12px; margin: 0 8px; width: calc(100% - 16px); padding: 11px 10px; border: 0; border-radius: 9px; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; text-align: left; white-space: nowrap; }
+.sidemenu .side-sec-btn { display: flex; align-items: center; gap: 12px; margin: 0 8px; width: calc(100% - 16px); padding: 11px 10px; border: 0; border-radius: 9px; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; text-align: left; white-space: normal; line-height: 1.15; }
 .sidemenu .side-sec-btn svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .sidemenu .side-sec-btn span { flex: 1; }
 .sidemenu .side-sec-btn i { font-style: normal; font-size: 16px; opacity: .7; }
