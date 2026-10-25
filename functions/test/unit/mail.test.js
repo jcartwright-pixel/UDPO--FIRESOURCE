@@ -32,6 +32,14 @@ test('the email: text and HTML versions, UTF-8 subject, no header injection, add
   assert.deepEqual(M.addresses('A@UnitedDairy.com, bad, a@uniteddairy.com; c@uniteddairy.com x<y>@z.com'), ['a@uniteddairy.com', 'c@uniteddairy.com']);
 });
 
+test('an email with text only still has a body in its HTML version (Joe 10/25: 877 came with a blank body)', () => {
+  const mime = M.buildMime({ from: 'joe@uniteddairy.com', to: ['a@idealease.com'], subject: 'United Dairy Truck Repair Request - 223877',
+    text: 'United Dairy Plant Operations\n\nTruck 223877\nIssue: Brake <light> & horn', boundary: 'B' });
+  const html = part(mime, 'text/html');
+  assert.match(html, /United Dairy Plant Operations<br><br>Truck 223877<br>Issue: Brake &lt;light&gt; &amp; horn/);
+  assert.equal(part(mime, 'text/plain'), 'United Dairy Plant Operations\n\nTruck 223877\nIssue: Brake <light> & horn');
+});
+
 test('sendMail: signs as the server account for the sender, gets a Gmail token, sends', async () => {
   const fetch = fakeFetch([{ status: 200, body: { access_token: 'tok' } }, { status: 200, body: { id: 'g1' } }]);
   signer.signed = [];

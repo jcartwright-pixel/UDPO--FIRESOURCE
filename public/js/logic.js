@@ -262,12 +262,19 @@
     var said = issueText(done).split('; ').map(key).filter(Boolean), want = issueText(texts).split('; ').map(key).filter(Boolean);
     return said.length > 0 && want.every(function (k) { return said.some(function (d) { return d.indexOf(k) >= 0 || k.indexOf(d) >= 0; }); });
   }
+  // Joe 10/25 (223877): the new app's repair emails went out with a blank body until 6.62. Those wrote their sent time in UTC
+  // (ending in Z); the fixed app and the old app write Eastern time (-04:00), so a Z time counts as not sent (Lessor sends it again).
+  function repairEmailSent(notes) {
+    var re = /Repair email sent (\S+) to ([^\n(]*)/g, m, last = null;
+    while ((m = re.exec(String(notes || '')))) last = m;
+    return last && !/Z$/.test(last[1]) ? last : null;
+  }
   function issueRows(records, kind, nowMs) {
     var DAY = 86400000;
     var copies = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
       var notes = String(r.notes || ''), status = String(r.status || 'OPEN').trim().toUpperCase();
       var unit = String(r.truck_number || r.trailer_number || r.unit_number || '').trim(), text = String(r.issue_details || '').trim();
-      var sent = /Repair email sent (\S+) to ([^\n(]*)/.exec(notes), garageAt = garageSent(notes) ? notes.lastIndexOf('Sent to garage') : -1;
+      var sent = repairEmailSent(notes), garageAt = garageSent(notes) ? notes.lastIndexOf('Sent to garage') : -1;
       var garage = garageAt >= 0 ? /^ (\S+) by ([^\n]*)/.exec(notes.slice(garageAt + 'Sent to garage'.length)) : null;
       var reviewed = /Reviewed by (\S+) at (\S+)/.exec(notes), lessor = /Sent to lessor (.*?) ?(\d{4}-\d\d-\d\dT\S+) by ([^\n]*)/.exec(notes);
       // A write-up the new app's reader made later from an older email (10/15) is dated the day the email was for, not the day it was read.
@@ -277,7 +284,7 @@
       return { id: r.id || r.record_id, recordId: r.record_id, report: issueReportKey(r), unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
         reported: reported, openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
-        emailed: !!sent, emailedAt: sent ? sent[1] : '', atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
+        emailed: !!sent, emailedAt: sent ? sent[1] : '', emailBlank: !sent && /Repair email sent \S+ to/.test(notes), atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
         toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
         done: ISSUE_DONE.test(status), occurrences: 1,
         // Where it came from, for the View link: the answering-service email (its message id opens the stored copy in mailCopies)
@@ -1529,7 +1536,7 @@
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
