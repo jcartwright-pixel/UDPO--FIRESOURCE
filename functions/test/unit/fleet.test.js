@@ -68,10 +68,10 @@ test('Driver Scorecard logic: the screen and the server load the same file; a mi
   assert.equal(fs.readFileSync(path.join(__dirname, '../../src/sc-core.js'), 'utf8'), fs.readFileSync(path.join(__dirname, '../../../public/js/sc-core.js'), 'utf8'));
   const S = require('../../src/sc-core');
   const s = S.scSettings_({ countFrom: '2026-01-01' });
-  const days = S.scBuildDay_('2026-10-05', [{ runId: 'r1', route: '855', run: 'SAL', runs: 'TRUE', driver: 'ADAMS, PAT', driverId: 'd1', casesOut: 500, plantCaseReturn: 392 }], [], {});
+  const days = S.scBuildDay_('2026-10-05', [{ runId: 'r1', route: '855', run: 'SAL', runs: 'TRUE', driver: 'ADAMS, PAT', driverId: 'd1', casesOut: 500, plantCaseReturn: 497 }], [], {});
   const rows = S.scScoreMonth_(days, [], s, { D1: 'ADAMS, PAT' });
-  // Joe 10/13: a missed check-in costs 4. Joe 10/25: 108 cases short is 2 x 54, so 2. Joe 10/16: attendance earns nothing for a clean day (score 100).
-  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points, rows[0].areas.attendance.points, rows[0].areas.attendance.score], [-4, -2, 0, 100], 'check-in 4 points, 108 cases short 2 points');
+  // Joe 10/13: a missed check-in costs 4 and 3 lost cases 3. Joe 10/16: attendance earns nothing for a clean day (score 100).
+  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points, rows[0].areas.attendance.points, rows[0].areas.attendance.score], [-4, -3, 0, 100], 'check-in 4 points, 3 lost cases 3 points');
   assert.equal(rows[0].driver, 'ADAMS, PAT');
 });
 

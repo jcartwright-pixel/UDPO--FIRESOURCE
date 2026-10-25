@@ -110,26 +110,26 @@ test('weeks run Sunday to Saturday; the year adds up GPS counts', () => {
 });
 
 test('no GPS at all leaves the old scoring exactly as it was', () => {
-  const days = S.scBuildDay_('2026-10-05', [run({ casesOut: 500, plantCaseReturn: 392, truck: '' })], [], {});
+  const days = S.scBuildDay_('2026-10-05', [run({ casesOut: 500, plantCaseReturn: 497, truck: '' })], [], {});
   const rows = S.scScoreMonth_(days, [], S.scSettings_({ countFrom: '2026-01-01' }), {});
-  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points], [-4, -2], 'Joe 10/25: 108 short is 2 x 54');
+  assert.deepEqual([rows[0].areas.checkin.points, rows[0].areas.cases.points], [-4, -3]);
   assert.equal(rows[0].areas.speeding.score, null, 'no GPS that day: driving is not graded');
   assert.equal(rows[0].speeding, 0);
   assert.equal(rows[0].mpg, null);
 });
 
 test('Joe 10/13: one grade per area and the overall score; each area is 100 less what it cost', () => {
-  const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 392 })], [dvir('855', 'SAL')], {});
+  const days = S.scBuildDay_(DAY, [run({ casesOut: 500, plantCaseReturn: 497 })], [dvir('855', 'SAL')], {});
   const m = S.scMatchGps_(DAY, days, [], [{ tag: '223893', at: '2026-10-14T12:00:00Z', type: 'SPEEDING' }, { tag: '223893', at: '2026-10-14T13:00:00Z', type: 'HARSH_ACCEL' }]);
   const r = S.scScoreMonth_(m.records, [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0];
   assert.deepEqual(S.SC_CORE.AREAS.map(a => a[0]), ['checkin', 'cases', 'inspection', 'attendance', 'speeding', 'hardStops', 'idling', 'seatbelt', 'fuel', 'time', 'cleanliness', 'accidents', 'complaints', 'pda']);
   assert.deepEqual(Object.fromEntries(Object.entries(r.areas).map(([k, v]) => [k, v.points])),
-    { checkin: -4, cases: -2, inspection: 1, attendance: 0, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0, pda: 0 });
+    { checkin: -4, cases: -3, inspection: 1, attendance: 0, speeding: -2, hardStops: -1, idling: 1, seatbelt: 0, fuel: 0, time: 0, cleanliness: 0, accidents: 0, complaints: 0, pda: 0 });
   assert.equal(r.areas.time.score, null, 'no dispatch time: Time is not graded');
-  assert.equal(r.points, -7, 'the day\'s points add up (attendance earns nothing, Joe 10/16)');
+  assert.equal(r.points, -8, 'the day\'s points add up (attendance earns nothing, Joe 10/16)');
   // One day: 80 + 20 x points per day, at most 100.
   assert.deepEqual([r.areas.checkin.score, r.areas.inspection.score, r.areas.speeding.score], [0, 100, 40]);
-  assert.equal(r.score, Math.round((0 + 40 + 100 + 100 + 40 + 60 + 100) / 7), 'overall = the average of the graded areas');
+  assert.equal(r.score, Math.round((0 + 20 + 100 + 100 + 40 + 60 + 100) / 7), 'overall = the average of the graded areas');
   const year = S.scScoreYear_([{ month: 10, rows: [r] }], S.scSettings_({ countFrom: '2026-01-01' }));
   assert.equal(year[0].areas.speeding.score, 40);
 });
@@ -335,7 +335,7 @@ test('Joe 10/14: nothing run before Scorecard counted from is graded (10-15-26 t
   assert.equal(S.scSettings_({}).countFrom, '2026-10-15');
   assert.equal(S.scSettings_({ countFrom: '2026-10-20' }).countFrom, '2026-10-20');
   assert.equal(S.scSettings_({ countFrom: 'junk' }).countFrom, '2026-10-15');
-  const day = (date) => S.scMatchGps_(date, S.scBuildDay_(date, [run({ plantCaseReturn: 440, dispatchTime: '06:00', routeHours: 8 })], [], {}),
+  const day = (date) => S.scMatchGps_(date, S.scBuildDay_(date, [run({ plantCaseReturn: 490, dispatchTime: '06:00', routeHours: 8 })], [], {}),
     [{ tag: '223893', miles: 100, yardOut: date + 'T09:00:00Z', yardIn: date + 'T22:00:00Z' }], []).records;
   const recs = day('2026-10-14').concat(day('2026-10-15'));
   const r = S.scScoreMonth_(recs, [], S.scSettings_({}), {})[0];
@@ -445,29 +445,4 @@ test('Joe 10/23: one check-in a day (app or email) covers every run the driver d
   const two = [run({ runId: 'c', route: '855', run: 'SAL', driver: 'ADAMS, PAT', driverId: 'd1' }), run({ runId: 'd', route: '856', run: 'BEL', driver: 'BAKER, LEE', driverId: 'd2' })];
   const out = S.scBuildDay_(DAY, two, [checkedIn('855', 'SAL')], {});
   assert.deepEqual(out.map(d => [d.driver, d.checkedIn, d.inspected]), [['ADAMS, PAT', true, true], ['BAKER, LEE', false, false]]);
-});
-
-test('Joe 10/25 cases: by the day, every full 54 short costs 1 and every full 54 over earns 1; the rest counts for nothing', () => {
-  const s = S.scSettings_({ countFrom: '2026-01-01' });
-  const days = [].concat(
-    S.scBuildDay_('2026-10-05', [run({ casesOut: 600, plantCaseReturn: 480 })], [], {}),
-    S.scBuildDay_('2026-10-06', [run({ casesOut: 600, plantCaseReturn: 570 })], [], {}),
-    S.scBuildDay_('2026-10-07', [run({ casesOut: 600, plantCaseReturn: 660 })], [], {}),
-    // Two runs on one day go together: 30 + 30 short = 60 short = 1 point.
-    S.scBuildDay_('2026-10-08', [run({ casesOut: 300, plantCaseReturn: 270 }), run({ runId: 'r2', run: 'SAL2', casesOut: 300, plantCaseReturn: 270 })], [], {}));
-  const r = S.scScoreMonth_(days, [], s, {})[0];
-  assert.equal(s.casesPerPoint, 54);
-  assert.deepEqual(r.misses.filter(m => m.area === 'cases').map(m => [m.date, m.points, m.what]),
-    [['2026-10-05', 2, '120 cases short (out 600, in 480)'], ['2026-10-08', 1, '60 cases short (out 600, in 540)']]);
-  assert.deepEqual(r.rewards.filter(x => x.area === 'cases').map(x => [x.date, x.points]), [['2026-10-07', 1]], '60 over earns 1');
-  const o = r.areas.cases;
-  assert.deepEqual([o.days, o.clean, o.lost, o.rewards], [4, 2, 3, 3], '30 short and 60 over are days with no miss (+1 each), and 60 over earns 1 more');
-  assert.equal(r.lostCases, 120 + 30 + 60, 'the Cases lost tile still counts every case short');
-  // The report a grade opens: each day's routes and the cases that day, and the days each area was scored on.
-  assert.deepEqual(r.caseDays['2026-10-08'], { out: 600, back: 540 });
-  assert.deepEqual(r.areaDays.cases, ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
-  assert.deepEqual(r.dayRuns['2026-10-05'].routes, ['855']);
-  assert.equal(S.scSettings_({ countFrom: '2026-01-01', casesPerPoint: 100 }).casesPerPoint, 100, 'the 54 can be changed on Settings');
-  const zero = S.scScoreMonth_(days, [], S.scSettings_({ countFrom: '2026-01-01', casesPerPoint: 0 }), {})[0];
-  assert.equal(zero.areas.cases.lost, 3, '0 on Settings falls back to 54 (no dividing by zero)');
 });

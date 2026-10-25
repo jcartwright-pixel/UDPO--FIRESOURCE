@@ -26,10 +26,7 @@ var SC_CORE = Object.freeze({
   REASONS: Object.freeze(['CALLED OFF', 'SICK DAY', 'UNPAID DAY', 'OTHER', 'BEREAVEMENT']),
   NEVER_COUNT: Object.freeze(['VACATION', 'PERSONAL DAY', 'OFF', 'AVAILABLE']),
   DEFAULTS: Object.freeze({
-    checkinMiss: 4,
-    // Joe 10/25: cases are counted by the day: every full casesPerPoint cases short costs 1 point and every full casesPerPoint
-    // over earns 1; what is left over (and a day under it either way) counts for nothing.
-    casesPerPoint: 54, inspectionDefect: 2, inspectionMissing: 0, callOff: 3,
+    checkinMiss: 4, lostCase: 1, lostCaseDayCap: 10, inspectionDefect: 2, inspectionMissing: 0, callOff: 3,
     callOffReasons: ['CALLED OFF', 'SICK DAY', 'UNPAID DAY', 'OTHER'],
     gradeA: 93, gradeB: 85, gradeC: 75, monthMinDays: 15,
     // Joe 10/13 GPS starting weights (he adjusts them on Settings): points per alert, at most gpsDayCap a day (0 = no cap).
@@ -72,7 +69,7 @@ var SC_CORE = Object.freeze({
     // (check-in, cases, inspections, driving, time, MPG, call-offs). Accidents, complaints and PDAs are entered and still count.
     countFrom: '2026-10-15'
   }),
-  NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'casesPerPoint', 'inspectionDefect', 'inspectionMissing', 'callOff',
+  NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'lostCase', 'lostCaseDayCap', 'inspectionDefect', 'inspectionMissing', 'callOff',
     'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
     'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'idleAllowMinutes', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
@@ -489,7 +486,7 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     return by[key] || (by[key] = {driverKey: key, driver: names[key] || name || key, routes: {}, runDays: 0, dates: {}, checkins: 0, missedCheckins: 0,
       casesOut: 0, casesIn: 0, lostCases: 0, lostPoints: 0, inspected: 0, defects: 0, notInspected: 0, callOffs: 0, miles: 0, misses: [],
       trucks: {}, speeding: 0, hardBrakes: 0, hardAccels: 0, hardTurns: 0, idles: 0, seatbelts: 0, idleMinutes: 0, gpsPoints: 0, gpsMiles: 0, gpsDays: 0, fuelGallons: 0, fuelMiles: 0, mpgMiles: 0, leftEarly: 0, backLate: 0,
-      mpgSum: 0, yardOuts: [], yardIns: [], yardFromMoves: false, scored: {}, rewards: [], pending: [], lowMpgDays: 0, caseDays: {}, dayRuns: {}});
+      mpgSum: 0, yardOuts: [], yardIns: [], yardFromMoves: false, scored: {}, rewards: [], pending: [], lowMpgDays: 0});
   }
   // Fuel: each truck's own average MPG over the period (all its drivers), unless Settings has a target.
   var fuelBy = {};
@@ -504,10 +501,6 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     r.runDays++; r.dates[d.date] = true; r.miles += d.miles || 0;
     r.routes[d.route] = (r.routes[d.route] || 0) + 1;
     if (d.truck) r.trucks[d.truck] = (r.trucks[d.truck] || 0) + 1;
-    // Joe 10/25: each day's routes and trucks, for the report a grade opens.
-    var dr = r.dayRuns[d.date] || (r.dayRuns[d.date] = {routes: [], trucks: []});
-    if (d.route && dr.routes.indexOf(d.route) < 0) dr.routes.push(d.route);
-    if (d.truck && dr.trucks.indexOf(d.truck) < 0) dr.trucks.push(d.truck);
     scAddGps_(r, d, s, ex);
     ['checkin', 'inspection'].forEach(function (a) { scored(r, d.date, a); });
     if (d.casesOut != null && d.casesIn != null) scored(r, d.date, 'cases');
@@ -532,23 +525,14 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     else { r.notInspected++; r.misses.push({date: d.date, what: 'No inspection done', points: s.inspectionMissing, area: 'inspection'}); }
     if (d.casesOut != null && d.casesIn != null) {
       r.casesOut += d.casesOut; r.casesIn += d.casesIn;
-      r.lostCases += Math.max(0, d.casesOut - d.casesIn);
-      var cd = r.caseDays[d.date] || (r.caseDays[d.date] = {out: 0, back: 0});
-      cd.out += d.casesOut; cd.back += d.casesIn;
+      var lost = Math.max(0, d.casesOut - d.casesIn);
+      if (lost) {
+        r.lostCases += lost;
+        var pts = Math.min(s.lostCaseDayCap, lost * s.lostCase);
+        r.lostPoints += pts;
+        r.misses.push({date: d.date, what: lost + ' case' + (lost === 1 ? '' : 's') + ' short (out ' + d.casesOut + ', in ' + d.casesIn + ')', points: pts, area: 'cases'});
+      }
     }
-  });
-  // Joe 10/25: cases by the day (all of that day's runs together): 1 point off for every full casesPerPoint short, 1 point earned
-  // for every full casesPerPoint over; the rest counts for nothing.
-  var per = s.casesPerPoint > 0 ? s.casesPerPoint : SC_CORE.DEFAULTS.casesPerPoint;
-  Object.keys(by).forEach(function (k) {
-    var r = by[k];
-    Object.keys(r.caseDays).forEach(function (date) {
-      var c = r.caseDays[date], diff = c.back - c.out, n = Math.floor(Math.abs(diff) / per);
-      if (!n) return;
-      var what = Math.abs(diff) + ' cases ' + (diff < 0 ? 'short' : 'over') + ' (out ' + c.out + ', in ' + c.back + ')';
-      if (diff < 0) { r.lostPoints += n; r.misses.push({date: date, what: what, points: n, area: 'cases'}); }
-      else r.rewards.push({date: date, what: what, points: n, area: 'cases'});
-    });
   });
   // Joe 10/16: call-off days are counted through the calendar year (callOffs should start January 1). The first
   // attendanceFreeDays neither cost nor earn; each later day costs callOff. A day a manager excused (FMLA, Other) is kept and
@@ -601,9 +585,6 @@ function scScoreMonth_(days, callOffs, settings, names, opts) {
     r.misses.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     r.areas = scAreas_(r, s, on);
     scOverall_(r, s);
-    // Joe 10/25: the days each area was scored on, for the report a grade opens.
-    r.areaDays = {};
-    Object.keys(r.scored).sort().forEach(function (date) { Object.keys(r.scored[date]).forEach(function (a) { (r.areaDays[a] = r.areaDays[a] || []).push(date); }); });
     delete r.routes; delete r.dates; delete r.trucks; delete r.scored;
     return r;
   });
