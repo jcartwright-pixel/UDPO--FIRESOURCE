@@ -88,9 +88,10 @@ test('Fleet Service starting miles load once from the GPS odometers: a typed num
   assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID], { waiting: 'no GPS odometers read yet' });
   const gps = (tag, odometerMiles, engineHours) => d.collection('gpsTrucks').doc(tag).set({ tag, odometerMiles, engineHours, lastReport: stamp });
   await gps('223893', 114720.6, 9000); await gps('223894', 120000, 0); await gps('T-2893', null, 1950.4); await gps('223896', 5000, 0);
-  // Joe 10/26 OK'd it for the live app ("go ahead and copy all that"): it runs there too.
-  // (The start date load, which runs in the same job, may already have given these units a date.)
-  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.FLEET_MILES_ID];
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_MILES_ID].skipped, /test copy only/, 'nothing on the live app');
+  // (The start date load, which runs in the same job on the test copy, may already have given these units a date.)
+  assert.equal(((await d.collection('fleetSetup').doc('223893').get()).data() || {}).last_service_miles, undefined, 'the live app is not touched');
+  const r = (await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID];
   assert.deepEqual(r, { set: 2, kept: 1, noReading: 1 });
   assert.equal((await d.collection('fleetSetup').doc('223893').get()).data().last_service_miles, '114721');
   assert.equal((await d.collection('fleetSetup').doc('223894').get()).data().last_service_miles, '100000', 'a typed number stays');
@@ -102,7 +103,7 @@ test('Fleet Service starting miles load once from the GPS odometers: a typed num
   assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_MILES_ID], { skipped: true });
 });
 
-test('Fleet Service start date load (both apps since Joe\'s 10/26 OK): 4-1-26 as last service and last annual inspection on every listed unit, once; typed dates stay', async () => {
+test('Fleet Service start date load (test copy only): 4-1-26 as last service and last annual inspection on every listed unit, once; typed dates stay', async () => {
   await clear();
   const d = db(), SB = { now: tick, project: 'ud-distribution-sandbox' };
   const unit = (id, u, type, extra) => d.collection('equipment').doc(id).set(Object.assign({ unit: u, type, status: 'ACTIVE', facilityId: 'fac_uniontown' }, extra || {}));
@@ -112,7 +113,10 @@ test('Fleet Service start date load (both apps since Joe\'s 10/26 OK): 4-1-26 as
   await d.collection('config').doc('fleetOwnership').set({ ok: true, units: { '223876': { own: false, facilityId: 'fac_uniontown' }, 'T-10318': { own: false, facilityId: 'fac_uniontown' } } });
   await d.collection('fleetSetup').doc('T-530').set({ unit: 'T-530', last_service_date: '2026-09-15', last_service_hours: '27000' });
   await d.collection('fleetSetup').doc('T-531').set({ unit: 'T-531', track: 'NO' });
-  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.FLEET_START_ID], { set: 4, kept: 0, notTracked: 1 }, 'runs on the live app');
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.FLEET_START_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.equal((await d.collection('fleetSetup').doc('688').get()).exists, false, 'the live app is not touched');
+  assert.equal((await d.collection('dataLoads').doc(DL.FLEET_START_ID).get()).exists, false, 'and no marker there');
+  assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_START_ID], { set: 4, kept: 0, notTracked: 1 });
   const s = async (id) => (await d.collection('fleetSetup').doc(id).get()).data() || {};
   assert.deepEqual([(await s('688')).last_service_date, (await s('688')).dot_due, (await s('688')).last_service_miles], ['2026-04-01', '2027-04-01', undefined], 'a truck\'s PM miles stay blank');
   assert.deepEqual([(await s('T-529')).last_service_date, (await s('T-529')).dot_due], ['2026-04-01', '2027-04-01']);
@@ -130,7 +134,7 @@ test('Fleet Service start date load (both apps since Joe\'s 10/26 OK): 4-1-26 as
   assert.deepEqual((await DL.runDataLoads(d, SB))[DL.FLEET_START_ID], { skipped: true });
 });
 
-test('Garage work orders load (both apps since Joe\'s 10/26 OK): each open write-up already sent to the garage gets one work order, once', async () => {
+test('Garage work orders load (test copy only): each open write-up already sent to the garage gets one work order, once', async () => {
   await clear();
   const d = db(), w = (id, extra) => d.collection('maintenance').doc(id).set(Object.assign({ record_id: id, kind: 'TRUCK', truck_number: '223881', issue_details: 'Clearance light out', status: 'OPEN', opened_at: '2026-10-13T12:00:00Z' }, extra));
   await w('TRK-A', { notes: 'Sent to garage 2026-10-13T13:00:00Z by joe' });
@@ -138,8 +142,9 @@ test('Garage work orders load (both apps since Joe\'s 10/26 OK): each open write
   await w('TRK-C', { notes: 'Sent to garage 2026-10-13T13:00:00Z by joe', status: 'COMPLETE' });
   await w('TRK-D', { notes: '' });
   await d.collection('workOrders').doc('WO-KEPT0001').set({ work_order_id: 'WO-KEPT0001', source: 'WRITE_UP', source_kind: 'trucks', source_id: 'TRK-B', status: 'WORKING' });
-  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.GARAGE_ORDERS_ID];
-  assert.equal(r.made, 1, 'runs on the live app');
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.GARAGE_ORDERS_ID].skipped, /test copy only/, 'nothing on the live app');
+  assert.equal((await d.collection('dataLoads').doc(DL.GARAGE_ORDERS_ID).get()).exists, false);
+  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.GARAGE_ORDERS_ID];
   assert.deepEqual(r, { made: 1, kept: 1 });
   const orders = (await d.collection('workOrders').get()).docs.map(x => x.data());
   assert.deepEqual(orders.map(o => o.source_id).sort(), ['TRK-A', 'TRK-B']);
@@ -152,8 +157,7 @@ test('Half gallon label readers load (test copy only): both half gallon fillers 
   await clear();
   const d = db(), line = (id, name) => d.collection('plantSetup').doc(id).set({ operationId: id, type: 'PRODUCTION_AREA', status: 'ACTIVE', name, area: name, facilityId: 'fac_uniontown', viewSequence: 60 });
   await line('ut_prod_new_half_gallon', 'NEW 1/2 GALLON');
-  assert.match((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.HALF_READERS_ID].skipped, /test copy only/, 'nothing on the live app');
-  assert.match((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.MAIL_CHECKINS_ID].skipped, /test copy only/, 'still waits for Joe');
+  assert.match((await DL.runDataLoads(d, { now: tick }))[DL.HALF_READERS_ID].skipped, /test copy only/, 'nothing on the live app');
   assert.match((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution-sandbox' }))[DL.HALF_READERS_ID].waiting, /not set up/, 'waits for both lines');
   await line('ut_prod_old_half_gallon', 'OLD 1/2 GALLON');
   await line('ut_prod_gallon_filler', 'GALLON FILLER');
