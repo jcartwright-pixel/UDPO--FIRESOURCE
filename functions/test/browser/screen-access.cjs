@@ -29,7 +29,8 @@ async function openPage(browser, width, height, url) {
   return page;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
-const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !x.hidden).map(x => x.dataset.side));
+// Joe 10/26: Home is four cards, each listing its departments' buttons; a department shows when any of its buttons shows.
+const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => [...new Set(a.filter(x => !x.hidden && !x.closest('[hidden]')).map(x => x.dataset.side))]);
 
 (async () => {
   await clear();
@@ -43,7 +44,7 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
     let m = await openPage(browser, 1536, 864, '/index.html?testEmail=' + MAINT);
     await m.waitForFunction(() => document.querySelectorAll('#sides a[data-side]').length > 0 && document.getElementById('plant-name').textContent.trim());
     await m.waitForTimeout(500);
-    assert.equal((await visibleCards(m)).length, 8, 'nothing ticked yet: every card');
+    assert.deepEqual(await visibleCards(m), ['plant', 'production', 'pmaint', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety'], 'nothing ticked yet: every department');
     await m.close();
     results.push('Nothing ticked yet: the manager sees every Home card, as before');
 
@@ -81,7 +82,7 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       m = await openPage(browser, w, h, '/index.html?testEmail=' + MAINT);
       await m.waitForFunction(() => document.querySelectorAll('#sides a[data-side]').length > 0 && document.getElementById('plant-name').textContent.trim());
-      await m.waitForFunction(() => [...document.querySelectorAll('#sides a[data-side]')].filter(x => !x.hidden).length === 2);
+      await m.waitForFunction(() => [...document.querySelectorAll('#sides a[data-side]')].filter(x => !x.hidden && !x.closest('[hidden]')).map(x => x.dataset.side).filter((k, i, all) => all.indexOf(k) === i).length === 2);
       assert.deepEqual(await visibleCards(m), ['pmaint', 'reports']);
       await shot(m, 'home-maint-' + w + '.png');
       await m.goto(HOSTING + '/reportcenter.html?testEmail=' + MAINT);

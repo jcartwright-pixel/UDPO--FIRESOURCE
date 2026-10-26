@@ -1323,7 +1323,7 @@ async function noScroll(page) {
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'distribution');
     assert.deepEqual(lp.errors, []);
     await lp.close();
-    results.push('Home: four cards (Plant Operations, Route Distribution, Reports, Safety Walkthrough) with their departments' buttons; each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
+    results.push('Home: four cards (Plant Operations, Route Distribution, Reports, Safety Walkthrough) with their departments\' buttons; each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
     const mp = await openPage(browser, 1920, 950, '/daily.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });
