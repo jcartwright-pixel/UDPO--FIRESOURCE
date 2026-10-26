@@ -402,6 +402,9 @@ body.weekly-page { background: #eef3f7; }
 /* Driver Roster: taller rows and larger print; the list scrolls inside its box under a fixed header. */
 .drivers-page .sheet thead th { position: sticky; top: 0; z-index: 1; height: 46px; font-size: 16px; }
 .drivers-page .sheet tbody td { font-size: 17px; }
+.drivers-page .sheet td.load-text { text-align: left; padding: 2px 6px; }
+.drivers-page .sheet td.load-text label { display: flex; align-items: center; gap: 6px; font-size: 16px; line-height: 1.3; cursor: pointer; white-space: nowrap; }
+.drivers-page .sheet td.load-text input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
 
 /* Vacation calendar: larger names and day numbers. */
 .calendar .cday span { font-size: clamp(16px, 1.6vh, 17px); line-height: 1.35; padding: 1px 8px; }
@@ -1201,12 +1204,16 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
-/* Load Done Texts (Joe 10/26): the example text, the driver ticks and the Find box on the right. */
+/* Texts (Joe 10/26): a part per kind of text, its switch and text on the left, who gets it on the right; the example text. */
+.texts-page .texts-kind-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; }
+.texts-page .texts-kind h3 { font-size: 18px; margin: 0 0 6px; }
+.texts-page .texts-mode { font-weight: 700; color: #8a5a00; margin: 0 0 8px; }
+@media (max-width: 800px) { .texts-page .texts-kind-grid { grid-template-columns: 1fr; } }
+.texts-page .texts-test { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.texts-page .texts-test label { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 700; }
+.texts-page .texts-test input { font-size: 16px; width: 200px; }
+.drivers-page .sheet td.load-text .stopped { display: block; color: #b3261e; font-weight: 800; font-size: 16px; line-height: 1.1; white-space: normal; overflow-wrap: normal; }
 .texts-page .texts-sample { background: #eef6ff; border-radius: 14px; padding: 10px 14px; font-size: 17px; line-height: 1.4; max-width: 520px; }
-.texts-page .texts-pick-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.texts-page .texts-filter { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; margin-left: auto; }
-.texts-page .texts-filter input { font-size: 16px; min-width: 200px; }
-.texts-page .texts-tick { width: 24px; height: 24px; }
 
 /* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once.
    Only how it looks waits: presses work as they always did, so nothing under the finger changes when it appears. */

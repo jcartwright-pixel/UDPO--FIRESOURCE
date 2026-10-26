@@ -46,11 +46,11 @@
         <div class="sheet">
           <table>
             <colgroup>
-              <col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:10%"><col style="width:9%"><col style="width:10%">
-              <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4%"><col style="width:6%">
+              <col style="width:8%"><col style="width:10%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%">
+              <col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:4%"><col style="width:5%">
             </colgroup>
             <thead><tr>
-              <th>Employee ID</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th><th>Mobile Phone</th>
+              <th>Employee ID</th><th>Driver</th><th>Relief</th><th>Seniority</th><th>Assigned truck</th><th>Mobile Phone</th><th>Texts</th>
               <th>Vacation wks</th><th>Status</th><th>Avail&shy;able</th><th>Acci&shy;dents</th><th>Com&shy;plaints</th><th>PDA</th><th>Edit</th>
             </tr></thead>
             <tbody id="rows"></tbody>
@@ -93,6 +93,9 @@
     const canEdit = () => canManage();
     // Joe 10/15: mobile phones typed here (driverPhones), else Driver Master's own phone column; written like 330-555-1234.
     let phones = {};
+    // Joe 10/26: the Texts ticks, who gets each kind of text (Schedule texts, Load done texts), kept with the phone.
+    let ticks = {}, stopped = {};
+    const KINDS = [['SCHEDULE', 'scheduleText', 'Schedule'], ['LOAD', 'loadText', 'Load']];
     const phoneText = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : String(v || ''); };
     // Joe 10/17: a blank typed number does not hide the Driver Master number (his 24 drivers' cell phones are in Driver Master).
     const phoneOf = (id) => { const p = phones[id]; return phoneText(p || (drivers.find(x => x.id === id) || {}).phone || ''); };
@@ -131,12 +134,15 @@
           '<td><input class="truck" list="truck-list" data-truck="' + id + '" value="' + escapeHtml(truckUnit(r.defaultTruckId)) + '" placeholder="No truck" maxlength="40" autocomplete="off"' + dis + '></td>' +
           // Joe 10/15: the driver's mobile phone for Schedule Texts (saved on its own, app only; Driver Master's phone column if none).
           '<td><input class="truck phone" type="tel" inputmode="tel" data-phone="' + id + '" value="' + escapeHtml(phoneOf(r.id)) + '" placeholder="No number" maxlength="20" autocomplete="off"' + dis + '></td>' +
+          '<td class="load-text">' + KINDS.map(([kind, field, label]) => '<label><input type="checkbox" data-text="' + kind + '" data-driver="' + id + '"' + ((ticks[r.id] || {})[field] ? ' checked' : '') + dis + '>' + label + '</label>').join('') +
+            // A driver who replied STOP to the texts (unticked by the server).
+            (stopped[r.id] && !(ticks[r.id] || {}).scheduleText && !(ticks[r.id] || {}).loadText ? '<span class="stopped">Replied STOP</span>' : '') + '</td>' +
           '<td>' + r.vacationWeeks + '</td>' +
           '<td><span class="status' + (r.active ? '' : ' off') + '" title="' + escapeHtml(r.unavailableReason) + '">' + (r.active ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><button type="button" class="switch' + (r.active ? ' on' : '') + '" data-toggle="' + id + '" aria-label="' + (r.active ? 'Mark not available' : 'Mark available') + '"' + dis + '></button></td>' +
           countCell(r, 'accident') + countCell(r, 'complaint') + countCell(r, 'pda') +
           '<td><button type="button" class="edit" data-edit="' + id + '"' + dis + '>Edit</button></td></tr>';
-      }).join('') || '<tr><td colspan="13" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
+      }).join('') || '<tr><td colspan="14" class="empty">' + (loaded ? 'No drivers match.' : 'Loading the driver list\u2026') + '</td></tr>';
       const active = rows.filter(r => r.active);
       document.getElementById('n-active').textContent = active.length;
       document.getElementById('n-relief').textContent = active.filter(r => r.reliefDriver).length;
@@ -318,6 +324,11 @@
       if (edit) openPanel(rows.find(x => x.id === (edit.dataset.edit || edit.dataset.id)));
     });
     table.addEventListener('change', e => {
+      const tk = e.target.closest('[data-text]');
+      if (tk) {
+        const r = rows.find(x => x.id === tk.dataset.driver), field = KINDS.find(k => k[0] === tk.dataset.text)[1], on = tk.checked, mine = ticks[r.id] = ticks[r.id] || {}, was = !!mine[field];
+        return saveOptimistic('setDriverText', { driverId: r.id, kind: tk.dataset.text, on }, () => { mine[field] = on; }, () => { mine[field] = was; }, render);
+      }
       const ph = e.target.closest('[data-phone]');
       if (ph) {
         typing = null;
@@ -357,7 +368,7 @@
       watchLists(user, render);
       onSnapshot(collection(db, 'driverIncidents'), snap => { incidents = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); const r = rows.find(x => x.id === editingId); if (panelOpen && r) paintIncidents(r); }, e => showError('Could not read the accidents and complaints: ' + friendlyError(e)));
       onSnapshot(doc(db, 'scorecard', 'settings'), snap => { scoreSaved = snap.exists() ? snap.data() : {}; render(); }, () => {});
-      onSnapshot(collection(db, 'driverPhones'), snap => { phones = {}; snap.docs.forEach(d => { phones[d.data().driverId || d.id] = d.data().phone || ''; }); render(); }, () => {});
+      onSnapshot(collection(db, 'driverPhones'), snap => { phones = {}; ticks = {}; stopped = {}; snap.docs.forEach(d => { const k = d.data().driverId || d.id; phones[k] = d.data().phone || ''; ticks[k] = { scheduleText: d.data().scheduleText === true, loadText: d.data().loadText === true }; stopped[k] = !!d.data().stoppedAt; }); render(); }, () => {});
       onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); loaded = true; render(); }, e => showError('Could not read the driver list: ' + friendlyError(e)));
       window.addEventListener('resize', render);
     });

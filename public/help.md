@@ -189,15 +189,16 @@ Which days each route runs for **one week only** (a holiday week, for example). 
 id: drivers
 screens: drivers.html
 
-Every driver: employee ID, relief or regular, seniority, assigned truck, mobile phone, vacation weeks and status. Accidents, complaints and PDAs (Progressive Discipline Actions) are entered here too and count on the Driver Scorecard.
+Every driver: employee ID, relief or regular, seniority, assigned truck, mobile phone, texts, vacation weeks and status. Accidents, complaints and PDAs (Progressive Discipline Actions) are entered here too and count on the Driver Scorecard.
 
 - Use the **Status** and **Relief** filters on the right to narrow the list.
 - `+ Add Driver` adds a driver. `Edit` on a line opens the driver beside the list.
 - In the driver's box: change the name, hire date, seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
+- Under **Texts**, tick **Schedule** to text that driver their schedule when a week is posted, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns each kind on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
 
-> The mobile phone here is the one Schedule Texts uses. If it is blank, the Driver Master phone is used.
+> The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used.
 
 !> Do not remove a driver who is only off for a while. Mark the time off on the Vacation Schedule.
 
@@ -1070,30 +1071,21 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 
 !> Do not save with problems on the list. Fix the workbook and upload it again.
 
-## Schedule Texts
-id: texts
+## Texts
+id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts each driver their schedule when a new week is posted. It stays off until turned on here.
+Texts to drivers from the company's Twilio number. Each kind of text has its own part and its own On / Off: **Schedule texts** (when a new week is posted) and **Load done texts** (when the plant finishes a driver's load, with any open pickups). Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
-2. **Who would get the next text** lists each driver and their mobile phone. A driver with no number gets no text; add it on the Driver Roster.
-3. **Texts and replies** shows what was sent and any replies.
+2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
+3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
+4. Press `Turn On` in each part you want. **Who gets them** lists the ticked drivers.
+5. **Texts and replies** shows each text and reply with its status.
 
-## Load Done Texts
-id: load-done-texts
-screens: donetexts.html, administration.html?item=load-done-texts
+> A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
 
-Texts a few drivers you pick when the plant finishes their load: their load is done, the trailer and cases, and any open pickups. It stays off until turned on here, and it uses the Twilio texting account saved on Schedule Texts.
-
-1. Save the Twilio texting account on **Schedule Texts** first.
-2. Under **Who gets a text**, tick each driver who should get one. A tick counts at once. Use `Find a driver` on the right to find a name.
-3. Press `Turn On`.
-4. **Load done texts sent** lists each text with its status. Replies are on Schedule Texts.
-
-> A driver gets one text per load, only for loads finished after you turned it on and ticked them.
-
-!> Do not tick a driver who has "No number". Add their mobile phone on the Driver Roster first.
+!> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 
 ## Phone Screens
 id: phone-screens

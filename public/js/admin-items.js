@@ -55,9 +55,9 @@ export const ADMIN_GROUPS = [
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [
     ['mocreo', 'MOCREO & Sensors', 'The MOCREO API key (never shown again once saved) and asset ID, Test Connection, and the thermometers: location, cooler, sensor, low and high limits, on or off.', 'mocreo.html', 'temperatures.webp'],
     // Joe 10/15: built ready and kept Off; the drivers' mobile phones are typed on the Driver Roster.
-    ['schedule-texts', 'Schedule Texts', 'Texts each driver when a new week is posted. Off until turned On here; the Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
-    // Joe 10/26 ("text temporarily a few people when the load is complete"): its own switch, Off; the same Twilio account.
-    ['load-done-texts', 'Load Done Texts', 'Texts the drivers you pick when the plant finishes their load, with any pickups. Off until turned On here; uses the Twilio account saved on Schedule Texts.', 'donetexts.html', 'gear'],
+    // Joe 10/26: one Texts screen, a part per kind of text (Schedule, Load done) each with its own On / Off; who gets them is
+    // ticked on the Driver Roster.
+    ['schedule-texts', 'Texts', 'Texts to drivers: schedule texts when a week is posted, and load done texts with any pickups. Each kind has its own On / Off; who gets them is ticked on the Driver Roster. The Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
     // Joe 10/11: RedZone's API sign-in (token, or client ID and secret), Test Connection; Products then gets Get from RedZone.
     // Joe 10/22 (the case counter hookup guide): the palletizer's counter box, and the case returns one, read-only by the plant PC.
     ['case-counters', 'Case Counters', 'The Palletizer and Case Returns counter boxes: brand, IP address and where the case total is, Test read, and the counter key for the plant PC. Read only: nothing is changed on the counter box.', '', 'factory'],

@@ -59,9 +59,30 @@ async function setDriverPhone(tx, db, req, email, stamp, logRef, mode) {
   const [snap, was] = await Promise.all([tx.get(ref), tx.get(phoneRef)]);
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
   const before = { phone: was.exists ? was.data().phone || '' : '' };
-  tx.set(phoneRef, { driverId: snap.data().id || req.driverId, phone: req.phone, updatedAt: stamp, updatedBy: email });
+  // merge: the Texts ticks (setDriverText) live on the same record.
+  tx.set(phoneRef, { driverId: snap.data().id || req.driverId, phone: req.phone, updatedAt: stamp, updatedBy: email }, { merge: true });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: snap.data().id || req.driverId, before, after: { phone: req.phone }, result });
+  return result;
+}
+
+/*
+ * Joe 10/26 ("can't we add a tick for that driver to receive text messages?"; "the driver's roster ... will control who gets
+ * them"): the Texts ticks on the Driver Roster, one per kind of text: SCHEDULE (Schedule Texts) and LOAD (Load Done Texts,
+ * src/sms.js). Kept with the mobile phone in driverPhones/{driverId}; the time Load was ticked keeps a load finished before
+ * that from being texted. Driver Master is not written with them.
+ */
+const TEXT_FIELDS = { SCHEDULE: 'scheduleText', LOAD: 'loadText' };
+async function setDriverText(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId)), phoneRef = db.collection('driverPhones').doc(M.safeIdPart(req.driverId));
+  const [snap, was] = await Promise.all([tx.get(ref), tx.get(phoneRef)]);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
+  const field = TEXT_FIELDS[req.kind], before = { [field]: was.exists && was.data()[field] === true };
+  const change = { driverId: snap.data().id || req.driverId, [field]: req.on, updatedAt: stamp, updatedBy: email };
+  if (field === 'loadText' && req.on && !before.loadText) change.loadTextAt = stamp;
+  tx.set(phoneRef, change, { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [] };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: snap.data().id || req.driverId, kind: req.kind, before, after: { [field]: req.on }, result });
   return result;
 }
 
@@ -245,4 +266,4 @@ async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };
+module.exports = { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };
