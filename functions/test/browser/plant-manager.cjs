@@ -108,7 +108,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
         ['Case Loading loadout.html?area=CASE', 'Tote Loading loadout.html?area=TOTES', 'Box Loading loadout.html?area=BOXING', 'Case Unloading unloading.html']);
       assert.equal(await deptText(page, 'Case Loading'), '4,3,0,1 | 1 of 4 loads complete');
       assert.deepEqual(await page.$$eval('[data-card="dept"] .dp-card:last-child .dp-line span', s => s.map(x => x.firstChild.textContent)), ['Back, not started', 'Truck Washing', 'Returns pending']);
-      // The Plant Distribution Scheduler is a menu item only (Joe 10/26).
+      // The scheduler is not on this page (Joe 10/26: it is Shipping & Receiving's).
       assert.deepEqual(await page.$$('[data-card="sched"]'), []);
       // Joe 10/15 (Manager Walkthrough): one card in walking order instead of Quality, Cooler Temperatures and Yard Checks.
       // Two lines are running (one past due, one due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.

@@ -38,7 +38,7 @@ const SCREENS = [
   ['Sheet Conflicts', 'conflicts.html'], ['Dispatch Administration', 'admin.html'], ['Operational Assignments', 'ops.html'], ['Print Layouts', 'print.html'],
   ['Dispatch Settings', 'settings.html'], ['Administration', 'administration.html'], ['Manager Center', 'manager.html'], ['Plant Departments', 'plant.html'],
   ['Loadout Center', 'loadout.html'], ['Daily Box Loadout', 'loadout.html?area=BOXING'], ['Late Forecast', 'forecast.html'], ['Unloading & Washing', 'unloading.html'],
-  ['Product Returns', 'returns.html'], ['Truck Washing', 'washing.html'], ['Trailer Assignments', 'trailers.html'], ['Plant Distribution Scheduler', 'scheduler.html'],
+  ['Product Returns', 'returns.html'], ['Truck Washing', 'washing.html'], ['Trailer Assignments', 'trailers.html'], ['Shipping & Receiving', 'scheduler.html'],
   ['Shift Notes', 'shiftnotes.html'], ['Quality Checks', 'quality.html'], ['Cooler Temperature', 'temps.html'], ['Yard Checks', 'yard.html'],
   ['Manager Walkthrough', 'walkthrough.html'], ['Plant Reports', 'reports.html'], ['Shift Reports', 'shiftreports.html'], ['Plant Performance TV', 'plant-kiosk.html'],
   ['Reports', 'reportcenter.html'], ['Safety Walkthrough', 'safety.html'], ['Production Lines', 'production.html'], ['Line Targets', 'linetargets.html'],

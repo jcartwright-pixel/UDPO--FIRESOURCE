@@ -1452,7 +1452,7 @@
     { key: 'plant', name: 'Plant Distribution', home: 'manager.html', screens: [
       ['manager', 'Manager Center', ['manager.html', 'forecast.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']],
       ['unloading', 'Unloading & Washing', ['unloading.html']], ['returns', 'Product Returns', ['returns.html']], ['washing', 'Truck Washing', ['washing.html']],
-      ['trailers', 'Trailer Assignments', ['trailers.html']], ['scheduler', 'Plant Distribution Scheduler', ['scheduler.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
+      ['trailers', 'Trailer Assignments', ['trailers.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
       ['yard', 'Yard Checks', ['yard.html']]] },
     // Joe 10/25: Quality Checks and Cooler Temperature moved to Plant Production (same screen keys, so saved ticks still hold).
     // Joe 10/26: Plant Production opens on its front page (production-home.html, the same layout as Plant Distribution).
@@ -1462,6 +1462,10 @@
     // Joe 10/25: Plant Vacations & Schedule (the plant's crew: loadout and production on one schedule).
     { key: 'crew', name: 'Plant Vacations & Schedule', home: 'crew.html', screens: [
       ['crewBoard', 'Schedule Board', ['crew.html']], ['crewVacations', 'Plant Vacations', ['crew.html']], ['crewSetup', 'Plant Schedule Setup', ['crew.html']]] },
+    // Joe 10/26 (ej): Shipping & Receiving, its own department: the scheduler (was on Plant Distribution) and Inventory (was its own
+    // card). Same screen keys, so saved ticks still hold.
+    { key: 'shipping', name: 'Shipping & Receiving', home: 'scheduler.html', screens: [
+      ['scheduler', 'Shipping and Receiving Schedule', ['scheduler.html']], ['receiving', 'Inventory (Receiving Log)', ['inventory.html']]] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],
@@ -1474,16 +1478,16 @@
       ['trucksToday', 'Trucks Today', ['trucks.html']], ['gpsSetup', 'GPS Setup', ['gps.html']], ['dispatchAdmin', 'Dispatch Administration', ['admin.html']],
       ['ops', 'Operational Assignments', ['ops.html']], ['printLayouts', 'Print Layouts', ['print.html']], ['dispatchSettings', 'Dispatch Settings', ['settings.html']]] },
     { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', screens: [
-      ['equipment', 'Equipment', ['equipment.html']], ['issues', 'Truck, Trailer and Fork Truck Issues', ['issues.html']], ['garage', 'Garage Work Orders', ['garage.html']],
-      ['fleetService', 'Fleet Service', ['fleet.html']], ['garageStation', 'Garage Station', ['garage-station.html']]] },
+      ['equipment', 'Equipment', ['equipment.html']], ['issues', 'Truck, Trailer and Fork Truck Issues', ['issues.html']], ['fleetService', 'Fleet Service', ['fleet.html']]] },
+    // Joe 10/26 (1E): the Garage is its own department under Route Distribution (same screen keys as when it sat on Fleet & Maintenance).
+    { key: 'garage', name: 'Garage', home: 'garage.html', screens: [['garage', 'Garage Work Orders', ['garage.html']], ['garageStation', 'Garage Station', ['garage-station.html']]] },
     { key: 'reports', name: 'Reports', home: 'reportcenter.html', screens: [
       ['plantReports', 'Plant Reports', ['reports.html']], ['shiftReports', 'Shift Reports', ['shiftreports.html']], ['plantTv', 'Plant Performance TV', ['plant-kiosk.html']],
       ['rScorecard', 'Driver Scorecard', ['scorecard.html']], ['rOtr', 'Over the Road', ['otr.html']], ['rTrucksToday', 'Trucks Today', ['trucks.html']],
       ['rFleetService', 'Fleet Service Report', ['fleet.html']]] },
     { key: 'safety', name: 'Safety Walkthrough', home: 'safety.html', screens: [
       ['safetyWalk', 'Weekly Walk', ['safety.html']], ['safetyIssues', 'Open Issues', ['safety-issues.html']], ['extinguishers', 'Fire Extinguishers', ['extinguishers.html']],
-      ['fire', 'Fire Alarm, Fire Suppression and Escape Plan', ['safety-fire.html']], ['pastWalks', 'Past Walks', ['safety-walks.html']], ['safetySetup', 'Checklist Setup', ['safety-setup.html']]] },
-    { key: 'inventory', name: 'Inventory', home: 'inventory.html', screens: [['receiving', 'Receiving Log', ['inventory.html']]] }
+      ['fire', 'Fire Alarm, Fire Suppression and Escape Plan', ['safety-fire.html']], ['pastWalks', 'Past Walks', ['safety-walks.html']], ['safetySetup', 'Checklist Setup', ['safety-setup.html']]] }
   ];
   var SCREEN_KEYS = [];
   SCREEN_AREAS.forEach(function (a) { a.screens.forEach(function (s) { SCREEN_KEYS.push(s[0]); }); });
@@ -1530,10 +1534,12 @@
   // more than one side (Shift Notes is on every side) but never drops off the menu: one left off every side goes back to
   // where the app puts it.
   var MENU_SIDES = [
-    { key: 'plant', name: 'Plant Distribution', first: '', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
+    { key: 'plant', name: 'Plant Distribution', first: '', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks'] },
     { key: 'production', name: 'Plant Production', first: 'Production Lines', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
     { key: 'crew', name: 'Plant Vacations & Schedule', first: 'Plant Vacations & Schedule', sections: ['Plant Vacations & Schedule'] },
-    { key: 'pmaint', name: 'Plant Maintenance', first: 'Plant Maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'] }
+    { key: 'pmaint', name: 'Plant Maintenance', first: 'Plant Maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'] },
+    // Joe 10/26 (ej): Shipping & Receiving.
+    { key: 'shipping', name: 'Shipping & Receiving', first: '', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'] }
   ];
   var MENU_POOL = MENU_SIDES.reduce(function (all, s) { s.sections.forEach(function (g) { if (all.indexOf(g) < 0) all.push(g); }); return all; }, []);
   // The plant's menu: { sideKey: [sections] } from what Menu Setup saved (or the app's own order when nothing is saved).

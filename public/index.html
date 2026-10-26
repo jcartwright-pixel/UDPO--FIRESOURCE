@@ -27,29 +27,40 @@
     <section class="launch-grid six" id="sides"></section>
   </div>
   <script type="module">
-    import { start, requireSignIn, shortDate, SIDES, ICON, escapeHtml, watchPerson } from './js/app.js';
+    import { start, requireSignIn, shortDate, SIDES, GROUPS, groupSides, ICON, escapeHtml, watchPerson } from './js/app.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { WALK_ROLES } from './js/walk-bar.js';
+    import { watchIssueRecords, watchHubWorkOrders } from './js/recent-records.js';
     const L = window.UDLogic;
     // Joe 10/11: Plant Production and Plant Maintenance carry an UNDER CONSTRUCTION banner across their picture.
     const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="' + (s.bannerInPic ? 'Under Construction' : '') + '">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
-    const card = (s) => '<a class="launch-card' + (s.building ? ' building' : '') + (s.bannerInPic ? ' banner-pic' : '') + '" data-side="' + s.key + '" href="' + s.home + '">' +
-      '<span class="launch-art">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
-      '<b class="open-text">Open ' + escapeHtml(s.short || s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b>' +
-      (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '</a>';
-    // Joe 10/11: six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports); Administration is the header button.
-    // Joe 10/25: a menu-only side (Plant Vacations & Schedule) has no card here.
-    const cards = SIDES.filter(s => !s.menuOnly);
-    document.getElementById('sides').innerHTML = cards.map(card).join('');
-    // Joe 10/12: a seventh card (Safety Walkthrough) next to Reports; four cards a row so all seven fit one screen (mock-up A).
-    document.getElementById('sides').classList.toggle('seven', cards.length > 6);
+    // Joe 10/26 (1E): four cards: Plant Operations and Route Distribution (each opens its own page of department cards) and Reports
+    // and Safety Walkthrough. Under each card's Open button, straight down: each department in dark blue with its main screens under
+    // it in light blue (Reports: its four report groups; Safety Walkthrough: its main screens). Administration is the header button.
+    const bld = (s) => s.building ? ' building' : '';
+    const sub = (s, [label, href]) => '<a class="hq-sub' + bld(s) + (s.buildingSections && /inventory\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
+    const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
+      (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
+    const groupCard = (g) => '<div class="launch-card hq-card" data-group="' + g.key + '"><a class="launch-art" href="' + g.home + '" tabindex="-1">' + art(g) + '</a><strong>' + escapeHtml(g.name) + '</strong>' +
+      '<a class="open-text" href="' + g.home + '">Open ' + escapeHtml(g.name) + ' &rarr;</a><div class="hq-list">' + groupSides(g.key).filter(s => !s.menuOnly).map(dept).join('') + '</div></div>';
+    const sideCard = (s) => '<div class="launch-card hq-card' + bld(s) + (s.bannerInPic ? ' banner-pic' : '') + '" data-card-side="' + s.key + '"><a class="launch-art" data-side="' + s.key + '" href="' + s.home + '" tabindex="-1">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</a>' +
+      '<strong>' + escapeHtml(s.name) + '</strong><a class="open-text" data-side="' + s.key + '" href="' + s.home + '">Open ' + escapeHtml(s.short || s.name) + ' &rarr;</a>' +
+      (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '<div class="hq-list">' + (s.quick || []).map(q => sub(s, q)).join('') + '</div></div>';
+    const cards = GROUPS.map(groupCard).concat(SIDES.filter(s => !s.group && !s.menuOnly).map(sideCard));
+    document.getElementById('sides').innerHTML = cards.join('');
+    document.getElementById('sides').classList.add('seven', 'hq-grid');
     // The side picked here is the side its screens' menu shows.
     // Joe 10/11: an Under Construction card opens only for an Administrator; anyone else stays on this page.
     document.getElementById('sides').addEventListener('click', e => {
       const a = e.target.closest('[data-side]');
       if (a && a.classList.contains('building') && !document.body.classList.contains('is-admin')) { e.preventDefault(); return; }
-      if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ }
+      if (a) { try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ } return; }
+      // Anywhere else on a card opens the card's own page.
+      const c = !e.target.closest('a') && e.target.closest('.hq-card'), open = c && c.querySelector('.open-text');
+      if (open && getComputedStyle(open).display !== 'none') open.click();
     });
+    // Joe 10/26: a little of each fleet department's numbers under its buttons (open truck issues, open garage work orders).
+    const note = (k, n, words) => { const el = document.querySelector('[data-note="' + k + '"]'); if (el) { el.innerHTML = '<b>' + n + '</b> ' + words; el.hidden = false; el.classList.toggle('bad', n > 0); } };
     // Joe 10/11: someone who sees more than one plant goes straight to the all-plants overview, without Uniontown's home
     // showing first. Known from this tab's last visit at once; otherwise the page stays blank until the Users list says.
     let picked0 = '', multi0 = '';
@@ -62,6 +73,8 @@
       const today = L.operatingDay(new Date());
       document.getElementById('today').textContent = L.dayName(today) + ' ' + shortDate(today);
       const { db } = await start();
+      watchIssueRecords(db, r => { const n = L.issueNumbers(L.issueRows(r, 'TRUCK', Date.now()), Date.now()).open; note('fleet', n, n === 1 ? 'open truck issue' : 'open truck issues'); }, () => {});
+      watchHubWorkOrders(db, L.weekStart(L.operatingDay(new Date())), r => { const n = r.filter(o => String(o.status || 'NEW').toUpperCase() !== 'DONE').length; note('garage', n, n === 1 ? 'work order open' : 'work orders open'); }, () => {});
       watchPerson(db, user, person => {
         const plants = L.plantsFor(person);
         let picked = '';
