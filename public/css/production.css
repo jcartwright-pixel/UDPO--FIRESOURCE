@@ -29,18 +29,39 @@
 
 /* ---------- Line tablet ---------- */
 .lt-tablet .view { padding: 10px 20px 20px; }
-.lb-head { display: flex; align-items: flex-end; gap: 14px; }
+.lb-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.lb-head[hidden] { display: none; }
+.lb-title { flex: 0 1 auto; min-width: 0; }
+.lb-title .lb-live { display: inline-block; margin-top: 6px; }
 .lb-head .eyebrow { display: block; color: #5b6b7c; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .lb-head h1 { margin: 2px 0 0; font-size: 38px; color: #0b2f55; }
 .lb-sub { color: #5b6b7c; font-size: 18px; margin-top: 2px; }
 .lb-live { margin-left: auto; background: #fff; border: 1px solid #c9d6e4; border-radius: 999px; padding: 8px 14px; font-size: 16px; font-weight: 800; white-space: nowrap; }
 .lb-live::before { content: '\25CF  '; }
 .lb-live.auto { color: #1d7a3e; } .lb-live.typed { color: var(--ud-blue); }
-.lb-cards { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 14px; margin-top: 12px; }
-.lb-card { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lb-cards { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 12px; margin-top: 10px; }
+/* Joe 10/26: Running now, Left to run, Made, Speed and Stopped across the line tablet. */
+#std-cards { grid-template-columns: 1.4fr 1.1fr 1fr 1fr 1fr; }
+.lb-code { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; background: #eef5fc; border: 2px solid #0b4f8a; border-radius: 10px; padding: 6px 12px; }
+.lb-code:empty { display: none; }
+.lb-code span { font-size: 16px; font-weight: 800; color: #5b6b7c; text-transform: uppercase; letter-spacing: .05em; }
+.lb-code b { font-size: 36px; font-weight: 900; color: #0b2f55; line-height: 1.05; }
+.lb-code em { font-style: normal; font-size: 17px; font-weight: 700; color: #9a5b00; }
+.lb-qty { display: flex; align-items: center; gap: 10px; white-space: nowrap; font-size: 16px; font-weight: 800; color: #5b6b7c; margin-top: auto; }
+.lb-qty .lb-in { width: 110px; min-width: 0; height: 48px; font-size: 22px; }
+.lb-green { color: #1d7a3e; }
+/* A tablet standing up: the tabs go on their own row under the name; the cards go three, then two, across. */
+@media (max-width: 1099px) {
+  .lb-head { flex-wrap: wrap; }
+  .lb-title, .lb-actions { flex: 1 1 100%; margin-left: 0; }
+  .lb-head .lb-actions button { flex: 1 1 0; }
+  #std-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) { #std-cards { grid-template-columns: 1fr 1fr; } .lb-actions { flex-wrap: wrap; } .lb-head .lb-actions button { flex: 1 1 30%; } .lb-qty { flex-wrap: wrap; white-space: normal; } .lb-qty .lb-in { width: 100%; } }
+.lb-card { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .lb-card .eyebrow { font-size: 16px; font-weight: 800; letter-spacing: .08em; color: #5b6b7c; text-transform: uppercase; }
 .lb-prod { font-size: 26px; font-weight: 800; color: #0b2f55; line-height: 1.15; }
-.lb-big { font-size: 52px; font-weight: 900; line-height: 1; color: #0b2f55; }
+.lb-big { font-size: 46px; font-weight: 900; line-height: 1; color: #0b2f55; }
 .lb-red { color: #c62828; }
 .lb-mut { color: #5b6b7c; font-size: 17px; }
 .lb-bar { height: 12px; background: #e3eaf1; border-radius: 6px; overflow: hidden; }
@@ -59,7 +80,7 @@
 .lb-date.ok { border-left-color: #1d7a3e; } .lb-date.bad { border-left-color: #c62828; background: #fff5f5; }
 .lb-date b { font-size: 24px; color: #0b2f55; white-space: nowrap; }
 .lb-date span:last-child { color: #5b6b7c; }
-.lb-status { margin-top: 12px; border-radius: 12px; padding: 10px 12px 10px 18px; display: flex; align-items: center; gap: 14px; font-size: 21px; color: #fff; }
+.lb-status { margin-top: 0; border-radius: 12px; padding: 10px 12px 10px 18px; display: flex; align-items: center; gap: 14px; font-size: 21px; color: #fff; }
 .lb-status > div { flex: 1; }
 .lb-status.running { background: #1c7c4a; } .lb-status.stopped { background: #c62828; } .lb-status.needs { background: #b86e00; }
 .lb-status button { min-height: 60px; padding: 0 26px; border: 3px solid #fff; border-radius: 12px; font: inherit; font-size: 22px; font-weight: 900; cursor: pointer; color: #fff; }
@@ -93,7 +114,7 @@
 }
 
 /* Line tablet, more (Joe 10/14, mock-ups C to H): Up next, each hour, the new buttons and their panes, the HTST and Blow Mold cards. */
-.lb-strip { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 12px; }
+.lb-strip { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 10px; }
 .lb-strip[hidden], .lb-actions[hidden], .lb-cards[hidden] { display: none; }
 .lb-box { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 12px 16px; font-size: 16px; color: #33475b; min-width: 0; }
 .lb-box h3 { margin: 0 0 8px; font-size: 18px; color: #0b2f55; text-transform: uppercase; letter-spacing: .05em; }
@@ -103,9 +124,24 @@
 .lb-hbars div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; justify-content: flex-end; font-size: 16px; color: #5b6b7c; }
 .lb-hbars i { display: block; width: 100%; background: #1d7a3e; border-radius: 4px 4px 0 0; min-height: 4px; }
 .lb-hbars i.a { background: #b86e00; } .lb-hbars i.r { background: #c62828; } .lb-hbars i.e { background: #e3eaf1; } .lb-hbars div.now span { color: #0b2f55; font-weight: 900; }
-.lb-actions { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
-.lb-actions button { min-height: 76px; background: #fff; border: 2px solid #0b4f8a; border-radius: 12px; font: inherit; font-size: 19px; font-weight: 900; color: #0b4f8a; line-height: 1.15; padding: 6px; cursor: pointer; touch-action: manipulation; }
-.lb-actions button small { display: block; font-size: 16px; font-weight: 700; color: #5b6b7c; margin-top: 3px; }
+/* Joe 10/26 (mock-up 1): the buttons are tabs in the head row, beside the line's name. */
+.lb-actions { display: flex; gap: 8px; margin-left: auto; flex: 1; justify-content: flex-end; min-width: 0; }
+.lb-actions button { flex: 0 1 150px; min-width: 0; min-height: 68px; background: #fff; border: 2px solid #0b4f8a; border-radius: 12px; font: inherit; font-size: 19px; font-weight: 900; color: #0b4f8a; line-height: 1.15; padding: 4px 8px; cursor: pointer; touch-action: manipulation; }
+.lb-actions button small { display: block; font-size: 16px; font-weight: 700; color: #5b6b7c; margin-top: 2px; }
+.lb-actions button.cur { background: #0b2f55; border-color: #0b2f55; color: #fff; } .lb-actions button.cur small { color: #d5e6f5; }
+/* Joe 10/26: the Quality Check as a list; tap OK or Not OK on each line. */
+.lb-qlist { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; overflow: hidden; margin-top: 10px; }
+.lb-qrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) 150px 150px; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid #e3eaf1; font-size: 21px; font-weight: 800; color: #0b2f55; min-height: 70px; }
+.lb-qrow:first-child { border-top: 0; }
+.lb-qrow small { display: block; font-size: 16px; font-weight: 600; color: #5b6b7c; }
+.lb-qrow .box { width: 40px; height: 40px; border: 3px solid #0b4f8a; border-radius: 9px; display: grid; place-items: center; font-size: 24px; font-weight: 900; color: #fff; }
+.lb-qrow.ok .box { background: #1d7a3e; border-color: #1d7a3e; }
+.lb-qrow.bad { background: #fdecec; } .lb-qrow.bad .box { background: #c62828; border-color: #c62828; }
+.lb-qrow button { min-height: 56px; border-radius: 10px; font: inherit; font-size: 19px; font-weight: 900; border: 2px solid #0b4f8a; background: #fff; color: #0b4f8a; cursor: pointer; touch-action: manipulation; }
+.lb-qrow button.yes.on { background: #1d7a3e; border-color: #1d7a3e; color: #fff; }
+.lb-qrow button.no { border-color: #c62828; color: #c62828; } .lb-qrow button.no.on { background: #c62828; color: #fff; }
+.lb-qrow button:disabled { opacity: .55; }
+.lb-qrow .lb-in { grid-column: span 2; width: 160px; }
 .lb-actions button.warn { border-color: #b86e00; color: #9a5b00; background: #fff8e6; }
 .lb-actions button.on { background: #0b4f8a; color: #fff; } .lb-actions button.on small { color: #d5e6f5; }
 .lb-actions button:disabled { opacity: .55; }
@@ -139,7 +175,7 @@ table.lb-t .n { text-align: right; }
 .lb-ok { color: #1d7a3e; font-weight: 800; } .lb-bad { color: #c62828; font-weight: 800; }
 @media (max-width: 900px) {
   .lb-strip { grid-template-columns: 1fr; }
-  .lb-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lb-qrow { grid-template-columns: 40px minmax(0, 1fr) 1fr 1fr; }
   .lb-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lb-checks { grid-template-columns: 1fr; }
   .lb-crew { grid-template-columns: 1fr 1fr; }
@@ -329,6 +365,7 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 @keyframes lb-boxflash { 0%, 100% { border-color: #e0a000; background: #fff; } 50% { border-color: #c62828; background: #fff4e5; } }
 .lb-box.lb-flashbox { border: 3px solid #e0a000; animation: lb-boxflash 1s steps(1) infinite; }
 .lb-actions button.lb-flashbtn { animation: lb-boxflash 1s steps(1) infinite; border-width: 3px; }
+.lb-actions button.cur, .lb-actions button.cur.warn, .lb-actions button.cur.on { background: #0b2f55; border-color: #0b2f55; color: #fff; animation: none; } .lb-actions button.cur small { color: #d5e6f5; }
 .lb-last { margin: 4px 0 10px; font-size: 18px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 /* A wide Earlier this shift table scrolls sideways inside its box, one line per cell, instead of squeezing into letters. */
 .lb-strip > .lb-box { min-width: 0; overflow-x: auto; }
@@ -530,3 +567,72 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .pm-lines p { margin: 6px 0; font-size: 17px; }
 .pm-eff { margin-top: 10px; }
 .pm-oee { color: var(--ud-blue-dark); }
+/* Joe 10/26 (down time, mock-up 3): the banner is Running (green), Changeover (blue) or Down (red), with a clock of how long and
+   its three buttons; the screen fills to the bottom on a tablet or Joe's window, with bigger cards and words. */
+#status { min-height: 84px; padding: 10px 12px 10px 18px; gap: 16px; }
+#status.idle { background: #5b6b7c; }
+#status .lb-state { font-size: 24px; font-weight: 900; min-width: 150px; }
+#status .lb-timer { font-size: 46px; font-weight: 900; font-variant-numeric: tabular-nums; background: rgba(0, 0, 0, .18); border-radius: 10px; padding: 0 14px; }
+#status .lb-timer[hidden] { display: none; }
+#status .lb-what { flex: 1; font-size: 20px; line-height: 1.25; min-width: 0; } #status .lb-what b { font-size: 23px; }
+.lb-sbtns { display: flex; gap: 8px; }
+#status .lb-sbtns button { min-height: 62px; min-width: 150px; padding: 0 16px; font-size: 21px; touch-action: manipulation; }
+.lb-sbtns .r { background: #1c7c4a; } .lb-sbtns .c { background: #0b4f8a; } .lb-sbtns .d { background: #c62828; }
+#status .lb-sbtns button.cur { outline: 4px solid #ffd54f; outline-offset: -8px; opacity: .55; }
+#status .lb-sbtns button.cur.c:not(:disabled) { opacity: .75; }
+#reasons { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+#reasons button { min-height: 56px; font-size: 16px; line-height: 1.1; padding: 4px 6px; }
+#reasons button.on { background: #c62828; border-color: #c62828; }
+.lb-dlist { display: flex; flex-direction: column; gap: 2px; font-size: 16px; color: #33475b; }
+.lb-dlist div { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #e3eaf1; padding: 3px 0; }
+.lb-dlist div span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } .lb-dlist div b { white-space: nowrap; } .lb-dlist .now { color: #c62828; font-weight: 800; } .lb-dlist .nowb { color: #0b4f8a; font-weight: 800; }
+.lb-since { font-size: 17px; color: #33475b; border-top: 1px solid #e3eaf1; padding-top: 6px; } .lb-since b { color: #0b2f55; } .lb-since:empty { display: none; }
+.lb-eb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .lb-eb .eyebrow { display: inline; } .lb-title .lb-eb .lb-live { margin: 0; padding: 2px 10px; }
+#screen:not([hidden]) { display: flex; flex-direction: column; min-height: 100vh; }
+.lt-tablet .view { flex: 1 1 auto; display: flex; flex-direction: column; box-sizing: border-box; }
+#board:not([hidden]) { flex: 1 1 auto; display: flex; flex-direction: column; }
+#std-cards, #kind-cards { flex: 1.5 1 auto; }
+@media (min-width: 1100px) { #std-cards { grid-template-columns: 1.4fr 1.1fr 1fr 1fr 1.3fr; } }
+#strip .lb-box { display: flex; flex-direction: column; }
+#strip .lb-hbars { flex: 1 1 auto; height: auto; min-height: 74px; }
+#std-cards .lb-card { padding: 12px 16px; gap: 6px; }
+.lb-card .eyebrow { font-size: 17px; }
+#std-cards .lb-big { font-size: 56px; }
+#std-cards .lb-prod { font-size: 30px; }
+#std-cards .lb-code b { font-size: 40px; }
+#strip .lb-next { font-size: 26px; }
+@media (max-width: 1300px) {
+  #std-cards .lb-big { font-size: 46px; } #std-cards .lb-card { padding: 10px 12px; } #std-cards .lb-prod { font-size: 26px; }
+  #status .lb-state { min-width: 0; font-size: 21px; } #status .lb-timer { font-size: 40px; } #status .lb-what { font-size: 18px; } #status .lb-what b { font-size: 20px; }
+  #status .lb-sbtns button { min-width: 0; font-size: 18px; padding: 0 12px; }
+  .lb-head .lb-actions button { font-size: 16px; padding: 4px; } .lb-head h1 { font-size: 32px; } .lb-head .lb-sub { font-size: 16px; }
+  #std-cards .lb-code { flex-direction: row; } #std-cards .lb-code b { font-size: 34px; } .lb-qty .lb-in { width: 90px; }
+}
+@media (max-width: 900px) {
+  #status { flex-wrap: wrap; } #status .lb-what { flex-basis: 100%; order: 3; } .lb-sbtns { flex: 1 1 100%; order: 4; }
+  #status .lb-sbtns button { flex: 1 1 0; width: auto; }
+  #std-cards .lb-big { font-size: 38px; }
+}
+@media (max-width: 500px) { #status .lb-sbtns button { font-size: 16px; padding: 0 4px; } #status .lb-sbtns button.c { flex-grow: 1.6; } #status .lb-timer { font-size: 32px; } }
+/* Joe 10/26 (filler mock-up 1): the Fill weight box (countdown and one weight box) beside Up next and Each hour. */
+.lb-bottom { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr); gap: 12px; margin-top: 10px; flex: 1 1 auto; }
+.lb-bottom:has(> #fill-box[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.lb-bottom:has(> #fill-box[hidden]):has(> #strip[hidden]) { display: none; }
+.lb-bottom > .lb-strip { margin-top: 0; }
+#fill-box[hidden] { display: none; }
+#fill-box > .lb-box { height: 100%; box-sizing: border-box; }
+.fw-box { display: flex; flex-direction: column; gap: 6px; }
+.fw-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fw-clock { font-size: 46px; font-weight: 900; color: #0b2f55; font-variant-numeric: tabular-nums; line-height: 1; }
+.fw-clock small { display: block; font-size: 16px; font-weight: 800; color: #5b6b7c; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+.fw-clock .fw-words { font-size: 22px; }
+.fw-due .fw-clock span { color: #c62828; }
+.fw-in { display: flex; flex-direction: column; font-size: 16px; font-weight: 800; color: #5b6b7c; }
+.fw-in .lb-in { width: 160px; height: 56px; font-size: 26px; font-weight: 900; }
+.fw-last { font-size: 17px; color: #33475b; } .fw-last b { color: #0b2f55; }
+.fw-ok { color: #1d7a3e; font-weight: 800; } .fw-bad { color: #c62828; font-weight: 800; } .fw-warn { color: #9a5b00; font-weight: 800; }
+@media (max-width: 900px) { .lb-bottom { grid-template-columns: minmax(0, 1fr); } }
+/* Seven tabs (fillers: Changeover and CIP / Sanitation): a size smaller so each word stays whole. */
+.lb-head .lb-actions:has(> button:nth-child(7)) { gap: 6px; }
+.lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 17px; padding: 4px; }
+@media (min-width: 1100px) and (max-width: 1300px) { .lb-head:has(.lb-actions > button:nth-child(7)) .lb-title { max-width: 330px; } .lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 16px; } }

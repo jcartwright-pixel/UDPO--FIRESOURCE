@@ -217,8 +217,10 @@ test('Fill weight check: due at the start and each product change, then every so
   assert.deepEqual([d.due, d.why, d.index], [true, 'start', null]);
   run.fills.push({ at: iso(5), count: 600, jug1: 3850 });
   d = P.fillDue(run, {}, t0 + 30 * 60000);
-  assert.deepEqual([d.due, d.index, d.nextAt], [false, 0, iso(5 + P.FILL_DEFAULT_MIN)], 'empty setting: every 2 hours');
-  // Joe 10/15: once all five weights are in, the check is recorded: the boxes empty for the next one, the result read-only.
+  // Joe 10/26: one jug a check, so one weight records it: the box empties for the next one and the countdown starts.
+  assert.equal(P.FILL_JUGS, 1);
+  assert.deepEqual([d.due, d.index, d.current, d.last.filled, d.nextAt], [false, null, null, 1, iso(5 + P.FILL_DEFAULT_MIN)], 'empty setting: every 2 hours');
+  // An earlier five-jug check (or one the Quality screen copied over) still reads all its weights.
   Object.assign(run.fills[0], { jug2: 3851, jug3: 3852, jug4: 3853, jug5: 3854 });
   d = P.fillDue(run, {}, t0 + 30 * 60000);
   assert.deepEqual([d.due, d.index, d.current, d.last.filled, d.nextAt], [false, null, null, 5, iso(5 + P.FILL_DEFAULT_MIN)]);
@@ -256,8 +258,12 @@ test('Gallon Filler add-on sensors (Joe 10/14, B): a filler reads its motor swit
   assert.deepEqual([m.running, m.runningSince, m.infeed, m.rejects], [false, '2026-10-14T09:58:00.000Z', 1030, 30]);
 });
 
-test('Bag fillers and Fed by (Joe 10/14): Raypak and Boxing weigh bags; a packing line\'s boxes against its fillers\' jugs', () => {
-  assert.deepEqual(['RAYPAK', 'BOXING', 'GALLON FILLER', 'NEW 1/2 GALLON', 'TOTES', 'HTST #1', 'BLOW MOLD'].map(P.hasFill), [true, true, true, true, false, false, false]);
+test('Bag fillers and Fed by (Joe 10/14): Raypak weighs bags (Joe 10/26: Boxing has no fill weight check); a packing line\'s boxes against its fillers\' jugs', () => {
+  assert.deepEqual(['RAYPAK', 'BOXING', 'GALLON FILLER', 'NEW 1/2 GALLON', 'TOTES', 'HTST #1', 'BLOW MOLD'].map(P.hasFill), [true, false, true, true, false, false, false]);
+  // Joe 10/26: the new bag filler weighs bags like the Raypak.
+  assert.deepEqual(['NEW BAG FILLER', 'Bag Filler 2', 'RAYPAK', 'GALLON FILLER'].map(P.isBagFiller), [true, true, true, false]);
+  assert.equal(P.hasFill('NEW BAG FILLER'), true);
+  assert.equal(P.lineMore(null, [], Date.parse('2026-10-08T15:00:00Z'), 'PACK', {}, { lineName: 'BOXING' }).fill, null);
   assert.equal(P.fillWords('RAYPAK').cap, 'fitment');
   assert.equal(P.fillWords('GALLON FILLER').one, 'jug');
   const raypak = P.lineMore(null, [], Date.parse('2026-10-08T15:00:00Z'), 'PACK', {}, { lineName: 'RAYPAK' });
@@ -359,4 +365,15 @@ test('Blow Mold (Joe 10/23, mock-up 2): shots x 6 = jugs molded, the tester coun
   assert.deepEqual(hrs.map(h => [h.molded, h.through, h.kicked, h.kickPct, h.lots]), [[48, 40, 8, 16.7, ['R-1 · White']], [72, 60, 12, 16.7, ['R-2 · Clear']]]);
   assert.deepEqual([hrs[0].tempRange, hrs[0].speedRange, hrs[0].roomRange, hrs[1].tempRange, hrs[1].roomRange], [[1100, 1150], [70, 71], [80, 82], [1200, 1200], null]);
   assert.equal(P.blowHours({ shiftStart: '2026-10-23T02:00:00.000Z', shiftEnd: '2026-10-23T09:30:00.000Z', count: 5, counts: [{ at: '2026-10-23T02:30:00.000Z', count: 5 }] }, {}, [], Date.parse('2026-10-23T02:45:00.000Z'))[0].molded, null, 'no shot counter, no jugs molded');
+});
+
+// Joe 10/26: Boxing has no CIP; the product running counts down from how many to run.
+test('Boxing has no CIP button; Left to run counts down from how many to run of the product running now', () => {
+  assert.deepEqual(['BOXING', 'RAYPAK', 'GALLON FILLER', 'HTST #1'].map(P.hasCip), [false, true, true, true]);
+  assert.equal(P.runLeft({ runs: [{ product: 'A', from: '2026-10-26T18:00:00Z' }] }, 0), null, 'no amount typed: no countdown');
+  const run = { count: 260, counts: [{ at: '2026-10-26T18:30:00Z', count: 100 }, { at: '2026-10-26T19:30:00Z', count: 160 }, { at: '2026-10-26T20:30:00Z', count: 260 }],
+    runs: [{ product: 'A', from: '2026-10-26T18:00:00Z', qty: 500 }, { product: 'B', from: '2026-10-26T19:00:00Z', qty: 300 }] };
+  assert.deepEqual(P.runLeft(run, 0), { qty: 300, made: 160, left: 140, over: 0, pct: 53 }, 'B made 260 - 100 counted before it started');
+  run.runs[1].qty = 150;
+  assert.deepEqual(P.runLeft(run, 0), { qty: 150, made: 160, left: 0, over: 10, pct: 100 });
 });

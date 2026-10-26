@@ -801,20 +801,31 @@ Every production line this week: what each line made against its target, how lon
 id: line
 screens: line.html
 
-The tablet at a production line. The operator signs on and keeps the line's count, product and checks.
+The tablet at a production line. The operator signs on and keeps the line's count, product and checks. Everything fits on one screen: the line's name, its buttons across the top, the **Running / Changeover / Down** bar right under them with a clock of how long, then the cards.
 
 1. Pick this tablet's line the first time (`Change Line` changes it later).
-2. `Change Product` picks what is running. The label reader checks the jug's label; WRONG LABEL means the label is not one of this line's products.
-3. `Enter Count` types how many were made this shift so far (when the machine does not count). It saves when you press Enter.
-4. Do each check when it is due (fill weights, bottle weights). Press `Passed` or `Failed`.
-5. Type kick-outs and waste with `Enter Kick-outs`.
-6. `Start CIP Wash` when the line goes into a wash, and `Back to Forward Flow` when it is done.
+2. `Change Product` picks what is running. **Running now** shows the product's **code date** in big letters. The label reader checks the jug's label; WRONG LABEL means the label is not one of this line's products.
+3. Type **How many to run** of that product. **Left to run** counts down as the count goes up, and says DONE when it is all made. The amount set with `Set Next` comes along by itself when that product starts.
+4. `Enter Count` types how many were made this shift so far (when the machine does not count). It saves when you press Enter.
+5. Tap `DOWN` when the line stops (the bar turns red and its clock starts), then tap why in the row under it. Tap `RUNNING` when it runs again.
+6. Do each check when it is due. **Quality Check** is a list: tap `OK` or `Not OK` on each line and type the temperature. Each tap saves right away; tap it again to take it back.
+7. Type kick-outs and waste with `Waste / Rejects` (or `Enter Kick-outs` on the Blow Mold).
+8. For a product change, tap `CHANGEOVER` on the bar: pick the product it changes to and tap `START CHANGEOVER`. The bar turns blue with its clock and the standard minutes. Tap `RUNNING` when the new product runs; the changeover's minutes are kept.
+9. `CIP / Sanitation` starts and finishes a wash (Boxing has no CIP).
 
-- Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE), what was made, and how long it was stopped.
+- The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
+- Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE) and what was made. **Running now** says since when the product has run and how long the last changeover took.
+- **Down this shift** adds up the minutes down and in changeover, and lists each one with its minutes, newest first; the one going on now says "now".
+- **Fill weight** (the fillers, and the Raypak and bag fillers with bags), beside Up next: it counts down to the next weight and says NOW, flashing, when one is due. Weigh one filled jug, type its weight in grams in the box and press Enter. The box empties and the countdown starts again; under it is the last weight and whether it was over or under target. How often is set on Line Targets. Boxing has no fill weight check: its product was weighed before it gets there.
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
-- `Set Next` sets what runs next on this line, for the next shift.
+- `Set Next` sets what runs next on this line and how many.
+
+> No code date on Running now? Set the product's shelf life on Line Targets.
 
 !> Do not type a check you did not do. A recorded check cannot be changed from the tablet.
+!> Do not leave How many to run blank when you know the amount. Without it there is no countdown.
+!> Do not type a weight from memory or from the last jug. Weigh a jug each time the box says NOW.
+!> Do not tap `DOWN` for a product change. Tap `CHANGEOVER`, so the time counts as a changeover, not as down.
 
 ## Line Targets
 id: linetargets

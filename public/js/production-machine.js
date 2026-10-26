@@ -131,7 +131,7 @@ function fillTable(v, h) {
   const fl = v.fill;
   if (!fl) return '';
   const fw = fl.words || { One: 'Jug', many: 'jugs' };
-  const rows = h.fills.slice().reverse().map(c => '<tr><td>' + clockOf(when(c.at)) + '</td><td class="w no-fit">' + escapeHtml(c.product || '—') + '</td><td class="n">' + c.filled + ' of ' + R().FILL_JUGS + '</td><td class="n">' + (c.avgNet === null ? '—' : fmt(c.avgNet) + ' g') + '</td>' +
+  const rows = h.fills.slice().reverse().map(c => '<tr><td>' + clockOf(when(c.at)) + '</td><td class="w no-fit">' + escapeHtml(c.product || '—') + '</td><td class="n">' + fmt(c.filled) + '</td><td class="n">' + (c.avgNet === null ? '—' : fmt(c.avgNet) + ' g') + '</td>' +
     '<td class="n">' + (c.diff === null ? 'Set target' : '<b class="' + (c.flag ? 'pm-r' : 'pm-g') + '">' + sg(c.diff) + ' g' + (c.flag ? ' ' + c.flag : '') + '</b>') + '</td><td>' + escapeHtml(who(c.by)) + '</td></tr>');
   const tot = fl.totals;
   return '<section class="pd-box pm-box"><h3>Fill weight checks</h3>' + (rows.length ? '<table class="pd-t pm-t"><thead><tr><th>Time</th><th class="w">Product</th><th class="n">' + fw.One + 's</th><th class="n">Average product</th><th class="n">Against target</th><th>Who</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '<p class="pd-none">No fill weight checks yet.</p>') +
