@@ -74,7 +74,9 @@
     let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '', lineId = tv ? '' : params.get('line') || '', kindFilter = 'ALL';
     // Joe 10/26: a machine card on the Plant Production front page opens the lines of its kind (?kind=FILLER).
     // Joe 10/26: one screen for each machine, the same for every machine (mock-ups 1, 2 and 3 while he picks).
+    // Joe 10/26 (picked 1): each area on its own tab (?tab=), so the page fits the screen without scrolling.
     const look = ['1', '2', '3'].indexOf(params.get('look')) >= 0 ? params.get('look') : '';
+    let pmTab = params.get('tab') || '';
     let weekView = !tv && params.get('view') === 'week', weekOf = params.get('week') || '', weekRuns = [], weekKey = '', stopWeek = null;
     const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
     if (KINDS.some(k => k[0] === params.get('kind'))) kindFilter = params.get('kind');
@@ -272,7 +274,7 @@
       const cipBox = box('CIP washes', table([['Started'], ['Done'], ['Min', 1], ['Result']], cipRows, v.lastCipAt ? 'None this shift. Last one that passed: ' + shortDate(v.lastCipAt.slice(0, 10)) + ' ' + clockOf(v.lastCipAt) + '.' : 'None this shift.'));
       const qualityBox = box('Quality checks', table([['Time']].concat(fields.map(f => [escapeHtml(f[1]), f[2] === 'num' ? 1 : 0])).concat([['By']]), checkRows, 'No checks yet this shift.'), 'wide');
       // Joe 10/25 (desk mock-up 2): the Blow Mold's own page, drawn into #detail with its own numbers up top.
-      document.getElementById('detail').classList.toggle('pm-detail', !!look && v.kind !== 'BLOWMOLD');
+      document.getElementById('detail').classList.toggle('pm-detail', v.kind !== 'BLOWMOLD');
       if (v.kind === 'BLOWMOLD') {
         const bm = drawBlowDetail(v, t, { box, table, mgr });
         document.getElementById('hstats').innerHTML = bm.stats;
@@ -280,11 +282,10 @@
           '<div class="pd-col">' + fillBox + effBox + coBox + cipBox + box('Crew and notes', notes) + '</div>' + qualityBox;
         return;
       }
-      if (look) {
-        document.getElementById('hstats').innerHTML = '';
-        document.getElementById('detail').innerHTML = drawMachine(v, t, look, { manager: mgr, quality: qualityBox });
-        return;
-      }
+      document.getElementById('hstats').innerHTML = '';
+      document.getElementById('detail').innerHTML = drawMachine(v, t, look, { manager: mgr, quality: qualityBox, tab: pmTab });
+      fitTab();
+      return;
       document.getElementById('detail').innerHTML = liveBox(v) + tlBox +
         '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]].concat(hasM ? [[escapeHtml(mach.speedName), 1], ['Temp', 1]] : []), hourRows, 'No hours yet this shift.')) +
         stopsBox + wasteBox + '</div>' +
@@ -396,14 +397,32 @@
       const c = e.target.closest('.pd-tile[data-line]');
       if (!c) return;
       lineId = c.dataset.line;
-      history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (look ? '&look=' + look : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (look ? '&look=' + look : '') + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
       render(); document.getElementById('view').scrollTop = 0; window.scrollTo(0, 0);
+    });
+    // The tab's box takes the rest of the window: a long list scrolls inside it, never the page.
+    function fitTab() {
+      const body = document.querySelector('#detail .pm-tabbody');
+      if (!body) return;
+      const room = Math.max(260, window.innerHeight - body.getBoundingClientRect().top - (document.getElementById('right').getBoundingClientRect().top < 0 ? 0 : 18));
+      body.style.height = room + 'px';
+      body.style.setProperty('--pm-ch', Math.max(160, Math.min(420, room - 110)) + 'px');
+    }
+    window.addEventListener('resize', fitTab);
+    document.getElementById('detail').addEventListener('click', e => {
+      const b = e.target.closest('button[data-pmtab]');
+      if (!b) return;
+      pmTab = b.dataset.pmtab;
+      const q = new URLSearchParams(location.search);
+      q.set('tab', pmTab);
+      history.replaceState(null, '', 'production.html?' + q.toString());
+      render();
     });
     document.getElementById('menu').addEventListener('click', e => {
       const b = e.target.closest('button[data-tab]');
       if (!b) return;
       lineId = b.dataset.tab; weekView = false;
-      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (look ? '&look=' + look : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (look ? '&look=' + look : '') + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
       render(); document.getElementById('right').scrollTop = 0;
     });
     window.addEventListener('popstate', () => { lineId = new URLSearchParams(location.search).get('line') || ''; render(); });

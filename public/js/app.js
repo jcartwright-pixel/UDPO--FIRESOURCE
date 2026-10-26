@@ -1250,6 +1250,7 @@ export function shortTime(v) {
   return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 }
 
+// A cell marked .no-fit is left as it is (Joe 10/26: a machine's product names stay on one line; the table scrolls instead).
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are
 // never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 16px (review item 56, Joe 10/13), and a cell that still does
 // not fit wraps onto a second line (.fit-wrap) instead. Headers keep their size. Runs after every redraw and on resize.
@@ -1278,7 +1279,7 @@ const weeklyFitMin = () => window.innerWidth <= 1024 ? 16 : WEEKLY_FIT_MIN;
 function fitMin(td) { return td.classList.contains('day') && !td.classList.contains('c-vacation-needs') && td.closest('.weekly-page .sheet.week') ? weeklyFitMin() : FIT_MIN; }
 function fitCells() {
   fitQueued = false;
-  const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
+  const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && !td.classList.contains('no-fit') && td.colSpan === 1);
   cells.forEach(td => { if (td.dataset.fit) { td.style.fontSize = ''; delete td.dataset.fit; } td.classList.remove('fit-wrap'); });
   let over = cells.filter(tooWide);
   const wrap = [];

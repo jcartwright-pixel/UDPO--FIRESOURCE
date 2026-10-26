@@ -447,7 +447,8 @@ body.pd-tv .pd-right .pd-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)
 
 /* ---------- One machine's page (Joe 10/26: one screen, the same for every machine; mock-ups 1, 2 and 3) ---------- */
 .pd-detail.pm-detail { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
-table.pm-t td.w, table.pm-t th.w { white-space: nowrap; min-width: 230px; }
+table.pm-t td.w, table.pm-t th.w { white-space: nowrap; min-width: 230px; overflow: visible; text-overflow: clip; }
+table.pm-t { table-layout: auto; }
 .pm-detail h4 { margin: 16px 0 6px; font-size: 17px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
 .pm-box-h { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
 .pm-box-h h3 { margin: 0; }
@@ -489,7 +490,7 @@ table.pm-t td.w, table.pm-t th.w { white-space: nowrap; min-width: 230px; }
 .pm-tl { height: 30px; }
 .pd-tl i.off { background: #eef2f6; }
 /* Each product run, one line each. */
-table.pm-t td, table.pm-t th { font-size: 17px; padding: 7px 10px; }
+table.pm-t td, table.pm-t th { font-size: 17px; padding: 5px 10px; }
 table.pm-t tr.pm-on td { background: #eef7f1; }
 table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc; }
 /* The rest of the page in two columns. */
@@ -542,3 +543,27 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .pm-bar em { font-style: normal; font-size: 16px; color: #c62828; font-weight: 700; text-align: center; line-height: 1.1; min-height: 36px; }
 @media (max-width: 1100px) { .pm-two, .pm-split2 { grid-template-columns: minmax(0, 1fr); } .pm-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .pm-prod, .pm-band .pm-prod { font-size: 26px; } .pm-tile b, .pm-band-nums b { font-size: 34px; } .pm-big b { font-size: 48px; } .pm-feed li { grid-template-columns: 1fr; gap: 2px; } .pm-feed i { display: none; } table.pm-t { min-width: 760px; } }
+/* Joe 10/26 (picked 1): each area on its own tab, so the machine's page fits the screen without scrolling. */
+.pm-now.pm-compact { padding: 10px 16px; }
+.pm-compact .pm-now-h { gap: 10px 14px; }
+.pm-compact .pm-prod { font-size: 30px; }
+.pm-compact .pm-since { margin: 0; }
+.pm-compact .pm-tiles { margin-top: 10px; gap: 10px; }
+.pm-compact .pm-tile { padding: 6px 12px; }
+.pm-compact .pm-tile b { font-size: 34px; line-height: 1.05; }
+.pm-compact .pm-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; }
+.pm-compact .pm-tile span { grid-column: 1 / -1; }
+.pm-compact .pm-tile small { align-self: end; padding-bottom: 4px; }
+.pm-compact .pm-tile span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-compact .pm-sensors { margin-top: 8px; padding: 6px 10px; }
+.pm-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: -6px; }
+.pm-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 2px solid #9fb3c8; border-radius: 10px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.pm-tabs button:hover { background: #eef5fc; }
+.pm-tabs button.on { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.pm-tabs button b { min-width: 26px; padding: 1px 7px; border-radius: 999px; background: var(--band); color: var(--ud-blue-dark); font-size: 16px; text-align: center; }
+.pm-tabs button.on b { background: #fff; }
+.pm-tabs button b.pm-badge-r { background: #c62828; color: #fff; }
+.pm-tabbody { overflow: auto; min-height: 260px; }
+.pm-tabbody .pm-ch-plot svg, .pm-tabbody .pm-ch-y { height: var(--pm-ch, 240px); }
+.pm-tabbody .pm-two h4:first-child, .pm-tabbody > .pm-two h4 { margin-top: 0; }
+.pm-tabbody .pd-oee { margin: 6px 0; }
