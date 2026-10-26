@@ -140,7 +140,7 @@ const ACTIONS = Object.freeze({
   // Receiving scan-in (receiving.js): each scan on a delivery, and the list of what the plant receives.
   saveReceivingScan: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
-  // Plant Schedule & Vacations (crew.js, Joe 10/25): the Schedule Board's days and the time off by the plant's supervisors;
+  // Plant Vacations & Schedule (crew.js, Joe 10/25): the Schedule Board's days and the time off by the plant's supervisors;
   // the setup (areas, shifts, jobs, people, limits) by a manager or administrator.
   saveCrewDay: { roles: L.SAVE_ROLES, screen: 'plant' },
   saveCrewVacation: { roles: L.SAVE_ROLES, screen: 'plant' },

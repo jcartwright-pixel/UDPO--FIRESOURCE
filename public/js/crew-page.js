@@ -1,5 +1,5 @@
 /*
- * Plant Schedule & Vacations and Maintenance Schedule (Joe 10/25, mock-ups 1 and 3): crew.html (the plant's crew: loadout and
+ * Plant Vacations & Schedule and Maintenance Schedule (Joe 10/25, mock-ups 1 and 3): crew.html (the plant's crew: loadout and
  * production on one schedule) and maint-crew.html (maintenance's mechanics). One page, three views from the menu:
  *   Schedule Board  one row per person, their job each day Sunday to Saturday, by shift; a line of the jobs still short of
  *                   people above each area. Click a day to pick another job or Off for that week; Usual puts it back.

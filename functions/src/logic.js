@@ -1458,8 +1458,8 @@
     { key: 'production', name: 'Plant Production', home: 'production.html', screens: [
       ['lines', 'Production Lines and Production TV', ['production.html']], ['lineTablet', 'Line Tablet', ['line.html']], ['lineTargets', 'Line Targets', ['linetargets.html']],
       ['quality', 'Quality Checks', ['quality.html']], ['temps', 'Cooler Temperature', ['temps.html']]] },
-    // Joe 10/25: Plant Schedule & Vacations (the plant's crew: loadout and production on one schedule).
-    { key: 'crew', name: 'Plant Schedule & Vacations', home: 'crew.html', screens: [
+    // Joe 10/25: Plant Vacations & Schedule (the plant's crew: loadout and production on one schedule).
+    { key: 'crew', name: 'Plant Vacations & Schedule', home: 'crew.html', screens: [
       ['crewBoard', 'Schedule Board', ['crew.html']], ['crewVacations', 'Plant Vacations', ['crew.html']], ['crewSetup', 'Plant Schedule Setup', ['crew.html']]] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
@@ -1531,7 +1531,7 @@
   var MENU_SIDES = [
     { key: 'plant', name: 'Plant Distribution', first: '', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
     { key: 'production', name: 'Plant Production', first: 'Production Lines', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
-    { key: 'crew', name: 'Plant Schedule & Vacations', first: 'Plant Schedule & Vacations', sections: ['Plant Schedule & Vacations'] },
+    { key: 'crew', name: 'Plant Vacations & Schedule', first: 'Plant Vacations & Schedule', sections: ['Plant Vacations & Schedule'] },
     { key: 'pmaint', name: 'Plant Maintenance', first: 'Plant Maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'] }
   ];
   var MENU_POOL = MENU_SIDES.reduce(function (all, s) { s.sections.forEach(function (g) { if (all.indexOf(g) < 0) all.push(g); }); return all; }, []);

@@ -1288,8 +1288,8 @@ async function noScroll(page) {
     await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 6, null, { timeout: 10000 });
     assert.equal(await lp.$$eval('.launch-card[data-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
     assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
-    // Joe 10/25: Plant Schedule & Vacations is a menu item only, with no card on the home page.
-    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX.slice(0, 2).concat(['Plant Schedule & Vacations'], SIX.slice(2)));
+    // Joe 10/25: Plant Vacations & Schedule is a menu item only, with no card on the home page.
+    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX.slice(0, 2).concat(['Plant Vacations & Schedule'], SIX.slice(2)));
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
     // Joe 10/10: the Plant Distribution picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.

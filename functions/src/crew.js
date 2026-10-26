@@ -1,5 +1,5 @@
 /*
- * Plant Schedule & Vacations (Joe 10/25, mock-ups 1 and 3): the plant's crew and Plant Maintenance's mechanics, by team.
+ * Plant Vacations & Schedule (Joe 10/25, mock-ups 1 and 3): the plant's crew and Plant Maintenance's mechanics, by team.
  * The rules are crew-rules.js (shared with the screens). Everything here is kept in the app only (no sheet).
  *
  * saveCrewSetup     Setup (also under Administration): an area and its shift times, a job and how many it needs, a person,

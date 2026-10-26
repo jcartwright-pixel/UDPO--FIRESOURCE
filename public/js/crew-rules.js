@@ -1,5 +1,5 @@
 /*
- * Plant Schedule & Vacations (Joe 10/25, mock-ups 1 and 3): who works which job each shift, their time off, and the setup
+ * Plant Vacations & Schedule (Joe 10/25, mock-ups 1 and 3): who works which job each shift, their time off, and the setup
  * (areas, each area's own shift times, jobs, people, vacation limits). Shared by the screens and the server (one file, copied
  * unchanged to public/js/crew-rules.js; a unit test checks the two match).
  *
@@ -17,7 +17,7 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.UDCrew = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  var TEAMS = { plant: 'Plant Schedule & Vacations', maint: 'Maintenance Schedule' };
+  var TEAMS = { plant: 'Plant Vacations & Schedule', maint: 'Maintenance Schedule' };
   var SHIFTS = [1, 2, 3];
   var SHIFT_NAMES = { 1: '1st', 2: '2nd', 3: '3rd' };
   var DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

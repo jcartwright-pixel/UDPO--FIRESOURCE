@@ -38,7 +38,7 @@
       '<b class="open-text">Open ' + escapeHtml(s.short || s.name.replace(/^Route /, '').replace(/ Operations$/, '')) + ' &rarr;</b>' +
       (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '</a>';
     // Joe 10/11: six cards (the plant's three, Route Distribution, Fleet & Maintenance, Reports); Administration is the header button.
-    // Joe 10/25: a menu-only side (Plant Schedule & Vacations) has no card here.
+    // Joe 10/25: a menu-only side (Plant Vacations & Schedule) has no card here.
     const cards = SIDES.filter(s => !s.menuOnly);
     document.getElementById('sides').innerHTML = cards.map(card).join('');
     // Joe 10/12: a seventh card (Safety Walkthrough) next to Reports; four cards a row so all seven fit one screen (mock-up A).

@@ -1,5 +1,5 @@
 'use strict';
-// Plant Schedule & Vacations (Joe 10/25, mock-ups 1 and 3): the setup (areas with their own shift times, jobs, people), the
+// Plant Vacations & Schedule (Joe 10/25, mock-ups 1 and 3): the setup (areas with their own shift times, jobs, people), the
 // Schedule Board's days, and time off with the driver Vacation Schedule's rules counted by area and shift.
 const test = require('node:test');
 const assert = require('node:assert/strict');

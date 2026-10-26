@@ -108,7 +108,7 @@ export const MENU = [
   ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
-  ['Plant Schedule & Vacations', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
+  ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
   ['Maintenance Schedule', [['Schedule Board', 'maint-crew.html', 'week'], ['Vacations', 'maint-crew.html?view=vacations', 'vacation'], ['Setup', 'maint-crew.html?view=setup', 'gear']]]
 ];
 // Joe 10/10: Home is the old app's icon launcher, one big picture per side; tapping one opens that side, and the menu then
@@ -120,8 +120,8 @@ export const SIDES = [
   { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
   { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
-  // Joe 10/25 (mock-up 1): Plant Schedule & Vacations sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
-  { key: 'crew', menuOnly: true, short: 'Plant Schedule', name: 'Plant Schedule & Vacations', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Schedule & Vacations'], flatFirst: true },
+  // Joe 10/25 (mock-up 1): Plant Vacations & Schedule sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
+  { key: 'crew', menuOnly: true, short: 'Plant Vacations & Schedule', name: 'Plant Vacations & Schedule', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Vacations & Schedule'], flatFirst: true },
   { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },

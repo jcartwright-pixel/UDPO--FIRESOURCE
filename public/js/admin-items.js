@@ -46,7 +46,7 @@ export const ADMIN_GROUPS = [
     ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map'],
     // Joe 10/25: the schedules' setup opens from the schedule's own menu and from here (the same lists), and each plant
     // puts its menu in its own order (mock-up 7).
-    ['menu-setup', 'Menu Setup', "Each plant's menu in its own order: move a section up or down, or to another side (Plant Distribution, Plant Production, Plant Schedule & Vacations, Plant Maintenance). Start over from the standard menu at any time.", 'menu-setup.html', 'swap'],
+    ['menu-setup', 'Menu Setup', "Each plant's menu in its own order: move a section up or down, or to another side (Plant Distribution, Plant Production, Plant Vacations & Schedule, Plant Maintenance). Start over from the standard menu at any time.", 'menu-setup.html', 'swap'],
     ['crew-setup', 'Plant Schedule Setup', 'The plant people schedule: areas with their own shift times, the jobs and how many each needs, the people, and the time-off limits.', 'crew.html?view=setup', 'week'],
     ['maint-crew-setup', 'Maintenance Schedule Setup', "Plant Maintenance's own schedule: its areas and shifts, jobs, mechanics and time-off limits.", 'maint-crew.html?view=setup', 'wrench'],
     ['plant-equipment', 'Maintenance Equipment', 'What maintenance looks after besides the production machines (refrigeration, boilers, compressors, the building): add and edit it.', 'plant-equipment.html', 'gear']
