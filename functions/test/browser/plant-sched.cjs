@@ -156,8 +156,16 @@ async function shots(page, name, w) {
     await desk.click('#f-confirm');
     await desk.waitForFunction(() => /Garber Farms/.test(document.querySelector('.sc-weekgrid > .sc-col:last-child').textContent));
     const shown = Date.now() - t0;
-    await watcher.waitForFunction(() => /Garber Farms[\s\S]*5:45 AM · T-961/.test(document.querySelector('.sc-weekgrid > .sc-col:last-child').textContent), null, { timeout: 8000 });
-    results.push('Add Load (Garber, Saturday 5:45 AM, trailer 961): on screen in ' + shown + ' ms, on the other screen in ' + (Date.now() - t0) + ' ms as T-961');
+    await watcher.waitForFunction(() => /Garber Farms[\s\S]*5:45 AM/.test(document.querySelector('.sc-weekgrid > .sc-col:last-child').textContent), null, { timeout: 8000 });
+    const shownMs = Date.now() - t0;
+    // Joe 10/25: the week card shows only the name and the time; the trailer is in the box the card opens.
+    const satCard = '.sc-weekgrid > .sc-col:last-child .sc-load:has-text("Garber Farms")';
+    assert.deepEqual(await watcher.$eval(satCard, b => [...b.children].map(c => c.textContent)), ['Garber Farms Load 1', '5:45 AM'], 'the week card: name and time only');
+    await watcher.click(satCard);
+    await watcher.waitForSelector('#f-trailer');
+    assert.match(await watcher.inputValue('#f-trailer'), /961/, 'the trailer is in the load box');
+    await watcher.click('#modal [data-close]');
+    results.push('Add Load (Garber, Saturday 5:45 AM, trailer 961): on screen in ' + shown + ' ms, on the other screen in ' + shownMs + ' ms; the card shows name and time, the box shows the trailer');
     // Edit Sun Valley: carrier needs a PO; change the time.
     await desk.click('.sc-load.car');
     await desk.fill('#f-po', '');
@@ -166,8 +174,12 @@ async function shots(page, name, w) {
     await desk.fill('#f-po', '4471-B');
     await desk.fill('#f-time', '14:30');
     await desk.click('#f-save');
-    await watcher.waitForFunction(() => /2:30 PM · PO 4471-B/.test(document.getElementById('body').textContent), null, { timeout: 8000 });
-    results.push('Edit Load (Sun Valley carrier): blank PO refused in the box; 2:30 PM and PO 4471-B on the other screen');
+    await watcher.waitForFunction(() => [...document.querySelector('.sc-load.car').children].map(c => c.textContent).join('|') === 'Sun Valley Load 1|2:30 PM', null, { timeout: 8000 });
+    await watcher.click('.sc-load.car');
+    await watcher.waitForSelector('#f-po');
+    assert.equal(await watcher.inputValue('#f-po'), '4471-B', 'the PO is in the load box, not on the card');
+    await watcher.click('#modal [data-close]');
+    results.push('Edit Load (Sun Valley carrier): blank PO refused in the box; 2:30 PM on the other screen\'s card and PO 4471-B in its box');
     // Joe 10/20: once the Live week has Garber's Thursday with a dispatch time, the Scheduler shows that time (the dispatch sheet
     // always wins over the Scheduler's own 7:00 AM).
     const thu = () => desk.textContent('.sc-weekgrid > .sc-col:nth-child(12)');
