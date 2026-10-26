@@ -45,11 +45,14 @@
       'scorecard.html': 'Every driver starts the month at 100: check-ins, cases, inspections, attendance and miles',
       'otr.html': 'The OTR report and cost per gallon, month by month',
       'trucks.html': 'Where every truck is today (GPS)',
-      'fleet.html': 'Fleet Service & Compliance: overdue and due soon, and what is at the garage'
+      'fleet.html': 'Fleet Service & Compliance: overdue and due soon, and what is at the garage',
+      'safety-walks.html': 'Every weekly safety walk, newest first'
     };
     const reports = SIDES.find(s => s.key === 'reports');
     const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.chart) + '</svg>';
-    document.getElementById('rc-groups').innerHTML = MENU.filter(([g]) => reports.sections.indexOf(g) >= 0).map(([group, items]) =>
+    // Joe 10/26: a group's button on the home opens Reports on that group only (?group=walkthrough, driver, plant or garage).
+    const only = new URLSearchParams(location.search).get('group');
+    document.getElementById('rc-groups').innerHTML = reports.sections.map(g => MENU.find(([m]) => m === g)).filter(m => m && (!only || m[0].toLowerCase().indexOf(only.toLowerCase() + ' ') === 0)).map(([group, items]) =>
       '<section class="rc-group"><h2>' + escapeHtml(group) + '</h2><div class="rc-grid">' + items.map(([label, href, ic]) =>
         '<a class="rc-card" href="' + href + '"><span class="rc-icon">' + icon(ic) + '</span><span class="rc-text"><strong>' + escapeHtml(label) + '</strong><small>' + escapeHtml(NOTE[href] || '') + '</small></span><b aria-hidden="true">&rarr;</b></a>').join('') +
       '</div></section>').join('');

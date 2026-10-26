@@ -71,6 +71,8 @@ export const MENU = [
     ['Equipment Issues', 'issues.html', 'issue', 'Issues'], ['Truck Issues', 'issues.html?kind=TRUCK', 'maintenance-tractor-v1-560.webp'], ['Trailer Issues', 'issues.html?kind=TRAILER', 'maintenance-trailer-v1-560.webp'],
     ['Fork Truck / Pallet Jack Issues', 'issues.html?kind=FORK_TRUCK', 'forklift-truck-v1-560.webp'], ['Garage Work Orders', 'garage.html', 'wrench', 'Garage'],
     ['Garage Station', 'garage-station.html', 'wrench']]],
+  // Joe 10/26 (1E): the Garage is its own department under Route Distribution (its screens stay in the Fleet & Maintenance menu too).
+  ['Garage', [['Garage Work Orders', 'garage.html', 'wrench'], ['Garage Station', 'garage-station.html', 'wrench']]],
   // Joe 10/10: Over the Road and Trucks Today (GPS) are manager reports (he prints Over the Road), so they sit here only.
   // Joe 10/10 evening: GPS / Fleet is not a Fleet & Maintenance section; GPS Setup and Driver Scorecard sit in Manager Reports.
   ['Manager Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'trucks.html', 'pin'], ['GPS Setup', 'gps.html', 'gear']]],
@@ -88,7 +90,9 @@ export const MENU = [
     ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Box Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
     ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
-  ['Plant Distribution Scheduler', [['Plant Distribution Scheduler', 'scheduler.html', 'week']]],
+  // Joe 10/26 (ej): the Plant Distribution Scheduler is its own department, Shipping & Receiving, with Inventory beside it.
+  ['Shipping', [['Shipping Schedule', 'scheduler.html', 'week']]],
+  ['Receiving', [['Receiving Schedule', 'scheduler.html?lane=receiving', 'day']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
@@ -96,8 +100,10 @@ export const MENU = [
   // Joe 10/11: Reports is its own module with every report in one place. The plant's reports moved here from Plant
   // Operations; the Route Distribution and Fleet reports are listed here too and stay on their own sides as well.
   ['Plant Reports', [['Plant Reports', 'reports.html', 'star'], ['Loading Rundown', 'reports.html?view=rundown', 'day'], ['Shift Reports', 'shiftreports.html', 'day'], ['Plant Performance TV', 'plant-kiosk.html', 'star']]],
-  ['Distribution Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'trucks.html', 'pin']]],
-  ['Fleet Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
+  // Joe 10/26: the reports sorted Walkthrough, Driver, Plant and Garage (were Distribution Reports and Fleet Reports).
+  ['Walkthrough Reports', [['Past Safety Walks', 'safety-walks.html', 'day']]],
+  ['Driver Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'trucks.html', 'pin']]],
+  ['Garage Reports', [['Fleet Service Report', 'fleet.html', 'truck']]],
   // Joe 10/12: the Safety Walkthrough, a card of its own next to Reports: the weekly walk, its open issues, the extinguishers.
   ['Safety Walkthrough', [['Weekly Walk', 'safety.html', 'safety'], ['Open Issues', 'safety-issues.html', 'alert'], ['Fire Extinguishers', 'extinguishers.html', 'safety'], ['Fire Alarm', 'safety-fire.html?sys=alarm', 'safety'], ['Fire Suppression', 'safety-fire.html?sys=suppression', 'safety'], ['Escape Plan', 'safety-fire.html?sys=escape', 'safety'], ['Past Walks', 'safety-walks.html', 'day'], ['Checklist Setup', 'safety-setup.html', 'gear']]],
   // Joe 10/11: Plant Production, our own RedZone: every line this shift, the line tablet, each product's targets and the TV.
@@ -117,21 +123,34 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 // Joe 10/12: the plant side is Plant Distribution (it was Plant Operations, which covers all three plant sides).
 export const SIDES = [
-  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
+  // Joe 10/26 (1E): each side belongs to a group card on the home (group) and shows its main screens under its button there (quick).
+  { key: 'plant', group: 'plantops', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks'],
+    quick: [['Case Loading', 'loadout.html?area=CASE'], ['Case Unloading', 'unloading.html?area=CASE']] },
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
-  { key: 'production', name: 'Plant Production', home: 'production-home.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
+  { key: 'production', group: 'plantops', quick: [['Production Lines', 'production.html'], ['Quality Checks', 'quality.html']], name: 'Plant Production', home: 'production-home.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/25 (mock-up 1): Plant Vacations & Schedule sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
-  { key: 'crew', menuOnly: true, short: 'Plant Vacations & Schedule', name: 'Plant Vacations & Schedule', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Vacations & Schedule'], flatFirst: true },
-  { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
+  { key: 'crew', group: 'plantops', menuOnly: true, short: 'Plant Vacations & Schedule', name: 'Plant Vacations & Schedule', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Vacations & Schedule'], flatFirst: true },
+  { key: 'pmaint', group: 'plantops', quick: [['Work Orders', 'pmworkorders.html'], ['PM Schedule', 'pmschedule.html']], name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
+  // Joe 10/26 (ej): Shipping & Receiving, its own department: outgoing product loads, receiving and inventory (the old Plant
+  // Distribution Scheduler and the Inventory card). Inventory is still being built, so it opens only for administrators (buildingSections).
+  { key: 'shipping', group: 'plantops', name: 'Shipping & Receiving', home: 'scheduler.html', pic: 'forklift-truck-v1-560.webp', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'], buildingSections: ['Inventory'],
+    quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html']] },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
-  { key: 'distribution', sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
-  { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
-  { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Plant Reports', 'Distribution Reports', 'Fleet Reports'] },
+  { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
+  { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
+  { key: 'garage', group: 'routeops', quick: [['Work Orders', 'garage.html']], name: 'Garage', home: 'garage.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Garage work orders and the garage station', sections: ['Garage'] },
+  { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Walkthrough Reports', 'Driver Reports', 'Plant Reports', 'Garage Reports'],
+    quick: [['Walkthrough Reports', 'reportcenter.html?group=walkthrough'], ['Driver Reports', 'reportcenter.html?group=driver'], ['Plant Reports', 'reportcenter.html?group=plant'], ['Garage Reports', 'reportcenter.html?group=garage']] },
   // Joe 10/12: a Safety Walkthrough card next to Reports (mock-up A). Under Construction (administrators only) while it is built.
-  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true },
-  // Joe 10/13: Inventory (receiving scan-in first; later putaway, scan-out and counts). Its own card in the last open spot on the home. Under Construction while it is built.
-  { key: 'inventory', name: 'Inventory', home: 'inventory.html', pic: 'box-v1.webp', note: 'Receiving scan-in: every case and pallet scanned in, by lot', sections: ['Inventory'], building: true }
+  { key: 'safety', name: 'Safety Walkthrough', short: 'Safety Walkthrough', home: 'safety.html', icon: 'safety', note: 'Weekly walk, open issues and fire extinguisher checks', sections: ['Safety Walkthrough'], building: true,
+    quick: [['Weekly Walk', 'safety.html'], ['Open Issues', 'safety-issues.html'], ['Past Walks', 'safety-walks.html']] },
 ];
+// Joe 10/26 (1E): the home groups its departments under two cards; each opens its own page (group.html) with their cards.
+export const GROUPS = [
+  { key: 'plantops', name: 'Plant Operations', home: 'group.html?g=plantops', pic: 'plant-building-v1-560.webp' },
+  { key: 'routeops', name: 'Route Distribution', home: 'group.html?g=routeops', pic: 'distribution-truck-v1-560.webp' }
+];
+export const groupSides = (key) => SIDES.filter(s => s.group === key);
 const pageOf = (href) => String(href).split(/[?#]/)[0];
 // Joe 10/25 (mock-up 7): each plant's own menu order from Administration > Menu Setup (logic.js menuArrange), kept on this
 // computer so the menu draws at once; it is read again after sign-in and a change shows on the next screen opened.
@@ -161,7 +180,9 @@ const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || [
 // Joe 10/25: Quality Checks, Cooler Temperature and Shift Notes moved into Plant Production (and Shift Notes into Plant Maintenance
 // too) stay open to everyone while those sides are being built (openSections).
 const builtHas = (side, page) => sideHas(Object.assign({}, side, { sections: side.baseSections.filter(g => (side.openSections || []).indexOf(g) < 0) }), page);
-export const buildingSideFor = (page) => SIDES.find(s => s.building && builtHas(s, page)) || null;
+// Joe 10/26: a side can hold one section still being built (Inventory inside Shipping & Receiving): only its screens are refused.
+const inBuildingSection = (side, page) => (side.buildingSections || []).some(g => MENU.some(([m, items]) => m === g && items.some(([, href]) => pageOf(href) === page)));
+export const buildingSideFor = (page) => SIDES.find(s => s.building && builtHas(s, page)) || SIDES.find(s => inBuildingSection(s, page)) || null;
 export const mayOpenBuilding = (person) => !!(person && window.UDLogic && window.UDLogic.isAdmin(person));
 function refuseBuilding(side) {
   if (document.getElementById('uc-refused')) return;
@@ -304,7 +325,7 @@ appVersion();
 watchForUpdates();
 export function sideFor(page) {
   // Home, the all-plants overview and the Administration Center sit above the three sides: their menu lists the sides.
-  if (!page || ['index.html', 'company.html', 'administration.html'].indexOf(page) >= 0) return null;
+  if (!page || ['index.html', 'company.html', 'administration.html', 'group.html'].indexOf(page) >= 0) return null;
   let last = '';
   try { last = sessionStorage.getItem('udSide') || ''; } catch (e) { /* no storage */ }
   const kept = SIDES.find(s => s.key === last);
@@ -332,10 +353,13 @@ function addSideMenu() {
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
   // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
-  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Distribution Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
+  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Shipping': 'distribution-truck-v1-560.webp', 'Receiving': 'forklift-truck-v1-560.webp', 'Inventory': 'box-v1.webp', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
+  // Joe 10/26: two links to one page (Shipping Schedule, Receiving Schedule) light the one whose ?settings this page has.
+  const qs = new URLSearchParams(location.search), fits = (href) => pageOf(href) === here && [...new URLSearchParams(href.split('?')[1] || '')].every(([k, v]) => qs.get(k) === v);
+  const best = MENU.reduce((b, [, items]) => items.reduce((b2, [, h]) => fits(h) && (b2 === null || h.length > b2.length) ? h : b2, b), null);
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
-    return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
+    return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here && (best === null || best === here) ? ' class="on" aria-current="page"' : href !== here && href === best ? ' class="on" aria-current="page"' : '')) +
       '>' + svg(icon) + '<span>' + label + '</span>' + '</a>';
   };
   const headed = (it) => (it[3] ? '<div class="side-group">' + it[3] + '</div>' : '') + link(it);
@@ -361,7 +385,16 @@ function addSideMenu() {
       '<div class="flyout" role="menu"><div class="flyout-title">' + p.name + '</div>' +
       SIDES.map(s => sep(s) + sideLink(s, live ? s.home : soon).replace('<a ', '<a data-plant="' + p.id + '" ')).join('') + '</div></div>';
   };
-  const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') : !side ? SIDES.map(s => sep(s) + sideLink(s)).join('') :
+  // Joe 10/26 (1E): the plant home's menu lists the two groups (each pops out its departments), a line, then Reports and Safety
+  // Walkthrough; a group's own page lists its name and its departments.
+  const grp = here === 'group.html' ? GROUPS.find(g => g.key === new URLSearchParams(location.search).get('g')) : null;
+  const groupSec = (g) => '<div class="side-sec side-group-sec" data-group="' + g.key + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + g.name + '">' +
+    svg(g.pic) + '<span>' + g.name + '</span></button><div class="flyout" role="menu"><div class="flyout-title">' + g.name + '</div>' +
+    '<a href="' + g.home + '" title="' + g.name + '"><span>All ' + g.name + '</span></a>' + groupSides(g.key).map(s => sideLink(s)).join('') + '</div></div>';
+  const homeTop = () => GROUPS.map(groupSec).join('') + '<div class="side-sep" role="separator"></div>' + SIDES.filter(s => !s.group).map(s => sideLink(s)).join('');
+  const top = here === 'company.html' ? PLANT_LIST().map(plantSec).join('') :
+    grp ? '<a class="side-name on" href="' + grp.home + '" title="' + grp.name + '"><span>' + grp.name + '</span></a>' + groupSides(grp.key).map(s => sideLink(s)).join('') :
+    !side ? homeTop() :
     sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (isHome(side, here) ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 || (side && side.flatFirst) ? groups[0][1].filter(([, href]) => href !== side.home).map(headed).join('') + groups.slice(1).map(section).join('') : groups.map(section).join(''));
@@ -466,8 +499,9 @@ addSideMenu();
 (function headerSide() {
   const small = document.querySelector('#screen > .topbar .brand small');
   if (!small || !document.body.classList.contains('has-side')) return;
-  const side = sideFor(location.pathname.split('/').pop() || 'index.html');
-  small.innerHTML = 'UNITED DAIRY' + (side ? ' &middot; ' + (side.key === 'crew' ? side.short : side.name).toUpperCase() : '');
+  const here = location.pathname.split('/').pop() || 'index.html', side = sideFor(here);
+  const grp = here === 'group.html' ? GROUPS.find(g => g.key === new URLSearchParams(location.search).get('g')) : null;
+  small.innerHTML = 'UNITED DAIRY' + (grp ? ' &middot; ' + grp.name.toUpperCase() : side ? ' &middot; ' + (side.key === 'crew' ? side.short : side.name).toUpperCase() : '');
 })();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
    filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and

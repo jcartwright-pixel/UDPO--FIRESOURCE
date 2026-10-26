@@ -75,7 +75,8 @@
     const today = () => L.operatingDay(new Date());
     const nyDate = (t) => { const d = new Date(t); return isNaN(d) ? '' : shortDate(d); };
     const FILTERS = [['all', 'All'], ['TRUCK', 'Trucks'], ['TRAILER', 'Trailers'], ['down', 'Down / out']];
-    let filter = 'all', search = '', downFor = null;
+    // Joe 10/26: the home's Tractors & Trucks and Trailers buttons open the list on that filter (?filter=TRUCK or TRAILER).
+    let filter = FILTERS.some(f => f[0] === new URLSearchParams(location.search).get('filter')) ? new URLSearchParams(location.search).get('filter') : 'all', search = '', downFor = null;
 
     // Joe 10/10: what each unit runs by default on each weekday (Route Master's tractor and trailer defaults), not just today.
     let routes = [];

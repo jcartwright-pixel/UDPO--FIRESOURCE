@@ -18,7 +18,8 @@ test('every screen in the side menu is in the screen list, so none can be missed
   const pages = [...menu.matchAll(/'([a-z-]+\.html)[^']*'/g)].map(m => m[1]).filter(p => p !== 'index.html');
   assert.ok(pages.length > 40);
   pages.forEach(p => assert.equal(L.pageGated(p), true, p + ' is in the menu but not in SCREEN_AREAS'));
-  const sides = app.slice(app.indexOf('export const SIDES = ['));
+  // The SIDES list only (the home's group cards after it, GROUPS, are not screens).
+  const sides = app.slice(app.indexOf('export const SIDES = ['), app.indexOf('export const GROUPS = ['));
   [...sides.matchAll(/key: '([a-z]+)'/g)].map(m => m[1]).forEach(k => assert.ok(L.SCREEN_AREAS.some(a => a.key === k), 'Home card ' + k));
   assert.equal(new Set(L.SCREEN_KEYS).size, L.SCREEN_KEYS.length, 'screen keys are unique');
 });

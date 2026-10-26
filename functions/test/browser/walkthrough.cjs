@@ -263,15 +263,15 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     await land.waitForSelector('.wk-choice');
     await land.click('#full');
     await land.waitForURL(/index\.html\?full=1/);
-    await land.waitForSelector('#sides .launch-card');
+    await land.waitForSelector('#sides .hq-card');
     await land.goto(HOSTING + '/index.html');
-    await land.waitForSelector('#sides .launch-card');
+    await land.waitForSelector('#sides .hq-card');
     assert.match(land.url(), /index\.html$/, 'the full app is kept for this tab');
     assert.deepEqual(land.errors, []);
     await land.context().close();
     // Managers only (Joe 10/15): a dispatcher on a phone keeps the normal home, and the walkthrough page tells them it is for managers.
     const sup = await openPage(browser, phone, '/index.html?testEmail=dispatch.test@uniteddairy.com');
-    await sup.waitForSelector('#sides .launch-card');
+    await sup.waitForSelector('#sides .hq-card');
     await sup.waitForTimeout(500);
     assert.match(sup.url(), /index\.html/, 'a dispatcher stays on the normal home');
     await sup.goto(HOSTING + '/walkthrough.html');
@@ -279,7 +279,7 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     assert.equal(await sup.isVisible('#list'), false);
     await sup.context().close();
     const desk = await openPage(browser, { viewport: { width: 1536, height: 730 } }, '/index.html?' + MANAGER);
-    await desk.waitForSelector('#sides .launch-card');
+    await desk.waitForSelector('#sides .hq-card');
     await desk.waitForTimeout(500);
     assert.match(desk.url(), /index\.html/, 'a desk computer keeps the full home');
     await desk.context().close();

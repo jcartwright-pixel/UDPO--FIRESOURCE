@@ -35,8 +35,8 @@ test('Equipment: added to its own list, keeps it when edited, and is not on Mach
 });
 
 test('Menu Setup: an administrator moves and reorders sections; a side keeps its own screens on top; Start Over puts it back', async () => {
-  const r = await act(ADMIN, 'saveMenuSetup', { sides: { plant: ['Yard Checks', 'Send Report', 'Plant Distribution Departments', 'Plant Distribution Scheduler', 'Shift Notes', 'Cooler Temperature'], production: ['Quality Checks', 'Shift Notes'] } });
-  assert.deepEqual(r.sides.plant, ['Yard Checks', 'Send Report', 'Plant Distribution Departments', 'Plant Distribution Scheduler', 'Shift Notes', 'Cooler Temperature']);
+  const r = await act(ADMIN, 'saveMenuSetup', { sides: { plant: ['Yard Checks', 'Send Report', 'Plant Distribution Departments', 'Receiving', 'Shift Notes', 'Cooler Temperature'], production: ['Quality Checks', 'Shift Notes'] } });
+  assert.deepEqual(r.sides.plant, ['Yard Checks', 'Send Report', 'Plant Distribution Departments', 'Receiving', 'Shift Notes', 'Cooler Temperature']);
   assert.deepEqual(r.sides.production, ['Production Lines', 'Quality Checks', 'Shift Notes']);
   const doc = (await db().collection('menuSetup').doc('fac_uniontown').get()).data();
   assert.deepEqual(doc.sides, r.sides);
