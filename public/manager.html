@@ -198,7 +198,7 @@
       const loadCounts = (c) => [[c.total, 'Today'], [c.waiting, 'Waiting'], [c.loading + c.paused, 'Loading'], [c.done, 'Done', c.total && c.done === c.total ? 'good' : '']];
       const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : '', '45+ min late'), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '', c.pickups ? 'not loaded yet' : 'none')];
       const loadNote = (c) => c.done + ' of ' + c.total + ' loads complete';
-      const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late, 'bad', 'late · done ' + x.forecast.allDoneWhen)
+      const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late, 'bad', 'late · all done est. ' + x.forecast.allDoneWhen)
         : dpLine('forecast.html', 'Late Forecast', 0, 'good', x.forecast.loads.length ? 'on time · all done est. ' + x.forecast.allDoneWhen : 'nothing left to load');
       const caseLines = loadLines(A.CASE, 'CASE').concat([fc], A.TANKER.total ? [dpLine('loadout.html?area=TANKER', 'Tanker loads', A.TANKER.total, '', A.TANKER.done + ' done')] : []);
       document.querySelector('[data-card="dept"]').innerHTML =

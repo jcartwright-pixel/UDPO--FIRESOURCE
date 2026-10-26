@@ -95,9 +95,11 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
       // Manager Center: the manager's own plant cards follow the ticks too (no Scheduler card without the Scheduler).
       await db().collection('personRights').doc(MAINT).set({ screenAccess: { fac_uniontown: ['manager', 'plantDepts', 'shiftNotes', 'quality', 'temps', 'yard'] } }, { merge: true });
       await m.goto(HOSTING + '/manager.html?testEmail=' + MAINT);
-      await m.waitForFunction(() => document.querySelector('[data-card="sched"]') && document.querySelector('[data-card="sched"]').dataset.href);
+      await m.waitForFunction(() => document.querySelector('[data-card="dept"] .dp-card'));
       await m.waitForTimeout(400);
-      assert.equal(await m.$eval('[data-card="sched"]', x => x.hidden), true, 'no Scheduler card');
+      // Joe 10/26: the Scheduler is a menu item only, and without the Scheduler ticked no link on the screen leads to it.
+      assert.deepEqual(await m.$$eval('#screen a[href^="scheduler.html"]', a => a.filter(x => !x.hidden && !x.closest('[hidden]')).length), 0, 'no Scheduler link');
+      assert.equal(await m.$eval('[data-card="dept"]', x => x.hidden), false);
       assert.equal(await m.$eval('[data-card="notes"]', x => x.hidden), false);
       await shot(m, 'manager-no-scheduler-' + w + '.png');
       await db().collection('personRights').doc(MAINT).set({ screenAccess: saved }, { merge: true });

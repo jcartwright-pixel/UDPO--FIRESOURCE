@@ -110,7 +110,7 @@ async function seed() {
     // Manager Center: the Reports button opens the Reports module (Joe 10/11: every report in one place); its Plant Reports
     // card opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
     const mc = await openPage(browser, 1920, 950, '/manager.html?' + MANAGER);
-    await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10/.test(document.querySelector('[data-card="dept"]').textContent));
+    await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10 To load/.test(document.getElementById('pv-chips').textContent));
     const size = await mc.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(size.scroll <= size.inner, 'Manager Center still fits with the Reports button');
     await shots(mc, 'manager-reports-button', 1920);

@@ -86,6 +86,8 @@ async function seed() {
   await line('PRODUCTION_QUALITY_app_mchtst', 'ut_prod_htst_1', 130);
 }
 // A tile's name (the walkthrough's DONE / DUE / PAST DUE word beside it is read on its own).
+// Joe 10/26: a department card's four counts and the line under its bar.
+const deptText = (page, title) => page.$eval('[data-card="dept"]', (c, t) => { const d = [...c.querySelectorAll('.dp-card')].find(x => x.querySelector('strong').textContent === t); return d ? [...d.querySelectorAll('.dp-counts b')].map(b => b.textContent).join(',') + ' | ' + d.querySelector('.dp-note').textContent : ''; }, title);
 const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]', (c, l) => { const t = [...c.querySelectorAll('.mc-tile')].find(x => x.querySelector('span').firstChild.textContent.trim() === l); return t ? t.querySelector('b').textContent + ' | ' + t.querySelector('i').textContent : ''; }, label);
 
 (async () => {
@@ -101,13 +103,19 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
       const behind = seed.behind;
       assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
-      assert.equal(await tileText(page, 'dept', 'Loadout Center'), '1of 4 | 3 waiting · 0 loading');
+      // Joe 10/26: four department cards, two by two (Today, Waiting, Loading, Done), each opening its own screen.
+      assert.deepEqual(await page.$$eval('[data-card="dept"] .dp-card', d => d.map(x => x.querySelector('strong').textContent + ' ' + x.dataset.href)),
+        ['Case Loading loadout.html?area=CASE', 'Tote Loading loadout.html?area=TOTES', 'Box Loading loadout.html?area=BOXING', 'Case Unloading unloading.html']);
+      assert.equal(await deptText(page, 'Case Loading'), '4,3,0,1 | 1 of 4 loads complete');
+      assert.deepEqual(await page.$$eval('[data-card="dept"] .dp-card:last-child .dp-line span', s => s.map(x => x.firstChild.textContent)), ['Back, not started', 'Truck Washing', 'Returns pending']);
+      // The Plant Distribution Scheduler is a menu item only (Joe 10/26).
+      assert.deepEqual(await page.$$('[data-card="sched"]'), []);
       // Joe 10/15 (Manager Walkthrough): one card in walking order instead of Quality, Cooler Temperatures and Yard Checks.
       // Two lines are running (one past due, one due); Cooler North read 44°F (too warm) 30 minutes ago, the newest check.
       assert.deepEqual(await page.$$('[data-card="quality"], [data-card="temps"], [data-card="yard"]'), []);
-      assert.equal(await tileText(page, 'walk', '3 · Production'), '2of 5 | 1 past due');
-      assert.match(await tileText(page, 'walk', '2 · Coolers'), /^\d+ \| 1 out of range$/);
-      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').firstChild.textContent.trim()).join() === '2 · Coolers,3 · Production'), 'Coolers and Production are red');
+      assert.equal(await tileText(page, 'walk', 'Production'), '2of 5 | 1 past due');
+      assert.match(await tileText(page, 'walk', 'Coolers'), /^\d+ \| 1 out of range$/);
+      assert.ok(await page.$eval('[data-card="walk"]', c => [...c.querySelectorAll('.mc-tile.bad')].map(t => t.querySelector('span').firstChild.textContent.trim()).join() === 'Coolers,Production'), 'Coolers and Production are red');
       // Joe 10/18: each area says DONE (green), DUE (yellow) or PAST DUE (red), and who did its newest check. No trucks on the
       // yard: the Yard is done automatically.
       assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-state', a => a.map(x => x.textContent)), ['DONE', 'PAST DUE', 'PAST DUE']);
@@ -118,20 +126,17 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       for (let i = 0; i < 20 && JSON.stringify(good) !== JSON.stringify(['rgb(238, 248, 241)']); i++) { await page.waitForTimeout(250); good = await goodColors(); }
       assert.deepEqual(good, ['rgb(238, 248, 241)']);
       assert.equal(await page.textContent('[data-card="walk"] .wk-tile:nth-child(1) .wk-who'), 'Done automatically');
-      assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(3) .wk-who'), /^Last \d{1,2}:\d\d [AP]M · Supervisor Test$/);
+      assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(3) .wk-who'), /^Last done \d{1,2}:\d\d [AP]M · Supervisor Test$/);
       assert.match(await tileText(page, 'walk', 'Last Walkthrough'), /^\d{1,2}:\d\d [AP]M \| Supervisor Test$/);
       assert.match(await page.textContent('[data-card="walk"] .mc-pill'), /^\d+ past due$/);
-      // Joe 10/15 (later): each tile lists what it holds, problems first in red: Cooler North too warm, the Gallon Filler past due,
-      // HTST #1 due, then the lines not running.
-      assert.match(await page.textContent('[data-card="walk"] .wk-tile:nth-child(2) .wk-items li.bad'), /^Cooler North 44°F · HIGH$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-tile:nth-child(3) .wk-items li', l => l.map(x => x.className + ' ' + (x.className === 'more' ? x.textContent : x.textContent.split(' · ')[0].replace(/^.*?(PAST DUE|DUE|NOT RUNNING)$/, '$1')))), ['bad PAST DUE', 'warn DUE', 'ok NOT RUNNING', 'ok NOT RUNNING', 'more + 1 more']);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-items li', l => l.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16).length), 0);
-      assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html' && (await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href')))).join() ===
-        'yard.html?walk=1,temps.html?walk=1,quality.html?walk=1,walkthrough.html,', 'the card and its tiles open the walkthrough (Joe 10/23: the Pictures stop is not a link; it has Take Picture)');
-      // Joe 10/15: Scheduler shows Shipping and Receiving only, today's loads big with this week under; Yard tiles say what they count.
-      assert.deepEqual(await page.$$eval('[data-card="sched"] .mc-tile > span', a => a.map(x => x.textContent)), ['Shipping', 'Receiving']);
-      assert.match(await tileText(page, 'sched', 'Shipping'), /^\d+today \| \d+ this week$/);
-      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.firstChild.textContent.trim())), ['1 · Yard', '2 · Coolers', '3 · Production', 'Last Walkthrough', '4 · Pictures']);
+      // Joe 10/26: no lists on the walkthrough card; each stop has Check now (the walkthrough check) and View (its screen).
+      assert.deepEqual(await page.$$('[data-card="walk"] .wk-items'), []);
+      assert.ok((await page.getAttribute('[data-card="walk"] a.mc-bar', 'href')) === 'walkthrough.html', 'the card opens the walkthrough');
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .wk-acts', a => a.map(x => [...x.querySelectorAll('a')].map(l => l.textContent + '=' + l.getAttribute('href')).join(' '))),
+        ['Check now=yard.html?walk=1 View=yard.html', 'Check now=temps.html?walk=1 View=temps.html', 'Check now=quality.html?walk=1 View=quality.html']);
+      assert.equal((await page.$$eval('[data-card="walk"] .mc-tile', t => t.map(x => x.getAttribute('href') || x.dataset.href || ''))).join(), 'yard.html?walk=1,temps.html?walk=1,quality.html?walk=1,walkthrough.html,',
+        'a tap on a stop opens its walkthrough check (Joe 10/23: the Pictures stop is not a link; it has Take Picture)');
+      assert.deepEqual(await page.$$eval('[data-card="walk"] .mc-tile > span', a => a.map(x => x.firstChild.textContent.trim())), ['Yard', 'Coolers', 'Production', 'Last Walkthrough', 'Pictures']);
       assert.deepEqual(await page.$$eval('[data-card="notes"] .mc-tile > span', a => a.map(x => x.textContent)), ['Breakdowns', 'Handoffs', 'Carryover']);
       // The card's tiles are redrawn as data arrives, so wait for the drawn tile rather than reading the first one.
       const bigSize = () => page.$eval('[data-card="walk"] .mc-tile b', b => getComputedStyle(b).fontSize + ' ' + b.className + ' ' + b.textContent);
@@ -150,11 +155,12 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       assert.deepEqual(await page.$$eval('.mc-tile > span', sp => sp.filter(x => parseFloat(getComputedStyle(x).fontSize) < 16 || x.getClientRects().length > 1 || x.offsetHeight > 26).map(x => x.textContent)), []);
       assert.deepEqual(await page.$$eval('.mc-rt i', i => i.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)), []);
       if (w === 1920) await fits(page, 'Manager Center ' + w + 'x' + h);
-      // Joe 10/19: on his laptop (1920 screen at 125%, a 1536 x 886 window) and at 1920 every card, the Manager Walkthrough row
-      // included, shows with no scrolling.
+      // Joe 10/19: on his laptop (a 1536 x 886 window) and at 1920 the page shows without scrolling. Joe 10/26: the department
+      // cards went two by two (bigger, like the Departments screen), so the four cards show whole and the walkthrough row is
+      // reached by scrolling the cards (the page itself still never scrolls).
       if (h >= 886) {
-        const g = await page.$eval('#grid', x => ({ scroll: x.scrollHeight, inner: x.clientHeight, walkBottom: Math.round(x.querySelector('[data-card="walk"]').getBoundingClientRect().bottom), gridBottom: Math.round(x.getBoundingClientRect().bottom) }));
-        assert.ok(g.scroll <= g.inner + 1 && g.walkBottom <= g.gridBottom + 1, 'Manager Center ' + w + 'x' + h + ' shows every card with no scrolling: ' + JSON.stringify(g));
+        const g = await page.$eval('#grid', x => ({ deptBottom: Math.round(x.querySelector('[data-card="dept"]').getBoundingClientRect().bottom), gridBottom: Math.round(x.getBoundingClientRect().bottom) }));
+        assert.ok(g.deptBottom <= g.gridBottom + 1, 'Plant Distribution ' + w + 'x' + h + ' shows the four department cards whole: ' + JSON.stringify(g));
       }
       await shots(page, 'manager', w === 1536 && h === 886 ? '1536x886' : w);
       // The Manager Walkthrough card at the bottom of the cards (scrolled to it where the screen is short).
