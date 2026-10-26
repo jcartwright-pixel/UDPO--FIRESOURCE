@@ -33,6 +33,8 @@
     <div class="head">
       <div class="title"><span class="eyebrow">Plant Production</span><h1 id="page-title">Production Lines</h1></div>
       <div class="hstats" id="hstats"></div>
+      <!-- Joe 10/26: a machine's tabs sit up here beside its name, so the page below has more room. -->
+      <div class="pm-headtabs" id="pmtabs" hidden></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view" id="view">
@@ -193,7 +195,7 @@
       const one = !weekView && !!lineId && views.some(v => v.line.operationId === lineId);
       document.getElementById('week').hidden = !weekView;
       if (weekView) {
-        ['filters', 'totals', 'tiles', 'legend', 'detail'].forEach(id => { document.getElementById(id).hidden = true; });
+        ['filters', 'totals', 'tiles', 'legend', 'detail', 'pmtabs'].forEach(id => { document.getElementById(id).hidden = true; });
         document.getElementById('page-title').textContent = 'This Week';
         return drawWeek(t);
       }
@@ -202,6 +204,7 @@
       document.getElementById('tiles').hidden = one;
       document.getElementById('legend').hidden = one;
       document.getElementById('detail').hidden = !one;
+      if (!one || tv) document.getElementById('pmtabs').hidden = true;
       document.getElementById('page-title').textContent = one ? views.find(v => v.line.operationId === lineId).line.name : 'Production Lines';
       if (tv) return;
       if (one) return drawDetail(views.find(v => v.line.operationId === lineId), views, t);
@@ -276,6 +279,7 @@
       // Joe 10/25 (desk mock-up 2): the Blow Mold's own page, drawn into #detail with its own numbers up top.
       document.getElementById('detail').classList.toggle('pm-detail', v.kind !== 'BLOWMOLD');
       if (v.kind === 'BLOWMOLD') {
+        document.getElementById('pmtabs').hidden = true;
         const bm = drawBlowDetail(v, t, { box, table, mgr });
         document.getElementById('hstats').innerHTML = bm.stats;
         document.getElementById('detail').innerHTML = tlBox + bm.top + '<div class="pd-col">' + stopsBox + wasteBox + '</div>' +
@@ -284,6 +288,10 @@
       }
       document.getElementById('hstats').innerHTML = '';
       document.getElementById('detail').innerHTML = drawMachine(v, t, look, { manager: mgr, quality: qualityBox, tab: pmTab });
+      const tabsEl = document.querySelector('#detail .pm-tabs'), head = document.getElementById('pmtabs');
+      head.innerHTML = '';
+      if (tabsEl) head.appendChild(tabsEl);
+      head.hidden = !tabsEl;
       fitTab();
       return;
       document.getElementById('detail').innerHTML = liveBox(v) + tlBox +
@@ -409,7 +417,7 @@
       body.style.setProperty('--pm-ch', Math.max(160, Math.min(420, room - 110)) + 'px');
     }
     window.addEventListener('resize', fitTab);
-    document.getElementById('detail').addEventListener('click', e => {
+    document.getElementById('pmtabs').addEventListener('click', e => {
       const b = e.target.closest('button[data-pmtab]');
       if (!b) return;
       pmTab = b.dataset.pmtab;

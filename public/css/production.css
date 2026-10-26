@@ -567,3 +567,7 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .pm-tabbody .pm-ch-plot svg, .pm-tabbody .pm-ch-y { height: var(--pm-ch, 240px); }
 .pm-tabbody .pm-two h4:first-child, .pm-tabbody > .pm-two h4 { margin-top: 0; }
 .pm-tabbody .pd-oee { margin: 6px 0; }
+/* Joe 10/26: the tabs up beside the machine's name. */
+.pm-headtabs { align-self: center; flex: 1 1 auto; min-width: 0; }
+.pm-headtabs[hidden] { display: none; }
+.pm-headtabs .pm-tabs { margin: 0; justify-content: flex-end; }
