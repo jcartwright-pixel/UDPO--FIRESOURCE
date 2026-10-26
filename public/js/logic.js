@@ -1455,7 +1455,8 @@
       ['trailers', 'Trailer Assignments', ['trailers.html']], ['scheduler', 'Plant Distribution Scheduler', ['scheduler.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
       ['yard', 'Yard Checks', ['yard.html']]] },
     // Joe 10/25: Quality Checks and Cooler Temperature moved to Plant Production (same screen keys, so saved ticks still hold).
-    { key: 'production', name: 'Plant Production', home: 'production.html', screens: [
+    // Joe 10/26: Plant Production opens on its front page (production-home.html, the same layout as Plant Distribution).
+    { key: 'production', name: 'Plant Production', home: 'production-home.html', screens: [
       ['lines', 'Production Lines and Production TV', ['production.html']], ['lineTablet', 'Line Tablet', ['line.html']], ['lineTargets', 'Line Targets', ['linetargets.html']],
       ['quality', 'Quality Checks', ['quality.html']], ['temps', 'Cooler Temperature', ['temps.html']]] },
     // Joe 10/25: Plant Vacations & Schedule (the plant's crew: loadout and production on one schedule).

@@ -1696,3 +1696,10 @@ a.wp-more { color: var(--ud-blue); }
   .manager-page .mc-grid > .mc-report { max-height: none; }
   .manager-page .mc-depts { display: flex; flex-direction: column; }
 }
+/* Joe 10/26 (mock-up 6b): the Plant Production front page uses Plant Distribution's layout; its report card opens the Send
+   Current Report window, and its Production Checks card has three stops. */
+.prod-home .mc-preview, .prod-home .mc-preview *, .prod-home a.mc-btn { text-decoration: none; }
+.prod-home .mc-preview { color: inherit; }
+.prod-home a.mc-btn { display: inline-flex; align-items: center; justify-content: center; }
+@media (min-width: 1501px) { .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.prod-home [data-card="walk"] .wk-who { white-space: normal; }
