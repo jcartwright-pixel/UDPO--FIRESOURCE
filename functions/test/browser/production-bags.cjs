@@ -143,11 +143,14 @@ async function until(what, fn) {
     assert.deepEqual(pl.errors, []);
     await pl.close();
     for (const w of [1536, 1920]) {
-      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BOXING + '&' + ADMIN);
-      await dv.waitForFunction(() => /Jugs in against boxes out/.test(document.getElementById('detail').textContent) && /Fill weight checks/.test(document.getElementById('detail').textContent));
-      const d = (await dv.textContent('#detail')).replace(/ /g, ' ');
+      // Joe 10/26: the Boxing page's Jugs and boxes and Fill weight tabs.
+      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BOXING + '&tab=boxing&' + ADMIN);
+      await dv.waitForFunction(() => /Jugs in/.test((document.querySelector('#detail .pm-tabbody') || {}).textContent || '') && !!document.querySelector('#pmtabs [data-pmtab="fill"]'));
+      const d = (await dv.textContent('#detail .pm-tabbody')).replace(/ /g, ' ');
       assert.match(d, /Jugs in 450\s+Boxes 100 × 4 = 400 jugs boxed\s+Not boxed 50/);
-      assert.match(d, /Bags/);
+      await dv.click('#pmtabs [data-pmtab="fill"]');
+      await dv.waitForSelector('#detail .pm-tabbody[data-tab="fill"]');
+      assert.match(await dv.textContent('#detail .pm-tabbody'), /Bags/);
       await fits(dv, 'the Boxing shift view at ' + w);
       await dv.$eval('#detail', e => e.scrollIntoView({ block: 'start' }));
       await shot(dv, 'bags-boxing-shift-' + w);
