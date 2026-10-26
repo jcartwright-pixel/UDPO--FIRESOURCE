@@ -1080,6 +1080,21 @@ Texts each driver their schedule when a new week is posted. It stays off until t
 2. **Who would get the next text** lists each driver and their mobile phone. A driver with no number gets no text; add it on the Driver Roster.
 3. **Texts and replies** shows what was sent and any replies.
 
+## Load Done Texts
+id: load-done-texts
+screens: donetexts.html, administration.html?item=load-done-texts
+
+Texts a few drivers you pick when the plant finishes their load: their load is done, the trailer and cases, and any open pickups. It stays off until turned on here, and it uses the Twilio texting account saved on Schedule Texts.
+
+1. Save the Twilio texting account on **Schedule Texts** first.
+2. Under **Who gets a text**, tick each driver who should get one. A tick counts at once. Use `Find a driver` on the right to find a name.
+3. Press `Turn On`.
+4. **Load done texts sent** lists each text with its status. Replies are on Schedule Texts.
+
+> A driver gets one text per load, only for loads finished after you turned it on and ticked them.
+
+!> Do not tick a driver who has "No number". Add their mobile phone on the Driver Roster first.
+
 ## Phone Screens
 id: phone-screens
 screens: phone-screens.html

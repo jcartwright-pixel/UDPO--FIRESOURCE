@@ -118,3 +118,57 @@ test('replies: kept in the log with the driver only when Twilio signed them with
   await SMS.handleReply(db(), url, { 'x-twilio-signature': SMS.twilioSignature('tok', url, stranger) }, stranger);
   assert.equal((await db().collection('textLog').doc('in_' + stranger.MessageSid).get()).data().driverId, '');
 });
+
+// Joe 10/26: Load Done Texts. The drivers picked get one text when the plant finishes their load, with its open pickups;
+// its own switch, Off by default; the test copy writes the text to the log only.
+test('Load Done Texts: only picked drivers, once per load, with the pickups, never a load done before', async () => {
+  const at = (t) => ({ now: () => new Date(t), env: {} });
+  const run = db().collection('runs').doc(WEEK + '__run_t905');
+  await run.set({ days: { mon: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', trailer: '901', casesOut: 1200 } } }, { merge: true });
+  await db().collection('pickups').doc('pu1').set({ date: '2026-10-19', runId: 'run_t905', route: '905', run: 'UT DSD MILK', item: 'crates chocolate milk', quantity: '2', status: 'PENDING' });
+  await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'setDoneOn', on: true }), /Only an administrator/);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'setDoneOn', on: true }), /Save the Twilio account/);
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'secret-token', fromNumber: '330-555-0000' }, { env: {} });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-done-0001', driverId: 'drv_test_casey', phone: '330 555 1234' });
+  let list = await SMS.smsCall(db(), ADMIN, { op: 'doneList' }, { env: {} });
+  assert.equal(list.doneOn, false, 'Off by default');
+  assert.ok(list.drivers.some(d => d.driverId === 'drv_test_casey' && d.phone === '330-555-1234' && !d.picked));
+  assert.match(list.sample, /^United Dairy: your load is done\. Route 801 UT DSD MILK, trailer T-901, 1,200 cases\. Pickups: 2 crates chocolate milk\.$/);
+  await SMS.smsCall(db(), ADMIN, { op: 'setDoneDriver', driverId: 'drv_test_casey', on: true }, at('2026-10-18T15:00:00Z'));
+  // Off: nothing, even with the load done.
+  await run.set({ days: { mon: { completeTime: '2026-10-18T17:30:00.000Z', loadStatus: 'COMPLETE' } } }, { merge: true });
+  assert.equal(await SMS.loadDoneCheck(db(), at('2026-10-18T18:00:00Z')), null);
+  // On after the load was done: that load is never texted.
+  await SMS.smsCall(db(), ADMIN, { op: 'setDoneOn', on: true }, at('2026-10-18T17:45:00Z'));
+  assert.equal(await SMS.loadDoneCheck(db(), at('2026-10-18T18:00:00Z')), null);
+  // Finished again after: one text, written to the log only on the test copy.
+  await run.set({ days: { mon: { completeTime: '2026-10-18T17:50:00.000Z' } } }, { merge: true });
+  const r = await SMS.loadDoneCheck(db(), at('2026-10-18T18:00:00Z'));
+  assert.deepEqual([r.logged, r.sent, r.live], [1, 0, false]);
+  const log = (await db().collection('textLog').doc('done_2026-10-18_' + WEEK + '__run_t905_mon').get()).data();
+  assert.equal(log.kind, 'LOAD_DONE');
+  assert.equal(log.status, 'NOT SENT');
+  assert.equal(log.to, '+13305551234');
+  assert.equal(log.body, 'United Dairy: your load is done. Route 905 UT DSD MILK, trailer T-901, 1,200 cases. Pickups: 2 crates chocolate milk.');
+  assert.equal(await SMS.loadDoneCheck(db(), at('2026-10-18T18:01:00Z')), null, 'once per load');
+  // A driver not picked is never texted; un-ticking stops the texts.
+  await SMS.smsCall(db(), ADMIN, { op: 'setDoneDriver', driverId: 'drv_test_casey', on: false });
+  assert.deepEqual((await SMS.smsCall(db(), ADMIN, { op: 'status' })).doneDrivers, []);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'setDoneDriver', driverId: 'drv_nobody', on: true }), /not on the Driver Roster/);
+});
+
+test('Load Done Texts: on the live app it sends through Twilio, and a load with no pickups says so', async () => {
+  const sent = [];
+  const fakeFetch = async (url, init) => { sent.push({ url, body: String(init.body) }); return { ok: true, json: async () => ({}) }; };
+  await db().collection('runs').doc(WEEK + '__run_t905').set({ days: { mon: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', trailer: '901', casesOut: 40 } } }, { merge: true });
+  await db().collection('driverPhones').doc('drv_test_casey').set({ driverId: 'drv_test_casey', phone: '+13305551234' });
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'secret-token', fromNumber: '330-555-0000' }, { env: {} });
+  await SMS.smsCall(db(), ADMIN, { op: 'setDoneDriver', driverId: 'drv_test_casey', on: true }, { now: () => new Date('2026-10-18T15:00:00Z') });
+  await SMS.smsCall(db(), ADMIN, { op: 'setDoneOn', on: true }, { now: () => new Date('2026-10-18T15:00:00Z') });
+  await db().collection('runs').doc(WEEK + '__run_t905').set({ days: { mon: { completeTime: '2026-10-18T17:50:00.000Z' } } }, { merge: true });
+  const r = await SMS.loadDoneCheck(db(), { now: () => new Date('2026-10-18T18:00:00Z'), env: { LIVE_TEXTS: '1' }, fetch: fakeFetch });
+  assert.deepEqual([r.sent, r.failed], [1, 0]);
+  assert.equal(sent.length, 1);
+  const p = new URLSearchParams(sent[0].body);
+  assert.deepEqual([p.get('To'), p.get('From'), p.get('Body')], ['+13305551234', '+13305550000', 'United Dairy: your load is done. Route 905 UT DSD MILK, trailer T-901, 40 cases. No pickups.']);
+});

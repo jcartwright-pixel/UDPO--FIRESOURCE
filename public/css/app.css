@@ -1201,6 +1201,12 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
+/* Load Done Texts (Joe 10/26): the example text, the driver ticks and the Find box on the right. */
+.texts-page .texts-sample { background: #eef6ff; border-radius: 14px; padding: 10px 14px; font-size: 17px; line-height: 1.4; max-width: 520px; }
+.texts-page .texts-pick-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.texts-page .texts-filter { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; margin-left: auto; }
+.texts-page .texts-filter input { font-size: 16px; min-width: 200px; }
+.texts-page .texts-tick { width: 24px; height: 24px; }
 
 /* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once.
    Only how it looks waits: presses work as they always did, so nothing under the finger changes when it appears. */
