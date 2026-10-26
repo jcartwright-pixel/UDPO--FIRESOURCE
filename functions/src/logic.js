@@ -1529,7 +1529,7 @@
   // more than one side (Shift Notes is on every side) but never drops off the menu: one left off every side goes back to
   // where the app puts it.
   var MENU_SIDES = [
-    { key: 'plant', name: 'Plant Distribution', first: '', sections: ['Send Report', 'Case Loading', 'Tote Loading', 'Box Loading', 'Case Unloading', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler', 'Plant Distribution Departments'] },
+    { key: 'plant', name: 'Plant Distribution', first: '', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
     { key: 'production', name: 'Plant Production', first: 'Production Lines', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'] },
     { key: 'crew', name: 'Plant Schedule & Vacations', first: 'Plant Schedule & Vacations', sections: ['Plant Schedule & Vacations'] },
     { key: 'pmaint', name: 'Plant Maintenance', first: 'Plant Maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'] }

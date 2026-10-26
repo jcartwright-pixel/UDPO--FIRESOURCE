@@ -115,13 +115,13 @@
     }
     // Joe 10/26 ("just a smaller version of what we got now"): each department is a small copy of its Plant Distribution
     // Departments card: its name (opens its screen), four counts, the bar, then its own lines (behind, pickups, the forecast).
-    function deptCard(href, eyebrow, title, color, counts, done, total, lines) {
-      return '<div class="mc-card dp-card" style="--accent:' + color + '" data-href="' + href + '" title="' + escapeHtml(eyebrow) + '"><a class="mc-bar" href="' + href + '"><strong>' + escapeHtml(title) + '</strong></a>' +
-        '<div class="dp-counts">' + counts.map(([n, w, k]) => '<span' + (k ? ' class="' + k + '"' : '') + '><b>' + escapeHtml(String(n)) + '</b>' + escapeHtml(w) + '</span>').join('') + '</div>' +
-        '<u class="dp-bar"><s style="width:' + pct(done, total) + '%"></s></u><div class="dp-lines">' + lines.join('') + '</div></div>';
+    function deptCard(href, eyebrow, title, color, counts, done, total, note, lines) {
+      return '<div class="mc-card dp-card" style="--accent:' + color + '" data-href="' + href + '"><a class="mc-bar dp-head" href="' + href + '"><span class="dp-eye">' + escapeHtml(eyebrow) + '</span><strong>' + escapeHtml(title) + '</strong></a>' +
+        '<div class="dp-counts">' + counts.map(([n, w, k]) => '<span' + (k ? ' class="' + k + '"' : '') + '><em>' + escapeHtml(w) + '</em><b>' + escapeHtml(String(n)) + '</b></span>').join('') + '</div>' +
+        '<u class="dp-bar"><s style="width:' + pct(done, total) + '%"></s></u><p class="dp-note">' + escapeHtml(note) + '</p><div class="dp-lines">' + lines.join('') + '</div></div>';
     }
-    // A line's label, its count on the right and (when there is one) a smaller line under the label, such as the forecast's done time.
-    const dpLine = (href, label, side, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span><b>' + escapeHtml(String(side)) + '</b></a>';
+    // An alert box as on the Departments screen: the number in front, the label and (when there is one) a smaller line under it.
+    const dpLine = (href, label, side, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><b>' + escapeHtml(String(side)) + '</b><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></a>';
     // Joe 10/23: the walkthrough pictures still to go with a report, this plant's only.
     let taking = false;
     const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
@@ -196,18 +196,19 @@
       // Forecast rides in Case Loading, Washing and Returns in Case Unloading, tanker loads (when there are any) in Case Loading.
       const A = x.byArea, pend = x.returns.filter(z => z.pending).length;
       const loadCounts = (c) => [[c.total, 'Today'], [c.waiting, 'Waiting'], [c.loading + c.paused, 'Loading'], [c.done, 'Done', c.total && c.done === c.total ? 'good' : '']];
-      const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : ''), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '')];
-      const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late + ' late', 'bad', 'All done est. ' + x.forecast.allDoneWhen)
-        : dpLine('forecast.html', 'Late Forecast', x.forecast.loads.length ? 'On time' : 'Nothing left', 'good', x.forecast.loads.length ? 'All done est. ' + x.forecast.allDoneWhen : '');
-      const caseLines = loadLines(A.CASE, 'CASE').concat([fc], A.TANKER.total ? [dpLine('loadout.html?area=TANKER', 'Tanker', A.TANKER.done + ' of ' + A.TANKER.total)] : []);
+      const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : '', '45+ min late'), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '', c.pickups ? 'not loaded yet' : 'none')];
+      const loadNote = (c) => c.done + ' of ' + c.total + ' loads complete';
+      const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late, 'bad', 'late · done ' + x.forecast.allDoneWhen)
+        : dpLine('forecast.html', 'Late Forecast', 0, 'good', x.forecast.loads.length ? 'on time · all done est. ' + x.forecast.allDoneWhen : 'nothing left to load');
+      const caseLines = loadLines(A.CASE, 'CASE').concat([fc], A.TANKER.total ? [dpLine('loadout.html?area=TANKER', 'Tanker loads', A.TANKER.total, '', A.TANKER.done + ' done')] : []);
       document.querySelector('[data-card="dept"]').innerHTML =
-        deptCard('loadout.html?area=CASE', 'Loadout Center', 'Case Loading', P.AREA.CASE.color, loadCounts(A.CASE), A.CASE.done, A.CASE.total, caseLines) +
-        deptCard('loadout.html?area=TOTES', 'Loadout Center', 'Tote Loading', P.AREA.TOTES.color, loadCounts(A.TOTES), A.TOTES.done, A.TOTES.total, loadLines(A.TOTES, 'TOTES')) +
-        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Box Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadLines(A.BOXING, 'BOXING')) +
-        deptCard('unloading.html', 'Trailers back from the routes', 'Case Unloading', '#455a64', [[x.uc.total, 'Trailers'], [x.uc.waiting, 'Waiting'], [x.uc.unloading, 'Unloading'], [x.uc.complete, 'Done', x.uc.total && x.uc.complete === x.uc.total ? 'good' : '']], x.uc.complete, x.uc.total, [
-          dpLine('unloading.html', 'Not started', x.backWaiting, x.backWaiting ? 'bad' : ''),
-          dpLine('washing.html', 'Washing', x.wash.length + ' to wash', x.wash.length ? 'warn' : '', x.repeat ? x.repeat + ' repeat' : ''),
-          dpLine('returns.html', 'Returns', pend + ' pending', pend ? 'bad' : '', x.returns.length + ' today')]);
+        deptCard('loadout.html?area=CASE', 'Loadout Center', 'Case Loading', P.AREA.CASE.color, loadCounts(A.CASE), A.CASE.done, A.CASE.total, loadNote(A.CASE), caseLines) +
+        deptCard('loadout.html?area=TOTES', 'Loadout Center', 'Tote Loading', P.AREA.TOTES.color, loadCounts(A.TOTES), A.TOTES.done, A.TOTES.total, loadNote(A.TOTES), loadLines(A.TOTES, 'TOTES')) +
+        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Box Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
+        deptCard('unloading.html', 'Trailers back from the routes', 'Case Unloading', '#455a64', [[x.uc.total, 'Trailers'], [x.uc.waiting, 'Waiting'], [x.uc.unloading, 'Unloading'], [x.uc.complete, 'Done', x.uc.total && x.uc.complete === x.uc.total ? 'good' : '']], x.uc.complete, x.uc.total, x.uc.complete + ' of ' + x.uc.total + ' trailers unloaded', [
+          dpLine('unloading.html', 'Back, not started', x.backWaiting, x.backWaiting ? 'bad' : '', 'checked in'),
+          dpLine('washing.html', 'Truck Washing', x.wash.length, x.wash.length ? 'warn' : '', 'to wash' + (x.repeat ? ' · ' + x.repeat + ' repeat' : '')),
+          dpLine('returns.html', 'Returns pending', pend, pend ? 'bad' : '', x.returns.length + ' today')]);
       // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Production (each opens its screen with the walkthrough
       // bar). Joe 10/15 (later): each tile carries what it can fit: every trailer, cooler and line with its reading or when it
       // is due, problems first in red; the rest under "+ N more". A past-due check puts a flashing "past due" pill on the card.

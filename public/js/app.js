@@ -80,13 +80,13 @@ export const MENU = [
   // The plant side (Joe 10/10): Plant Distribution opens the Manager Center cards; the menu lists the cards in the same order,
   // and a card with more than one area opens its screens beside it. A section with one screen is a plain link.
   ['Send Report', [['Send Current Report', 'manager.html?report=1', 'star']]],
-  // Joe 10/26: under Send Report, each department straight in the menu, the same four as the Plant Distribution front page.
-  ['Case Loading', [['Case Loading', 'loadout.html?area=CASE', 'load']]],
-  ['Tote Loading', [['Tote Loading', 'loadout.html?area=TOTES', 'load']]],
-  ['Box Loading', [['Box Loading', 'loadout.html?area=BOXING', 'load']]],
-  ['Case Unloading', [['Case Unloading', 'unloading.html', 'unload']]],
   // Joe 10/11: production first, then shift notes and quality, then temperatures and yard (as the Manager Center cards).
-  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'], ['Loadout Center', 'loadout.html', 'load'], ['Unloading & Washing', 'unloading.html', 'unload'], ['Product Returns', 'returns.html', 'returns'], ['Truck Washing', 'washing.html', 'wash'], ['Trailer Assignments', 'trailers.html', 'load']]],
+  // Joe 10/26: one pop-out for the departments, each loading and unloading by its own name (Case, Tote, Box and Tanker), so the
+  // menu itself stays short: Send Report, this, Shift Notes, Yard Checks and the Scheduler.
+  ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'],
+    ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Box Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
+    ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Box Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
+    ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
   ['Plant Distribution Scheduler', [['Plant Distribution Scheduler', 'scheduler.html', 'week']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
@@ -117,7 +117,7 @@ export const MENU = [
 // Distribution, Fleet & Maintenance and Reports. Plant Production and Plant Maintenance are under construction.
 // Joe 10/12: the plant side is Plant Distribution (it was Plant Operations, which covers all three plant sides).
 export const SIDES = [
-  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Case Loading', 'Tote Loading', 'Box Loading', 'Case Unloading', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler', 'Plant Distribution Departments'] },
+  { key: 'plant', name: 'Plant Distribution', home: 'manager.html', pic: 'plant-building-v1-560.webp', note: 'Loading, unloading, washing, returns, yard checks and shift notes', sections: ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks', 'Plant Distribution Scheduler'] },
   // Joe 10/11: still Under Construction, so its screens open only for administrators (the shared buildingSideFor / mayOpenBuilding check below).
   { key: 'production', name: 'Plant Production', home: 'production.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/25 (mock-up 1): Plant Schedule & Vacations sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
@@ -332,7 +332,7 @@ function addSideMenu() {
   nav.setAttribute('aria-label', 'Screens');
   // Joe 10/9: the menu lists only the sections; hovering (or tapping) a section opens its screens beside it.
   // Joe 10/10: the United Dairy icon library wherever a picture fits; line icons where none does.
-  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Case Loading': 'load', 'Tote Loading': 'load', 'Box Loading': 'load', 'Case Unloading': 'unload', 'Yard Checks': 'yard-checks.webp', 'Plant Distribution Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
+  const SECTION_ICON = { Dispatch: 'distribution-truck-v1-560.webp', Drivers: 'people', Equipment: 'maintenance-tractor-v1-560.webp', 'Manager Reports': 'star', Overall: 'check', Administration: 'gear', 'Send Report': 'star', 'Yard Checks': 'yard-checks.webp', 'Plant Distribution Scheduler': 'week', 'Plant Distribution Departments': 'factory', 'Quality Checks': 'production.webp', 'Cooler Temperature': 'temperatures.webp', 'Shift Notes': 'alert' };
   const link = ([label, href, icon]) => {
     const ext = /^https:/.test(href);
     return '<a href="' + href + '"' + (ext ? ' class="ext" title="' + label + ' (opens the current app in this window)"' : ' title="' + label + '"' + (href === here ? ' class="on" aria-current="page"' : '')) +
