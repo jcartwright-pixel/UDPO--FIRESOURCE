@@ -1688,8 +1688,9 @@ a.wp-more { color: var(--ud-blue); }
   .manager-page .mc-grid [data-card="walk"] { grid-column: 1 / -1; }
   .manager-page .mc-grid [data-card="notes"] { grid-column: 1 / -1; grid-row: 3; }
   .manager-page .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; }
-  /* "Production PAST DUE" beside "0 of 5" is wider than its tile here: the name goes to a second line, whole. */
-  .manager-page [data-card="walk"] .wk-tile > span { white-space: normal; }
+  /* The walkthrough has the whole row here: "Production PAST DUE" beside "0 of 5" needs a wider tile, so Last Walkthrough and
+     Pictures share the fourth column, one above the other, and every name stays whole on one line. */
+  .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1.3fr)) minmax(0, 1fr); }
 }
 /* Tablets and narrower screens: the cards wrap two to a row (the departments and the walkthrough take a whole row each). */
 @media (max-width: 1500px) {
