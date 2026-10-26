@@ -103,17 +103,14 @@ async function until(what, fn) {
     {
       const tb = await openPage(browser, 1024, 1400, '/line.html?line=' + RAYPAK + '&' + ADMIN);
       await tb.waitForSelector('#fill-box:not([hidden]) input[data-field="jug1"]');
-      assert.match(await tb.textContent('#fill-box'), /Bag 1 g/);
-      const g = ['19950', '19900'];
-      for (let j = 0; j < g.length; j++) {
-        await tb.fill('#fill-box input[data-field="jug' + (j + 1) + '"]', g[j]);
-        await tb.press('#fill-box input[data-field="jug' + (j + 1) + '"]', 'Tab');
-      }
-      await until('raypak bags saved', async () => (await runsOf(RAYPAK)).some(r => (r.fills || []).length === 1 && r.fills[0].jug2 === Number(g[1])));
-      await tb.waitForFunction(() => /Average product per bag/.test(document.getElementById('fill-box').textContent));
-      const box = await tb.textContent('#fill-box');
-      assert.match(box, /empty bag 450 g − fitment 20 g\. Target 19,500 g for 5 Gal 2% Dispenser/);
-      assert.match(box, /19,430 g product · −70 g/, '19900 - 450 - 20 = 19430, LIGHT under 19,450');
+      // Joe 10/26: the Raypak is a bag filler like the fillers: one bag a check with the countdown.
+      assert.match(await tb.textContent('#fill-box'), /Bag weight g/);
+      await tb.fill('#fill-box input[data-field="jug1"]', '19900');
+      await tb.press('#fill-box input[data-field="jug1"]', 'Enter');
+      await until('raypak bag saved', async () => (await runsOf(RAYPAK)).some(r => (r.fills || []).length === 1 && r.fills[0].jug1 === 19900));
+      await tb.waitForFunction(() => /Last 19,900 g at/.test(document.getElementById('fill-box').textContent));
+      assert.match(await tb.textContent('#fill-box'), /−70 g under target, LIGHT/, '19900 - 450 - 20 = 19430, LIGHT under 19,450');
+      assert.match(await tb.textContent('#actions'), /CIP/, 'the Raypak keeps CIP / Sanitation');
       await fits(tb, 'raypak tablet');
       await bigText(tb, '#fill-box', 'raypak fill weight check');
       await tb.$eval('#fill-box', e => e.scrollIntoView({ block: 'start' }));

@@ -816,7 +816,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 - The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
 - Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE) and what was made. **Running now** says since when the product has run and how long the last changeover took.
 - **Down this shift** adds up the minutes down and in changeover, and lists each one with its minutes, newest first; the one going on now says "now".
-- The fillers weigh filled jugs (Raypak weighs bags) on the **Fill weight check**. Boxing has no fill weight check: its product was weighed before it gets there.
+- **Fill weight** (the fillers, and the Raypak and bag fillers with bags), beside Up next: it counts down to the next weight and says NOW, flashing, when one is due. Weigh one filled jug, type its weight in grams in the box and press Enter. The box empties and the countdown starts again; under it is the last weight and whether it was over or under target. How often is set on Line Targets. Boxing has no fill weight check: its product was weighed before it gets there.
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
 - `Set Next` sets what runs next on this line and how many.
 
@@ -824,6 +824,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 
 !> Do not type a check you did not do. A recorded check cannot be changed from the tablet.
 !> Do not leave How many to run blank when you know the amount. Without it there is no countdown.
+!> Do not type a weight from memory or from the last jug. Weigh a jug each time the box says NOW.
 !> Do not tap `DOWN` for a product change. Tap `CHANGEOVER`, so the time counts as a changeover, not as down.
 
 ## Line Targets

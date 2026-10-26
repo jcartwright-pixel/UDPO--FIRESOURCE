@@ -100,7 +100,7 @@ function validateLineEntry(input, SaveError) {
   }
   if (op === 'fill') {
     out.field = text(input.field);
-    if (!new RegExp('^jug[1-' + P.FILL_JUGS + ']$').test(out.field)) throw new SaveError('BAD_REQUEST', 'Pick which jug.');
+    if (!new RegExp('^jug[1-' + P.FILL_MAX + ']$').test(out.field)) throw new SaveError('BAD_REQUEST', 'Pick which jug.');
     const v = text(input.value), n = Number(v);
     if (v !== '' && (!isFinite(n) || n <= 0 || n > P.LIMITS.GRAMS)) throw new SaveError('BAD_REQUEST', 'Type the filled jug\'s weight in grams.');
     out.value = v === '' ? null : Math.round(n * 10) / 10;

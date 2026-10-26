@@ -593,7 +593,6 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 #board:not([hidden]) { flex: 1 1 auto; display: flex; flex-direction: column; }
 #std-cards, #kind-cards { flex: 1.5 1 auto; }
 @media (min-width: 1100px) { #std-cards { grid-template-columns: 1.4fr 1.1fr 1fr 1fr 1.3fr; } }
-#strip { flex: 1 1 auto; }
 #strip .lb-box { display: flex; flex-direction: column; }
 #strip .lb-hbars { flex: 1 1 auto; height: auto; min-height: 74px; }
 #std-cards .lb-card { padding: 12px 16px; gap: 6px; }
@@ -615,3 +614,25 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
   #std-cards .lb-big { font-size: 38px; }
 }
 @media (max-width: 500px) { #status .lb-sbtns button { font-size: 16px; padding: 0 4px; } #status .lb-sbtns button.c { flex-grow: 1.6; } #status .lb-timer { font-size: 32px; } }
+/* Joe 10/26 (filler mock-up 1): the Fill weight box (countdown and one weight box) beside Up next and Each hour. */
+.lb-bottom { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr); gap: 12px; margin-top: 10px; flex: 1 1 auto; }
+.lb-bottom:has(> #fill-box[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.lb-bottom:has(> #fill-box[hidden]):has(> #strip[hidden]) { display: none; }
+.lb-bottom > .lb-strip { margin-top: 0; }
+#fill-box[hidden] { display: none; }
+#fill-box > .lb-box { height: 100%; box-sizing: border-box; }
+.fw-box { display: flex; flex-direction: column; gap: 6px; }
+.fw-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fw-clock { font-size: 46px; font-weight: 900; color: #0b2f55; font-variant-numeric: tabular-nums; line-height: 1; }
+.fw-clock small { display: block; font-size: 16px; font-weight: 800; color: #5b6b7c; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+.fw-clock .fw-words { font-size: 22px; }
+.fw-due .fw-clock span { color: #c62828; }
+.fw-in { display: flex; flex-direction: column; font-size: 16px; font-weight: 800; color: #5b6b7c; }
+.fw-in .lb-in { width: 160px; height: 56px; font-size: 26px; font-weight: 900; }
+.fw-last { font-size: 17px; color: #33475b; } .fw-last b { color: #0b2f55; }
+.fw-ok { color: #1d7a3e; font-weight: 800; } .fw-bad { color: #c62828; font-weight: 800; } .fw-warn { color: #9a5b00; font-weight: 800; }
+@media (max-width: 900px) { .lb-bottom { grid-template-columns: minmax(0, 1fr); } }
+/* Seven tabs (fillers: Changeover and CIP / Sanitation): a size smaller so each word stays whole. */
+.lb-head .lb-actions:has(> button:nth-child(7)) { gap: 6px; }
+.lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 17px; padding: 4px; }
+@media (min-width: 1100px) and (max-width: 1300px) { .lb-head:has(.lb-actions > button:nth-child(7)) .lb-title { max-width: 330px; } .lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 16px; } }
