@@ -120,6 +120,29 @@ test('People & Roles: ticked screens are kept per plant and decide which saves g
   assert.deepEqual(await checkSaves(db(), { email: sup.email }, ['publishWeek']), { publishWeek: true });
 });
 
+// Joe 10/26: each person's Home screen, picked in the People list and saved on its own; a later Save Person Access keeps it.
+test('People & Roles: Home screen saves on its own, only a screen the person can see, and Save Person Access keeps it', async () => {
+  let sup = await person('sup@uniteddairy.com');
+  assert.equal(sup.homeScreen, '', 'blank = the normal home');
+  const out = await call({ op: 'setHomeScreen', email: sup.email, page: 'daily.html' });
+  assert.deepEqual([out.ok, out.homeScreen], [true, 'daily.html']);
+  sup = await person(sup.email);
+  assert.equal(sup.homeScreen, 'daily.html');
+  assert.equal(out.revision, sup.revision, 'the list keeps a revision that still saves');
+  await assert.rejects(call({ op: 'setHomeScreen', email: sup.email, page: 'nowhere.html' }), /not one this person can see/);
+  await assert.rejects(call({ op: 'setHomeScreen', email: 'nobody@uniteddairy.com', page: '' }), /not on the Users list/);
+  await assert.rejects(call({ op: 'setHomeScreen', email: sup.email, page: '' }, { email: 'sup@uniteddairy.com' }), /Only an administrator/);
+  // Saving the person (here ticking only maintenance screens) keeps the Home screen; a screen not ticked cannot be picked.
+  await call({ op: 'savePerson', email: sup.email, name: 'Sup', roles: ['SUPERVISOR'], status: 'ACTIVE', facilities: ['fac_uniontown'], grants: [], denials: [], revision: sup.revision,
+    screenAccess: { fac_uniontown: ['pmCenter', 'machinery'] } });
+  assert.equal((await person(sup.email)).homeScreen, 'daily.html');
+  await assert.rejects(call({ op: 'setHomeScreen', email: sup.email, page: 'weekly.html' }), /not one this person can see/);
+  await call({ op: 'setHomeScreen', email: sup.email, page: 'machinery.html' });
+  await call({ op: 'setHomeScreen', email: sup.email, page: '' });
+  const rights = (await db().collection('personRights').doc(sup.email).get()).data();
+  assert.deepEqual([rights.homeScreen, rights.screenAccess], ['', { fac_uniontown: ['pmCenter', 'machinery'] }]);
+});
+
 test('personal access link: generated once, revoked, emailed only to the sender outside production', async () => {
   const out = await call({ op: 'accessGenerate', email: 'sup@uniteddairy.com' });
   assert.match(out.token, /^[A-Za-z0-9_-]{20,}$/);

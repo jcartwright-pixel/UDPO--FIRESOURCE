@@ -4,7 +4,7 @@
  * directly: the collections below are server-only in firestore.rules), except People & Roles, which also writes the
  * sandbox copy of the Users list through the master write-back (masterwrite.js; production sheets are refused there).
  *
- *   People & Roles        people, savePerson             USERS_MASTER row + personRights/{email} (Allow / Deny)
+ *   People & Roles        people, savePerson, setHomeScreen USERS_MASTER row + personRights/{email} (Allow / Deny)
  *   Role Templates        roleTemplates, saveRoleTemplate private/roleTemplates
  *   Access & QR Codes     accessLinks, accessGenerate, accessRevoke, accessEmail      personAccess/{email}
  *   Driver Station Codes  appLinks, routeCodeNew, routeCodeOnOff                       config/routePhone (phone.js)
@@ -73,7 +73,7 @@ async function people(db) {
   const list = snap.docs.map(d => {
     const p = d.data(), e = ex[d.id] || null;
     return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [], grants: e ? e.grants || [] : [], denials: e ? e.denials || [] : [],
-      screenAccess: e && e.screenAccess ? e.screenAccess : null, updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
+      screenAccess: e && e.screenAccess ? e.screenAccess : null, homeScreen: (e && e.homeScreen) || '', updatedAt: (e && e.updatedAt) || (p.cells && p.cells.updated_at) || '', updatedBy: (e && e.updatedBy) || (p.cells && p.cells.updated_by) || '', primary: L.PRIMARY_ADMINS.indexOf(d.id) >= 0,
       revision: personRevision(p, e), rights: R.effectiveRights(p, tpl.templates, e) };
   });
   return { people: list, catalog: R.CATALOG, screenAreas: L.SCREEN_AREAS, screenJobs: L.SCREEN_JOBS, roles: tpl.roles, defaults: R.DEFAULTS, templates: tpl.templates, plants: L.PLANTS, newRevision: personRevision(null, null) };
@@ -128,12 +128,31 @@ async function savePerson(db, email, input, stamp, deps) {
     if (!before) Object.assign(fields, { 'cells.id': id, 'cells.created_at': stamp, 'cells.created_by': email });
     tx.set(ref, { name, status, roles, facilities: fields.facilities, updatedAt: stamp, updatedBy: email, cells: Object.assign({}, before ? before.cells : {}, { email: target, id }) }, { merge: true });
     const keepScreens = input.screenAccess === undefined ? (exBefore && exBefore.screenAccess) || null : admin ? null : screenAccess;
-    tx.set(exRef, { grants, denials, screenAccess: keepScreens, updatedAt: stamp, updatedBy: email });
+    tx.set(exRef, { grants, denials, screenAccess: keepScreens, homeScreen: (exBefore && exBefore.homeScreen) || '', updatedAt: stamp, updatedBy: email });
     queueMaster(tx, db, mode, 'person-' + crypto.randomBytes(8).toString('hex'), '', ref, target, fields, !before, stamp, email, 'users');
     tx.set(db.collection(M.COLLECTIONS.actions).doc('adm-' + crypto.randomBytes(8).toString('hex')), { action: 'savePerson', by: email, at: stamp, person: target,
       before: before ? { name: before.name, status: before.status, roles: before.roles, facilities: before.facilities, grants: exBefore ? exBefore.grants : [], denials: exBefore ? exBefore.denials : [], screenAccess: exBefore ? exBefore.screenAccess || null : null } : null,
       after: { name, status, roles, facilities: fields.facilities, grants, denials, screenAccess: keepScreens } });
     return { ok: true, message: 'Person access saved.', email: target };
+  });
+}
+
+// Joe 10/26: the page this person lands on when they open the app (People & Roles, Home screen column; blank = the normal
+// home). Saved on its own as soon as it is picked; it is one of the screens the person may see.
+async function setHomeScreen(db, email, input, stamp) {
+  const target = text(input.email, 254).toLowerCase();
+  const page = text(input.page, 80);
+  return db.runTransaction(async tx => {
+    const exRef = db.collection('personRights').doc(M.safeIdPart(target));
+    const [snap, exSnap] = await Promise.all([tx.get(db.collection(M.COLLECTIONS.users).doc(M.safeIdPart(target))), tx.get(exRef)]);
+    if (!snap.exists) fail('NOT_FOUND', target + ' is not on the Users list; reload.');
+    const person = snap.data(), exBefore = exSnap.exists ? exSnap.data() : null;
+    if (page && !L.homeChoices(person, (exBefore && exBefore.screenAccess) || null).some(c => c.page === page)) fail('BAD_REQUEST', 'That screen is not one this person can see. Tick it under What this person can see first.');
+    const ex = Object.assign({ grants: [], denials: [], screenAccess: null }, exBefore || {}, { homeScreen: page, updatedAt: stamp, updatedBy: email });
+    tx.set(exRef, ex);
+    tx.set(db.collection(M.COLLECTIONS.actions).doc('adm-' + crypto.randomBytes(8).toString('hex')), { action: 'setHomeScreen', by: email, at: stamp, person: target,
+      before: (exBefore && exBefore.homeScreen) || '', after: page });
+    return { ok: true, email: target, homeScreen: page, revision: personRevision(person, ex) };
   });
 }
 
@@ -424,7 +443,7 @@ async function completeRepairItem(db, email, input, stamp) {
 
 const OPS = {
   people: (db) => people(db),
-  savePerson, saveRoleTemplate, addRole,
+  savePerson, setHomeScreen, saveRoleTemplate, addRole,
   roleTemplates: async (db) => { const t = await templatesOf(db); return { catalog: R.CATALOG, roles: t.roles, defaults: R.DEFAULTS, templates: t.templates, meta: t.meta }; },
   accessLinks: (db) => accessLinks(db), accessGenerate, accessRevoke, accessEmail: (db, email, input) => accessEmail(db, email, input),
   appLinks: (db) => appLinks(db), routeCodeNew: (db, email, input, stamp) => routeCodeNew(db, email, stamp), routeCodeOnOff,

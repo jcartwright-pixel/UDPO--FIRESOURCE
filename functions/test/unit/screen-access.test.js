@@ -70,3 +70,17 @@ test('People & Roles saves only known plants and screens', () => {
   assert.equal(R.cleanScreenAccess(['x'], plants), undefined);
   L.SCREEN_JOBS.forEach(j => j.screens.forEach(k => assert.ok(L.SCREEN_KEYS.indexOf(k) >= 0, j.name + ': ' + k)));
 });
+
+// Joe 10/26: the Home screen choices are the screens this person can see, grouped by Home card, each page once.
+test('Home screen choices follow the ticked screens', () => {
+  const all = L.homeChoices(maint, null), pages = all.map(c => c.page);
+  assert.equal(new Set(pages).size, pages.length, 'each page once');
+  ['manager.html', 'daily.html', 'crew.html', 'production-home.html', 'pmaint.html'].forEach(p => assert.ok(pages.indexOf(p) >= 0, p));
+  assert.deepEqual(all.find(c => c.page === 'manager.html'), { page: 'manager.html', name: 'Plant Distribution', group: 'Plant Distribution' });
+  pages.forEach(p => assert.equal(L.pageAllowed(maint, null, 'fac_uniontown', p), true, p));
+  const mine = L.homeChoices(maint, ticks);
+  assert.deepEqual([...new Set(mine.map(c => c.group))], ['Plant Maintenance', 'Reports']);
+  mine.forEach(c => assert.equal(L.pageAllowed(maint, ticks, 'fac_uniontown', c.page), true, c.page));
+  assert.equal(mine.some(c => c.page === 'daily.html'), false);
+  assert.deepEqual(L.homeChoices(maint, { fac_uniontown: [] }), []);
+});

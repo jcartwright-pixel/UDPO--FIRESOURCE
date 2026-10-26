@@ -182,7 +182,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
-    assert.deepEqual(await adm.$$eval('.adm-table th', t => t.map(x => x.textContent)), ['Name', 'Email', 'Role', 'Plants', 'Status']);
+    // Joe 10/26: each person's Home screen is picked right in the list.
+    assert.deepEqual(await adm.$$eval('.adm-table th', t => t.map(x => x.textContent)), ['Name', 'Email', 'Role', 'Plants', 'Status', 'Home screen']);
     assert.ok(await noSideScroll(adm), 'Administration fits the width');
     assert.equal(await adm.$$eval('a[href*="script.google.com"], a[target="_blank"]', a => a.length), 0);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-people-1920.png') });

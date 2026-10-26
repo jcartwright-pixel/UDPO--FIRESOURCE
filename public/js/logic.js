@@ -1519,6 +1519,24 @@
       return a.screens.some(function (s) { return mine.indexOf(s[0]) >= 0 && (s[2].indexOf(page) >= 0 || a.home === page); });
     });
   }
+  // Joe 10/26: each person's Home screen, the page they land on when they open the app (People & Roles, Home screen column).
+  // The choices are the screens they may see at any of their plants, grouped by Home card, each page once; a card's own first
+  // page is listed under the card's name.
+  function homeChoices(person, access) {
+    var mine = {}, seen = {}, out = [];
+    var plants = screenLimited(person, access) ? plantsFor(person) : [''];
+    plants.forEach(function (pl) { screensFor(person, access, pl).forEach(function (k) { mine[k] = 1; }); });
+    SCREEN_AREAS.forEach(function (a) {
+      var rows = a.screens.filter(function (s) { return mine[s[0]]; });
+      if (!rows.length) return;
+      [[a.home, a.name]].concat(rows.map(function (s) { return [s[2][0], s[1]]; })).forEach(function (r) {
+        if (seen[r[0]]) return;
+        seen[r[0]] = 1;
+        out.push({ page: r[0], name: r[1], group: a.name });
+      });
+    });
+    return out;
+  }
   // Start from a job (People & Roles): the screens each kind of job usually needs; Joe can tick more or fewer after.
   var SCREEN_JOBS = [
     { key: 'plantMaint', name: 'Plant Maintenance Manager', screens: ['pmCenter', 'machinery', 'pmEquipment', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'pmCrew', 'plantReports', 'shiftReports'] },
@@ -1575,7 +1593,7 @@
   return {
     MENU_SIDES: MENU_SIDES, MENU_POOL: MENU_POOL, menuArrange: menuArrange, menuProblem: menuProblem,
     SCREEN_AREAS: SCREEN_AREAS, SCREEN_KEYS: SCREEN_KEYS, SCREEN_JOBS: SCREEN_JOBS, pageName: pageName, pageGated: pageGated, screenLimited: screenLimited, screensFor: screensFor,
-    areaAllowed: areaAllowed, pageAllowed: pageAllowed,
+    areaAllowed: areaAllowed, pageAllowed: pageAllowed, homeChoices: homeChoices,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
