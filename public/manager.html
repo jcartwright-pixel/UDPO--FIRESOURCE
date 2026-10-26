@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Manager Center · Operations</title>
+  <title>Plant Distribution · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
@@ -17,7 +17,7 @@
 </head>
 <body class="fill issues-page plant-page manager-page">
   <div class="signin" id="signin" hidden>
-    <h1>Manager Center</h1>
+    <h1>Plant Distribution</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -29,7 +29,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Distribution · Daily Review · Reports</span><h1>Manager Center</h1></div>
+      <div class="title"><span class="eyebrow">Daily Review · Reports</span><h1>Plant Distribution</h1></div>
       <div class="dayname" id="dayname"></div>
       <!-- Joe 10/10 (look B): a Reports button on Manager Center opens the Plant Scorecard; Shift Comparison, Day-of-Week Trends
            and the Plant Performance TV are on that screen. -->
@@ -52,9 +52,10 @@
           <div class="mc-to" id="pv-to">To: Plant Managers group</div>
           <div class="mc-acts"><button type="button" class="mc-btn" data-open-report>Edit / Add</button><button type="button" class="mc-btn send" id="send-card">SEND CURRENT REPORT</button></div>
         </div>
-        <!-- Joe 10/11: production first (Departments, Scheduler), then Shift Notes and Quality, then Temperatures and Yard. -->
-        <div class="mc-card" style="--accent:#d27b00" data-card="dept"></div>
-        <div class="mc-card" style="--accent:#1976d2" data-card="sched"></div>
+        <!-- Joe 10/26: the four departments (Case, Tote and Box Loading, Case Unloading) take the top; the Plant Distribution Scheduler
+             and the Plant Vacations & Schedule are menu items only, each its own window. The Manager Walkthrough and Shift Notes go
+             along the bottom. -->
+        <div class="mc-depts" data-card="dept" data-href="plant.html"></div>
         <div class="mc-card" style="--accent:#0f766e" data-card="notes"></div>
         <!-- Joe 10/15: Quality, Cooler Temperatures and Yard Checks are done walking the plant, so one Manager Walkthrough card
              (the same walkthrough as the phone app) takes their place, with each tile's detail. The three screens stay on the menu. -->
@@ -112,6 +113,15 @@
       return '<a class="mc-tile' + (kind ? ' ' + kind : '') + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span><b' + (/[AP]M$|^None$/.test(String(n)) ? ' class="time"' : '') + '>' + escapeHtml(String(n)) +
         (unit ? '<small>' + escapeHtml(unit) + '</small>' : '') + '</b><i>' + escapeHtml(line || '') + '</i>' + (bar == null ? '' : '<u><s style="width:' + bar + '%"></s></u>') + '</a>';
     }
+    // Joe 10/26 ("just a smaller version of what we got now"): each department is a small copy of its Plant Distribution
+    // Departments card: its name (opens its screen), four counts, the bar, then its own lines (behind, pickups, the forecast).
+    function deptCard(href, eyebrow, title, color, counts, done, total, note, lines) {
+      return '<div class="mc-card dp-card" style="--accent:' + color + '" data-href="' + href + '"><a class="mc-bar dp-head" href="' + href + '"><span class="dp-eye">' + escapeHtml(eyebrow) + '</span><strong>' + escapeHtml(title) + '</strong></a>' +
+        '<div class="dp-counts">' + counts.map(([n, w, k]) => '<span' + (k ? ' class="' + k + '"' : '') + '><em>' + escapeHtml(w) + '</em><b>' + escapeHtml(String(n)) + '</b></span>').join('') + '</div>' +
+        '<u class="dp-bar"><s style="width:' + pct(done, total) + '%"></s></u><p class="dp-note">' + escapeHtml(note) + '</p><div class="dp-lines">' + lines.join('') + '</div></div>';
+    }
+    // An alert box as on the Departments screen: the number in front, the label and (when there is one) a smaller line under it.
+    const dpLine = (href, label, side, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><b>' + escapeHtml(String(side)) + '</b><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></a>';
     // Joe 10/23: the walkthrough pictures still to go with a report, this plant's only.
     let taking = false;
     const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
@@ -119,7 +129,7 @@
       // The newest picture with its caption box; with more than one, the count opens the walkthrough, which lists them all.
       const pics = myPics(), SHOWN = 1;
       const take = canSend() ? '<button type="button" class="mc-btn wp-take"' + (taking ? ' disabled' : '') + '>' + (taking ? 'Saving the picture…' : 'Take Picture') + '</button>' : '';
-      return '<div class="mc-tile wk-tile wp-tile' + (pics.length ? ' warn' : '') + '"><span>4 · Pictures</span>' + (pics.length > SHOWN ? '<a class="wp-count" href="walkthrough.html" title="See every picture on the walkthrough">' : '') + '<b>' + pics.length + '<small>waiting</small></b>' + (pics.length > SHOWN ? '</a>' : '') + '<i>' + (pics.length ? 'for the next report' : 'none waiting') + '</i>' +
+      return '<div class="mc-tile wk-tile wp-tile' + (pics.length ? ' warn' : '') + '"><span>Pictures</span>' + (pics.length > SHOWN ? '<a class="wp-count" href="walkthrough.html" title="See every picture on the walkthrough">' : '') + '<b>' + pics.length + '<small>waiting</small></b>' + (pics.length > SHOWN ? '</a>' : '') + '<i>' + (pics.length ? 'for the next report' : 'none waiting') + '</i>' +
         '<div class="wp-box">' + (pics.length ? thumbsHtml(pics.slice(-SHOWN), { remove: canSend(), time: false, after: take }) : take) + '</div></div>';
     }
     const camera = cameraInput(async (file) => {
@@ -153,7 +163,13 @@
       const wash = P.washItems(date, data.wash, data.appWash, todays), seen = {};
       let repeat = 0;
       wash.forEach(w => { const k = String(w.trailer || '').toUpperCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] === 2) repeat++; });
-      const ship = U.managerSchedule(U.scheduleEntries(data.ship, 'SHIPPING'), date), recv = U.managerSchedule(U.scheduleEntries(data.recv, 'RECEIVING'), date);
+      // Joe 10/26: each department its own box; Tote and Box loads are mostly Scheduler loads, so they come in here too.
+      const areaLoads = U.withScheduleLoads(loads, todaysShip, customers), allPickups = P.withNotePickups(areaLoads, data.pickups), byArea = {};
+      P.AREAS.forEach(a => {
+        const ar = areaLoads.filter(z => z.area === a);
+        byArea[a] = Object.assign(P.counts(ar), { behind: ar.filter(z => P.isBehind(z, date, new Date(now))).length, pickups: ar.reduce((n, z) => n + P.pickupsFor(z, allPickups).filter(P.pickupOpen).length, 0) });
+      });
+      const backWaiting = urows.filter(z => z.checkedIn && z.status === 'WAITING').length;
       const lines = U.qualityLines(data.setup, journal, data.lineStatus, now);
       const temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), journal, now, data.sensors);
       // The report carries open breakdowns over from earlier shifts (30 days of the log, Joe 10/15: nothing open drops off);
@@ -169,42 +185,48 @@
       // Joe 10/15: every note not yet resolved by hand, newest first, and how many of the last 24 hours still need review.
       const wait = week.filter(r => r.status !== 'RESOLVED').sort((a, b) => (a.status === 'MONITOR') - (b.status === 'MONITOR'));
       const walk = U.managerWalk(yard, temps, lines, now);
-      return { done, returns, uc, wash, repeat, ship, recv, N, S, wait, walk, forecast };
+      return { done, byArea, backWaiting, returns, uc, wash, repeat, N, S, wait, walk, forecast };
     }
 
     function render() {
       const x = build(), r = report;
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       const grid = document.getElementById('grid'), put = (k, html) => { const el = grid.querySelector('[data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
-      put('sched', card('&#128467;', 'Plant Operations Scheduler', 'Shipping out · Receiving in · Day, Week and Month', 'scheduler.html', [
-        // Joe 10/15: today's loads big, this week underneath; This Month and Need Trailer came off so these two can be bigger.
-        tile('scheduler.html?lane=SHIPPING', 'Shipping', x.ship.today, 'today', x.ship.week + ' this week'), tile('scheduler.html?lane=RECEIVING', 'Receiving', x.recv.today, 'today', x.recv.week + ' this week')]));
-      put('dept', card('&#9638;', 'Plant Distribution Departments', 'Loading, unloading, returns, washing and live workboards', 'plant.html', [
-        tile('loadout.html', 'Loadout Center', x.done.done, 'of ' + x.done.total, x.done.waiting + ' waiting · ' + (x.done.loading + x.done.paused) + ' loading' + (x.done.paused ? ' (' + x.done.paused + ' paused)' : ''), pct(x.done.done, x.done.total)),
-        tile('unloading.html', 'Unloading', x.uc.complete, 'of ' + x.uc.total, x.uc.waiting + ' waiting · ' + x.uc.unloading + ' unloading', pct(x.uc.complete, x.uc.total)),
-        tile('returns.html', 'Returns', x.returns.length, '', x.returns.filter(z => z.pending).length + ' pending', null, x.returns.some(z => z.pending) ? 'warn' : ''),
-        tile('washing.html', 'Washing', x.wash.length, '', x.repeat ? 'to wash · ' + x.repeat + ' repeat' : 'to wash'),
-        // Joe 10/19 (option t): the Late Forecast tile opens the Late Forecast screen.
-        x.forecast.late ? tile('forecast.html', 'Late Forecast', x.forecast.late, 'late', 'All done est. ' + x.forecast.allDoneWhen, null, 'bad')
-          : tile('forecast.html', 'Late Forecast', 'On time', '', x.forecast.loads.length ? 'All done est. ' + x.forecast.allDoneWhen : 'nothing left to load', null, 'good')]));
+      // Joe 10/26: Case Loading, Tote Loading, Box Loading and Case Unloading, each a small copy of its Departments card. The Late
+      // Forecast rides in Case Loading, Washing and Returns in Case Unloading, tanker loads (when there are any) in Case Loading.
+      const A = x.byArea, pend = x.returns.filter(z => z.pending).length;
+      const loadCounts = (c) => [[c.total, 'Today'], [c.waiting, 'Waiting'], [c.loading + c.paused, 'Loading'], [c.done, 'Done', c.total && c.done === c.total ? 'good' : '']];
+      const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : '', '45+ min late'), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '', c.pickups ? 'not loaded yet' : 'none')];
+      const loadNote = (c) => c.done + ' of ' + c.total + ' loads complete';
+      const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late, 'bad', 'late · all done est. ' + x.forecast.allDoneWhen)
+        : dpLine('forecast.html', 'Late Forecast', 0, 'good', x.forecast.loads.length ? 'on time · all done est. ' + x.forecast.allDoneWhen : 'nothing left to load');
+      const caseLines = loadLines(A.CASE, 'CASE').concat([fc], A.TANKER.total ? [dpLine('loadout.html?area=TANKER', 'Tanker loads', A.TANKER.total, '', A.TANKER.done + ' done')] : []);
+      document.querySelector('[data-card="dept"]').innerHTML =
+        deptCard('loadout.html?area=CASE', 'Loadout Center', 'Case Loading', P.AREA.CASE.color, loadCounts(A.CASE), A.CASE.done, A.CASE.total, loadNote(A.CASE), caseLines) +
+        deptCard('loadout.html?area=TOTES', 'Loadout Center', 'Tote Loading', P.AREA.TOTES.color, loadCounts(A.TOTES), A.TOTES.done, A.TOTES.total, loadNote(A.TOTES), loadLines(A.TOTES, 'TOTES')) +
+        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Box Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
+        deptCard('unloading.html', 'Trailers back from the routes', 'Case Unloading', '#455a64', [[x.uc.total, 'Trailers'], [x.uc.waiting, 'Waiting'], [x.uc.unloading, 'Unloading'], [x.uc.complete, 'Done', x.uc.total && x.uc.complete === x.uc.total ? 'good' : '']], x.uc.complete, x.uc.total, x.uc.complete + ' of ' + x.uc.total + ' trailers unloaded', [
+          dpLine('unloading.html', 'Back, not started', x.backWaiting, x.backWaiting ? 'bad' : '', 'checked in'),
+          dpLine('washing.html', 'Truck Washing', x.wash.length, x.wash.length ? 'warn' : '', 'to wash' + (x.repeat ? ' · ' + x.repeat + ' repeat' : '')),
+          dpLine('returns.html', 'Returns pending', pend, pend ? 'bad' : '', x.returns.length + ' today')]);
       // Joe 10/15 (Manager Walkthrough, option 2): the walk is Yard, Coolers, Production (each opens its screen with the walkthrough
       // bar). Joe 10/15 (later): each tile carries what it can fit: every trailer, cooler and line with its reading or when it
       // is due, problems first in red; the rest under "+ N more". A past-due check puts a flashing "past due" pill on the card.
       // Joe 10/18: each area is green when done, yellow when due (2 hours) and red when past due (3 hours), with who did its
       // newest check and when, or "Done automatically" when nothing needs checking (no trucks in the yard, no line running).
       const W = x.walk, late = W.yard.late + W.coolers.late + W.quality.late, SHOW = 4;
-      const item = (z) => '<li class="' + z.kind + '"><b>' + escapeHtml(z.name) + '</b> ' + escapeHtml(z.detail) + '</li>';
       const STATE = { ok: 'DONE', due: 'DUE', late: 'PAST DUE' };
-      const walkTile = (href, label, z, what, of) => {
-        const kind = z.state === 'late' || z.out ? 'bad' : z.state === 'due' ? 'warn' : 'good', items = z.items || [];
-        const who = z.auto ? 'Done automatically' : z.lastCheck ? 'Last ' + clock(z.lastCheck.at) + (z.lastCheck.by ? ' · ' + personName(z.lastCheck.by) : '') : 'Not checked yet';
-        return '<a class="mc-tile wk-tile ' + kind + '" href="' + href + '" title="Open ' + escapeHtml(label) + '"><span>' + escapeHtml(label) + ' <em class="wk-state ' + z.state + '">' + STATE[z.state] + '</em></span><b>' + z.due + (of && z.total ? '<small>of ' + z.total + '</small>' : '') + '</b>' +
+      // Joe 10/26: no lists on the card. Each stop says when it was last done, with Check now (the walkthrough check) and View.
+      const walkTile = (href, view, label, z, what, of) => {
+        const kind = z.state === 'late' || z.out ? 'bad' : z.state === 'due' ? 'warn' : 'good';
+        const who = z.auto ? 'Done automatically' : z.lastCheck ? 'Last done ' + clock(z.lastCheck.at) + (z.lastCheck.by ? ' · ' + personName(z.lastCheck.by) : '') : 'Not done yet';
+        return '<div class="mc-tile wk-tile ' + kind + '" data-href="' + href + '"><span>' + escapeHtml(label) + ' <em class="wk-state ' + z.state + '">' + STATE[z.state] + '</em></span><b>' + z.due + (of && z.total ? '<small>of ' + z.total + '</small>' : '') + '</b>' +
           '<i>' + escapeHtml(z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : z.auto || 'all checked') + '</i>' +
           '<p class="wk-who">' + escapeHtml(who) + '</p>' +
-          '<ul class="wk-items">' + (items.length ? items.slice(0, SHOW).map(item).join('') + (items.length > SHOW ? '<li class="more">+ ' + (items.length - SHOW) + ' more</li>' : '') : '<li class="ok">Nothing to check</li>') + '</ul></a>';
+          '<p class="wk-acts"><a class="wk-do" href="' + href + '">Check now</a><a class="wk-view" href="' + view + '">View</a></p></div>';
       };
-      keepCaretIn(grid.querySelector('[data-card="walk"]'), () => put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Production every 2 to 3 hours · yellow at 2 hours, red at 3 · the same checks as the phone app', 'walkthrough.html', [
-        walkTile('yard.html?walk=1', '1 · Yard', W.yard, 'trailers to check'), walkTile('temps.html?walk=1', '2 · Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', '3 · Production', W.quality, 'lines due', true),
+      keepCaretIn(grid.querySelector('[data-card="walk"]'), () => put('walk', card('', 'Manager Walkthrough', 'Yard, Coolers and Production every 2 to 3 hours · yellow at 2 hours, red at 3 · Check now or View', 'walkthrough.html', [
+        walkTile('yard.html?walk=1', 'yard.html', 'Yard', W.yard, 'trailers to check'), walkTile('temps.html?walk=1', 'temps.html', 'Coolers', W.coolers, 'to check'), walkTile('quality.html?walk=1', 'quality.html', 'Production', W.quality, 'lines due', true),
         tile('walkthrough.html', 'Last Walkthrough', W.last ? clock(W.last.at) : 'None', '', W.last ? personName(W.last.by) : 'no checks yet', null, W.last ? 'good' : ''),
         // Joe 10/23 (pictures, option 1): the 4th stop. Take Picture opens the camera (a picture file on a computer); the pictures go
         // with the next Send Current Report and never again after that.

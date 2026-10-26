@@ -1635,6 +1635,84 @@ a.wp-more { color: var(--ud-blue); }
 .walk-page .wp-side { flex: 1 1 200px; }
 .walk-page .wp-thumbs img { width: 120px; height: 90px; }
 
+/* Joe 10/26: Manager Center is now the Plant Distribution front page. The four departments (Case, Tote and Box Loading, Case
+   Unloading) are small copies of their Plant Distribution Departments cards across the top beside Send Current Report; the
+   Manager Walkthrough (action cards, no lists) and Shift Notes go along the bottom. The Scheduler is a menu item only. */
+.manager-page .mc-depts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-height: 0; min-width: 0; }
+.manager-page .dp-card { cursor: pointer; padding: 8px 12px 10px; gap: 6px; min-width: 0; }
+.manager-page .dp-card:hover { box-shadow: 0 0 0 2px var(--accent); }
+.manager-page .dp-head { flex-direction: column; align-items: flex-start; gap: 0; }
+.manager-page .dp-eye { font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.manager-page .dp-card .dp-head strong { font-size: 24px; line-height: 1.1; flex: none; }
+.manager-page .dp-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.manager-page .dp-counts span { display: flex; flex-direction: column; align-items: center; padding: 3px 2px; border-radius: 10px; background: #eef4fa; min-width: 0; }
+.manager-page .dp-counts em { font-style: normal; font-size: 16px; font-weight: 800; color: #0a3866; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.manager-page .dp-counts b { font-size: 28px; line-height: 1.1; font-weight: 900; color: #0a3866; }
+.manager-page .dp-counts span.good b { color: #1f7a4d; }
+.manager-page .dp-bar { display: block; height: 8px; border-radius: 4px; background: #e3e9f0; overflow: hidden; text-decoration: none; }
+.manager-page .dp-bar s { display: block; height: 100%; background: var(--accent); }
+.manager-page .dp-note { margin: -2px 0 0; font-size: 16px; color: var(--muted); font-weight: 600; }
+.manager-page .dp-lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; min-height: 0; }
+.manager-page .dp-line { display: flex; align-items: center; gap: 10px; padding: 4px 10px; border: 1px solid #dbe6f0; border-radius: 10px; font-size: 16px; font-weight: 800; color: #0a3866; text-decoration: none; background: #fff; min-width: 0; }
+.manager-page .dp-line b { flex: none; font-size: 26px; line-height: 1.1; color: #0a3866; }
+.manager-page .dp-line span { flex: 1; min-width: 0; line-height: 1.15; }
+.manager-page .dp-line small { display: block; font-size: 16px; font-weight: 600; color: var(--muted); }
+.manager-page .dp-line.bad { background: #fdeeee; border-color: #f2c4c4; } .manager-page .dp-line.bad b, .manager-page .dp-line.bad span { color: #b42318; }
+.manager-page .dp-line.warn b { color: #b45f00; }
+.manager-page .dp-line.good b { color: #1f7a4d; }
+.manager-page .dp-line:hover { border-color: var(--accent); }
+/* The walkthrough's action cards: Check now and View under when it was last done. */
+.manager-page [data-card="walk"] .wk-tile { grid-template-areas: "label num" "line num" "who who" "acts acts"; cursor: pointer; }
+.manager-page [data-card="walk"] .wk-tile .wk-who { grid-area: who; }
+.manager-page .wk-acts { grid-area: acts; display: flex; gap: 6px; margin: 6px 0 0; }
+.manager-page .wk-acts a { flex: 1; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--ud-blue); border-radius: 8px; font-size: 16px; font-weight: 800; text-decoration: none; white-space: nowrap; color: var(--ud-blue); background: #fff; }
+.manager-page .wk-acts a.wk-do { background: var(--ud-blue); color: #fff; }
+@media (min-width: 1501px) {
+  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: minmax(min-content, 1fr) auto; }
+  .manager-page .mc-report { grid-row: 1; grid-column: 1 / span 3; }
+  .manager-page .mc-grid [data-card="dept"] { grid-column: 4 / span 5; grid-row: 1; min-height: min-content; }
+  .manager-page .mc-grid [data-card="walk"] { grid-column: 1 / span 6; grid-row: 2; }
+  .manager-page .mc-grid [data-card="notes"] { grid-column: 7 / span 2; grid-row: 2; }
+  .manager-page .wk-acts a { padding: 0 4px; }
+  .manager-page .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: minmax(0, 1fr); }
+  .manager-page .mc-grid [data-card="notes"] .mc-tile { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line num"; padding: 4px 12px; }
+  .manager-page .mc-grid [data-card="notes"] .mc-tile b { text-align: right; font-size: 32px; }
+  /* "Production PAST DUE" beside "0 of 5" needs a wide tile: Last Walkthrough and Pictures share the fourth column, one above
+     the other, so every name stays whole on one line. */
+  .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1.3fr)) minmax(0, 1fr); }
+  .manager-page [data-card="walk"] .wk-tile > span { white-space: nowrap; }
+}
+/* Laptops (1536): five walkthrough tiles in six columns cut their labels, so the walkthrough and Shift Notes take a whole row each. */
+@media (min-width: 1501px) and (max-width: 1799px) {
+  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: max-content max-content max-content; }
+  .manager-page .mc-grid :is([data-card="walk"], [data-card="notes"]) { min-height: max-content; }
+  .manager-page .mc-grid [data-card="walk"] { grid-column: 1 / -1; }
+  .manager-page .mc-grid [data-card="notes"] { grid-column: 1 / -1; grid-row: 3; }
+  .manager-page .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; }
+}
+/* Tablets and narrower screens: the cards wrap two to a row (the departments and the walkthrough take a whole row each). */
+@media (max-width: 1500px) {
+  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { display: flex; flex-wrap: wrap; align-content: flex-start; }
+  .manager-page .mc-grid > * { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  .manager-page .mc-grid > :is([data-card="dept"], [data-card="walk"]) { flex-basis: 100%; }
+  .manager-page .mc-grid > [data-card="dept"] { order: -1; }
+  .manager-page .mc-grid > .mc-report { max-height: 560px; }
+  .manager-page .mc-grid [data-card="dept"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { flex-direction: column; flex-wrap: nowrap; }
+  .manager-page .mc-grid > * { flex: none; width: 100%; }
+  .manager-page .mc-grid > .mc-report { max-height: none; }
+  .manager-page .mc-depts { display: flex; flex-direction: column; }
+}
+/* Joe 10/26 (mock-up 6b): the Plant Production front page uses Plant Distribution's layout; its report card opens the Send
+   Current Report window, and its Production Checks card has three stops. */
+.prod-home .mc-preview, .prod-home .mc-preview *, .prod-home a.mc-btn { text-decoration: none; }
+.prod-home .mc-preview { color: inherit; }
+.prod-home a.mc-btn { display: inline-flex; align-items: center; justify-content: center; }
+@media (min-width: 1501px) { .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.prod-home [data-card="walk"] .wk-who { white-space: normal; }
+
 /* 6.63 full test (tablet 1024x768): the day columns got about 70px and names broke mid-word, and the top buttons ran off the
    right edge. Under 1200px the buttons take their own line and wrap, the customers list narrows, and each day keeps at least
    130px; the week scrolls sideways in its own box when the days don't fit. */

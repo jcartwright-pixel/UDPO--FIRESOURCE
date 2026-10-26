@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Maintenance Schedule · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/crew.css">
+  <script src="js/logic.js"></script>
+  <script src="js/crew-rules.js"></script>
+</head>
+<!-- Joe 10/25 (mock-ups 1 and 3): the screens are js/crew-page.js; this page is the maintenance mechanics. -->
+<body class="fill crew-page" data-team="maint">
+  <div class="signin" id="signin" hidden>
+    <h1>Maintenance Schedule</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow"><span id="team-name">Maintenance Schedule</span> · <span id="plant-name"></span></span><h1 id="page-title"></h1><small id="page-sub"></small></div>
+      <div class="actions in-head" id="top"></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view crew-view" id="body"></div>
+  </div>
+
+  <script type="module">
+    import './js/app.js';
+    import './js/crew-page.js';
+  </script>
+</body>
+</html>

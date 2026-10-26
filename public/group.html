@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Departments · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/home.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="launch-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Operations</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
+    <div class="topbar"><span class="who" id="who"></span><button id="signout" type="button">Sign out</button></div>
+    <div class="launch-title"><h1 id="group-name">Departments</h1><p>Select the department you want to open.</p><span id="today">-</span></div>
+    <div class="notice error" id="error" hidden></div>
+    <!-- Joe 10/26 (1E): a home group's own page (Plant Operations or Route Distribution): one card per department, as the home had. -->
+    <section class="launch-grid six" id="sides"></section>
+  </div>
+  <script type="module">
+    import { start, requireSignIn, shortDate, GROUPS, groupSides, ICON, escapeHtml, watchPerson } from './js/app.js';
+    const L = window.UDLogic;
+    const group = GROUPS.find(g => g.key === new URLSearchParams(location.search).get('g')) || GROUPS[0];
+    document.title = group.name + ' · Operations';
+    const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="' + (s.bannerInPic ? 'Under Construction' : '') + '">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
+    const card = (s) => '<a class="launch-card' + (s.building ? ' building' : '') + (s.bannerInPic ? ' banner-pic' : '') + '" data-side="' + s.key + '" href="' + s.home + '">' +
+      '<span class="launch-art">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</span><strong>' + escapeHtml(s.name) + '</strong><small>' + escapeHtml(s.note) + '</small>' +
+      '<b class="open-text">Open ' + escapeHtml(s.short || s.name) + ' &rarr;</b>' +
+      (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '</a>';
+    const cards = groupSides(group.key).filter(s => !s.menuOnly);
+    const grid = document.getElementById('sides');
+    grid.innerHTML = cards.map(card).join('');
+    grid.classList.toggle('seven', cards.length > 3);
+    grid.classList.toggle('three', cards.length <= 3);
+    // Joe 10/11: an Under Construction card opens only for an Administrator; anyone else stays on this page.
+    grid.addEventListener('click', e => {
+      const a = e.target.closest('[data-side]');
+      if (a && a.classList.contains('building') && !document.body.classList.contains('is-admin')) { e.preventDefault(); return; }
+      if (a) try { sessionStorage.setItem('udSide', a.dataset.side); } catch (x) { /* no storage */ }
+    });
+    requireSignIn(async (user) => {
+      const today = L.operatingDay(new Date());
+      document.getElementById('today').textContent = L.dayName(today) + ' ' + shortDate(today);
+      const { db } = await start();
+      watchPerson(db, user, person => {
+        const plants = L.plantsFor(person);
+        let picked = '';
+        try { picked = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+        const plant = L.PLANTS.find(p => p.id === (plants.indexOf(picked) >= 0 ? picked : plants[0])) || L.PLANTS[0];
+        document.getElementById('group-name').textContent = plant.name + ' · ' + group.name;
+      }, { withEmail: true });
+    });
+  </script>
+</body>
+</html>

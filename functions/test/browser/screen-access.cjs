@@ -29,7 +29,8 @@ async function openPage(browser, width, height, url) {
   return page;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name) }); };
-const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !x.hidden).map(x => x.dataset.side));
+// Joe 10/26: Home is four cards, each listing its departments' buttons; a department shows when any of its buttons shows.
+const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => [...new Set(a.filter(x => !x.hidden && !x.closest('[hidden]')).map(x => x.dataset.side))]);
 
 (async () => {
   await clear();
@@ -43,7 +44,7 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
     let m = await openPage(browser, 1536, 864, '/index.html?testEmail=' + MAINT);
     await m.waitForFunction(() => document.querySelectorAll('#sides a[data-side]').length > 0 && document.getElementById('plant-name').textContent.trim());
     await m.waitForTimeout(500);
-    assert.equal((await visibleCards(m)).length, 8, 'nothing ticked yet: every card');
+    assert.deepEqual(await visibleCards(m), ['plant', 'production', 'pmaint', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety'], 'nothing ticked yet: every department');
     await m.close();
     results.push('Nothing ticked yet: the manager sees every Home card, as before');
 
@@ -75,13 +76,13 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
       await p.close();
     }
     const saved = (await db().collection('personRights').doc(MAINT).get()).data().screenAccess;
-    assert.deepEqual(saved, { fac_uniontown: ['pmCenter', 'machinery', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'plantReports', 'shiftReports'] });
-    results.push('Start from a job ticks the maintenance screens and two reports; Save keeps them for Uniontown');
+    assert.deepEqual(saved, { fac_uniontown: ['pmCenter', 'machinery', 'pmEquipment', 'pmWorkOrders', 'pmSchedule', 'maintStation', 'pmCrew', 'plantReports', 'shiftReports'] });
+    results.push('Start from a job ticks the maintenance screens (Equipment and the Maintenance Schedule too, Joe 10/25) and two reports; Save keeps them for Uniontown');
 
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       m = await openPage(browser, w, h, '/index.html?testEmail=' + MAINT);
       await m.waitForFunction(() => document.querySelectorAll('#sides a[data-side]').length > 0 && document.getElementById('plant-name').textContent.trim());
-      await m.waitForFunction(() => [...document.querySelectorAll('#sides a[data-side]')].filter(x => !x.hidden).length === 2);
+      await m.waitForFunction(() => [...document.querySelectorAll('#sides a[data-side]')].filter(x => !x.hidden && !x.closest('[hidden]')).map(x => x.dataset.side).filter((k, i, all) => all.indexOf(k) === i).length === 2);
       assert.deepEqual(await visibleCards(m), ['pmaint', 'reports']);
       await shot(m, 'home-maint-' + w + '.png');
       await m.goto(HOSTING + '/reportcenter.html?testEmail=' + MAINT);
@@ -95,9 +96,11 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => a.filter(x => !
       // Manager Center: the manager's own plant cards follow the ticks too (no Scheduler card without the Scheduler).
       await db().collection('personRights').doc(MAINT).set({ screenAccess: { fac_uniontown: ['manager', 'plantDepts', 'shiftNotes', 'quality', 'temps', 'yard'] } }, { merge: true });
       await m.goto(HOSTING + '/manager.html?testEmail=' + MAINT);
-      await m.waitForFunction(() => document.querySelector('[data-card="sched"]') && document.querySelector('[data-card="sched"]').dataset.href);
+      await m.waitForFunction(() => document.querySelector('[data-card="dept"] .dp-card'));
       await m.waitForTimeout(400);
-      assert.equal(await m.$eval('[data-card="sched"]', x => x.hidden), true, 'no Scheduler card');
+      // Joe 10/26: the Scheduler is a menu item only, and without the Scheduler ticked no link on the screen leads to it.
+      assert.deepEqual(await m.$$eval('#screen a[href^="scheduler.html"]', a => a.filter(x => !x.hidden && !x.closest('[hidden]')).length), 0, 'no Scheduler link');
+      assert.equal(await m.$eval('[data-card="dept"]', x => x.hidden), false);
       assert.equal(await m.$eval('[data-card="notes"]', x => x.hidden), false);
       await shot(m, 'manager-no-scheduler-' + w + '.png');
       await db().collection('personRights').doc(MAINT).set({ screenAccess: saved }, { merge: true });

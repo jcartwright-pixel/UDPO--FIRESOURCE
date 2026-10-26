@@ -71,8 +71,10 @@
     const started = Date.now(), now = () => testNow ? testNow + (Date.now() - started) : Date.now();
     window.udBack = () => { if (tv) { location.search = ''; return true; } return false; };
     let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '', lineId = tv ? '' : params.get('line') || '', kindFilter = 'ALL';
+    // Joe 10/26: a machine card on the Plant Production front page opens the lines of its kind (?kind=FILLER).
     let weekView = !tv && params.get('view') === 'week', weekOf = params.get('week') || '', weekRuns = [], weekKey = '', stopWeek = null;
     const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
+    if (KINDS.some(k => k[0] === params.get('kind'))) kindFilter = params.get('kind');
     // Joe 10/14: line efficiency is for managers only (not the tablets or the TV).
     const manager = () => !tv && !!person && L.hasRole(person, L.REORDER_ROLES);
     const clockOf = (iso) => { const x = Date.parse(iso || ''); return isFinite(x) ? new Date(x).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };

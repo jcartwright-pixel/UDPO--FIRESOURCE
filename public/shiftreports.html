@@ -102,7 +102,7 @@
         '<tr><td colspan="4" class="empty">' + (reports === null ? 'Loading the reports&hellip;' : 'No reports were sent' + (dateBox.value ? ' on ' + escapeHtml(shortDate(dateBox.value)) : '') + (shiftBox.value ? ' on ' + escapeHtml(nice(shiftBox.value)) : '') + '.') + '</td></tr>';
       showReport(list.find(r => r.id === chosen));
       document.getElementById('foot').textContent = reports === null ? '' : list.length + (list.length === 1 ? ' report' : ' reports') + (dateBox.value ? ' on ' + shortDate(dateBox.value) : ', every date') +
-        '. Each one is kept as it was sent with Send Current Report (Manager Center).';
+        '. Each one is kept as it was sent with Send Current Report (Plant Distribution).';
       const q = new URLSearchParams();
       if (dateBox.value) q.set('date', dateBox.value);
       if (chosen) q.set('id', chosen);

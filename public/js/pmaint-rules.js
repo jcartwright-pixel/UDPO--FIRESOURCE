@@ -10,13 +10,17 @@
  *     entry's Equipment / area box, else the words typed there;
  *   - work orders are numbered M-1001, M-1002, ... per plant; NEW, WORKING and PARTS are open, DONE is closed;
  *   - a PM task repeats every so many days, weeks or months from the day it was last done; it is LATE after its due day,
- *     WEEK when due this week (Sunday to Saturday), SOON within 30 days, else LATER.
+ *     WEEK when due this week (Sunday to Saturday), SOON within 30 days, else LATER;
+ *   - Joe 10/25: Equipment is the other things maintenance looks after (refrigeration, boilers, compressors, the building),
+ *     kept on its own list beside Machinery (group EQUIPMENT); work orders and PMs work the same on both.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.UDPlantMaint = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   var KINDS = ['Production line', 'Machine', 'Utility', 'Building', 'Other'];
+  var EQUIP_KINDS = ['Refrigeration', 'Boiler & Steam', 'Air Compressor', 'Water & Wastewater', 'Electrical', 'Building', 'Forklift', 'Other'];
+  var GROUPS = ['MACHINERY', 'EQUIPMENT'];
   var FIELDS = ['name', 'area', 'kind', 'make', 'model', 'serial', 'location', 'installed', 'notes'];
   var WO_STATUS = { NEW: 'New', WORKING: 'Being worked', PARTS: 'Waiting on parts', DONE: 'Done' };
   var OPEN = ['NEW', 'WORKING', 'PARTS'];
@@ -54,11 +58,13 @@
       FIELDS.forEach(function (f) { m[f] = text(s[f]); });
       m.name = l.name;
       m.kind = m.kind || l.kind;
+      m.group = 'MACHINERY';
       return m;
     });
     Object.keys(byId).forEach(function (id) {
       var s = byId[id], m = { id: id, line: false, order: 0, facilityId: facilityId, status: upper(s.status) || 'ACTIVE' };
       FIELDS.forEach(function (f) { m[f] = text(s[f]); });
+      m.group = upper(s.group) === 'EQUIPMENT' ? 'EQUIPMENT' : 'MACHINERY';
       if (m.name) out.push(m);
     });
     return out.filter(function (m) { return withRetired || m.status !== 'RETIRED'; }).sort(function (a, b) {
@@ -112,6 +118,6 @@
   }
   function daysLate(due, today) { return isDay(due) && isDay(today) && due < today ? daysBetween(due, today) : 0; }
 
-  return { KINDS: KINDS, FIELDS: FIELDS, WO_STATUS: WO_STATUS, OPEN: OPEN, UNITS: UNITS, FIRST_WO: FIRST_WO, lineMachines: lineMachines, machines: machines, findMachine: findMachine,
+  return { KINDS: KINDS, EQUIP_KINDS: EQUIP_KINDS, GROUPS: GROUPS, FIELDS: FIELDS, WO_STATUS: WO_STATUS, OPEN: OPEN, UNITS: UNITS, FIRST_WO: FIRST_WO, lineMachines: lineMachines, machines: machines, findMachine: findMachine,
     woNumber: woNumber, isOpen: isOpen, statusWord: statusWord, nextDue: nextDue, everyText: everyText, weekOf: weekOf, pmState: pmState, daysLate: daysLate, addDays: addDays };
 });

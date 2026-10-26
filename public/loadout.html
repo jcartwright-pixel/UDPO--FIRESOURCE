@@ -95,7 +95,7 @@
       <label>Product<input id="s-product" maxlength="80" placeholder="Optional"></label>
       <label class="wide">Notes<textarea id="s-notes" maxlength="1200"></textarea></label>
     </div>
-    <p class="hint" id="s-hint">It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).</p>
+    <p class="hint" id="s-hint">It goes on the Shipping schedule too, numbered by its pickup time (Load 1, Load 2, ...).</p>
     <div class="notice error" id="s-error" hidden></div>
     <div class="modal-actions"><button type="button" class="left danger-line" id="s-notrunning" hidden>Ended Up Not Running</button><button type="button" class="left danger-line" id="s-delete" hidden>Delete Load</button><button type="button" data-close>Cancel</button><button type="button" class="primary" id="s-save">Save Load</button></div>
   </section>
@@ -652,7 +652,7 @@
       // Joe 10/20 ("in case the plant forgot"): a load already on the schedule shows its Start and End times to type or fix.
       document.querySelectorAll('#sched-form .s-times').forEach(b => { b.hidden = !x; });
       put('s-start', x && x.work && x.work.startedAt ? P.clock(x.work.startedAt) : ''); put('s-end', x && x.work && x.work.completedAt ? P.clock(x.work.completedAt) : '');
-      document.getElementById('s-hint').textContent = 'It goes on the Plant Operations Scheduler too, numbered by its pickup time (Load 1, Load 2, ...).' +
+      document.getElementById('s-hint').textContent = 'It goes on the Shipping schedule too, numbered by its pickup time (Load 1, Load 2, ...).' +
         (x ? ' Type a Start or End time if the plant forgot to press it; a time before 6 AM is the night after the load date.' : '');
       document.getElementById('s-error').hidden = true;
       const del = document.getElementById('s-delete');
