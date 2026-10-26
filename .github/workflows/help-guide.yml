@@ -1,0 +1,37 @@
+name: Help guide kept up to date
+
+# Joe 10/26: "anytime we make changes, we update the help." Its own check, so editing the pull request's description runs
+# it again (the screen tests do not run again for that).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  # Joe 10/26: "anytime we make changes, we update the help." A pull request that changes a screen (a page in public/ or
+  # its script) also changes public/help.md, or says in its description why the help stays the same, on a line starting
+  # "Help unchanged:" (a fix nobody sees, for example). The rule is in CLAUDE.md.
+  help-updated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: The Help guide changes with the screens
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          changed=$(git diff --name-only "$BASE...$HEAD")
+          screens=$(printf '%s\n' "$changed" | grep -E '^public/[^/]+\.html$|^public/js/[^/]+\.js$' | grep -v -E '^public/(help\.html|js/help\.js)$' || true)
+          if [ -z "$screens" ]; then echo "No screen changed."; exit 0; fi
+          if printf '%s\n' "$changed" | grep -qx 'public/help.md'; then echo "Screens and help.md both changed."; exit 0; fi
+          if printf '%s\n' "$BODY" | grep -qiE '^[[:space:]]*Help unchanged:[[:space:]]*[^[:space:]]'; then echo "The description says why the help stays the same."; exit 0; fi
+          echo "These screens changed but public/help.md did not:"
+          printf '%s\n' "$screens"
+          echo "Update the screen's part of public/help.md, or add a line 'Help unchanged: <why>' to the pull request description."
+          exit 1
+
