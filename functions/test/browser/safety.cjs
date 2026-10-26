@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium, devices } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, plantDb, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
@@ -403,10 +403,12 @@ async function cameraShot(page, color) {
     await la.waitForSelector('#rows tr[data-newsub][data-a="0"] input');
     await la.fill('#rows tr[data-newsub][data-a="0"] input', 'Receiving');
     await la.press('#rows tr[data-newsub][data-a="0"] input', 'Tab');
-    const chLocs = async () => S.locations((await db().collection('locationAreas').doc('fac_charleston').get()).data() || null, 'fac_charleston');
+    // Joe 10/26 ("completely separate"): Charleston's areas are kept in Charleston's own database.
+    const chLocs = async () => S.locations((await plantDb('fac_charleston').collection('locationAreas').doc('fac_charleston').get()).data() || null, 'fac_charleston');
     for (let i = 0; i < 40 && JSON.stringify((await chLocs()).map(a => [a.name, a.subs.map(x => x.name)])) !== '[["Plant",["Receiving"]]]'; i++) await la.waitForTimeout(250);
     assert.deepEqual((await chLocs()).map(a => [a.name, a.subs.map(x => x.name), a.off]), [['Plant', ['Receiving'], false]], 'Charleston has only its own area, nothing from Uniontown');
     assert.equal(JSON.stringify(await locsNow()), utBefore, 'Uniontown\'s areas are unchanged');
+    assert.equal((await db().collection('locationAreas').doc('fac_charleston').get()).exists, false, 'nothing of Charleston\'s is kept in Uniontown\'s database');
     await la.waitForSelector('#rows tr.sw-sub-row[data-drag] input[value="Receiving"]');
     assert.match(await la.textContent('#counts'), /^1 area · 1 sub-area$/, 'one area and one sub-area are counted in the singular');
     await fits(la, 'Location Areas for Charleston at 1536');
