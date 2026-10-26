@@ -278,6 +278,24 @@ async function shots(page, name, w) {
       'Virginia Dare', 'Synergy', 'KDV', 'Brenntag', 'Green Spot', 'Robertet Tea', 'Heritage', 'Forbes', 'Liquid B.I.B', 'U LINE'];
     await desk.setViewportSize({ width: 1536, height: 864 });
     await desk.click('#modal [data-close]');
+    // 6.63 full test: on a tablet (1024x768) the week's days were about 70px, names broke mid-word and the top buttons ran off the
+    // right edge. Each day keeps at least 130px (the week scrolls sideways in its own box), every top button is on screen, and no
+    // card's name or time is cut, on a tablet and a phone.
+    await desk.click('[data-view="week"]');
+    await desk.waitForSelector('.sc-load');
+    for (const [w, h] of [[1024, 768], [390, 844]]) {
+      await desk.setViewportSize({ width: w, height: h });
+      const look = await desk.evaluate(() => ({
+        narrowest: Math.min(...[...document.querySelectorAll('.sc-col')].map(c => Math.round(c.getBoundingClientRect().width))),
+        offRight: [...document.querySelectorAll('.head .top-row button')].filter(b => b.getBoundingClientRect().width && b.getBoundingClientRect().right > innerWidth).map(b => b.textContent.trim()),
+        cut: [...document.querySelectorAll('.sc-load strong, .sc-load span')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),
+        pageWide: document.scrollingElement.scrollWidth > innerWidth }));
+      assert.ok(look.narrowest >= 130, 'each day at least 130px wide at ' + w + 'x' + h + ': ' + look.narrowest);
+      assert.deepEqual([look.offRight, look.cut, look.pageWide], [[], [], false], 'week at ' + w + 'x' + h + ': buttons on screen, no card cut, no page scrolling sideways');
+      if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-week-tablet-' + w + '.png'), scale: 'css' });
+    }
+    await desk.setViewportSize({ width: 1536, height: 864 });
+    results.push('Week on a tablet (1024x768) and a phone: each day at least 130px, the top buttons wrap on screen, no load card cut');
     await desk.click('[data-lane="RECEIVING"]');
     await desk.click('#suppliers');
     await desk.click('#supplier-list');

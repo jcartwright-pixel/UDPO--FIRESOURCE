@@ -266,7 +266,7 @@
 .sched-page .sc-by.branch i { background: #15803d; }
 .sched-page .sc-by.carrier i { background: #7e3fbf; }
 .sched-page .sc-load strong, .sched-page .sc-load span, .sched-page .sc-load small { display: block; overflow: hidden; text-overflow: ellipsis; }
-.sched-page .sc-load strong { font-size: 16px; white-space: normal; overflow-wrap: anywhere; }
+.sched-page .sc-load strong { font-size: 16px; white-space: normal; overflow-wrap: break-word; }
 .sched-page .sc-load span { font-size: 16px; color: var(--muted); }
 .sched-page .sc-load small { font-size: 16px; color: #8a4b00; font-weight: 700; }
 .sched-page .sc-add { margin-top: auto; min-height: 32px; border: 1px dashed var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
@@ -298,7 +298,6 @@
   .sched-page .sc-day small { font-size: 16px; }
   .sched-page .sc-dn b { font-size: 16px; }
 }
-
 /* Joe 10/20: "Confirm this load" before a Scheduler load is saved (Scheduler and Daily Box Loadout). */
 .sched-confirm { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 0 0 14px; align-items: baseline; }
 .sched-confirm dt { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
@@ -1713,3 +1712,22 @@ a.wp-more { color: var(--ud-blue); }
 .prod-home a.mc-btn { display: inline-flex; align-items: center; justify-content: center; }
 @media (min-width: 1501px) { .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .prod-home [data-card="walk"] .wk-who { white-space: normal; }
+
+/* 6.63 full test (tablet 1024x768): the day columns got about 70px and names broke mid-word, and the top buttons ran off the
+   right edge. Under 1200px the buttons take their own line and wrap, the customers list narrows, and each day keeps at least
+   130px; the week scrolls sideways in its own box when the days don't fit. */
+@media (max-width: 1200px) {
+  body.sched-page .head, body.sched-page .head:has(.top-row) { flex-wrap: wrap; row-gap: 8px; }
+  body.sched-page .head .actions.in-head.top-row { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 8px; min-width: 0; margin-left: 0; }
+  body.sched-page .sc-strip { flex-wrap: wrap; row-gap: 6px; }
+  body.sched-page .sc-whos { flex-basis: 180px; min-width: 0; }
+  body.sched-page .sc-whos input { min-width: 0; }
+  body.sched-page .sc-weekgrid { grid-template-columns: repeat(7, minmax(130px, 1fr)); overflow-x: auto; }
+}
+/* Phones: the customers list goes above the week, in a short box of its own. */
+@media (max-width: 760px) {
+  body.sched-page .sc-v-week { flex-direction: column; }
+  body.sched-page .sc-whos { flex: 0 0 auto; max-height: 180px; }
+  body.sched-page .head .title { flex: 1 1 100%; min-width: 0; }
+  body.sched-page .sc-titleline { flex-wrap: wrap; row-gap: 8px; }
+}
