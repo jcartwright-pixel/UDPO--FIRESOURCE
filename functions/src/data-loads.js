@@ -26,13 +26,12 @@
  * the starting number, and every trailer with no "last reefer service hours" gets its GPS engine hours, written the way Fleet
  * Service Setup's Save writes them (garage.js saveFleetUnit). Joe then changes each to the real last service on Fleet Service
  * Setup. A unit that already has a number keeps it; a unit Fleet has no reading for is left blank. It waits (tries again next
- * run) until a GPS read has brought in odometers. The marker lists every unit and number it set, for undoing by hand. Joe OK'd it
- * for the live app on 10/26 (LIVE_OK below).
+ * run) until a GPS read has brought in odometers. The marker lists every unit and number it set, for undoing by hand.
  *
  * garage-work-orders-2026-10-14 (Joe 10/14, "this says two at the garage, so I should be able to go into the garage and see two
  * work orders"): Truck Issues' Garage button now makes the write-up's work order (garage.js writeUpOrderStep). Every open truck,
  * trailer or fork truck write-up already marked "Sent to garage" before that gets its work order the same way, one per write-up
- * (one already there is kept). Joe OK'd it for the live app on 10/26 (LIVE_OK below).
+ * (one already there is kept). TEST COPY ONLY: on the live app it does nothing and leaves no marker until Joe OKs it by name.
  *
  * half-gallon-label-readers-2026-10-15 (Joe 10/15, "b": both half gallon fillers have a UPC label scanner like the Gallon Filler):
  * NEW 1/2 GALLON and OLD 1/2 GALLON are counted by their label reader (Counted by = Label reader on Line Targets, as
@@ -47,7 +46,8 @@
  * date and as its last annual inspection (the next one due by the rule: 4-1-27 at 12 months), written the way Fleet Service
  * Setup's Save writes them (garage.js saveFleetUnit). A date already typed is kept. Truck PM miles stay as they are: the app has
  * no GPS miles from 4-1-26, so a truck with no last PM miles still asks for them. Plates are not touched. The marker lists every
- * unit and field it set, for undoing by hand. Joe OK'd it for the live app on 10/26 (LIVE_OK below).
+ * unit and field it set, for undoing by hand. TEST COPY ONLY: on the live app it does nothing and leaves no marker until Joe OKs
+ * it by name.
  *
  * otr-history-2026-10-18 (Joe 10/18, "this screen is not getting filled out, and I thought it was already done once"): the Over
  * the Road history from his OTR Trips 2026 workbook and the August accounting package (day counts 9-30-16 to 8-31-26, monthly
@@ -197,14 +197,11 @@ async function loadGarageTechsOnce(db, opts) {
 
 const FLEET_MILES_ID = 'fleet-gps-start-miles-2026-10-13';
 const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
-// The test-copy-only loads Joe has OK'd by name for the live app. Joe 10/26, on the list of fleet-gps-start-miles-2026-10-13,
-// fleet-service-start-2026-04-01 and garage-work-orders-2026-10-14: "Well, go ahead and copy all that. I just want that done."
-const LIVE_OK = new Set(['fleet-gps-start-miles-2026-10-13', 'fleet-service-start-2026-04-01', 'garage-work-orders-2026-10-14']);
-const runsHere = (id, o) => LIVE_OK.has(id) || (o.project || projectId()) === 'ud-distribution-sandbox';
 const blank = (v) => v === undefined || v === null || String(v).trim() === '';
 async function loadFleetStartMilesOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
-  if (!runsHere(FLEET_MILES_ID, o)) return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  // Joe's OK for the live app has to name this load, so it runs by itself on the test copy only.
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
   const mark = db.collection('dataLoads').doc(FLEET_MILES_ID);
   return db.runTransaction(async tx => {
     const m = await tx.get(mark);
@@ -237,7 +234,7 @@ const FLEET_START_ID = 'fleet-service-start-2026-04-01';
 const FLEET_START_DATE = '2026-04-01';
 async function loadFleetServiceStartOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
-  if (!runsHere(FLEET_START_ID, o)) return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
   const mark = db.collection('dataLoads').doc(FLEET_START_ID);
   return db.runTransaction(async tx => {
     const m = await tx.get(mark);
@@ -270,7 +267,7 @@ const GARAGE_ORDERS_ID = 'garage-work-orders-2026-10-14';
 const CLOSED = /^(COMPLETE|COMPLETED|CLOSED|RESOLVED|REPAIRED|REMOVED)$/i;
 async function loadGarageOrdersOnce(db, opts) {
   const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
-  if (!runsHere(GARAGE_ORDERS_ID, o)) return { skipped: 'test copy only (live needs Joe\'s OK)' };
+  if ((o.project || projectId()) !== 'ud-distribution-sandbox') return { skipped: 'test copy only (live needs Joe\'s OK)' };
   const mark = db.collection('dataLoads').doc(GARAGE_ORDERS_ID);
   return db.runTransaction(async tx => {
     const m = await tx.get(mark);
