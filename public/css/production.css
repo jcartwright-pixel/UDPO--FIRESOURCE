@@ -509,7 +509,8 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .pm-compact .pm-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; }
 .pm-compact .pm-tile span { grid-column: 1 / -1; }
 .pm-compact .pm-tile small { align-self: end; padding-bottom: 4px; }
-.pm-compact .pm-tile span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Tile labels wrap instead of being cut off (Joe: tiles show whole wording). */
+.pm-compact .pm-tile span { white-space: normal; overflow-wrap: break-word; }
 .pm-compact .pm-sensors { margin-top: 8px; padding: 6px 10px; }
 .pm-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: -6px; }
 .pm-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 2px solid #9fb3c8; border-radius: 10px; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
