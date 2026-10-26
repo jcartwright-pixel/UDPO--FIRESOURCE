@@ -267,12 +267,15 @@ function ioModule() {
     await pl.waitForFunction(id => /Fill weight \+5\.7 g vs target · 1 LIGHT · 1 HEAVY at/.test((document.querySelector('.pd-tile[data-line="' + id + '"]') || {}).textContent || ''), GALLON).catch(async e => { console.error('CARD', await pl.$eval('.pd-tile[data-line="' + GALLON + '"]', x => x.textContent).catch(() => 'none')); throw e; });
     await pl.close();
     for (const w of [1536, 1920]) {
-      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + GALLON + '&' + ADMIN);
-      await dv.waitForFunction(() => /Fill weight checks/.test(document.getElementById('detail').textContent) && /Giveaway/.test(document.getElementById('detail').textContent));
-      const d = await dv.textContent('#detail');
+      // Joe 10/26: the machine page's Fill weight and From the machine tabs.
+      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + GALLON + '&tab=fill&' + ADMIN);
+      await dv.waitForFunction(() => /Giveaway/.test((document.querySelector('#detail .pm-tabbody[data-tab="fill"]') || {}).textContent || ''));
+      const d = await dv.textContent('#detail .pm-tabbody');
       assert.match(d, /Average \+5\.7 g over target/);
       assert.match(d, /Giveaway 1\.3 lb \(570 g\) on 100 jugs/);
-      assert.match(d, /Rejects and spills: 4/);
+      await dv.click('#pmtabs [data-pmtab="machine"]');
+      await dv.waitForSelector('#detail .pm-tabbody[data-tab="machine"]');
+      assert.match(await dv.textContent('#detail .pm-tabbody'), /Rejects and spills: 4/);
       await fits(dv, 'the Gallon Filler shift view at ' + w);
       await dv.$eval('#detail', e => e.scrollIntoView({ block: 'start' }));
       await shot(dv, 'fill-line-shift-' + w);

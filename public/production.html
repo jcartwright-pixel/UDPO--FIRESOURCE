@@ -76,8 +76,7 @@
     let person = null, data = null, stop = null, db = null, plant = params.get('plant') || '', lineId = tv ? '' : params.get('line') || '', kindFilter = 'ALL';
     // Joe 10/26: a machine card on the Plant Production front page opens the lines of its kind (?kind=FILLER).
     // Joe 10/26: one screen for each machine, the same for every machine (mock-ups 1, 2 and 3 while he picks).
-    // Joe 10/26 (picked 1): each area on its own tab (?tab=), so the page fits the screen without scrolling.
-    const look = ['1', '2', '3'].indexOf(params.get('look')) >= 0 ? params.get('look') : '';
+    // Joe 10/26: a machine's page has each area on its own tab (?tab=), so it fits the screen without scrolling.
     let pmTab = params.get('tab') || '';
     let weekView = !tv && params.get('view') === 'week', weekOf = params.get('week') || '', weekRuns = [], weekKey = '', stopWeek = null;
     const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
@@ -92,7 +91,6 @@
       || !!(v.fill && v.fill.checks.length && v.fill.checks[v.fill.checks.length - 1].flag === 'LIGHT') || !!(v.machine && v.machine.running === false);
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
     const STATE_WORD = (v) => v.state === 'IDLE' ? 'Not started' : v.state === 'STOPPED' ? 'Stopped ' + v.stoppedMin + ' min' : v.state === 'CHANGEOVER' ? 'Changeover' : v.state === 'CIP' ? 'CIP wash' : v.kind === 'HTST' && v.diverting ? 'In divert' : 'Running';
-    const COUNTED = { TABLET: 'Typed', SENSOR: 'Sensor', READER: 'Label reader', CONTROLLER: 'Machine' };
     // The machine menu (Joe 10/24, picked dd): every machine set up for the plant, whether or not its sensors are in yet, grouped by
     // kind, with its color, whether it is running and what it made against target; the reports (This Week, the TV, the line
     // tablet and Line Targets) are at the bottom of the menu.
@@ -105,24 +103,6 @@
       document.getElementById('menu').innerHTML = all + groups.map(g => { const vs = views.filter(v => v.kind === g[0]); return vs.length ? '<h3>' + g[1] + '</h3>' + vs.map(item).join('') : ''; }).join('') +
         '<h3>Reports</h3><a id="week-link" href="production.html?view=week&plant=' + encodeURIComponent(plant) + '"' + (weekView ? ' class="on"' : '') + '>This Week</a><a id="tv" href="production.html?tv=1&plant=' + encodeURIComponent(plant) + '">TV Display</a><a href="line.html">Line Tablet</a><a href="linetargets.html">Line Targets</a>';
     }
-    // Live from the machine (Joe 10/24: every machine will have its RedZone sensors): what the machine itself reports, and
-    // "Waiting for sensor" for each reading not wired yet.
-    function liveBox(v) {
-      const m = v.machine, auto = v.counter && v.counter !== 'TABLET', wait = '<b class="pd-wait">Waiting for sensor</b>';
-      const cell = (name, val, note) => '<div class="pd-live-c"><span>' + name + '</span>' + val + (note ? '<small>' + note + '</small>' : '') + '</div>';
-      const cells = [
-        cell('Count', auto ? '<b>' + fmt(v.made) + '</b>' : wait, auto ? 'From the ' + escapeHtml((COUNTED[v.counter] || '').toLowerCase()) : 'Typed on the line tablet for now: ' + fmt(v.made)),
-        cell('Speed', m && m.speed !== null ? '<b' + (m.speedFlag ? ' class="pd-bad"' : '') + '>' + fmt(m.speed) + (m.rpm ? ' RPM' : '/min') + '</b>' : auto && v.speed !== null ? '<b>' + v.speed + '/min</b>' : wait, m && m.speed !== null ? escapeHtml(m.speedName || '') : v.speed !== null ? 'Worked out from the counts: ' + v.speed + '/min' : ''),
-        cell(v.kind === 'BLOWMOLD' ? 'Annealer temp' : 'Temperature', m && m.temp !== null ? '<b' + (m.tempFlag ? ' class="pd-bad"' : '') + '>' + fmt(m.temp) + '°F</b>' : wait, ''),
-        cell('Running or stopped', m && m.running !== null ? (m.running ? '<b class="pd-good">Running</b>' : '<b class="pd-bad">Stopped</b>') : wait, 'Line tablet says: ' + escapeHtml(STATE_WORD(v)))
-      ];
-      if (v.kind === 'FILLER') cells.push(cell('Label reader', v.reader ? (v.reader.dateOk === false ? '<b class="pd-bad">Wrong date</b>' : '<b class="pd-good">Reading</b>') : wait, v.reader ? fmt(v.reader.read) + ' read' : 'UPC and code date on each jug'));
-      const last = m && m.at ? 'Last reading ' + clockOf(m.at) + (m.stale ? ' · not reading now' : '') : 'No sensors wired on this machine yet';
-      return '<section class="pd-box wide pd-live"><div class="pd-live-h"><h3>Live from the machine</h3><span class="pd-none">' + escapeHtml(last) + '</span>' +
-        '<a class="lt-top" href="line.html?line=' + encodeURIComponent(v.line.operationId) + '">Line Tablet</a><a class="lt-top" href="linetargets.html?line=' + encodeURIComponent(v.line.operationId) + '">Targets and Sensors</a></div>' +
-        '<div class="pd-live-g">' + cells.join('') + '</div></section>';
-    }
-
     function render() {
       if (!data) return;
       const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
@@ -218,7 +198,8 @@
       boxes.push(['Stopped', sum(v => v.downMin) + ' min'], ['Waste', fmt(sum(v => v.wasteTotal))], [nextCip ? 'Next CIP · ' + escapeHtml(nextCip.v.line.name) : 'Next CIP', nextCip ? clockOf(new Date(nextCip.at).toISOString()) : '—']);
       document.getElementById('totals').innerHTML = boxes.map(x => '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>').join('');
     }
-    // One line's shift (mock-up B): timeline, hour by hour, efficiency, changeovers, stops, waste, quality checks, CIP, crew and notes.
+    // One machine's page. Joe 10/26: one screen for every machine, what it is doing now and its history since it started running,
+    // each area on its own tab (js/production-machine.js); the Blow Mold keeps its own page (Joe 10/25).
     function drawDetail(v, views, t) {
       const run = v.run || {}, mgr = manager();
       document.getElementById('hstats').innerHTML = [['Made', fmt(v.made), ''], ['Target so far', fmt(v.soFar), ''], mgr ? ['Efficiency', v.efficiency && v.efficiency.oee !== null ? v.efficiency.oee + '%' : '—', 'good'] : null, ['Stopped', v.downMin + ' min', v.downMin ? 'bad' : '']]
@@ -233,27 +214,8 @@
       if (start && stopAt) for (let a = Math.ceil(start / 3600000) * 3600000; a <= stopAt; a += 3600000) ticks.push('<span style="left:' + ((a - start) / (stopAt - start) * 100) + '%">' + new Date(a).toLocaleTimeString('en-US', { hour: 'numeric' }) + '</span>');
       const NAMES = { run: 'Running', stop: 'Stopped', co: 'Changeover', cip: 'CIP / sanitation', brk: 'Break', idle: 'Not started' };
       const tl = segs.length ? '<div class="pd-tl">' + segs.map(x => '<i class="' + x.kind + '" style="width:' + (x.minutes / total * 100) + '%" title="' + (NAMES[x.kind] || 'Still to come') + ' ' + clockOf(x.from) + ', ' + x.minutes + ' min"></i>').join('') + '</div><div class="pd-ticks">' + ticks.join('') + '</div><div class="pd-key">' + Object.keys(NAMES).map(k => '<span><i class="' + k + '"></i>' + NAMES[k] + '</span>').join('') + '</div>' : '<p class="pd-none">Nothing entered on this line this shift.</p>';
-      // Hour by hour
-      const hrs = R.hourly(run, v.targets, t).filter(x => x.past);
-      const mach = v.machine, hasM = !!mach && hrs.some(x => x.speed !== null || x.temp !== null);
-      const mCell = (val, lo, hi, unit) => val === null ? '–' : R.machineFlag(val, lo, hi) ? '<b class="pd-bad">' + fmt(val) + unit + '</b>' : fmt(val) + unit;
-      const hourRows = hrs.map(x => [clockOf(x.from).replace(':00', '') + '–' + clockOf(x.to).replace(':00', ''), escapeHtml(x.products.join(' → ') || '—'), fmt(x.made), fmt(x.target), x.pct === null ? '–' : x.pct, x.stopped]
-        .concat(hasM ? [mCell(x.speed, mach.speedLow, mach.speedHigh, ''), mCell(x.temp, mach.tempLow, mach.tempHigh, '°')] : []));
-      const machBox = mach ? box('From the machine', (() => {
-        const range = (lo, hi, u) => lo === null && hi === null ? 'no range set' : (lo === null ? 'up' : lo + u) + ' to ' + (hi === null ? 'any' : hi + u);
-        const line = (name, now, lo, hi, mn, mx, out, f, u) => now === null && mn === null ? '' : '<p><b>' + escapeHtml(name) + ':</b> ' + (now === null ? '—' : (f ? '<b class="pd-bad">' + fmt(now) + u + '</b>' : '<b>' + fmt(now) + u + '</b>')) + ' now · shift ' + (mn === null ? '—' : fmt(mn) + u + ' to ' + fmt(mx) + u) + ' · range ' + escapeHtml(range(lo, hi, u)) + (out ? ' · <b class="pd-bad">' + out + ' min outside</b>' : '') + '</p>';
-        return (mach.counter !== null ? '<p><b>Machine counter:</b> ' + fmt(mach.counter) + (v.counter === 'CONTROLLER' ? ' (the jugs made count from it)' : '') + '</p>' : '') +
-          line(mach.speedName, mach.speed, mach.speedLow, mach.speedHigh, mach.speedMin, mach.speedMax, mach.speedOutMin, mach.speedFlag, '') +
-          line('Temperature', mach.temp, mach.tempLow, mach.tempHigh, mach.tempMin, mach.tempMax, mach.tempOutMin, mach.tempFlag, '°F') +
-          (mach.running !== null ? '<p><b>Motor:</b> ' + (mach.running ? 'running' : '<b class="pd-bad">off</b>') + ' since ' + clockOf(mach.runningSince) + ' (current switch; off opens a stop)</p>' : '') +
-          (mach.rejects !== null ? '<p><b>Rejects and spills:</b> ' + fmt(mach.rejects) + ' (' + fmt(mach.infeed) + ' jugs in on the infeed eye, less the jugs counted out)</p>' : '') +
-          '<p class="pd-none">Read ' + (mach.stale ? '<b class="pd-bad">last at ' + clockOf(mach.at) + ', not reading now</b>' : clockOf(mach.at)) + (v.counter === 'CONTROLLER' ? ' from the machine\'s controller' : ' from the add-on sensors') + ' (read-only).</p>';
-      })()) : '';
       // The fill weight checks (Joe 10/14): each check's product per jug against target, and the giveaway on every jug made.
       const fl = v.fill, fw = (fl && fl.words) || { One: 'Jug', many: 'jugs', empty: 'empty jug', Empty: 'Empty jug', cap: 'cap' }, sg = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
-      const bx = v.boxing, boxBox = bx ? box('Jugs in against boxes out', table([['Filler', 'w'], ['Jugs made', 1]], bx.feeders.map(f => [escapeHtml(f.name), fmt(f.made)]), 'No feeding line this shift.') +
-        '<p class="pd-eff">Jugs in <b>' + fmt(bx.jugsIn) + '</b> &nbsp; Boxes <b>' + fmt(bx.boxes) + '</b>' + (bx.perBox ? ' × ' + fmt(bx.perBox) + ' = <b>' + fmt(bx.boxed) + '</b> jugs boxed &nbsp; ' + (bx.diff < 0 ? '<b class="pd-bad">' + fmt(-bx.diff) + ' more boxed than the fillers counted</b>' : 'Not boxed <b>' + fmt(bx.diff) + '</b>') : '') + '</p>' +
-        '<p class="pd-none">' + (bx.perBox ? 'Not boxed = jugs in less jugs boxed: still on the conveyor, rejected or spilled.' : 'Type the jugs in each box on Line Targets to compare.') + '</p>') : '';
       const fillBox = fl ? box('Fill weight checks', table([['Time'], ['Product', 'w'], [fw.One + 's', 1], ['Average product', 1], ['vs target', 1], [fw.Empty, 1], ['Who']], fl.checks.map(c => [clockOf(c.at), escapeHtml(c.product || '—'), c.filled + ' of ' + R.FILL_JUGS,
           c.avgNet === null ? '—' : fmt(c.avgNet) + ' g', c.diff === null ? 'set target' : c.flag ? '<b class="pd-bad">' + sg(c.diff) + ' g ' + c.flag + '</b>' : sg(c.diff) + ' g', c.tare === null ? 'not set' : fmt(c.tare) + ' g' + (c.tareFrom === 'BLOWMOLD' ? ' (Blow Mold)' : ''), escapeHtml(who(c.by))]), 'No fill weight checks this shift.') +
         (fl.totals.checks && fl.totals.avgDiff !== null ? '<p class="pd-eff">Average <b>' + sg(fl.totals.avgDiff) + ' g</b> ' + (fl.totals.avgDiff >= 0 ? 'over' : 'under') + ' target &nbsp; Giveaway <b>' + fmt(fl.totals.giveawayLb) + ' lb</b> (' + fmt(fl.totals.giveawayG) + ' g) on ' + fmt(v.made) + ' ' + fw.many + '</p><p class="pd-none">Giveaway = the average over target × the ' + fw.many + ' made this shift. Product = filled weight − ' + fw.empty + ' − ' + fw.cap + '.</p>' : fl.totals.noTarget ? '<p class="pd-none">Set the product\'s Target Fill Weight g on the Product Sheet to see over and under.</p>' : '') +
@@ -287,17 +249,12 @@
         return;
       }
       document.getElementById('hstats').innerHTML = '';
-      document.getElementById('detail').innerHTML = drawMachine(v, t, look, { manager: mgr, quality: qualityBox, tab: pmTab });
+      document.getElementById('detail').innerHTML = drawMachine(v, t, { manager: mgr, quality: qualityBox, tab: pmTab });
       const tabsEl = document.querySelector('#detail .pm-tabs'), head = document.getElementById('pmtabs');
       head.innerHTML = '';
       if (tabsEl) head.appendChild(tabsEl);
       head.hidden = !tabsEl;
       fitTab();
-      return;
-      document.getElementById('detail').innerHTML = liveBox(v) + tlBox +
-        '<div class="pd-col">' + box('Hour by hour', table([['Hour'], ['Product', 'w'], ['Made', 1], ['Target', 1], ['%', 1], ['Stopped', 1]].concat(hasM ? [[escapeHtml(mach.speedName), 1], ['Temp', 1]] : []), hourRows, 'No hours yet this shift.')) +
-        stopsBox + wasteBox + '</div>' +
-        '<div class="pd-col">' + machBox + fillBox + boxBox + effBox + coBox + cipBox + box('Crew and notes', notes) + '</div>' + qualityBox;
     }
     // The Blow Mold's room sensor (a MOCREO sensor picked on Line Targets), read live as the tablet does.
     let room = { id: '', value: null, stop: null };
@@ -405,7 +362,7 @@
       const c = e.target.closest('.pd-tile[data-line]');
       if (!c) return;
       lineId = c.dataset.line;
-      history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (look ? '&look=' + look : '') + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      history.pushState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(lineId) + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
       render(); document.getElementById('view').scrollTop = 0; window.scrollTo(0, 0);
     });
     // The tab's box takes the rest of the window: a long list scrolls inside it, never the page.
@@ -414,7 +371,7 @@
       if (!body) return;
       const room = Math.max(260, window.innerHeight - body.getBoundingClientRect().top - (document.getElementById('right').getBoundingClientRect().top < 0 ? 0 : 18));
       body.style.height = room + 'px';
-      body.style.setProperty('--pm-ch', Math.max(160, Math.min(420, room - 110)) + 'px');
+      body.style.setProperty('--pm-ch', Math.max(160, Math.min(420, room - 150)) + 'px');
     }
     window.addEventListener('resize', fitTab);
     document.getElementById('pmtabs').addEventListener('click', e => {
@@ -430,7 +387,7 @@
       const b = e.target.closest('button[data-tab]');
       if (!b) return;
       lineId = b.dataset.tab; weekView = false;
-      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (look ? '&look=' + look : '') + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
+      history.replaceState(null, '', 'production.html?plant=' + encodeURIComponent(plant) + (lineId ? '&line=' + encodeURIComponent(lineId) : '') + (pmTab ? '&tab=' + pmTab : '') + (testNow ? '&now=' + encodeURIComponent(params.get('now')) : ''));
       render(); document.getElementById('right').scrollTop = 0;
     });
     window.addEventListener('popstate', () => { lineId = new URLSearchParams(location.search).get('line') || ''; render(); });

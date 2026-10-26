@@ -290,10 +290,20 @@ async function pickFirstProduct(tb) {
       await pl.waitForFunction(() => document.querySelectorAll('.pd-tile').length === 1);
       await pl.click('#filters [data-kind="ALL"]');
       await pl.click('.pd-tile[data-line="' + LINE + '"]');
-      await pl.waitForSelector('#detail:not([hidden]) .pd-tl');
+      await pl.waitForSelector('#detail:not([hidden]) .pm-tabbody');
       assert.equal(await pl.textContent('#page-title'), 'GALLON FILLER');
-      assert.match(await pl.textContent('#detail'), /Hour by hour.*Stops and why.*Waste and rejects.*How the shift is going.*Changeovers.*CIP washes.*Crew and notes.*Quality checks/s);
-      assert.match(await pl.textContent('#detail'), /Valve 14 sticking\./);
+      // Joe 10/26: one screen for every machine: what it is doing now on top, each area on its own tab up beside its name.
+      const tabs = await pl.$$eval('#pmtabs [data-pmtab]', b => b.map(x => x.firstChild.textContent));
+      for (const t of ['Made vs target', 'Each product', 'Fill weight', 'Stops & waste', 'Changeovers', 'Quality', 'Crew & notes']) assert.ok(tabs.includes(t), t + ' tab: ' + tabs.join(', '));
+      assert.match(await pl.textContent('#detail .pm-now'), /Made.*Target so far.*Against target.*Speed a minute.*Last fill weight/s);
+      assert.match(await pl.textContent('#detail .pm-tabbody'), /Line efficiency/, 'managers see the efficiency on Made vs target');
+      const tabText = async (id) => { await pl.click('#pmtabs [data-pmtab="' + id + '"]'); await pl.waitForSelector('#detail .pm-tabbody[data-tab="' + id + '"]'); assert.match(pl.url(), new RegExp('tab=' + id)); return pl.textContent('#detail .pm-tabbody'); };
+      assert.match(await tabText('stops'), /Stops and why.*Waste and rejects/s);
+      assert.match(await tabText('changeovers'), /Changeovers.*CIP washes/s);
+      assert.match(await tabText('crew'), /Valve 14 sticking\./);
+      // Joe 10/26: no scrolling, the tab's box takes the rest of the screen.
+      assert.ok(await pl.evaluate(() => { const r = document.getElementById('right'); return r.scrollHeight <= r.clientHeight + 1 && document.scrollingElement.scrollHeight <= innerHeight + 1; }), 'the machine page fits without scrolling at ' + w);
+      await tabText('made');
       assert.match(pl.url(), /line=ut_prod_gallon_filler/);
       await fits(pl, 'one line\'s shift at ' + w);
       await bigText(pl, '#detail, #totals, #filters', 'Production Lines');
@@ -303,7 +313,7 @@ async function pickFirstProduct(tb) {
       assert.deepEqual(await pl.$$eval('#menu button[data-tab] b', b => b.map(x => x.firstChild.textContent.trim())), ['All Machines', 'GALLON FILLER', 'HTST #1', 'BOXING', 'TOTES', 'BLOW MOLD']);
       assert.deepEqual(await pl.$$eval('#menu h3', h => h.map(x => x.textContent)), ['Fillers', 'HTST', 'Boxing & Totes', 'Blow Mold', 'Reports']);
       assert.deepEqual(await pl.$$eval('#menu a', a => a.map(x => x.textContent)), ['This Week', 'TV Display', 'Line Tablet', 'Line Targets']);
-      assert.match(await pl.textContent('#detail .pd-live'), /Live from the machine.*Count.*Speed.*Temperature.*Running or stopped/s);
+      assert.match(await pl.textContent('#detail .pm-sensors'), /Sensors.*Count.*Speed.*Temperature.*Running or stopped/s);
       await pl.click('#menu [data-tab="' + HTST + '"]');
       await pl.waitForFunction(() => document.getElementById('page-title').textContent === 'HTST #1');
       await pl.goBack();

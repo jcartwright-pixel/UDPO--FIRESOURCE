@@ -1,7 +1,7 @@
 // One machine's page on Plant Production (Joe 10/26: "one screen ... the same for all the machines ... what the machine is doing at
-// this time and the history from the time it's running"). Mock-ups 1, 2 and 3 (production.html?line=...&look=1|2|3) share the
-// pieces worked out here: what is running now, and the machine's history since it started running, which reaches back into the
-// shift before when the machine ran on through the shift change.
+// this time and the history from the time it's running"; picked mock-up 1 with each area on its own tab). What is running now
+// stays on top; the tabs show the machine's history since it started running, which reaches back into the shift before when the
+// machine ran on through the shift change. Every machine but the Blow Mold, which keeps its own page.
 import { escapeHtml, shortDate } from './app.js';
 import { fmt } from './production.js';
 
@@ -46,7 +46,7 @@ export function machineHistory(v, nowMs) {
   const used = docs.filter(d => merged.some(p => p.docs.indexOf(d) >= 0)), start = merged.length ? merged[0].from : 0;
   const events = [], stops = [], changeovers = [], cips = [], fills = [], waste = {};
   used.forEach(d => {
-    (d.stops || []).forEach(s => { const a = when(s.start), b = s.end ? when(s.end) : nowMs; if (b < start) return; const o = { at: a, end: s.end ? b : 0, min: Math.round((b - a) / 60000), reason: s.reason || '', by: s.reasonBy || s.by || '', brk: /break|lunch/i.test(s.reason || '') }; stops.push(o); events.push(Object.assign({ kind: o.brk ? 'brk' : 'stop' }, o)); });
+    (d.stops || []).forEach(s => { const a = when(s.start), b = s.end ? when(s.end) : nowMs; if (b < start) return; const o = { at: a, end: s.end ? b : 0, min: Math.round((b - a) / 60000), reason: s.reason || '', wo: s.woNumber || '', by: s.reasonBy || s.by || '', brk: /break|lunch/i.test(s.reason || '') }; stops.push(o); events.push(Object.assign({ kind: o.brk ? 'brk' : 'stop' }, o)); });
     (d.changeovers || []).forEach(c => { const a = when(c.start), b = c.end ? when(c.end) : nowMs; if (b < start) return; const o = { at: a, end: c.end ? b : 0, min: Math.round((b - a) / 60000), from: c.from || '', to: c.to || '' }; changeovers.push(o); events.push(Object.assign({ kind: 'co' }, o)); });
     (d.cips || []).forEach(c => { const a = when(c.start), b = c.end ? when(c.end) : nowMs; if (b < start) return; const o = { at: a, end: c.end ? b : 0, min: Math.round((b - a) / 60000), result: c.result || '' }; cips.push(o); events.push(Object.assign({ kind: 'cip' }, o)); });
     (d.fills || []).forEach(f => { const x = R().fillOf(f), a = when(x.at); if (a < start) return; fills.push(x); events.push({ kind: 'fill', at: a, f: x }); });
@@ -117,28 +117,6 @@ function chartHtml(h) {
     '<div class="pd-ticks">' + ticks.join('') + '</div></div></div>' +
     '<div class="pd-key"><span><i class="pm-k-made"></i>Made</span><span><i class="pm-k-target"></i>Target</span><span><i class="pm-k-mark"></i>Product change</span></div>';
 }
-// Made each hour since it started running (bars), the hour's product under each bar.
-function barsHtml(h, nowMs) {
-  if (!h.start) return '<p class="pd-none">Nothing has run on this machine yet.</p>';
-  const hours = [];
-  for (let a = Math.floor(h.start / 3600000) * 3600000; a < h.end; a += 3600000) {
-    const b = Math.min(a + 3600000, h.end);
-    let made = 0, target = 0, stop = 0;
-    const p = h.pts.filter(x => x.at >= a && x.at <= b);
-    if (p.length) { const before = h.pts.filter(x => x.at <= a).pop() || h.pts[0]; made = p[p.length - 1].made - before.made; target = p[p.length - 1].target - before.target; }
-    h.stops.filter(s => !s.brk).forEach(s => { stop += Math.max(0, Math.min(s.end || nowMs, b) - Math.max(s.at, a)) / 60000; });
-    const prod = h.runs.filter(r => r.from < b && r.to > a).map(r => r.product);
-    hours.push({ a, made, target, stop: Math.round(stop), prod, now: b === h.end && b < a + 3600000 });
-  }
-  const top = Math.max(1, ...hours.map(x => Math.max(x.made, x.target)));
-  const prods = h.runs.map(r => r.product).filter((p, i, l) => l.indexOf(p) === i);
-  return '<div class="pm-bars">' + hours.map(x => {
-    const pct = x.target ? Math.round(x.made / x.target * 100) : null, cls = x.now ? 'now' : pctClass(pct);
-    return '<div class="pm-bar"><b>' + fmt(x.made) + '</b><div class="pm-bar-in"><i class="' + cls + '" style="height:' + (x.made / top * 100) + '%"></i>' +
-      (x.target ? '<s style="bottom:' + (x.target / top * 100) + '%"></s>' : '') + '</div><span>' + hourOf(x.a) + '</span>' +
-      '<small class="p' + prods.indexOf(x.prod[x.prod.length - 1]) % 3 + '">' + (x.prod.length > 1 ? 'Change' : '') + '</small>' + (x.stop ? '<em>' + x.stop + ' min stopped</em>' : '<em></em>') + '</div>';
-  }).join('') + '</div><div class="pd-key"><span><i class="pm-k-made"></i>Made in the hour (green at or over target, yellow up to 10% under, red more)</span><span><i class="pm-k-target"></i>Target</span></div>';
-}
 // The product runs since it started running: one line for each product.
 function runsTable(h, nowMs) {
   if (!h.runs.length) return '<p class="pd-none">Nothing has run on this machine yet.</p>';
@@ -147,19 +125,6 @@ function runsTable(h, nowMs) {
       '<td class="n"><b>' + fmt(p.made) + '</b></td><td class="n">' + fmt(p.target) + '</td><td class="n"><b class="pm-' + pctClass(p.pct) + '">' + (p.pct === null ? '–' : p.pct + '%') + '</b></td><td class="n">' + p.stopMin + ' min</td></tr>'; }).join('') +
     (h.runs.length > 1 ? '<tr class="pm-sum"><td class="w no-fit"><b>Since it started running</b></td><td>' + whenWords(h.start, nowMs) + '</td><td></td><td class="n">' + longFor((h.end - h.start) / 60000) + '</td><td class="n"><b>' + fmt(h.total.made) + '</b></td><td class="n">' + fmt(h.total.target) + '</td><td class="n"><b class="pm-' + pctClass(h.total.pct) + '">' + (h.total.pct === null ? '–' : h.total.pct + '%') + '</b></td><td class="n">' + h.total.stopMin + ' min</td></tr>' : '') +
     '</tbody></table>';
-}
-// What happened since it started running, newest first.
-function feedHtml(h, nowMs, fw) {
-  const line = (e) => {
-    if (e.kind === 'start') return ['g', e.first ? 'Started running <b>' + escapeHtml(e.product) + '</b>' : 'Now running <b>' + escapeHtml(e.product) + '</b>'];
-    if (e.kind === 'stop') return ['r', 'Stopped <b>' + (e.end ? e.min + ' min' : e.min + ' min so far') + '</b> · ' + (e.reason ? escapeHtml(e.reason) : '<b class="pm-r">No reason yet</b>')];
-    if (e.kind === 'brk') return ['x', escapeHtml(e.reason || 'Break') + ' ' + e.min + ' min'];
-    if (e.kind === 'co') return ['b', 'Changeover <b>' + e.min + ' min</b> · ' + escapeHtml(e.from || '—') + ' to ' + escapeHtml(e.to || '—')];
-    if (e.kind === 'cip') return ['p', 'CIP wash <b>' + e.min + ' min</b>' + (e.result === 'FAIL' ? ' · <b class="pm-r">Failed</b>' : e.result ? ' · Passed' : '')];
-    const f = e.f;
-    return [f.flag ? 'r' : 'g', 'Fill weight check · ' + (f.avgNet === null ? 'not finished' : f.diff === null ? fmt(f.avgNet) + ' g average' : '<b' + (f.flag ? ' class="pm-r"' : '') + '>' + sg(f.diff) + ' g ' + (f.diff >= 0 ? 'over' : 'under') + '</b> target' + (f.flag ? ' · ' + (f.light ? f.light + ' LIGHT' : f.heavy + ' HEAVY') : '')) + ' · ' + escapeHtml(who(f.by))];
-  };
-  return h.events.length ? '<ol class="pm-feed">' + h.events.map(e => { const [c, words] = line(e); return '<li><time>' + whenWords(e.at, nowMs) + '</time><i class="' + c + '"></i><span>' + words + '</span></li>'; }).join('') + '</ol>' : '<p class="pd-none">Nothing yet.</p>';
 }
 // The fill weight checks, wide enough to read: one line for each check.
 function fillTable(v, h) {
@@ -170,7 +135,7 @@ function fillTable(v, h) {
     '<td class="n">' + (c.diff === null ? 'Set target' : '<b class="' + (c.flag ? 'pm-r' : 'pm-g') + '">' + sg(c.diff) + ' g' + (c.flag ? ' ' + c.flag : '') + '</b>') + '</td><td>' + escapeHtml(who(c.by)) + '</td></tr>');
   const tot = fl.totals;
   return '<section class="pd-box pm-box"><h3>Fill weight checks</h3>' + (rows.length ? '<table class="pd-t pm-t"><thead><tr><th>Time</th><th class="w">Product</th><th class="n">' + fw.One + 's</th><th class="n">Average product</th><th class="n">Against target</th><th>Who</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '<p class="pd-none">No fill weight checks yet.</p>') +
-    (tot.checks && tot.avgDiff !== null ? '<p class="pm-line">This shift: average <b>' + sg(tot.avgDiff) + ' g</b> ' + (tot.avgDiff >= 0 ? 'over' : 'under') + ' target · giveaway <b>' + fmt(tot.giveawayLb) + ' lb</b> on ' + fmt(v.made) + ' ' + fw.many + '</p>' : '') +
+    (tot.checks && tot.avgDiff !== null ? '<p class="pm-line">This shift: Average <b>' + sg(tot.avgDiff) + ' g</b> ' + (tot.avgDiff >= 0 ? 'over' : 'under') + ' target · Giveaway <b>' + fmt(tot.giveawayLb) + ' lb</b> (' + fmt(tot.giveawayG) + ' g) on ' + fmt(v.made) + ' ' + fw.many + '</p>' : tot.noTarget ? '<p class="pd-none">Set the product\'s Target Fill Weight g on the Product Sheet to see over and under.</p>' : '') +
     '<p class="pd-none">' + escapeHtml(dueWords(fl.due, fw.many)) + '</p></section>';
 }
 function dueWords(d, many) {
@@ -194,7 +159,7 @@ function buttons(v) {
 function restParts(v, h, nowMs, more) {
   const box = (title, inner, cls) => '<section class="pd-box pm-box' + (cls ? ' ' + cls : '') + '"><h3>' + title + '</h3>' + inner + '</section>';
   const tbl = (heads, rows, empty) => rows.length ? '<table class="pd-t pm-t"><thead><tr>' + heads.map(x => '<th' + (x[1] ? ' class="' + x[1] + '"' : '') + '>' + x[0] + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr>' + r.map((c, i) => '<td' + (heads[i][1] ? ' class="' + heads[i][1] + (heads[i][1] === 'w' ? ' no-fit' : '') + '"' : '') + '>' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '<p class="pd-none">' + empty + '</p>';
-  const stops = box('Stops and why', tbl([['From'], ['Min', 'n'], ['Why', 'w'], ['Who']], h.stops.slice().reverse().map(s => [whenWords(s.at, nowMs), s.end ? s.min : s.min + ' so far', s.reason ? escapeHtml(s.reason) : '<b class="pm-r">No reason yet</b>', escapeHtml(who(s.by))]), 'No stops.'));
+  const stops = box('Stops and why', tbl([['From'], ['Min', 'n'], ['Why', 'w'], ['Who']], h.stops.slice().reverse().map(s => [whenWords(s.at, nowMs), s.end ? s.min : s.min + ' so far', (s.reason ? escapeHtml(s.reason) : '<b class="pm-r">No reason yet</b>') + (s.wo ? ' · <a href="pmaint.html">work order ' + escapeHtml(s.wo) + '</a>' : ''), escapeHtml(who(s.by))]), 'No stops.'));
   const wk = Object.keys(h.waste);
   const waste = box('Waste and rejects', tbl([['Why', 'w'], ['How many', 'n']], wk.map(k => [escapeHtml(k), fmt(h.waste[k])]), 'No waste entered.'));
   const cos = box('Changeovers', tbl([['From and to', 'w'], ['Started'], ['Min', 'n'], ['Standard', 'n']], h.changeovers.slice().reverse().map(c => [escapeHtml(c.from || '—') + '<br>to ' + escapeHtml(c.to || '—'), clockOf(c.at), c.end ? c.min : c.min + ' so far', v.changeoverStd === null ? '–' : v.changeoverStd]), 'No changeovers.'));
@@ -202,13 +167,36 @@ function restParts(v, h, nowMs, more) {
     v.lastCipAt ? 'Last one that passed: ' + shortDate(dayOf(when(v.lastCipAt))) + ' ' + clockOf(when(v.lastCipAt)) + (v.cipHours && v.sinceCipHours !== null ? ' (' + v.sinceCipHours + ' of ' + v.cipHours + ' hours)' : '') + '.' : 'None yet.'));
   const crew = v.crew.length ? v.crew.map(c => escapeHtml(c.name) + (c.on ? '' : ' (off)')).join(', ') : 'No one signed on.';
   const notes = box('Crew and notes', '<p><b>Crew:</b> ' + crew + '</p>' + (v.prevNote ? '<p><b>From last shift' + (v.prevNoteBy ? ' (' + escapeHtml(who(v.prevNoteBy)) + ')' : '') + ':</b> ' + escapeHtml(v.prevNote) + '</p>' : '') +
-    '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' + (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : ''));
-  const eff = v.efficiency, effBox = more.manager ? box('How the shift is going', eff ? '<p class="pm-line">Running <b>' + (eff.running === null ? '—' : eff.running + '%') + '</b> of the time · at speed <b>' + (eff.speed === null ? '—' : eff.speed + '%') + '</b> · good <b>' + (eff.good === null ? '—' : eff.good + '%') + '</b></p><p class="pd-oee">Line efficiency ' + (eff.oee === null ? '—' : eff.oee + '%') + '</p>' : '<p class="pd-none">Starts with the shift\'s first product.</p>') : '';
-  return { fill: fillTable(v, h), stops, waste, cos, cip, notes, effBox, quality: more.quality };
+    '<p><b>For the next shift:</b> ' + (v.note ? escapeHtml(v.note) : 'no note yet') + '</p>' +
+    (v.kind === 'HTST' ? '<p><b>Silo and tanks:</b> ' + escapeHtml([v.source.from, v.source.to].filter(Boolean).join(' → ') || '—') + ' &nbsp; <b>Diverts:</b> ' + v.diverts + '</p>' : '') + (v.next ? '<p><b>Up next:</b> ' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</p>' : ''));
+  return { fill: fillTable(v, h), stops, waste, cos, cip, notes, quality: more.quality };
 }
-function restHtml(v, h, nowMs, more) {
-  const r = restParts(v, h, nowMs, more);
-  return r.fill + '<div class="pm-two"><div class="pd-col">' + r.stops + r.waste + '</div><div class="pd-col">' + r.effBox + r.cos + r.cip + r.notes + '</div></div>' + r.quality;
+// Efficiency for managers (Joe 10/14), under the chart on Made vs target.
+function effLine(v) {
+  const eff = v.efficiency;
+  return '<p class="pm-line pm-eff">' + (eff ? 'This shift: running <b>' + (eff.running === null ? '—' : eff.running + '%') + '</b> of the time · at speed <b>' + (eff.speed === null ? '—' : eff.speed + '%') + '</b> · good <b>' + (eff.good === null ? '—' : eff.good + '%') + '</b> · <b class="pm-oee">Line efficiency ' + (eff.oee === null ? '—' : eff.oee + '%') + '</b>' : 'Line efficiency starts with the shift\'s first product.') + '</p>';
+}
+// What the machine's controller or add-on sensors sent (Joe 10/14): now, lowest to highest this shift, its range, and the motor
+// and rejects on a filler.
+function machineHtml(v) {
+  const mach = v.machine;
+  if (!mach) return '';
+  const range = (lo, hi, u) => lo === null && hi === null ? 'no range set' : (lo === null ? 'up' : lo + u) + ' to ' + (hi === null ? 'any' : hi + u);
+  const line = (name, now, lo, hi, mn, mx, out, f, u) => now === null && mn === null ? '' : '<p><b>' + escapeHtml(name) + ':</b> ' + (now === null ? '—' : (f ? '<b class="pm-r">' + fmt(now) + u + '</b>' : '<b>' + fmt(now) + u + '</b>')) + ' now · shift ' + (mn === null ? '—' : fmt(mn) + u + ' to ' + fmt(mx) + u) + ' · range ' + escapeHtml(range(lo, hi, u)) + (out ? ' · <b class="pm-r">' + out + ' min outside</b>' : '') + '</p>';
+  return '<div class="pm-lines">' + (mach.counter !== null ? '<p><b>Machine counter:</b> ' + fmt(mach.counter) + (v.counter === 'CONTROLLER' ? ' (the jugs made count from it)' : '') + '</p>' : '') +
+    line(mach.speedName, mach.speed, mach.speedLow, mach.speedHigh, mach.speedMin, mach.speedMax, mach.speedOutMin, mach.speedFlag, '') +
+    line('Temperature', mach.temp, mach.tempLow, mach.tempHigh, mach.tempMin, mach.tempMax, mach.tempOutMin, mach.tempFlag, '°F') +
+    (mach.running !== null ? '<p><b>Motor:</b> ' + (mach.running ? 'running' : '<b class="pm-r">off</b>') + ' since ' + clockOf(when(mach.runningSince)) + ' (current switch; off opens a stop)</p>' : '') +
+    (mach.rejects !== null ? '<p><b>Rejects and spills:</b> ' + fmt(mach.rejects) + ' (' + fmt(mach.infeed) + ' jugs in on the infeed eye, less the jugs counted out)</p>' : '') +
+    '<p class="pd-none">Read ' + (mach.stale ? '<b class="pm-r">last at ' + clockOf(when(mach.at)) + ', not reading now</b>' : clockOf(when(mach.at))) + (v.counter === 'CONTROLLER' ? ' from the machine\'s controller' : ' from the add-on sensors') + ' (read-only).</p></div>';
+}
+// A packing line's jugs in from its fillers against the boxes it packed (Joe 10/14).
+function boxingHtml(v) {
+  const bx = v.boxing;
+  if (!bx) return '';
+  return '<table class="pd-t pm-t"><thead><tr><th class="w">Filler</th><th class="n">Jugs made</th></tr></thead><tbody>' + (bx.feeders.length ? bx.feeders.map(f => '<tr><td class="w no-fit">' + escapeHtml(f.name) + '</td><td class="n">' + fmt(f.made) + '</td></tr>').join('') : '<tr><td class="w no-fit">No feeding line this shift.</td><td></td></tr>') + '</tbody></table>' +
+    '<p class="pm-line">Jugs in <b>' + fmt(bx.jugsIn) + '</b> &nbsp; Boxes <b>' + fmt(bx.boxes) + '</b>' + (bx.perBox ? ' × ' + fmt(bx.perBox) + ' = <b>' + fmt(bx.boxed) + '</b> jugs boxed &nbsp; ' + (bx.diff < 0 ? '<b class="pm-r">' + fmt(-bx.diff) + ' more boxed than the fillers counted</b>' : 'Not boxed <b>' + fmt(bx.diff) + '</b>') : '') + '</p>' +
+    '<p class="pd-none">' + (bx.perBox ? 'Not boxed = jugs in less jugs boxed: still on the conveyor, rejected or spilled.' : 'Type the jugs in each box on Line Targets to compare.') + '</p>';
 }
 
 // The numbers for what is running now: made on this product, its target, %, speed and the last fill weight check.
@@ -228,49 +216,10 @@ function headline(v, h, nowMs) {
     started: h.start ? 'Running since ' + whenWords(h.start, nowMs) + (h.lastNight && h.prevName ? ' (' + escapeHtml(h.prevName) + ')' : '') : '' };
 }
 
-// Mock-up 1: what is running now across the top in big numbers, then the history since it started running as a chart, the
-// timeline and one line for each product run.
-function look1(v, h, nowMs, more) {
-  const hd = headline(v, h, nowMs), n = nowNumbers(v, h);
-  const tile = (label, value, note, cls) => '<div class="pm-tile' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><b>' + value + '</b>' + (note ? '<small>' + note + '</small>' : '') + '</div>';
-  return '<section class="pm-now pm-c-' + hd.c + '"><div class="pm-now-h"><span class="pm-pill ' + hd.c + '">' + escapeHtml(hd.word) + '</span><div class="pm-prod">' + escapeHtml(hd.product) + '</div><div class="pm-btns">' + buttons(v) + '</div></div>' +
-    '<div class="pm-since">' + hd.since + '</div>' +
-    '<div class="pm-tiles">' + tile('Made on this product', fmt(n.made)) + tile('Target so far', fmt(n.target)) + tile('Against target', n.pct === null ? '–' : n.pct + '%', '', 'pm-' + pctClass(n.pct)) +
-    tile('Speed a minute', n.speed === null ? '–' : fmt(n.speed), n.range ? 'Range ' + n.range : '', n.off ? 'pm-r pm-flash' : '') + (v.fill ? tile('Last fill weight', n.fill ? n.fill.words : '–', n.fill ? 'at ' + n.fill.at + (n.fill.flag ? ' · ' + n.fill.flag : '') : 'No check yet', n.fill ? 'pm-' + n.fill.cls : '') : '') + '</div>' + sensorsHtml(v) + '</section>' +
-    '<section class="pd-box pm-box"><div class="pm-box-h"><h3>Since it started running</h3><span>' + hd.started + ' · made <b>' + fmt(h.total.made) + '</b> of <b>' + fmt(h.total.target) + '</b> target' + (h.total.pct === null ? '' : ' (<b class="pm-' + pctClass(h.total.pct) + '">' + h.total.pct + '%</b>)') + ' · stopped <b>' + h.total.stopMin + ' min</b></span></div>' +
-    chartHtml(h) + '<h4>Running, stopped and changeovers</h4>' + timelineHtml(h, nowMs) + '<h4>Each product</h4>' + runsTable(h, nowMs) + '</section>' + restHtml(v, h, nowMs, more);
-}
-// Mock-up 2: what is running now in a big panel on the left; what happened since it started running, newest first, on the right.
-function look2(v, h, nowMs, more) {
-  const hd = headline(v, h, nowMs), n = nowNumbers(v, h), w = n.target ? Math.min(100, n.made / n.target * 100) : 0;
-  const row = (label, value, cls) => '<div class="pm-row"><span>' + label + '</span><b class="' + (cls || '') + '">' + value + '</b></div>';
-  const left = '<section class="pm-now pm-panel pm-c-' + hd.c + '"><span class="pm-pill ' + hd.c + '">' + escapeHtml(hd.word) + '</span><div class="pm-prod">' + escapeHtml(hd.product) + '</div><div class="pm-since">' + hd.since + '</div>' +
-    '<div class="pm-big"><b>' + fmt(n.made) + '</b><span>made of ' + fmt(n.target) + ' target</span></div><div class="lb-bar"><i class="c-' + (pctClass(n.pct) || 'g') + '" style="width:' + w + '%"></i></div>' +
-    row('Against target', n.pct === null ? '–' : n.pct + '%', 'pm-' + pctClass(n.pct)) + row('Speed a minute', (n.speed === null ? '–' : fmt(n.speed)) + (n.range ? ' <small>(' + n.range + ')</small>' : ''), n.off ? 'pm-r' : '') +
-    (v.fill ? row('Last fill weight', n.fill ? n.fill.words + ' <small>at ' + n.fill.at + '</small>' : 'No check yet', n.fill ? 'pm-' + n.fill.cls : '') + row('Next fill weight check', escapeHtml(dueWords(v.fill.due, (v.fill.words || {}).many || 'jugs').replace(/^Next fill weight check (due )?/, '').replace(/\.$/, ''))) : '') +
-    row('Stopped today', h.total.stopMin + ' min') + (v.next ? row('Up next', escapeHtml(v.next.product)) : '') + row('Crew', v.crewOn.length ? escapeHtml(v.crewOn.join(', ')) : 'No one signed on') +
-    '<div class="pm-btns">' + buttons(v) + '</div>' + sensorsHtml(v) + '</section>';
-  const right = '<section class="pd-box pm-box pm-panel"><div class="pm-box-h"><h3>Since it started running</h3><span>' + hd.started + '</span></div>' +
-    '<div class="pm-mini"><div><span>Made</span><b>' + fmt(h.total.made) + '</b></div><div><span>Target</span><b>' + fmt(h.total.target) + '</b></div><div><span>Against target</span><b class="pm-' + pctClass(h.total.pct) + '">' + (h.total.pct === null ? '–' : h.total.pct + '%') + '</b></div><div><span>Stopped</span><b>' + h.total.stopMin + ' min</b></div></div>' +
-    '<h4>What happened, newest first</h4>' + feedHtml(h, nowMs) + '</section>';
-  return '<div class="pm-split2">' + left + right + '</div><section class="pd-box pm-box"><h3>Running, stopped and changeovers since it started</h3>' + timelineHtml(h, nowMs) + '<h4>Each product</h4>' + runsTable(h, nowMs) + '</section>' + restHtml(v, h, nowMs, more);
-}
-// Mock-up 3: one big colored band like the TV (green running, red stopped, blue changeover or CIP), then made each hour since it
-// started running as bars, and one line for each product run.
-function look3(v, h, nowMs, more) {
-  const hd = headline(v, h, nowMs), n = nowNumbers(v, h);
-  const num = (label, value, note) => '<div><b>' + value + '</b><span>' + label + '</span>' + (note ? '<small>' + note + '</small>' : '') + '</div>';
-  return '<section class="pm-band pm-band-' + hd.c + '"><div class="pm-band-top"><div><div class="pm-band-word">' + escapeHtml(hd.word.toUpperCase()) + '</div><div class="pm-prod">' + escapeHtml(hd.product) + '</div><div class="pm-since">' + hd.since + '</div></div><div class="pm-btns">' + buttons(v) + '</div></div>' +
-    '<div class="pm-band-nums">' + num('made on this product', fmt(n.made)) + num('target so far', fmt(n.target)) + num('against target', n.pct === null ? '–' : n.pct + '%') + num('a minute', n.speed === null ? '–' : fmt(n.speed), n.range ? 'range ' + n.range : '') +
-    (v.fill ? num('last fill weight', n.fill ? n.fill.words : '–', n.fill ? 'at ' + n.fill.at : '') : '') + '</div></section>' + sensorsHtml(v) +
-    '<section class="pd-box pm-box"><div class="pm-box-h"><h3>Made each hour since it started running</h3><span>' + hd.started + ' · made <b>' + fmt(h.total.made) + '</b> of <b>' + fmt(h.total.target) + '</b> · stopped <b>' + h.total.stopMin + ' min</b></span></div>' + barsHtml(h, nowMs) +
-    '<h4>Running, stopped and changeovers</h4>' + timelineHtml(h, nowMs) + '<h4>Each product</h4>' + runsTable(h, nowMs) + '</section>' + restHtml(v, h, nowMs, more);
-}
-
-// Joe 10/26 (picked 1): mock-up 1 with each area on its own tab, so the page fits on the screen without scrolling. What is
-// running now stays on top; the tab picked is kept while the page redraws (production.html keeps it in the address too).
-export const TABS = [['made', 'Made vs target'], ['products', 'Each product'], ['fill', 'Fill weight'], ['stops', 'Stops & waste'], ['changeovers', 'Changeovers'], ['quality', 'Quality'], ['crew', 'Crew & notes'], ['efficiency', 'Efficiency']];
-function look1Tabs(v, h, nowMs, more) {
+// Joe 10/26: each area on its own tab, so the page fits on the screen without scrolling (production.html moves the tabs up beside
+// the machine's name and keeps the tab picked in the address). A tab only shows on the machines that have it.
+export const TABS = [['made', 'Made vs target'], ['products', 'Each product'], ['fill', 'Fill weight'], ['machine', 'From the machine'], ['boxing', 'Jugs and boxes'], ['stops', 'Stops & waste'], ['changeovers', 'Changeovers'], ['quality', 'Quality'], ['crew', 'Crew & notes']];
+function machinePage(v, h, nowMs, more) {
   const hd = headline(v, h, nowMs), n = nowNumbers(v, h), r = restParts(v, h, nowMs, more);
   const tile = (label, value, note, cls) => '<div class="pm-tile' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><b>' + value + '</b>' + (note ? '<small>' + note + '</small>' : '') + '</div>';
   const since = h.now ? 'Since ' + whenWords(h.now.from, nowMs) + ' · ' + longFor((nowMs - h.now.from) / 60000) : hd.since;
@@ -281,19 +230,21 @@ function look1Tabs(v, h, nowMs, more) {
   const noReason = h.stops.filter(x => !x.brk && !x.reason).length, badFill = h.fills.filter(f => f.flag).length;
   const badge = { products: h.runs.length, fill: h.fills.length, stops: h.stops.filter(x => !x.brk).length, changeovers: h.changeovers.length + h.cips.length };
   const red = { stops: noReason > 0, fill: badFill > 0 };
-  const tabs = TABS.filter(t => (t[0] !== 'fill' || v.fill) && (t[0] !== 'efficiency' || more.manager));
+  const has = { fill: !!v.fill, machine: !!v.machine, boxing: !!v.boxing };
+  const tabs = TABS.filter(t => has[t[0]] !== false);
   const pick = tabs.some(t => t[0] === more.tab) ? more.tab : tabs[0][0];
   const sum = '<div class="pm-box-h"><span>' + hd.started + ' · made <b>' + fmt(h.total.made) + '</b> of <b>' + fmt(h.total.target) + '</b> target' + (h.total.pct === null ? '' : ' (<b class="pm-' + pctClass(h.total.pct) + '">' + h.total.pct + '%</b>)') + ' · stopped <b>' + h.total.stopMin + ' min</b></span></div>';
   const strip = (html) => html.replace(/^<section class="pd-box[^"]*"><h3>[^<]*<\/h3>/, '').replace(/<\/section>$/, '');
   const body = {
-    made: sum + chartHtml(h),
+    made: sum + chartHtml(h) + (more.manager ? effLine(v) : ''),
     products: sum + timelineHtml(h, nowMs) + runsTable(h, nowMs),
     fill: strip(r.fill),
     stops: '<div class="pm-two"><div><h4>Stops and why</h4>' + strip(r.stops) + '</div><div><h4>Waste and rejects</h4>' + strip(r.waste) + '</div></div>',
     changeovers: '<div class="pm-two"><div><h4>Changeovers</h4>' + strip(r.cos) + '</div><div><h4>CIP washes</h4>' + strip(r.cip) + '</div></div>',
+    machine: machineHtml(v),
+    boxing: boxingHtml(v),
     quality: strip(r.quality),
-    crew: strip(r.notes),
-    efficiency: strip(r.effBox)
+    crew: strip(r.notes)
   }[pick];
   return top + '<div class="pm-tabs" role="tablist">' + tabs.map(t => '<button type="button" role="tab" data-pmtab="' + t[0] + '"' + (t[0] === pick ? ' class="on" aria-selected="true"' : '') + '>' + t[1] +
     (badge[t[0]] ? '<b' + (red[t[0]] ? ' class="pm-badge-r"' : '') + '>' + badge[t[0]] + '</b>' : '') + '</button>').join('') + '</div>' +
@@ -301,7 +252,6 @@ function look1Tabs(v, h, nowMs, more) {
 }
 
 // The machine's page into #detail. more = { manager, quality (the quality checks box), tab (the tab picked) }.
-export function drawMachine(v, nowMs, look, more) {
-  const h = machineHistory(v, nowMs);
-  return look === '2' ? look2(v, h, nowMs, more) : look === '3' ? look3(v, h, nowMs, more) : look === '1' ? look1(v, h, nowMs, more) : look1Tabs(v, h, nowMs, more);
+export function drawMachine(v, nowMs, more) {
+  return machinePage(v, machineHistory(v, nowMs), nowMs, more);
 }
