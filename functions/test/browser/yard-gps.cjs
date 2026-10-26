@@ -88,8 +88,8 @@ async function seed() {
       const yardTile = (await mc.textContent('[data-card="walk"] .wk-tile:nth-child(1)')).replace(/\s+/g, ' ').trim();
       seen.push(w + ' Manager Center Yard: ' + yardTile);
       if (!BEFORE) {
-        assert.match(yardTile, /^Yard PAST DUE 3 3 past due /);
-        assert.match(yardTile, /Check now View$/);
+        assert.match(yardTile, /^Yard PAST DUE ?3 ?3 past due ?Not done yet/);
+        assert.match(yardTile, /Check now ?View$/);
       }
       for (const pg of [yd, mc]) { assert.deepEqual(pg.errors, []); await pg.close(); }
     }
