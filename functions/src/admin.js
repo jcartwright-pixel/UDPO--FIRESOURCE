@@ -26,6 +26,7 @@ const { queueMaster } = require('./masterwrite');
 const { appMail, emailSettings, ourAddress, DOMAIN } = require('./adminmail');
 const { addresses } = require('./mail');
 const STATIONS = require('./stations');
+const { companyDb } = require('./plants');
 
 class AdminError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -42,8 +43,9 @@ const plantName = (id) => (L.PLANTS.find(p => p.id === id) || {}).name || id;
 const activePlants = () => L.PLANTS.filter(p => p.status === 'ACTIVE');
 const prettyRole = (r) => String(r).charAt(0) + String(r).slice(1).toLowerCase().replace(/_/g, ' ');
 
+// The Users list is the company's (Uniontown's database), whichever plant's Administration page asks.
 async function personOf(db, email) {
-  const snap = await db.collection(M.COLLECTIONS.users).doc(M.safeIdPart(email)).get();
+  const snap = await companyDb(db).collection(M.COLLECTIONS.users).doc(M.safeIdPart(email)).get();
   return snap.exists ? snap.data() : null;
 }
 async function requireAdmin(db, user) {
@@ -395,6 +397,8 @@ async function saveEmailSenders(db, email, input, stamp, deps) {
   const before = await emailSettings(db), senders = {}, notes = [];
   const given = input.senders || {};
   L.PLANTS.forEach(p => {
+    // Joe 10/26: each plant keeps its own sender in its own database, so a save names only the plants it changes.
+    if (!given[p.id]) { if (before.senders[p.id]) senders[p.id] = before.senders[p.id]; return; }
     const g = given[p.id] || {}, raw = text(g.address, 120).toLowerCase();
     let name = text(g.name, 80).replace(/[<>"\r\n]/g, '');
     if (raw && !ourAddress(raw)) fail('BAD_REQUEST', p.name + ': "' + raw + '" is not a United Dairy email address (it must end in ' + DOMAIN + ').');

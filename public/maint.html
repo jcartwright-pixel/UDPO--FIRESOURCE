@@ -51,7 +51,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, currentPlant } from './js/app.js';
     import { collection, doc, onSnapshot, httpsCallable } from './js/firebase.js';
     import { watchIssueRecords, watchHubWorkOrders } from './js/recent-records.js';
 
@@ -121,7 +121,7 @@
     };
     async function loadWaiting() {
       if (document.hidden) return; // read again when the page shows
-      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waitingJobs = (r.data && r.data.jobs) || []; } catch (err) { /* the work orders still count */ }
+      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office', udPlant: currentPlant() }); waitingJobs = (r.data && r.data.jobs) || []; } catch (err) { /* the work orders still count */ }
       render();
     }
     setInterval(loadWaiting, 60000);

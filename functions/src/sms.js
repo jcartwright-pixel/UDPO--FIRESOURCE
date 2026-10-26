@@ -50,7 +50,8 @@ function messageFor(week) {
 
 async function adminOnly(db, user) {
   const email = String(user && user.email || '').toLowerCase();
-  const snap = await db.collection(C.users).doc(safeIdPart(email)).get();
+  // The one Users list (Uniontown's database), whichever plant this is for.
+  const snap = await require('./plants').companyDb(db).collection(C.users).doc(safeIdPart(email)).get();
   const person = snap.exists ? snap.data() : null;
   if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ROLES)) throw new SmsError('NOT_ALLOWED', 'Only an administrator can change Schedule Texts');
   return email;

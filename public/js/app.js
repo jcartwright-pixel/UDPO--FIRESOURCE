@@ -208,11 +208,18 @@ function signedPerson() {
   return { status: 'ACTIVE', roles: admin ? ['ADMINISTRATOR'] : [], facilities: Array.isArray(plants) ? plants : [] };
 }
 // The plant this tab is working in: the one picked on the overview or a plant's home, else the person's first plant.
+// Joe 10/26: a link can name its plant (?plant=fac_charleston), as a plant's tablets and phones do.
+const knownPlant = (id) => !!(window.UDLogic && window.UDLogic.plantDb && window.UDLogic.plantDb(id));
+try { const named = new URLSearchParams(location.search).get('plant'); if (knownPlant(named)) sessionStorage.setItem('udPlant', named); } catch (e) { /* no storage */ }
 export function currentPlant() {
   const plants = readJson('udPlants');
   let picked = '';
   try { picked = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
-  return Array.isArray(plants) && plants.length ? (plants.indexOf(picked) >= 0 ? picked : plants[0]) : 'fac_uniontown';
+  if (Array.isArray(plants) && plants.length) return plants.indexOf(picked) >= 0 ? picked : plants[0];
+  return knownPlant(picked) ? picked : 'fac_uniontown';
+}
+export function plantName(id) {
+  return ((window.UDLogic && window.UDLogic.PLANTS || []).find(p => p.id === (id || currentPlant())) || {}).name || '';
 }
 export function mayOpenPage(href, plantId) {
   const L = window.UDLogic;
@@ -503,6 +510,14 @@ addSideMenu();
   const grp = here === 'group.html' ? GROUPS.find(g => g.key === new URLSearchParams(location.search).get('g')) : null;
   small.innerHTML = 'UNITED DAIRY' + (grp ? ' &middot; ' + grp.name.toUpperCase() : side ? ' &middot; ' + (side.key === 'crew' ? side.short : side.name).toUpperCase() : '');
 })();
+// Joe 10/26 (picture 2): every screen of a plant names that plant in the header, in yellow, where "UNITED DAIRY" was, so no one
+// mistakes one plant's screen for another's. The all-plants overview keeps "UNITED DAIRY".
+(function headerPlant() {
+  const small = document.querySelector('#screen > .topbar .brand small'), here = location.pathname.split('/').pop() || 'index.html';
+  if (!small || here === 'company.html') return;
+  const name = plantName(currentPlant());
+  if (name) small.innerHTML = small.innerHTML.replace(/^UNITED DAIRY/, '<b class="plant-name">' + escapeHtml(name.toUpperCase()) + '</b>');
+})();
 /* Joe 10/10: "move the action buttons all in a line up above". Anything a screen marks data-top (a button, or a whole action or
    filter row, even one the screen fills later) joins one row in the screen's top line: buttons first, all the same size, and
    filters (pickers, chips, search boxes) to their right. A row that belongs to one view shows only while that view does. */
@@ -697,6 +712,8 @@ function noteAccess(person, screens) {
     sessionStorage.setItem('udPlants', JSON.stringify(L.plantsFor(person)));
     if (screens !== undefined) sessionStorage.setItem('udScreens', JSON.stringify(screens));
   } catch (e) { /* no storage */ }
+  // Joe 10/26: the screen opened before the person's plants were known, on another plant's database: open it again on theirs.
+  if (services && services.plant !== currentPlant()) { location.reload(); return; }
   document.body.classList.toggle('is-admin', L.isAdmin(person));
   plantHomeBack();
   limitPlants();
@@ -778,22 +795,33 @@ async function firebaseConfig() {
 }
 
 let services;
-export async function start() {
-  if (services) return services;
-  const app = initializeApp(await firebaseConfig());
+// Joe 10/26: "All three locations have completely separate". Each plant keeps everything in its own database (logic.js
+// PLANTS[].db; Uniontown's is the first one, as always). A screen reads the plant it is open at (db); the Users list, the one
+// list for the company, is in Uniontown's (homeDb); the Home overview reads each plant's with dbOf(plant).
+const plantDbs = new Map();
+function openDb(app, plant) {
+  const id = (window.UDLogic && window.UDLogic.plantDb && window.UDLogic.plantDb(plant)) || '(default)';
+  if (plantDbs.has(id)) return plantDbs.get(id);
   // Joe 10/12: screens carried round the plant on an iPad (window.UD_OFFLINE, the Safety Walkthrough) keep what they read on
   // the iPad, so they open and show the last data with no signal; every other screen reads live as before.
   let db;
   if (window.UD_OFFLINE) {
-    try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
-  } else db = getFirestore(app);
+    try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, id); } catch (e) { db = getFirestore(app, id); }
+  } else db = getFirestore(app, id);
+  if (LOCAL) connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  plantDbs.set(id, db);
+  return db;
+}
+export async function start() {
+  if (services) return services;
+  const app = initializeApp(await firebaseConfig());
+  const plant = currentPlant(), db = openDb(app, plant), homeDb = openDb(app, 'fac_uniontown');
   const auth = getAuth(app), functions = getFunctions(app, 'us-east4');
   if (LOCAL) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-    connectFirestoreEmulator(db, '127.0.0.1', 8080);
     connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   }
-  services = { app, auth, db, functions };
+  services = { app, auth, db, homeDb, plant, dbOf: (p) => openDb(app, p), functions };
   return services;
 }
 
@@ -829,7 +857,8 @@ async function stationOf(user) {
 export function watchPerson(db, user, done, opts) {
   const o = opts || {};
   if (user.station) { done({ status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'], name: user.station.name, email: '' }); return () => {}; }
-  return onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? (o.withEmail ? Object.assign({ email: user.email }, s.data()) : s.data()) : null), o.onError);
+  // The one Users list (Uniontown's database), whichever plant the screen is open at.
+  return onSnapshot(doc(services ? services.homeDb : db, 'users', String(user.email).toLowerCase()), s => done(s.exists() ? (o.withEmail ? Object.assign({ email: user.email }, s.data()) : s.data()) : null), o.onError);
 }
 // Review item 76 (Joe 10/13): may this person save on this screen? One of the roles (or that one save given to them in
 // Administration, allowedSave === true), and the screen switched on in Go-Live Switches (app = config/app, screen = its key).
@@ -919,6 +948,11 @@ export async function requireSignIn(ready) {
     if (station) {
       remember('');
       user.station = station;
+      // Joe 10/26: a tablet signed in for a plant works in that plant's database only.
+      if (station.facilityId && knownPlant(station.facilityId)) {
+        try { sessionStorage.setItem('udPlant', station.facilityId); } catch (e) { /* no storage */ }
+        if (services && services.plant !== station.facilityId && currentPlant() === station.facilityId) { location.reload(); return; }
+      }
       gate.hidden = true;
       screen.hidden = false;
       // It leaves only through the Plant Station's Release (and the manager release code), not Sign out.
@@ -952,7 +986,8 @@ export async function requireSignIn(ready) {
     if (!window.UDPlantStartWatch) { window.UDPlantStartWatch = true; start().then(({ db }) => onSnapshot(doc(db, 'config', 'app'), s => { window.UDPlantStart = ((s.data() || {}).plantStart || {}).date || ''; }, () => { window.UDPlantStartWatch = false; })); }
     if (early) { gate.hidden = true; screen.hidden = false; showWho(user); readyNow(); ready(user); }
     // The database shows dispatch data only to people ACTIVE in USERS_MASTER; say so plainly instead of a blank screen.
-    const { db } = await start();
+    // The Users list and People & Roles' ticks are the company's, in Uniontown's database (homeDb).
+    const { db: plantDb, homeDb: db } = await start();
     // A read that fails (the connection dropped, "the client is offline") is tried again and never signs anyone out: signing
     // out here signs out every screen in the browser, so only a Users list that says "not active" does that.
     let entry = null;
@@ -979,7 +1014,7 @@ export async function requireSignIn(ready) {
     const ticks = mine === undefined ? undefined : mine.screenAccess || null;
     noteAccess(Object.assign({ email }, entry.data()), ticks);
     if (mine && goHomeScreen(mine.homeScreen, Object.assign({ email }, entry.data()))) return;
-    { const plant = currentPlant(); getDoc(doc(db, 'menuSetup', plant)).then(d => keepMenuSetup(plant, d.exists() ? d.data().sides || null : null)).catch(() => {}); }
+    { const plant = currentPlant(); getDoc(doc(plantDb, 'menuSetup', plant)).then(d => keepMenuSetup(plant, d.exists() ? d.data().sides || null : null)).catch(() => {}); }
     if (!mayOpenPage(here)) {
       gate.hidden = true;
       screen.hidden = false;
@@ -1111,7 +1146,11 @@ export async function callServer(name, fields) {
   const held = key && inDoubt.get(key), fresh = held && Date.now() - held.at < IN_DOUBT_MS;
   const requestId = fresh ? held.requestId : newRequestId();
   try {
-    const result = await httpsCallable(functions, name)(Object.assign({ requestId }, fields));
+    // Joe 10/26: every call names the plant it is for, so the server works in that plant's database only: the plant a
+    // screen's own plant box picked (facilityId), else the plant the screen is open at.
+    const f = fields || {};
+    const udPlant = f.udPlant || (knownPlant(f.facilityId) ? f.facilityId : currentPlant());
+    const result = await httpsCallable(functions, name)(Object.assign({ requestId, udPlant }, fields));
     if (key) inDoubt.delete(key);
     return result.data;
   } catch (e) {
