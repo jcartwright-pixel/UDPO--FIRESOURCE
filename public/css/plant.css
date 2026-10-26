@@ -244,7 +244,7 @@
 .sched-page .sc-count strong { display: block; font-size: 22px; line-height: 1.1; }
 .sched-page .sc-count.today { box-shadow: 0 0 0 3px var(--ud-gold); }
 .sched-page .sc-count.holiday { background: #b46a00; }
-.sched-page .sc-col { min-height: 0; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 5px; }
+.sched-page .sc-col { min-height: 0; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 14px; }
 .sched-page .sc-col.today { background: #fffbea; }
 .sched-page .sc-load { display: block; width: 100%; text-align: left; border: 0; border-left: 4px solid var(--ud-blue); border-radius: 6px; background: var(--band); padding: 6px 8px; font: inherit; color: var(--ink); cursor: pointer; }
 .sched-page.sc-recv .sc-load { border-left-color: var(--runs-ink); background: var(--runs-bg); }
