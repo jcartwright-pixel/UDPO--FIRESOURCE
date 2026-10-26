@@ -54,6 +54,8 @@
     let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
     // Review item 54 (Joe 10/13): ?item=<key> opens that item first (Phone Screens' one line points to Links & Codes this way).
     { const want = new URLSearchParams(location.search).get('item'); if (want && adminItem(want)) current = want; }
+    // Joe 10/26: the "?" opens the help for the item that is open (the page it shows, or the item's own part).
+    window.udHelpFor = () => { const it = current && adminItem(current); return it && it.page ? it.page : 'administration.html' + (it ? '?item=' + it.key : ''); };
     const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
     const withTest = (href) => testEmail ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + encodeURIComponent(testEmail) : href;
     const state = (it) => it.page ? 'ready' : PANELS[it.key] ? 'inline' : 'soon';

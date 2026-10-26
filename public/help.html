@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Help · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/help.css">
+  <script src="js/logic.js"></script>
+</head>
+<body class="fill help-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Help</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><h1>Help</h1><small>How each screen works, what to do and what not to do</small></div>
+      <input class="help-q" id="help-q" type="search" placeholder="Search the help" aria-label="Search the help">
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view help-body">
+      <nav class="help-nav" id="help-list" aria-label="Help topics"><p class="muted">Loading the help…</p></nav>
+      <article class="help-read" id="help-read"></article>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireSignIn, showError } from './js/app.js';
+    import { loadHelp, sectionForPage, renderBody } from './js/help.js';
+
+    // Joe 10/26: the whole Help guide (words in help.md). Topics down the left with a search box; the picked part on the
+    // right with a button to open that screen. The "?" on a screen opens this page on that screen's part.
+    const params = new URLSearchParams(location.search), test = params.get('testEmail');
+    const withTest = (href) => test ? href + (href.indexOf('?') < 0 ? '?' : '&') + 'testEmail=' + encodeURIComponent(test) : href;
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // Back goes straight back to the screen the "?" was pressed on.
+    let fromScreen = false;
+    try { fromScreen = !!document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1; } catch (e) { /* no referrer */ }
+    window.udBack = () => { if (fromScreen) { history.back(); return true; } return false; };
+
+    let help = null, picked = '';
+    const list = document.getElementById('help-list'), read = document.getElementById('help-read'), q = document.getElementById('help-q');
+    function drawList() {
+      const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const hit = (s) => !words.length || words.every(w => (s.title + ' ' + s.body).toLowerCase().indexOf(w) >= 0);
+      const html = help.chapters.map(c => {
+        const items = c.sections.filter(hit);
+        return items.length ? '<div class="help-ch">' + esc(c.title) + '</div>' + items.map(s => '<a href="#' + esc(s.id) + '" class="help-item' + (s.id === picked ? ' on' : '') + '" data-id="' + esc(s.id) + '">' + esc(s.title) + '</a>').join('') : '';
+      }).join('');
+      list.innerHTML = html || '<p class="muted">Nothing in the help matches that.</p>';
+      const on = list.querySelector('.help-item.on');
+      if (on) on.scrollIntoView({ block: 'nearest' });
+    }
+    function drawPage() {
+      const s = help.sections.find(x => x.id === picked);
+      if (!s) { read.innerHTML = '<p class="muted">Pick a topic on the left.</p>'; return; }
+      const go = s.screens.filter(p => p.indexOf('*') < 0).slice(0, 1).map(p => '<a class="button help-go" href="' + esc(withTest(p)) + '">Open this screen</a>').join('');
+      read.innerHTML = '<div class="help-where">' + esc(s.chapter) + '</div><h2 class="help-title">' + esc(s.title) + '</h2>' + go + '<div class="help-text">' + renderBody(s.body) + '</div>';
+      read.scrollTop = 0;
+      document.title = s.title + ' · Help · Operations';
+    }
+    function pick(id) { picked = id; drawList(); drawPage(); history.replaceState(null, '', location.search + '#' + id); }
+    list.addEventListener('click', e => { const a = e.target.closest('[data-id]'); if (a) { e.preventDefault(); pick(a.dataset.id); } });
+    read.addEventListener('click', e => { const a = e.target.closest('[data-help-link]'); if (a) { e.preventDefault(); pick(a.dataset.helpLink); } });
+    q.addEventListener('input', drawList);
+
+    requireSignIn(async () => {
+      if (help) return;
+      try { help = await loadHelp(); } catch (e) { showError(e.message); return; }
+      const want = location.hash.slice(1), forPage = params.get('for') || '';
+      const [page, search] = forPage.split('?');
+      const s = (want && help.sections.find(x => x.id === want)) || (page && sectionForPage(help, page, search)) || help.sections[0];
+      picked = s ? s.id : '';
+      drawList(); drawPage();
+    });
+  </script>
+</body>
+</html>
