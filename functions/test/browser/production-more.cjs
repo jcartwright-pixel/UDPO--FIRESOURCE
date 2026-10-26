@@ -48,6 +48,7 @@ async function bigText(page, sel, what) {
   assert.deepEqual(small, [], what + ': text 16px or larger');
 }
 const runOf = async (id, key) => (await db().collection('productionRuns').doc(P.runId(id, key)).get()).data() || {};
+// Joe 10/26 (mock-up 1): the buttons are tabs beside the line's name, Line (the board) first.
 const acts = (page) => page.$$eval('#actions button', b => b.map(x => x.firstChild.textContent.trim()));
 async function pickFirstProduct(tb) {
   await tb.click(await tb.isVisible('#change-product') ? '#change-product' : '#kind-cards [data-act="product"]');
@@ -90,7 +91,7 @@ async function pickFirstProduct(tb) {
     const tb = await openPage(browser, 1024, 768, '/line.html?line=' + LINE + '&' + ADMIN);
     await tb.waitForFunction(() => document.getElementById('line-name').textContent === 'GALLON FILLER');
     const shiftKey = await tb.evaluate(() => window.UDProduction.shiftNow([], Date.now()).key);
-    assert.deepEqual(await acts(tb), ['Changeover', 'CIP / Sanitation', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
+    assert.deepEqual(await acts(tb), ['Line', 'Changeover', 'CIP / Sanitation', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
     assert.equal(await tb.isVisible('#strip'), true, 'Up next and each hour');
     await pickFirstProduct(tb);
     const first = await tb.textContent('#prod');
@@ -132,7 +133,10 @@ async function pickFirstProduct(tb) {
     await tb.fill('#mp-body input[data-field="temp"]', '38');
     await tb.press('#mp-body input[data-field="temp"]', 'Tab');
     await tb.waitForFunction(() => /1 OF 3 DONE/.test(document.getElementById('mp-badge').textContent));
-    assert.equal(await tb.inputValue('#mp-body select[data-field="capSeal"]'), '', 'OK / Not OK starts blank');
+    // Joe 10/26: the check is a list; OK / Not OK starts with neither picked, and a tap saves it.
+    assert.equal(await tb.$('#mp-body .lb-qrow button.on[data-field="capSeal"]'), null, 'OK / Not OK starts with neither picked');
+    await tb.click('#mp-body .lb-qrow button.yes[data-field="capSeal"]');
+    await tb.waitForFunction(() => /2 OF 3 DONE/.test(document.getElementById('mp-badge').textContent) && !!document.querySelector('#mp-body .lb-qrow button.yes.on[data-field="capSeal"]'));
     await tb.fill('#mp-body input[data-field="temp"]', 'cold');
     await tb.press('#mp-body input[data-field="temp"]', 'Tab');
     await tb.waitForFunction(() => /Type a number/.test(document.getElementById('error').textContent));
@@ -186,7 +190,7 @@ async function pickFirstProduct(tb) {
     // The HTST tablet (mock-up G).
     const ht = await openPage(browser, 1024, 768, '/line.html?line=' + HTST + '&' + ADMIN);
     await ht.waitForFunction(() => document.getElementById('line-name').textContent === 'HTST #1');
-    assert.deepEqual(await acts(ht), ['Divert', 'CIP Wash', 'Silo / Tank', 'Changeover', 'Crew', 'Shift Notes']);
+    assert.deepEqual(await acts(ht), ['Line', 'Divert', 'CIP Wash', 'Silo / Tank', 'Changeover', 'Crew', 'Shift Notes']);
     assert.equal(await ht.isVisible('#std-cards'), false);
     assert.match(await ht.textContent('#kind-cards'), /Pasteurizing temp/);
     assert.match(await ht.textContent('#cip-strip'), /SINCE CIP 6\.5 H/);
@@ -231,7 +235,7 @@ async function pickFirstProduct(tb) {
     // The Blow Mold tablet (mock-up H).
     const bm = await openPage(browser, 1024, 768, '/line.html?line=' + BLOW + '&' + ADMIN);
     await bm.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');
-    assert.deepEqual(await acts(bm), ['Mold Change', 'Resin Lot', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
+    assert.deepEqual(await acts(bm), ['Line', 'Mold Change', 'Resin Lot', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
     // Joe 10/24: mock-up 2's screen shows before any sensor is wired, each sensor saying WAITING FOR SENSOR.
     const eyebrows = (sel) => bm.$$eval(sel + ' .lb-card > .eyebrow', es => es.map(e => e.textContent));
     assert.deepEqual(await eyebrows('#kind-cards'), ['Making now', 'Jugs molded', 'Jugs on the Alpine', 'Tester kick-outs']);

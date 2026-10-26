@@ -801,20 +801,27 @@ Every production line this week: what each line made against its target, how lon
 id: line
 screens: line.html
 
-The tablet at a production line. The operator signs on and keeps the line's count, product and checks.
+The tablet at a production line. The operator signs on and keeps the line's count, product and checks. Everything fits on one screen: the line's name, its buttons across the top, **Line Running / Line Stopped** right under them, then the cards.
 
 1. Pick this tablet's line the first time (`Change Line` changes it later).
-2. `Change Product` picks what is running. The label reader checks the jug's label; WRONG LABEL means the label is not one of this line's products.
-3. `Enter Count` types how many were made this shift so far (when the machine does not count). It saves when you press Enter.
-4. Do each check when it is due (fill weights, bottle weights). Press `Passed` or `Failed`.
-5. Type kick-outs and waste with `Enter Kick-outs`.
-6. `Start CIP Wash` when the line goes into a wash, and `Back to Forward Flow` when it is done.
+2. `Change Product` picks what is running. **Running now** shows the product's **code date** in big letters. The label reader checks the jug's label; WRONG LABEL means the label is not one of this line's products.
+3. Type **How many to run** of that product. **Left to run** counts down as the count goes up, and says DONE when it is all made. The amount set with `Set Next` comes along by itself when that product starts.
+4. `Enter Count` types how many were made this shift so far (when the machine does not count). It saves when you press Enter.
+5. Tap `Line Stopped` when the line stops, then tap why. Tap `Running Again` when it runs.
+6. Do each check when it is due. **Quality Check** is a list: tap `OK` or `Not OK` on each line and type the temperature. Each tap saves right away; tap it again to take it back.
+7. Type kick-outs and waste with `Waste / Rejects` (or `Enter Kick-outs` on the Blow Mold).
+8. `Changeover` starts and finishes a product change, with its checklist. `CIP / Sanitation` starts and finishes a wash (Boxing has no CIP).
 
+- The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
 - Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE), what was made, and how long it was stopped.
+- The fillers weigh filled jugs (Raypak weighs bags) on the **Fill weight check**. Boxing has no fill weight check: its product was weighed before it gets there.
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
-- `Set Next` sets what runs next on this line, for the next shift.
+- `Set Next` sets what runs next on this line and how many.
+
+> No code date on Running now? Set the product's shelf life on Line Targets.
 
 !> Do not type a check you did not do. A recorded check cannot be changed from the tablet.
+!> Do not leave How many to run blank when you know the amount. Without it there is no countdown.
 
 ## Line Targets
 id: linetargets

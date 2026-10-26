@@ -33,7 +33,7 @@ const W = require('./weightjoin');
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
-const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'color', 'stock', 'next', 'fill'];
+const OPS = ['product', 'count', 'stop', 'run', 'reason', 'changeover', 'cocheck', 'cip', 'waste', 'check', 'crew', 'note', 'divert', 'source', 'lot', 'color', 'stock', 'next', 'fill', 'qty'];
 const STOP_LIMIT = 300, COUNT_LIMIT = 400, RUN_LIMIT = 100, LOT_LIMIT = 100;
 
 function lineId(v, SaveError) {
@@ -131,6 +131,12 @@ function validateLineEntry(input, SaveError) {
     if (text(input.count) === '' || !Number.isInteger(n) || n < 0 || n > 9999999) throw new SaveError('BAD_REQUEST', 'Type how many jugs, a whole number.');
     out.count = n;
   }
+  if (op === 'qty') {
+    // Joe 10/26: how many to run of the product running now (blank = no countdown).
+    const n = Number(input.qty);
+    out.qty = text(input.qty) === '' ? null : n;
+    if (out.qty !== null && (!Number.isInteger(n) || n < 0 || n > 9999999)) throw new SaveError('BAD_REQUEST', 'Type how many to run, a whole number.');
+  }
   if (op === 'next') {
     out.product = text(input.product).slice(0, 120);
     const n = Number(input.qty);
@@ -186,6 +192,15 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   let headPlan = null, fillPlan = null, fillCtx = null;
   // The line's last lot and color, kept on the run at its first scan or pick: the run the shift started on (production-rules lotRuns).
   const lotLine = req.op === 'lot' || req.op === 'color' ? ((await tx.get(lineRef)).data() || {}) : null;
+  // Joe 10/26: starting the Up next product brings its amount along as how many to run (the countdown), and Up next empties.
+  const nextLine = req.op === 'product' || (req.op === 'changeover' && req.sub === 'done') ? ((await tx.get(lineRef)).data() || {}) : null;
+  // The Up next amount when the product starting is the Up next product (and Up next empties); otherwise nothing.
+  const fromNext = (product) => {
+    const nx = nextLine && nextLine.next && typeof nextLine.next === 'object' ? nextLine.next : null;
+    if (!nx || text(nx.product).toUpperCase() !== text(product).toUpperCase()) return {};
+    lineSet = Object.assign(lineSet || {}, { next: null });
+    return Number.isInteger(nx.qty) ? { qty: nx.qty } : {};
+  };
   if (req.op === 'check' && kind === 'BLOWMOLD' && W.HEADS.indexOf(req.field) >= 0) headPlan = await W.planHeads(get, db, run, req.slot, stamp);
   if (req.op === 'fill') {
     if (!P.hasFill(line.name)) throw new SaveError('BAD_REQUEST', line.name + ' has no fill weight check.');
@@ -202,8 +217,13 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   if (req.op === 'product') {
     if (run.runs.length >= RUN_LIMIT) throw new SaveError('BAD_REQUEST', 'This shift has too many product changes to keep.');
     run.product = req.product; run.sku = req.sku;
-    run.runs.push({ product: req.product, sku: req.sku, from: stamp, by: email });
+    run.runs.push(Object.assign({ product: req.product, sku: req.sku, from: stamp, by: email }, fromNext(req.product)));
     message = line.name + ' is running ' + req.product + '.';
+  } else if (req.op === 'qty') {
+    const cur = run.runs.slice().sort((a, b) => Date.parse(a.from) - Date.parse(b.from)).pop();
+    if (!cur) throw new SaveError('BAD_REQUEST', 'Pick the product running first.');
+    cur.qty = req.qty; cur.qtyBy = email; cur.qtyAt = stamp;
+    message = line.name + (req.qty === null ? ': no amount to run.' : ': run ' + req.qty.toLocaleString('en-US') + ' of ' + cur.product + '.');
   } else if (req.op === 'count') {
     run.count = req.count; run.countAt = stamp; run.countBy = email;
     run.counts.push({ at: stamp, count: req.count });
@@ -232,7 +252,7 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
     } else {
       if (!co) throw new SaveError('CONFLICT', line.name + ' is not in a changeover.');
       co.end = stamp; co.endBy = email;
-      if (co.to && co.to !== run.product) { run.product = co.to; run.runs.push({ product: co.to, sku: '', from: stamp, by: email }); }
+      if (co.to && co.to !== run.product) { run.product = co.to; run.runs.push(Object.assign({ product: co.to, sku: '', from: stamp, by: email }, fromNext(co.to))); }
       message = line.name + ': changeover done.';
     }
   } else if (req.op === 'cocheck') {

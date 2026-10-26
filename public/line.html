@@ -42,14 +42,24 @@
         <p class="ps-intro">Pick the production line this tablet is at. The tablet remembers it and opens straight to that line next time.</p>
         <div class="ps-stations" id="line-list"></div>
       </section>
+      <!-- Joe 10/26 (Boxing, mock-up 1): the line's name with its buttons beside it as tabs, like the machine page, so the whole
+           tablet fits without scrolling. The head stays while a button's page is open. -->
+      <div class="lb-head" id="line-head" hidden>
+        <div class="lb-title"><span class="eyebrow">Plant Production · Line tablet</span><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div><span class="lb-live" id="live"></span></div>
+        <div class="lb-actions" id="actions"></div>
+      </div>
       <section id="board" hidden>
-        <div class="lb-head">
-          <div><span class="eyebrow">Plant Production · Line tablet</span><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div></div>
-          <span class="lb-live" id="live"></span>
-        </div>
+        <!-- Joe 10/26: Line Running / Line Stopped right under the tabs, always on the screen. -->
+        <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
+        <div class="lb-reasons" id="reasons"></div>
         <div class="lb-cards" id="std-cards">
+          <!-- Joe 10/26: the code date of what is running, big enough to read from the line. -->
           <div class="lb-card"><span class="eyebrow">Running now</span><div class="lb-prod" id="prod"></div><div class="lb-mut" id="prod-sub"></div><div id="prod-pill"></div>
+            <div class="lb-code" id="prod-code"></div>
             <button type="button" class="lb-btn" id="change-product">Change Product</button></div>
+          <!-- Joe 10/26: how many to run of this product, counting down to zero. -->
+          <div class="lb-card" id="left-card"><span class="eyebrow">Left to run</span><div class="lb-big" id="left"></div><div class="lb-mut" id="left-sub"></div><div class="lb-bar"><i id="left-bar"></i></div>
+            <label class="lb-qty">How many to run<input class="lb-in" id="qty-box" inputmode="numeric" enterkeyhint="done" maxlength="7" autocomplete="off" data-save="qty"></label></div>
           <div class="lb-card"><span class="eyebrow">Made this shift</span><div class="lb-big" id="made"></div><div class="lb-mut" id="so-far"></div><div class="lb-bar"><i id="bar"></i></div><div id="vs"></div>
             <button type="button" class="lb-btn" id="enter-count">Enter Count</button></div>
           <div class="lb-card" id="speed-card"><span class="eyebrow">Speed now</span><div class="lb-big" id="speed"></div><div class="lb-mut" id="speed-sub"></div><div id="speed-flag"></div></div>
@@ -69,9 +79,6 @@
         <!-- Joe 10/14: a filler's fill weight check (filled jugs in grams) and the product in each jug against the product's target. -->
         <div class="lb-strip lb-fillbox" id="fill-box" hidden></div>
         <div class="lb-strip" id="strip" hidden></div>
-        <div class="lb-actions" id="actions"></div>
-        <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
-        <div class="lb-reasons" id="reasons"></div>
       </section>
       <!-- Change Product: the line's products (the plant's Products list). -->
       <section class="lb-pane" id="product-pane" hidden>
@@ -126,6 +133,7 @@
       const line = data.lines.find(l => l.operationId === lineId) || null;
       if (lineId && !line && data.read.setup) { lineId = ''; write(''); }
       document.getElementById('pick').hidden = !!line || !!pane;
+      document.getElementById('line-head').hidden = !line;
       document.getElementById('board').hidden = !line || !!pane;
       document.getElementById('product-pane').hidden = pane !== 'product';
       document.getElementById('count-pane').hidden = pane !== 'count';
@@ -139,19 +147,32 @@
       }
       const t = now(), v = lineView(data, line, t), s = data.shift;
       document.getElementById('pill').textContent = line.name + ' · ' + plantName(plant());
-      if (pane === 'product') return drawProducts(v);
-      if (pane === 'count') return;
-      if (MORE[pane]) return drawMore(v);
+      // The head and its tabs (Joe 10/26, mock-up 1): Line, then the line's buttons; the open one is dark.
       document.getElementById('line-name').textContent = line.name;
       document.getElementById('line-sub').textContent = plantName(plant()).toUpperCase() + ' · ' + shortDate(s.date) + ' · ' + shiftText(s);
       const live = document.getElementById('live');
       live.textContent = v.counter === 'READER' ? 'Label reader on' : v.counter === 'SENSOR' ? 'Counts from sensor' : v.counter === 'CONTROLLER' ? 'Counts from the machine' : 'Counts typed on this tablet';
       live.className = 'lb-live ' + (v.counter === 'TABLET' ? 'typed' : 'auto');
+      drawTabs(v);
+      if (pane === 'product') return drawProducts(v);
+      if (pane === 'count') return;
+      if (MORE[pane]) return drawMore(v);
       // Running now
       const tg = v.target;
       document.getElementById('prod').textContent = v.product || 'No product picked';
       document.getElementById('prod-sub').textContent = v.product ? [v.sku ? 'SKU ' + v.sku : '', tg && tg.perHour ? 'target ' + fmt(tg.perHour) + ' an hour' : 'no target set'].filter(Boolean).join(' · ') : 'Pick what is running to start the target.';
       document.getElementById('prod-pill').innerHTML = v.counter === 'READER' && v.product ? '<span class="lb-pill g">READ FROM JUG LABEL (UPC)</span>' : '';
+      // Joe 10/26: the code date of what is running, big.
+      document.getElementById('prod-code').innerHTML = !v.product ? '' : v.expectedCode ? '<span>Code date</span><b>' + escapeHtml(v.expectedCode) + '</b>' : '<span>Code date</span><em>Set the shelf life on Line Targets</em>';
+      // Joe 10/26: Left to run counts down from how many to run of this product.
+      const rl = v.runLeft, qb = document.getElementById('qty-box');
+      document.getElementById('left').textContent = !rl ? '—' : rl.left ? fmt(rl.left) : 'DONE';
+      document.getElementById('left').className = 'lb-big' + (rl && !rl.left ? ' lb-green' : '');
+      document.getElementById('left-sub').textContent = !v.product ? 'Pick the product first.' : !rl ? 'Type how many to run to start the countdown.' : fmt(rl.made) + ' of ' + fmt(rl.qty) + ' made' + (rl.over ? ' · ' + fmt(rl.over) + ' over' : '');
+      const lb = document.getElementById('left-bar');
+      lb.style.width = (rl ? rl.pct : 0) + '%'; lb.className = 'c-g';
+      qb.disabled = !v.product || busy;
+      if (document.activeElement !== qb) qb.value = rl ? String(rl.qty) : '';
       document.getElementById('change-product').textContent = v.product ? 'Change Product' : 'Pick Product';
       // Made this shift
       document.getElementById('made').textContent = fmt(v.made);
@@ -173,7 +194,8 @@
       document.getElementById('down-sub').textContent = v.stops + ' stop' + (v.stops === 1 ? '' : 's') + (v.needReason.length ? ' · ' + v.needReason.length + ' need' + (v.needReason.length === 1 ? 's' : '') + ' a reason' : '');
       // Code date check: the label reader's, or what the code should be until one is on the line.
       const rd = v.reader, dc = document.getElementById('date-check');
-      dc.hidden = v.kind === 'HTST' || v.kind === 'BLOWMOLD';
+      // Joe 10/26: the code date is in Running now; this line shows only what the label reader read.
+      dc.hidden = v.kind === 'HTST' || v.kind === 'BLOWMOLD' || !(rd && v.counter === 'READER');
       if (rd && v.counter === 'READER') {
         const ok = rd.dateOk !== false;
         dc.className = 'lb-date ' + (ok ? 'ok' : 'bad');
@@ -392,8 +414,12 @@
         sp.innerHTML = '<div class="lb-box"><h3>Up next on this line</h3>' + (v.next ? '<div class="lb-next">' + escapeHtml(v.next.product) + (v.next.qty ? ' · ' + fmt(v.next.qty) : '') + '</div>' : '<div class="lb-mut">Nothing set yet.</div>') + '<button type="button" class="lb-btn" data-act="next">Set Next</button></div>' +
           '<div class="lb-box"><h3>Each hour</h3>' + (hrs.length ? '<div class="lb-hbars">' + hrs.map(x => '<div' + (x.now ? ' class="now"' : '') + ' title="' + fmt(x.made) + ' made' + (x.target ? ' of ' + fmt(x.target) : '') + '"><i class="' + (!x.past ? 'e' : x.pct === null ? (x.made ? '' : 'e') : x.pct >= 100 ? '' : x.pct >= 90 ? 'a' : 'r') + '" style="height:' + (x.past && (x.made || x.target) ? Math.max(6, Math.round(Math.max(x.made, 1) / top * 56)) : 6) + 'px"></i><span>' + hourName(x.from) + '</span></div>').join('') + '</div>' : '<div class="lb-mut">Starts with the shift\'s first product.</div>') + '</div>';
       }
-      const acts = document.getElementById('actions');
-      acts.innerHTML = (ACTIONS[k] || ACTIONS.FILLER).map(a => { const t = actionText(v, a); return '<button type="button" data-act="' + a + '"' + (t[2] ? ' class="' + t[2] + '"' : '') + '>' + escapeHtml(t[0]) + '<small>' + escapeHtml(t[1]) + '</small></button>'; }).join('');
+    }
+    // The tabs in the head (Joe 10/26, mock-up 1): Line (the board), then the line's buttons. Boxing has no CIP (Joe 10/26).
+    function drawTabs(v) {
+      const open = MORE[pane] ? pane : pane ? '' : 'board';
+      const tabs = [['board', 'Line', 'now', '']].concat((ACTIONS[v.kind] || ACTIONS.FILLER).filter(a => a !== 'cip' || v.hasCip).map(a => [a].concat(actionText(v, a))));
+      draw('actions', tabs.map(t => '<button type="button" data-act="' + t[0] + '" class="' + [t[3], t[0] === open ? 'cur' : ''].filter(Boolean).join(' ') + '">' + escapeHtml(t[1]) + '<small>' + escapeHtml(t[2]) + '</small></button>').join(''));
     }
     // ---------- Fill weight check (Joe 10/14): filled jugs weighed in grams, as often as Line Targets says ----------
     // Product in each jug = filled - empty jug - cap, against the product's Target Fill Weight g (Product Sheet). Each box saves as it is left.
@@ -485,6 +511,22 @@
         return '<label class="lb-field' + (wf ? ' lb-off' : '') + '">' + escapeHtml(f[1]) + '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '">' + (wf ? '<b class="lb-pill r">' + wf + '</b>' : '') + '</label>';
       }).join('') + '</div>' + (v.kind === 'BLOWMOLD' && v.jugWeight && (v.jugWeight.low !== null || v.jugWeight.high !== null || v.jugWeight.target !== null) ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.' + (v.jugWeight.target !== null ? ' Target ' + v.jugWeight.target + ' g.' : '') + (v.jugWeight.low !== null || v.jugWeight.high !== null ? ' Range ' + (v.jugWeight.low !== null ? v.jugWeight.low : 'up') + ' to ' + (v.jugWeight.high !== null ? v.jugWeight.high : 'any') + ' g.' : '') + '</p>' : v.kind === 'BLOWMOLD' ? '<p class="lb-mut lb-wrange">One jug from each head, in grams.</p>' : '');
     }
+    // Joe 10/26: the Quality Check as a list: tap OK or Not OK on each line (tap it again to take it back), type the numbers.
+    function checkList(v) {
+      const c = v.check;
+      if (!c || c.done) return checkForm(v);
+      return '<div class="lb-qlist">' + (R.CHECK_FIELDS[v.kind] || []).map(f => {
+        const got = c.values[f[0]] === undefined ? '' : String(c.values[f[0]]);
+        if (f[2] === 'ok') {
+          const opts = f[0] === 'pen' ? ['ON TIME', 'LATE'] : ['OK', 'NOT OK'], bad = got === opts[1];
+          return '<div class="lb-qrow' + (got ? bad ? ' bad' : ' ok' : '') + '"><span class="box">' + (got ? bad ? '&#10007;' : '&#10003;' : '') + '</span><span>' + escapeHtml(f[1]) + '<small>' + (got ? escapeHtml(got === 'OK' ? 'OK' : got === 'NOT OK' ? 'Not OK' : got === 'ON TIME' ? 'On time' : 'Late') : 'tap one') + '</small></span>' +
+            opts.map((o, i) => '<button type="button" class="' + (i ? 'no' : 'yes') + (got === o ? ' on' : '') + '" data-click="qc" data-field="' + f[0] + '" data-slot="' + c.slot + '" data-value="' + (got === o ? '' : o) + '">' + (i ? '&#10007; ' : '&#10003; ') + (o === 'NOT OK' ? 'Not OK' : o === 'ON TIME' ? 'On time' : o === 'LATE' ? 'Late' : 'OK') + '</button>').join('') + '</div>';
+        }
+        const wf = R.weightFlag(f[0], got, v.jugWeight && { jugWeightLow: v.jugWeight.low, jugWeightHigh: v.jugWeight.high });
+        return '<div class="lb-qrow' + (wf ? ' bad' : got ? ' ok' : '') + '"><span class="box">' + (wf ? '&#10007;' : got ? '&#10003;' : '') + '</span><span>' + escapeHtml(f[1]) + '<small>' + (wf ? wf : got ? 'typed' : 'type it') + '</small></span>' +
+          '<input class="lb-in" inputmode="decimal" maxlength="8" autocomplete="off" aria-label="' + escapeHtml(f[1]) + '" data-save="check" data-field="' + f[0] + '" data-slot="' + c.slot + '" value="' + escapeHtml(got) + '"></div>';
+      }).join('') + '</div><p class="lb-mut">Each tap saves right away; a number saves when you leave its box. The check is done when every line has an answer.</p>';
+    }
     // last = only the newest that many checks, newest first (the Blow Mold's bottle check box).
     function checkTable(v, last) {
       const c = (v.run && v.run.checks) || {}, every = (R.CHECK_EVERY[v.kind] || 2) * 3600000, start = Date.parse((v.run && v.run.shiftStart) || '');
@@ -528,7 +570,7 @@
         const c = v.check;
         head = 'Quality check' + (c ? ' · ' + (c.done ? 'next due ' + clock(c.next) : 'due ' + clock(c.at)) : '');
         if (c) pill = '<span class="lb-pill ' + (c.done ? 'g' : 'a') + '">' + c.filled + ' OF ' + c.of + ' DONE</span>';
-        body = checkForm(v) + '<div class="lb-box" style="margin-top:12px"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>';
+        body = checkList(v) + '<div class="lb-box" style="margin-top:12px"><h3>Earlier this shift</h3>' + checkTable(v) + '</div>';
       } else if (pane === 'crew') {
         head = 'Who is on ' + name;
         body = '<div class="lb-crew">' + v.crew.map(c => '<button type="button" data-click="crew" data-name="' + escapeHtml(c.name) + '" data-on="' + (c.on ? '0' : '1') + '"' + (c.on ? ' class="on"' : '') + '>' + escapeHtml(c.name) + '<small>' + (c.on ? 'on ' : 'off ') + clock(c.at) + ' · tap for ' + (c.on ? 'off the line' : 'back on') + '</small></button>').join('') + '</div>' +
@@ -630,11 +672,12 @@
       if (c === 'cip-start') return enter('cip', { sub: 'start' });
       if (c === 'cip-pass' || c === 'cip-fail') { pane = ''; return enter('cip', { sub: 'done', result: c === 'cip-pass' ? 'PASS' : 'FAIL' }); }
       if (c === 'crew') return enter('crew', { name: b.dataset.name, on: b.dataset.on === '1' });
+      if (c === 'qc') return queue('check', { slot: Number(b.dataset.slot), field: b.dataset.field, value: b.dataset.value });
       if (c === 'divert') return enter('divert', { sub: 'start', reason: b.dataset.reason });
       if (c === 'forward') return enter('divert', { sub: 'forward' });
     });
-    // The six buttons, and the HTST and Blow Mold cards' buttons.
-    document.getElementById('board').addEventListener('click', e => {
+    // The tabs in the head, and the HTST and Blow Mold cards' buttons.
+    const act = e => {
       const cb = e.target.closest('[data-color]');
       if (cb) return queue('color', { color: cb.dataset.color });
       const b = e.target.closest('[data-act]');
@@ -644,7 +687,17 @@
       if (a === 'count') return document.getElementById('enter-count').click();
       if (a === 'waste') wasteReason = b.dataset.reason || wasteReason;
       if (a === 'changeover') coTo = '';
+      if (a === 'board') { pane = ''; render(); return; }
       pane = a; drawn['mp-body'] = null; render(); window.scrollTo(0, 0);
+    };
+    document.getElementById('board').addEventListener('click', act);
+    document.getElementById('actions').addEventListener('click', act);
+    // Joe 10/26: how many to run saves when its box is left (or Enter is pressed); blank takes the countdown away.
+    document.getElementById('qty-box').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+    document.getElementById('qty-box').addEventListener('change', e => {
+      const n = e.target.value.replace(/[,\s]/g, '');
+      if (n && !/^\d+$/.test(n)) { showError('Type how many to run, digits only.'); return; }
+      queue('qty', { qty: n });
     });
     document.getElementById('mp-close').addEventListener('click', () => { pane = ''; render(); });
     function drawProducts(v) {
