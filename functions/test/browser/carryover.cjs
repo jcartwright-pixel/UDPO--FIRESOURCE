@@ -111,8 +111,8 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(first.reason, 'misses dispatch');
     // Joe 10/20: the email lists what is left over from yesterday first, then today's loads (Save-A-Lot included), in loading order.
     const html = R.reportHtml(rep, ''), plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-    assert.match(plainText, /Left over from Mon 10-19-26 971 [\s\S]*901 [\s\S]*909 [\s\S]*907 [\s\S]*Today Tue 10-20-26 855 Save-A-Lot 1 [\s\S]*856 Save-A-Lot 2 [\s\S]*852 [\s\S]*849 [\s\S]*813 /);
-    assert.doesNotMatch(plainText, /Delivers /);
+    // Joe 10/26: today's loads under their delivery day, each day once (Save-A-Lot delivers Tuesday, the rest Wednesday).
+    assert.match(plainText, /Left over from Mon 10-19-26 971 [\s\S]*901 [\s\S]*909 [\s\S]*907 [\s\S]*Delivers Tuesday 10-20-26 855 Save-A-Lot 1 [\s\S]*856 Save-A-Lot 2 [\s\S]*Delivers Wednesday 10-21-26 852 [\s\S]*849 [\s\S]*813 /);
     fs.writeFileSync(path.join(SHOTS || require('os').tmpdir(), 'carryover-email.html'), html);
     assert.deepEqual(mc.errors, []);
 

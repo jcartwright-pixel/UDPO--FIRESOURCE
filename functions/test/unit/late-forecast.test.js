@@ -168,14 +168,15 @@ test('the email and the report carry the forecast', () => {
   // Joe 10/22 (option az): every time has its day.
   assert.match(html, /Due by Tue 5:00 AM: \d+ loads, [\d,]+ cases.*est\. Tue \d+:\d\d [AP]M/);
   assert.match(html, /All loads done.*est\. (Mon|Tue) \d+:\d\d [AP]M/);
-  assert.match(html, /Est\. Done/);
+  // Joe 10/26: loaded and not loaded share one list, so an estimated time says "est." in front of it.
+  assert.match(html, />est\. \d+:\d\d [AP]M/);
   assert.match(html, /misses dispatch/);
   assert.match(r.text, /^LATE FORECAST \(ESTIMATED\)/m);
   assert.match(r.text, /Due by Tue 5:00 AM: 10 loads, [\d,]+ cases, est\. done Tue \d+:\d\d [AP]M/);
   // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
   [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
-  assert.doesNotMatch(none, /Est\. Done|Forecast at/, 'a report without a forecast reads as before');
+  assert.doesNotMatch(none, /Est\. Done|>est\. |Forecast at/, 'a report without a forecast reads as before');
 });
 
 // Joe 10/19: "I would just like to be able to send it in the live version to see before I put it to everybody."
