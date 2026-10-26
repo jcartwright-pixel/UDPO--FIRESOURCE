@@ -191,3 +191,6 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 .ap .cc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .ap .cc-mono { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
 .ap .cc-bad { color: #b42318; }
+/* Joe 10/26: Home screen drop-down on each person's row (People & Roles). */
+.people-table td.hs-cell { padding: 6px 8px; }
+.people-table select.hs-pick { width: 100%; font-size: 16px; padding: 6px 8px; border: 1px solid #9fb3c8; border-radius: 6px; background: #fff; color: #0b2545; }

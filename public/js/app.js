@@ -822,6 +822,17 @@ export async function tvCodeSignIn(code) {
 export async function signOutHere() { const { auth } = await start(); await signOut(auth); }
 
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
+// Joe 10/26: a person's Home screen (Administration > People & Roles) opens when they open the app, instead of the Home
+// cards. Only once per tab: after that the Home button goes to the normal Home, and a bookmark to another screen stays put.
+function goHomeScreen(page, person) {
+  let gone = false;
+  try { gone = sessionStorage.getItem('udHomeScreenGone') === '1'; sessionStorage.setItem('udHomeScreenGone', '1'); } catch (e) { gone = true; }
+  const here = location.pathname.split('/').pop() || 'index.html';
+  if (gone || !page || page === here || ['index.html', 'company.html'].indexOf(here) < 0 || !mayOpenPage(page)) return false;
+  if (buildingSideFor(page) && !mayOpenBuilding(person)) return false;
+  location.replace(page);
+  return true;
+}
 export async function requireSignIn(ready) {
   // Moving between screens (Joe 10/9): someone already checked in this tab sees the screen at once, not a blank page while
   // the sign-in and the Users list are checked again; the check still runs and signs out anyone no longer active.
@@ -866,7 +877,8 @@ export async function requireSignIn(ready) {
       who.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } });
     }
   };
-  const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else sessionStorage.removeItem('udActive'); } catch (e) { /* no storage */ } };
+  // Signed out: the next person to sign in on this tab goes to their own Home screen (goHomeScreen).
+  const remember = (email) => { try { if (email) sessionStorage.setItem('udActive', email); else { sessionStorage.removeItem('udActive'); sessionStorage.removeItem('udHomeScreenGone'); } } catch (e) { /* no storage */ } };
   onAuthStateChanged(auth, async (user) => {
     // A Plant Station signed in by its code alone (stationSignIn): only the screens a Plant Station opens.
     const station = user && !isUnitedDairy(user) ? await stationOf(user) : null;
@@ -929,8 +941,10 @@ export async function requireSignIn(ready) {
     remember(email);
     // Joe 10/14: the screens ticked for this person (People & Roles). A read that fails keeps what this tab already knew;
     // the server still refuses saves on a screen not ticked.
-    const ticks = await getDoc(doc(db, 'personRights', email)).then(d => (d.exists() && d.data().screenAccess) || null).catch(() => undefined);
+    const mine = await getDoc(doc(db, 'personRights', email)).then(d => d.exists() ? d.data() : {}).catch(() => undefined);
+    const ticks = mine === undefined ? undefined : mine.screenAccess || null;
     noteAccess(Object.assign({ email }, entry.data()), ticks);
+    if (mine && goHomeScreen(mine.homeScreen, Object.assign({ email }, entry.data()))) return;
     { const plant = currentPlant(); getDoc(doc(db, 'menuSetup', plant)).then(d => keepMenuSetup(plant, d.exists() ? d.data().sides || null : null)).catch(() => {}); }
     if (!mayOpenPage(here)) {
       gate.hidden = true;

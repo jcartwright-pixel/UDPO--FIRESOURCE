@@ -104,8 +104,9 @@ export async function renderPeople(box) {
     '<div class="ap-msg" hidden></div>' +
     // Review item 53 (Joe 10/13): the three info boxes (Company sign-in, Administrator is assigned, Supplied codes are separate)
     // are gone, so the list starts right under the buttons. Review item 52: Email is wide and Plants and Status narrow, so an
-    // address never breaks mid-word (it may break only after the @).
-    '<div class="ap-scroll"><table class="issues adm-table people-table"><colgroup><col style="width:20%"><col style="width:36%"><col style="width:20%"><col style="width:13%"><col style="width:11%"></colgroup><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th></tr></thead><tbody id="people"></tbody></table></div>' +
+    // address never breaks mid-word (it may break only after the @). Joe 10/26: Home screen, the page each person lands on when
+    // they open the app, picked right in the list and saved as soon as it is picked.
+    '<div class="ap-scroll"><table class="issues adm-table people-table"><colgroup><col style="width:15%"><col style="width:24%"><col style="width:13%"><col style="width:10%"><col style="width:9%"><col style="width:29%"></colgroup><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th><th>Home screen</th></tr></thead><tbody id="people"></tbody></table></div>' +
     '<p class="ap-note">Click a person to change or disable them. Disabled people stay visible; no account is deleted. Changes are also written to the Users sheet.</p>' +
     '<div class="ap-modal" id="p-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Person"><div class="ap-msg" id="p-modal-msg" hidden></div><div class="ap-card" id="p-edit"></div></div></div>' +
     '<div class="ap-modal" id="r-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Add Role"><div class="ap-card" id="r-edit"></div></div></div></div>';
@@ -159,13 +160,30 @@ export async function renderPeople(box) {
       '<table class="ap-t sa-t"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>';
   }
 
+  // Joe 10/26: the Home screen drop-down on each person's row: blank = the normal home; the choices are the screens this person
+  // may see (logic.js homeChoices), grouped by Home card.
+  function homeSelect(p) {
+    const list = L.homeChoices(Object.assign({}, p, { status: 'ACTIVE' }), p.screenAccess || null), have = p.homeScreen || '';
+    let html = '<option value=""></option>', group = '';
+    list.forEach(c => {
+      if (c.group !== group) html += (group ? '</optgroup>' : '') + '<optgroup label="' + e(group = c.group) + '">';
+      html += '<option value="' + e(c.page) + '"' + (c.page === have ? ' selected' : '') + '>' + e(c.name) + '</option>';
+    });
+    if (group) html += '</optgroup>';
+    if (have && !list.some(c => c.page === have)) {
+      const was = L.homeChoices({ status: 'ACTIVE', roles: ['ADMINISTRATOR'] }, null).find(c => c.page === have);
+      html += '<option value="' + e(have) + '" selected>' + e((was ? was.name : have) + ' (no longer ticked)') + '</option>';
+    }
+    return '<select class="hs-pick" data-home-for="' + e(p.email) + '" aria-label="Home screen for ' + e(p.name || p.email) + '">' + html + '</select>';
+  }
+
   function renderList() {
     const q = find.trim().toLowerCase();
     const rows = data.people.filter(p => (filter === 'all' || p.status === filter) && (!q || (p.name + ' ' + p.email).toLowerCase().indexOf(q) >= 0))
       .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
     $('#people').innerHTML = rows.map(p => '<tr data-email="' + e(p.email) + '"' + (sel && sel.email === p.email ? ' class="on"' : '') + '><td class="strong">' + e(p.name || p.email) + '</td><td class="email">' + e(p.email).replace('@', '@<wbr>') + '</td><td>' +
-      e(roleText(p.roles)) + '</td><td>' + e(plantsText(p)) + '</td><td><span class="pill ' + (p.status === 'ACTIVE' ? 'good' : 'muted') + '">' + (p.status === 'ACTIVE' ? 'Active' : p.status === 'INACTIVE' ? 'Disabled' : e(p.status || 'Unknown')) + '</span></td></tr>').join('') ||
-      '<tr><td colspan="5" class="ap-empty">No matching people.</td></tr>';
+      e(roleText(p.roles)) + '</td><td>' + e(plantsText(p)) + '</td><td><span class="pill ' + (p.status === 'ACTIVE' ? 'good' : 'muted') + '">' + (p.status === 'ACTIVE' ? 'Active' : p.status === 'INACTIVE' ? 'Disabled' : e(p.status || 'Unknown')) + '</span></td><td class="hs-cell">' + homeSelect(p) + '</td></tr>').join('') ||
+      '<tr><td colspan="6" class="ap-empty">No matching people.</td></tr>';
   }
 
   function renderEdit() {
@@ -253,6 +271,7 @@ export async function renderPeople(box) {
 
   box.addEventListener('click', ev => {
     const row = ev.target.closest('#people tr[data-email]');
+    if (row && ev.target.closest('.hs-cell')) return;
     if (row) { if (!leaving('row:' + row.dataset.email)) return; pick(data.people.find(p => p.email === row.dataset.email)); return; }
     const b = ev.target.closest('button');
     if (!b) return;
@@ -298,6 +317,21 @@ export async function renderPeople(box) {
       if (!sensitive) { go(); return; }
       if (b.dataset.armed !== '1') say(box, 'This changes enabled status or administrator access. Click Save Person Access again to confirm.');
       twice(b, 'Click Again to Confirm', go);
+    }
+  });
+  // Joe 10/26: a Home screen saves as soon as it is picked (no Save button, no saved message, nothing moves).
+  box.addEventListener('change', async ev => {
+    const home = ev.target.closest('select.hs-pick');
+    const p = home && data.people.find(x => x.email === home.dataset.homeFor);
+    if (!p) return;
+    const was = p.homeScreen || '';
+    p.homeScreen = home.value;
+    try {
+      const out = await call('setHomeScreen', { email: p.email, page: home.value });
+      p.homeScreen = out.homeScreen; p.revision = out.revision;
+    } catch (err) {
+      p.homeScreen = was; home.value = was;
+      say(box, 'The Home screen for ' + (p.name || p.email) + ' was not saved: ' + errText(err), 'bad');
     }
   });
   box.addEventListener('change', ev => {
