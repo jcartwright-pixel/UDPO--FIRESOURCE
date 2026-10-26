@@ -58,22 +58,25 @@ const SCREENS = [
     assert.equal(await side.getAttribute('.sidemenu a.side-name', 'href'), 'manager.html', 'Plant Distribution opens Manager Center');
     assert.ok(await side.$('.sidemenu a.side-name.on'), 'Manager Center is the Plant Distribution screen');
     assert.deepEqual(await side.$$eval('.sidemenu > a:not(.side-name):not(#go-home), .sidemenu > .side-sec > .side-sec-btn', x => x.map(e => e.textContent.replace(/[\u25b8]/g, '').trim())),
-      ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks']);
+      ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks']);
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
-    for (const [page] of SCREENS) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
+    // Joe 10/25: Quality Checks and Cooler Temperature moved to Plant Production's menu. Joe 10/26 (ej): the scheduler is Shipping & Receiving's.
+    for (const [page] of SCREENS) if (['quality.html', 'temps.html', 'scheduler.html'].indexOf(page) < 0) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
     assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
-    // Review item 30 (Joe 10/13): the report card takes the top two rows of the left column (no big empty area), Plant
-    // Distribution Departments runs across the top of the other two columns, and the last row has a card under the report card.
-    const boxes = await side.$$eval('#grid > .mc-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom), Math.round(r.right)]; }));
-    assert.ok(boxes.slice(1, 4).every(b => b[0] > boxes[0][0]), 'the cards of the top two rows are right of the report card ' + JSON.stringify(boxes));
-    assert.ok(Math.abs(boxes[0][1] - boxes[1][1]) <= 2 && Math.abs(boxes[0][2] - boxes[2][2]) <= 2, 'the report card is as tall as the top two rows ' + JSON.stringify(boxes));
-    assert.ok(Math.abs(boxes[1][3] - boxes[3][3]) <= 2 && Math.abs(boxes[1][0] - boxes[2][0]) <= 2, 'Plant Distribution Departments spans the two right columns ' + JSON.stringify(boxes));
-    assert.ok(Math.abs(boxes[4][0] - boxes[0][0]) <= 2 && boxes[4][1] >= boxes[0][2], 'a card sits under the report card ' + JSON.stringify(boxes));
+    // Joe 10/26: Send Current Report on the left with the four department cards two by two beside it, then the Manager
+    // Walkthrough under the report card with Shift Notes at its right.
+    const box = (sel) => side.$eval(sel, x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom), Math.round(r.right)]; });
+    const rep = await box('#grid > .mc-report'), dept = await box('[data-card="dept"]'), walk = await box('[data-card="walk"]'), notes = await box('[data-card="notes"]');
+    const cards = await side.$$eval('[data-card="dept"] .dp-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
+    assert.ok(dept[0] > rep[3] && Math.abs(dept[1] - rep[1]) <= 2, 'the departments sit right of the report card ' + JSON.stringify([rep, dept]));
+    assert.ok(cards.length === 4 && cards[0][1] === cards[1][1] && cards[2][1] === cards[3][1] && cards[2][1] > cards[0][1] && cards[0][0] === cards[2][0], 'the four department cards are two by two ' + JSON.stringify(cards));
+    assert.ok(Math.abs(walk[0] - rep[0]) <= 2 && walk[1] >= rep[2] && walk[1] >= dept[2], 'the walkthrough runs along the bottom ' + JSON.stringify([rep, dept, walk]));
+    assert.ok(notes[0] > walk[3] && Math.abs(notes[1] - walk[1]) <= 2, 'Shift Notes sits beside the walkthrough ' + JSON.stringify([walk, notes]));
     await side.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
     await side.waitForSelector('.side-flyouts .flyout.open');
-    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Loadout Center', 'Unloading & Washing', 'Product Returns', 'Truck Washing', 'Trailer Assignments']);
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Case Loading', 'Tote Loading', 'Box Loading', 'Tanker Loading', 'Late Forecast', 'Case Unloading', 'Tote Unloading', 'Box Unloading', 'Tanker Unloading', 'Truck Washing', 'Product Returns', 'Trailer Assignments']);
     await side.mouse.move(1500, 900);
     await Promise.all([side.waitForURL(/report=1/), side.click('.sidemenu a[href="manager.html?report=1"]')]);
     await side.waitForSelector('#modal:not([hidden])');
@@ -81,7 +84,8 @@ const SCREENS = [
     // Joe 10/10: a menu click always opens the screen's default view (Scheduler = Shipping, the month, today), never the
     // last tab or mode used; the switches inside the screen stay.
     const menuHrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href')));
-    assert.deepEqual(menuHrefs.filter(h => /\?/.test(h)), ['manager.html?report=1'], 'no plant menu link opens a remembered or side view');
+    // Joe 10/26: each loading and unloading is its own menu item (loadout.html?area=TOTES is Tote Loading itself, not a remembered view).
+    assert.deepEqual(menuHrefs.filter(h => /\?/.test(h) && !/^(loadout|unloading)\.html\?area=(CASE|TOTES|BOXING|TANKER)$/.test(h)), ['manager.html?report=1'], 'no plant menu link opens a remembered or side view');
     await side.close();
     const sch = await openPage(browser, 1920, 950, '/scheduler.html' + MANAGER);
     await sch.waitForSelector('.sc-day');

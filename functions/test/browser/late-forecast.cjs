@@ -72,17 +72,18 @@ async function openPage(browser, url, w, h, opts) {
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
     await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
     // The loads reach Manager Center through runDays (filled by a trigger on each run), so wait for all of them.
-    await mc.waitForFunction(() => /1\s*late/.test((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || ''), null, { timeout: 20000 }).catch(async (e) => {
+    await mc.waitForFunction(() => /^1\s*Late Forecast/.test((document.querySelector('.dp-line[href="forecast.html"]') || {}).textContent || ''), null, { timeout: 20000 }).catch(async (e) => {
       // What the tile showed instead, so a slow or wrong fill can be told apart.
-      console.error('late-forecast: the tile reads', JSON.stringify(await mc.evaluate(() => ((document.querySelector('.mc-tile[href="forecast.html"]') || {}).textContent || '(no tile)').replace(/\s+/g, ' '))), 'errors', JSON.stringify(mc.errors));
+      console.error('late-forecast: the tile reads', JSON.stringify(await mc.evaluate(() => ((document.querySelector('.dp-line[href="forecast.html"]') || {}).textContent || '(no tile)').replace(/\s+/g, ' '))), 'errors', JSON.stringify(mc.errors));
       if (SHOTS) await mc.screenshot({ path: path.join(SHOTS, 'late-forecast-timeout-1536.png') });
       throw e;
     });
-    const tile = await mc.textContent('.mc-tile[href="forecast.html"]');
+    const tile = await mc.textContent('.dp-line[href="forecast.html"]');
     // Joe 10/22 (option az): the time says its day.
-    assert.match(tile, /Late Forecast\s*1\s*late\s*All done est\. Tue \d+:\d\d AM/);
-    const tileDone = tile.match(/All done est\. (Tue \d+:\d\d AM)/)[1];
-    const cut = await mc.$$eval('[data-card="dept"] .mc-tile span, [data-card="dept"] .mc-tile i', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
+    // Joe 10/26: the forecast rides in the Case Loading card as an alert box, the number in front.
+    assert.match(tile, /^1\s*Late Forecast\s*late · all done est\. Tue \d+:\d\d AM$/);
+    const tileDone = tile.match(/all done est\. (Tue \d+:\d\d AM)/)[1];
+    const cut = await mc.$$eval('[data-card="dept"] .dp-line span, [data-card="dept"] .dp-counts em', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
     assert.deepEqual(cut, [], 'every tile keeps its whole wording');
     if (SHOTS) await mc.screenshot({ path: path.join(SHOTS, 'late-forecast-manager-1536.png') });
     // Send Test to Me: only the sender, and the round (what was checked since the last report) does not start over.
@@ -102,7 +103,7 @@ async function openPage(browser, url, w, h, opts) {
     assert.match(await mc.textContent('#rp-body'), new RegExp('All loads done\\s*est\\. ' + tileDone));
     assert.deepEqual(mc.errors, []);
 
-    await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.mc-tile[href="forecast.html"]')]);
+    await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.dp-line[href="forecast.html"]')]);
     await mc.waitForSelector('.fc-row.late');
     // Past nights read in: the due-by count is the one worked out with them.
     await mc.waitForFunction(() => /10 loads\s*4,691 cases/.test(document.getElementById('band').textContent));

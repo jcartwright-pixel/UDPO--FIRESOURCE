@@ -116,8 +116,9 @@ const ACTION_RIGHT = Object.freeze({
   savePlantLoad: 'plant.loading.write', reorderPlantLoads: 'plant.loading.write', addPickup: 'customerPickup.write', completePickup: 'customerPickup.write', saveUnloading: 'plant.unloading.write', addReturn: 'plant.unloading.write',
   completeWash: 'plant.washing.complete', savePlantSchedule: 'operations.write', saveYardCheck: 'plant.write', saveQualityCheck: 'plant.write', saveShiftNote: 'plant.write',
   saveTemperatureCheck: 'plant.write', sendPlantReport: 'plant.report.send', saveWalkPhoto: 'plant.report.send', removeWalkPhoto: 'plant.report.send', captionWalkPhoto: 'plant.report.send', saveMachineProducts: 'plant.settings.write', saveProductSetup: 'plant.settings.write', saveProductUpload: 'plant.settings.write', saveProductSheet: 'plant.settings.write', savePlantShifts: 'plant.settings.write', sendToGarage: 'issues.write', deleteGarageJob: 'issues.write',
-  saveSafetyWalk: 'plant.write', saveSafetyIssue: 'plant.write', saveExtinguisherCheck: 'plant.write', saveExtinguisher: 'plant.settings.write', saveFireSystemCheck: 'plant.write', saveFireSystem: 'plant.settings.write', saveSafetyChecklist: 'plant.settings.write', saveLocationAreas: 'plant.settings.write',
-  saveReceivingScan: 'operations.write', saveReceivingItem: 'plant.settings.write'
+  saveSafetyWalk: 'plant.write', saveSafetyIssue: 'plant.write', saveExtinguisherCheck: 'plant.write', saveExtinguisher: 'plant.settings.write', saveFireSystemCheck: 'plant.write', saveFireSystem: 'plant.settings.write', saveSafetyChecklist: 'plant.settings.write', saveLocationAreas: 'plant.settings.write', saveMenuSetup: 'plant.settings.write',
+  saveReceivingScan: 'operations.write', saveReceivingItem: 'plant.settings.write',
+  saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write'
 });
 
 // templates: { ROLE: [codes] } saved in Role Templates (a role not there keeps its defaults).
@@ -179,10 +180,11 @@ const ACTION_SCREENS = Object.freeze({
   saveMachineProducts: ['lineTargets'], saveLineCounter: ['lineTargets'], saveLineSetup: ['lineTargets'], saveLineEntry: ['lineTablet'],
   saveSafetyWalk: ['safetyWalk'], saveSafetyIssue: ['safetyIssues'], saveExtinguisherCheck: ['extinguishers'], saveExtinguisher: ['extinguishers'],
   saveFireSystemCheck: ['fire'], saveFireSystem: ['fire'], saveSafetyChecklist: ['safetySetup'],
-  saveMachine: ['machinery'], makeWorkOrder: ['pmCenter'], savePmTask: ['pmSchedule'], sendPmToMaintenance: ['pmCenter', 'pmSchedule'], saveReceivingItem: ['receiving'],
+  saveMachine: ['machinery', 'pmEquipment'], makeWorkOrder: ['pmCenter'], savePmTask: ['pmSchedule'], sendPmToMaintenance: ['pmCenter', 'pmSchedule'], saveReceivingItem: ['receiving'],
   sendToGarage: ['fleetService', 'rFleetService'], deleteGarageJob: ['fleetService', 'rFleetService'], saveFleetRules: ['fleetService'], saveFleetUnit: ['fleetService'],
   saveGarageTech: ['fleetService'],
-  saveProductSetup: [], saveProductUpload: [], saveProductSheet: [], savePlantShifts: [], saveLocationAreas: [], saveReceivingScan: []
+  saveCrewDay: ['crewBoard', 'pmCrew'], saveCrewVacation: ['crewVacations', 'pmCrew'], saveCrewSetup: ['crewSetup', 'pmCrew'],
+  saveProductSetup: [], saveProductUpload: [], saveProductSheet: [], savePlantShifts: [], saveLocationAreas: [], saveMenuSetup: [], saveReceivingScan: []
 });
 
 // The ticks a People & Roles save may hold: {plantId: [screen keys]} with known plants and screens, or null (every screen).

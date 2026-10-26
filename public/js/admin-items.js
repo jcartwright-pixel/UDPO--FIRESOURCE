@@ -43,7 +43,13 @@ export const ADMIN_GROUPS = [
     ['machine-setup', 'Machine Setup', "Each machine's products: pick a machine, add or remove the products run on it, and drag them into the order of its Quality Check drop-down.", 'machine-setup.html', 'production.webp'],
     ['plant-shifts', 'Plant Shifts', 'Each plant\'s Distribution and Plant Production shifts (Uniontown distribution: 6:00 AM-2:30 PM, 2:00-10:30 PM, 10:00 PM-5:30 AM). Plant Reports compare the shifts by these times.', 'shifts.html', 'week'],
     // Joe 10/12: one list of each plant's areas and sub-areas; the Safety Walkthrough walks it, other screens can use it later.
-    ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map']
+    ['location-areas', 'Location Areas', "Each plant's areas (Plant, Garage, Office, Yard) and their sub-areas: add, rename, reorder, turn off. The Safety Walkthrough walks them in this order; other screens can use them later.", 'location-areas.html', 'map'],
+    // Joe 10/25: the schedules' setup opens from the schedule's own menu and from here (the same lists), and each plant
+    // puts its menu in its own order (mock-up 7).
+    ['menu-setup', 'Menu Setup', "Each plant's menu in its own order: move a section up or down, or to another side (Plant Distribution, Plant Production, Plant Vacations & Schedule, Plant Maintenance). Start over from the standard menu at any time.", 'menu-setup.html', 'swap'],
+    ['crew-setup', 'Plant Schedule Setup', 'The plant people schedule: areas with their own shift times, the jobs and how many each needs, the people, and the time-off limits.', 'crew.html?view=setup', 'week'],
+    ['maint-crew-setup', 'Maintenance Schedule Setup', "Plant Maintenance's own schedule: its areas and shifts, jobs, mechanics and time-off limits.", 'maint-crew.html?view=setup', 'wrench'],
+    ['plant-equipment', 'Maintenance Equipment', 'What maintenance looks after besides the production machines (refrigeration, boilers, compressors, the building): add and edit it.', 'plant-equipment.html', 'gear']
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [

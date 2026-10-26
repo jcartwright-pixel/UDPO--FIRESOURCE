@@ -109,3 +109,4 @@
    the browser's box). With no date yet it is blank instead of the browser's mm/dd/yyyy; while it is being typed in, the
    browser's own text shows. */
 .mach-page input[type="date"]:not(.ud-date-dressed):not(:focus)::-webkit-datetime-edit { color: transparent; }
+.mach-page[data-list="equipment"] #rows td:nth-child(2), .mach-page[data-list="equipment"] #rows td:nth-child(3) { white-space: normal; }

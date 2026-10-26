@@ -648,7 +648,7 @@ export async function renderReportRecipients(box) {
   let data = null, fac = 'fac_uniontown';
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="rr-reload">Refresh</button>' +
     '<div class="ap-right"><label class="ap-field" style="flex-direction:row;align-items:center;gap:8px">Location <select id="rr-loc"></select></label></div></div><div class="ap-msg" hidden></div>' +
-    '<p class="ap-note">The Send Current Report card in Manager Center emails one of these groups. Type the addresses separated by commas; a group saves when you leave its box. Each location has its own groups.</p>' +
+    '<p class="ap-note">The Send Current Report card on Plant Distribution emails one of these groups. Type the addresses separated by commas; a group saves when you leave its box. Each location has its own groups.</p>' +
     '<div id="rr-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-list" id="rr-list"></div>' +
     '<div class="ap-section" style="margin-top:10px"><h3>New group</h3><div class="ap-grid2"><label class="ap-field">Group name<small>Name it, e.g. Plant Management</small><input id="rr-new-name" maxlength="100"></label>' +
     '<label class="ap-field">Addresses<small>Separated by commas</small><input id="rr-new-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label></div>' +
@@ -718,7 +718,7 @@ export async function renderSentLog(box) {
       $('#sl-forecast').innerHTML = '<b>Forecast in the plant report email</b>' +
         '<button type="button" class="ap-btn' + (s.forecastEveryone ? '' : ' main') + '" id="sl-fc-me" aria-pressed="' + !s.forecastEveryone + '">Only me</button>' +
         '<button type="button" class="ap-btn' + (s.forecastEveryone ? ' main' : '') + '" id="sl-fc-all" aria-pressed="' + !!s.forecastEveryone + '">Everyone</button>' +
-        '<span class="ap-help">' + (s.forecastEveryone ? 'The forecast box goes in every plant report email.' : 'The forecast box goes only in a Send Test to Me email (Manager Center > the report > Send Test to Me).') +
+        '<span class="ap-help">' + (s.forecastEveryone ? 'The forecast box goes in every plant report email.' : 'The forecast box goes only in a Send Test to Me email (Plant Distribution > the report > Send Test to Me).') +
         (s.forecastChangedBy ? ' Changed by ' + e(s.forecastChangedBy) + ' ' + e(when(s.forecastChangedAt)) : '') + '</span>';
       $('#sl-rows').innerHTML = data.emails.map(m => {
         const st = STATUS[m.status] || [m.status, ''];

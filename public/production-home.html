@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Plant Production · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/plant.css">
+  <script src="js/logic.js"></script>
+  <script src="js/plant-rules.js"></script>
+  <script src="js/production-rules.js"></script>
+</head>
+<body class="fill issues-page plant-page manager-page prod-home">
+  <div class="signin" id="signin" hidden>
+    <h1>Plant Production</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">This Shift · Reports</span><h1>Plant Production</h1></div>
+      <div class="dayname" id="dayname"></div>
+      <a class="mc-repbtn" id="reports" href="reportcenter.html" title="Reports: every report in one place">Reports</a>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view mc-shell">
+      <!-- Joe 10/26 (mock-up 6b, "the plant production is right"): the same front page as Plant Distribution. Send Current Report on
+           the left, the four kinds of machines two by two (Fillers, HTST, Boxing & Totes, Blow Mold), then Production Checks
+           (Quality Checks, Cooler Temperature, the line tablets) and Shift Notes along the bottom. -->
+      <section class="mc-grid" id="grid">
+        <div class="mc-card mc-report" style="--accent:#c62828">
+          <div class="mc-bar"><strong>Send Current Report</strong></div>
+          <small class="mc-desc">Emails the plant report, with each line's shift, to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.</small>
+          <a class="mc-preview" id="preview" href="manager.html?report=1" title="Open the full report">
+            <span class="mc-subject" id="pv-subject">Reading the lines…</span>
+            <span class="mc-chips" id="pv-chips"></span>
+            <span class="mc-pvlist" id="pv-list"></span>
+            <span class="mc-pvnote">Add a note to this report…</span>
+          </a>
+          <div class="mc-to">To: Plant Managers group</div>
+          <div class="mc-acts"><a class="mc-btn" href="manager.html?report=1">Edit / Add</a><a class="mc-btn send" id="send-card" href="manager.html?report=1">SEND CURRENT REPORT</a></div>
+        </div>
+        <div class="mc-depts" data-card="dept" data-href="production.html"></div>
+        <div class="mc-card" style="--accent:#7b35b5" data-card="walk"></div>
+        <div class="mc-card" style="--accent:#0f766e" data-card="notes"></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, shortTime, watchPerson } from './js/app.js';
+    import { collection, query, where, onSnapshot } from './js/firebase.js';
+    import { watchProduction, lineView, fmt, shiftText } from './js/production.js';
+    import { plantFor } from './js/pmaint.js';
+    import { watchRound } from './js/autosave.js';
+    import { cardClicks } from './js/cards.js';
+    cardClicks(document.getElementById('grid'));
+
+    const L = window.UDLogic, U = window.UDPlant;
+    const today = () => L.operatingDay(new Date());
+    let date = today(), person = null, prod = null, stopProd = null;
+    const data = { setup: [], tempLocs: [], sensors: [], lineStatus: [], journal: [], shift: [], roundStart: '' };
+    const NOTE_DAYS = 30;
+    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
+    const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+    const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
+    const KINDS = [['FILLER', 'Fillers', '#1976d2'], ['HTST', 'HTST', '#0f766e'], ['PACK', 'Boxing & Totes', '#f28a00'], ['BLOWMOLD', 'Blow Mold', '#7b35b5']];
+    const stateWord = (v) => v.state === 'IDLE' ? 'Not started' : v.state === 'STOPPED' ? 'Stopped ' + v.stoppedMin + ' min' : v.state === 'CHANGEOVER' ? 'Changeover' : v.state === 'CIP' ? 'CIP wash' : v.kind === 'HTST' && v.diverting ? 'In divert' : 'Running';
+    const speedOff = (v) => v.speedFlag === 'OVER' || v.speedFlag === 'UNDER';
+    const checkDue = (v) => !!(v.check && !v.check.done && v.state !== 'IDLE');
+
+    // The same small cards as Plant Distribution's departments (plant.css .dp-card).
+    function deptCard(href, title, color, counts, done, total, note, lines) {
+      return '<div class="mc-card dp-card" style="--accent:' + color + '" data-href="' + href + '"><a class="mc-bar dp-head" href="' + href + '"><span class="dp-eye">Production Lines</span><strong>' + escapeHtml(title) + '</strong></a>' +
+        '<div class="dp-counts">' + counts.map(([n, w, k]) => '<span' + (k ? ' class="' + k + '"' : '') + '><em>' + escapeHtml(w) + '</em><b>' + escapeHtml(String(n)) + '</b></span>').join('') + '</div>' +
+        '<u class="dp-bar"><s style="width:' + pct(done, total) + '%"></s></u><p class="dp-note">' + escapeHtml(note) + '</p><div class="dp-lines">' + lines.join('') + '</div></div>';
+    }
+    const dpLine = (href, label, n, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><b>' + escapeHtml(String(n)) + '</b><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></a>';
+    const names = (vs) => vs.map(v => v.line.name).join(', ');
+    function tile(href, label, n, unit, line, kind) {
+      return '<a class="mc-tile' + (kind ? ' ' + kind : '') + '" href="' + href + '"><span>' + escapeHtml(label) + '</span><b>' + escapeHtml(String(n)) + (unit ? '<small>' + escapeHtml(unit) + '</small>' : '') + '</b><i>' + escapeHtml(line || '') + '</i></a>';
+    }
+    function card(title, desc, href, tiles) {
+      return '<a class="mc-bar" href="' + href + '"><strong>' + escapeHtml(title) + '</strong><em>Open</em></a><small class="mc-desc">' + escapeHtml(desc) + '</small><div class="mc-tiles">' + tiles.join('') + '</div>';
+    }
+    const put = (k, html) => { const el = document.querySelector('#grid [data-card="' + k + '"]'); el.innerHTML = html; const bar = el.querySelector('a.mc-bar'); if (bar) el.dataset.href = bar.getAttribute('href'); };
+
+    function render() {
+      const t = Date.now(), views = prod && prod.shift ? prod.lines.map(l => lineView(prod, l, t)) : [];
+      document.getElementById('dayname').textContent = prod && prod.shift ? (shiftText(prod.shift) + '  ·  ' + shortDate(prod.shift.date)).toUpperCase() : L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
+      // The report card's preview: this shift's lines (the same lines the Current Report email carries).
+      const stopped = views.filter(v => v.state === 'STOPPED'), off = views.filter(speedOff), due = views.filter(checkDue), running = views.filter(v => v.state === 'RUNNING');
+      const made = views.reduce((n, v) => n + (Number(v.made) || 0), 0), soFar = views.reduce((n, v) => n + (Number(v.soFar) || 0), 0);
+      const S = U.shiftReport(U.shiftLog(data.shift, t, NOTE_DAYS * 24), data.roundStart);
+      const subject = document.getElementById('pv-subject');
+      subject.textContent = prod ? 'Production Update ' + shortTime(t) + ': ' + (stopped.length ? stopped.length + (stopped.length === 1 ? ' line' : ' lines') + ' stopped' : running.length + ' of ' + views.length + ' lines running') : 'Reading the lines…';
+      subject.className = 'mc-subject' + (stopped.length || off.length ? ' bad' : ' good');
+      document.getElementById('pv-chips').innerHTML = [[stopped.length, 'Stopped', stopped.length ? 'bad' : ''], [off.length, 'Speed off', off.length ? 'bad' : ''], [running.length + ' of ' + views.length, 'Running', ''], [fmt(made), 'Made', ''], [due.length, 'Checks due', ''], [S.down.length, 'Breakdowns', S.down.length ? 'bad' : '']]
+        .map(([n, l, k]) => '<span class="' + k + '"><b>' + escapeHtml(String(n)) + '</b> ' + l + '</span>').join('');
+      const attn = stopped.map(v => [v, stateWord(v) + (v.needReason && v.needReason.length ? ' · no reason picked' : ''), 'bad'])
+        .concat(off.filter(v => stopped.indexOf(v) < 0).map(v => [v, (v.speedFlag === 'OVER' ? 'Too fast · ' : 'Too slow · ') + v.speed + '/min', 'bad']))
+        .concat(due.filter(v => stopped.indexOf(v) < 0 && off.indexOf(v) < 0).map(v => [v, 'Quality check due', 'warn']));
+      document.getElementById('pv-list').innerHTML = '<span class="mc-pvh">Lines<em>' + (soFar ? pct(made, soFar) + '% of target so far' : 'no target yet') + '</em></span>' +
+        (attn.length ? '<span class="mc-pvh bad">Needs attention<em>' + attn.length + '</em></span>' + attn.map(([v, w, k]) => '<span class="mc-pvrow ' + k + '"><b>' + escapeHtml(v.line.name) + '</b> ' + escapeHtml(w) + '</span>').join('') : '<span class="mc-pvnone">Nothing needs attention right now.</span>') +
+        '<span class="mc-pvnone">Tap to see the full report.</span>';
+      // The four kinds of machines, each a small card that opens Production Lines on that kind.
+      document.querySelector('[data-card="dept"]').innerHTML = KINDS.map(([k, title, color]) => {
+        const vs = views.filter(v => v.kind === k), st = vs.filter(v => v.state === 'STOPPED'), sp = vs.filter(speedOff), ck = vs.filter(checkDue), cc = vs.filter(v => v.state === 'CHANGEOVER' || v.state === 'CIP');
+        const m = vs.reduce((n, v) => n + (Number(v.made) || 0), 0), so = vs.reduce((n, v) => n + (Number(v.soFar) || 0), 0), href = 'production.html?kind=' + k;
+        return deptCard(href, title, color, [[vs.length, 'Lines'], [vs.filter(v => v.state === 'RUNNING').length, 'Running', 'good'], [st.length, 'Stopped'], [fmt(m), 'Made']], m, so,
+          so ? fmt(m) + ' of ' + fmt(so) + ' so far · ' + pct(m, so) + '%' : vs.length ? 'no target yet this shift' : 'no lines set up',
+          [dpLine(href, 'Stopped', st.length, st.length ? 'bad' : '', st.length ? names(st) : 'none'), dpLine(href, 'Speed off', sp.length, sp.length ? 'bad' : '', sp.length ? names(sp) : 'none'),
+            dpLine(href, 'Checks due', ck.length, ck.length ? 'warn' : '', ck.length ? names(ck) : 'none'), dpLine(href, 'Changeover / CIP', cc.length, cc.length ? 'warn' : '', cc.length ? names(cc) : 'none')]);
+      }).join('');
+      // Production Checks: Quality Checks and Cooler Temperature as on the walkthrough (last done, Check now and View), and the
+      // line tablets (lines with nothing entered yet this shift).
+      const lines = U.qualityLines(data.setup, data.journal, data.lineStatus, t), temps = U.tempRows(U.withTempLocations(data.setup, data.tempLocs), data.journal, t, data.sensors);
+      const W = U.managerWalk({ rows: [], locked: [], gps: [] }, temps, lines, t), STATE = { ok: 'DONE', due: 'DUE', late: 'PAST DUE' };
+      const act = (href, view, label, z, what, of) => {
+        const kind = z.state === 'late' || z.out ? 'bad' : z.state === 'due' ? 'warn' : 'good';
+        const who = z.auto ? 'Done automatically' : z.lastCheck ? 'Last done ' + clock(z.lastCheck.at) + (z.lastCheck.by ? ' · ' + personName(z.lastCheck.by) : '') : 'Not done yet';
+        return '<div class="mc-tile wk-tile ' + kind + '" data-href="' + href + '"><span>' + escapeHtml(label) + ' <em class="wk-state ' + z.state + '">' + STATE[z.state] + '</em></span><b>' + z.due + (of && z.total ? '<small>of ' + z.total + '</small>' : '') + '</b>' +
+          '<i>' + escapeHtml(z.out ? z.out + ' out of range' : z.late ? z.late + ' past due' : z.due ? what : z.auto || 'all checked') + '</i><p class="wk-who">' + escapeHtml(who) + '</p>' +
+          '<p class="wk-acts"><a class="wk-do" href="' + href + '">Check now</a><a class="wk-view" href="' + view + '">View</a></p></div>';
+      };
+      const idle = views.filter(v => v.state === 'IDLE');
+      const tablets = '<div class="mc-tile wk-tile ' + (idle.length ? 'warn' : 'good') + '" data-href="line.html"><span>Line Tablets <em class="wk-state ' + (idle.length ? 'due' : 'ok') + '">' + (idle.length ? 'NOT STARTED' : 'DONE') + '</em></span><b>' + idle.length + (views.length ? '<small>of ' + views.length + '</small>' : '') + '</b>' +
+        '<i>' + (idle.length ? 'nothing entered yet' : 'all entered') + '</i><p class="wk-who">' + escapeHtml(idle.length ? names(idle) : 'Every line has started this shift') + '</p>' +
+        '<p class="wk-acts"><a class="wk-do" href="line.html">Check now</a><a class="wk-view" href="production.html">View</a></p></div>';
+      const late = W.coolers.late + W.quality.late;
+      put('walk', card('Production Checks', 'Quality and cooler checks every 2 to 3 hours · yellow at 2 hours, red at 3 · Check now or View', 'quality.html', [
+        act('quality.html?walk=1', 'quality.html', 'Quality Checks', W.quality, 'lines due', true), act('temps.html?walk=1', 'temps.html', 'Cooler Temperature', W.coolers, 'to check'), tablets]));
+      if (late) document.querySelector('[data-card="walk"] .mc-bar strong').insertAdjacentHTML('beforeend', ' <span class="mc-pill">' + late + ' past due</span>');
+      // Shift Notes: the same three tiles as on Plant Distribution.
+      const week = U.shiftLog(data.shift, t, NOTE_DAYS * 24), wait = week.filter(r => r.status !== 'RESOLVED'), before = Date.parse(data.roundStart || '');
+      const carried = isFinite(before) ? wait.filter(r => Date.parse(r.recordedAt || '') <= before).length : 0, handOpen = wait.filter(r => String(r.type || '').toUpperCase() === 'HANDOFF').length;
+      put('notes', card('Shift Notes', 'Breakdowns carried over until resolved, shift handoff', 'shiftnotes.html', [
+        tile('shiftnotes.html?kind=Breakdown', 'Breakdowns', S.down.length, '', 'still open', S.down.length ? 'bad' : ''),
+        tile('shiftnotes.html?kind=Handoff', 'Handoffs', handOpen, '', 'open', handOpen ? 'bad' : ''),
+        tile('shiftnotes.html', 'Carryover', carried, '', 'from earlier shifts', carried ? 'warn' : '')]));
+    }
+
+    requireSignIn(async (user) => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
+      let timer = null;
+      const later = () => { if (!timer) timer = setTimeout(() => { timer = null; render(); }, 50); };
+      watchPerson(db, user, p => {
+        person = p;
+        if (!stopProd) stopProd = watchProduction(db, plantFor(person, null).id, d => { prod = d; later(); }, fail('the production lines'));
+        later();
+      }, { withEmail: true });
+      onSnapshot(collection(db, 'plantSetup'), s => { data.setup = s.docs.map(d => d.data()); later(); }, fail('the plant set-up'));
+      onSnapshot(collection(db, 'tempLocations'), s => { data.tempLocs = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'sensors'), s => { data.sensors = s.docs.map(d => d.data()); later(); }, () => {});
+      onSnapshot(collection(db, 'plantLineStatus'), s => { data.lineStatus = s.docs.map(d => d.data()); later(); }, fail('the line status'));
+      watchRound(db, at => { data.roundStart = at; later(); });
+      const unsubs = [];
+      const watch = () => {
+        date = today();
+        unsubs.splice(0).forEach(u => u());
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { data.journal = s.docs.map(d => d.data()); later(); }, fail('the plant journal')));
+        unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: NOTE_DAYS }, (_, n) => L.addDays(date, -n)))), s => { data.shift = s.docs.map(d => d.data()); later(); }, fail('the shift notes')));
+      };
+      watch();
+      setInterval(() => { if (today() !== date) watch(); render(); }, 60000);
+      render();
+    });
+  </script>
+</body>
+</html>

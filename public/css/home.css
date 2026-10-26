@@ -44,3 +44,23 @@ body:not(.is-admin) .launch-card.building .uc-admin-only { display: inline-block
 @media (max-width: 900px) {
   .launch-grid.six.seven { grid-template-columns: 1fr; }
 }
+/* Joe 10/26 (1E): four cards, each with its Open button under the title and its buttons straight down beneath: a department in
+   dark blue with its main screens under it in light blue. */
+.launch-grid.hq-grid { align-items: start; }
+.hq-card { cursor: pointer; }
+.hq-card .launch-art { height: clamp(84px, calc(100vh - 760px), 230px); }
+.hq-card a.open-text { margin-top: 2px; padding: 10px 22px; border-radius: 999px; background: #0f2747; color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.hq-list { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; padding-top: 10px; border-top: 1px solid #dfe6ee; }
+.hq-list:empty { display: none; }
+.hq-main, .hq-sub { display: flex; align-items: center; justify-content: center; white-space: nowrap; border-radius: 9px; font-size: 16px; font-weight: 800; text-decoration: none; }
+.hq-main { min-height: 40px; margin-top: 6px; background: #0b3d6b; color: #fff; border: 2px solid #0b3d6b; }
+.hq-main:first-child { margin-top: 0; }
+.hq-sub { min-height: 32px; background: #e3eefa; color: #0b3d6b; border: 2px solid #9cc0e8; }
+.hq-main:hover, .hq-sub:hover { border-color: #1f6feb; }
+.hq-note { font-size: 16px; font-weight: 700; color: #4a6b8d; text-align: center; white-space: nowrap; }
+.hq-note b { margin: 0; padding: 0; background: none; color: #0b3d6b; font-size: 16px; }
+.hq-note.bad b { color: #c62828; }
+body:not(.is-admin) .hq-list .building { opacity: .55; cursor: not-allowed; }
+.launch-grid.six.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .launch-grid.six.three { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .launch-grid.six.three { grid-template-columns: 1fr; } }

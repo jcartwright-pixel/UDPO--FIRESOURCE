@@ -22,6 +22,8 @@ const SC = require('./sc-core');
 const SAFE = require('./safety');
 const PMAINT = require('./plantmaint');
 const RECV = require('./receiving');
+const CREW = require('./crew');
+const MENUS = require('./menu-setup');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const STATIONS = require('./stations');
@@ -138,6 +140,13 @@ const ACTIONS = Object.freeze({
   // Receiving scan-in (receiving.js): each scan on a delivery, and the list of what the plant receives.
   saveReceivingScan: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
+  // Plant Vacations & Schedule (crew.js, Joe 10/25): the Schedule Board's days and the time off by the plant's supervisors;
+  // the setup (areas, shifts, jobs, people, limits) by a manager or administrator.
+  saveCrewDay: { roles: L.SAVE_ROLES, screen: 'plant' },
+  saveCrewVacation: { roles: L.SAVE_ROLES, screen: 'plant' },
+  saveCrewSetup: { roles: REORDER_ROLES, screen: 'plant' },
+  // Joe 10/25 (mock-up 7): Administration > Menu Setup, Administrators only.
+  saveMenuSetup: { roles: L.ADMIN_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service's Work Orders: Delete takes a job off the Garage Station (garage.js deleteGarageJob, Joe 10/14).
@@ -533,6 +542,10 @@ function validate(input) {
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
+  if (action === 'saveCrewSetup') return Object.assign(out, CREW.validateSetup(input, SaveError));
+  if (action === 'saveMenuSetup') return Object.assign(out, MENUS.validateMenu(input, SaveError));
+  if (action === 'saveCrewDay') return Object.assign(out, CREW.validateDay(input, SaveError));
+  if (action === 'saveCrewVacation') return Object.assign(out, CREW.validateVacation(input, SaveError));
   if (action === 'makeWorkOrder') return Object.assign(out, PMAINT.validateSend(input, SaveError));
   if (action === 'savePmTask') return Object.assign(out, PMAINT.validatePmTask(input, SaveError));
   if (action === 'sendPmToMaintenance') return Object.assign(out, PMAINT.validateSendPm(input, SaveError));
@@ -877,6 +890,10 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveSafetyChecklist') return SAFE.saveChecklist(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLocationAreas') return SAFE.saveLocations(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachine') return PMAINT.saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveCrewSetup') return CREW.saveSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveMenuSetup') return MENUS.saveMenu(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveCrewDay') return CREW.saveDay(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveCrewVacation') return CREW.saveVacation(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'makeWorkOrder') return PMAINT.makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'savePmTask') return PMAINT.savePmTask(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'sendPmToMaintenance') return PMAINT.sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, SaveError);

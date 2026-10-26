@@ -4,6 +4,7 @@
  *
  * saveMachine        Machinery: add a machine, or change one box of a machine (each box saves when it is left). A production
  *                    line is already a machine; what is saved about it goes on a plantMachines record with the line's id.
+ *                    Equipment (Joe 10/25) adds to the same records with group EQUIPMENT; a thing stays on the list it was added to.
  * makeWorkOrder      Maintenance Center: a plant's maintenance request (a Shift Notes entry) becomes a work order (plantWorkOrders),
  *                    once per entry, numbered M-1001 on. Joe 10/12: big breakdowns are fixed on the spot and only recorded; issues
  *                    that can wait are requested.
@@ -36,7 +37,9 @@ function validateMachine(input, SaveError) {
     if (R.FIELDS.indexOf(k) < 0) throw new SaveError('BAD_REQUEST', 'Unknown machine box: ' + k);
     out.fields[k] = text(f[k]).slice(0, LIMIT[k]);
   });
-  if (f.kind !== undefined && out.fields.kind && R.KINDS.indexOf(out.fields.kind) < 0) throw new SaveError('BAD_REQUEST', 'Pick what kind of machine it is.');
+  if (f.kind !== undefined && out.fields.kind && R.KINDS.indexOf(out.fields.kind) < 0 && R.EQUIP_KINDS.indexOf(out.fields.kind) < 0) throw new SaveError('BAD_REQUEST', 'Pick what kind of machine it is.');
+  out.group = text(input.group).toUpperCase();
+  if (out.group && R.GROUPS.indexOf(out.group) < 0) throw new SaveError('BAD_REQUEST', 'Pick Machinery or Equipment.');
   if (out.fields.installed && !/^\d{4}-\d\d-\d\d$/.test(out.fields.installed)) throw new SaveError('BAD_REQUEST', 'Installed must be a date.');
   const status = text(input.status).toUpperCase();
   if (status && ['ACTIVE', 'RETIRED'].indexOf(status) < 0) throw new SaveError('BAD_REQUEST', 'A machine is in service or retired.');
@@ -61,19 +64,20 @@ async function saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (was && was.line && req.fields.name !== undefined && req.fields.name !== was.name) throw new SaveError('BAD_REQUEST', was.name + ' is a production line; its name comes from Plant Operations.');
   const name = req.fields.name !== undefined ? req.fields.name : was ? was.name : '';
   const twin = all.find(m => m.id !== id && m.status !== 'RETIRED' && m.name.toUpperCase() === name.toUpperCase());
-  if (twin && (!was || req.fields.name !== undefined)) throw new SaveError('BAD_REQUEST', name + ' is already on this plant\'s machinery list.');
+  if (twin && (!was || req.fields.name !== undefined)) throw new SaveError('BAD_REQUEST', name + ' is already on this plant\'s ' + (twin.group === 'EQUIPMENT' ? 'equipment' : 'machinery') + ' list.');
+  const group = was ? was.group : req.group || 'MACHINERY', word = group === 'EQUIPMENT' ? 'equipment' : 'machinery';
   if (!id) {
     id = docId(req.facilityId + '_mach_' + (slug(name) || 'machine'));
     if (all.some(m => m.id === id)) id = docId(id + '_' + req.requestId.slice(-6));
   }
   const ref = db.collection('plantMachines').doc(id), had = await tx.get(ref), before = had.exists ? had.data() : null;
   const after = Object.assign({ facilityId: req.facilityId, machineId: id, line: !!(was && was.line), createdAt: stamp, createdBy: email }, before || {}, req.fields,
-    req.status ? { status: req.status } : {}, { updatedAt: stamp, updatedBy: email, testEdited: true });
+    req.status ? { status: req.status } : {}, { group, updatedAt: stamp, updatedBy: email, testEdited: true });
   if (!after.status) after.status = 'ACTIVE';
   if (was && was.line) after.name = was.name;
-  if (!after.kind) after.kind = was && was.line ? 'Production line' : 'Machine';
+  if (!after.kind) after.kind = was && was.line ? 'Production line' : group === 'EQUIPMENT' ? 'Other' : 'Machine';
   tx.set(ref, after);
-  const result = { ok: true, requestId: req.requestId, machineId: id, created: !was, message: was ? name + ' saved.' : name + ' added to the machinery list.' };
+  const result = { ok: true, requestId: req.requestId, machineId: id, created: !was, message: was ? name + ' saved.' : name + ' added to the ' + word + ' list.' };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, machineId: id, facilityId: req.facilityId, before, after, result });
   return result;
 }

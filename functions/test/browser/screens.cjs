@@ -781,7 +781,7 @@ async function noScroll(page) {
     await Promise.all([backPage.waitForURL(/distribution\.html/), backPage.click('#go-back')]);
     await backPage.waitForSelector('.cards');
     await Promise.all([backPage.waitForURL(/index\.html/), backPage.click('#go-back')]);
-    await backPage.waitForSelector('.launch-card');
+    await backPage.waitForSelector('.hq-card');
     assert.equal(await backPage.$('#go-back'), null, 'Home has no Back');
     await backPage.close();
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
@@ -1281,31 +1281,37 @@ async function noScroll(page) {
     // Joe 10/11: six cards after picking a plant: Plant Distribution, Plant Production and Plant Maintenance (both Under
     // Construction), Route Distribution, Fleet & Maintenance and Reports. Five carry pictures; Reports has a drawn icon.
     // Joe 10/12: a seventh, Safety Walkthrough, next to Reports, with a drawn icon too. Joe 10/13: an eighth, Inventory (its box picture), in the last open spot.
-    const SIX = ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Route Distribution', 'Fleet & Maintenance', 'Reports', 'Safety Walkthrough', 'Inventory'];
+    // Joe 10/26 (1E): four cards: Plant Operations and Route Distribution (their departments as dark blue buttons with their main
+    // screens under them in light blue), Reports and Safety Walkthrough. The menu lists the two groups (each pops out its
+    // departments, Plant Vacations & Schedule included), a line, then Reports and Safety Walkthrough.
+    const FOUR = ['Plant Operations', 'Route Distribution', 'Reports', 'Safety Walkthrough'];
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
-    await lp.waitForSelector('.launch-card');
-    assert.deepEqual(await lp.$$eval('.launch-card strong', s => s.map(x => x.textContent)), SIX);
-    await lp.waitForFunction(() => [...document.querySelectorAll('.launch-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 6, null, { timeout: 10000 });
-    assert.equal(await lp.$$eval('.launch-card[data-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
-    assert.equal(await lp.$('.sidemenu .side-sec'), null, 'Home lists the sides, not every screen');
-    assert.deepEqual(await lp.$$eval('.sidemenu a[data-side]', a => a.map(x => x.textContent.trim())), SIX);
+    await lp.waitForSelector('.hq-card');
+    assert.deepEqual(await lp.$$eval('.hq-card > strong', s => s.map(x => x.textContent)), FOUR);
+    assert.deepEqual(await lp.$$eval('.hq-main', s => s.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Shipping & Receiving', 'Route Distribution', 'Fleet & Maintenance', 'Garage']);
+    await lp.waitForFunction(() => [...document.querySelectorAll('.hq-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 2, null, { timeout: 10000 });
+    assert.equal(await lp.$$eval('.hq-card[data-card-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
+    assert.deepEqual(await lp.$$eval('.sidemenu .side-sec-btn', b => b.map(x => x.getAttribute('title'))), ['Plant Operations', 'Route Distribution'], 'Home lists the two groups, not every screen');
+    assert.deepEqual(await lp.$$eval('.sidemenu > a[data-side]', a => a.map(x => x.textContent.trim())), ['Reports', 'Safety Walkthrough']);
+    assert.deepEqual(await lp.$$eval('.side-flyouts .flyout', f => f.map(x => [...x.querySelectorAll('a[data-side]')].map(a => a.textContent.trim()).join(', '))),
+      ['Plant Distribution, Plant Production, Plant Vacations & Schedule, Plant Maintenance, Shipping & Receiving', 'Route Distribution, Fleet & Maintenance, Garage']);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
     // Joe 10/10: the Plant Distribution picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.
-    await Promise.all([lp.waitForURL(/manager\.html/), lp.click('.launch-card[data-side="plant"]')]);
+    await Promise.all([lp.waitForURL(/manager\.html/), lp.click('.hq-main[data-side="plant"]')]);
     await lp.waitForSelector('.sidemenu a.side-name');
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'plant');
     const plantMenu = await lp.$$eval('.sidemenu > a:not(.side-name), .sidemenu > .side-sec', e => e.map(x => x.matches('a') ? x.textContent.trim() : x.querySelector('.side-sec-btn').getAttribute('title')));
-    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Plant Distribution Departments', 'Plant Operations Scheduler', 'Shift Notes', 'Quality Checks', 'Cooler Temperature', 'Yard Checks'], 'the Plant side lists its own sections');
+    assert.deepEqual(plantMenu.filter(x => x !== 'Home'), ['Send Report', 'Plant Distribution Departments', 'Shift Notes', 'Yard Checks'], 'the Plant side lists its own sections (the scheduler is Shipping & Receiving now)');
     assert.equal(await lp.$$eval('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]', b => b.length), 1, 'a section with several screens has a fly-out');
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)).then(t => t.filter(x => ['Dispatch', 'Drivers', 'Equipment', 'GPS / Fleet'].indexOf(x) >= 0)), [], 'no Dispatch, Drivers or Equipment sections on the Plant side');
     await lp.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
-    await lp.waitForSelector('.side-flyouts .flyout.open a[href="loadout.html"]', { state: 'visible' });
-    await Promise.all([lp.waitForURL(/loadout\.html/), lp.click('.side-flyouts .flyout.open a[href="loadout.html"]')]);
+    await lp.waitForSelector('.side-flyouts .flyout.open a[href="loadout.html?area=CASE"]', { state: 'visible' });
+    await Promise.all([lp.waitForURL(/loadout\.html/), lp.click('.side-flyouts .flyout.open a[href="loadout.html?area=CASE"]')]);
     await lp.waitForSelector('.sidemenu a.side-name[data-side="plant"]');
     await Promise.all([lp.waitForURL(/manager\.html/), lp.click('#go-back')]);
     await Promise.all([lp.waitForURL(/index\.html/), lp.click('#go-home')]);
-    await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.launch-card[data-side="fleet"]')]);
+    await Promise.all([lp.waitForURL(/maint\.html/), lp.click('.hq-main[data-side="fleet"]')]);
     await lp.waitForSelector('.sidemenu a[href="fleet.html"]');
     // Joe 10/10 evening: GPS / Fleet is not on the Fleet & Maintenance side; its one section (Equipment) lists its screens straight in the menu.
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout-title', t => t.map(x => x.textContent)), [], 'the Fleet & Maintenance side lists only its own screens');
@@ -1317,7 +1323,7 @@ async function noScroll(page) {
     assert.equal(await lp.getAttribute('.sidemenu a.side-name', 'data-side'), 'distribution');
     assert.deepEqual(lp.errors, []);
     await lp.close();
-    results.push('Home: seven cards (Plant Distribution, Plant Production, Plant Maintenance, Route Distribution, Fleet & Maintenance, Reports, Safety Walkthrough); each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
+    results.push('Home: four cards (Plant Operations, Route Distribution, Reports, Safety Walkthrough) with their departments\' buttons; each side\'s menu lists only its own screens; Back goes up to the side, Home goes to the pictures');
     // Joe 10/10: an Administration section holds Dispatch Administration; Driver Weekly Template is under Drivers only.
     const mp = await openPage(browser, 1920, 950, '/daily.html?testEmail=manager.test@uniteddairy.com');
     await mp.waitForSelector('.side-flyouts .flyout', { state: 'attached' });

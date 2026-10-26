@@ -80,16 +80,16 @@ async function seed() {
       }
 
       const mc = await openPage(browser, w, h, '/manager.html' + MANAGER);
-      await mc.waitForFunction(() => /Trailer T-712/.test((document.querySelector('[data-card="walk"]') || {}).textContent || ''));
+      // Joe 10/26: the walkthrough's Yard stop is an action card (no trailer list); its count leaves out the trailers in range on the GPS.
+      await mc.waitForFunction(() => /past due|trailers to check/.test((document.querySelector('[data-card="walk"] .wk-tile') || {}).textContent || ''));
       await mc.waitForTimeout(800);
       await mc.$eval('[data-card="walk"]', e => e.scrollIntoView({ block: 'end' }));
       await shot(mc, 'manager', w);
       const yardTile = (await mc.textContent('[data-card="walk"] .wk-tile:nth-child(1)')).replace(/\s+/g, ' ').trim();
       seen.push(w + ' Manager Center Yard: ' + yardTile);
       if (!BEFORE) {
-        assert.match(yardTile, /3 past due/);
-        assert.match(yardTile, /Trailer T-713 Route 855 · GPS stuck at 32°F · PAST DUE/);
-        assert.doesNotMatch(yardTile, /T-711[^T]*PAST DUE/, 'in range on the GPS is not past due');
+        assert.match(yardTile, /^Yard PAST DUE ?3 ?3 past due ?Not done yet/);
+        assert.match(yardTile, /Check now ?View$/);
       }
       for (const pg of [yd, mc]) { assert.deepEqual(pg.errors, []); await pg.close(); }
     }
