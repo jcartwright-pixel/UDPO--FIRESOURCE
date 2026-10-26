@@ -211,7 +211,7 @@ function ioModule() {
     await until('the motor switch stopped the line', async () => (await runsOf(GALLON)).some(r => (r.stops || []).some(s => !s.end && s.by === RD.BY_SWITCH)));
     const off = await openPage(browser, 1024, 1400, '/line.html?line=' + GALLON + '&' + ADMIN);
     await off.waitForFunction(() => /MOTOR OFF/.test(document.getElementById('machine').textContent));
-    assert.match(await off.textContent('#status-text'), /STOPPED/i);
+    assert.equal(await off.textContent('#state-name'), 'DOWN');
     await still(off);
     await shot(off, 'sensors-tablet-motor-off-1024');
     assert.deepEqual(off.errors, []);

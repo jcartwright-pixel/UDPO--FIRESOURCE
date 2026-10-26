@@ -45,17 +45,20 @@
       <!-- Joe 10/26 (Boxing, mock-up 1): the line's name with its buttons beside it as tabs, like the machine page, so the whole
            tablet fits without scrolling. The head stays while a button's page is open. -->
       <div class="lb-head" id="line-head" hidden>
-        <div class="lb-title"><span class="eyebrow">Plant Production · Line tablet</span><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div><span class="lb-live" id="live"></span></div>
+        <div class="lb-title"><div class="lb-eb"><span class="eyebrow">Plant Production · Line tablet</span><span class="lb-live" id="live"></span></div><h1 id="line-name"></h1><div class="lb-sub" id="line-sub"></div></div>
         <div class="lb-actions" id="actions"></div>
       </div>
       <section id="board" hidden>
-        <!-- Joe 10/26: Line Running / Line Stopped right under the tabs, always on the screen. -->
-        <div class="lb-status" id="status"><div id="status-text"></div><button type="button" id="status-btn"></button></div>
+        <!-- Joe 10/26 (down time, mock-up 3): Running, Changeover or Down, with a clock of how long, right under the tabs.
+             Changeover opens the Changeover tab (pick what it changes to there); Down asks why in the row under it. -->
+        <div class="lb-status" id="status"><span class="lb-state" id="state-name"></span><span class="lb-timer" id="timer"></span><div class="lb-what" id="status-text"></div>
+          <div class="lb-sbtns" id="state-btns"><button type="button" class="r" data-go="run">RUNNING</button><button type="button" class="c" data-go="co" id="go-co">CHANGEOVER</button><button type="button" class="d" data-go="down">DOWN</button></div></div>
         <div class="lb-reasons" id="reasons"></div>
         <div class="lb-cards" id="std-cards">
           <!-- Joe 10/26: the code date of what is running, big enough to read from the line. -->
           <div class="lb-card"><span class="eyebrow">Running now</span><div class="lb-prod" id="prod"></div><div class="lb-mut" id="prod-sub"></div><div id="prod-pill"></div>
             <div class="lb-code" id="prod-code"></div>
+            <div class="lb-since" id="prod-since"></div>
             <button type="button" class="lb-btn" id="change-product">Change Product</button></div>
           <!-- Joe 10/26: how many to run of this product, counting down to zero. -->
           <div class="lb-card" id="left-card"><span class="eyebrow">Left to run</span><div class="lb-big" id="left"></div><div class="lb-mut" id="left-sub"></div><div class="lb-bar"><i id="left-bar"></i></div>
@@ -63,7 +66,8 @@
           <div class="lb-card"><span class="eyebrow">Made this shift</span><div class="lb-big" id="made"></div><div class="lb-mut" id="so-far"></div><div class="lb-bar"><i id="bar"></i></div><div id="vs"></div>
             <button type="button" class="lb-btn" id="enter-count">Enter Count</button></div>
           <div class="lb-card" id="speed-card"><span class="eyebrow">Speed now</span><div class="lb-big" id="speed"></div><div class="lb-mut" id="speed-sub"></div><div id="speed-flag"></div></div>
-          <div class="lb-card"><span class="eyebrow">Stopped this shift</span><div class="lb-big lb-red" id="down"></div><div class="lb-mut" id="down-sub"></div></div>
+          <!-- Joe 10/26: every stop and changeover this shift with its minutes; the one going on now is marked. -->
+          <div class="lb-card"><span class="eyebrow">Down this shift</span><div class="lb-big lb-red" id="down"></div><div class="lb-mut" id="down-sub"></div><div class="lb-dlist" id="down-list"></div></div>
         </div>
         <!-- Joe 10/14 (mock-ups G and H): the HTST's and the Blow Mold's own cards in place of the filler's. -->
         <div class="lb-cards" id="kind-cards" hidden></div>
@@ -128,6 +132,16 @@
     const plant = () => { const ids = person ? L.plantsFor(person) : []; return params.get('plant') || ids[0] || 'fac_uniontown'; };
     const plantName = (id) => ((L.PLANTS || []).find(p => p.id === id) || { name: 'Uniontown' }).name;
 
+    // The banner's clock (Joe 10/26): h:mm:ss since the state began, every second.
+    function tick() {
+      const tm = document.getElementById('timer'), from = Number(tm.dataset.since || 0);
+      if (!from) { tm.textContent = ''; tm.hidden = true; return; }
+      const sec = Math.max(0, Math.floor((now() - from) / 1000));
+      tm.hidden = false;
+      tm.textContent = Math.floor(sec / 3600) + ':' + String(Math.floor(sec / 60) % 60).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+    }
+    // Not reasons to be down: Changeover is its own button, the wash is the CIP tab.
+    const NOT_DOWN = ['Changeover', 'Changeover / flush', 'Sanitation / CIP', 'Mold change'];
     function render() {
       if (!data) return;
       const line = data.lines.find(l => l.operationId === lineId) || null;
@@ -189,9 +203,19 @@
       const flag = v.speedFlag, card = document.getElementById('speed-card');
       card.classList.toggle('lb-flash', flag === 'OVER' || flag === 'UNDER');
       document.getElementById('speed-flag').innerHTML = flag === 'OVER' ? '<span class="lb-pill r">TOO FAST</span>' : flag === 'UNDER' ? '<span class="lb-pill r">TOO SLOW</span>' : flag === 'OK' ? '<span class="lb-pill g">IN RANGE</span>' : '';
-      // Stopped this shift
-      document.getElementById('down').textContent = v.downMin + ' min';
-      document.getElementById('down-sub').textContent = v.stops + ' stop' + (v.stops === 1 ? '' : 's') + (v.needReason.length ? ' · ' + v.needReason.length + ' need' + (v.needReason.length === 1 ? 's' : '') + ' a reason' : '');
+      // Down this shift (Joe 10/26, mock-up 3): the stops and changeovers with their minutes, newest first; the one going on is "now".
+      const ms = (iso) => Date.parse(iso || '') || 0;
+      const stopRows = ((v.run && v.run.stops) || []).map(x => ({ start: x.start, end: x.end, co: false, what: x.reason || (x.end ? 'Down, needs a reason' : 'Down'), min: Math.round(((x.end ? ms(x.end) : t) - ms(x.start)) / 60000) }));
+      const coRows = (v.changeovers || []).map(x => ({ start: x.start, end: x.end, co: true, what: (v.kind === 'BLOWMOLD' ? 'Mold change' : 'Changeover') + (x.to ? ' to ' + x.to : ''), min: x.minutes }));
+      const downRows = stopRows.concat(coRows).sort((a, b) => ms(b.start) - ms(a.start));
+      const coMin = coRows.reduce((n, x) => n + x.min, 0);
+      document.getElementById('down').textContent = (v.downMin + coMin) + ' min';
+      document.getElementById('down-sub').textContent = [v.stops + ' stop' + (v.stops === 1 ? '' : 's'), coRows.length ? coRows.length + ' changeover' + (coRows.length === 1 ? '' : 's') : '', v.needReason.length ? v.needReason.length + ' need' + (v.needReason.length === 1 ? 's' : '') + ' a reason' : ''].filter(Boolean).join(' · ');
+      document.getElementById('down-list').innerHTML = downRows.slice(0, 3).map(x => '<div class="' + (x.end ? '' : x.co ? 'nowb' : 'now') + '"><span title="' + escapeHtml(x.what) + '">' + escapeHtml(clock(x.start).replace(/ [AP]M$/, '') + ' ' + x.what) + '</span><b>' + x.min + ' min' + (x.end ? '' : ' now') + '</b></div>').join('') +
+        (downRows.length > 3 ? '<div><span>and ' + (downRows.length - 3) + ' earlier</span></div>' : '');
+      // Running now (Joe 10/26): since when this product has run, and how long the last changeover took.
+      const curRun = ((v.run && v.run.runs) || []).slice().sort((a, b) => ms(b.from) - ms(a.from))[0], lastCo = coRows.filter(x => x.end).sort((a, b) => ms(b.end) - ms(a.end))[0];
+      document.getElementById('prod-since').innerHTML = !v.product || !curRun ? '' : 'Running since <b>' + escapeHtml(clock(curRun.from)) + '</b>' + (lastCo ? ' · last ' + (v.kind === 'BLOWMOLD' ? 'mold change' : 'changeover') + ' <b>' + lastCo.min + ' min</b>' : '');
       // Code date check: the label reader's, or what the code should be until one is on the line.
       const rd = v.reader, dc = document.getElementById('date-check');
       // Joe 10/26: the code date is in Running now; this line shows only what the label reader read.
@@ -208,38 +232,49 @@
         dc.className = 'lb-date wait';
         dc.innerHTML = '<span class="lb-pill n">CODE DATE CHECK</span><b>' + escapeHtml(v.expectedCode || '—') + '</b><span>' + (v.expectedCode ? 'is today\'s code for this product. ' : 'Set the product\'s shelf life on Line Targets to see today\'s code. ') + 'The label reader checks every jug once it is on this line.</span>';
       }
-      // Running or stopped, and why.
-      const st = document.getElementById('status'), btn = document.getElementById('status-btn'), txt = document.getElementById('status-text'), need = v.needReason[0];
-      let reasonFor = -1, chosen = '';
-      if (v.state === 'CHANGEOVER' || v.state === 'CIP') {
-        // Joe 10/14 (mock-up D): a changeover or CIP wash counts as that, not as stopped.
-        const co = v.state === 'CHANGEOVER', x = co ? v.changeover : v.cip;
-        st.className = 'lb-status ' + (co ? 'co' : 'cip');
-        txt.innerHTML = '<b>' + (co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE' : 'CHANGEOVER') : 'CIP WASH') + ' RUNNING ' + x.minutes + ' MIN</b> since ' + clock(x.start) + (co && v.changeoverStd ? ' (standard ' + v.changeoverStd + ' min)' : '') + '. The line counts as ' + (co ? 'changeover' : 'CIP') + ', not stopped.';
-        btn.textContent = co ? (v.kind === 'BLOWMOLD' ? 'MOLD CHANGE DONE' : 'CHANGEOVER DONE') : 'CIP DONE'; btn.className = 'done';
-      } else if (v.state === 'STOPPED') {
-        st.className = 'lb-status stopped';
+      // Running, Changeover or Down (Joe 10/26, mock-up 3): the state, a clock of how long, and the three buttons.
+      const st = document.getElementById('status'), txt = document.getElementById('status-text'), need = v.needReason[0];
+      const coWord = v.kind === 'BLOWMOLD' ? 'MOLD CHANGE' : 'CHANGEOVER';
+      let reasonFor = -1, chosen = '', name = 'RUNNING', since = '', cur = 'run';
+      if (v.state === 'STOPPED') {
         const openStop = v.run && v.run.stops ? v.run.stops[v.stopIndex] : null;
-        txt.innerHTML = '<b>LINE STOPPED ' + v.stoppedMin + ' MIN</b> since ' + clock(v.stoppedAt) + '. ' + (v.openReason ? 'Reason: ' + escapeHtml(v.openReason) + '.' : 'Tap why it stopped.') +
-          (openStop && openStop.woNumber ? ' <b>Work order ' + escapeHtml(openStop.woNumber) + ' sent to maintenance.</b>' : '');
-        btn.textContent = 'RUNNING AGAIN'; btn.className = 'run';
+        st.className = 'lb-status stopped'; name = 'DOWN'; since = v.stoppedAt; cur = 'down';
+        txt.innerHTML = (v.openReason ? '<b>' + escapeHtml(v.openReason) + '</b>' : '<b>Tap why it is down</b>') + '<br>since ' + clock(v.stoppedAt) +
+          (openStop && openStop.woNumber ? ' · work order ' + escapeHtml(openStop.woNumber) + ' sent to maintenance' : '');
         reasonFor = v.stopIndex; chosen = v.openReason;
+      } else if (v.state === 'CHANGEOVER') {
+        // Joe 10/14 (mock-up D): a changeover counts as that, not as stopped.
+        const x = v.changeover;
+        st.className = 'lb-status co'; name = coWord; since = x.start; cur = 'co';
+        txt.innerHTML = (x.to ? 'to <b>' + escapeHtml(x.to) + '</b><br>' : '') + 'since ' + clock(x.start) + (v.changeoverStd ? ' · standard ' + v.changeoverStd + ' min' : '');
+      } else if (v.state === 'CIP') {
+        st.className = 'lb-status cip'; name = 'CIP WASH'; since = v.cip.start; cur = 'cip';
+        txt.innerHTML = 'since ' + clock(v.cip.start) + '<br>Press Running when the wash is done.';
+      } else if (v.state === 'IDLE') {
+        st.className = 'lb-status idle'; name = 'NOT STARTED'; cur = '';
+        txt.innerHTML = 'Pick the product running to start the shift.';
       } else {
-        st.className = 'lb-status ' + (need ? 'needs' : 'running');
-        txt.innerHTML = need ? '<b>STOP AT ' + clock(need.start) + ' (' + need.minutes + ' MIN) NEEDS A REASON.</b> Tap why it stopped.' :
-          v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (v.product ? '' : ' · pick the product running') :
-          '<b>LINE RUNNING</b>' + (v.product || v.targets.length === 1 ? '' : ' · pick the product running');
-        if (!need && v.diverting) st.className = 'lb-status needs';
-        btn.textContent = 'LINE STOPPED'; btn.className = 'stop';
+        // Running since the line last came back up: the end of the last stop, changeover or wash, else the first product picked.
+        const ends = [].concat(((v.run && v.run.stops) || []).map(x => x.end), (v.changeovers || []).map(x => x.end), (v.cips || []).map(x => x.end), ((v.run && v.run.runs) || []).map(x => x.from)).map(ms).filter(Boolean);
+        since = ends.length ? new Date(Math.max(...ends)).toISOString() : '';
+        st.className = 'lb-status ' + (need || v.diverting ? 'needs' : 'running');
+        txt.innerHTML = need ? '<b>The stop at ' + clock(need.start) + ' (' + need.minutes + ' min) needs a reason.</b> Tap why it stopped.' :
+          v.kind === 'HTST' ? (v.diverting ? '<b>IN DIVERT ' + v.diverting.minutes + ' MIN</b>' + (v.diverting.reason ? ' · ' + escapeHtml(v.diverting.reason) : '') : '<b>PASTEURIZING</b> · forward flow') + (since ? '<br>since ' + clock(since) : '') :
+          (since ? 'since ' + clock(since) : '') + (v.product ? ' · <b>' + escapeHtml(v.product) + '</b>' : v.targets.length === 1 ? '' : ' · pick the product running');
         reasonFor = need ? need.index : -1;
       }
-      btn.disabled = busy;
+      document.getElementById('state-name').textContent = name;
+      const tm = document.getElementById('timer');
+      tm.dataset.since = since ? String(ms(since)) : '';
+      tick();
+      document.getElementById('go-co').textContent = coWord;
+      document.querySelectorAll('#state-btns button').forEach(b => { b.classList.toggle('cur', b.dataset.go === cur); b.disabled = busy || (b.dataset.go === cur && cur !== 'co'); });
       const rs = document.getElementById('reasons');
       rs.hidden = reasonFor < 0;
       rs.dataset.stop = reasonFor;
       // Joe 10/16: RedZone's problem types for this line, once Administration > RedZone has read them in.
       const rzLoc = rz ? R.rzLocationFor(v.line ? v.line.name : '', (data.lineInfo || {})[lineId] || {}, rz) : null;
-      rs.innerHTML = reasonFor < 0 ? '' : R.rzStopReasons(v.kind, R.rzProblemsFor(rz, rzLoc)).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
+      rs.innerHTML = reasonFor < 0 ? '' : R.rzStopReasons(v.kind, R.rzProblemsFor(rz, rzLoc)).filter(r => !NOT_DOWN.includes(r)).map(r => '<button type="button" data-reason="' + escapeHtml(r) + '"' + (r === chosen ? ' class="on"' : '') + (busy ? ' disabled' : '') + '>' + escapeHtml(r) + '</button>').join('');
       drawMoreBoard(v);
     }
     // ---------- Joe 10/14 ("all of your picks", mock-ups C to H): Up next, each hour, six buttons for the kind of line and what they open ----------
@@ -666,7 +701,8 @@
       if (!b) return;
       const c = b.dataset.click;
       if (c === 'waste-reason') { wasteReason = b.dataset.reason; render(); const box = document.getElementById('waste-box'); if (box) box.focus(); return; }
-      if (c === 'co-start') return enter('changeover', { sub: 'start', to: coTo });
+      // Joe 10/26 (mock-up 3): once it starts, back to the Line, where the banner turns blue with its clock.
+      if (c === 'co-start') { pane = ''; return enter('changeover', { sub: 'start', to: coTo }); }
       if (c === 'co-done') { pane = ''; return enter('changeover', { sub: 'done' }); }
       if (c === 'cocheck') return enter('cocheck', { key: b.dataset.key, done: b.dataset.done === '1' });
       if (c === 'cip-start') return enter('cip', { sub: 'start' });
@@ -720,11 +756,18 @@
       } catch (err) { showError(line.name + ': not saved (' + (err.message || err) + '). Try again.'); return false; }
       finally { busy = false; render(); }
     }
-    document.getElementById('status-btn').addEventListener('click', () => {
+    // Joe 10/26 (mock-up 3): Running ends a stop, a changeover (its time is logged) or a wash; Changeover opens the Changeover tab
+    // to pick what it changes to; Down starts the stop clock and asks why.
+    document.getElementById('state-btns').addEventListener('click', e => {
+      const b = e.target.closest('[data-go]');
+      if (!b || b.disabled) return;
       const v = lineView(data, data.lines.find(l => l.operationId === lineId), now());
+      if (b.dataset.go === 'co') { pane = 'changeover'; return render(); }
+      if (b.dataset.go === 'down') return enter('stop');
+      if (v.state === 'STOPPED') return enter('run');
       if (v.state === 'CHANGEOVER') return enter('changeover', { sub: 'done' });
       if (v.state === 'CIP') { pane = 'cip'; return render(); }
-      enter(v.state === 'STOPPED' ? 'run' : 'stop');
+      if (v.state === 'IDLE' || !v.product) { document.getElementById('change-product').click(); }
     });
     document.getElementById('reasons').addEventListener('click', e => {
       const b = e.target.closest('[data-reason]');
@@ -775,6 +818,7 @@
       }, { withEmail: true });
       // The clock moves the stopped minutes and target so far.
       setInterval(render, 15000);
+      setInterval(tick, 1000);
     });
   </script>
 </body>

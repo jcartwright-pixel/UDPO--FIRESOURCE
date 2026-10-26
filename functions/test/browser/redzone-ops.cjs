@@ -186,10 +186,10 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     // The Line Tablet: Line Stopped shows RedZone's problem types for the Blow Mold.
     const tb = await openPage(browser, 1024, 1180, '/line.html?line=' + BLOW + '&' + ADMIN);
     await tb.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');
-    await tb.click('#status-btn');
+    await tb.click('#state-btns [data-go="down"]');
     await tb.waitForFunction(() => document.querySelector('#reasons button') && document.querySelector('#reasons button').textContent === 'Blow mold is down');
-    assert.deepEqual(await tb.$$eval('#reasons button', b => b.map(x => x.textContent)), ['Blow mold is down', 'Bottle Jam', 'Adjusting weights', 'No Orders', 'Mold change', 'Resin feed', 'Leak tester down', 'Trimmer jam',
-      'Conveyor / bottle jam', 'Heater / temperature', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room');
+    assert.deepEqual(await tb.$$eval('#reasons button', b => b.map(x => x.textContent)), ['Blow mold is down', 'Bottle Jam', 'Adjusting weights', 'No Orders', 'Resin feed', 'Leak tester down', 'Trimmer jam',
+      'Conveyor / bottle jam', 'Heater / temperature', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room; Mold change is the banner\'s button (Joe 10/26)');
     await tb.$eval('#reasons', e => e.scrollIntoView({ block: 'center' }));
     await shot(tb, 'rz-line-tablet-stopped-1024');
     await tb.click('#reasons button[data-reason="Bottle Jam"]');

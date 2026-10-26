@@ -107,16 +107,21 @@ async function pickFirstProduct(tb) {
     assert.equal(await tb.inputValue('#mp-body select[data-save="co-to"]'), '', 'the drop-down starts blank');
     await tb.selectOption('#mp-body select[data-save="co-to"]', to);
     await tb.click('#mp-body [data-click="co-start"]');
+    // Joe 10/26 (mock-up 3): starting goes back to the Line, blue with the clock; the banner's Changeover opens the checklist.
+    await tb.waitForSelector('#board:not([hidden]) #status.co');
+    await tb.click('#state-btns [data-go="co"]');
     await tb.waitForSelector('#mp-body [data-click="cocheck"][data-key="purge"]');
     await tb.click('#mp-body [data-click="cocheck"][data-key="purge"]');
     await tb.waitForSelector('#mp-body .lb-check.done[data-key="purge"]');
     await shot(tb, 'more-tablet-changeover-1024');
     await bigText(tb, '#more-pane', 'the changeover pane');
     await tb.click('#mp-close');
-    await tb.waitForFunction(() => /CHANGEOVER RUNNING/.test(document.getElementById('status-text').textContent));
-    assert.equal(await tb.textContent('#status-btn'), 'CHANGEOVER DONE');
-    await tb.click('#status-btn');
-    await tb.waitForFunction((p) => document.getElementById('prod').textContent === p && /LINE RUNNING/.test(document.getElementById('status-text').textContent), to);
+    // Joe 10/26 (mock-up 3): the banner is blue with the changeover's clock and what it changes to; Running ends it.
+    await tb.waitForFunction((p) => document.getElementById('state-name').textContent === 'CHANGEOVER' && document.getElementById('status-text').textContent.includes(p), to);
+    await tb.click('#state-btns [data-go="run"]');
+    await tb.waitForFunction((p) => document.getElementById('prod').textContent === p && document.getElementById('state-name').textContent === 'RUNNING', to);
+    assert.match(await tb.textContent('#down-list'), /Changeover to/);
+    assert.match(await tb.textContent('#prod-since'), /Running since .* last changeover \d+ min/);
     let r = await runOf(LINE, shiftKey);
     assert.deepEqual([r.changeovers.length, r.changeovers[0].from, r.changeovers[0].to, Object.keys(r.changeovers[0].checks)], [1, first, to, ['purge']]);
     // Waste by reason.
@@ -159,10 +164,10 @@ async function pickFirstProduct(tb) {
     await tb.click('#actions [data-act="cip"]');
     await tb.click('#mp-body [data-click="cip-start"]');
     await tb.click('#mp-close');
-    await tb.waitForFunction(() => /CIP WASH RUNNING/.test(document.getElementById('status-text').textContent));
-    await tb.click('#status-btn');
+    await tb.waitForFunction(() => document.getElementById('state-name').textContent === 'CIP WASH');
+    await tb.click('#state-btns [data-go="run"]');
     await tb.click('#mp-body [data-click="cip-pass"]');
-    await tb.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
+    await tb.waitForFunction(() => document.getElementById('state-name').textContent === 'RUNNING');
     // Up next.
     await tb.click('#strip [data-act="next"]');
     await tb.selectOption('#mp-body select[data-save="next"]', first);
@@ -214,13 +219,13 @@ async function pickFirstProduct(tb) {
     await ht.click('#mp-close');
     await ht.waitForFunction(() => /From Silo 3/.test(document.getElementById('kind-cards').textContent));
     // Stop reasons for the HTST (follow-on 1): its own twelve.
-    await ht.click('#status-btn');
-    await ht.waitForFunction(() => document.querySelectorAll('#reasons button').length === 12 && !!document.querySelector('#reasons [data-reason="Pump or flow problem"]'));
+    await ht.click('#state-btns [data-go="down"]');
+    await ht.waitForFunction(() => document.querySelectorAll('#reasons button').length === 10 && !!document.querySelector('#reasons [data-reason="Pump or flow problem"]'));
     assert.equal(await ht.$('#reasons [data-reason="Filler jam"]'), null, 'no filler reasons on the HTST');
     await shot(ht, 'more-tablet-htst-stopped-1024');
     await ht.click('#reasons [data-reason="Pump or flow problem"]');
     await ht.waitForSelector('#reasons [data-reason="Pump or flow problem"].on');
-    await ht.click('#status-btn');
+    await ht.click('#state-btns [data-go="run"]');
     await ht.waitForFunction(() => /PASTEURIZING/.test(document.getElementById('status-text').textContent));
     await fits(ht, 'the HTST tablet at 1024');
     await bigText(ht, '#kind-cards, #cip-strip, #check-inline, #actions', 'the HTST cards');
@@ -257,13 +262,13 @@ async function pickFirstProduct(tb) {
     await bm.press('#mp-body input[data-save="lot"]', 'Tab');
     await bm.click('#mp-close');
     await bm.waitForFunction(() => /2,300/.test(document.getElementById('machine').textContent) && /R-2291/.test(document.getElementById('kind-cards').textContent) && /46/.test(document.getElementById('kind-cards').textContent));
-    await bm.click('#status-btn');
-    await bm.waitForFunction(() => document.querySelectorAll('#reasons button').length === 12 && !!document.querySelector('#reasons [data-reason="Leak tester down"]'));
+    await bm.click('#state-btns [data-go="down"]');
+    await bm.waitForFunction(() => document.querySelectorAll('#reasons button').length === 11 && !!document.querySelector('#reasons [data-reason="Leak tester down"]'));
     await shot(bm, 'more-tablet-blow-mold-stopped-1024');
     await bm.click('#reasons [data-reason="Leak tester down"]');
     await bm.waitForSelector('#reasons [data-reason="Leak tester down"].on');
-    await bm.click('#status-btn');
-    await bm.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
+    await bm.click('#state-btns [data-go="run"]');
+    await bm.waitForFunction(() => document.getElementById('state-name').textContent === 'RUNNING');
     await fits(bm, 'the Blow Mold tablet at 1024');
     // Joe 10/25: Plant Production's Blow Mold page before any sensor is wired: each sensor WAITING FOR SENSOR, R-2291 on Making now.
     const bd = await openPage(browser, 1536, 960, '/production.html?line=' + BLOW + '&' + ADMIN);
@@ -336,15 +341,15 @@ async function pickFirstProduct(tb) {
     results.push('Production Lines: kind filters, the plant\'s totals with efficiency for managers, crew and up next on each card, one line\'s shift from its card; the TV stays as it was, without efficiency');
     // Stop to work order (follow-on 4): Maintenance called makes a Plant Maintenance work order, once.
     const mt = await openPage(browser, 1024, 768, '/line.html?line=' + LINE + '&' + ADMIN);
-    await mt.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
-    await mt.click('#status-btn');
+    await mt.waitForFunction(() => document.getElementById('state-name').textContent === 'RUNNING');
+    await mt.click('#state-btns [data-go="down"]');
     await mt.click('#reasons [data-reason="Maintenance called"]');
-    await mt.waitForFunction(() => /Work order M-\d+ sent to maintenance/.test(document.getElementById('status-text').textContent));
+    await mt.waitForFunction(() => /work order M-\d+ sent to maintenance/i.test(document.getElementById('status-text').textContent));
     await shot(mt, 'more-tablet-work-order-1024');
     const wos = (await db().collection('plantWorkOrders').where('source', '==', 'LINE_TABLET').get()).docs.map(d => d.data());
     assert.deepEqual([wos.length, wos[0].machine, wos[0].lineDown, wos[0].status], [1, 'GALLON FILLER', 'YES', 'NEW']);
-    await mt.click('#status-btn');
-    await mt.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent));
+    await mt.click('#state-btns [data-go="run"]');
+    await mt.waitForFunction(() => document.getElementById('state-name').textContent === 'RUNNING');
     assert.deepEqual(mt.errors, []);
     await mt.close();
     results.push('Stop to work order: Maintenance called on the tablet makes work order M-number for the line, shown on the tablet');

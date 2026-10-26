@@ -131,13 +131,16 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.equal(await tb.$('#count-save'), null, 'no Save Count button');
     await tb.press('#count-box', 'Tab');
     await tb.waitForFunction(() => document.getElementById('made').textContent === '1,250');
-    await tb.click('#status-btn');
-    await tb.waitForFunction(() => /LINE STOPPED/.test(document.getElementById('status-text').textContent) && document.querySelectorAll('#reasons button').length === 12);
+    // Joe 10/26 (mock-up 3): Down starts the clock and asks why; Changeover and Sanitation / CIP are not reasons (they have their own buttons).
+    await tb.click('#state-btns [data-go="down"]');
+    await tb.waitForFunction(() => document.getElementById('state-name').textContent === 'DOWN' && /\d:\d\d:\d\d/.test(document.getElementById('timer').textContent) && document.querySelectorAll('#reasons button').length === 10);
+    assert.equal(await tb.$('#reasons [data-reason="Changeover"]'), null, 'no Changeover reason');
     await shot(tb, 'line-tablet-stopped-1280');
     await tb.click('#reasons button[data-reason="Caser jam"]');
     await tb.waitForFunction(() => document.querySelector('#reasons button.on') && document.querySelector('#reasons button.on').textContent === 'Caser jam');
-    await tb.click('#status-btn');
-    await tb.waitForFunction(() => /LINE RUNNING/.test(document.getElementById('status-text').textContent) && document.getElementById('reasons').hidden);
+    await tb.click('#state-btns [data-go="run"]');
+    await tb.waitForFunction(() => document.getElementById('state-name').textContent === 'RUNNING' && document.getElementById('reasons').hidden);
+    assert.match(await tb.textContent('#down-list'), /Caser jam/);
     const shiftKey = await tb.evaluate(() => window.UDProduction.shiftNow([], Date.now()).key);
     const run = (await db().collection('productionRuns').doc(P.runId(LINE, shiftKey)).get()).data();
     assert.equal(run.product, 'Broughton 2% Gallon');
@@ -173,7 +176,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.equal(await tb.textContent('#speed-flag'), 'TOO FAST');
     assert.match(await tb.textContent('#live'), /Label reader on/);
     assert.equal(await tb.$('#enter-count:not([hidden])'), null, 'no typed count when the reader counts');
-    assert.match(await tb.textContent('#status-text'), /NEEDS A REASON/);
+    assert.match(await tb.textContent('#status-text'), /needs a reason/i);
     await shot(tb, 'line-tablet-1280');
     await tb.setViewportSize({ width: 390, height: 844 });
     await fits(tb, 'the line tablet on a phone');

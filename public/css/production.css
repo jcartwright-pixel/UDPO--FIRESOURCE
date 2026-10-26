@@ -51,7 +51,7 @@
 .lb-qty .lb-in { width: 110px; min-width: 0; height: 48px; font-size: 22px; }
 .lb-green { color: #1d7a3e; }
 /* A tablet standing up: the tabs go on their own row under the name; the cards go three, then two, across. */
-@media (max-width: 1300px) {
+@media (max-width: 1099px) {
   .lb-head { flex-wrap: wrap; }
   .lb-title, .lb-actions { flex: 1 1 100%; margin-left: 0; }
   .lb-head .lb-actions button { flex: 1 1 0; }
@@ -567,3 +567,51 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .pm-lines p { margin: 6px 0; font-size: 17px; }
 .pm-eff { margin-top: 10px; }
 .pm-oee { color: var(--ud-blue-dark); }
+/* Joe 10/26 (down time, mock-up 3): the banner is Running (green), Changeover (blue) or Down (red), with a clock of how long and
+   its three buttons; the screen fills to the bottom on a tablet or Joe's window, with bigger cards and words. */
+#status { min-height: 84px; padding: 10px 12px 10px 18px; gap: 16px; }
+#status.idle { background: #5b6b7c; }
+#status .lb-state { font-size: 24px; font-weight: 900; min-width: 150px; }
+#status .lb-timer { font-size: 46px; font-weight: 900; font-variant-numeric: tabular-nums; background: rgba(0, 0, 0, .18); border-radius: 10px; padding: 0 14px; }
+#status .lb-timer[hidden] { display: none; }
+#status .lb-what { flex: 1; font-size: 20px; line-height: 1.25; min-width: 0; } #status .lb-what b { font-size: 23px; }
+.lb-sbtns { display: flex; gap: 8px; }
+#status .lb-sbtns button { min-height: 62px; min-width: 150px; padding: 0 16px; font-size: 21px; touch-action: manipulation; }
+.lb-sbtns .r { background: #1c7c4a; } .lb-sbtns .c { background: #0b4f8a; } .lb-sbtns .d { background: #c62828; }
+#status .lb-sbtns button.cur { outline: 4px solid #ffd54f; outline-offset: -8px; opacity: .55; }
+#status .lb-sbtns button.cur.c:not(:disabled) { opacity: .75; }
+#reasons { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+#reasons button { min-height: 56px; font-size: 16px; line-height: 1.1; padding: 4px 6px; }
+#reasons button.on { background: #c62828; border-color: #c62828; }
+.lb-dlist { display: flex; flex-direction: column; gap: 2px; font-size: 16px; color: #33475b; }
+.lb-dlist div { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #e3eaf1; padding: 3px 0; }
+.lb-dlist div span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } .lb-dlist div b { white-space: nowrap; } .lb-dlist .now { color: #c62828; font-weight: 800; } .lb-dlist .nowb { color: #0b4f8a; font-weight: 800; }
+.lb-since { font-size: 17px; color: #33475b; border-top: 1px solid #e3eaf1; padding-top: 6px; } .lb-since b { color: #0b2f55; } .lb-since:empty { display: none; }
+.lb-eb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .lb-eb .eyebrow { display: inline; } .lb-title .lb-eb .lb-live { margin: 0; padding: 2px 10px; }
+#screen:not([hidden]) { display: flex; flex-direction: column; min-height: 100vh; }
+.lt-tablet .view { flex: 1 1 auto; display: flex; flex-direction: column; box-sizing: border-box; }
+#board:not([hidden]) { flex: 1 1 auto; display: flex; flex-direction: column; }
+#std-cards, #kind-cards { flex: 1.5 1 auto; }
+@media (min-width: 1100px) { #std-cards { grid-template-columns: 1.4fr 1.1fr 1fr 1fr 1.3fr; } }
+#strip { flex: 1 1 auto; }
+#strip .lb-box { display: flex; flex-direction: column; }
+#strip .lb-hbars { flex: 1 1 auto; height: auto; min-height: 74px; }
+#std-cards .lb-card { padding: 12px 16px; gap: 6px; }
+.lb-card .eyebrow { font-size: 17px; }
+#std-cards .lb-big { font-size: 56px; }
+#std-cards .lb-prod { font-size: 30px; }
+#std-cards .lb-code b { font-size: 40px; }
+#strip .lb-next { font-size: 26px; }
+@media (max-width: 1300px) {
+  #std-cards .lb-big { font-size: 46px; } #std-cards .lb-card { padding: 10px 12px; } #std-cards .lb-prod { font-size: 26px; }
+  #status .lb-state { min-width: 0; font-size: 21px; } #status .lb-timer { font-size: 40px; } #status .lb-what { font-size: 18px; } #status .lb-what b { font-size: 20px; }
+  #status .lb-sbtns button { min-width: 0; font-size: 18px; padding: 0 12px; }
+  .lb-head .lb-actions button { font-size: 16px; padding: 4px; } .lb-head h1 { font-size: 32px; } .lb-head .lb-sub { font-size: 16px; }
+  #std-cards .lb-code { flex-direction: row; } #std-cards .lb-code b { font-size: 34px; } .lb-qty .lb-in { width: 90px; }
+}
+@media (max-width: 900px) {
+  #status { flex-wrap: wrap; } #status .lb-what { flex-basis: 100%; order: 3; } .lb-sbtns { flex: 1 1 100%; order: 4; }
+  #status .lb-sbtns button { flex: 1 1 0; width: auto; }
+  #std-cards .lb-big { font-size: 38px; }
+}
+@media (max-width: 500px) { #status .lb-sbtns button { font-size: 16px; padding: 0 4px; } #status .lb-sbtns button.c { flex-grow: 1.6; } #status .lb-timer { font-size: 32px; } }
