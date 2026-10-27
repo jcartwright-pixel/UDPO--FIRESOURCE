@@ -707,8 +707,13 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 
 /* Joe 10/27: the TV's weather in the top bar, and its right-hand box taking turns (FOX Weather live, the Driver Scorecard). */
 .ds-wx { display: none; }
-body.ds-tv .head { position: relative; }
-body.ds-tv .ds-wx:not([hidden]) { display: flex; align-items: center; gap: 12px; position: absolute; right: 16px; top: 6px; margin: 0; color: #fff; white-space: nowrap; }
+body.ds-tv .ds-wx:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; color: #fff; }
+/* On a TV-wide screen it sits in the top bar's right corner (left of the Exit button when that shows); narrower, it wraps under the title. */
+@media (min-width: 1300px) {
+  body.ds-tv .head { position: relative; }
+  body.ds-tv .ds-wx:not([hidden]) { position: absolute; right: 16px; top: 6px; white-space: nowrap; flex-wrap: nowrap; }
+  body.ds-tv .ds-exit:not([hidden]) ~ .head .ds-wx { right: 110px; }
+}
 body.ds-tv .ds-wx .sym svg { width: 44px; height: 44px; display: block; }
 body.ds-tv .ds-wx b { font-size: 24px; } body.ds-tv .ds-wx span:last-child { font-size: 18px; opacity: .9; }
 body.ds-tv .ds-weather.ds-boxed { padding: 0; background: none; border: 0; box-shadow: none; }
