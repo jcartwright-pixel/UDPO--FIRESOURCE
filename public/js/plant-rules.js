@@ -633,6 +633,27 @@
     return n >= 1 ? n : 1;
   }
   function skipWhy(route) { return (route ? route + ' was' : 'This load was') + ' already skipped ' + SKIP_LIMIT + ' times in a row. Load it next.'; }
+  // Joe 10/27 (practice test: a load skipped and then put back still said SKIPPED): a load is out of the sheet's place when
+  // its place among its loadout's loads of that day differs from its place in the sheet's order, not when its number differs
+  // from the sheet's number. A save that numbers the loads afresh (5, 10, 15 ...) leaves numbers that never match the sheet's
+  // again, though the order does. rows: the loads shown (loadDate, area, loadSequence, baseSequence); the ids out of place.
+  function outOfPlace(rows) {
+    var off = {}, groups = {};
+    var has = function (v) { return v !== null && v !== undefined && v !== '' && isFinite(Number(v)); };
+    (rows || []).forEach(function (r) {
+      if (!r || !has(r.loadSequence) || !has(r.baseSequence)) return;
+      var k = r.loadDate + '|' + (r.area || '');
+      (groups[k] = groups[k] || []).push(r);
+    });
+    var byId = function (a, b) { return String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0; };
+    Object.keys(groups).forEach(function (k) {
+      var list = groups[k];
+      var now = list.slice().sort(function (a, b) { return Number(a.loadSequence) - Number(b.loadSequence) || Number(a.baseSequence) - Number(b.baseSequence) || byId(a, b); });
+      var sheet = list.slice().sort(function (a, b) { return Number(a.baseSequence) - Number(b.baseSequence) || Number(a.loadSequence) - Number(b.loadSequence) || byId(a, b); });
+      now.forEach(function (r, i) { if (sheet[i] !== r) off[r.id] = true; });
+    });
+    return off;
+  }
 
 
   /* ---------- Production Line Status & Quality ---------- */
@@ -1474,7 +1495,7 @@
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
-    shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, SKIP_LIMIT: SKIP_LIMIT, skipsInARow: skipsInARow, skipWhy: skipWhy, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
+    shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, SKIP_LIMIT: SKIP_LIMIT, skipsInARow: skipsInARow, skipWhy: skipWhy, outOfPlace: outOfPlace, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,
     qualityHistory: qualityHistory, weightText: weightText,
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempChecked: tempChecked, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,

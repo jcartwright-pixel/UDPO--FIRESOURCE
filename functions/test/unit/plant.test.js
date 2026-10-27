@@ -599,3 +599,18 @@ test('Joe 10/27: a load can be skipped at most 2 times in a row (plant-rules ski
   assert.equal(R.skipsInARow({ how: 'SKIP', savedAt: at, skips: 2 }, '2026-10-10', []), 0, 'a skip from an earlier day does not count');
   assert.equal(R.skipWhy('Route 811'), 'Route 811 was already skipped 2 times in a row. Load it next.');
 });
+
+// Joe 10/27 (practice test: a load skipped and then put back still said SKIPPED): the tag follows the load's place in the
+// order, not its number, so loads numbered afresh (5, 10, 15 ...) after a save are in place when the order matches the sheet's.
+test('outOfPlace: a load is out of place by its place in the order, not by its number', () => {
+  const ld = (id, now, sheet, extra) => Object.assign({ id, loadDate: '2026-10-27', area: 'CASE', loadSequence: now, baseSequence: sheet }, extra || {});
+  // Numbered afresh: every number differs from the sheet's, but the order is the sheet's.
+  assert.deepEqual(R.outOfPlace([ld('a', 5, 12), ld('b', 10, 13), ld('c', 15, 18)]), {});
+  // b skipped past c: both are out of their places.
+  assert.deepEqual(R.outOfPlace([ld('a', 5, 12), ld('b', 15, 13), ld('c', 10, 18)]), { b: true, c: true });
+  // The same with the sheet's own numbers (a swap of numbers) agrees with comparing the numbers.
+  assert.deepEqual(R.outOfPlace([ld('a', 5, 5), ld('b', 15, 10), ld('c', 10, 15)]), { b: true, c: true });
+  // Each loadout and each day on its own; a load with no sheet number is never out of place.
+  assert.deepEqual(R.outOfPlace([ld('a', 5, 20), ld('b', 10, 10, { area: 'TOTES' }), ld('c', 20, 5, { loadDate: '2026-10-26' }), ld('d', 1, null), ld('e', 30, 30)]), {});
+  assert.deepEqual(R.outOfPlace([]), {});
+});

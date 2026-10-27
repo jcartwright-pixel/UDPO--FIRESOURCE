@@ -117,7 +117,11 @@ export function moveNote(r) {
 
 // A load someone moved (moveMark) that is still out of the sheet's place: a Skip past one load can leave either of the two
 // marked by movedIds, so the one that was moved is always marked too.
-export function movedBySomeone(r) {
+// Joe 10/27 (a load skipped and then put back still said SKIPPED): off = outOfPlace(the loads shown); the place is the load's
+// place in the order, not its number (plant-rules.js outOfPlace).
+export function outOfPlace(rows) { return U.outOfPlace(rows); }
+export function movedBySomeone(r, off) {
+  if (off) return !!(r && r.moveMark && off[r.id]);
   return !!(r && r.moveMark && r.baseSequence != null && r.loadSequence != null && Number(r.loadSequence) !== Number(r.baseSequence));
 }
 
