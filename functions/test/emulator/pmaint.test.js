@@ -107,18 +107,26 @@ test('Shift Notes: a Breakdown keeps Back up at and What fixed it; a Maintenance
   await assert.rejects(act(PLANT, 'saveShiftNote', { values: { Entry: 'x', Type: 'Maintenance Request', Urgency: 'Never' }, followUpStatus: 'OPEN' }), /Can it wait must be/);
 });
 
-// Mock-up E: the Maintenance Station works the plant's work orders like the Garage Station (same technicians and login IDs).
+// Mock-up E: the Maintenance Station works the plant's work orders like the Garage Station. Joe 10/27: with the plant's own
+// mechanics (Maintenance Schedule Setup, People, and the login IDs typed there), not the garage's.
 test('Maintenance Station: start, a helper, need parts, complete a PM (Last done moves on); report a problem; record a breakdown', async () => {
   const GA = require('../../src/garage');
   const at = (min) => () => new Date(Date.parse('2026-10-08T14:00:00Z') + (min || 0) * 60000);
-  for (const [id, name, pin] of [['TECH-JT', 'JELLICK Tom', '48213'], ['TECH-JN', 'NARD Jaxon', '551902']]) {
-    await db().collection('garageTechs').doc(id).set({ tech_id: id, name, active: 'YES', facility_id: 'fac_uniontown' });
-    await db().collection('garageLogins').doc(id).set({ hash: GA.loginHash(id, pin) });
+  for (const [id, name, pin] of [['MECH-JT', 'JELLICK Tom', '48213'], ['MECH-JN', 'NARD Jaxon', '551902']]) {
+    await db().collection('crewPeople').doc(id).set({ name, team: 'maint', facilityId: 'fac_uniontown', status: 'ACTIVE' });
+    const r = await act(MANAGER, 'saveCrewSetup', { facilityId: 'fac_uniontown', team: 'maint', op: 'login', id, loginId: pin });
+    assert.match(r.message, /login ID saved/);
   }
-  const LOGIN = { TOM: ['TECH-JT', '48213'], JAX: ['TECH-JN', '551902'] };
+  // A garage mechanic (Fleet Service Setup), a Charleston mechanic, a plant crew person and one taken off: none on Uniontown's station.
+  await db().collection('garageTechs').doc('TECH-SM').set({ tech_id: 'TECH-SM', name: 'MARTIN Shaun', active: 'YES', facility_id: 'fac_uniontown' });
+  await db().collection('garageLogins').doc('TECH-SM').set({ hash: GA.loginHash('TECH-SM', '77001') });
+  await db().collection('crewPeople').doc('MECH-CH').set({ name: 'BOONE Ada', team: 'maint', facilityId: 'fac_charleston', status: 'ACTIVE' });
+  await db().collection('crewPeople').doc('CREW-1').set({ name: 'FILLER Pat', team: 'plant', facilityId: 'fac_uniontown', status: 'ACTIVE' });
+  await db().collection('crewPeople').doc('MECH-OLD').set({ name: 'GONE Lee', team: 'maint', facilityId: 'fac_uniontown', status: 'RETIRED' });
+  const LOGIN = { TOM: ['MECH-JT', '48213'], JAX: ['MECH-JN', '551902'] };
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   // The tablet is signed in with a United Dairy account (review item 68: the board needs a sign-in or a station code).
-  const call = (fields, min) => GA.garageCall(db(), Object.assign({ facilityId: 'fac_uniontown' }, fields), at(min), { user: { uid: 'u1', email: 'maint.tablet@uniteddairy.com' } });
+  const call = (fields, min) => GA.garageCall(db(), Object.assign({ facilityId: 'fac_uniontown', maint: true }, fields), at(min), { user: { uid: 'u1', email: 'maint.tablet@uniteddairy.com' } });
   const as = async (who, fields, min) => { const s = await call({ op: 'signIn', techId: LOGIN[who][0], loginId: LOGIN[who][1], tokens: [] }, min); return call(Object.assign({ op: 'pmStep', tokens: [s.token], requestId: rid() }, fields), min); };
 
   const made = await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease bearings', every: 1, unit: 'MONTHS', lastDone: '2026-09-01' } });
@@ -128,6 +136,21 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
   assert.ok(b.machines.some(m => m.name === 'GALLON FILLER'));
   assert.deepEqual(b.techs.map(t => [t.name, t.on]), [['JELLICK Tom', null], ['NARD Jaxon', null]]);
   await assert.rejects(call({ op: 'pmStep', tokens: [], step: 'START', id: sent.workOrderId, requestId: rid() }), /GARAGE_SIGN_IN_REQUIRED/);
+  // The garage's mechanic cannot sign in here, and the garage's own sign-in does not work a plant work order.
+  await assert.rejects(call({ op: 'signIn', techId: 'TECH-SM', loginId: '77001', tokens: [] }), /Tap your name first/);
+  const garageSession = await GA.garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '77001', tokens: [] }, at(0));
+  await assert.rejects(call({ op: 'pmStep', tokens: [garageSession.token], step: 'START', id: sent.workOrderId, requestId: rid() }), /GARAGE_SIGN_IN_REQUIRED/);
+  // Nor does a plant mechanic's sign-in work on the Garage Station, or on another plant's Maintenance Station.
+  const plantSession = await call({ op: 'signIn', techId: 'MECH-JT', loginId: '48213', tokens: [] });
+  assert.deepEqual((await GA.garageCall(db(), { op: 'read', tokens: [plantSession.token] }, at(0))).signedIn, []);
+  await assert.rejects(call({ op: 'pmStep', facilityId: 'fac_charleston', tokens: [plantSession.token], step: 'REPORT', machineId: 'x', problem: 'x', lineDown: false, requestId: rid() }), /GARAGE_SIGN_IN_REQUIRED/);
+  await call({ op: 'signOut', tokens: [plantSession.token] });
+  // A wrong login ID, and one another mechanic already uses.
+  await assert.rejects(call({ op: 'signIn', techId: 'MECH-JT', loginId: '11111', tokens: [] }), /Wrong login ID/);
+  await assert.rejects(act(MANAGER, 'saveCrewSetup', { facilityId: 'fac_uniontown', team: 'maint', op: 'login', id: 'MECH-JN', loginId: '48213' }), /Another mechanic already uses that login ID/);
+  await assert.rejects(act(MANAGER, 'saveCrewSetup', { facilityId: 'fac_uniontown', team: 'plant', op: 'login', id: 'CREW-1', loginId: '12345' }), /for the maintenance mechanics/);
+  assert.equal((await db().collection('crewPeople').doc('MECH-JT').get()).data().loginSet, true);
+  assert.ok(!JSON.stringify((await db().collection('plantMaintLogins').get()).docs.map(d => d.data())).includes('48213'), 'the login ID itself is never kept');
 
   await as('TOM', { step: 'START', id: sent.workOrderId }, 0);
   let r = await as('JAX', { step: 'HELPER', id: sent.workOrderId }, 10);
@@ -169,7 +192,7 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
   await assert.rejects(GA.garageCall(db(), { op: 'board' }, at(130)), /STATION_CODE/);
   await assert.rejects(GA.garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213', tokens: [] }, at(130)), /STATION_CODE/);
   assert.ok(Array.isArray((await call({ op: 'pmBoard' }, 130)).jobs));
-  const s = await call({ op: 'signIn', maint: true, techId: 'TECH-JT', loginId: '48213', tokens: [] }, 131);
+  const s = await call({ op: 'signIn', techId: 'MECH-JT', loginId: '48213', tokens: [] }, 131);
   r = await call({ op: 'pmStep', tokens: [s.token], requestId: rid(), step: 'REPORT', machineId: 'ut_prod_gallon_filler', problem: 'Belt squeal', lineDown: false }, 131);
   assert.match(r.message, /^M-1003/);
 });
@@ -178,7 +201,7 @@ test('Maintenance Station: start, a helper, need parts, complete a PM (Last done
 // with the link: it needs a signed-in United Dairy account or a valid station code, like the other station reads.
 test('Maintenance Station board needs a United Dairy sign-in or a valid station code', async () => {
   const GA = require('../../src/garage'), ST = require('../../src/stations');
-  await db().collection('garageTechs').doc('TECH-JT').set({ tech_id: 'TECH-JT', name: 'JELLICK Tom', active: 'YES', facility_id: 'fac_uniontown' });
+  await db().collection('crewPeople').doc('MECH-JT').set({ name: 'JELLICK Tom', team: 'maint', facilityId: 'fac_uniontown', status: 'ACTIVE' });
   const board = (caller, extra) => GA.garageCall(db(), Object.assign({ op: 'pmBoard', facilityId: 'fac_uniontown', maint: true }, extra || {}), undefined, caller);
   await assert.rejects(board(), /Sign in with a United Dairy account, or enter the station code/);
   await assert.rejects(board({ user: null, claims: { email: 'someone@gmail.com' } }), /Sign in with a United Dairy account/);
