@@ -554,7 +554,7 @@ Trucks back from the route: each load's trailer, cases in, counted, RTA (returne
 
 - **Return day** (top right) with the arrows picks the day.
 - On a phone or small tablet each load is a card with every box named.
-- A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be.
+- A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be, here and on the plant tablets.
 
 > To make a load show by name, open the Route Editor and tick **Drop and Hook** on that run.
 

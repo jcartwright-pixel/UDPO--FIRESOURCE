@@ -80,6 +80,9 @@ test('a no-account Plant Station reads only the plant-floor lists, while On and 
   await assertSucceeds(getDoc(doc(station('v1'), 'runs/2026-10-04__run_t801')));
   await assertSucceeds(getDocs(collection(station('v1'), 'pickups')));
   await assertSucceeds(getDoc(doc(station('v1'), 'config/app')));
+  // Joe 10/27 (gy): Route Master too, read only (Case Unloading shows drop-and-hook loads by name).
+  await assertSucceeds(getDocs(collection(station('v1'), 'routes')));
+  await assertFails(setDoc(doc(station('v1'), 'routes/x'), { route: '1' }));
   // Never a person's entry, the dispatch weeks, drivers or anything else.
   await assertFails(getDoc(doc(station('v1'), 'users/joe@uniteddairy.com')));
   await assertFails(getDocs(collection(station('v1'), 'weeks')));

@@ -86,7 +86,8 @@ service cloud.firestore {
     match /driverBackups/{id} { allow read: if activeUser(); }
     match /textLog/{id} { allow read: if activeUser(); }
     match /equipment/{id} { allow read: if activeUserOrStation(); }
-    match /routes/{id} { allow read: if activeUser(); }
+    // Joe 10/27 (gy): a plant station reads Route Master too (read only), so Case Unloading shows drop-and-hook loads by name.
+    match /routes/{id} { allow read: if activeUserOrStation(); }
     // Each person may read their own entry (to know which buttons to show, or that they are not on the list), not everyone's.
     match /users/{email} { allow read: if unitedDairy() && request.auth.token.email.lower() == email; }
     // Joe 10/14: each person reads their own ticked screens (People & Roles), so their Home and menu show only those; not anyone else's.
