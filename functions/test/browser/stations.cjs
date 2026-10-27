@@ -26,6 +26,8 @@ async function openPage(browser, width, height, url, clock, touch) {
   const page = await browser.newPage(Object.assign(touch ? { viewport: { width, height }, hasTouch: true, isMobile: true } : { viewport: { width, height } }, { serviceWorkers: 'block' }));
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
+  // Joe 10/27: no live weather picture in these checks (YouTube is refused), so the TV's weather turn shows the local weather.
+  await page.route(/youtube\.com/, route => route.abort());
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
   if (process.env.LOCAL_CALLS) {
     await page.route(/:5001\/[^/]+\/[^/]+\/(garage|phone)$/, async (route) => {
@@ -197,6 +199,8 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.equal(await tv.textContent('#weather-now'), '54°F · Partly cloudy');
     assert.equal(await tv.textContent('#weather-today'), 'High 61° · Low 44° · Rain 20% · Wind 8 mph');
     assert.equal(await tv.textContent('#weather-next'), 'Tomorrow: Rain, 58° / 47°');
+    await tv.waitForSelector('#turn-weather .now:visible', { timeout: 15000 });
+    assert.equal(await tv.isVisible('#turn-live'), false, 'no live picture: the local weather shows instead');
     assert.deepEqual(ds.errors.concat(tv.errors), []);
     results.push('Driver Station: the board and the Driver Room TV open, with the weather window filled in');
 

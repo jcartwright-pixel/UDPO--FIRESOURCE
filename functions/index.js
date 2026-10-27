@@ -28,6 +28,7 @@
  *   stationSignIn         the Plant Station with no UD account: a plant station's code signs the tablet in as that station
  *                         (and the Driver's Kiosk Station TV: its code signs the TV in, {tv: true})
  *                         only, while the plant's switch is On (Administration > Plant Station Codes)
+ *   scorecardKioskEvery15Minutes  the Driver Room TV's Driver Scorecard turn: the month's overall scores (scorecard/kiosk)
  *   adminJobsEvery5Minutes  repair emails to lessors, the driver check-in mailbox and the weekly archive, each at its Refresh Rate
  *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
  *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
@@ -47,6 +48,7 @@ const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { runTransfer } = require('./src/transfer');
 const { runCleanup } = require('./src/cleanup');
+const { writeKioskScores } = require('./src/scorecard-kiosk');
 const { applyAction, checkSaves, SaveError } = require('./src/actions');
 const { phoneCall, newRouteCode } = require('./src/phone');
 const FAILS = require('./src/fails');
@@ -549,6 +551,11 @@ exports.fleetOwnershipEvery30Minutes = onSchedule({ schedule: 'every 30 minutes'
   if (!setup || process.env.DEMO_DATA === '1') return;
   const r = await refreshFleetOwnership({ db, reader: makeSheetsReader() });
   if (!r.ok) console.error('fleetOwnership', r.error);
+});
+
+// Joe 10/27: the Driver Room TV's Driver Scorecard turn (src/scorecard-kiosk.js): the month's overall scores, every 15 minutes.
+exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
+  await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));
 });
 
 // How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.

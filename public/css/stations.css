@@ -683,9 +683,6 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .dv-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .drv-sign.dv-need { border: 2px solid #b42318; background: #fdecea; }
 /* Joe 10/13: the Driver Scorecard grades take turns with the weekly schedule on the TV. */
-body.ds-tv .ds-score { grid-row: 2; grid-column: 1 / 3; }
-.ds-score iframe { flex: 1; width: 100%; height: 100%; border: 0; }
-@media (max-width: 1050px) { body.ds-tv .ds-score { grid-column: 1; } }
 
 /* Joe 10/15 (Case Unloading, mock-up A): the unloading order number, the trailer in big type, Back / On the road, transfer trailers. */
 .sw-title.unload b { display: flex; align-items: center; flex-wrap: wrap; gap: 0 14px; font-size: 26px; line-height: 1.2; }
@@ -707,3 +704,27 @@ body.ds-tv .ds-score { grid-row: 2; grid-column: 1 / 3; }
 /* Joe 10/19: Over and Short are two parts of the over / shortage box. */
 .phone-card .ci-os-box .ci-os-head { align-self: end; padding-bottom: 8px; font-size: 18px; color: #8a1f1f; }
 .phone-card .ci-os-box hr { border: 0; border-top: 1px solid #f0c7c7; margin: 2px 0; }
+
+/* Joe 10/27: the TV's weather in the top bar, and its right-hand box taking turns (FOX Weather live, the Driver Scorecard). */
+.ds-wx { display: none; }
+body.ds-tv .head { position: relative; }
+body.ds-tv .ds-wx:not([hidden]) { display: flex; align-items: center; gap: 12px; position: absolute; right: 16px; top: 6px; margin: 0; color: #fff; white-space: nowrap; }
+body.ds-tv .ds-wx .sym svg { width: 44px; height: 44px; display: block; }
+body.ds-tv .ds-wx b { font-size: 24px; } body.ds-tv .ds-wx span:last-child { font-size: 18px; opacity: .9; }
+body.ds-tv .ds-weather.ds-boxed { padding: 0; background: none; border: 0; box-shadow: none; }
+.ds-turn[hidden] { display: none !important; }
+.ds-wcard { display: contents; }
+body.ds-tv .ds-weather.ds-boxed .ds-turn { flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
+.ds-live { position: relative; background: #000; }
+.ds-live #live-player, .ds-live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.ds-live-tag { position: absolute; left: 14px; top: 12px; background: #c8102e; color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: 800; font-size: 16px; }
+.ds-live-cap { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .6); color: #fff; padding: 10px 14px; font-size: 18px; font-weight: 700; }
+.ds-sc { display: flex; flex-direction: column; background: #fff; color: #0b2d4d; }
+.ds-sc-title { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; background: #20578e; color: #fff; padding: 12px 18px; }
+body.ds-tv .ds-weather .ds-sc-title b { font-size: 19px; letter-spacing: .05em; opacity: 1; } .ds-sc-title span { font-size: 16px; }
+.ds-sc-scroll { flex: 1; min-height: 0; overflow: hidden; }
+.ds-sc table { width: 100%; border-collapse: collapse; font-size: 20px; }
+.ds-sc tr:nth-child(even) { background: #eef5fa; }
+.ds-sc td { padding: 9px 8px; font-weight: 700; text-align: left; border: 0; } .ds-sc td.rk { width: 44px; padding-left: 16px; font-weight: 800; } .ds-sc td.ov { text-align: right; padding-right: 16px; white-space: nowrap; } .ds-sc td.ar { width: 40px; text-align: center; }
+.ds-sc .g { display: inline-block; min-width: 32px; padding: 2px 8px; border-radius: 6px; font-weight: 800; text-align: center; }
+.ds-sc .g-A { background: #d9f2e1; color: #156b34; } .ds-sc .g-B { background: #e3effa; color: #1a5490; } .ds-sc .g-C { background: #fff1cc; color: #8a5a00; } .ds-sc .g-D { background: #fde0de; color: #a32019; } .ds-sc .g-none { color: #6b7d8f; }

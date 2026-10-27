@@ -70,7 +70,7 @@
     let gpsDays = [], gpsAlerts = [], alertsEver = null, gpsSub = null, gpsKey = '', dbRef = null;
     // Joe 10/13: accidents / incidents and complaints (driverIncidents, entered on Driver Roster > Edit), excused GPS misses
     // (scorecardExcuses), the area tab on screen, and ?kiosk=1 for the Driver's Kiosk Station (grades only).
-    let incidents = [], excuses = [], routeSleeper = {}, excuseOpen = '', excuseText = '', idleOpen = '';
+    let incidents = [], excuses = [], excuseOpen = '', excuseText = '', idleOpen = '';
     let tab = 'overall';
     // Joe 10/25: a grade on the board opens a report of that driver's days in that one area ({key, area}).
     let report = null;
@@ -78,52 +78,6 @@
     { const t = new URLSearchParams(location.search).get('tab') || ''; if (t === 'incidents' || CORE.AREAS.some(a => a[0] === t)) tab = t; }
     if (kiosk) document.body.classList.add('sc-kiosk');
 
-    function names() { const out = {}; drivers.forEach(d => { if (!d.name) return; if (d.id) out[S.scPersonKey_(d.id)] = d.name; out[S.scPersonKey_(d.name)] = d.name; }); return out; }
-    // Every day in the copied Live weeks, built the current app's way (scBuildDay_).
-    function allDays(routeMiles) {
-      const byDate = {}, ev = {};
-      events.forEach(e => { (ev[e.date] = ev[e.date] || []).push({ eventType: e.type, payload: { route: e.route, run: e.run, checks: e.defect ? ['Defect found'] : [] } }); });
-      runs.forEach(run => L.DAYS.forEach((p, i) => {
-        const d = run.days && run.days[p]; if (!d) return;
-        const date = L.addDays(run.weekStart, i);
-        (byDate[date] = byDate[date] || []).push({ runId: run.runId, route: run.route, run: run.run, runs: d.runs ? 'TRUE' : '', driver: d.driver || '', driverId: d.driverId || '',
-          casesOut: d.casesOut, plantCaseReturn: d.plantCaseReturn, driverCaseReturn: d.driverCaseReturn, // Joe 10/14: checked in the same way Driver Check-ins counts it: a check-in made in the app (phone, Driver Room station,
-          // the answering-service email the app read) or the cases delivered the driver reported (the current app's email intake).
-          checkedIn: !!(d.checkinCompletedAt || (d.casesDelivered !== null && d.casesDelivered !== undefined && d.casesDelivered !== '')),
-          truck: d.truck || '', startTime: d.startTime || '', departure: L.dateKey(d.departureDate) || '',
-          // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
-          dispatchTime: d.dispatchTime || ((routeTimes[p] || {})[run.runId] || {}).dispatchTime, routeHours: d.routeHours || ((routeTimes[p] || {})[run.runId] || {}).hours,
-          // Joe 10/13: Route Master's Sleeper yes/no; idling on a sleeper route counts less.
-          sleeper: d.sleeper || run.sleeper || routeSleeper[run.runId] ? 'TRUE' : '' });
-      }));
-      const out = {}, gd = {}, ga = {};
-      gpsDays.forEach(g => { (gd[g.date] = gd[g.date] || []).push(g); });
-      gpsAlerts.forEach(a => { (ga[a.date] = ga[a.date] || []).push(a); });
-      unassigned = {};
-      // Only our Uniontown units (Equipment Master, the same list Trucks Today matches Fleet against) can wait under No driver
-      // dispatched; another plant's Fleet units are left out.
-      const ours = (lists.fleetTrucks || []).concat(lists.fleetTrailers || []).map(e => e.unit);
-      // Joe 10/14: only our drivers (Driver Master; never CARRIER), never on a day off, and only alerts while the truck was out.
-      const ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
-      const who = { known: names(), off: S.scOffDays_(ex, '2000-01-01', '2999-12-31') }, trucks = {}, byDepart = {};
-      Object.keys(byDate).forEach(date => {
-        const p = L.DAYS[S.scWeekday_(date)], rows = byDate[date];
-        // A check-in typed on Driver Check-ins counts like the phone's ROUTE_CHECKIN event.
-        const dayEv = (ev[date] || []).concat(rows.filter(r => r.checkedIn).map(r => ({ eventType: 'ROUTE_CHECKIN', payload: { route: r.route, run: r.run } })));
-        out[date] = S.scBuildDay_(date, rows, dayEv, routeMiles[p] || {}, who);
-        // Joe 10/14: a run's GPS is the day it leaves (most loads leave the day after they are loaded).
-        out[date].forEach(r => { (byDepart[r.departDate] = byDepart[r.departDate] || []).push(r); const k = S.scUnitKey_(r.truck); if (k) (trucks[r.departDate] = trucks[r.departDate] || {})[k] = true; });
-      });
-      const inWindow = S.scAlertWindows_(ga, gd, trucks, today());
-      // Each truck's GPS and alerts go to the driver Daily Dispatch put in it for the run leaving that day; the rest wait under No driver dispatched.
-      [...new Set(Object.keys(byDepart).concat(Object.keys(inWindow)))].forEach(day => {
-        const m = S.scMatchGps_(day, byDepart[day] || [], gd[day] || [], inWindow[day] || [], ours);
-        if (m.unassigned.length) unassigned[day] = m.unassigned;
-      });
-      return out;
-    }
-    let unassigned = {};
-    const ratingsIn = (a, z) => ratings.filter(x => x.date >= a && x.date <= z);
     function period() {
       if (mode === 'week') return S.scWeekRange_(weekStart);
       if (mode === 'year') return { start: year + '-01-01', end: year + '-12-31' };
@@ -156,39 +110,14 @@
         onSnapshot(range('gpsAlerts'), s => { gpsAlerts = s.docs.map(d => d.data()); render(); }, () => { gpsAlerts = []; render(); })
       ];
     }
-    let routeMiles = {}, routeTimes = {};
+    let routeMaps = S.scRouteMaps_(L, []);
 
+    // Joe 10/27: the board is built by the shared scorecard rules (sc-core.js scBoard_), so the Driver Room TV's copy of the
+    // overall scores (the server's scorecard/kiosk) comes out the same as this screen.
     function board(s) {
-      const t = today(), yesterday = S.scAddDays_(t, -1), days = allDays(routeMiles), ex = exceptions.map(e => Object.assign({}, e.cells || {}, { driver_id: (e.cells || {}).driver_id || e.driverId || '' }));
-      // Joe 10/14: No driver dispatched starts at Scorecard counted from too.
-      const lost = (a, z) => Object.keys(unassigned).filter(d => d >= a && d <= z && d >= s.countFrom).sort().reduce((l, d) => l.concat(unassigned[d]), []);
-      const exMap = {};
-      excuses.forEach(x => { if (x.key) exMap[x.key] = { reason: x.reason || '', by: x.by || '', at: x.at || '' }; });
-      // Accidents (12 months), PDAs (9) and complaints (6) look back past the period, fading as they age.
-      const opts = (a, z, ratingEnd) => ({ alertsOn: alertsEver !== false || gpsAlerts.length > 0, seatbeltOn: gpsAlerts.some(x => S.scAlertKind_(x.type) === 'seatbelt'), ratings: ratingsIn(a, ratingEnd),
-        excuses: exMap, incidents, accidentsOn: incidents.some(x => x.kind === 'accident'), complaintsOn: incidents.some(x => x.kind === 'complaint'), pdaOn: incidents.some(x => x.kind === 'pda'), start: a, asOf: z });
-      // Joe 10/16: call-offs count through the calendar year, so read them from January 1.
-      const offs = (a, z) => S.scCallOffDays_(ex, a.slice(0, 4) + '-01-01', z, s);
-      if (mode === 'week') {
-        const w = S.scWeekRange_(weekStart), end = w.end < yesterday ? w.end : yesterday;
-        let list = [];
-        for (let d = w.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        const rows = w.start > yesterday ? [] : S.scScoreMonth_(list, offs(w.start, end), s, names(), opts(w.start, end, end));
-        return { rows, minDays: 99, summary: S.scSummary_(rows, s, 99), through: end < w.start ? w.start : end, days: Object.keys(days).sort(), unassigned: lost(w.start, end) };
-      }
-      const first = mode === 'year' ? 1 : month, last = mode === 'year' ? 12 : month, months = [];
-      for (let m = first; m <= last; m++) {
-        const range = S.scMonthRange_(year, m);
-        if (range.start > yesterday) break;
-        const end = range.end < yesterday ? range.end : yesterday;
-        let list = [];
-        for (let d = range.start; d <= end; d = S.scAddDays_(d, 1)) list = list.concat(days[d] || []);
-        months.push({ month: m, rows: S.scScoreMonth_(list, offs(range.start, end), s, names(), opts(range.start, end, range.end)) });
-      }
-      const rows = mode === 'year' ? S.scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
-      const minDays = mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
-      const p = period();
-      return { rows, minDays, summary: S.scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort(), unassigned: lost(p.start, p.end < yesterday ? p.end : yesterday) };
+      const units = (lists.fleetTrucks || []).concat(lists.fleetTrailers || []).map(e => e.unit);
+      return S.scBoard_(L, { runs, events, gpsDays, gpsAlerts, drivers, exceptions, ratings, incidents, excuses, routeMaps, units, alertsEver }, s,
+        { mode, weekStart, year, month, today: today() });
     }
 
     // Replacing the page can blur a typed box, whose save asks for a redraw while this one is still running: that one waits its turn.
@@ -537,8 +466,7 @@
       watch('scorecardRatings', v => { ratings = v; });
       watch('driverIncidents', v => { incidents = v; });
       watch('scorecardExcuses', v => { excuses = v; });
-      watch('routes', v => { routeMiles = {}; routeTimes = {}; routeSleeper = {}; v.forEach(r => { if (r.sleeper) routeSleeper[r.id] = true; }); L.DAYS.forEach(p => { routeMiles[p] = {}; routeTimes[p] = {}; });
-        v.forEach(r => L.DAYS.forEach(p => { const d = r.days && r.days[p]; if (d && (d.dispatchTime != null || d.hours)) routeTimes[p][r.id] = { dispatchTime: d.dispatchTime, hours: d.hours }; })); v.forEach(r => L.DAYS.forEach(p => { if (r.days && r.days[p] && r.days[p].miles) routeMiles[p][r.id] = r.days[p].miles; })); });
+      watch('routes', v => { routeMaps = S.scRouteMaps_(L, v); });
       onSnapshot(doc(db, 'scorecard', 'settings'), s => { saved = s.exists() ? s.data() : {}; render(); }, e => showError('Could not read the scorecard settings (' + e.message + '). The scores use the standard settings until it loads; reload the page.'));
     });
   </script>

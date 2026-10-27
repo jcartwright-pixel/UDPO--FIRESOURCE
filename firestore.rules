@@ -112,7 +112,8 @@ service cloud.firestore {
     match /plantEvents/{id} { allow read: if activeUser(); }
     // The drivers' DVIR inspections (phone.js), one per trailer.
     match /dvirs/{id} { allow read: if activeUser(); }
-    match /scorecard/{id} { allow read: if activeUser(); }
+    // Joe 10/27: the TV's Driver Scorecard turn reads only scorecard/kiosk (the overall scores the server keeps there).
+    match /scorecard/{id} { allow read: if activeUser() || (id == 'kiosk' && tvStation()); }
     // Joe 10/13: truck cleanliness ratings (the server writes them through rateTruckClean).
     match /scorecardRatings/{id} { allow read: if activeUser(); }
     // Joe 10/13: accidents / incidents and complaints, and excused GPS misses (the server writes them).
