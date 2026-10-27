@@ -48,8 +48,8 @@
       <div class="uw-split">
         <div class="sheet scroll-list">
           <table class="loadout unload">
-            <colgroup id="cols"><col style="width:13%"><col style="width:24%"><col style="width:9%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:8%"></colgroup>
-            <thead><tr><th>Route · Run</th><th>Trailer</th><th>Status</th><th id="qty-head">Cases In</th><th id="counted-head" hidden>Counted</th><th>RTA</th><th>Washed</th><th data-l="Start / End"></th><th>Total Time</th><th></th></tr></thead>
+            <colgroup id="cols"></colgroup>
+            <thead><tr><th>Route · Run</th><th>Trailer</th><th>Status</th><th id="out-head">Cases Out</th><th>Driver Said</th><th id="qty-head">Cases Returned</th><th>Lost</th><th id="counted-head" hidden>Counted</th><th>RTA</th><th>Washed</th><th data-l="Start / End"></th><th>Total Time</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -73,10 +73,11 @@
     let tab = 'needs', editKey = '', mode = 'check';
     let runs = [], routes = [], journal = [], sheetWash = [], appWash = [], person = null, app = {};
     // Case counters (Joe 10/23): what the case returns counter counted on each trailer, beside the Cases In typed.
-    let caseCounts = {}, returnsCounter = null;
+    let caseCounts = {}, returnsCounter = null, gpsDays = [];
     const counting = () => area === 'CASE' && !!(returnsCounter && returnsCounter.controller && returnsCounter.controller.ip);
-    // Cases In with the counter on: Trailer gives the room for the Counted column.
-    const COL_WIDTHS = [13, 24, 9, 10, 8, 10, 8, 10, 8], COUNTED_WIDTHS = [13, 16, 9, 10, 8, 8, 10, 8, 10, 8];
+    // Joe 10/27 (hg): Cases Out (loadout), Driver Said (check-in), Cases Returned (typed here) and Lost. With the counter on,
+    // Trailer gives the room for the Counted column.
+    const COL_WIDTHS = [9, 12, 9, 8, 8, 10, 8, 7, 9, 7, 7, 6], COUNTED_WIDTHS = [8, 10, 8, 7, 7, 9, 7, 8, 7, 8, 7, 7, 7];
     const pending = {};        // unload key -> what is shown before the server has it
     const washedNow = {};      // wash item id -> true while its Wash press is saving
     const unsubs = [];
@@ -87,7 +88,8 @@
     function data() {
       const returns = P.returnsFor(runs, date, journal).map(x => (pending.returns && pending.returns[x.id] ? Object.assign({}, x, { pending: false }) : x));
       const loads = P.loadoutRows(runs, date);
-      const rows = P.unloadRows(runs, date, journal, returns, loads, routes).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r));
+      // Joe 10/27: the same order as the tablet: what today's loadout needs first, a trailer that is here ahead of one on the road.
+      const rows = P.unloadOrder(P.unloadRows(runs, date, journal, returns, loads, routes).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)), gpsDays);
       const wash = P.washItems(date, sheetWash, appWash, journal).filter(w => !washedNow[w.id]);
       return { returns, rows, wash };
     }
@@ -118,15 +120,16 @@
       document.getElementById('scope').textContent = name + ' only';
       const retLoads = mine.filter(r => r.pendingReturns.length).length;
       document.getElementById('banner').innerHTML = retLoads ? '<div class="uw-banner"><b>Product returns need attention · ' + retLoads + ' load' + (retLoads === 1 ? '' : 's') + '</b><span>Assigned product must be returned to the cooler. Do not dump.</span><a href="returns.html?date=' + date + '">Open Returns &rarr;</a></div>' : '';
-      document.getElementById('qty-head').textContent = unit + ' In';
-      const on = counting(), ncol = on ? 10 : 9;
+      document.getElementById('out-head').textContent = unit + ' Out';
+      document.getElementById('qty-head').textContent = unit + ' Returned';
+      const on = counting(), ncol = on ? 13 : 12;
       document.getElementById('counted-head').hidden = !on;
       document.getElementById('cols').innerHTML = (on ? COUNTED_WIDTHS : COL_WIDTHS).map(w => '<col style="width:' + w + '%">').join('');
       // Side stats for the area.
       const ac = P.unloadCounts(mine), toWash = mine.filter(r => P.washesForRow(r, wash).length).length, washed = mine.filter(r => !P.washesForRow(r, wash).length && r.washed).length;
       const line = (l, v, k) => '<div class="line ' + (k || '') + '"><span>' + escapeHtml(l) + '</span><b>' + escapeHtml(String(v)) + '</b></div>';
       document.getElementById('side').innerHTML = '<h2>' + name + ' today</h2>' + line('Loads', ac.total) + line('Waiting', ac.waiting, 'w') + line('Unloading', ac.unloading, 'u') + line('Done', ac.complete, 'd') + '<hr>' +
-        line(unit + ' in', ac.qty.toLocaleString()) + line('Average time', ac.avg === null ? '—' : P.minutesText(ac.avg)) + '<hr>' + line('To the cooler', retLoads, retLoads ? 'r' : '') + line('To wash', toWash, toWash ? 'o' : '') + line('Washed', washed);
+        line(unit + ' out', ac.out.toLocaleString()) + line(unit + ' returned', ac.qty.toLocaleString()) + line('Lost', ac.lost.toLocaleString(), ac.lost > 0 ? 'r' : '') + line('Average time', ac.avg === null ? '—' : P.minutesText(ac.avg)) + '<hr>' + line('To the cooler', retLoads, retLoads ? 'r' : '') + line('To wash', toWash, toWash ? 'o' : '') + line('Washed', washed);
       // The table.
       const ck = check(), k = (r) => ' data-key="' + escapeHtml(r.key) + '"';
       let html = '';
@@ -135,7 +138,9 @@
         // Joe 10/27: a drop-and-hook load shows its name (Ferry Product 1, Lancaster Transfer), never a trailer number.
         const trailer = r.dropAndHook ? '<span class="trl dh">' + escapeHtml(r.name) + '</span>' : r.trailer ? '<span class="trl">' + escapeHtml(r.trailer) + '</span>' : !ck ? '<span class="na">—</span>' : '<input data-f="trailer"' + k(r) + ' placeholder="Trailer #" aria-label="Trailer back for ' + escapeHtml(r.route) + '">';
         const qty = r.casesIn !== '' ? '<span class="chk ok">&#10003; ' + escapeHtml(r.casesIn) + ' ' + unit.toLowerCase() + '</span>' : !ck ? '<span class="na">—</span>' :
-          s === 'UNLOADING' ? '<input data-f="casesIn"' + k(r) + ' inputmode="numeric" placeholder="' + unit + '" aria-label="' + unit + ' in for ' + escapeHtml(r.route) + '">' : '<span class="chk na">Start first</span>';
+          s === 'UNLOADING' ? '<input data-f="casesIn"' + k(r) + ' inputmode="numeric" placeholder="' + unit + '" aria-label="' + unit + ' returned for ' + escapeHtml(r.route) + '">' : '<span class="chk na">Start first</span>';
+        const count = (v) => (v === '' ? '<span class="na">—</span>' : '<b>' + Number(v).toLocaleString() + '</b>');
+        const lost = P.lostCases(r), lostCell = () => (lost === null ? '<span class="na">—</span>' : lost > 0 ? '<span class="lost">' + lost.toLocaleString() + ' lost</span>' : lost < 0 ? '<span class="chk ok">' + (-lost).toLocaleString() + ' extra</span>' : '<span class="chk ok">&#10003; All back</span>');
         const titleRet = r.pendingReturns.map(x => x.detail).join('; ');
         const rta = r.pendingReturns.length ? (ck ? '<button type="button" class="rta" data-do="rta"' + k(r) + ' title="Return to the cooler (RTA): ' + escapeHtml(titleRet) + '">RTA</button>' : '<span class="pill ret">Return pending</span>')
           : hadReturn ? '<span class="chk ok">&#10003; Returned</span>' : '<span class="chk na">None</span>';
@@ -147,11 +152,11 @@
         const clockCell = !ck ? '' : s === 'WAITING' ? '<button type="button" class="clock" data-do="start"' + k(r) + '>Start</button>' : s === 'UNLOADING' ? '<button type="button" class="clock end" data-do="end"' + k(r) + '>End</button>' : '<span class="tick">&#10003;</span>';
         // Joe 10/18: the route cell shows only the route (no run line under it) and the trailer cell only the trailer (no "Next:" line).
         html += '<tr' + k(r) + ' class="' + (r.pendingReturns.length ? 'needs-return ' : '') + (s === 'COMPLETE' ? 'done' : s === 'UNLOADING' ? 'loading' : '') + '"' + (titleRet ? ' title="Return: ' + escapeHtml(titleRet) + '"' : '') + '>' +
-          '<td class="rr"><b>' + escapeHtml(r.route) + '</b></td><td class="trlcell">' + trailer + '</td><td>' + pill(r) + '</td><td>' + qty + '</td>' + (on ? countedCell(r) : '') + '<td>' + rta + '</td><td>' + washCell + '</td>' +
+          '<td class="rr"><b>' + escapeHtml(r.route) + '</b></td><td class="trlcell">' + trailer + '</td><td>' + pill(r) + '</td><td>' + count(r.casesOut) + '</td><td>' + count(r.driverSaid) + '</td><td>' + qty + '</td><td>' + lostCell(r) + '</td>' + (on ? countedCell(r) : '') + '<td>' + rta + '</td><td>' + washCell + '</td>' +
           '<td>' + clockCell + '</td><td>' + time + '</td><td>' + (ck ? '<button type="button" class="edit-row" data-do="edit"' + k(r) + '>Edit</button>' : '') + '</td></tr>';
         if (ck && editKey === r.key) {
           html += '<tr class="editrow"><td colspan="' + ncol + '"><div class="editbar"><b>Edit · ' + escapeHtml(r.route + ' ' + r.run) + '</b><span class="read">Started ' + escapeHtml(P.clock(r.startedAt) || '—') + ' · Finished ' + escapeHtml(P.clock(r.completedAt) || '—') + '</span>' +
-            '<label>' + unit + ' In<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label><label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>' +
+            '<label>' + unit + ' Returned<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label><label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>' +
             '<label class="grow">Notes<input data-e="notes" maxlength="1200" value="' + escapeHtml(r.notes) + '"></label><button type="button" data-do="editclose">Close</button></div></td></tr>';
         }
       });
@@ -330,6 +335,8 @@
         s.docs.forEach(d => { const c = d.data(); if (c.kind === 'UNLOAD') caseCounts[c.unloadKey] = c; });
         render();
       }, () => { caseCounts = {}; }));
+      // Fleet's yard leave and return per unit (here or on the road, for the order). A screen that cannot read them orders without them.
+      unsubs.push(onSnapshot(query(collection(db, 'gpsDays'), where('date', 'in', [-1, 0, 1].map(n => L.addDays(date, n)))), s => { gpsDays = s.docs.map(d => d.data()); render(); }, () => { gpsDays = []; render(); }));
     }
 
     requireSignIn(async (user) => {

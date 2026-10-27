@@ -127,6 +127,8 @@
 .plant-page .uw-side .line.w b { color: #516273; } .plant-page .uw-side .line.u b { color: #b45f00; } .plant-page .uw-side .line.d b { color: var(--runs-ink); }
 .plant-page .uw-side .line.r b { color: #b42332; } .plant-page .uw-side .line.o b { color: #0080a0; }
 .plant-page table.unload td.rr { text-align: left; padding-left: 14px; }
+/* Joe 10/27 (hg): the empty cases lost on a load (Cases Out less Cases Returned). */
+.plant-page table.unload .lost { color: #b42332; font-weight: 900; }
 .plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
 .plant-page td.rr span { display: block; font-size: 16px; color: var(--muted); }
 .plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }

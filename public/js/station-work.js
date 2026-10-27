@@ -393,7 +393,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     rows.forEach(r => {
       const s = r.status, isOpen = s === 'UNLOADING' ? !closed[r.key] : !!opened[r.key], ws = P.washesForRow(r, wash), done = s === 'COMPLETE';
       const where = done || s === 'UNLOADING' ? '' : r.transfer ? '<i class="tt">Transfer trailer</i>' : r.back ? '<i class="back">&#10003; Back ' + escapeHtml(P.clock(r.back)) + '</i>' : r.road ? '<i class="road">On the road</i>' : '';
-      const chips = [where, r.casesIn !== '' ? '<i class="ok">' + unit + ' · ' + escapeHtml(r.casesIn) + ' confirmed</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
+      const chips = [where, r.casesIn !== '' ? '<i class="ok">' + unit + ' returned · ' + escapeHtml(r.casesIn) + '</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
         ws.length ? '<i class="wash">Wash required</i>' : r.washed ? '<i class="ok">Washed</i>' : ''].join('');
       const status = done ? badge('COMPLETE', 'done') : s === 'UNLOADING' ? badge('UNLOADING', 'going') : r.transfer ? badge('NEEDS A TRAILER') : badge('WAITING');
       const quick = ck && s === 'WAITING' && !isOpen && !r.road && !r.transfer ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
@@ -406,7 +406,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
         '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
       if (isOpen) {
         const dis = !ck || done;
-        html += '<div class="sw-body"><div class="sw-fields two">' + field(r.key, 'casesIn', unit + ' in', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) + field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + '</div>' +
+        // Joe 10/27 (hg): Cases out (from the loadout), Cases returned (typed here) and Lost, as on the office screen.
+        const typedIn = String(val(r.key, 'casesIn', r.casesIn)).trim().replace(/,/g, ''), lost = P.lostCases(Object.assign({}, r, { casesIn: /^\d+$/.test(typedIn) ? typedIn : '' }));
+        html += '<div class="sw-body"><div class="sw-fields">' + field(r.key + ':out', 'casesOut', unit + ' out', r.casesOut === '' ? '' : Number(r.casesOut).toLocaleString(), { disabled: true }) +
+          field(r.key, 'casesIn', unit + ' returned', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) +
+          '<label class="sw-field"><span>Lost</span><input value="' + (lost === null ? '' : lost < 0 ? (-lost).toLocaleString() + ' extra' : lost.toLocaleString()) + '" disabled' + (lost > 0 ? ' style="color:#b42332;font-weight:900"' : '') + '></label>' + field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + '</div>' +
           field(r.key, 'notes', 'Notes', r.notes, { wide: true, disabled: dis || s !== 'UNLOADING' }) +
           '<div class="sw-step' + (r.pendingReturns.length ? ' need' : '') + '"><b>2</b><span><strong>Returned product</strong><small>' + escapeHtml(r.pendingReturns.length ? r.pendingReturns.map(x => x.detail).join('; ') : r.returns.length ? 'Back in the cooler' : 'No return assigned') + '</small></span>' +
           (r.pendingReturns.length ? (ck ? btn('BACK IN THE COOLER (RTA)', 'urta', r.key, 'danger') : badge('PENDING', 'ret')) : badge(r.returns.length ? 'DONE' : 'NOT REQUIRED', r.returns.length ? 'done' : '')) + '</div>' +
@@ -680,7 +684,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
         saveUnload(r, { start: true }, { status: 'UNLOADING', startedAt: now });
       } else if (a === 'uend') {
         const typed = String(val(r.key, 'casesIn', r.casesIn)).trim().replace(/,/g, '');
-        if (!/^\d+$/.test(typed)) { showError('Enter the ' + P.UNLOAD_UNIT[area() || 'CASE'].toLowerCase() + ' in before completing (0 if none).'); const f = box.querySelector('[data-id="' + CSS.escape(r.key) + '"][data-k="casesIn"]'); if (f) f.focus(); return; }
+        if (!/^\d+$/.test(typed)) { showError('Enter the ' + P.UNLOAD_UNIT[area() || 'CASE'].toLowerCase() + ' returned before completing (0 if none).'); const f = box.querySelector('[data-id="' + CSS.escape(r.key) + '"][data-k="casesIn"]'); if (f) f.focus(); return; }
         if (r.pendingReturns.length) { showError('Put the returned product back in the cooler (RTA) before completing.'); return; }
         const first = typed !== r.casesIn ? saveUnload(r, { casesIn: String(Number(typed)) }, { casesIn: String(Number(typed)) }) : Promise.resolve(true);
         first.then(ok => { if (!ok) return; delete drafts[r.key]; const x = unloads().find(y => y.key === r.key); if (x) saveUnload(x, { end: true }, { status: 'COMPLETE', completedAt: new Date().toISOString() }); });

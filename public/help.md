@@ -545,13 +545,16 @@ Will the plant be late? Every case load still to load, in the order it will be l
 id: unloading
 screens: unloading.html
 
-Trucks back from the route: each load's trailer, cases in, counted, RTA (returned to the plant) and whether the trailer was washed.
+Trucks back from the route: each load's trailer, the empty cases that went out and came back, RTA (returned to the plant) and whether the trailer was washed.
 
 1. Press `Check Off` to work the list (`View Only` just looks).
-2. On a load press `Start`, type the **Cases In** count, then `End`. One unload at a time.
+2. On a load press `Start`, type the **Cases Returned** count, then `End`. One unload at a time.
 3. Mark `RTA` for returns and `Wash` if the trailer needs washing.
-4. `Edit` fixes the Trailer Back time and Notes.
+4. `Edit` fixes the Cases Returned count, the Trailer Back and Notes.
 
+- **Cases Out** comes from the loadout and **Driver Said** is what the driver typed at check-in. You don't type either one.
+- **Lost** is Cases Out minus Cases Returned, in red. The box on the right adds up the day.
+- On the plant tablet the open card shows Cases out, Cases returned and Lost the same way.
 - **Return day** (top right) with the arrows picks the day.
 - On a phone or small tablet each load is a card with every box named.
 - A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be, here and on the plant tablets.
