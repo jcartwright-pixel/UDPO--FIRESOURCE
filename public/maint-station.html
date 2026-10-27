@@ -89,8 +89,8 @@
     fullScreenOnTap();
 
     /*
-     * Plant Maintenance's Maintenance Station (Joe 10/12, mock-up E): the Garage Station for the plant's machinery, with the
-     * same technicians and login IDs. Record a Breakdown logs a big one fixed on the spot (on Shift Notes and the machine's
+     * Plant Maintenance's Maintenance Station (Joe 10/12, mock-up E): the Garage Station for the plant's machinery. Joe 10/27: its
+     * mechanics are the plant's own (Maintenance Schedule Setup, People, with their login IDs), not the garage's. Record a Breakdown logs a big one fixed on the spot (on Shift Notes and the machine's
      * history); + Report a Problem makes a work order. The screens it shares with the Garage Station (work orders, one work
      * order, Who are you?, Complete) are js/job-station.js (review item 74); here are the plant's own.
      */
@@ -107,8 +107,9 @@
     const S = mountJobStation({
       call, views: ['breakdown'], forms: ['report', 'breakdown'], safeYes: 'Yes, safe to run', officeSource: 'PM', downWord: 'LINE DOWN', unitClass: 'unit ms-unit',
       emptyJobs: 'No open work orders right now. Requests the plant sends and PMs come in here.',
-      noTechs: 'No mechanics yet. The office adds them in Fleet Service Setup (Garage Technicians); they sign in here with the same login ID.',
+      noTechs: 'No plant mechanics yet. A manager adds them on Plant Maintenance, Maintenance Schedule, Setup, People, with each one\'s station login ID.',
       hideEmptyStrip: true,
+      emptyStrip: 'No plant mechanics yet. A manager adds them on Plant Maintenance, Maintenance Schedule, Setup, People.',
       board: () => call('pmBoard'),
       onBoard: (r) => { machines = r.machines; },
       jobKey: (j) => j.id,

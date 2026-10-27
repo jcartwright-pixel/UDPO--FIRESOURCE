@@ -14,7 +14,7 @@
  *   purposes             { purpose: (who) => ... } the page's own steps after Who are you? (Report a Problem ...)
  *   asks                 the page's own Who are you? titles; signIn(tech, loginId) when the page signs in its own way
  *   step(who, job, op)   one clock step; complete(job, who, fields) the Complete step and doneText(job, who, safe, r)
- *   jobKey, jobLine, jobHead, jobLabel, problem, officeSource, downWord, unitClass, emptyJobs, noTechs, hideEmptyStrip,
+ *   jobKey, jobLine, jobHead, jobLabel, problem, officeSource, downWord, unitClass, emptyJobs, noTechs, hideEmptyStrip, emptyStrip,
  *   completeName, safeQ, safeWord, safeYes   the words and looks that differ
  */
 import { escapeHtml, goBack, hoursMinutesText } from './app.js';
@@ -115,8 +115,10 @@ export function mountJobStation(cfg) {
   function drawJobs() {
     $('jobs-title').textContent = 'Work Orders' + (jobs.length ? ' · ' + jobs.length + ' open' : '');
     // Review item 48 (Joe 10/13, Maintenance Station): no "Mechanics:" with nothing after it; the line shows once there are mechanics.
-    if (cfg.hideEmptyStrip) $('strip').hidden = !techs.length;
-    $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
+    // Joe 10/27 (Maintenance Station): with no mechanics yet, the line says where they are added (cfg.emptyStrip) instead.
+    if (cfg.hideEmptyStrip) $('strip').hidden = !techs.length && !cfg.emptyStrip;
+    if (!techs.length && cfg.emptyStrip) { $('strip').innerHTML = '<span class="gs-hint">' + escapeHtml(cfg.emptyStrip) + '</span>'; }
+    else $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
       '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
     $('jobs').innerHTML = jobs.map((j, i) => {
       const subs = ['<small>' + escapeHtml(cfg.jobLine(j)) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + '</small>'];

@@ -375,6 +375,10 @@ The garage's tablet. Mechanics sign in with their name and login ID, start and f
 - With no signal the station keeps working and sends everything when the signal is back.
 - A tablet opened with a station code has no Back or Home. `Release` (with the manager release code) is the only way out.
 
+> A mechanic's sign-in works only on their own plant's Maintenance Station.
+
+!> Do not add the plant's mechanics on Fleet Service Setup. That list is the garage's mechanics, and they show only on the Garage Station.
+
 !> Do not sign in as another mechanic. Each mechanic's time goes on their own name.
 
 ## Fleet Service
@@ -386,7 +390,7 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - **Due · Services & Annual Inspection** shows each unit with PM / Reefer, Annual Inspection and Plates side by side. Overdue and due soon stand out in color.
 - **Work Orders** lists the open work orders and what the mechanics did this week.
 - **History** shows the last 12 months.
-- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`).
+- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup.
 - To start a unit's dates, click its PM / Reefer or Annual Inspection on **Due**, or `Edit dates`. Type the last service date and miles, reefer hours, inspection due and plate expiry.
 - `Send to Garage` makes a work order for a unit that is due.
 - `Print Fleet Service Report` prints the report.
@@ -909,8 +913,13 @@ The preventive maintenance for each machine: what the PM is, how often (every so
 id: maint-station
 screens: maint-station.html
 
-The mechanics' tablet in the plant. Mechanics sign in and work their work orders.
+The mechanics' tablet in the plant. The plant's own maintenance mechanics sign in and work their work orders.
 
+1. Tap a work order.
+2. Tap your name, then type your login ID.
+3. Start, stop or complete your time on it.
+
+- **Mechanics:** the line across the top lists this plant's mechanics, the people on its Maintenance Schedule. A manager adds them, and each one's login ID, on Maintenance Schedule, `Setup`, `People`. With none yet, the line says so.
 - **Work Orders:** pick one to start or finish your time on it.
 - `+ Report a Problem`: pick the machine, say what is wrong and whether it is down (`Yes, it's down` or `No, it runs`), then `Send`.
 - `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up, then `Record`.
@@ -939,6 +948,14 @@ id: crew-setup
 screens: crew.html?view=setup, maint-crew.html?view=setup
 
 The areas with their own shift times, the jobs and how many people each needs, the people (name, employee ID, phone, usual job, shift, days off) and the vacation limits. Every box saves when you leave it.
+
+On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
+
+1. Add the mechanic on `People` (`+ Add Person`) and type their name.
+2. In their **Station login ID** box, type a 5- or 6-digit number and leave the box. It saves and the box then says `Set`.
+3. Tell the mechanic their number. It is never shown again; type a new one to change it.
+
+!> Do not give two mechanics the same login ID. The app will not save it.
 
 ## Plant Shifts
 id: shifts
