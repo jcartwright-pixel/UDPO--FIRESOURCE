@@ -301,7 +301,7 @@
       setCols(cols);
       document.getElementById('head-row').innerHTML = cols.map(([h], i) => '<th>' + escapeHtml(area !== 'TANKER' && i === 5 ? info.label : h) + '</th>').join('');
       const edit = canLoad(), dis = edit ? '' : ' disabled';
-      const orderIds = ordering ? movable.map(r => r.id) : [];
+      const orderIds = ordering ? movable.map(r => r.id) : [], started = orderRows(rows).map(r => r.startedAt);
       // Joe 10/12: a load not yet loaded is dragged up or down by its line (no arrows, no grab dots).
       const routeCell = (r) => '<td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';
       const dragAttrs = (r) => orderIds.indexOf(r.id) < 0 ? '' : ' data-drag="' + r.id + '" tabindex="0" aria-label="Load ' + escapeHtml(r.route + ' ' + r.run) + ', place ' + (orderIds.indexOf(r.id) + 1) + ' of ' + orderIds.length + '. Drag up or down, or Alt and the up or down arrow, to change the loading order"';
@@ -324,8 +324,12 @@
         const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'loading' : '') + '" data-state="' + r.id + '"' + dis + '>' + (st === 'DONE' ? '&#10003; Done' : r.paused ? '&#10073;&#10073; Paused' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
         const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + r.id + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : k === 'truck' ? ' list="lo-trucks" autocomplete="off"' : '') + ' value="' + escapeHtml(v) + '"' + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route) + '"' + dis + '>';
         const mins = P.minutesTaken(r);
-        // Skip shows on a load not yet started that has a load still to load below it (the last one stays where it is).
-        const oi = orderIds.indexOf(r.id), skipBtn = edit && st !== 'DONE' && st !== 'LOADING' && oi >= 0 && oi < orderIds.length - 1 ? '<button type="button" class="skip" data-skip="' + r.id + '" title="Move this load down one place">Skip</button>' : '';
+        // Skip shows on a load not yet started that has a load still to load below it (the last one stays where it is). Joe 10/27:
+        // a load already skipped R.SKIP_LIMIT times in a row shows Skip greyed; pressing it says why.
+        const oi = orderIds.indexOf(r.id), canSkip = edit && st !== 'DONE' && st !== 'LOADING' && oi >= 0 && oi < orderIds.length - 1;
+        const skipBtn = !canSkip ? '' : R.skipsInARow(r.moveMark, date, started) >= R.SKIP_LIMIT
+          ? '<button type="button" class="skip off" data-skipno="' + r.id + '" title="' + escapeHtml(R.skipWhy('Route ' + routeNo(r.route))) + '">Skip</button>'
+          : '<button type="button" class="skip" data-skip="' + r.id + '" title="Move this load down one place">Skip</button>';
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
@@ -457,15 +461,19 @@
       if (from < 0 || to < 0 || to >= list.length || to === from) return;
       const next = list.slice();
       next.splice(to, 0, next.splice(from, 1)[0]);
-      saveLoadOrder(next, { runDocId: list[from].runDocId, day: list[from].day, how: how || 'DRAG' });
+      return saveLoadOrder(next, { runDocId: list[from].runDocId, day: list[from].day, how: how || 'DRAG' });
     }
     // Skip: down one place, past the next load shown with a line to drag (a loaded load between them keeps its place).
+    const skipping = {};          // load id -> true while its Skip is on its way to the server (a second press does nothing)
     function skipDown(id) {
-      if (!canOrder()) return;
+      if (!canOrder() || skipping[id]) return;
       const shown = [...document.querySelectorAll('#rows tr[data-drag]')].map(tr => tr.dataset.drag), i = shown.indexOf(id);
       if (i < 0 || i >= shown.length - 1) return;
       const full = orderRows(rowsNow().filter(r => r.area === area));
-      moveLoad(id, full.findIndex(r => r.id === shown[i + 1]), 'SKIP');
+      const going = moveLoad(id, full.findIndex(r => r.id === shown[i + 1]), 'SKIP');
+      if (!going) return;
+      skipping[id] = true;
+      going.then(() => { delete skipping[id]; });
     }
 
     // Joe 10/12 ("grab the line with the hand and drag it"): toIndex is the load's new place among the loads shown with a line
@@ -824,6 +832,7 @@
       if (t.dataset.sedit) { const r = schedById(t.dataset.sedit); if (r) openSchedLoad(r.sched); return; }
       if (t.dataset.state) { const r = rowById(t.dataset.state); if (r && canLoad()) openStatus(t, r); return; }
       if (t.dataset.skip) { skipDown(t.dataset.skip); return; }
+      if (t.dataset.skipno) { const r = rowById(t.dataset.skipno); showError(R.skipWhy('Route ' + routeNo(r ? r.route : ''))); return; }
       if (t.dataset.clock) {
         const r = rowById(t.dataset.clock), now = new Date().toISOString();
         if (!r) return;

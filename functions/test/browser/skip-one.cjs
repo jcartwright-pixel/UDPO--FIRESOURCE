@@ -84,10 +84,19 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
         // A second press: one more place (past 815).
         await t.click(card('811') + ' [data-act="skip"]');
         await t.waitForFunction(() => { const c = [...document.querySelectorAll('#work .sw-card[data-sw]')].map(x => x.dataset.sw.replace(/^2026-10-04__run_p|\|.*$/g, '')); return c.indexOf('811') === c.indexOf('815') + 1; }, null, { timeout: 8000 });
+        // Joe 10/27 ("Don't allow more than 2 skips in a row"): after two skips in a row 811's SKIP is greyed; a tap says why
+        // and the load stays where it is.
+        await t.waitForSelector(card('811') + ' [data-act="skipno"]', { timeout: 8000 });
+        assert.equal((await day('811')).moveMark.skips, 2);
+        await t.click(card('811') + ' [data-act="skipno"]');
+        await t.waitForFunction(s => /Route 811 was already skipped 2 times in a row\. Load it next\./.test((document.querySelector(s + ' .sw-refuse') || {}).textContent || ''), card('811'), { timeout: 8000 });
+        const held = await cards(t);
+        assert.ok(after(held, '811', '815'), 'a third tap does not move it ' + held);
+        if (SHOTS) { await t.$eval(card('811'), el => el.scrollIntoView({ block: 'center' })); await t.screenshot({ path: path.join(SHOTS, 'station-third-skip-1024.png') }); }
         // The last load to load has no Skip: it stays where it is.
         const last = (await cards(t)).filter(r => /^[0-9_]+$/.test(r)).pop();
         assert.equal(await t.$(card(last) + ' [data-act="skip"]'), null, 'the last load (' + last + ') has no SKIP');
-        results.push('Plant Station Case tablet: each SKIP moved 811 down one place (past 812, then past 815), saved as the loading order, marked SKIPPED (who and the tablet on hover); the last load has no SKIP');
+        results.push('Plant Station Case tablet: each SKIP moved 811 down one place (past 812, then past 815), saved as the loading order, marked SKIPPED (who and the tablet on hover); a third SKIP in a row is greyed and says why; the last load has no SKIP');
       }
       assert.deepEqual(t.errors, []);
       await t.close();
@@ -132,6 +141,15 @@ const after = (list, a, b) => list.indexOf(a) === list.indexOf(b) + 1;
         results.push('Daily Case Loadout and Plant Station tablet: a skip made the day before shows no SKIPPED tag; its order stays');
       }
       if (w === 1920) {
+        // Joe 10/27: a second Skip moves it one more place; then Skip is greyed and pressing it says why.
+        await p.click(row('811') + ' button.skip');
+        await p.waitForFunction(() => { const r = [...document.querySelectorAll('#rows tr[data-row] td:first-child')].map(td => td.textContent); return r.indexOf('811') === r.indexOf('815') + 1; }, null, { timeout: 8000 });
+        await p.waitForSelector(row('811') + ' button.skip.off', { timeout: 8000 });
+        await p.click(row('811') + ' button.skip.off');
+        await p.waitForFunction(() => /Route 811 was already skipped 2 times in a row\. Load it next\./.test((document.getElementById('error') || {}).textContent || ''), null, { timeout: 8000 });
+        assert.ok(after(await rows(p), '811', '815'), 'a third press does not move it');
+        if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'loadout-third-skip-1920.png') });
+        results.push('Daily Case Loadout at 1920: a second Skip moved 811 one more place (past 815); then Skip is greyed and says why');
         // Joe 10/20: once the skipped load is Done its SKIPPED tag comes off, here and on the Plant Station tablet.
         await p.click(row('811') + ' button.clock');
         await p.waitForSelector(row('811') + ' button.clock.end', { timeout: 8000 });

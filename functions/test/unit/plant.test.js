@@ -574,3 +574,16 @@ test('yard checks: All Trailers in Yard lists every loaded trailer until it leav
   // Once a trailer leaves (its dispatch time, or the GPS sees it out) it is not listed.
   assert.deepEqual(R.yardAll(R.yardQueue(runs, [check], '2026-10-22', at('2026-10-23T06:10:00Z'), gps), at('2026-10-23T06:10:00Z')).map(x => x.trailer), ['T-921', 'T-10314', 'T-888'], '2:10 AM: T-893 (2 AM) has left');
 });
+
+test('Joe 10/27: a load can be skipped at most 2 times in a row (plant-rules skipsInARow)', () => {
+  const R = require('../../src/plant-rules');
+  const at = '2026-10-09T16:00:00.000Z';   // noon in Uniontown on 10-9-26
+  assert.equal(R.SKIP_LIMIT, 2);
+  assert.equal(R.skipsInARow(null, '2026-10-09', []), 0);
+  assert.equal(R.skipsInARow({ how: 'DRAG', savedAt: at }, '2026-10-09', []), 0, 'a drag is not a skip');
+  assert.equal(R.skipsInARow({ how: 'SKIP', savedAt: at }, '2026-10-09', []), 1, 'a skip saved before the count was kept counts once');
+  assert.equal(R.skipsInARow({ how: 'SKIP', savedAt: at, skips: 2 }, '2026-10-09', ['', '2026-10-09T15:00:00.000Z']), 2);
+  assert.equal(R.skipsInARow({ how: 'SKIP', savedAt: at, skips: 2 }, '2026-10-09', ['2026-10-09T16:05:00.000Z']), 0, 'another load started since: the count starts again');
+  assert.equal(R.skipsInARow({ how: 'SKIP', savedAt: at, skips: 2 }, '2026-10-10', []), 0, 'a skip from an earlier day does not count');
+  assert.equal(R.skipWhy('Route 811'), 'Route 811 was already skipped 2 times in a row. Load it next.');
+});

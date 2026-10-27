@@ -513,7 +513,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it.
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
-4. `Skip` moves a load down one place, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done.
+4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done. One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
 5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag.
 
 - `+ Add Load` adds a load nobody scheduled. Fill in the route, schedule type, load type, dates, time, trailer and cases, then `Confirm`. Nothing saves until Confirm.
@@ -524,6 +524,8 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
+
+!> Do not press Skip over and over to send a load to the bottom. Each press moves it one place, 2 at most. If it really has to wait longer, a manager can drag it.
 
 !> Do not press Done before the trailer is really loaded. Done stops the clock and the load drops off the plant's list.
 
@@ -1209,6 +1211,7 @@ screens: plant-station.html
 The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Box and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
 
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
+- `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
 - A station has no Back, Home or Sign out. `RELEASE THIS STATION` at the very bottom, with the **Manager release code**, is the only way out.
 
 !> Do not release a station to use the tablet for something else in the middle of a shift.

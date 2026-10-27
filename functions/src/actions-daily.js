@@ -9,6 +9,7 @@ const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const MAINT = require('./maintenance');
 const BOARD = require('./board-rules');
+const R = require('./plant-rules');
 const { SaveError, queueSheetCells } = require('./actions-common');
 
 const C = M.COLLECTIONS;
@@ -190,6 +191,27 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
     }
     return { item, run, seq: L.effectiveSequence(day) };
   });
+  // Joe 10/27 (Skip went "clear down to the bottom of the list"): a Skip is worked out here from the order the loads have now,
+  // whatever order the screen sent: the load goes down one place, past the next load not loaded yet, and at most
+  // R.SKIP_LIMIT times in a row.
+  let skips = 0;
+  if (req.action === 'reorderPlantLoads' && req.moved && req.moved.how === 'SKIP') {
+    const dayOf = (t) => t.run.days[t.item.day];
+    const isDone = (d) => !!d.completeTime || d.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(String(d.loadStatus || '').trim().toUpperCase()) >= 0;
+    const now = targets.slice().sort((a, b) => (a.seq == null ? 999999 : Number(a.seq)) - (b.seq == null ? 999999 : Number(b.seq)) ||
+      String(a.run.route).localeCompare(String(b.run.route), undefined, { numeric: true }));
+    const from = now.findIndex(t => t.item.runDocId === req.moved.runDocId && t.item.day === req.moved.day), me = now[from], d = dayOf(me);
+    const label = 'Route ' + L.routeNumber(me.run.route);
+    if (isDone(d) || d.plantStartedAt || ['LOADING', 'PAUSED'].indexOf(String(d.loadStatus || '').trim().toUpperCase()) >= 0) throw new SaveError('NOT_ALLOWED', label + ' is already loading, so it cannot be skipped');
+    let to = from + 1;
+    while (to < now.length && isDone(dayOf(now[to]))) to++;
+    if (to >= now.length) throw new SaveError('NOT_ALLOWED', label + ' is the last load still to load, so it cannot be skipped');
+    skips = R.skipsInARow(d.moveMark, req.loadDate, now.map(t => dayOf(t).plantStartedAt));
+    if (skips >= R.SKIP_LIMIT) throw new SaveError('NOT_ALLOWED', R.skipWhy(label));
+    skips += 1;
+    now.splice(to, 0, now.splice(from, 1)[0]);
+    targets.splice(0, targets.length, ...now);
+  }
   let slots = targets.map(t => t.seq).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
   slots = slots.filter((v, i) => slots.indexOf(v) === i);
   if (slots.length !== targets.length) slots = targets.map((_, i) => (i + 1) * 5);
@@ -202,7 +224,7 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
     u['days.' + t.item.day + '.updatedBy'] = email;
     // Joe 10/16 ("noted, just like manually moving the sequence, that it was moved, and then who did it"): app-only, never on the sheet.
     if (req.moved && req.saver && req.moved.runDocId === t.item.runDocId && req.moved.day === t.item.day) {
-      u['days.' + t.item.day + '.moveMark'] = { how: req.moved.how, savedAt: stamp, by: email, name: req.saver.name || '', via: req.saver.station ? 'TABLET' : 'DESK', station: req.saver.station || '' };
+      u['days.' + t.item.day + '.moveMark'] = Object.assign({ how: req.moved.how, savedAt: stamp, by: email, name: req.saver.name || '', via: req.saver.station ? 'TABLET' : 'DESK', station: req.saver.station || '' }, skips ? { skips } : {});
     }
     before.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: t.seq });
     after.push({ runDocId: t.item.runDocId, day: t.item.day, loadSequence: slots[i] });
