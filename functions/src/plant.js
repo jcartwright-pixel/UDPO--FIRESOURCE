@@ -504,10 +504,24 @@ function validateUnload(input, SaveError) {
     u.returnIds = f.returnIds.map(x => text(x).slice(0, 300)).filter(Boolean);
     if (!u.returnIds.length) throw new SaveError('BAD_REQUEST', 'Pick the return');
   }
+  // Joe 10/27 (hd, "there may be trailers here that wasn't unloaded the day before"): + Add a Trailer puts a trailer that is
+  // on no load on the list, to unload or only to wash. It is its own row (route ADDED, run = the trailer), so nothing goes
+  // on a week's load or the sheets. dropped takes one added by mistake back off, or one of yesterday's carried over that was
+  // in fact unloaded or is not here.
+  if (f.added !== undefined) {
+    if (ADDED_KINDS.indexOf(f.added) < 0) throw new SaveError('BAD_REQUEST', 'Pick what the trailer needs: Unload it or Wash only.');
+    if (!u.trailer) throw new SaveError('BAD_REQUEST', 'Enter the trailer number.');
+    if (out.route !== ADDED_ROUTE || out.run !== R.unitKey(u.trailer) || out.runDocId) throw new SaveError('BAD_REQUEST', 'An added trailer is on no load');
+    u.added = f.added;
+    u.area = ADDED_AREAS.indexOf(text(f.area)) >= 0 ? text(f.area) : 'CASE';
+    u.forRoute = text(f.forRoute).slice(0, 60);
+  }
+  if (f.dropped === true) u.dropped = true;
   if (!Object.keys(u).length) throw new SaveError('BAD_REQUEST', 'Nothing to save');
   out.unload = u;
   return out;
 }
+const ADDED_ROUTE = 'ADDED', ADDED_KINDS = ['UNLOAD', 'WASH'], ADDED_AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
 
 const appUnloadId = (key) => docId('UNLOADING_app_' + key);
 // A driver check-in that reported product back is a return too (the current app's ROUTE_CHECKIN returns).
@@ -523,6 +537,18 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   const next = { unloadKey: key, route: req.route, run: req.run, casesIn: prev.casesIn === undefined || prev.casesIn === null ? '' : String(prev.casesIn), startedAt: prev.startedAt || '',
     completedAt: prev.completedAt || '', notes: prev.notes || '', productReturnRemovedIds: prev.removed.slice() };
   if (prev.trailer !== undefined) next.trailer = prev.trailer;
+  ['added', 'area', 'addedAt', 'forRoute'].forEach(k => { if (prev[k]) next[k] = prev[k]; });
+  if (prev.dropped) next.dropped = true;
+  if (u.added) {
+    next.added = u.added; next.area = u.area; next.forRoute = u.forRoute; next.addedAt = stamp; next.dropped = false;
+    // Added again after being taken off or finished (the trailer came back again): a fresh row.
+    if (prev.dropped || prev.completedAt) { next.startedAt = ''; next.completedAt = ''; next.casesIn = ''; }
+  } else if (req.route === ADDED_ROUTE && !next.added) throw new SaveError('NOT_FOUND', 'That trailer is no longer on the list. Refresh the screen.');
+  if (u.dropped) {
+    if (next.startedAt) throw new SaveError('BAD_REQUEST', 'This trailer was started. Finish it instead of taking it off.');
+    next.dropped = true;
+  }
+  if (u.start && next.added === 'WASH') throw new SaveError('BAD_REQUEST', 'This trailer is only to be washed. Press Wash when it is clean.');
   if (u.returnIds) {
     const known = dayDocs.filter(d => String(d.type).toUpperCase() === 'RETURN' && text((d.payload || {}).route || d.route) === req.route && text((d.payload || {}).run || d.run) === req.run).map(d => d.recordId);
     if (req.runDocId && req.day) known.push(checkinReturnId(req.runDocId, req.day));
@@ -538,6 +564,7 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
     const active = Object.keys(all).filter(k => k !== key && all[k].startedAt && !all[k].completedAt)[0];
     if (active) throw new SaveError('CONFLICT', 'Stop unloading ' + all[active].route + ' · ' + all[active].run + ' before starting another.');
     next.startedAt = stamp;
+    next.dropped = false;
   }
   if (u.end) {
     if (!next.startedAt) throw new SaveError('BAD_REQUEST', 'Start unloading before ending.');
@@ -1436,5 +1463,5 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
 }
 
 module.exports = { runAreaOf, dayLoadingNow, scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
-  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
+  validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, ADDED_ROUTE, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
   validateSchedule, saveSchedule, appScheduleId };

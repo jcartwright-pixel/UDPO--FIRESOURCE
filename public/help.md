@@ -545,13 +545,22 @@ Will the plant be late? Every case load still to load, in the order it will be l
 id: unloading
 screens: unloading.html
 
-Trucks back from the route: each load's trailer, cases in, counted, RTA (returned to the plant) and whether the trailer was washed.
+Trucks back from the route: each load's trailer, the empty cases that went out and came back, RTA (returned to the plant) and whether the trailer was washed.
 
 1. Press `Check Off` to work the list (`View Only` just looks).
-2. On a load press `Start`, type the **Cases In** count, then `End`. One unload at a time.
+2. On a load press `Start`, type the **Cases Returned** count, then `End`. One unload at a time.
 3. Mark `RTA` for returns and `Wash` if the trailer needs washing.
-4. `Edit` fixes the Trailer Back time and Notes.
+4. `Edit` fixes the Cases Returned count, the Trailer Back and Notes.
+5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
+- **The order:** the trailers today's loadout needs come first, by when their load leaves, then the ones that came back but are not needed today. A trailer that is here goes ahead of one still on the road.
+- **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
+- A **Wash only** trailer has a `Wash` button and no `Start`. It is done once washed.
+- An added trailer, or one from yesterday that was in fact unloaded, can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
+- On the plant tablet the box **A trailer that is not on the list** does the same: type the trailer, then `UNLOAD IT` or `WASH ONLY`.
+- **Cases Out** comes from the loadout and **Driver Said** is what the driver typed at check-in. You don't type either one.
+- **Lost** is Cases Out minus Cases Returned, in red. The box on the right adds up the day.
+- On the plant tablet the open card shows Cases out, Cases returned and Lost the same way.
 - **Return day** (top right) with the arrows picks the day.
 - On a phone or small tablet each load is a card with every box named.
 - A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be, here and on the plant tablets.
@@ -559,6 +568,8 @@ Trucks back from the route: each load's trailer, cases in, counted, RTA (returne
 > To make a load show by name, open the Route Editor and tick **Drop and Hook** on that run.
 
 !> Do not start a second unload before ending the first one.
+
+!> Do not use `+ Add a Trailer` for a load that is already on the list. Find it and press `Start`.
 
 ## Truck Washing
 id: washing
@@ -568,6 +579,7 @@ Trailers that need washing, and the washes done.
 
 - Each line shows the trailer, when it was reported, the work needed, how many times it was reported and the work action.
 - `Wash` on a line marks it washed. `+ Add Wash` adds a wash nobody asked for: pick the day and trailer, then `Wash`.
+- A trailer added on Unloading as **Wash only** shows here too until it is washed.
 - **Wash Analytics** shows open wash items, washes this week and the trailers reported most often.
 
 ## Product Returns

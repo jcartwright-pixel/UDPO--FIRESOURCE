@@ -276,6 +276,8 @@ const U = window.UDPlant;
 export const UNLOAD_UNIT = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Gallons' };
 export const UNLOAD_TILE = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Tankers' };
 const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
+// A count from the sheet or the app: a whole number, or '' when blank or not a number.
+const num = (v) => { const t = txt(v).replace(/,/g, ''); return t !== '' && isFinite(Number(t)) ? Number(t) : ''; };
 const reported = (v) => !!txt(v) && !L.noWriteUp(v);
 
 /*
@@ -347,6 +349,11 @@ export function washItems(date, sheet, app, journal) {
   const done = U.washesDone(journal), unloads = U.latestUnloads(journal, date);
   Object.keys(unloads).forEach(k => {
     const u = unloads[k], unit = U.unitKey(u.trailer);
+    // Joe 10/27 (hd): a trailer added on Case Unloading only to be washed, until it is washed.
+    if (u.added === 'WASH' && !u.dropped && unit) {
+      if (!(done[unit] && U.when(done[unit].completedAt) >= U.when(u.addedAt))) out.push({ id: 'ADDED|' + k, kind: 'UNLOAD', trailer: txt(u.trailer), route: u.route, run: u.run, need: 'Wash only (added on Case Unloading)', reported: u.addedAt, refs: [] });
+      return;
+    }
     if (!u.completedAt || !unit) return;
     if (done[unit] && U.when(done[unit].completedAt) >= U.when(u.completedAt)) return;
     out.push({ id: 'UNLOAD|' + k, kind: 'UNLOAD', trailer: txt(u.trailer), route: u.route, run: u.run, need: 'Trailer washing required after unloading', reported: u.completedAt, refs: [] });
@@ -389,9 +396,22 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
     const mine = (returns || []).filter(x => (x.runDocId ? x.runDocId === run.id : x.route === txt(run.route) && x.run === txt(run.run)));
     const unit = U.unitKey(trailer || d.truck), wash = done[unit];
     rows.push({ id: key, key, runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
-      trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook, name: dropAndHook ? dropHookName(Object.assign({}, m, run, { streamId: run.streamId || m.streamId })) : '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
+      // Joe 10/27 (hg): Cases Out from the loadout and the empty cases the driver said at check-in, beside Cases Returned.
+      casesOut: num(d.casesOut), driverSaid: num(d.driverCaseReturn),
+      trailerTyped: u.trailer !== undefined && u.trailer !== '', dropped: !!u.dropped, dropAndHook, name: dropAndHook ? dropHookName(Object.assign({}, m, run, { streamId: run.streamId || m.streamId })) : '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
       startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
       washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, checkinAt: d.checkinCompletedAt || '', nextLoad: null, nextRank: 999999 });
+  });
+  // Joe 10/27 (hd): a trailer added by hand (+ Add a Trailer) to unload or only to wash. A wash-only trailer is done once washed.
+  Object.keys(unloads).forEach(k => {
+    const u = unloads[k];
+    if (!u.added || u.dropped || u.route !== ADDED_ROUTE) return;
+    const trailer = txt(u.trailer), wash = done[U.unitKey(trailer)], washOnly = u.added === 'WASH';
+    const washed = !!(wash && U.when(wash.completedAt) >= U.when(washOnly || !u.completedAt ? u.addedAt : u.completedAt));
+    rows.push({ id: k, key: k, runDocId: '', day: '', route: u.route, run: u.run, runId: '', area: u.area || 'CASE', driver: '', truck: '', trailer, casesOut: '', driverSaid: '',
+      trailerTyped: true, dropAndHook: false, name: '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn), startedAt: u.startedAt || '', completedAt: u.completedAt || '',
+      notes: u.notes || '', status: washOnly ? (washed ? 'COMPLETE' : 'WAITING') : u.status || 'WAITING', returns: [], pendingReturns: [], washed, checkedIn: false, checkinAt: '',
+      nextLoad: null, nextRank: 999999, added: u.added, washOnly, forRoute: u.forRoute || '', addedAt: u.addedAt || '' });
   });
   // When each trailer is next needed: the first unfinished load (in loading order) that uses the same unit.
   (loads || []).forEach((l, i) => {
@@ -407,13 +427,32 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
   return rows.sort((a, b) => (order[a.status] - order[b.status]) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
 }
 
+// Joe 10/27 (hd): + Add a Trailer's rows are route ADDED, run = the trailer (the server checks the same).
+export const ADDED_ROUTE = 'ADDED';
+export const addedRun = (trailer) => U.unitKey(trailer);
+
+/*
+ * Joe 10/27 (hd): yesterday's trailers nobody pressed End on come over to today's list by themselves, in red at the top,
+ * each saved on its own day. Not when the plant was started fresh after yesterday (as the loadout's carry-over), not for a
+ * day that has not started yet, and not a transfer trailer still out (drop and hook with no trailer back).
+ * journal = the plant journal of yesterday and today (today's washes count for yesterday's wash-only trailers).
+ */
+export function carriedUnloads(runs, date, journal, routes, plantStart) {
+  const y = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
+  if ((start && y < start) || date > L.operatingDay(new Date())) return [];
+  return unloadRows(runs, y, journal, [], [], routes).filter(r => r.status !== 'COMPLETE' && !r.dropped && !(r.dropAndHook && !r.trailer))
+    .map(r => Object.assign(r, { prior: true, date: y }));
+}
+
 /*
  * Case Unloading's order on the Plant Station (Joe 10/15, mock-up A): the trailers in the order the next loads leave (the
  * first unfinished load that needs the same trailer, by departure), with no times or routes shown. Each card says whether
  * the trailer is back: Verizon Connect Fleet's yard return (gpsDays yardIn after yardOut, the trailer's unit first, else its
  * truck), else the driver's check-in. A trailer Fleet shows out of the yard is "On the road" and goes below the ones that
  * are back. A drop-and-hook load (Route Master drop and hook, e.g. Marietta) with no trailer typed is a transfer trailer
- * still needed. Order: unloading now, back (numbered 1, 2, 3...), on the road, transfer trailers, then the ones done.
+ * still needed. Joe 10/27: the trailers today's loadout needs come first (by when their load leaves), then the ones not
+ * needed today; a trailer that is here goes ahead of one still on the road. Order: yesterday's and added trailers (hd);
+ * unloading now; here and needed; here and not needed (all numbered 1, 2, 3...); on the road and needed; on the road and not needed; transfer trailers; done.
  * gpsDays: the gpsDays docs of the days around `date` ([] when the tablet cannot read them: then no one is On the road).
  */
 export function unloadOrder(rows, gpsDays) {
@@ -425,7 +464,8 @@ export function unloadOrder(rows, gpsDays) {
     if (back && (!out || back > out)) return { back };
     return out ? { road: true } : null;
   };
-  const rank = (r) => r.status === 'COMPLETE' ? 4 : r.transfer ? 3 : r.status === 'UNLOADING' ? 0 : r.road ? 2 : 1;
+  // Yesterday's trailers and the ones added by hand go to the top, above the one unloading now (Joe 10/27, hd, mock-up 2).
+  const rank = (r) => r.status === 'COMPLETE' ? 7 : r.prior || r.added ? 0 : r.status === 'UNLOADING' ? 1 : r.transfer ? 6 : (r.road ? 4 : 2) + (r.nextLoad ? 0 : 1);
   const out = (rows || []).map(r => {
     const transfer = r.dropAndHook && !r.trailer;
     const y = transfer ? null : r.trailer && yard(r.trailer) || yard(r.truck);
@@ -433,16 +473,25 @@ export function unloadOrder(rows, gpsDays) {
     const road = !!(y && y.road) && !r.checkedIn && r.status === 'WAITING';
     return Object.assign({}, r, { transfer, back, road, order: 0 });
   });
+  const firstIn = (r) => (r.prior ? 0 : 1);
   const dep = (r) => (r.nextLoad && r.nextLoad.depart !== null && r.nextLoad.depart !== undefined ? r.nextLoad.depart : 1e12);
-  out.sort((a, b) => rank(a) - rank(b) || dep(a) - dep(b) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
+  out.sort((a, b) => rank(a) - rank(b) || firstIn(a) - firstIn(b) || dep(a) - dep(b) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
   let n = 0;
-  out.forEach(r => { if (rank(r) <= 1) r.order = ++n; });
+  out.forEach(r => { if (rank(r) <= 3) r.order = ++n; });
   return out;
 }
 
+// Joe 10/27 (hg): the empty cases lost on a load = Cases Out (loadout) less Cases Returned (unloaders); null until both are known.
+export function lostCases(r) {
+  if (!r || r.casesOut === '' || r.casesIn === '' || r.casesIn === undefined) return null;
+  return Number(r.casesOut) - Number(r.casesIn);
+}
+
 export function unloadCounts(rows) {
-  const c = { total: rows.length, waiting: 0, unloading: 0, complete: 0, qty: 0, mins: [] };
+  const c = { total: rows.length, waiting: 0, unloading: 0, complete: 0, qty: 0, out: 0, lost: 0, mins: [] };
   rows.forEach(r => {
+    const lost = lostCases(r);
+    if (lost !== null) { c.out += Number(r.casesOut); c.lost += lost; }
     c[r.status === 'COMPLETE' ? 'complete' : r.status === 'UNLOADING' ? 'unloading' : 'waiting']++;
     if (r.casesIn !== '') c.qty += Number(r.casesIn) || 0;
     const a = Date.parse(r.startedAt), b = Date.parse(r.completedAt);

@@ -127,6 +127,19 @@
 .plant-page .uw-side .line.w b { color: #516273; } .plant-page .uw-side .line.u b { color: #b45f00; } .plant-page .uw-side .line.d b { color: var(--runs-ink); }
 .plant-page .uw-side .line.r b { color: #b42332; } .plant-page .uw-side .line.o b { color: #0080a0; }
 .plant-page table.unload td.rr { text-align: left; padding-left: 14px; }
+/* Joe 10/27 (hg): the empty cases lost on a load (Cases Out less Cases Returned). */
+.plant-page table.unload .lost { color: #b42332; font-weight: 900; }
+.plant-page .uw-add { height: 40px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--ud-blue); color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.plant-page .uw-addbox { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 16px; padding: 10px 14px; border-radius: 10px; background: #fff8e6; border: 1px solid #f0d58a; }
+.plant-page .uw-addbox[hidden] { display: none; }
+.plant-page .uw-addbox label { display: flex; flex-direction: column; gap: 3px; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); }
+.plant-page .uw-addbox input, .plant-page .uw-addbox select { height: 38px; min-width: 160px; font: inherit; font-size: 16px; }
+.plant-page .uw-addbox button { height: 38px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; color: var(--ud-blue); }
+.plant-page .uw-addbox button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.plant-page table.unload .uw-tag { display: block; width: max-content; max-width: 100%; margin-top: 2px; padding: 0 5px; white-space: nowrap; border-radius: 6px; font-size: 16px; font-weight: 800; }
+.plant-page table.unload .uw-tag.from { background: #fde5e3; color: #b42332; }
+.plant-page table.unload .uw-tag.add { background: #fff3cf; color: #7a5600; }
+.plant-page tr.prior > td:first-child { box-shadow: inset 5px 0 0 #b42332; }
 .plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
 .plant-page td.rr span { display: block; font-size: 16px; color: var(--muted); }
 .plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }
@@ -953,7 +966,11 @@ body.yard-page .head .badge-test { order: 6; }
   .plant-page small.next { font-size: 16px; }
   .plant-page:is(.loadout-page, .unload-page) .sheet.scroll-list { overflow-x: auto; }
   .plant-page.loadout-page .sheet.scroll-list table.loadout { min-width: 1150px; }
-  .plant-page.unload-page .sheet.scroll-list table.loadout { min-width: 1150px; }
+  /* Joe 10/27: at 1366 the whole Unloading list fits beside the side box (Total Time and Edit were scrolled off). */
+  .plant-page.unload-page .sheet.scroll-list table.loadout { min-width: 1020px; }
+  .plant-page.unload-page table.unload th, .plant-page.unload-page table.unload td { padding-left: 4px; padding-right: 4px; }
+  .plant-page.unload-page table.unload td.rr { padding-left: 8px; }
+  .plant-page.unload-page table.unload .pill { padding-left: 6px; padding-right: 6px; }
 }
 /* Temperatures: the range under each cooler, its status and the last reading stay readable. */
 .temp-page .tp-table small, .temp-page .tp-status, .plant-page .as-last, .plant-page .as-note { font-size: 16px; }
