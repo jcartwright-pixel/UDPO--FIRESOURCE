@@ -68,6 +68,8 @@ async function openPage(browser, width, height, url, touch) {
       const p = await openPage(browser, w, h, '/plant-station.html?' + MANAGER + '&station=CASE_UNLOADING', true);
       await p.waitForSelector('#work .sw-card .sw-chips i.back', { timeout: 15000 });
       await p.waitForSelector('#work .sw-card.road');
+      // Route Master (the Drop and Hook tick) is read on its own, after the loads: wait for the transfer card it makes.
+      await p.waitForSelector('#work .sw-card .sw-chips i.tt');
       const cards = await p.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => ({
         key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
         title: c.querySelector('.sw-title b').textContent, chips: c.querySelector('.sw-chips').textContent, badge: c.querySelector('.sw-head .sw-badge').textContent,
@@ -110,8 +112,8 @@ async function openPage(browser, width, height, url, touch) {
     const o = await openPage(browser, 1536, 790, '/unloading.html?' + MANAGER + '&area=CASE&date=2026-10-08');
     await o.waitForSelector('#rows tr[data-key]', { timeout: 15000 });
     await o.click('[data-tab="all"]');
-    const cell = await o.waitForSelector('#rows tr[data-key*="909_1"] td.trlcell');
-    assert.equal((await cell.textContent()).trim(), 'Marietta 1');
+    await o.waitForFunction(() => { const c = document.querySelector('#rows tr[data-key*="909_1"] td.trlcell'); return c && c.textContent.trim() === 'Marietta 1'; });
+    const cell = await o.$('#rows tr[data-key*="909_1"] td.trlcell');
     assert.equal(await cell.$('input'), null, 'no Trailer # box on a drop-and-hook load');
     assert.deepEqual(o.errors, []);
     results.push('office: Marietta 1 in the Trailer column');
