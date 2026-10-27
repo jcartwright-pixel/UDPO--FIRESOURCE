@@ -1370,18 +1370,11 @@ body.yard-page .head .badge-test { order: 6; }
 /* Joe 10/15 (Manager Walkthrough, look C, option 1): the phone and tablet start screen (three choices) and the walkthrough
    (Coolers, then Quality) as big tiles with big numbers; a red tile flashes while a check is past due. */
 .walk-page .wk-view { display: block; overflow: auto; padding: 4px 16px 16px; }
-/* Joe 10/27: on a phone or tablet the managers' screens scroll as one page, the way a phone expects (a box scrolling inside a
-   screen-high page could not be scrolled on his phone). */
-@media (max-width: 1024px) {
-  body.fill.walk-page { height: auto; min-height: 100dvh; overflow: visible; }
-  body.fill.walk-page #screen:not([hidden]) { height: auto; min-height: 100dvh; }
-  body.fill.walk-page .side-wrap, body.fill.walk-page .wk-view:not([hidden]) { flex: none; overflow: visible; }
-  body.fill.walk-page .side-main { overflow: visible; }
-}
 /* Joe 10/27: on a phone or tablet the plant screens that grow as one long page (Loading, Unloading and others) could not be
-   scrolled at all: the page grew but the page itself was held still. Now the page scrolls. */
+   scrolled at all: the page grew but the page itself was held still. Now the page scrolls. (The managers' start screen and
+   walkthrough keep their own scrolling list.) */
 @media (max-width: 1000px) {
-  body.fill.plant-page { height: auto; min-height: 100dvh; overflow: visible; }
+  body.fill.plant-page:not(.walk-page) { height: auto; min-height: 100dvh; overflow: visible; }
 }
 .walk-page .wk-ask { margin: 6px 2px 12px; font-size: 20px; color: var(--ink); }
 .walk-page .wk-list { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
