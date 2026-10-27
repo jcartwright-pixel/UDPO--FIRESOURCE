@@ -1721,9 +1721,9 @@ a.wp-more { color: var(--ud-blue); }
   .prod-home .mc-grid [data-card="dept"] { grid-column: 6 / span 11; grid-row: 1; }
   .prod-home .mc-grid [data-card="walk"] { grid-column: 1 / span 11; grid-row: 2; }
   .prod-home .mc-grid [data-card="notes"] { grid-column: 12 / span 5; grid-row: 2; }
-  .prod-home .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
-  .prod-home .mc-grid [data-card="notes"] .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; padding: 4px 10px; }
-  .prod-home .mc-grid [data-card="notes"] .mc-tile b { text-align: left; font-size: 30px; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: minmax(0, 1fr); gap: 4px; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tile { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "label line num"; align-items: center; column-gap: 8px; padding: 0 10px; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tile b { text-align: right; font-size: 24px; line-height: 1.05; }
   .prod-home .mc-grid [data-card="notes"] .mc-tile i { white-space: normal; overflow: visible; line-height: 1.15; }
   .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .prod-home .mc-grid [data-card="walk"] .mc-tile, .prod-home .mc-grid [data-card="notes"] .mc-tile { padding-left: 10px; padding-right: 10px; }
@@ -1736,8 +1736,10 @@ a.wp-more { color: var(--ud-blue); }
   .prod-home .dp-counts span { padding: 1px 2px; }
   .prod-home .dp-counts em { line-height: 1.15; }
   .prod-home .dp-counts b { font-size: 22px; line-height: 1.05; }
-  .prod-home .dp-bar { height: 6px; }
-  .prod-home .dp-note { margin: 0; }
+  .prod-home .dp-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; column-gap: 12px; }
+  .prod-home .dp-card > :is(.dp-head, .dp-counts, .dp-lines) { grid-column: 1 / -1; }
+  .prod-home .dp-note { grid-column: 1; grid-row: 3; margin: 0; }
+  .prod-home .dp-bar { grid-column: 2; grid-row: 3; align-self: center; height: 8px; }
   .prod-home .dp-line { padding: 1px 8px; gap: 8px; }
   .prod-home .dp-line b { font-size: 22px; }
   .prod-home .dp-line span { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
