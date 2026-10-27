@@ -123,7 +123,7 @@
       col('Jug Weight Target (g)', 'jugWeightTarget', false, 'number', 'BLOW MOLD only: the empty jug it makes, 0 to 500 g.', 'jugWeightTarget (Blow Mold)', null, { upTo: 500 }),
       col('Jug Weight Low (g)', 'jugWeightLow', false, 'number', 'BLOW MOLD only: lightest jug, 0 to 500 g.', 'jugWeightLow (Blow Mold)', null, { upTo: 500 }),
       col('Jug Weight High (g)', 'jugWeightHigh', false, 'number', 'BLOW MOLD only: heaviest jug, 0 to 500 g.', 'jugWeightHigh (Blow Mold)', null, { upTo: 500 }),
-      col('Fill Check Due', 'fillEvery', false, 'choice', 'Fillers (and RAYPAK / BOXING bags): when the fill weight check is due. Blank = every 2 hours.', 'Line Targets fillEvery', FILL_MODES),
+      col('Fill Check Due', 'fillEvery', false, 'choice', 'Fillers (and RAYPAK bags): when the fill weight check is due. Blank = every 2 hours.', 'Line Targets fillEvery', FILL_MODES),
       col('Fill Check Every', 'fillEveryN', false, 'number', 'With Every so many minutes or jugs: how many, 0 to 100000.', 'fillEveryN', null, { upTo: 100000 }),
       col('Empty Jug (g)', 'tareGrams', false, 'number', 'Fillers: the empty jug (or bag), 0 to 2000 g.', 'tareGrams', null, { upTo: 2000 }),
       col('Cap (g)', 'capGrams', false, 'number', 'Fillers: the cap (or fitment), 0 to 200 g.', 'capGrams', null, { upTo: 200 }),
@@ -244,8 +244,8 @@
     return 'FILLER';
   }
   var KIND_LABEL = { FILLER: 'Fillers', HTST: 'HTST', PACK: 'Boxing & Totes', BLOWMOLD: 'Blow Mold' };
-  // production-rules.js hasFill: fillers, and the RAYPAK and BOXING bag fillers.
-  function hasFill(name) { var k = String(name == null ? '' : name).toUpperCase().replace(/[^A-Z0-9]/g, ''); return lineKind(name) === 'FILLER' || k === 'RAYPAK' || k === 'BOXING'; }
+  // production-rules.js hasFill: fillers, and the RAYPAK bag filler (Joe 10/26: not BOXING).
+  function hasFill(name) { var k = String(name == null ? '' : name).toUpperCase().replace(/[^A-Z0-9]/g, ''); return lineKind(name) === 'FILLER' || k === 'RAYPAK'; }
 
   function text(v) { return v === null || v === undefined ? '' : String(v).replace(/\s+/g, ' ').trim(); }
   function upper(v) { return text(v).toUpperCase(); }
@@ -521,7 +521,7 @@
               if (hit.length && !ok) p.push(hit.join(', ') + ': ' + words + ' only (' + v.name + ' is ' + KIND_LABEL[lk] + ')');
             };
             only(['jugWeightTarget', 'jugWeightLow', 'jugWeightHigh'], lk === 'BLOWMOLD', 'BLOW MOLD');
-            only(['fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver'], hasFill(v.name), 'fillers and the RAYPAK / BOXING bag fillers');
+            only(['fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver'], hasFill(v.name), 'fillers and the RAYPAK bag filler');
             only(['perBox', 'fedBy'], lk === 'PACK', 'BOXING, RAYPAK and TOTES');
             if (v.jugWeightLow !== '' && v.jugWeightHigh !== '' && Number(v.jugWeightLow) > Number(v.jugWeightHigh)) p.push('Jug Weight Low is above High');
             if (v.fillEveryN !== '' && ['Every so many minutes', 'Every so many jugs'].indexOf(v.fillEvery) < 0) p.push('Fill Check Every needs Fill Check Due of Every so many minutes or jugs');

@@ -141,28 +141,23 @@ test('Gallon Filler add-on sensors (B): the motor switch stops and starts the li
   assert.equal(r.count, 100, 'the I/O module never counts jugs on a label reader line');
 });
 
-test('5-gallon bag fillers: bags weighed in grams against the target; Boxing\'s are the Quality check, Raypak\'s (no package weight there) stay on the tablet', async () => {
+// Joe 10/26: Boxing has no fill weight check (the product was weighed before it gets there).
+test('5-gallon bag filler: Raypak\'s bags weighed in grams against the target stay on the tablet (no package weight on its Quality check); Boxing and Totes have no fill weight check', async () => {
   const RAYPAK = 'ut_prod_raypak', BOXING = 'ut_prod_boxing', TOTES = 'ut_prod_totes';
   await db().collection('plantSetup').doc(RAYPAK).set({ operationId: RAYPAK, type: 'PRODUCTION_AREA', status: 'ACTIVE', name: 'RAYPAK', area: 'RAYPAK', facilityId: 'fac_uniontown', viewSequence: 15 });
-  for (const id of [RAYPAK, BOXING]) {
-    await save('saveMachineProducts', { operationId: id, products: [{ name: '5 Gal 2% Dispenser', sku: '90305', fillGrams: 19500, ratePerMin: 10 }] });
-    await save('saveLineSetup', { operationId: id, tareGrams: '450', capGrams: '20', fillUnder: '50' });
-    await entry(id, { op: 'product', product: '5 Gal 2% Dispenser', sku: '90305' }, 1);
-    await entry(id, { op: 'fill', field: 'jug1', value: '19950', index: null }, 2);
-    await entry(id, { op: 'fill', field: 'jug2', value: '19900', index: 0 }, 3);
-    const f = P.fillOf((await runOf(id)).fills[0]);
-    assert.deepEqual([f.jugs[0].net, f.jugs[0].diff, f.jugs[1].net, f.jugs[1].flag], [19480, -20, 19430, 'LIGHT'], id + ': bag - empty bag - fitment against 19,500 g');
-  }
+  await save('saveMachineProducts', { operationId: RAYPAK, products: [{ name: '5 Gal 2% Dispenser', sku: '90305', fillGrams: 19500, ratePerMin: 10 }] });
+  await save('saveLineSetup', { operationId: RAYPAK, tareGrams: '450', capGrams: '20', fillUnder: '50' });
+  await entry(RAYPAK, { op: 'product', product: '5 Gal 2% Dispenser', sku: '90305' }, 1);
+  await entry(RAYPAK, { op: 'fill', field: 'jug1', value: '19950', index: null }, 2);
+  await entry(RAYPAK, { op: 'fill', field: 'jug2', value: '19900', index: 0 }, 3);
+  const f = P.fillOf((await runOf(RAYPAK)).fills[0]);
+  assert.deepEqual([f.jugs[0].net, f.jugs[0].diff, f.jugs[1].net, f.jugs[1].flag], [19480, -20, 19430, 'LIGHT'], 'bag - empty bag - fitment against 19,500 g');
   assert.equal((await quality(RAYPAK)).length, 0, 'Raypak\'s Quality check has no package weight: nothing written there');
   assert.equal((await runOf(RAYPAK)).fills[0].qualityId, undefined);
-  const q = await quality(BOXING);
-  assert.equal(q.length, 1);
-  assert.equal(q[0].payload.weights.result, '19950, 19900 g');
-  // Totes have no fill weight check.
-  await assert.rejects(entry(TOTES, { op: 'fill', field: 'jug1', value: '19950', index: null }, 4), /has no fill weight check/);
+  for (const id of [BOXING, TOTES]) await assert.rejects(entry(id, { op: 'fill', field: 'jug1', value: '19950', index: null }, 4), /has no fill weight check/);
   // A bag over 20 kg is still a weight (up to 30 kg).
-  await entry(BOXING, { op: 'fill', field: 'jug3', value: '20400', index: 0 }, 5);
-  assert.equal((await runOf(BOXING)).fills[0].jug3, 20400);
+  await entry(RAYPAK, { op: 'fill', field: 'jug3', value: '20400', index: 0 }, 5);
+  assert.equal((await runOf(RAYPAK)).fills[0].jug3, 20400);
 });
 
 test('Fed by: a packing line keeps the fillers that feed it and the jugs in each box', async () => {

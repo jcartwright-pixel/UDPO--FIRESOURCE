@@ -189,7 +189,7 @@ async function sendPmToMaintenance(tx, db, req, email, stamp, logRef, mode, Save
 /* ---------- Maintenance Station (mock-up E): the tablet, like the Garage Station ---------- */
 /*
  * Joe 10/12: the mechanics work the plant's work orders the way they work the garage's: the open work orders come up first with
- * no sign-in; a mechanic taps one, then their name and login ID (the same technicians and login IDs as the Garage Station), and
+ * no sign-in; a mechanic taps one, then their name and login ID, and
  * Starts their own clock. Need Parts, Add another mechanic, Stop, and Complete (what was fixed, safe to run, finger signature).
  * A PM work order completed moves the PM task's Last done to that day. + Report a Problem makes a work order; Record a Breakdown
  * puts a big one fixed on the spot (machine, down, back up, cause and fix) on the shift log, the same as Shift Notes does.
@@ -207,6 +207,37 @@ const CLOCK = require('./job-clock');
 const { laborOf, joinNames } = CLOCK;
 const FROM_WORD = { SHIFT_NOTES: 'Request from the plant', PM: 'PM', MAINTENANCE: 'Reported by maintenance' };
 
+/*
+ * Joe 10/27 ("These are distribution managed mechanics. Not plant."): the station's mechanics are the plant's own, the people on
+ * its Maintenance Schedule (Maintenance Schedule Setup, People: crewPeople, team maint), not the Garage Station's technicians.
+ * Each one's login ID is typed on that same People list (saveCrewSetup op login) and kept only as a hash in plantMaintLogins,
+ * which no browser may read; wrong numbers lock them out the same way (plantMaintLocks). Their sign-ins carry station MAINT and
+ * the plant, so they work only on that plant's Maintenance Station.
+ */
+const MECH_LOGINS = 'plantMaintLogins', MECH_LOCKS = 'plantMaintLocks';
+const plantMechanic = (facilityId) => (p) => p && p.team === 'maint' && p.facilityId === facilityId && p.status !== 'RETIRED' && text(p.name) ? { id: text(p.id), name: short(p.name, 40) } : null;
+function maintSource(facilityId) {
+  const plant = plantOf(facilityId || 'fac_uniontown', A().SaveError);
+  return { station: 'MAINT', facilityId: plant, techs: 'crewPeople', logins: MECH_LOGINS, locks: MECH_LOCKS, tech: plantMechanic(plant), where: 'the Maintenance Station',
+    noLogin: (name) => name + ' has no login ID yet. A manager adds it on Maintenance Schedule Setup, People.' };
+}
+const maintWant = (facilityId) => ({ station: 'MAINT', facilityId: plantOf(facilityId || 'fac_uniontown', A().SaveError) });
+const loginKey = (facilityId, loginId) => 'id_' + require('crypto').createHash('sha256').update('UDPO-MAINT-ID|' + facilityId + '|' + String(loginId).trim()).digest('hex');
+// Maintenance Schedule Setup, People: set or change a plant mechanic's login ID (5 or 6 digits; two of the plant's mechanics cannot
+// share one). Reads first, then writes, inside the save's transaction. The number itself is never kept or logged.
+async function setMechanicLogin(tx, db, facilityId, personId, loginId, stamp, email) {
+  const keyRef = db.collection(MECH_LOGINS).doc(loginKey(facilityId, loginId)), mineRef = db.collection(MECH_LOGINS).doc(docId(personId));
+  const [taken, mine] = await tx.getAll(keyRef, mineRef);
+  if (taken.exists && taken.data().techId !== personId) throw SaveErr('BAD_REQUEST', 'Another mechanic already uses that login ID. Pick a different number.');
+  const old = mine.exists && mine.data().key && mine.data().key !== keyRef.id ? db.collection(MECH_LOGINS).doc(mine.data().key) : null;
+  return () => {
+    tx.set(mineRef, { techId: personId, facilityId, hash: GA().loginHash(personId, loginId), key: keyRef.id, setAt: stamp, setBy: email });
+    tx.set(keyRef, { techId: personId, facilityId, setAt: stamp });
+    if (old) tx.delete(old);
+    tx.delete(db.collection(MECH_LOCKS).doc(docId(personId)));
+  };
+}
+
 // A work order as the tablet shows it.
 function stationJob(o) {
   const labor = laborOf(o);
@@ -218,7 +249,9 @@ function stationJob(o) {
 
 async function stationBoard(db, input, nowMs) {
   const facilityId = plantOf(input.facilityId || 'fac_uniontown', A().SaveError);
-  const techs = GA().activeTechs((await db.collection('garageTechs').get()).docs.map(d => d.data()));
+  const mech = plantMechanic(facilityId);
+  const techs = (await db.collection('crewPeople').where('facilityId', '==', facilityId).get()).docs.map(d => mech(Object.assign({}, d.data(), { id: d.id }))).filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
   const setup = (await db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA').get()).docs.map(d => d.data());
   const saved = (await db.collection('plantMachines').where('facilityId', '==', facilityId).get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
   // Joe 10/18 (polled every 30 seconds): the open work orders and the ones finished in the last two days (for Done today), not
@@ -283,7 +316,7 @@ async function stationStep(db, input, nowMs) {
   return db.runTransaction(async tx => {
     const logRef = db.collection('actions').doc(req.requestId), logSnap = await tx.get(logRef);
     if (logSnap.exists) return Object.assign({}, logSnap.data().result, { repeated: true });
-    const people = await GA().signedInTechs(tx, db, input.tokens, nowMs);
+    const people = await GA().signedInTechs(tx, db, input.tokens, nowMs, { station: 'MAINT', facilityId: req.facilityId });
     if (!people.length) throw SaveErr('NOT_ALLOWED', 'GARAGE_SIGN_IN_REQUIRED: Tap your name and enter your login ID.');
     const names = people.map(p => p.name), by = 'maintenance:' + names.join('+');
     const mode = await A().requireTestMode(tx, db, 'plant');
@@ -361,4 +394,4 @@ async function stationStep(db, input, nowMs) {
   });
 }
 
-module.exports = { stationBoard, stationStep, FIXES, validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, plantMachines, nextNumber, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };
+module.exports = { stationBoard, stationStep, maintSource, maintWant, setMechanicLogin, MECH_LOGINS, FIXES, validateMachine, saveMachine, validateSend, makeWorkOrder, woIdFor, plantMachines, nextNumber, validatePmTask, savePmTask, validateSendPm, sendPmToMaintenance };

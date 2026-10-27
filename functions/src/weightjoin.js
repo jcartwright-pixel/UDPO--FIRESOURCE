@@ -101,11 +101,11 @@ async function fillContext(get, db, line, operationId, product, nowMs) {
 function newFill(ctx, run, email, stamp) {
   return Object.assign({ at: stamp, by: email, product: text(run.product), count: Number(run.count) || 0 }, ctx);
 }
-const jugsText = (f) => { const g = []; for (let i = 1; i <= P.FILL_JUGS; i++) if (text(f['jug' + i]) !== '') g.push(text(f['jug' + i])); return g.length ? g.join(', ') + ' g' : ''; };
+const jugsText = (f) => { const g = []; for (let i = 1; i <= P.FILL_MAX; i++) if (text(f['jug' + i]) !== '') g.push(text(f['jug' + i])); return g.length ? g.join(', ') + ' g' : ''; };
 // The filled jugs typed on the Quality screen's Package weight, when they are grams (1 to 5 numbers of 100 g or more): [g, ...] or null.
 function jugsFrom(result) {
   const nums = (text(result).replace(/,(?=\d{3}\b)/g, '').match(/\d+(\.\d+)?/g) || []).map(Number);
-  return nums.length >= 1 && nums.length <= P.FILL_JUGS && nums.every(n => n >= 100 && n <= P.LIMITS.GRAMS) ? nums : null;
+  return nums.length >= 1 && nums.length <= P.FILL_MAX && nums.every(n => n >= 100 && n <= P.LIMITS.GRAMS) ? nums : null;
 }
 // Station side, read first: the Quality check a fill weight check goes to (its own, else one started on the Quality screen just
 // before with no weight yet, else new).
@@ -156,7 +156,7 @@ function applyFromQuality(tx, db, plan, req, email, stamp) {
   if (plan.jugs) {
     let f = plan.index >= 0 ? run.fills[plan.index] : null;
     if (!f) { if (run.fills.length >= P.LIMITS.FILLS) return; f = newFill(plan.ctx, Object.assign({}, run, { product: text(run.product) || req.product }), email, stamp); f.qualityId = plan.checkId; run.fills.push(f); }
-    for (let i = 1; i <= P.FILL_JUGS; i++) { if (i <= plan.jugs.length) f['jug' + i] = plan.jugs[i - 1]; else delete f['jug' + i]; }
+    for (let i = 1; i <= P.FILL_MAX; i++) { if (i <= plan.jugs.length) f['jug' + i] = plan.jugs[i - 1]; else delete f['jug' + i]; }
     f.editedAt = stamp; f.editedBy = email;
   }
   run.updatedAt = stamp; run.updatedBy = email;

@@ -188,7 +188,10 @@ async function garageLists(db, nowMs) {
 
 /* ---------- sign-in ---------- */
 
-async function signedInTechs(tx, db, tokens, nowMs) {
+// Joe 10/27: the Garage Station's sign-ins and the plant Maintenance Station's are kept apart (station: MAINT and the plant on
+// the plant's), so a garage mechanic's sign-in does not work a plant work order, or the other way round. want: {station, facilityId}.
+async function signedInTechs(tx, db, tokens, nowMs, want) {
+  const station = (want && want.station) || 'GARAGE', plant = want && want.facilityId;
   const list = (Array.isArray(tokens) ? tokens : []).map(t => text(t, 80)).filter(t => /^[A-Za-z0-9_-]{20,80}$/.test(t)).slice(0, G.MAX_TECHS);
   if (!list.length) return [];
   const refs = list.map(t => db.collection(SESSIONS).doc(sha(t)));
@@ -196,7 +199,7 @@ async function signedInTechs(tx, db, tokens, nowMs) {
   const seen = {}, out = [];
   snaps.forEach((s, i) => {
     const d = s.exists ? s.data() : null;
-    if (!d || Date.parse(d.expiresAt) <= nowMs || seen[d.techId]) return;
+    if (!d || Date.parse(d.expiresAt) <= nowMs || seen[d.techId] || (d.station || 'GARAGE') !== station || (plant && d.facilityId !== plant)) return;
     seen[d.techId] = true;
     out.push({ token: list[i], ref: refs[i], id: d.techId, name: d.name });
   });
@@ -204,24 +207,30 @@ async function signedInTechs(tx, db, tokens, nowMs) {
 }
 function renew(write, people, nowMs) { people.filter(p => p.ref).forEach(p => write(p.ref, { expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() })); }
 
+// Where a station's mechanics and their login IDs are kept. The Garage Station's: Fleet Service Setup's Garage Technicians. The
+// plant Maintenance Station has its own (plantmaint.js maintSource, Joe 10/27).
+const GARAGE_SOURCE = Object.freeze({ station: 'GARAGE', techs: TECHS, logins: LOGINS, locks: LOCKS, tech: (d) => activeTechs([d])[0] || null,
+  noLogin: (name) => name + ' has no login ID yet. Ask the office to add it.', where: 'the garage station' });
+
 // A mechanic's name and login ID, checked inside a save (wrong numbers count towards the 5-minute lock, as at sign-in).
 // Returns {tech} or {wrong: true}; the caller lets the transaction finish (so the count is kept) and then refuses.
-async function checkLogin(tx, db, techId, loginId, nowMs, device) {
+async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
+  const src = source || GARAGE_SOURCE;
   const stamp = new Date(nowMs).toISOString(), minute = stamp.slice(0, 16);
-  const techSnap = techId ? await tx.get(db.collection(TECHS).doc(docId(techId))) : null;
-  const tech = techSnap && techSnap.exists ? activeTechs([techSnap.data()])[0] : null;
+  const techSnap = techId ? await tx.get(db.collection(src.techs).doc(docId(techId))) : null;
+  const tech = techSnap && techSnap.exists ? src.tech(Object.assign({ id: techSnap.id }, techSnap.data())) : null;
   if (!tech) throw SaveErr('NOT_FOUND', 'Tap your name first.');
-  const lockRef = db.collection(LOCKS).doc(docId(techId)), stationRef = db.collection(LOCKS).doc('_station');
-  const [lockSnap, stationSnap, loginSnap] = await tx.getAll(lockRef, stationRef, db.collection(LOGINS).doc(docId(techId)));
+  const lockRef = db.collection(src.locks).doc(docId(techId)), stationRef = db.collection(src.locks).doc('_station');
+  const [lockSnap, stationSnap, loginSnap] = await tx.getAll(lockRef, stationRef, db.collection(src.logins).doc(docId(techId)));
   const lock = lockSnap.exists ? lockSnap.data() : {}, station = stationSnap.exists ? stationSnap.data() : {};
   const fails = Date.parse(lock.since || 0) > nowMs - G.TECH_LOCK_MS ? (lock.count || 0) : 0;
   if (fails >= G.TECH_FAILS) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers. Wait 5 minutes or ask the office.');
   // Counted per device (fails.js), so one tablet typing wrong numbers does not lock every garage tablet.
   const dev = device || 'unknown', byDevice = FAILS.current(station.byDevice, f => f.minute === minute);
   const stationFails = (byDevice[dev] || {}).count || 0;
-  if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on the garage station. Wait a minute and try again.');
+  if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on ' + src.where + '. Wait a minute and try again.');
   const login = loginSnap.exists ? loginSnap.data() : null;
-  if (!login || !login.hash) throw SaveErr('NOT_FOUND', tech.name + ' has no login ID yet. Ask the office to add it.');
+  if (!login || !login.hash) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
   const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
   if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
     tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
@@ -232,19 +241,21 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device) {
   return { tech };
 }
 
-async function signIn(db, input, nowMs) {
+// source: the plant Maintenance Station's mechanics (plantmaint.js maintSource) when it signs in; the garage's when not sent.
+async function signIn(db, input, nowMs, source) {
+  const src = source || GARAGE_SOURCE, want = src.station === 'GARAGE' ? null : { station: src.station, facilityId: src.facilityId };
   const techId = text(input.techId, 80), loginId = String(input.loginId || '').trim();
   if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
   return db.runTransaction(async tx => {
     const stamp = new Date(nowMs).toISOString();
-    const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
+    const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input), src);
     if (checked.wrong) return checked;
-    const tech = checked.tech, lockRef = db.collection(LOCKS).doc(docId(techId));
-    const others = (await signedInTechs(tx, db, input.tokens, nowMs)).filter(p => p.id !== techId);
+    const tech = checked.tech, lockRef = db.collection(src.locks).doc(docId(techId));
+    const others = (await signedInTechs(tx, db, input.tokens, nowMs, want)).filter(p => p.id !== techId);
     if (others.length >= G.MAX_TECHS) throw SaveErr('NOT_ALLOWED', 'Two technicians are already signed in. Sign one out first.');
     const token = crypto.randomBytes(24).toString('base64url');
     tx.delete(lockRef);
-    tx.set(db.collection(SESSIONS).doc(sha(token)), { techId, name: tech.name, at: stamp, expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() });
+    tx.set(db.collection(SESSIONS).doc(sha(token)), Object.assign({ techId, name: tech.name, at: stamp, expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() }, want || {}));
     renew((ref, data) => tx.update(ref, data), others, nowMs);
     return { token, id: techId, name: tech.name };
   }).then(r => { if (r.wrong) throw SaveErr('NOT_ALLOWED', 'Wrong login ID. Try again.'); return r; });
@@ -779,6 +790,15 @@ async function maintBoardAllowed(db, input, caller) {
   throw SaveErr('NOT_ALLOWED', 'Sign in with a United Dairy account, or enter the station code, to open the Maintenance Station.');
 }
 
+// Sign Out ends the sign-in on the server too (the current app left it alive until it ran out).
+async function signOutCall(db, input, nowMs, want) {
+  const people = await signedInTechs(null, db, input.tokens, nowMs, want), only = text(input.techId, 80);
+  const batch = db.batch();
+  people.filter(p => !only || p.id === only).forEach(p => batch.delete(p.ref));
+  await batch.commit();
+  return { ok: true };
+}
+
 /*
  * One Garage Station call: {op: 'read' | 'signIn' | 'signOut' | 'step', tokens, ...}. Throws SaveError. caller: who is
  * calling, as index.js knows it from the sign-in ({user, claims}); only the Maintenance Station board looks at it.
@@ -793,30 +813,25 @@ async function garageCall(db, input, now, caller) {
   // Review item 49 (Joe 10/13): the Maintenance Station (maint: true) locks too; its Release checks its own plant's manager release code.
   const releaseFac = input.maint === true && /^fac_[a-z_]{1,40}$/.test(String(input.facilityId || '')) ? input.facilityId : FACILITY;
   if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: releaseFac, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
-  // Plant Maintenance's Maintenance Station (Joe 10/12): the same technicians and sign-in, the plant's work orders. It is not
-  // the garage tablet, so the garage's station code does not lock it; every step still needs a mechanic's login ID.
+  // Plant Maintenance's Maintenance Station (Joe 10/12): the plant's work orders. It is not the garage tablet, so the garage's
+  // station code does not lock it; every step still needs a mechanic's login ID. Joe 10/27: its mechanics are the plant's own
+  // (Maintenance Schedule Setup, People), not the garage's, and their sign-ins work only on their own plant's station.
   if (op === 'pmBoard') { await maintBoardAllowed(db, input, caller); return require('./plantmaint').stationBoard(db, input, nowMs); }
   if (op === 'pmStep') return require('./plantmaint').stationStep(db, input, nowMs);
+  if (input.maint === true && op === 'signIn') return signIn(db, input, nowMs, require('./plantmaint').maintSource(input.facilityId));
+  if (input.maint === true && op === 'signOut') return signOutCall(db, input, nowMs, require('./plantmaint').maintWant(input.facilityId));
   // Fleet Service's Work Orders (office screens): a signed-in United Dairy account, not the garage tablet's code.
   if (op === 'office') { if (!caller || !caller.user) throw SaveErr('NOT_ALLOWED', 'Sign in with your United Dairy account.'); return officeJobs(db); }
-  const maintSignIn = input.maint === true && (op === 'signIn' || op === 'signOut');
-  if (!maintSignIn && await ST.needsCode(db, 'GARAGE', FACILITY)) {
+  if (await ST.needsCode(db, 'GARAGE', FACILITY)) {
     const st = input.station || {}, ok = await ST.check(db, 'GARAGE', st.key, st.version);
     if (!ok.ok) throw SaveErr('NOT_ALLOWED', 'STATION_CODE: ' + ok.message.replace('This station', 'This garage tablet').replace(/Enter a station code\.|Enter it.*$/, 'Enter the garage station code.'));
   }
   if (op === 'read') return read(db, input, nowMs);
   if (op === 'board') return board(db, nowMs);
   if (op === 'signIn') return signIn(db, input, nowMs);
-  if (op === 'signOut') {
-    // Sign Out ends the sign-in on the server too (the current app left it alive until it ran out).
-    const people = await signedInTechs(null, db, input.tokens, nowMs), only = text(input.techId, 80);
-    const batch = db.batch();
-    people.filter(p => !only || p.id === only).forEach(p => batch.delete(p.ref));
-    await batch.commit();
-    return { ok: true };
-  }
+  if (op === 'signOut') return signOutCall(db, input, nowMs, null);
   if (op === 'step') return step(db, input, nowMs);
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };
+module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };

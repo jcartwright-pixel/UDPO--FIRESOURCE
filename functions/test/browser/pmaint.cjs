@@ -72,11 +72,13 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
-  // Two mechanics with login IDs (the Garage Station's own list).
-  for (const [id, name, pin] of [['TECH-JT', 'JELLICK Tom', '48213'], ['TECH-JN', 'NARD Jaxon', '551902']]) {
-    await db().collection('garageTechs').doc(id).set({ tech_id: id, name, active: 'YES', facility_id: 'fac_uniontown' });
-    await db().collection('garageLogins').doc(id).set({ hash: loginHash(id, pin) });
+  // Joe 10/27: the plant's own mechanics (Maintenance Schedule Setup, People) with login IDs; a garage mechanic (Fleet Service
+  // Setup) stays off the Maintenance Station.
+  for (const [id, name, pin] of [['MECH-JT', 'JELLICK Tom', '48213'], ['MECH-JN', 'NARD Jaxon', '551902']]) {
+    await db().collection('crewPeople').doc(id).set({ name, team: 'maint', facilityId: 'fac_uniontown', status: 'ACTIVE', loginSet: true });
+    await db().collection('plantMaintLogins').doc(id).set({ techId: id, facilityId: 'fac_uniontown', hash: loginHash(id, pin) });
   }
+  await db().collection('garageTechs').doc('TECH-SM').set({ tech_id: 'TECH-SM', name: 'MARTIN Shaun', active: 'YES', facility_id: 'fac_uniontown' });
   // The plant floor: a breakdown fixed on the spot, one still down, and a request that can wait.
   await act(PLANT, 'saveShiftNote', { values: { Entry: 'Valve 14 blew a seal', Type: 'Breakdown', Equipment: 'GALLON FILLER', UpAt: '10:20', Fix: 'Replaced the seal' }, readingTime: '09:42', followUpStatus: 'RESOLVED' });
   // Joe 10/18 (long cooler track): marked Resolved with what fixed it but no back up time, its Down at a minute or two after it was
@@ -208,7 +210,26 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
     await chs.waitForSelector('#jobs .gs-empty');
     assert.match(await chs.textContent('#title'), /Maintenance Station · Charleston/);
     assert.doesNotMatch(await chs.textContent('#jobs'), /M-1001/, 'Charleston\'s station shows only Charleston\'s work orders');
+    // Joe 10/27: Charleston has no plant mechanics yet: the line says where they are added, and no garage or Uniontown names.
+    assert.match(await chs.textContent('#strip'), /No plant mechanics yet[\s\S]*Maintenance Schedule, Setup, People/);
+    assert.doesNotMatch(await chs.textContent('body'), /JELLICK|MARTIN/);
     await chs.context().close();
+    results.push('Maintenance Station: only the plant\'s own mechanics; none yet says where they are added (Joe 10/27)');
+
+    // Maintenance Schedule Setup, People: a Station login ID box per mechanic; typing one saves it (kept only as a hash).
+    const ppl = await openPage(browser, 1536, 730, '/maint-crew.html?view=setup&tab=people&plant=fac_uniontown&' + ADMIN, false, 'fac_uniontown');
+    await ppl.waitForSelector('tr[data-id="MECH-JN"] input[data-login]');
+    assert.match(await ppl.textContent('thead'), /Station login ID/);
+    assert.match(await ppl.textContent('tr[data-id="MECH-JN"]'), /Set/);
+    const before = (await db().collection('plantMaintLogins').doc('MECH-JN').get()).data().hash;
+    await ppl.fill('tr[data-id="MECH-JN"] input[data-login]', '660021');
+    await ppl.press('tr[data-id="MECH-JN"] input[data-login]', 'Tab');
+    for (let i = 0; i < 40 && (await db().collection('plantMaintLogins').doc('MECH-JN').get()).data().hash === before; i++) await new Promise(r => setTimeout(r, 200));
+    assert.equal((await db().collection('plantMaintLogins').doc('MECH-JN').get()).data().hash, loginHash('MECH-JN', '660021'));
+    await shot(ppl, 'pmaint-mechanic-logins-1536');
+    assert.deepEqual(ppl.errors, []);
+    await ppl.context().close();
+    results.push('Maintenance Schedule Setup, People: a mechanic\'s station login ID typed and saved');
     results.push('Plant comes from the plant home opened: no plant picker; Charleston\'s home opens Charleston\'s pages and station');
 
     // Maintenance Station: the tablet's United Dairy sign-in to see the work orders (review item 68); name + login ID to start;
@@ -218,6 +239,8 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
       await page.waitForSelector('#jobs .gs-job');
       assert.match(await page.textContent('#jobs'), /GALLON FILLER[\s\S]*M-1001/);
       assert.match(await page.textContent('#title'), /Maintenance Station · Uniontown/);
+      assert.match(await page.textContent('#strip'), /JELLICK Tom[\s\S]*NARD Jaxon/);
+      assert.doesNotMatch(await page.textContent('#strip'), /MARTIN/, 'garage mechanics stay on the Garage Station');
       await fits(page, 'Maintenance Station ' + w);
       await shot(page, 'pmaint-station-' + w);
       assert.deepEqual(page.errors, []);
@@ -227,14 +250,14 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
     await st.waitForSelector('#jobs .gs-job');
     await st.click('#jobs .gs-job:has-text("M-1002") button');
     await st.click('#job-start');
-    await st.click('#names [data-who="TECH-JT"]');
+    await st.click('#names [data-who="MECH-JT"]');
     for (const k of '48213') await st.click('#keys [data-key="' + k + '"]');
     await st.click('#keys [data-key="go"]');
     await st.waitForFunction(() => /JELLICK Tom started/.test(document.getElementById('gs-message').textContent), null, { timeout: 8000 });
     await st.waitForSelector('#crew .gs-clock');
     await shot(st, 'pmaint-station-job-1280');
     await st.click('#job-done');
-    await st.click('#names [data-who="TECH-JT"]');
+    await st.click('#names [data-who="MECH-JT"]');
     for (const k of '48213') await st.click('#keys [data-key="' + k + '"]');
     await st.click('#keys [data-key="go"]');
     await st.waitForSelector('#view-fix:not([hidden])');

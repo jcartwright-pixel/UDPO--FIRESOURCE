@@ -219,3 +219,16 @@ test('report email: each delivery day is listed once, loaded and not loaded toge
   assert.match(plainText, /Box \(7\) 3 loaded · 4 not loaded Route Run Done Dispatch Delivers Monday 10-26-26 878 Darden L3 [^]*?878 Darden L2 [^]*?838 Gordon Food [^]*?878 Darden L1 [^]*?Delivers Tuesday 10-27-26 909 Marietta L1 [^]*?950 Aldi Charles [^]*?Delivers Thursday 10-29-26 847 Pals Shake /);
   ['Monday', 'Tuesday', 'Thursday'].forEach(d => assert.equal((plainText.match(new RegExp('Delivers ' + d, 'g')) || []).length, 1, d + ' heading once'));
 });
+
+// Joe 10/26 (6:22 PM email): "This is not leaving until Thursday at 2 p.m. ... why would it be showing late?" A Scheduler load
+// loaded early leaves at its pickup time on its delivery day, so it is not behind on the day it is loaded.
+test('report email: a Scheduler load loaded days early is not behind before its delivery-day pickup (Joe 10/26)', () => {
+  const S = (id, date, pickupTime) => ({ id, date, loadDate: '2026-10-26', route: '847', run: 'PALS SHAKE MIX', loadNo: 1, pickupTime, loadType: 'BOXING', trailer: '', work: {} });
+  const loads = R.reportLoads([], [S('S1', '2026-10-29', '14:00'), S('S2', '2026-10-26', '14:00')], []);
+  const r = R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, Date.parse('2026-10-26T22:22:00Z')); // Monday 6:22 PM
+  assert.deepEqual(r.behind.map(x => x.deliveryDate), ['2026-10-26'], 'only the one picked up today at 2:00 PM is behind');
+  const html = R.reportHtml(r, ''), plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(plainText, /Delivers Thursday 10-29-26 847 Pals Shake – 2:00 PM/, 'Thursday\'s load shows no BEHIND');
+  const later = R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, Date.parse('2026-10-29T19:00:00Z')); // Thursday 3:00 PM
+  assert.ok(later.behind.some(x => x.deliveryDate === '2026-10-29'), 'still not loaded 45 minutes after Thursday\'s pickup, it is behind');
+});

@@ -258,12 +258,14 @@
     return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r; }).concat(extra);
   }
   // Joe 10/25 ("Gmail report is not showing the boxing loading"): the report's loads are the loadouts' loads, Scheduler loads
-  // included (most box loads are Scheduler loads). A Scheduler load of its own leaves at its pickup time on its load day.
+  // included (most box loads are Scheduler loads). A Scheduler load of its own leaves at its pickup time on its delivery day,
+  // the day the Scheduler shows it on (Joe 10/26: 847 Pals Shake, loaded Monday, "is not leaving until Thursday at 2 p.m.", so
+  // it is not behind on Monday).
   function reportLoads(live, todays, customers) {
     return withScheduleLoads(live, todays, customers).map(function (r) {
       if (!r.sched) return r;
       var x = r.sched, delivery = text(x.date), load = text(x.loadDate) || delivery;
-      return Object.assign({}, r, { loadDate: load, deliveryDate: delivery, departureDate: delivery, leavesOn: 'LOAD DAY', dispatchTime: text(x.pickupTime) });
+      return Object.assign({}, r, { loadDate: load, deliveryDate: delivery, departureDate: delivery, leavesOn: 'DELIVERY DAY', dispatchTime: text(x.pickupTime) });
     });
   }
 

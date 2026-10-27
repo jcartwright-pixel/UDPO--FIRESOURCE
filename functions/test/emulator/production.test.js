@@ -106,6 +106,29 @@ test('Joe 10/14: changeover with its checklist, CIP wash, waste, a quality check
   assert.equal(r.next, undefined, 'up next is kept on the line, not the shift');
 });
 
+// Joe 10/26: "how many we're going to run and then ... a countdown, how many left to run".
+test('Joe 10/26: how many to run of the product running now; the Up next amount comes along when its product starts', async () => {
+  await assert.rejects(tap('qty', { qty: 300 }, '2026-10-08T10:01:00Z'), /Pick the product running first/);
+  await tap('product', { product: 'Broughton 2% Gallon', sku: '50305' }, '2026-10-08T10:05:00Z');
+  await tap('qty', { qty: 300 }, '2026-10-08T10:06:00Z');
+  await assert.rejects(tap('qty', { qty: 'lots' }), /how many to run/);
+  let r = await run();
+  assert.deepEqual([r.runs[0].qty, r.runs[0].qtyBy], [300, MANAGER]);
+  await tap('qty', { qty: '' }, '2026-10-08T10:07:00Z');
+  assert.equal((await run()).runs[0].qty, null, 'blank takes the countdown away');
+  await tap('next', { product: 'GV 2% Gallon', qty: 4000 }, '2026-10-08T11:00:00Z');
+  await tap('product', { product: 'GV 2% Gallon', sku: '' }, '2026-10-08T11:05:00Z');
+  r = await run();
+  assert.equal(r.runs[1].qty, 4000, 'the Up next amount is how many to run');
+  assert.equal((await db().collection('productionLines').doc(LINE).get()).data().next, null, 'Up next empties once it is running');
+  // A changeover to the Up next product brings its amount too.
+  await tap('next', { product: 'GV Whole Gallon', qty: 900 }, '2026-10-08T12:00:00Z');
+  await tap('changeover', { sub: 'start', to: 'GV Whole Gallon' }, '2026-10-08T12:01:00Z');
+  await tap('changeover', { sub: 'done' }, '2026-10-08T12:20:00Z');
+  r = await run();
+  assert.deepEqual([r.runs[2].product, r.runs[2].qty], ['GV Whole Gallon', 900]);
+});
+
 test('Joe 10/14: the HTST\'s divert, silo and tanks; the Blow Mold\'s resin lot and jugs ahead', async () => {
   await tap('divert', { sub: 'start', reason: 'Low temperature' }, '2026-10-08T11:00:00Z');
   await assert.rejects(tap('divert', { sub: 'start', reason: 'Test' }, '2026-10-08T11:01:00Z'), /already in divert/);

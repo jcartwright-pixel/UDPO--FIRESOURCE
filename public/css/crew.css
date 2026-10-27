@@ -42,6 +42,7 @@
 .crew-setup td.left input { width: 100%; min-width: 160px; }
 .crew-setup input.num { width: 70px; text-align: center; }
 .crew-setup input.short { width: 120px; }
+.crew-setup .crew-set { font-weight: 700; color: var(--pill-green-ink); }
 .crew-setup input[type=time] { width: 130px; }
 .crew-days { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .crew-days label { display: inline-flex; align-items: center; gap: 2px; font-size: 16px; font-weight: 700; }

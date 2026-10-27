@@ -273,17 +273,31 @@
   // fill weight (g) on the Product Sheet. The Gallon Filler's empty jug is the average of the Blow Mold's latest Head 1 to 6
   // weights (its jugs come from the Blow Mold) for TARE_HOURS; otherwise, and on the other fillers, the empty weight typed on
   // Line Targets (tareGrams). LIGHT below target less fillUnder (blank = 0), HEAVY above target plus fillOver (blank = not flagged).
-  var FILL_JUGS = 5, TARE_HOURS = 12, FILL_DEFAULT_MIN = 120, GRAMS_PER_LB = 453.592;
+  // Joe 10/26: one jug a check, every so many minutes, with a countdown on the tablet (FILL_JUGS). A check can still hold up to
+  // FILL_MAX jugs: the earlier five-jug checks, and the weights a Quality screen check copies over.
+  var FILL_JUGS = 1, FILL_MAX = 5, TARE_HOURS = 12, FILL_DEFAULT_MIN = 120, GRAMS_PER_LB = 453.592;
   var FILL_MODES = [['MINUTES', 'Every so many minutes'], ['JUGS', 'Every so many jugs'], ['CHANGE', 'Only at the start and after each product change']];
-  // Joe 10/14: the 5-gallon bag fillers (Raypak, "the dispenser", and Boxing, the dispenser filler that feeds the box) weigh
-  // filled bags the same way: the empty bag and fitment typed on Line Targets, against the product's Target Fill Weight g.
-  var BAG_LINES = ['RAYPAK', 'BOXING'];
-  function isBagFiller(lineName) { return BAG_LINES.indexOf(text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '')) >= 0; }
+  // Joe 10/14: the 5-gallon bag filler (Raypak, "the dispenser") weighs filled bags the same way: the empty bag and fitment
+  // typed on Line Targets, against the product's Target Fill Weight g. Joe 10/26: Boxing has no fill weight check (the product
+  // was weighed before it gets there; Boxing only puts it in the box).
+  var BAG_LINES = ['RAYPAK'];
+  // Joe 10/26: the new bag filler works like the Raypak (a 5-gallon bag filler), whatever its line is named with "Bag Filler".
+  function isBagFiller(lineName) { var k = text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, ''); return BAG_LINES.indexOf(k) >= 0 || /BAGFILLER/.test(k); }
   function hasFill(lineName) { return lineKind(lineName) === 'FILLER' || isBagFiller(lineName); }
   // The words for what a line's fill weight check weighs: jugs and caps, or bags and fitments.
   function fillWords(lineName) {
     return isBagFiller(lineName) ? { one: 'bag', many: 'bags', One: 'Bag', empty: 'empty bag', Empty: 'Empty bag', cap: 'fitment', Cap: 'Fitment' }
       : { one: 'jug', many: 'jugs', One: 'Jug', empty: 'empty jug', Empty: 'Empty jug', cap: 'cap', Cap: 'Cap' };
+  }
+  // Joe 10/26: Boxing has no CIP / sanitation (no CIP button on its tablet); it does have changeovers.
+  function hasCip(lineName) { return text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '') !== 'BOXING'; }
+  // Joe 10/26: the countdown for the product running now. qty = how many to run (typed on the tablet, or the Up next amount
+  // when that product is started); made = counted since the product started this shift; left = what is still to run.
+  function runLeft(run, nowMs) {
+    var r = run || {}, runs = (r.runs || []).slice().sort(function (a, b) { return when(a.from) - when(b.from); }), cur = runs[runs.length - 1];
+    if (!cur || num(cur.qty) === null) return null;
+    var made = Math.max(0, (num(r.count) || 0) - countAt(r.counts, when(cur.from) - 1)), qty = num(cur.qty);
+    return { qty: qty, made: made, left: Math.max(0, qty - made), over: Math.max(0, made - qty), pct: qty ? Math.min(100, Math.round(made / qty * 100)) : 100 };
   }
   function usesBlowMoldJugs(lineName) { return text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '') === 'GALLONFILLER'; }
   // The empty jug weight for a line now: { grams, from: 'BLOWMOLD' | 'TYPED', at } or null. blowHeads = the Blow Mold's headsLast.
@@ -303,7 +317,7 @@
   // One fill weight check (a run.fills entry) worked out: each jug's net and difference from target, their average and flags.
   function fillOf(f) {
     var x = f || {}, tare = num(x.tare), cap = num(x.cap) || 0, target = num(x.target), jugs = [];
-    for (var i = 1; i <= FILL_JUGS; i++) {
+    for (var i = 1; i <= FILL_MAX; i++) {
       var g = num(x['jug' + i]), net = g !== null && tare !== null ? round1(g - tare - cap) : null;
       jugs.push({ gross: g, net: net, diff: net !== null && target !== null ? round1(net - target) : null, flag: fillFlag(net, target, x.under, x.over) });
     }
@@ -537,7 +551,7 @@
       fill: kind === 'FILLER' || isBagFiller(lname) ? { due: fillDue(r, ld, nowMs), tare: tareFor(ld.line || r.line, ld, (plant || {}).blowHeads, nowMs), cap: num(ld.capGrams),
         target: base.target ? num(base.target.fillGrams) : null, under: num(ld.fillUnder), over: num(ld.fillOver), totals: fillTotals(r, base.made),
         checks: (r.fills || []).map(fillOf), words: fillWords(lname) } : null,
-      boxing: boxingOf(ld, base.made, (plant || {}).feeders),
+      boxing: boxingOf(ld, base.made, (plant || {}).feeders), runLeft: runLeft(r, nowMs), hasCip: hasCip(lname),
       lot: text(r.lot) || text(ld.lot), jugColor: text(r.color) || text(ld.color), lotAt: text(r.lotAt), lotCarried: !text(r.lot) && !!text(ld.lot),
       lotRuns: kind === 'BLOWMOLD' ? lotRuns(r, ld, nowMs) : [], stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
@@ -693,7 +707,7 @@
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, blowHours: blowHours, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
-    OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
-    usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
+    OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MAX: FILL_MAX, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
+    usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasCip: hasCip, runLeft: runLeft, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
     countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });
