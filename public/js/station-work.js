@@ -204,6 +204,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     let html = (box ? LEGEND : '') + '<div class="sw-band start"><b>&#9660; START</b><span>' + (box ? 'Shipping' : 'Loading') + ' today · ' + escapeHtml(L.dayName(date).slice(0, 3) + ', ' + shortDate(date)) + '</span><i>' + left + ' remaining of ' + plural(total, 'load') + '</i></div>';
     html += '<div class="sw-cols" aria-hidden="true"><span>Route</span><span>' + (box ? 'Run / customer' : 'Run') + '</span><span class="truck">' + (box ? 'Truck / pickup' : 'Truck') + '</span><span>Trailer</span><span>Status</span></div>';
     let lastPrior = null;
+    const offPlace = P.outOfPlace(rows);
     list.forEach(({ r, s }) => {
       if (s) { html += shipCard(s); return; }
       if (r.prior && lastPrior !== true) html += '<p class="sw-group prior">Still open from ' + escapeHtml(L.dayName(r.loadDate) + ' ' + shortDate(r.loadDate)) + ': finish these first</p>';
@@ -212,7 +213,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       const items = P.pickupsFor(r, pk), open = items.filter(P.pickupOpen).length, st = r.state, skip = below[r.id] === true;
       const skipBtn = skip ? btn('SKIP', 'skip', r.id, 'warn') : below[r.id] === 'limit' ? btn('SKIP', 'skipno', r.id, 'warn off') : '';
       // Joe 10/20: once a skipped load is complete its SKIPPED flag comes off (a MOVED flag stays).
-      const note = P.movedBySomeone(r) && !P.movedEarlier(r) ? P.moveNote(r) : null, moved = note && !(st === 'DONE' && note.word === 'SKIPPED') ? note : null;
+      const note = P.movedBySomeone(r, offPlace) && !P.movedEarlier(r) ? P.moveNote(r) : null, moved = note && !(st === 'DONE' && note.word === 'SKIPPED') ? note : null;
       const going = st === 'LOADING' && !r.paused, isOpen = going ? !closed[r.id] : !!opened[r.id], done = st === 'DONE';
       const status = done ? badge('COMPLETE', 'done') : r.paused ? badge('PAUSED', 'paused') : st === 'LOADING' ? badge('LOADING', 'going') : badge('WAITING');
       const quick = ck && !isOpen ? (st === 'WAITING' ? '<span class="sw-quick">' + skipBtn + btn('START LOADING', 'start', r.id, 'primary') + '</span>'

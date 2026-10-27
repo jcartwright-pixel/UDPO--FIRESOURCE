@@ -513,7 +513,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it.
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
-4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done. One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
+4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done, or until it is back in its place in the sheet's order (for example when the load that went past it is skipped back down). One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
 5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag.
 
 - `+ Add Load` adds a load nobody scheduled. Fill in the route, schedule type, load type, dates, time, trailer and cases, then `Confirm`. Nothing saves until Confirm.

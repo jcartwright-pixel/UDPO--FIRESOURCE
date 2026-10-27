@@ -312,6 +312,7 @@
       // a load someone moved or skipped and that is still out of the sheet's place, the same as the Plant Station tablets; it no
       // longer follows a guess from the order, which changed as other loads moved.
       let html = '', lastPrior = null;
+      const offPlace = P.outOfPlace(rows);
       rows.forEach(r => {
         if (r.sched) { html += schedRowHtml(r) + noteLine(r, [r.sched.notes, r.sched.work && r.sched.work.notes].filter((v, i, a) => v && a.indexOf(v) === i).join('\n'), cols.length, 'data-sedit'); return; }
         if (r.prior !== lastPrior) {
@@ -333,7 +334,7 @@
         const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
-        const isMoved = !P.movedEarlier(r) && P.movedBySomeone(r), note = P.moveNote(r);
+        const isMoved = !P.movedEarlier(r) && P.movedBySomeone(r, offPlace), note = P.moveNote(r);
         // Joe 10/20: once a skipped load is Done its SKIPPED tag comes off (a MOVED tag stays).
         const movedTag = isMoved && !(st === 'DONE' && note.word === 'SKIPPED') ? '<span class="moved-tag" title="' + escapeHtml(note.title) + '">' + note.word + (note.word === 'SKIPPED' && note.initials ? ' · ' + escapeHtml(note.initials) : '') + '</span>' : '';
         const runCell = '<span class="lo-run"' + (tag ? ' title="' + escapeHtml(r.run + ' · Scheduler: ' + tag) + '"' : '') + '>' + escapeHtml(L.runText(r)) + '</span>' + movedTag;
