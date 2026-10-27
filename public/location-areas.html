@@ -64,7 +64,7 @@
     // else the plant the screen was opened from (this tab), else the person's first plant (safety.js pickPlant). Uniontown
     // keeps its areas; another location starts empty, with + Add area.
     const plantBox = document.getElementById('plant');
-    let db = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
+    let db = null, dbOf = null, person = null, app = {}, plant = '', setup = null, seen = false, stop = null, chain = Promise.resolve(), pending = null;
     const list = () => pending || S.locations(setup && setup.locations, plant);
     const copy = () => JSON.parse(JSON.stringify(list()));
     const newKey = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -149,7 +149,8 @@
       document.getElementById('plant-name').textContent = plantName(plant);
       plantBox.value = plant;
       const at = plant;
-      stop = watchSetup(db, plant, s => { if (at !== plant) return; setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations, plant)) === JSON.stringify(pending)) pending = null; render(); });
+      // Joe 10/26: each plant's areas are in that plant's own database.
+      stop = watchSetup(dbOf(plant), plant, s => { if (at !== plant) return; setup = s; seen = true; if (pending && JSON.stringify(S.locations(s && s.locations, plant)) === JSON.stringify(pending)) pending = null; render(); });
     }
     // Picking a location here shows its areas; the plant the rest of the app is working in stays as it was.
     plantBox.onchange = () => {
@@ -158,7 +159,7 @@
       follow();
     };
     requireSignIn(async (user) => {
-      ({ db } = await start());
+      ({ db, dbOf } = await start());
       watchPerson(db, user, p => {
         person = p;
         const ok = mayOpenBuilding(person);

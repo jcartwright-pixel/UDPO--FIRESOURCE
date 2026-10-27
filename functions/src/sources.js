@@ -40,4 +40,32 @@ function transferSources(env) {
   return { live: Object.assign({}, UNIONTOWN.live, given.live), masters, plant: given.plant || {} };
 }
 
-module.exports = { UNIONTOWN, transferSources };
+// Joe 10/26 (fk): Charleston and Martins Ferry keep typing in their own dispatch sheets, like Uniontown. Each plant's sheets are
+// copied (read only) into that plant's own database, so one plant's copy can never touch another's. Their Live workbooks are
+// known (the current app's, never written: writeback.js PRODUCTION_IDS); their master lists are added here as each plant sends
+// them. The Users list is never copied from a plant's sheets: it stays the company's one list.
+const OTHER_PLANTS = Object.freeze({
+  fac_charleston: { live: { spreadsheetId: '1UrAzrPIe4x6jcNBCjCJUIE8mjvJAniZMoONRGK8GJmw' }, masters: {}, plant: {} },
+  fac_martins_ferry: { live: { spreadsheetId: '1ac78al6_HhYA3_89kwYU93KbIzOv0vqExYhFsG1i4Rk' }, masters: {}, plant: {} }
+});
+// Every Uniontown sheet: another plant's copy may never read one of them (it would put Uniontown's things in that plant).
+const uniontownIds = () => new Set([UNIONTOWN.live.spreadsheetId, UNIONTOWN.plant.pickups.spreadsheetId].concat(Object.keys(UNIONTOWN.masters).map(k => UNIONTOWN.masters[k].spreadsheetId)));
+
+// The sheets another plant's copy reads: OTHER_PLANTS, or (test copy) PLANT_SOURCES_JSON {"fac_charleston": {"live":
+// {"spreadsheetId"}, "masters": {"routes": {"spreadsheetId", "tab"}, ...}, "plant": {...}}}. null when the plant has none.
+function plantSources(env, plant) {
+  let given = null;
+  if (env && env.PLANT_SOURCES_JSON) given = (JSON.parse(env.PLANT_SOURCES_JSON) || {})[plant] || null;
+  // A test copy reads only the copies it names, never a plant's real sheets.
+  const base = env && env.PLANT_SOURCES_JSON ? given : OTHER_PLANTS[plant];
+  if (!base || !base.live || !base.live.spreadsheetId) return null;
+  const masters = Object.assign({}, base.masters || {});
+  delete masters.users;
+  const out = { live: Object.assign({}, base.live), masters, plant: Object.assign({}, base.plant || {}) };
+  const ut = uniontownIds(), named = [out.live.spreadsheetId].concat(Object.keys(masters).map(k => masters[k].spreadsheetId), Object.keys(out.plant).map(k => out.plant[k].spreadsheetId));
+  const bad = named.find(id => ut.has(String(id)));
+  if (bad) throw new Error('Another plant may not copy a Uniontown sheet (' + bad + ')');
+  return out;
+}
+
+module.exports = { UNIONTOWN, OTHER_PLANTS, transferSources, plantSources };

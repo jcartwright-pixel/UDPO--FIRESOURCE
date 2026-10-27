@@ -9,7 +9,7 @@ import { doc, onSnapshot } from './firebase.js';
 
 const L = window.UDLogic;
 const PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
-let plant = new URLSearchParams(location.search).get('plant') || currentPlant(), sides = null, admin = false, db = null, stop = null, busy = Promise.resolve();
+let plant = new URLSearchParams(location.search).get('plant') || currentPlant(), sides = null, admin = false, db = null, dbOf = null, stop = null, busy = Promise.resolve();
 if (!PLANTS.some(p => p.id === plant)) plant = PLANTS[0].id;
 const nameOf = (key) => (L.MENU_SIDES.find(s => s.key === key) || {}).name || key;
 const itemsOf = (g) => ((MENU.find(([m]) => m === g) || [])[1] || []).map(i => i[0]);
@@ -75,11 +75,12 @@ function follow() {
   if (stop) stop();
   sides = null;
   draw();
-  stop = onSnapshot(doc(db, 'menuSetup', plant), d => { sides = L.menuArrange(d.exists() ? d.data().sides : null); draw(); },
+  // Joe 10/26: each plant's menu is in that plant's own database.
+  stop = onSnapshot(doc(dbOf(plant), 'menuSetup', plant), d => { sides = L.menuArrange(d.exists() ? d.data().sides : null); draw(); },
     err => showError('Could not read the menu (' + err.message + '). Check the network and reload the page.'));
 }
 requireSignIn(async (user) => {
-  ({ db } = await start());
+  ({ db, dbOf } = await start());
   watchPerson(db, user, p => { admin = L.isAdmin(p); draw(); });
   follow();
 });

@@ -3,7 +3,7 @@
  * buttons on one line at the top. Everything goes through the server's `admin` call (functions/src/admin.js), for
  * Administrators only. A change that cannot be undone asks for a second press first.
  */
-import { escapeHtml, callServer, dateTimeText } from './app.js';
+import { escapeHtml, callServer, dateTimeText, currentPlant } from './app.js';
 
 const L = window.UDLogic;
 const e = escapeHtml;
@@ -522,7 +522,10 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
     '<div class="ap-msg" hidden></div>' + (sandbox ? '<div class="ap-msg bad">SANDBOX &mdash; TEST ONLY. Do not give these to drivers or plant staff.</div>' : '') + '<div class="ap-scroll" style="padding:10px"><div class="ap-links" id="al-list"></div>' + tail +
     (after.length ? '<div class="ap-links" id="al-list2" style="margin-top:10px"></div>' : '') + '</div></div>';
   const $ = (s) => box.querySelector(s);
-  const url = (l) => location.origin + '/' + l.path;
+  // Joe 10/26: the links are for the plant this Administration is open at; another plant's links name it (?plant=), so its
+  // tablets and phones work in that plant's own database. Uniontown's links stay as they were.
+  const plantPath = (path) => { const id = currentPlant(); return !path || id === 'fac_uniontown' ? path : path + (path.indexOf('?') >= 0 ? '&' : '?') + 'plant=' + encodeURIComponent(id); };
+  const url = (l) => location.origin + '/' + plantPath(l.path);
   function codeRow() {
     const c = data.routeCode;
     const codeText = c.code ? '<code>' + e(c.code) + '</code> <button type="button" class="ap-btn small" id="al-copy-code">Copy Code</button>' : c.state === 'NOT SET' ? 'No code yet' : 'Make a new code once to show it here';
@@ -535,7 +538,7 @@ export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', 
     const card = l => '<div class="ap-link" data-link="' + l.key + '"><div class="ap-link-name"><h4>' + e(l.title) + '</h4><span class="ap-chip ' + (l.soon ? '' : l.who === 'ud' ? 'blue' : 'orange') + '">' + (l.soon ? 'Being built' : l.who === 'ud' ? 'UD sign-in' : 'Code, no account') + '</span></div>' +
       '<p class="ap-link-who"><b>Who can open it:</b> ' + e(l.short) + '</p><div class="ap-acts">' +
       (l.soon ? '' : l.goto ? '<button type="button" class="ap-btn small main" data-goto="' + l.goto + '">Details</button>' : '<button type="button" class="ap-btn small" data-copy="' + l.key + '">Copy Link</button><button type="button" class="ap-btn small" data-qr="' + l.key + '">Print QR</button>' +
-        '<a class="ap-btn small main" href="' + e(l.path) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') + (l.noacct ? '<div class="ap-code-row" id="na-row"></div>' : '') +
+        '<a class="ap-btn small main" href="' + e(plantPath(l.path)) + '" data-launch target="_blank" rel="noopener" title="Opens in a new window; Administration stays open here">Launch</a>') + '</div>' + (l.code ? codeRow() : '') + (l.noacct ? '<div class="ap-code-row" id="na-row"></div>' : '') +
       '<details class="ap-how"><summary>How it works</summary><p>' + e(l.opens) + '</p><p><b>Turn off or change:</b> ' + e(l.shut) + '</p>' + (l.path ? '<p class="ap-url">' + e(url(l)) + '</p>' : '') +
       (l.extra ? '<p>' + e(l.extra.label) + ': <span class="ap-url">' + e(l.extra.url) + '</span></p>' : '') + '</details></div>';
     $('#al-list').innerHTML = first.map(card).join('');

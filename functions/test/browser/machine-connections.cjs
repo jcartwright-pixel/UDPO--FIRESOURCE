@@ -6,7 +6,7 @@
  *     each is doing, the picked machine on the right;
  *   - a line's page is its hookups only (Counted by, the controller, RedZone): changing Counted by there changes the list;
  *   - the Palletizer's page is its counter box alone; the Thermometers' page is the thermometers alone;
- *   - Charleston has no machines yet (each plant its own); fits 1536x790, 1920x1080 and a 390 phone, text 16px or larger.
+ *   - Charleston shows only its own (its own database): its counter boxes not set up, none of Uniontown's lines; fits 1536x790, 1920x1080 and a 390 phone, text 16px or larger.
  * Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -114,10 +114,11 @@ const pick = (page, name) => page.click('#mx-list .mx-m:has(b:text-is("' + name 
       assert.equal(await t.locator('.mc-left').isVisible(), false, 'no MOCREO key on the thermometers');
       await shot(page, 'thermometers-' + w);
 
-      // Charleston: its own machines (none yet), nothing from Uniontown.
+      // Charleston: its own database, so its own counter boxes (not set up) and none of Uniontown's lines or sensors.
       await page.click('#mx-plants button:text-is("Charleston")');
-      await page.waitForFunction(() => /No machines are set up for Charleston yet/.test(document.getElementById('mx-list').textContent));
-      assert.equal(await page.$('#mx-list .mx-m'), null);
+      await page.waitForFunction(() => /Palletizer[\s\S]*Not set up/.test(document.getElementById('mx-list').textContent));
+      assert.equal(await machine(page, 'GALLON FILLER'), '');
+      assert.match(await machine(page, 'Thermometers'), /Not set up[\s\S]*No MOCREO sensors yet/);
       await shot(page, 'charleston-' + w);
       assert.deepEqual(page.errors, []);
       await page.close();

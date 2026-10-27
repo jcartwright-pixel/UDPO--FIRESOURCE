@@ -110,11 +110,14 @@ jobs:
           if [ "$TARGET" = sandbox ] && [ -z "$SANDBOX_SOURCES_JSON" ] && [ -f ../sandbox-sources.json ]; then
             SANDBOX_SOURCES_JSON=$(node -e "console.log(JSON.stringify(require('../sandbox-sources.json').sources))")
             SANDBOX_WRITEBACK_JSON=$(node -e "const w=require('../sandbox-sources.json').writeBack; console.log(w ? JSON.stringify(w) : '')")
+            # Joe 10/26: copies of Charleston's and Martins Ferry's own sheets, when the test copy has them ({"plants": {...}}).
+            SANDBOX_PLANT_SOURCES_JSON=$(node -e "const p=require('../sandbox-sources.json').plants; console.log(p ? JSON.stringify(p) : '')")
           fi
           if [ "$TARGET" = sandbox ]; then
             if [ -n "$SANDBOX_SOURCES_JSON" ]; then
               printf 'SOURCES_JSON=%s\n' "$SANDBOX_SOURCES_JSON" > .env
               if [ -n "$SANDBOX_WRITEBACK_JSON" ]; then printf 'WRITEBACK_JSON=%s\n' "$SANDBOX_WRITEBACK_JSON" >> .env; fi
+              if [ -n "${SANDBOX_PLANT_SOURCES_JSON:-}" ]; then printf 'PLANT_SOURCES_JSON=%s\n' "$SANDBOX_PLANT_SOURCES_JSON" >> .env; fi
             else
               printf 'DEMO_DATA=1\nDEMO_ADMINS=%s\n' "$SANDBOX_ADMINS" > .env
             fi
@@ -161,6 +164,22 @@ jobs:
             --role=roles/secretmanager.secretAccessor --condition=None --quiet >/dev/null \
             && echo "Server account may read the MOCREO secrets: yes" \
             || echo "::warning::Could not let $runtime read secrets (Secret Manager Secret Accessor); MOCREO sensors stay off until it can."
+          # Joe 10/26 (the plants are completely separate): Charleston's and Martins Ferry's own databases, made once, in the
+          # same place as Uniontown's. The same rules and indexes guard each (tools/plant-databases.cjs); the server learns
+          # which exist (PLANT_DBS). If one cannot be made the deploy goes on, and that plant stays unreachable until it is.
+          where=$(gcloud firestore databases describe --database='(default)' --project "$PROJECT" --format='value(locationId)' 2>/dev/null || true)
+          plant_dbs=""
+          for d in $(node ../tools/plant-databases.cjs list); do
+            if gcloud firestore databases describe --database="$d" --project "$PROJECT" --quiet >/dev/null 2>&1 \
+              || { [ -n "$where" ] && gcloud firestore databases create --database="$d" --location="$where" --type=firestore-native --project "$PROJECT" --quiet >/dev/null 2>&1; }; then
+              plant_dbs="${plant_dbs:+$plant_dbs,}$d"
+            else
+              echo "::warning::Could not make the $d database on $PROJECT; that plant's screens stay closed until it exists."
+            fi
+          done
+          printf 'PLANT_DBS=%s\n' "$plant_dbs" >> .env
+          node ../tools/plant-databases.cjs use "$plant_dbs"
+          echo "Plant databases: (default)${plant_dbs:+, $plant_dbs}"
           # A new address for the styles on every deploy, so no browser or cache can pair a new page with old styles.
           cd .. && sed -i "s|css/app.css\"|css/app.css?v=${GITHUB_SHA::12}\"|" public/*.html
           # Diagnostics are sandbox only (Joe 10/10): the sandbox gets the Diagnostics screen and its probe on every screen;

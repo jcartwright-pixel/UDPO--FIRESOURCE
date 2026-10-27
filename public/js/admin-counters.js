@@ -10,12 +10,13 @@ import { say, errText } from './admin-pages.js';
 
 const e = escapeHtml;
 const P = () => window.UDProduction;
-const call = (fields) => callServer('lineReader', fields);
+const call = (fields, plant) => callServer('lineReader', plant ? Object.assign({ udPlant: plant }, fields) : fields);
 const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/deviceReads';
 const fmt = (n) => Number(n).toLocaleString('en-US');
 
-// Joe 10/26 (Machine Connections, mock-up 1): each counter also opens on its own, as that machine's page there (only = its id).
-export async function renderCaseCounters(box, ctx, only) {
+// Joe 10/26 (Machine Connections, mock-up 1): each counter also opens on its own, as that machine's page there (only = its id),
+// for the plant picked there (plant).
+export async function renderCaseCounters(box, ctx, only, plant) {
   let data = null, shownKey = null, timer = null;
   box.innerHTML = '<div class="ap"><div class="ap-msg" hidden></div><div class="ap-scroll" id="cc-list" style="padding:10px;display:flex;flex-direction:column;gap:12px"></div></div>';
   const list = box.querySelector('#cc-list');
@@ -52,13 +53,13 @@ export async function renderCaseCounters(box, ctx, only) {
     list.innerHTML = data.counters.filter(c => !only || c.id === only).map(c => section(c.id)).join('');
   }
   async function load() {
-    try { data = await call({ op: 'counters' }); render(); } catch (err) { say(box, errText(err), 'bad'); }
+    try { data = await call({ op: 'counters' }, plant); render(); } catch (err) { say(box, errText(err), 'bad'); }
     clearTimeout(timer);
     if (box.isConnected) timer = setTimeout(load, 5000);
   }
   async function op(fields) {
     try {
-      const r = await call(fields);
+      const r = await call(fields, plant);
       if (r.key) shownKey = { counter: fields.counter, key: r.key };
       say(box, r.message || '', r.message ? 'good' : '');
       document.activeElement && list.contains(document.activeElement) && document.activeElement.blur();

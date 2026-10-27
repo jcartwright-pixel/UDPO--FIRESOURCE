@@ -27,6 +27,7 @@ const MENUS = require('./menu-setup');
 const GARAGE = require('./garage');
 const RIGHTS = require('./rights');
 const STATIONS = require('./stations');
+const { isHome, companyDb } = require('./plants');
 // Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
 const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
 const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
@@ -623,8 +624,13 @@ function validate(input) {
 }
 
 const MANAGER_ROLES = ['ADMINISTRATOR', 'ADMIN', 'MANAGER', 'SUPERVISOR'];
-// The plant a save is for: the plant it names, else Uniontown (the only plant whose data has no plant on it yet).
-const savePlant = (req) => { const id = String(req && (req.facilityId || req.plantId) || ''); return L.PLANTS.some(p => p.id === id) ? id : 'fac_uniontown'; };
+// The plant a save is for: the plant it names, else the plant whose database it is saved in (Joe 10/26: each plant has its own).
+const savePlant = (req, db) => {
+  const id = String(req && (req.facilityId || req.plantId) || '');
+  if (L.PLANTS.some(p => p.id === id)) return id;
+  const here = (L.PLANTS.find(p => p.db === ((db && db.databaseId) || '(default)')) || {}).id;
+  return here || 'fac_uniontown';
+};
 async function requireSaver(tx, db, user, roles, action, plantId) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
@@ -632,11 +638,16 @@ async function requireSaver(tx, db, user, roles, action, plantId) {
     return { email: user.email, name: user.station.name, status: 'ACTIVE', roles: ['PLANT_EMPLOYEE'] };
   }
   const email = String(user && user.email || '').toLowerCase();
-  const snap = await tx.get(db.collection(C.users).doc(M.safeIdPart(email)));
+  // Joe 10/26: the Users list, Role Templates and People & Roles' Allow / Deny are the company's, kept in Uniontown's database;
+  // a save at another plant (its own database) reads them there.
+  const here = isHome(db);
+  const read = (ref) => (here ? tx.get(ref) : ref.get());
+  const company = companyDb(db);
+  const snap = await read(company.collection(C.users).doc(M.safeIdPart(email)));
   const person = snap.exists ? snap.data() : null;
   if (!person || person.status !== 'ACTIVE') throw new SaveError('NOT_ALLOWED', email + ' is not an active user in the Users list');
   // Administration's Role Templates and the person's Allow / Deny (rights.js) change the role check only where set.
-  const [tpl, ex] = await Promise.all([tx.get(db.collection('private').doc('roleTemplates')), tx.get(db.collection('personRights').doc(M.safeIdPart(email)))]);
+  const [tpl, ex] = await Promise.all([read(company.collection('private').doc('roleTemplates')), read(company.collection('personRights').doc(M.safeIdPart(email)))]);
   const roleOk = L.hasRole(person, roles);
   if (!RIGHTS.saveAllowed(person, action, roleOk, tpl.exists ? tpl.data().templates : null, ex.exists ? ex.data() : null)) {
     throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
@@ -774,7 +785,7 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 // anything. Joe 10/12: a tablet account with "Update route loading: Allowed" still showed View only, because the screen
 // checked the role alone. Only names in ACTIONS are answered.
 async function checkSaves(db, user, actions, facilityId) {
-  const out = {}, plantId = savePlant({ facilityId });
+  const out = {}, plantId = savePlant({ facilityId }, db);
   for (const action of (Array.isArray(actions) ? actions : []).slice(0, 20)) {
     if (!ACTIONS[action]) continue;
     try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action, plantId)); out[action] = true; } catch (e) { out[action] = false; }
@@ -793,7 +804,7 @@ async function applyAction(db, user, input, now, deps) {
     const live = await db.runTransaction(async (tx) => {
       if ((await tx.get(db.collection(C.actions).doc(req.requestId))).exists) return null;
       const mode = await requireTestMode(tx, db, spec.screen);
-      await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input));
+      await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input, db));
       const app = (await tx.get(db.collection(C.config).doc('app'))).data() || {}, weeks = app.liveWeeks || {};
       // Audit batch 2: Publish moves the Live sheet's weeks, so it waits while writing to the sheets is paused.
       if (mode.writeBack && app.sheetWrites && app.sheetWrites.paused === true) throw new SaveError('NOT_ALLOWED', 'Writing to the sheets is paused, so the week was not published. Resume it in Administration > Go-Live Switches, then press Publish again.');
@@ -819,7 +830,7 @@ async function applyAction(db, user, input, now, deps) {
       return Object.assign({}, prior.result, { repeated: true });
     }
     const mode = await requireTestMode(tx, db, spec.screen);
-    const person = await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input));
+    const person = await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input, db));
     // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
     req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
     // Loading Rundown (Joe 10/15): who saved a load's Start / End, and whether from a Plant Station tablet (plant.js markTimes).

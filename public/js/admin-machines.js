@@ -8,18 +8,18 @@
  *     own boxes, linetargets.html?hookups=1, so both save the same way);
  *   - the Palletizer and Case Returns counter boxes (admin-counters.js, one counter at a time);
  *   - the coolers' thermometers (mocreo.html?part=thermometers).
+ * Joe 10/26 (the plants are completely separate): each plant's machines, counter boxes and thermometers are read from that
+ * plant's own database, and every call names the plant.
  * Read only on every machine: nothing is ever changed on a counter box, a controller or RedZone.
  */
-import { escapeHtml } from './app.js';
+import { escapeHtml, callServer, start } from './app.js';
 import { doc, onSnapshot, collection } from './firebase.js';
 import { watchProduction } from './production.js';
-import { callServer } from './app.js';
 import { renderCaseCounters } from './admin-counters.js';
 
 const e = escapeHtml;
 const L = () => window.UDLogic;
 const R = () => window.UDProduction;
-// The counter boxes and the MOCREO thermometers are Uniontown's (the only plant they are set up at).
 const HOME_PLANT = 'fac_uniontown';
 const AREAS = [['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['OTHER', 'Other machines'], ['SHIP', 'Shipping & Returns'], ['COOL', 'Coolers & Freezers']];
 const HOW = { SENSOR: 'Sensor', READER: 'Label reader', CONTROLLER: 'Machine controller' };
@@ -29,7 +29,7 @@ const chip = (s) => '<span class="ap-chip ' + CHIP[s][0] + '">' + CHIP[s][1] + '
 export async function renderMachineConnections(box, ctx) {
   const params = new URLSearchParams(location.search), testEmail = params.get('testEmail');
   const withTest = (href) => testEmail ? href + '&testEmail=' + encodeURIComponent(testEmail) : href;
-  const person = ctx.person || {}, db = ctx.db;
+  const person = ctx.person || {}, { dbOf } = await start();
   const allowed = L().plantsFor(person), plants = L().PLANTS.filter(p => allowed.indexOf(p.id) >= 0);
   let came = params.get('plant') || '';
   if (!came) { try { came = sessionStorage.getItem('udPlant') || ''; } catch (err) { /* no storage */ } }
@@ -51,14 +51,14 @@ export async function renderMachineConnections(box, ctx) {
       const what = [HOW[how] || 'Line tablet'].concat(onRz ? ['RedZone'] : []).join(', ');
       out.push(['line:' + l.operationId, area, l.name, what, how === 'TABLET' ? 'typed' : 'ok']);
     });
-    if (plant === HOME_PLANT) {
-      (counters || []).forEach(c => {
-        const set = !!(c.controller && c.controller.ip), fresh = c.heardAt && Date.now() - Date.parse(c.heardAt) < 10 * 60000 && !c.error;
-        out.push(['counter:' + c.id, 'SHIP', c.name, set ? 'Case counter box' : 'Nothing hooked up', !set ? 'none' : fresh ? 'ok' : 'bad']);
-      });
-      const n = sensors.length;
-      out.push(['temps', 'COOL', 'Thermometers', n ? n + ' MOCREO sensor' + (n === 1 ? '' : 's') : 'No MOCREO sensors yet', n ? (sensors.some(s => s.online !== false) ? 'ok' : 'bad') : 'none']);
-    }
+    // Until the lines are read, nothing shows (so a plant's list does not jump).
+    if (!prod) return out;
+    (counters || []).forEach(c => {
+      const set = !!(c.controller && c.controller.ip), fresh = c.heardAt && Date.now() - Date.parse(c.heardAt) < 10 * 60000 && !c.error;
+      out.push(['counter:' + c.id, 'SHIP', c.name, set ? 'Case counter box' : 'Nothing hooked up', !set ? 'none' : fresh ? 'ok' : 'bad']);
+    });
+    const n = sensors.length;
+    out.push(['temps', 'COOL', 'Thermometers', n ? n + ' MOCREO sensor' + (n === 1 ? '' : 's') : 'No MOCREO sensors yet', n ? (sensors.some(s => s.online !== false) ? 'ok' : 'bad') : 'none']);
     return out;
   }
 
@@ -86,10 +86,10 @@ export async function renderMachineConnections(box, ctx) {
     if (m[0].indexOf('line:') === 0) {
       det.innerHTML = head + '<iframe class="mx-frame" title="' + e(m[2]) + ' hookups" src="' + e(withTest('linetargets.html?hookups=1&plant=' + encodeURIComponent(plant) + '&line=' + encodeURIComponent(m[0].slice(5)))) + '"></iframe>';
     } else if (m[0] === 'temps') {
-      det.innerHTML = head + '<iframe class="mx-frame" title="Thermometers" src="' + e(withTest('mocreo.html?part=thermometers')) + '"></iframe>';
+      det.innerHTML = head + '<iframe class="mx-frame" title="Thermometers" src="' + e(withTest('mocreo.html?part=thermometers&plant=' + encodeURIComponent(plant))) + '"></iframe>';
     } else {
       det.innerHTML = head + '<div class="mx-cc" id="mx-cc"></div>';
-      renderCaseCounters($('mx-cc'), ctx, m[0].slice(8));
+      renderCaseCounters($('mx-cc'), ctx, m[0].slice(8), plant);
     }
   }
   function draw() {
@@ -105,15 +105,15 @@ export async function renderMachineConnections(box, ctx) {
   async function readCounters() {
     clearTimeout(timer);
     if (!box.isConnected) return;
-    if (plant === HOME_PLANT) {
-      try { counters = (await callServer('lineReader', { op: 'counters' })).counters || []; } catch (err) { counters = counters || []; }
-      draw();
-    }
+    const at = plant;
+    try { const r = (await callServer('lineReader', { op: 'counters', udPlant: at })).counters || []; if (at === plant) counters = r; } catch (err) { counters = counters || []; }
+    draw();
     timer = setTimeout(readCounters, 15000);
   }
   function follow() {
     stops.forEach(f => f());
-    prod = null; rz = null;
+    prod = null; rz = null; counters = null; sensors = [];
+    const db = dbOf(plant);
     stops = [
       watchProduction(db, plant, d => { prod = d; draw(); }, () => { prod = { lines: [], counters: {}, lineInfo: {} }; draw(); }),
       onSnapshot(doc(db, 'redzoneData', plant), s => { rz = s.exists() ? s.data() : null; draw(); }, () => {}),

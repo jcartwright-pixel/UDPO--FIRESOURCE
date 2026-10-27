@@ -171,7 +171,7 @@
   </form>
 
   <script type="module">
-    import { start, escapeHtml, shortDate, dateTimeText, showError, isUnitedDairy } from './js/app.js';
+    import { start, escapeHtml, shortDate, dateTimeText, showError, isUnitedDairy, currentPlant } from './js/app.js';
     import { httpsCallable, doc, getDoc } from './js/firebase.js';
     import { addSpeak } from './js/speak.js';
     import { askRelease, lockStation } from './js/station-code.js';
@@ -206,7 +206,7 @@
 
     // One call as it goes to the server: the phone's code (or the Driver Room station) goes with every call.
     const withWho = (op, fields) => Object.assign(room ? { station } : { code }, { op }, fields || {});
-    const rawCall = async (op, input) => { const { functions } = await start(); return (await httpsCallable(functions, 'phone')(input)).data; };
+    const rawCall = async (op, input) => { const { functions } = await start(); return (await httpsCallable(functions, 'phone')(Object.assign({ udPlant: currentPlant() }, input))).data; };
     // Joe 10/12 (no signal): the last roster, loads and board are kept on the phone and shown when there is no signal.
     const READ_OPS = ['roster', 'loads', 'board', 'schedule'], readKey = (op, fields) => op + '|' + (room ? 'room:' + (station && station.key) : code) + '|' + JSON.stringify(fields || {});
     async function call(op, fields) {

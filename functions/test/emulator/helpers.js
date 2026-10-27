@@ -13,13 +13,22 @@ function db() {
 
 // The emulator answers 409 while a write is still going on (the run-day trigger, src/rundays.js, writes just after a run
 // changes), so a clear waits a moment and tries again.
+// Joe 10/26: each plant's own database is cleared too (Uniontown's is "(default)").
 async function clear() {
-  for (let tries = 0; ; tries++) {
-    const res = await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/' + PROJECT + '/databases/(default)/documents', { method: 'DELETE' });
-    if (res.ok) return;
-    if (res.status !== 409 || tries >= 20) throw new Error('could not clear the emulator: ' + res.status);
-    await new Promise(r => setTimeout(r, 250));
+  for (const database of ['(default)', 'charleston', 'martins-ferry']) {
+    for (let tries = 0; ; tries++) {
+      const res = await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/' + PROJECT + '/databases/' + database + '/documents', { method: 'DELETE' });
+      if (res.ok) break;
+      if (res.status !== 409 || tries >= 20) throw new Error('could not clear the emulator: ' + res.status);
+      await new Promise(r => setTimeout(r, 250));
+    }
   }
+}
+// A plant's own database on the local test database ('fac_charleston' -> its "charleston" database).
+function plantDb(plant) {
+  db();
+  const id = require('../../src/logic').plantDb(plant);
+  return id === '(default)' ? admin.firestore() : require('firebase-admin/firestore').getFirestore(id);
 }
 
 // Screens read the loads from runDays, which a trigger fills after each run is written (src/rundays.js). A test that seeds
@@ -38,4 +47,4 @@ async function runDaysSettled(d, ms) {
   }
 }
 
-module.exports = { PROJECT, db, clear, runDaysSettled };
+module.exports = { plantDb, PROJECT, db, clear, runDaysSettled };

@@ -3,7 +3,7 @@
 // Rates and Archive now, Pre-Flight, Update Live Sheets, Start Plant Fresh, Date Inventory and Date Convert.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { db, clear } = require('./helpers');
+const { db, plantDb, clear } = require('./helpers');
 const { runTransfer } = require('../../src/transfer');
 const { applyAction } = require('../../src/actions');
 const A = require('../../src/admin');
@@ -177,29 +177,35 @@ test('Driver Check-In Email: the answering-service email becomes records once; a
 });
 
 test('Driver Check-In Email per location (Joe 10/11): each plant keeps its own settings; Uniontown keeps the saved ones', async () => {
+  // Joe 10/26: each location's settings and check-ins are kept in that location's own database.
+  const CH = 'fac_charleston', chCall = (input, deps) => A.adminCall(plantDb(CH), ADMIN, input, Object.assign({ now: tick }, deps || {}));
   await call({ op: 'saveCheckinEmail', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'utdrivercheckin@uniteddairy.com', subject: 'UNIONTOWN DRIVER CHECK IN' });
-  const ch = await call({ op: 'checkinEmail', plant: 'fac_charleston' });
+  const ch = await chCall({ op: 'checkinEmail', plant: CH });
   assert.deepEqual([ch.settings.enabled, ch.settings.sender, ch.settings.recipient, ch.settings.subject], [false, '', '', '']);
   assert.equal(ch.standard.subject, 'CHARLESTON DRIVER CHECK IN');
   assert.deepEqual(ch.plants.map(p => p.name), ['Uniontown', 'Charleston', 'Martins Ferry']);
   // Blank and off saves; on needs the addresses.
-  await call({ op: 'saveCheckinEmail', plant: 'fac_charleston', enabled: false, sender: '', recipient: '', subject: '' });
-  await assert.rejects(call({ op: 'saveCheckinEmail', plant: 'fac_charleston', enabled: true, sender: '', recipient: '', subject: '' }), /sender/);
-  const saved = await call({ op: 'saveCheckinEmail', plant: 'fac_charleston', enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'chdrivercheckin@uniteddairy.com', subject: 'CHARLESTON DRIVER CHECK IN' });
+  await chCall({ op: 'saveCheckinEmail', plant: CH, enabled: false, sender: '', recipient: '', subject: '' });
+  await assert.rejects(chCall({ op: 'saveCheckinEmail', plant: CH, enabled: true, sender: '', recipient: '', subject: '' }), /sender/);
+  const saved = await chCall({ op: 'saveCheckinEmail', plant: CH, enabled: true, sender: 'callcenter@lauttamus.com', recipient: 'chdrivercheckin@uniteddairy.com', subject: 'CHARLESTON DRIVER CHECK IN' });
   assert.match(saved.message, /Saved for Charleston/);
   assert.equal((await call({ op: 'checkinEmail' })).settings.recipient, 'utdrivercheckin@uniteddairy.com', 'Uniontown is unchanged');
-  assert.equal((await call({ op: 'checkinEmail', plant: 'fac_charleston' })).settings.recipient, 'chdrivercheckin@uniteddairy.com');
+  assert.equal((await chCall({ op: 'checkinEmail', plant: CH })).settings.recipient, 'chdrivercheckin@uniteddairy.com');
+  assert.equal((await call({ op: 'checkinEmail', plant: CH })).settings.recipient, '', 'nothing of Charleston\'s is kept in Uniontown\'s database');
   await assert.rejects(call({ op: 'checkinEmail', plant: 'nowhere' }), /Pick a location/);
-  // The scheduled check reads each location's own mailbox; Check now reads only the one picked.
+  // The scheduled check in each plant's database reads that plant's own mailbox only; Check now reads only the one picked.
   const queries = [];
   const readMail = async ({ query }) => { queries.push(query); return []; };
   await T.checkinRun(db(), { readMail });
-  assert.deepEqual(queries.map(q => /to:(\S+)/.exec(q)[1]).sort(), ['chdrivercheckin@uniteddairy.com', 'utdrivercheckin@uniteddairy.com']);
+  assert.deepEqual(queries.map(q => /to:(\S+)/.exec(q)[1]), ['utdrivercheckin@uniteddairy.com']);
   queries.length = 0;
-  const now = await call({ op: 'checkinEmailNow', plant: 'fac_charleston' }, { readMail });
+  await T.checkinRun(plantDb(CH), { readMail });
+  assert.deepEqual(queries.map(q => /to:(\S+)/.exec(q)[1]), ['chdrivercheckin@uniteddairy.com']);
+  queries.length = 0;
+  const now = await chCall({ op: 'checkinEmailNow', plant: CH }, { readMail });
   assert.equal(queries.length, 1);
   assert.match(queries[0], /to:chdrivercheckin/);
-  assert.equal(now.plant, 'fac_charleston');
+  assert.equal(now.plant, CH);
 });
 
 test('Driver Check-In Email keeps the original email; Maintenance marks those write-ups From email (review item 33)', async () => {
