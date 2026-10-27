@@ -364,17 +364,32 @@ export function washesForRow(row, items) {
  * Trailers back on `date`: every load delivering that day (Joe: unloading counts all routes delivering today), with the
  * unloading record kept for it, its returns, and the next load that needs the same trailer (loads = loadoutRows of the date).
  */
-export function unloadRows(runs, date, journal, returns, loads) {
+/*
+ * Joe 10/27: a drop-and-hook load (Route Master's Drop and Hook tick, set in the Route Editor) shows its name on Case
+ * Unloading, never a trailer number: "Ferry Product 1", "Lancaster Transfer", "Fairmont Transfer". The name is the route's
+ * stream (FERRY PRODUCT, LANCASTER TRANSFER), plus the run's number when the stream has none (PRODUCT 1 > Ferry Product 1).
+ */
+export function dropHookName(run) {
+  const stream = txt(run && (run.streamId || run.routeName || run.route)), r = txt(run && run.run), n = /(\d+)\s*$/.exec(r);
+  const name = stream && n && !/\d\s*$/.test(stream) ? stream + ' ' + n[1] : stream || r;
+  return name.toLowerCase().replace(/(^|[\s/(-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+}
+
+// routes: the Route Master docs (id = run id), for the Drop and Hook tick the week's loads do not carry.
+export function unloadRows(runs, date, journal, returns, loads, routes) {
   const prefix = L.dayPrefix(date), week = L.weekStart(date), unloads = U.latestUnloads(journal, date), done = U.washesDone(journal), rows = [];
+  const master = {};
+  (routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
   (runs || []).forEach(run => {
+    const m = master[run.runId] || {}, dropAndHook = !!(run.dropAndHook || m.dropAndHook);
     const area = runArea(run, run.weekStart === week ? prefix : ''), d = run.weekStart === week && run.days && run.days[prefix];
     if (!area || !shownForPlant(run) || !d || !d.runs) return;
     const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};
-    const trailer = u.trailer !== undefined && u.trailer !== '' ? u.trailer : run.dropAndHook ? '' : txt(d.trailer);
+    const trailer = u.trailer !== undefined && u.trailer !== '' ? u.trailer : dropAndHook ? '' : txt(d.trailer);
     const mine = (returns || []).filter(x => (x.runDocId ? x.runDocId === run.id : x.route === txt(run.route) && x.run === txt(run.run)));
     const unit = U.unitKey(trailer || d.truck), wash = done[unit];
     rows.push({ id: key, key, runDocId: run.id, day: prefix, route: txt(run.route), run: txt(run.run), runId: run.runId || '', area, driver: d.driver || '', truck: txt(d.truck), trailer,
-      trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook: !!run.dropAndHook, casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
+      trailerTyped: u.trailer !== undefined && u.trailer !== '', dropAndHook, name: dropAndHook ? dropHookName(Object.assign({}, m, run, { streamId: run.streamId || m.streamId })) : '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
       startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
       washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, checkinAt: d.checkinCompletedAt || '', nextLoad: null, nextRank: 999999 });
   });

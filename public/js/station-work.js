@@ -24,7 +24,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   let runs = [], pickups = [], week = [], queue = [], sheetWash = [], appWash = [], app = {}, products = [], gpsDays = [];
   // Boxing: the Plant Operations Scheduler's Shipping and Receiving loads (read only while a Boxing station is open).
   const sched = { SHIPPING: [], RECEIVING: [] };
-  let routeDocs = [];   // Route Master (coverage_type), for a United Dairy account; a station-code tablet cannot read it
+  let routeDocs = [];   // Route Master (coverage_type, Drop and Hook), for a United Dairy account; a station-code tablet cannot read it
   const got = { runs: false, week: false, SHIPPING: false, RECEIVING: false };
   const pending = {};       // card id -> what is shown before the server has it
   const drafts = {};        // card id -> { field: typed value } until it is saved
@@ -71,7 +71,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   }
   function unloads() {
     const rets = returnsList();
-    return P.unloadRows(runs, date, dayJournal(), rets, P.loadoutRows(runs, date)).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r));
+    return P.unloadRows(runs, date, dayJournal(), rets, P.loadoutRows(runs, date), routeDocs).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r));
   }
   function washes() {
     const earlier = weekDays().filter(d => d < date).flatMap(d => P.washItems(d, [], [], week).filter(w => w.kind === 'UNLOAD'));
@@ -388,7 +388,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const rows = P.unloadOrder(unloads(), gpsDays), ck = canSave(), unit = P.UNLOAD_UNIT[area() || 'CASE'], wash = washes();
     const left = rows.filter(r => r.status !== 'COMPLETE').length;
     const transfers = rows.filter(r => r.transfer && r.status !== 'COMPLETE');
-    const places = [...new Set(transfers.map(r => String(r.run).replace(/\s*load\s*\d+\s*$/i, '').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase())).filter(Boolean))];
+    const places = [...new Set(transfers.map(r => r.name).filter(Boolean))];
     let html = '';
     rows.forEach(r => {
       const s = r.status, isOpen = s === 'UNLOADING' ? !closed[r.key] : !!opened[r.key], ws = P.washesForRow(r, wash), done = s === 'COMPLETE';
@@ -397,10 +397,12 @@ export function mountStationWork({ db, box, person, onDraw }) {
         ws.length ? '<i class="wash">Wash required</i>' : r.washed ? '<i class="ok">Washed</i>' : ''].join('');
       const status = done ? badge('COMPLETE', 'done') : s === 'UNLOADING' ? badge('UNLOADING', 'going') : r.transfer ? badge('NEEDS A TRAILER') : badge('WAITING');
       const quick = ck && s === 'WAITING' && !isOpen && !r.road && !r.transfer ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
-      const title = (r.order ? '<span class="sw-order">' + r.order + '</span>' : '') + (r.trailer ? '<span class="sw-trailer">' + escapeHtml(r.trailer) + '</span>' : '') + escapeHtml(r.run);
+      // Joe 10/27: a drop-and-hook load leads with its name (Ferry Product 1, Lancaster Transfer), never a trailer number.
+      const title = (r.order ? '<span class="sw-order">' + r.order + '</span>' : '') + (r.dropAndHook ? '<span class="sw-trailer">' + escapeHtml(r.name) + '</span>' :
+        (r.trailer ? '<span class="sw-trailer">' + escapeHtml(r.trailer) + '</span>' : '') + escapeHtml(r.run));
       html += '<article class="sw-card ' + (done ? 'done' : s === 'UNLOADING' ? 'run' : '') + (r.pendingReturns.length ? ' ret' : '') + (r.road ? ' road' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.key) + '">' +
         '<div class="sw-head tall" data-toggle="' + escapeHtml(r.key) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title unload"><b>' + title + '</b>' +
-        (!r.trailer && !r.transfer ? '<small>Trailer not typed yet</small>' : '') + '<span class="sw-chips">' + chips + '</span></span>' +
+        (!r.trailer && !r.dropAndHook ? '<small>Trailer not typed yet</small>' : '') + '<span class="sw-chips">' + chips + '</span></span>' +
         '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
       if (isOpen) {
         const dis = !ck || done;
@@ -433,10 +435,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const list = returnsList(), ck = canSave(), pend = list.filter(x => x.pending).length;
     let html = '<p class="sw-rule"><b>Returned product goes back to the cooler.</b> Never dump it. Press RTA once it is in the cooler.</p>';
     if (ck) {
-      const loadsBack = P.unloadRows(runs, date, dayJournal(), [], []).filter(inArea).sort((a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+      const loadsBack = P.unloadRows(runs, date, dayJournal(), [], [], routeDocs).filter(inArea).sort((a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
       const pick = val('add-ret', 'load', '');
       html += '<form class="sw-add ret" data-form="ret"><h3>Add a return nobody noted</h3><label class="sw-field"><span>Route</span><select data-k="load" data-id="add-ret"><option value="">Pick the route</option>' +
-        loadsBack.map(r => '<option value="' + escapeHtml(r.key) + '"' + (pick === r.key ? ' selected' : '') + '>' + escapeHtml(r.route + ' · ' + r.run + (r.trailer ? ' · ' + r.trailer : '')) + '</option>').join('') +
+        loadsBack.map(r => '<option value="' + escapeHtml(r.key) + '"' + (pick === r.key ? ' selected' : '') + '>' + escapeHtml(r.route + ' · ' + (r.dropAndHook ? r.name : r.run + (r.trailer ? ' · ' + r.trailer : ''))) + '</option>').join('') +
         '<option value="unknown"' + (pick === 'unknown' ? ' selected' : '') + '>Unknown route</option></select></label>' +
         '<label class="sw-field"><span>Product</span><input data-k="product" data-id="add-ret" list="sw-products" autocomplete="off" value="' + escapeHtml(val('add-ret', 'product', '')) + '"></label>' +
         field('add-ret', 'cases', 'Cases', '', { mode: 'numeric' }) + '<button type="submit" class="sw-btn primary">ADD RETURN</button></form>' +
@@ -798,7 +800,6 @@ export function mountStationWork({ db, box, person, onDraw }) {
       render();
     }, fail('the scans')));
     schedUnsubs.push(onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { recvItems = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the item list')));
-    schedUnsubs.push(onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; }));
   }
   function watch() {
     if (stopped) return;
@@ -813,7 +814,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
       // Refusals called in by email: a tablet with no UD account cannot read them; the rest still works.
       onSnapshot(query(collection(db, 'plantReturns'), where('date', '==', date)), s => { queue = s.docs.map(d => d.data()); render(); }, () => { queue = []; render(); }),
       // Fleet's yard leave and return per unit (Case Unloading's Back / On the road). A tablet that cannot read them shows neither.
-      onSnapshot(query(collection(db, 'gpsDays'), where('date', 'in', [-1, 0, 1].map(n => L.addDays(date, n)))), s => { gpsDays = s.docs.map(d => d.data()); render(); }, () => { gpsDays = []; render(); })
+      onSnapshot(query(collection(db, 'gpsDays'), where('date', 'in', [-1, 0, 1].map(n => L.addDays(date, n)))), s => { gpsDays = s.docs.map(d => d.data()); render(); }, () => { gpsDays = []; render(); }),
+      // Route Master's Drop and Hook tick (Case Unloading shows those loads by name; the week's loads do not carry it).
+      onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; render(); })
     ];
   }
   always = [onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); }, () => {}),

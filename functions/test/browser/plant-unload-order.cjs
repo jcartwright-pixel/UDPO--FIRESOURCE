@@ -7,6 +7,8 @@
  *   - Fleet's yard return (gpsDays yardIn after yardOut) shows "Back 9:42 AM"; a trailer Fleet shows out of the yard is
  *     "On the road", greyed, below the ones back, unnumbered and with no Start button on the card;
  *   - a drop-and-hook load (Marietta) with no trailer is a "Transfer trailer" card that NEEDS A TRAILER, counted at the top;
+ *     Joe 10/27: the tick is Route Master's (the week's loads do not carry it) and the card shows the load's name
+ *     ("Marietta 1"), never Dispatch's trailer number; the office Case Unloading shows the same name in the Trailer column;
  *   - the trailer being unloaded now is number 1, at the top.
  * With SHOTS_DIR=<folder> it also saves pictures at 1024 and 800.
  */
@@ -46,8 +48,9 @@ async function openPage(browser, width, height, url, touch) {
   const d = db();
   // Marietta (909) is drop and hook: its Thursday delivery left its trailer at the customer, so it needs a transfer trailer.
   const base = (await d.collection('runs').doc('2026-10-04__run_p801').get()).data();
-  await d.collection('runs').doc('2026-10-04__run_m909_1').set(Object.assign({}, base, { route: '909_1', run: 'MARIETTA LOAD 1', routeId: 'rte_m909', runId: 'run_m909_1', routeName: 'Marietta', dropAndHook: true,
+  await d.collection('runs').doc('2026-10-04__run_m909_1').set(Object.assign({}, base, { route: '909_1', run: 'MARIETTA LOAD 1', routeId: 'rte_m909', runId: 'run_m909_1', routeName: 'Marietta', streamId: 'MARIETTA 1',
     days: { thu: Object.assign({}, base.days.thu, { trailer: 'T-10285' }) } }));
+  await d.collection('routes').doc('run_m909_1').set({ routeId: 'rte_m909', route: '909', routeName: 'Marietta', run: 'MARIETTA LOAD 1', streamId: 'MARIETTA 1', dropAndHook: true, loadType: 'Case Loadout', days: {} });
   // Fleet: T-953 left the yard at 1:00 AM and came back at 9:42 AM; T-955 left at 2:00 AM and is still out.
   await d.collection('gpsDays').doc('2026-10-08__T953').set({ tag: 'T-953', date: '2026-10-08', yardOut: '2026-10-08T05:00:00Z', yardIn: '2026-10-08T13:42:00Z' });
   await d.collection('gpsDays').doc('2026-10-08__T955').set({ tag: 'T-955', date: '2026-10-08', yardOut: '2026-10-08T06:00:00Z' });
@@ -86,10 +89,11 @@ async function openPage(browser, width, height, url, touch) {
       assert.ok(t955.road && !t955.order && !t955.quick, 'T-955 is on the road: greyed, no number, no Start');
       assert.equal(road.length, 1);
       assert.equal(transfer.length, 1);
-      assert.equal(transfer[0].title, 'MARIETTA LOAD 1');
+      assert.equal(transfer[0].title, 'Marietta 1', 'a drop-and-hook load shows its name');
+      assert.ok(!cards.some(c => /T-10285/.test(c.title)), 'never Dispatch\'s trailer number on a drop-and-hook load');
       assert.equal(transfer[0].badge, 'NEEDS A TRAILER');
       assert.ok(!transfer[0].quick, 'a transfer trailer has no Start on the card');
-      assert.match(await p.textContent('#work .sw-panel-head span'), /^1 transfer trailer needed \(Marietta\)/);
+      assert.match(await p.textContent('#work .sw-panel-head span'), /^1 transfer trailer needed \(Marietta 1\)/);
       assert.ok(done.length >= 1, 'the unloaded trailer is at the bottom');
       if (SHOTS) {
         await p.screenshot({ path: path.join(SHOTS, 'after-case-unloading-' + w + '.png') });
@@ -102,6 +106,16 @@ async function openPage(browser, width, height, url, touch) {
       results.push(w + ': ' + numbered.length + ' trailers back numbered by next departure (' + numbered.map(c => c.trailer || c.title).join(', ') + '); T-953 "Back 9:42 AM"; T-955 On the road; Marietta needs a transfer trailer');
       await p.close();
     }
+    // The office Case Unloading: the drop-and-hook load's Trailer column shows its name, not a trailer number or a Trailer # box.
+    const o = await openPage(browser, 1536, 790, '/unloading.html?' + MANAGER + '&area=CASE&date=2026-10-08');
+    await o.waitForSelector('#rows tr[data-key]', { timeout: 15000 });
+    await o.click('[data-tab="all"]');
+    const cell = await o.waitForSelector('#rows tr[data-key*="909_1"] td.trlcell');
+    assert.equal((await cell.textContent()).trim(), 'Marietta 1');
+    assert.equal(await cell.$('input'), null, 'no Trailer # box on a drop-and-hook load');
+    assert.deepEqual(o.errors, []);
+    results.push('office: Marietta 1 in the Trailer column');
+    await o.close();
   } finally {
     await browser.close();
   }
