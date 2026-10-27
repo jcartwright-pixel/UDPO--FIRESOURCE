@@ -10,15 +10,17 @@ ME="$(id -un)"
 HOME_DIR="$(getent passwd "$ME" | cut -d: -f6)"
 echo "Setting up the Driver Room TV board for user $ME ..."
 
-sudo apt-get update -y
-sudo apt-get install -y v4l-utils
+sudo apt-get update -y </dev/null
+sudo apt-get install -y v4l-utils </dev/null
 BROWSER="$(command -v chromium-browser || command -v chromium || true)"
-if [ -z "$BROWSER" ]; then sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium; BROWSER="$(command -v chromium-browser || command -v chromium)"; fi
+if [ -z "$BROWSER" ]; then sudo apt-get install -y chromium-browser </dev/null || sudo apt-get install -y chromium </dev/null; BROWSER="$(command -v chromium-browser || command -v chromium)"; fi
 
-# Desktop signs in by itself; the labwc desktop; the screen never blanks.
-sudo raspi-config nonint do_boot_behaviour B4
-sudo raspi-config nonint do_wayland W3 || true
-sudo raspi-config nonint do_blanking 1 || true
+# Desktop signs in by itself; the labwc desktop; the screen never blanks. Joe 10/27: the newer Pi system calls labwc W2
+# (W3 popped up "Programmer error, unrecognised boot option"). raspi-config reads nothing from the keyboard here, so a box
+# like that can't stop the setup or swallow the rest of this script (it is read from the same pipe).
+sudo raspi-config nonint do_boot_behaviour B4 </dev/null || true
+grep -qs 'labwc' /etc/lightdm/lightdm.conf || sudo raspi-config nonint do_wayland W2 </dev/null || true
+sudo raspi-config nonint do_blanking 1 </dev/null || true
 
 # The browser: full screen, no "restore pages" bubble after a power cut, video plays with no button press, the board's
 # timers never slowed down as if it were in the background (Joe 10/27: the lists stopped rolling), and it starts again by
