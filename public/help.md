@@ -685,11 +685,12 @@ The cooler and freezer temperatures from the MOCREO sensors, with a manual readi
 id: walkthrough
 screens: walkthrough.html
 
-The plant manager's phone walkthrough: Yard, Coolers and Quality, then Pictures, Loading and Unloading. Each stop is green DONE, yellow DUE (2 hours) or red PAST DUE (3 hours).
+The plant manager's phone walkthrough. The Plant Managers app opens on three choices: the Manager Walkthrough, Loading and Unloading. The walkthrough is Yard, Coolers and Production, then Pictures. Each stop is green DONE, yellow DUE (2 hours) or red PAST DUE (3 hours).
 
 - Press a stop to open its check.
 - **Pictures:** `Take Picture` opens the camera; the pictures go with the next Send Current Report.
-- **Send Report** opens the Plant Update email (see [Send Current Report](#send-report)).
+- Send Report and Trailer Assignments are in the full app (`Open the full Operations app`).
+- On a phone, swipe up to see the rest of the screen.
 - For managers only.
 
 # Reports

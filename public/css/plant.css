@@ -1370,6 +1370,12 @@ body.yard-page .head .badge-test { order: 6; }
 /* Joe 10/15 (Manager Walkthrough, look C, option 1): the phone and tablet start screen (three choices) and the walkthrough
    (Coolers, then Quality) as big tiles with big numbers; a red tile flashes while a check is past due. */
 .walk-page .wk-view { display: block; overflow: auto; padding: 4px 16px 16px; }
+/* Joe 10/27: on a phone or tablet the plant screens that grow as one long page (Loading, Unloading and others) could not be
+   scrolled at all: the page grew but the page itself was held still. Now the page scrolls. (The managers' start screen and
+   walkthrough keep their own scrolling list.) */
+@media (max-width: 1000px) {
+  body.fill.plant-page:not(.walk-page) { height: auto; min-height: 100dvh; overflow: visible; }
+}
 .walk-page .wk-ask { margin: 6px 2px 12px; font-size: 20px; color: var(--ink); }
 .walk-page .wk-list { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
 .walk-page .wk-choice { display: flex; align-items: center; gap: 14px; min-height: 120px; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-left: 8px solid var(--ud-blue); border-radius: 14px; text-decoration: none; color: var(--ink); }

@@ -166,25 +166,49 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     }
     results.push('Pictures: TAKE PICTURE on the 4th stop opens the camera, the picture is made smaller, its caption saves as typed, it shows on the phone and on Manager Center (newest, with + more) waiting for the next report, every card still fits at 1536 x 886, and a picture can be removed');
 
-    // The phone and tablet start screen: four choices (Joe 10/18: Send Report).
+    // The phone and tablet start screen (Joe 10/27): just the walkthrough and the loadout screens, Loading and Unloading. Send Report
+    // and Trailer Assignment stay in the full app.
     for (const [w, h] of [[390, 844], [800, 1280]]) {
       const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700 }, '/walkthrough.html?view=home&' + MANAGER);
       await page.waitForSelector('.wk-choice');
-      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading', 'Send Report', 'Trailer Assignment']);
-      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html', 'manager.html?report=1', 'trailers.html']);
-      assert.equal(await page.textContent('.wk-choice[href="manager.html?report=1"] .wk-n'), 'Nonelast sent');
-      assert.match(await page.textContent('.wk-choice[href="trailers.html"] .wk-n'), /^\d+of \d+ assigned$/);
+      assert.deepEqual(await page.$$eval('.wk-choice .wk-t b', b => b.map(x => x.textContent)), ['Manager Walkthrough', 'Loading', 'Unloading']);
+      assert.deepEqual(await page.$$eval('.wk-choice', a => a.map(x => x.getAttribute('href'))), ['walkthrough.html', 'loadout.html', 'unloading.html']);
       assert.deepEqual(await page.$$eval('.wk-row:nth-child(1) .wk-items li b', b => b.map(x => x.textContent)), ['Yard', 'Coolers', 'Production']);
-      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading, Unloading, Send Report and Trailer Assignment have none');
+      assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.getAttribute('href'))), ['PAST DUE walkthrough.html'], 'the walkthrough has its button; Loading and Unloading have none');
       assert.equal(await page.textContent('#ask'), 'What are you doing?');
       assert.equal(await page.isVisible('#full'), true);
       await tidy(page, 'Start screen ' + w);
       await shot(page, 'walkthrough-home-' + w);
-      if (SHOTS) { await page.$eval('.wk-choice[href="trailers.html"]', el => el.scrollIntoView({ block: 'end' })); await page.waitForTimeout(200); await shot(page, 'walkthrough-home-bottom-' + w); }
+      if (SHOTS) { await page.$eval('.wk-choice[href="unloading.html"]', el => el.scrollIntoView({ block: 'end' })); await page.waitForTimeout(200); await shot(page, 'walkthrough-home-bottom-' + w); }
       assert.deepEqual(page.errors, []);
       await page.context().close();
     }
-    results.push('Start screen: Manager Walkthrough (Yard, Coolers, Production) with its PAST DUE button, Loading, Unloading and Send Report at 390 and 800, with Open the full Operations app');
+    results.push('Start screen: just Manager Walkthrough (Yard, Coolers, Production) with its PAST DUE button, Loading and Unloading at 390 and 800, with Open the full Operations app');
+
+    // Joe 10/27: on his phone the managers' screens could not be scrolled. A finger swipe up moves each one: the start screen, the
+    // walkthrough, Loading and Unloading (both longer than the phone on the made-up plant day).
+    for (const [w, h] of [[390, 844], [800, 1280]]) {
+      for (const url of ['/walkthrough.html?view=home&app=1&', '/walkthrough.html?', '/loadout.html?date=2026-10-08&', '/unloading.html?date=2026-10-08&']) {
+        const page = await openPage(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700 }, url + MANAGER);
+        // Loading and Unloading hold the made-up plant day's loads, so they are longer than the phone or tablet.
+        if (/walkthrough/.test(url)) await page.waitForSelector('.wk-choice');
+        else await page.waitForFunction(() => document.scrollingElement.scrollHeight > innerHeight + 200, null, { timeout: 20000 });
+        await page.waitForTimeout(400);
+        const scrolled = () => page.evaluate(() => [document.documentElement, ...document.querySelectorAll('*')].reduce((a, e) => a + e.scrollTop, 0));
+        const room = await page.evaluate(() => document.scrollingElement.scrollHeight - innerHeight);
+        if (room < 40) { await page.context().close(); continue; }
+        const cdp = await page.context().newCDPSession(page), x = Math.round(w / 2);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: Math.round(h * 0.75) }] });
+        for (let i = 1; i <= 12; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: Math.round(h * 0.75 - h * 0.4 * i / 12) }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(400);
+        assert.ok(await scrolled() > 40, url + ' scrolls with a finger at ' + w);
+        assert.deepEqual(await page.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), true, url + ' has no sideways scrolling at ' + w);
+        assert.deepEqual(page.errors, []);
+        await page.context().close();
+      }
+    }
+    results.push('Phone and tablet: the start screen, the walkthrough, Loading and Unloading each scroll with a finger swipe');
 
     // Send Report opens Manager Center's report (what goes out, a note box and Send).
     const rep = await openPage(browser, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, '/manager.html?report=1&' + MANAGER);
