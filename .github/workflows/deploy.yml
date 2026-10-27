@@ -167,14 +167,22 @@ jobs:
           # Joe 10/26 (the plants are completely separate): Charleston's and Martins Ferry's own databases, made once, in the
           # same place as Uniontown's. The same rules and indexes guard each (tools/plant-databases.cjs); the server learns
           # which exist (PLANT_DBS). If one cannot be made the deploy goes on, and that plant stays unreachable until it is.
+          # 6.66: the deploy account may not be allowed to make (or even describe) a database, so a database is also found by
+          # reading it (the deploy account reads Firestore), and the warning says Google's reason and the line an Owner pastes
+          # in Cloud Shell to make it.
           where=$(gcloud firestore databases describe --database='(default)' --project "$PROJECT" --format='value(locationId)' 2>/dev/null || true)
+          token=$(gcloud auth print-access-token 2>/dev/null || true)
           plant_dbs=""
           for d in $(node ../tools/plant-databases.cjs list); do
-            if gcloud firestore databases describe --database="$d" --project "$PROJECT" --quiet >/dev/null 2>&1 \
-              || { [ -n "$where" ] && gcloud firestore databases create --database="$d" --location="$where" --type=firestore-native --project "$PROJECT" --quiet >/dev/null 2>&1; }; then
+            found=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/$d/documents?pageSize=1" || true)
+            why=""
+            if [ "$found" = 200 ] || gcloud firestore databases describe --database="$d" --project "$PROJECT" --quiet >/dev/null 2>&1; then
+              plant_dbs="${plant_dbs:+$plant_dbs,}$d"
+            elif [ -n "$where" ] && why=$(gcloud firestore databases create --database="$d" --location="$where" --type=firestore-native --project "$PROJECT" --quiet 2>&1); then
               plant_dbs="${plant_dbs:+$plant_dbs,}$d"
             else
-              echo "::warning::Could not make the $d database on $PROJECT; that plant's screens stay closed until it exists."
+              [ -n "$where" ] || why="could not read where Uniontown's database is"
+              echo "::warning::Could not make the $d database on $PROJECT ($(echo "$why" | grep -m1 -iE 'error|denied|permission|could not' | cut -c1-200)); that plant's screens stay closed until it exists. An Owner pastes in Cloud Shell: gcloud firestore databases create --database=$d --location=\$(gcloud firestore databases describe --database='(default)' --project=$PROJECT --format='value(locationId)') --type=firestore-native --project=$PROJECT"
             fi
           done
           printf 'PLANT_DBS=%s\n' "$plant_dbs" >> .env
