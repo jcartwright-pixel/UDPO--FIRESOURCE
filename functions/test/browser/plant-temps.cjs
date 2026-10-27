@@ -114,11 +114,12 @@ async function shots(page, name, w) {
     results.push('Plant Temperatures on an 800 tablet: each location is a card with every column named; no side-menu strip');
     // Joe 10/17: a sensor that stopped reporting on an earlier day shows that day under the time, so its old reading is not
     // taken for today's; one that read today shows the time alone.
-    const old = new Date(Date.now() - 2 * 86400000), today = new Date(Date.now() - 5 * 60000);
+    // "Today" is 5 minutes ago, unless that is still yesterday in Uniontown (a run just after midnight): then it is now.
+    const day = (d) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).format(d).replace(/\//g, '-');
+    const old = new Date(Date.now() - 2 * 86400000), before = new Date(Date.now() - 5 * 60000), today = day(before) === day(new Date()) ? before : new Date();
     await db().collection('config').doc('mocreo').set({ configured: true, lastSuccess: today.toISOString(), lastError: '', sensors: 2 });
     await db().collection('sensors').doc('S_OLD').set({ sensorId: 'S_OLD', name: 'Cooler Middle', temperatureF: 36.3, batteryLevel: 100, online: false, lastReadingAt: old.toISOString(), returned: true, error: '' });
     await db().collection('sensors').doc('S_NOW').set({ sensorId: 'S_NOW', name: 'Cooler North', temperatureF: 37.9, batteryLevel: 100, online: true, lastReadingAt: today.toISOString(), returned: true, error: '' });
-    const day = (d) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).format(d).replace(/\//g, '-');
     for (const [w, h] of [[1920, 950], [1536, 760]]) {
       const page = w === 1920 ? desk : await openPage(browser, w, h, '/temps.html' + MANAGER);
       if (w === 1920) await desk.click('[data-pane="current"]');
