@@ -23,9 +23,13 @@ id: start
 
 Operations is United Dairy's app for dispatch, the plant floor, fleet and maintenance. Every screen has the same three parts:
 
-- **The blue bar across the top.** The United Dairy logo, then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
+- **The blue bar across the top.** The United Dairy logo with the plant you are in written in yellow (Uniontown, Charleston or Martins Ferry), then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
 - **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in.
 - **The screen.** Filters and the date sit on the right. Lists have headings that stay put when you scroll.
+
+### Each plant is separate
+
+Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, trucks, settings and lists. A screen shows only the plant named in the top bar, and nothing you change there touches another plant. Only Home's **Operations Overview** shows all the plants together. You see a plant only when People & Roles gives it to you.
 
 ### Buttons you see everywhere
 
@@ -789,7 +793,19 @@ What the weekly walk looks at, and how often. Each line is one thing to look at:
 id: production-home
 screens: production-home.html
 
-The front page for Plant Production (being built, administrators only for now). One card per kind of machine, plus Quality Checks, Cooler Temperature and Shift Notes. Click a card to open its lines.
+The front page for Plant Production (being built, administrators only for now). It fits on one screen without scrolling.
+
+- **Send Current Report** on the left: a preview of the plant report. `Edit / Add` opens it to add a note; `SEND CURRENT REPORT` emails it to the Plant Managers group.
+- **Fillers**, **HTST**, **Boxing** and **Totes**: one card each, with how many lines are running, stopped and what they made. Boxing and Totes sit side by side. The Raypak counts with Boxing.
+- **Production Checks** along the bottom: Quality Checks, Cooler Temperature and the line tablets, each with `Check now` and `View`.
+- **Shift Notes** beside it: breakdowns still open, handoffs and carryover.
+
+1. Click a machine card to open just those lines on Production Lines.
+2. Click `Check now` on a check that is due or past due.
+
+> Blow Mold has its own page: open it from the Production Lines menu.
+
+!> Do not wait for a red card to clear on its own. Open it and see which line is stopped or off its speed.
 
 ## Production Lines
 id: production
@@ -1030,7 +1046,7 @@ Where email goes and who it comes from:
 - **Email Senders:** email comes from the person who presses Send, and each plant's own address for automatic email.
 - **Manager Report Recipients:** who gets the plant report at each plant. Remove is pressed twice.
 - **Sent Email Log:** every email the app sent, newest first.
-- **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`.
+- **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`. Pick the plant with `Location`; each plant keeps its own mailbox settings and its own check-ins.
 
 ## Refresh Rates
 id: admin-refresh

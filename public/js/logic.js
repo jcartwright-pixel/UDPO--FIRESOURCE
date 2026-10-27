@@ -516,11 +516,16 @@
   // Joe 10/10: the plants (the current app's facility list) and who sees which. A person's plant list (USERS_MASTER
   // facility_ids_json) decides: ["*"] is every plant, otherwise the plants named. With no list, an Administrator sees
   // every plant and anyone else sees Uniontown. Someone who sees more than one plant lands on the all-plants overview.
+  // Joe 10/26: the three plants are completely separate. Each keeps everything in its own database (db): Uniontown in the
+  // first one, as always, Charleston and Martins Ferry each in their own. Only the Home overview reads all three.
   var PLANTS = [
-    { id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' },
-    { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' },
-    { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }
+    { id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE', db: '(default)' },
+    { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED', db: 'charleston' },
+    { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED', db: 'martins-ferry' }
   ];
+  var HOME_PLANT = 'fac_uniontown';
+  // The database a plant keeps its things in; '' for a plant not on the list.
+  function plantDb(id) { var p = PLANTS.filter(function (x) { return x.id === id; })[0]; return p ? p.db : ''; }
   var PRIMARY_ADMINS = ['jcartwright@uniteddairy.com'];
   var ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
   function isAdmin(person) { return hasRole(person, ADMIN_ROLES); }
@@ -1603,7 +1608,7 @@
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
-    PLANTS: PLANTS, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
+    PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,

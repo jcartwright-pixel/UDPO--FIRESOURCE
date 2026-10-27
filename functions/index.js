@@ -32,6 +32,11 @@
  *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
  *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
  *   productionEveryMinute the sandbox test feed's pretend jugs, and a stop when a label reader line goes quiet
+ *   usersToPlants         Joe 10/26 (the plants are completely separate): each plant's database gets a copy of only the people
+ *                         given that plant (src/plants.js), so no one else can read it
+ *
+ * Every call from a screen names the plant it is open at (udPlant); the call works in that plant's own database only, after
+ * checking the caller may work there (src/plants.js). Uniontown's database is the first one, as before.
  */
 'use strict';
 
@@ -54,7 +59,7 @@ const { unitedDairyUser } = require('./src/auth');
 const { makeSheetsReader, makeSheetsWriter } = require('./src/sheets');
 const { runWriteBack } = require('./src/writeback');
 const { runMasterWriteBack } = require('./src/masterwrite');
-const { transferSources } = require('./src/sources');
+const { transferSources, plantSources } = require('./src/sources');
 const { safeIdPart } = require('./src/model');
 const { runFleetSync, refreshFleetOwnership } = require('./src/fleetsync');
 const { mailReport } = require('./src/reportmail');
@@ -68,6 +73,7 @@ const TOOLS = require('./src/admintools');
 const READER = require('./src/reader');
 const L = require('./src/logic');
 const RUNDAYS = require('./src/rundays');
+const PLANTS = require('./src/plants');
 
 admin.initializeApp();
 setGlobalOptions({ region: 'us-east4', maxInstances: 5 });
@@ -104,6 +110,18 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   // Administration > Refresh Rates: every minute unless an administrator chose a slower rate.
   if (!(await TOOLS.jobDue(db, 'transfer'))) return;
   await runTransfer({ db, reader: setup.reader, sources: setup.sources });
+  // Joe 10/26 (fk): each other plant's own sheets, into its own database only, once that plant is working (or a test copy
+  // names its sheet copies). Read only; one plant's copy never touches another plant's database.
+  for (const p of L.PLANTS.filter(x => x.db !== '(default)' && plantReady(x))) {
+    try {
+      // The test copy (SOURCES_JSON) reads only the sheet copies it names, never a plant's real sheets.
+      const copyOnly = process.env.DEMO_DATA === '1' || !!process.env.SOURCES_JSON;
+      const sources = copyOnly && !process.env.PLANT_SOURCES_JSON ? null : plantSources(process.env, p.id);
+      if (!sources || (p.status !== 'ACTIVE' && !process.env.PLANT_SOURCES_JSON)) continue;
+      const pdb = PLANTS.dbFor(p.id, db);
+      if (await TOOLS.jobDue(pdb, 'transfer')) await runTransfer({ db: pdb, reader: setup.reader, sources });
+    } catch (e) { console.error('Copy of ' + p.name + "'s sheets failed: " + (e && e.message || e)); }
+  }
   // Nobody pressed Publish and the calendar reached the Next week: publish it, as the current app's scheduled refresh does.
   try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
   // Joe 10/15: Schedule Texts, once a new week is the Live Current week (Off until an administrator turns it On).
@@ -129,9 +147,43 @@ exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSec
 // The Over the Road history is about 19,000 day counts, so a run gets 5 minutes and room for the file.
 exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
   await require('./src/data-loads').runDataLoads(db);
+  // Joe 10/26: once after each deploy, every person's copies in the plants' databases (a deploy may add a plant's database).
+  try {
+    const mark = db.collection('private').doc('plantMirrorDeploy'), revision = String(process.env.K_REVISION || 'local') + '|' + (process.env.PLANT_DBS || '');
+    if (((await mark.get()).data() || {}).revision !== revision) { await PLANTS.mirrorAll(db, readyDbs()); await mark.set({ revision, at: new Date().toISOString() }); }
+  } catch (e) { console.error('Copying people to the plants failed: ' + (e && e.message || e)); }
 });
 
-const asHttps = (error) => (error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof SMS.SmsError || error instanceof MocreoError || error instanceof RedzoneError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+// Joe 10/26: a change to the Users list (the copy from USERS_MASTER, or People & Roles) reaches the plants' databases at once.
+if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
+  exports.usersToPlants = onDocumentWritten({ document: 'users/{email}', timeoutSeconds: 60 }, (event) => mirrorOne(event.params.email));
+}
+
+const asHttps = (error) => (error instanceof PLANTS.PlantError || error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof SMS.SmsError || error instanceof MocreoError || error instanceof RedzoneError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+
+// The plant's own database for a call from a screen (src/plants.js): refused unless the caller may work at that plant.
+async function plantDb(request, who) {
+  try { return PLANTS.dbFor(await PLANTS.callPlant(db, request.data || {}, who), db); } catch (error) { throw asHttps(error); }
+}
+// A call that a code (a phone's Route Distribution code, a garage or reader key) checks inside: the plant it names.
+function namedPlantDb(input) {
+  try { return PLANTS.dbFor(PLANTS.plantOf(input || {}), db); } catch (error) { throw asHttps(error); }
+}
+// The plants' own databases that exist on this project: Uniontown's always; the others once the deploy has made them
+// (PLANT_DBS, written by the deploy) and always on the local test database.
+const plantReady = (p) => p.db === '(default)' || process.env.FUNCTIONS_EMULATOR === 'true' || String(process.env.PLANT_DBS || '').split(',').indexOf(p.db) >= 0;
+const readyDbs = () => Object.fromEntries(L.PLANTS.filter(plantReady).map(p => [p.id, PLANTS.dbFor(p.id, db)]));
+// A job that each working plant runs on its own database, one plant after another (a plant being built has nothing to run).
+async function eachPlant(name, fn) {
+  for (const p of PLANTS.activePlants().filter(plantReady)) {
+    try { await fn(PLANTS.dbFor(p.id, db), p); } catch (e) { console.error(name + ' (' + p.name + ')', e && e.message || e); }
+  }
+}
+// One person's copies in the plants' databases (People & Roles changed their plants, or the Users list copy changed them).
+async function mirrorOne(email) {
+  const person = (await db.collection('users').doc(safeIdPart(email)).get()).data() || null;
+  await PLANTS.mirrorPerson(db, email, person, readyDbs());
+}
 
 // Open to phones without a United Dairy account: every call is checked against the Route Distribution code (or, from the
 // Driver Room Check-In tablet, its Driver Room kiosk station code).
@@ -143,8 +195,9 @@ exports.phone = onCall({ maxInstances: 3 }, async (request) => {
     // its station code then decides the page. The drivers' own phones keep the Route Distribution code alone.
     if (roomCall(input) && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with a United Dairy account on the Driver Station link first.');
     // The Driver Room Check-In tablet's Release: the plant's manager release code (as the no-account Plant Station).
-    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(db, FAILS.withDevice(request, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code }));
-    return await phoneCall(db, FAILS.withDevice(request, input));
+    const pdb = namedPlantDb(input);
+    if (input.op === 'roomStatus' || input.op === 'roomRelease') return await ADMIN.releaseCheck(pdb, FAILS.withDevice(request, { op: input.op === 'roomStatus' ? 'status' : 'release', facilityId: input.facilityId, code: input.code }));
+    return await phoneCall(pdb, FAILS.withDevice(request, input));
   } catch (error) { throw asHttps(error); }
 });
 
@@ -155,19 +208,21 @@ exports.garage = onCall({ maxInstances: 3 }, async (request) => {
     // Joe 10/12: a Garage Station with its code is signed in with a United Dairy account first (as every station).
     if (request.data && request.data.station && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
     // Review item 68 (Joe 10/13): who is calling, so the Maintenance Station board can ask for a sign-in or a station code.
-    return await garageCall(db, FAILS.withDevice(request, request.data), undefined, { user: unitedDairyUser(request.auth), claims: request.auth && request.auth.token });
+    const user = unitedDairyUser(request.auth);
+    const pdb = user ? await plantDb(request, user) : namedPlantDb(request.data);
+    return await garageCall(pdb, FAILS.withDevice(request, request.data), undefined, { user: unitedDairyUser(request.auth), claims: request.auth && request.auth.token });
   } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {
   const user = signedIn(request);
-  try { return await newRouteCode(db, user); } catch (error) { throw asHttps(error); }
+  try { return await newRouteCode(await plantDb(request, user), user); } catch (error) { throw asHttps(error); }
 });
 
 exports.setSwitch = onCall(async (request) => {
   const user = signedIn(request);
   // The write-back can go on only where the server names a sandbox Live workbook to write.
-  try { return await setSwitch(db, user, request.data, !!process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1'); } catch (error) { throw asHttps(error); }
+  try { return await setSwitch(await plantDb(request, user), user, request.data, !!process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1'); } catch (error) { throw asHttps(error); }
 });
 
 // Joe 10/10: Administration's People & Roles lists everyone on the Users list, for Administrators only. Each person may
@@ -183,24 +238,24 @@ exports.people = onCall(async (request) => {
 // Administration > Schedule Texts (src/sms.js): an administrator saves the Twilio login, turns the texts On or Off, sees who would get one.
 exports.sms = onCall({ timeoutSeconds: 60 }, async (request) => {
   const user = signedIn(request);
-  try { return await SMS.smsCall(db, user, request.data); } catch (error) { throw asHttps(error); }
+  try { return await SMS.smsCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
-  try { return await gpsCall(db, user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
+  try { return await gpsCall(await plantDb(request, user), user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });
 
 // Administration > MOCREO & Sensors: the API key (write-only), Test Connection, and the thermometer locations.
 exports.mocreo = onCall({ timeoutSeconds: 60 }, async (request) => {
   const user = signedIn(request);
-  try { return await mocreoCall(db, user, request.data); } catch (error) { throw asHttps(error); }
+  try { return await mocreoCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 // Administration > RedZone: the API sign-in (write-only) and Test Connection; Products' Get from RedZone reads the list.
 exports.redzone = onCall({ timeoutSeconds: 120 }, async (request) => {
   const user = signedIn(request);
-  try { return await redzoneCall(db, user, request.data); } catch (error) { throw asHttps(error); }
+  try { return await redzoneCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
 });
 
 // Administration (src/admin.js): Administrators only, checked inside.
@@ -218,24 +273,67 @@ function adminDeps() {
   };
 }
 
+// Joe 10/26: People & Roles, role templates, people's access links and the Upload Center are the company's, kept with the one
+// Users list (Uniontown's database); every other Administration page is the plant's own.
+const COMPANY_ADMIN_OPS = ['people', 'savePerson', 'setHomeScreen', 'saveRoleTemplate', 'addRole', 'roleTemplates', 'accessLinks', 'accessGenerate', 'accessRevoke', 'accessEmail', 'uploadStatus', 'uploadSave'];
+// Pages that list every plant on one page (Manager Links' release codes, Email Senders, the station codes): each plant's line
+// comes from that plant's own database, and a save of several plants' lines goes to each plant's own database.
+async function eachPlantOf(user) {
+  const person = (await db.collection('users').doc(safeIdPart(user.email)).get()).data();
+  return L.PLANTS.filter(p => plantReady(p) && L.plantsFor(person).indexOf(p.id) >= 0);
+}
+const ownLines = (rows, id) => (rows || []).filter(r => r && r.id === id);
+const PLANT_LIST_OPS = {
+  releaseCodes: (all) => ({ plants: all.flatMap(([id, r]) => ownLines(r.plants, id)) }),
+  emailSenders: (all, here) => Object.assign({}, here, { plants: all.flatMap(([id, r]) => ownLines(r.plants, id)) }),
+  saveEmailSenders: (all, here) => Object.assign({}, here, { plants: all.flatMap(([id, r]) => ownLines(r.plants, id)) }),
+  stations: (all, here) => Object.assign({}, here, {
+    noAccount: all.flatMap(([id, r]) => ownLines(r.noAccount, id)),
+    stations: all.flatMap(([id, r]) => (r.stations || []).filter(x => x.facilityId === id))
+  })
+};
+async function adminAllPlants(user, input, deps) {
+  const plants = await eachPlantOf(user), all = [];
+  for (const p of plants) {
+    const mine = Object.assign({}, input, { udPlant: p.id });
+    // Email Senders: each plant's database saves only its own sender.
+    if (input.op === 'saveEmailSenders') mine.senders = input.senders && input.senders[p.id] ? { [p.id]: input.senders[p.id] } : {};
+    all.push([p.id, await adminCall(PLANTS.dbFor(p.id, db), user, mine, deps)]);
+  }
+  const here = (all.find(x => x[0] === PLANTS.plantOf(input)) || all[0] || [null, {}])[1];
+  return PLANT_LIST_OPS[input.op](all, here);
+}
+
 exports.admin = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
-  try { return await adminCall(db, user, request.data, adminDeps()); } catch (error) { throw asHttps(error); }
+  const op = String(request.data && request.data.op || ''), company = COMPANY_ADMIN_OPS.indexOf(op) >= 0;
+  try {
+    if (PLANT_LIST_OPS[op]) return await adminAllPlants(user, request.data || {}, adminDeps());
+    const result = await adminCall(company ? db : await plantDb(request, user), user, request.data, adminDeps());
+    // A person's plants changed: their copies in the plants' databases follow at once.
+    if (request.data && request.data.op === 'savePerson' && request.data.email) await mirrorOne(String(request.data.email).toLowerCase());
+    return result;
+  } catch (error) { throw asHttps(error); }
 });
 
 // Repair emails (Immediately / Once a day), the driver check-in mailbox and the weekly archive, each only when its
 // Refresh Rate says it is due. Each does nothing until an administrator switches it on.
 exports.adminJobsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  // Joe 10/26: each plant's own repair emails and check-in mailbox, from its own database.
+  await eachPlant('adminJobs', async (pdb) => {
+    const run = async (key, fn) => { try { if (await TOOLS.jobDue(pdb, key)) await fn(); } catch (e) { console.error(key, e); } };
+    await run('repairEmail', () => TOOLS.repairSweep(pdb, {}));
+    await run('checkinMail', () => TOOLS.checkinRun(pdb, {}));
+  });
+  // The weekly archive is Uniontown's Live sheet's.
   const run = async (key, fn) => { try { if (await TOOLS.jobDue(db, key)) await fn(); } catch (e) { console.error(key, e); } };
-  await run('repairEmail', () => TOOLS.repairSweep(db, {}));
-  await run('checkinMail', () => TOOLS.checkinRun(db, {}));
   const d = adminDeps();
   if (d.sheets && d.liveId) await run('archive', () => TOOLS.archiveCompleted(db, 'SCHEDULE', { sheets: d.sheets(), liveId: d.liveId }));
 });
 
 exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
   const user = signedIn(request);
-  try { return await stationRelease(db, user, FAILS.withDevice(request, request.data)); } catch (error) { throw asHttps(error); }
+  try { return await stationRelease(await plantDb(request, user), user, FAILS.withDevice(request, request.data)); } catch (error) { throw asHttps(error); }
 });
 
 // Open to tablets with no United Dairy account (Joe 10/12, the old app's public Plant Station): a plant station's code, only
@@ -244,8 +342,10 @@ exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
 exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
   const input = FAILS.withDevice(request, request.data);
   try {
-    if (input.op === 'status' || input.op === 'release') return await ADMIN.releaseCheck(db, input);
-    const r = await STATIONS.signIn(db, input);
+    // The tablet's link names its plant (?plant=); none = Uniontown. Each plant's codes are in its own database.
+    const pdb = namedPlantDb(input);
+    if (input.op === 'status' || input.op === 'release') return await ADMIN.releaseCheck(pdb, input);
+    const r = await STATIONS.signIn(pdb, input);
     if (!r.ok || input.op !== 'enter') return r;
     // The Driver's Kiosk Station TV (Joe 10/16): signed in as that TV station only (database rules: tvStation()).
     if (input.tv === true) return Object.assign({ token: await admin.auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name }) }, r);
@@ -258,13 +358,15 @@ exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
 async function saver(request) {
   const user = unitedDairyUser(request.auth);
   if (user) return user;
-  const station = request.auth ? await STATIONS.stationSaver(db, request.auth.token) : null;
+  const plant = request.auth && request.auth.token && request.auth.token.udPlant;
+  const station = request.auth ? await STATIONS.stationSaver(PLANTS.dbFor(L.plantDb(plant) ? plant : L.HOME_PLANT, db), request.auth.token) : null;
   if (!station) return signedIn(request);
   return { uid: request.auth.uid, email: 'station:' + station.key, station };
 }
 
 exports.save = onCall({ timeoutSeconds: 120 }, async (request) => {
   const user = await saver(request);
+  const db = await plantDb(request, user);
   try {
     // Asking, not saving: which of these saves this person may make (People & Roles counts).
     if (request.data && Array.isArray(request.data.checkSaves)) return { allowed: await checkSaves(db, user, request.data.checkSaves, request.data.facilityId) };
@@ -398,6 +500,14 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
 if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   exports.runDaysOnRunWrite = onDocumentWritten({ document: 'runs/{runId}', timeoutSeconds: 60 }, (event) => RUNDAYS.syncRun(db, event.params.runId));
 }
+// Joe 10/26: the same two for each other plant, in its own database, once the deploy has made it (a trigger needs its database).
+if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
+  L.PLANTS.filter(p => p.db !== '(default)' && plantReady(p)).forEach(p => {
+    const name = p.id.replace(/^fac_/, '').replace(/_(.)/g, (m, c) => c.toUpperCase()).replace(/^./, c => c.toUpperCase()), pdb = PLANTS.dbFor(p.id, db);
+    exports['mailPlantReport' + name] = onDocumentCreated({ document: 'plantReports/{id}', database: p.db, timeoutSeconds: 60 }, (event) => (event.data ? mailReport(event.data.ref, event.data.data()) : null));
+    exports['runDaysOnRunWrite' + name] = onDocumentWritten({ document: 'runs/{runId}', database: p.db, timeoutSeconds: 60 }, (event) => RUNDAYS.syncRun(pdb, event.params.runId));
+  });
+}
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));
 
 // Fleet list sync: reads the fleet list, writes only the Equipment Master copy the write-back writes (and the transfer reads).
@@ -441,44 +551,55 @@ exports.fleetOwnershipEvery30Minutes = onSchedule({ schedule: 'every 30 minutes'
 
 // How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.
 exports.cleanupNightly = onSchedule({ schedule: '30 3 * * *', timeZone: 'America/New_York', timeoutSeconds: 540, maxInstances: 1 }, async () => {
-  await runCleanup({ db });
+  await eachPlant('cleanup', (pdb) => runCleanup({ db: pdb }));
 });
 
 // Verizon Connect Fleet GPS (src/fleetgps.js): where each truck is now, and every 15 minutes today's miles. It reads the
 // login saved in GPS Setup each run, so it does nothing until a manager saves one there.
 exports.fleetGpsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
-  const r = await FLEETGPS.pull(db);
-  if (r && r.error) console.error('fleetGps', r.error);
-  // Joe 10/14: this week's history, read once, a part each run after the live read.
-  const h = await FLEETGPS.history(db, { budgetMs: 150000 });
-  if (h && h.error) console.error('fleetGps history', h.error);
+  // Joe 10/26: each plant reads its own GPS login and keeps its own trucks.
+  const plants = PLANTS.activePlants().filter(plantReady).length || 1;
+  await eachPlant('fleetGps', async (pdb) => {
+    const r = await FLEETGPS.pull(pdb);
+    if (r && r.error) console.error('fleetGps', r.error);
+    // Joe 10/14: this week's history, read once, a part each run after the live read.
+    const h = await FLEETGPS.history(pdb, { budgetMs: Math.floor(150000 / plants) });
+    if (h && h.error) console.error('fleetGps history', h.error);
+  });
 });
 
 // Joe 10/18: the GPS trailer temperatures are kept 6 months, then deleted; on its own so a failed GPS read never stops it.
 exports.gpsReeferCleanupNightly = onSchedule({ schedule: '30 3 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
-  const r = await FLEETGPS.purgeReefer(db, new Date().toISOString(), { budgetMs: 90000 });
-  console.log('gpsReefer cleanup', JSON.stringify(r));
+  await eachPlant('gpsReefer cleanup', async (pdb) => {
+    const r = await FLEETGPS.purgeReefer(pdb, new Date().toISOString(), { budgetMs: 30000 });
+    console.log('gpsReefer cleanup', JSON.stringify(r));
+  });
 });
 
 // RedZone's count feed (src/redzone.js readEvents): read only, every 5 minutes; nothing happens until RedZone is set up, and
 // until RedZone turns the feed on it only notes that it is off.
 exports.redzoneEventsEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
-  try { await readRedzoneEvents(db); } catch (e) { console.error('redzone events', e.message); }
-  // Joe 10/18: the checks people typed into RedZone, read the same way (read only).
-  try { await readRedzoneChecks(db); } catch (e) { console.error('redzone checks', e.message); }
+  await eachPlant('redzone', async (pdb) => {
+    try { await readRedzoneEvents(pdb); } catch (e) { console.error('redzone events', e.message); }
+    // Joe 10/18: the checks people typed into RedZone, read the same way (read only).
+    try { await readRedzoneChecks(pdb); } catch (e) { console.error('redzone checks', e.message); }
+  });
 });
 
 // MOCREO sensors (src/mocreo.js): the key is read each run, so the sync starts by itself once a key is saved and tested.
 exports.mocreoEvery5Minutes = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 120, maxInstances: 1 }, async () => {
-  if (!(await TOOLS.jobDue(db, 'mocreo'))) return;
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
-  // The key saved in Administration > MOCREO & Sensors; else the Secret Manager secrets.
-  const getSecrets = () => appSecrets(db, async () => {
-    const { GoogleAuth } = require('google-auth-library');
-    const token = await new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getAccessToken();
-    return readSecrets({ project, token, fetchFn: fetch });
+  await eachPlant('mocreo', async (pdb, p) => {
+    if (!(await TOOLS.jobDue(pdb, 'mocreo'))) return;
+    // The key saved in Administration > MOCREO & Sensors; else (Uniontown only, as before) the Secret Manager secrets.
+    const getSecrets = () => appSecrets(pdb, async () => {
+      if (pdb !== db) return { missing: 'MOCREO_API_KEY' };
+      const { GoogleAuth } = require('google-auth-library');
+      const token = await new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }).getAccessToken();
+      return readSecrets({ project, token, fetchFn: fetch });
+    });
+    await runMocreoSync({ db: pdb, getSecrets, fetchFn: fetch });
   });
-  await runMocreoSync({ db, getSecrets, fetchFn: fetch });
 });
 
 // Equipment's "Sync fleet list" button, and its "Preview fleet sync" ({preview: true}: writes nothing, lists every change).
@@ -525,9 +646,11 @@ exports.smsReply = onRequest({ maxInstances: 2, timeoutSeconds: 30 }, async (req
 });
 exports.lineReader = onCall({ timeoutSeconds: 30 }, async (request) => {
   const user = signedIn(request);
-  try { return await READER.readerAll(db, user, request.data, { project: projectId() }); } catch (error) { throw asHttps(error); }
+  try { return await READER.readerAll(await plantDb(request, user), user, request.data, { project: projectId() }); } catch (error) { throw asHttps(error); }
 });
 exports.productionEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 60, maxInstances: 1 }, async () => {
-  const done = await READER.readerMinute(db, { project: projectId() });
-  if (done.length) console.log('production', done.join('; '));
+  await eachPlant('production', async (pdb) => {
+    const done = await READER.readerMinute(pdb, { project: projectId() });
+    if (done.length) console.log('production', done.join('; '));
+  });
 });

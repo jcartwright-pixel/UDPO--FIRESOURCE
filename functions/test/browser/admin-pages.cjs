@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, plantDb } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const localCalls = require('./local-calls.cjs');
@@ -225,13 +225,16 @@ async function until(check, what) {
     await p.fill('[data-addr="fac_charleston"]', 'charleston.operations@uniteddairy.com');
     await p.fill('[data-name="fac_charleston"]', 'United Dairy Charleston Operations');
     await p.selectOption('#es-who', 'PLANT');
-    await until(async () => { const x = (await db().collection('private').doc('emailSettings').get()).data(); return x.fromWho === 'PLANT' && x.senders.fac_charleston.name === 'United Dairy Charleston Operations'; }, 'Email senders saved');
+    // Joe 10/26: each plant keeps its own sender in its own database (Charleston's in Charleston's).
+    const chSettings = async () => ((await plantDb('fac_charleston').collection('private').doc('emailSettings').get()).data() || { senders: {} });
+    await until(async () => { const x = (await db().collection('private').doc('emailSettings').get()).data(), c = await chSettings(); return x.fromWho === 'PLANT' && (c.senders.fac_charleston || {}).name === 'United Dairy Charleston Operations'; }, 'Email senders saved');
     await p.waitForSelector('#es-rows tr[data-plant="fac_charleston"] td:last-child small');
     assert.equal(await p.textContent('#view .ap-msg'), '', 'no saved message');
     assert.equal(await p.inputValue('[data-addr="fac_uniontown"]'), 'uniontown.operations@uniteddairy.com');
     assert.equal(await p.inputValue('#es-who'), 'PLANT');
-    const es = (await db().collection('private').doc('emailSettings').get()).data();
-    assert.deepEqual([es.senders.fac_charleston.address, es.fromWho], ['charleston.operations@uniteddairy.com', 'PLANT']);
+    const es = (await db().collection('private').doc('emailSettings').get()).data(), ch = await chSettings();
+    assert.deepEqual([ch.senders.fac_charleston.address, es.fromWho], ['charleston.operations@uniteddairy.com', 'PLANT']);
+    assert.equal(es.senders.fac_charleston, undefined, "Charleston's sender is not kept in Uniontown's database");
     await shot(p, 'email-senders-1920.png');
     await shot(p, 'email-senders-top-2x.png', { x: 0, y: 0, width: 1920, height: 540 });
     await p.fill('[data-addr="fac_martins_ferry"]', 'someone@gmail.com');

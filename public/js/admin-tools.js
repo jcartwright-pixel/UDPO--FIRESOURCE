@@ -99,13 +99,14 @@ export async function renderCheckinEmail(box) {
   // Batch 5 (10/23): no Save button; the tick saves when it is changed and each box when it is left, for the location shown.
   let saving = Promise.resolve();
   function save() {
-    const fields = { plant, enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value };
+    // Joe 10/26: each location's check-in mailbox is kept in that location's own database (udPlant names it).
+    const fields = { plant, udPlant: plant, enabled: $('#ce-on').checked, sender: $('#ce-from').value, recipient: $('#ce-to').value, subject: $('#ce-subject').value };
     saving = saving.then(async () => {
       try { const out = await call('saveCheckinEmail', fields); say(box, ''); if (out.plant === plant) { data = out; if (box.isConnected) render(); } } catch (err) { say(box, errText(err), 'bad'); }
     });
     return saving;
   }
-  async function load() { await saving; try { data = await call('checkinEmail', { plant }); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
+  async function load() { await saving; try { data = await call('checkinEmail', { plant, udPlant: plant }); if (box.isConnected) { fill(data.settings); render(); } } catch (err) { say(box, errText(err), 'bad'); } }
   box.addEventListener('change', ev => {
     if (ev.target.id === 'ce-plant') { plant = ev.target.value; say(box, ''); load(); return; }
     if (data && ev.target.closest('#ce-on, #ce-from, #ce-to, #ce-subject')) save();
@@ -115,7 +116,7 @@ export async function renderCheckinEmail(box) {
     if (!b) return;
     if (b.id === 'ce-reload') load();
     if (b.id === 'ce-std') { $('#ce-from').value = data.standard.sender; $('#ce-to').value = data.standard.recipient; $('#ce-subject').value = data.standard.subject; save(); }
-    if (b.id === 'ce-now') busy(box, b, async () => { await saving; data = await call('checkinEmailNow', { plant }); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
+    if (b.id === 'ce-now') busy(box, b, async () => { await saving; data = await call('checkinEmailNow', { plant, udPlant: plant }); render(); say(box, data.message, data.status === 'FAIL' ? 'bad' : data.status === 'OFF' ? '' : 'good'); });
   });
   await load();
 }

@@ -11,15 +11,31 @@ service cloud.firestore {
     }
     // A United Dairy account is not enough to see dispatch data or driver phone numbers: the person must be an
     // ACTIVE user in USERS_MASTER (copied to users/{email}). One extra read per query, not per document.
+    // Joe 10/26: the three plants are completely separate. The same rules guard each plant's own database; this database's
+    // plant comes from its name. Uniontown's is the first database ("(default)").
+    function thisPlant() {
+      return database == 'charleston' ? 'fac_charleston' : (database == 'martins-ferry' ? 'fac_martins_ferry' : 'fac_uniontown');
+    }
+    // The plants a person may work at (People & Roles), as the server copies them into every plant's database
+    // (functions/src/plants.js). Another plant's database holds a copy of a person's entry only when they have that plant,
+    // so no one else gets in there. In Uniontown's database a person with no copy yet is let in as before (Uniontown is
+    // the plant everyone had), until the server has copied everyone once after the deploy.
+    function myPlant() {
+      return exists(/databases/$(database)/documents/plantAccess/$(request.auth.token.email.lower()))
+        ? get(/databases/$(database)/documents/plantAccess/$(request.auth.token.email.lower())).data.get('plants', []).hasAny([thisPlant()])
+        : thisPlant() == 'fac_uniontown';
+    }
     function activeUser() {
       return unitedDairy()
-        && get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('status', '') == 'ACTIVE';
+        && get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('status', '') == 'ACTIVE'
+        && myPlant();
     }
     // A Plant Station signed in by its code alone (Joe 10/12; index.js stationSignIn): only while its plant's switch is On and
     // its station still has the same code (stationAccess, which the server keeps in step), and only the plant-floor screens'
     // lists below. Never a person's entry, dispatch weeks or any other list.
     function plantStation() {
       return request.auth != null && request.auth.token.get('udStation', '') != ''
+        && request.auth.token.get('udPlant', 'none') == thisPlant()
         && get(/databases/$(database)/documents/stationAccess/$(request.auth.token.get('udPlant', 'none'))).data.get('on', false) == true
         && get(/databases/$(database)/documents/stationAccess/$(request.auth.token.get('udPlant', 'none'))).data.get('keys', {}).get(request.auth.token.udStation, '') == request.auth.token.get('udVersion', 'none');
     }
@@ -28,6 +44,7 @@ service cloud.firestore {
     // station keeps the same code (stationAccess/tv). Only the board's lists: loads, pickups, drivers, config/app.
     function tvStation() {
       return request.auth != null && request.auth.token.get('udTv', '') != ''
+        && request.auth.token.get('udPlant', 'fac_uniontown') in [thisPlant(), '']
         && get(/databases/$(database)/documents/stationAccess/tv).data.get('keys', {}).get(request.auth.token.udTv, '') == request.auth.token.get('udTvVersion', 'none');
     }
     match /config/app { allow read: if activeUserOrStation() || tvStation(); }

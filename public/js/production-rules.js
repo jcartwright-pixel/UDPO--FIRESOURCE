@@ -153,6 +153,9 @@
     return 'FILLER';
   }
   var KIND_LABEL = { FILLER: 'Fillers', HTST: 'HTST', PACK: 'Boxing & Totes', BLOWMOLD: 'Blow Mold' };
+  // Joe 10/26: the Plant Production front page shows Boxing and Totes as two cards. Totes is its own card; Boxing, the Raypak
+  // (the Dairy Queen bag-in-box machine) and any other boxing line go on the Boxing card.
+  function packSide(name) { return text(name).toUpperCase().replace(/[^A-Z0-9]/g, '') === 'TOTES' ? 'TOTES' : 'BOXING'; }
   var WASTE_REASONS = {
     FILLER: ['Underfill (scale)', 'Leaker', 'Bad cap', 'Bad label', 'Bad code date', 'Changeover purge', 'Dropped / damaged', 'Other'],
     PACK: ['Leaker', 'Bad seal', 'Bad label', 'Bad code date', 'Changeover purge', 'Damaged', 'Other'],
@@ -705,7 +708,7 @@
 
   return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, rzEfficiency: rzEfficiency, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
-    lineKind: lineKind, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
+    lineKind: lineKind, packSide: packSide, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, blowHours: blowHours, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MAX: FILL_MAX, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
     usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasCip: hasCip, runLeft: runLeft, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,

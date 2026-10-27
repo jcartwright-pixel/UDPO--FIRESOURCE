@@ -560,10 +560,11 @@ async function saveDigestEntry(db, msg, i, c, stamp) {
  */
 async function checkinRun(db, opts) {
   const o = opts || {};
-  // The scheduled job (no location named) checks every location whose check is on.
+  // The scheduled job (no location named) checks the location whose database this is, when its check is on (Joe 10/26: each
+  // plant's check-ins are kept in its own database, so each plant's job reads only its own mailbox).
   if (!o.plant) {
-    const out = [];
-    for (const p of L.PLANTS) out.push(Object.assign({ plant: p.id }, await checkinRun(db, Object.assign({}, o, { plant: p.id }))));
+    const out = [], here = (db && db.databaseId) || '(default)';
+    for (const p of L.PLANTS.filter(x => x.db === here)) out.push(Object.assign({ plant: p.id }, await checkinRun(db, Object.assign({}, o, { plant: p.id }))));
     return { status: out.some(r => r.status === 'FAIL') ? 'FAIL' : 'SUCCESS', message: out.map(r => r.message).join(' '), plants: out };
   }
   const plant = checkinPlant(o.plant), now = o.now ? o.now() : new Date(), stamp = now.toISOString();
