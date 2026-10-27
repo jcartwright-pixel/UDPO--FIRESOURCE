@@ -189,8 +189,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
   function loadingView() {
     const all = loads(), ck = canSave(), unit = P.AREA[area() || 'CASE'];
     const rows = inOrder(all), below = skippable(rows), urows = unloads();
-    // Joe 10/27: just the trailer, green once it is unloaded, red while it is still waiting on the Unloading list.
-    const trl = (r) => { const ok = r.state === 'DONE' ? null : P.trailerUnloaded(r.trailer, urows); return ok === null ? '' : ok ? ' unl-ok' : ' unl-no'; };
+    // Joe 10/27: just the trailer, green once it is unloaded, red while it is still waiting on the Unloading list (no colour
+    // until the unloading records are read, so a trailer already unloaded never shows red first).
+    const trl = (r) => { const ok = r.state === 'DONE' || !got.week ? null : P.trailerUnloaded(r.trailer, urows); return ok === null ? '' : ok ? ' unl-ok' : ' unl-no'; };
     const pk = P.withNotePickups(all, pickups), ships = shipments(), box = boxing();
     // A box load the Scheduler marks Carrier is a carrier's load (the Scheduler's line itself is worked on this card).
     const carried = box ? numbered().filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER' && !x.overSlots).map(x => (x.slot ? Object.assign({}, x, x.slot) : x)) : [];
