@@ -1712,6 +1712,44 @@ a.wp-more { color: var(--ud-blue); }
 .prod-home a.mc-btn { display: inline-flex; align-items: center; justify-content: center; }
 @media (min-width: 1501px) { .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .prod-home [data-card="walk"] .wk-who { white-space: normal; }
+/* Joe 10/26: Blow Mold is off this page and Boxing and Totes are two cards, and the page fits a 1536 laptop window without
+   scrolling: each machine card is shorter (the counts and the four lines each on one line, the name beside "Production
+   Lines"), and Production Checks and Shift Notes share the bottom row. */
+@media (min-width: 1501px) {
+  .prod-home .mc-grid, .prod-home .mc-grid:has(.mc-alert) { grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: minmax(min-content, 1fr) auto; gap: 8px; }
+  .prod-home .mc-report { grid-row: 1; grid-column: 1 / span 5; }
+  .prod-home .mc-grid [data-card="dept"] { grid-column: 6 / span 11; grid-row: 1; }
+  .prod-home .mc-grid [data-card="walk"] { grid-column: 1 / span 11; grid-row: 2; }
+  .prod-home .mc-grid [data-card="notes"] { grid-column: 12 / span 5; grid-row: 2; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-rows: minmax(0, 1fr); gap: 4px; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tile { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "label line num"; align-items: center; column-gap: 8px; padding: 0 10px; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tile b { text-align: right; font-size: 24px; line-height: 1.05; }
+  .prod-home .mc-grid [data-card="notes"] .mc-tile i { white-space: normal; overflow: visible; line-height: 1.15; }
+  .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .prod-home .mc-grid [data-card="walk"] .mc-tile, .prod-home .mc-grid [data-card="notes"] .mc-tile { padding-left: 10px; padding-right: 10px; }
+  .prod-home .mc-card { padding: 8px 12px 9px; gap: 3px; }
+  .prod-home .mc-depts { gap: 8px; }
+  .prod-home .mc-report .mc-btn { min-width: 0; padding: 0 8px; }
+  .prod-home .mc-report .mc-btn:first-child { flex: 0 1 130px; }
+  .prod-home .dp-head { flex-direction: row; align-items: baseline; gap: 10px; }
+  .prod-home .dp-card .dp-head strong { order: -1; font-size: 22px; }
+  .prod-home .dp-counts span { padding: 1px 2px; }
+  .prod-home .dp-counts em { line-height: 1.15; }
+  .prod-home .dp-counts b { font-size: 22px; line-height: 1.05; }
+  .prod-home .dp-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; column-gap: 12px; }
+  .prod-home .dp-card > :is(.dp-head, .dp-counts, .dp-lines) { grid-column: 1 / -1; }
+  .prod-home .dp-note { grid-column: 1; grid-row: 3; margin: 0; }
+  .prod-home .dp-bar { grid-column: 2; grid-row: 3; align-self: center; height: 8px; }
+  .prod-home .dp-line { padding: 1px 8px; gap: 8px; }
+  .prod-home .dp-line b { font-size: 22px; }
+  .prod-home .dp-line span { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  .prod-home .dp-line small { display: inline; }
+  .prod-home [data-card="walk"] .wk-tile { padding: 3px 10px 6px; }
+  .prod-home [data-card="walk"] .wk-tile b { font-size: 28px; }
+  .prod-home [data-card="walk"] .wk-tile { grid-template-areas: "label label" "line num" "who who" "acts acts"; }
+  .prod-home .wk-acts { margin-top: 4px; }
+  .prod-home .wk-acts a { min-height: 36px; }
+}
 
 /* 6.63 full test (tablet 1024x768): the day columns got about 70px and names broke mid-word, and the top buttons ran off the
    right edge. Under 1200px the buttons take their own line and wrap, the customers list narrows, and each day keeps at least

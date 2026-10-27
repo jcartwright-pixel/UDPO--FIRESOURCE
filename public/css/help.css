@@ -1,0 +1,29 @@
+/* The Help guide (help.html, Joe 10/26): topics on the left, the picked part on the right, both scroll on their own. */
+.help-page .head { align-items: center; }
+.help-q { margin-left: auto; width: 360px; max-width: 100%; height: 42px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; font: inherit; font-size: 16px; }
+.help-body { display: flex !important; flex-direction: row !important; gap: 14px; padding: 0 16px 12px; }
+.help-nav { flex: 0 0 340px; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 0; }
+.help-ch { position: sticky; top: -6px; background: var(--band); color: var(--ud-blue-dark); font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 8px 14px; }
+.help-item { display: block; padding: 8px 14px 8px 22px; color: var(--ink); text-decoration: none; font-size: 16px; font-weight: 600; border-left: 4px solid transparent; }
+.help-item:hover { background: #eef4fa; }
+.help-item.on { background: #e1edf9; border-left-color: var(--ud-blue); color: var(--ud-blue-dark); font-weight: 800; }
+.help-read { flex: 1; min-width: 0; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 26px 26px; font-weight: 500; font-size: 17px; line-height: 1.5; }
+.help-where { color: var(--muted); font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.help-title { margin: 2px 0 10px; font-size: 26px; color: var(--ud-blue-dark); }
+.help-go { display: inline-block; margin: 0 0 8px; background: var(--ud-blue); color: #fff; border-radius: 8px; padding: 9px 16px; font-weight: 700; text-decoration: none; }
+.help-text h3 { margin: 20px 0 6px; font-size: 19px; color: var(--ud-blue-dark); }
+.help-text p { margin: 8px 0; }
+.help-text ul, .help-text ol { margin: 6px 0; padding-left: 26px; }
+.help-text li { margin: 4px 0; }
+.help-text a { color: var(--ud-blue); font-weight: 700; }
+.help-key { display: inline-block; background: #eef4fa; border: 1px solid #b9c7d3; border-radius: 6px; padding: 0 7px; font-weight: 800; color: var(--ud-blue-dark); white-space: nowrap; }
+.help-tip { background: #e7f6ec; border-left: 5px solid #1d7a3e; border-radius: 6px; padding: 8px 12px; }
+.help-tip::before { content: 'Tip: '; font-weight: 800; color: #1d7a3e; }
+.help-dont { background: var(--error-bg); border-left: 5px solid #c62828; border-radius: 6px; padding: 8px 12px; }
+.help-dont::before { content: 'Do not: '; font-weight: 800; color: #9b1c1c; }
+@media (max-width: 900px) {
+  .help-body { flex-direction: column !important; overflow: auto; }
+  .help-nav { flex: none; max-height: 240px; }
+  .help-read { overflow: visible; }
+  .help-q { width: 100%; }
+}

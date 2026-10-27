@@ -1,9 +1,9 @@
 'use strict';
 /*
  * Browser check of the 5-gallon bag fillers and a packing line fed by the fillers (Joe 10/14), end to end:
- *   - Line Targets, Boxing: the fill weight check for bags (empty bag and fitment), and Fed by: the fillers whose jugs it boxes
- *     and the jugs in each box;
- *   - the Raypak and Boxing tablets: the fill weight check in bags against the product's Target Fill Weight g;
+ *   - Line Targets, Boxing: Fed by: the fillers whose jugs it boxes and the jugs in each box (Joe 10/26: no fill weight check on
+ *     Boxing, the product was weighed before it gets there);
+ *   - the Raypak tablet: the fill weight check in bags against the product's Target Fill Weight g; the Boxing tablet has none;
  *   - the Boxing tablet and Production Lines: jugs in from the fillers against boxes out × jugs in each box.
  * Pictures go to SHOTS_DIR.
  */
@@ -77,19 +77,13 @@ async function until(what, fn) {
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Line Targets, Boxing: the bag fill weight check and Fed by.
+    // Line Targets, Boxing: Fed by, and no fill weight check (Joe 10/26).
     const lt = await openPage(browser, 1536, 960, '/linetargets.html?line=' + BOXING + '&' + ADMIN);
     await lt.waitForFunction(() => document.getElementById('form-title').textContent === 'BOXING');
     await lt.waitForSelector('#setup [data-fedby]');
     const setup = await lt.textContent('#setup');
-    assert.match(setup, /5 filled bags weighed in grams on the line tablet, the same check as the Quality screen's package weight/);
-    assert.match(setup, /Product in each bag = filled weight − empty bag − fitment/);
+    assert.doesNotMatch(setup, /filled bags weighed in grams|Product in each bag/, 'Boxing has no fill weight check');
     assert.deepEqual(await lt.$$eval('#setup [data-fedby]', b => b.map(x => x.parentElement.textContent.trim())), ['NEW 1/2 GALLON', 'GALLON FILLER'], 'the fillers, not the packing lines or HTST');
-    for (const [k, v] of [['tareGrams', '450'], ['capGrams', '20'], ['fillUnder', '50']]) {
-      await lt.fill('#setup-' + k, v);
-      await lt.press('#setup-' + k, 'Tab');
-      await until(k + ' saved', async () => String((await lineDoc(BOXING))[k]) === v);
-    }
     await lt.check('#setup [data-fedby="' + GALLON + '"]');
     await until('Gallon Filler feeds Boxing', async () => String((await lineDoc(BOXING)).fedBy) === GALLON);
     await lt.check('#setup [data-fedby="' + NEW_HALF + '"]');
@@ -99,42 +93,48 @@ async function until(what, fn) {
     await until('perBox saved', async () => (await lineDoc(BOXING)).perBox === 4);
     await fits(lt, 'Line Targets');
     await bigText(lt, '#setup', 'Line Targets setup');
-    await lt.$eval('#setup .lt-fill:last-child', e => e.scrollIntoView({ block: 'center' }));
+    await lt.$eval('#setup [data-fedby]', e => e.scrollIntoView({ block: 'center' }));
     await shot(lt, 'bags-line-targets-boxing-1536');
     assert.deepEqual(lt.errors, []);
     await lt.close();
-    results.push('Line Targets, Boxing: bag fill weight check (empty bag 450 g, fitment 20 g) and Fed by GALLON FILLER and NEW 1/2 GALLON, 4 jugs in each box');
+    results.push('Line Targets, Boxing: no fill weight check; Fed by GALLON FILLER and NEW 1/2 GALLON, 4 jugs in each box');
 
-    // The bag fillers' tablets.
-    for (const [id, name, g] of [[RAYPAK, 'raypak', ['19950', '19900']], [BOXING, 'boxing', ['19980', '20010']]]) {
-      const tb = await openPage(browser, 1024, 1400, '/line.html?line=' + id + '&' + ADMIN);
+    // The Raypak tablet: bags weighed in grams.
+    {
+      const tb = await openPage(browser, 1024, 1400, '/line.html?line=' + RAYPAK + '&' + ADMIN);
       await tb.waitForSelector('#fill-box:not([hidden]) input[data-field="jug1"]');
-      assert.match(await tb.textContent('#fill-box'), /Bag 1 g/);
-      for (let j = 0; j < g.length; j++) {
-        await tb.fill('#fill-box input[data-field="jug' + (j + 1) + '"]', g[j]);
-        await tb.press('#fill-box input[data-field="jug' + (j + 1) + '"]', 'Tab');
-      }
-      await until(name + ' bags saved', async () => (await runsOf(id)).some(r => (r.fills || []).length === 1 && r.fills[0].jug2 === Number(g[1])));
-      await tb.waitForFunction(() => /Average product per bag/.test(document.getElementById('fill-box').textContent));
-      const box = await tb.textContent('#fill-box');
-      assert.match(box, /empty bag 450 g − fitment 20 g\. Target 19,500 g for 5 Gal 2% Dispenser/);
-      if (id === RAYPAK) assert.match(box, /19,430 g product · −70 g/, '19900 - 450 - 20 = 19430, LIGHT under 19,450');
-      if (id === BOXING) {
-        await tb.waitForFunction(() => !document.getElementById('box-strip').hidden && /BOXES MATCH|JUGS NOT BOXED/.test(document.getElementById('box-strip').textContent));
-        const strip = await tb.textContent('#box-strip');
-        assert.match(strip, /450 jugs in · 100 boxes × 4 = 400 boxed/);
-        assert.match(strip, /50 jugs not boxed yet/);
-        assert.match(strip, /From NEW 1\/2 GALLON 150 · GALLON FILLER 300/);
-        await bigText(tb, '#box-strip', 'jugs in against boxes');
-      }
-      await fits(tb, name + ' tablet');
-      await bigText(tb, '#fill-box', name + ' fill weight check');
-      await tb.$eval('#date-check', e => e.scrollIntoView({ block: 'start' }));
-      await shot(tb, 'bags-tablet-' + name + '-1024');
+      // Joe 10/26: the Raypak is a bag filler like the fillers: one bag a check with the countdown.
+      assert.match(await tb.textContent('#fill-box'), /Bag weight g/);
+      await tb.fill('#fill-box input[data-field="jug1"]', '19900');
+      await tb.press('#fill-box input[data-field="jug1"]', 'Enter');
+      await until('raypak bag saved', async () => (await runsOf(RAYPAK)).some(r => (r.fills || []).length === 1 && r.fills[0].jug1 === 19900));
+      await tb.waitForFunction(() => /Last 19,900 g at/.test(document.getElementById('fill-box').textContent));
+      assert.match(await tb.textContent('#fill-box'), /−70 g under target, LIGHT/, '19900 - 450 - 20 = 19430, LIGHT under 19,450');
+      assert.match(await tb.textContent('#actions'), /CIP/, 'the Raypak keeps CIP / Sanitation');
+      await fits(tb, 'raypak tablet');
+      await bigText(tb, '#fill-box', 'raypak fill weight check');
+      await tb.$eval('#fill-box', e => e.scrollIntoView({ block: 'start' }));
+      await shot(tb, 'bags-tablet-raypak-1024');
       assert.deepEqual(tb.errors, []);
       await tb.close();
     }
-    results.push('RAYPAK and BOXING tablets: bags weighed in grams (19,900 g filled = 19,430 g product, LIGHT); BOXING: 450 jugs in · 100 boxes × 4 = 400 boxed, 50 not boxed yet');
+    // Joe 10/26: the Boxing tablet has no fill weight check and no CIP button; jugs in against boxes stays.
+    {
+      const tb = await openPage(browser, 1024, 1400, '/line.html?line=' + BOXING + '&' + ADMIN);
+      await tb.waitForFunction(() => !document.getElementById('box-strip').hidden && /BOXES MATCH|JUGS NOT BOXED/.test(document.getElementById('box-strip').textContent));
+      assert.equal(await tb.$eval('#fill-box', e => e.hidden), true, 'Boxing has no fill weight check');
+      assert.deepEqual(await tb.$$eval('#actions button', b => b.map(x => x.dataset.act)), ['board', 'changeover', 'waste', 'check', 'crew', 'notes'], 'no CIP on Boxing');
+      const strip = await tb.textContent('#box-strip');
+      assert.match(strip, /450 jugs in · 100 boxes × 4 = 400 boxed/);
+      assert.match(strip, /50 jugs not boxed yet/);
+      assert.match(strip, /From NEW 1\/2 GALLON 150 · GALLON FILLER 300/);
+      await bigText(tb, '#box-strip', 'jugs in against boxes');
+      await fits(tb, 'boxing tablet');
+      await shot(tb, 'bags-tablet-boxing-1024');
+      assert.deepEqual(tb.errors, []);
+      await tb.close();
+    }
+    results.push('RAYPAK tablet: bags weighed in grams (19,900 g filled = 19,430 g product, LIGHT); BOXING: no fill weight check or CIP, 450 jugs in · 100 boxes × 4 = 400 boxed, 50 not boxed yet');
 
     // Production Lines: the card and the shift view.
     const pl = await openPage(browser, 1536, 960, '/production.html?' + ADMIN);
@@ -143,18 +143,19 @@ async function until(what, fn) {
     assert.deepEqual(pl.errors, []);
     await pl.close();
     for (const w of [1536, 1920]) {
-      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BOXING + '&' + ADMIN);
-      await dv.waitForFunction(() => /Jugs in against boxes out/.test(document.getElementById('detail').textContent) && /Fill weight checks/.test(document.getElementById('detail').textContent));
-      const d = (await dv.textContent('#detail')).replace(/ /g, ' ');
+      // Joe 10/26: the Boxing page's Jugs and boxes tab; no Fill weight tab (Boxing has no fill weight check).
+      const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BOXING + '&tab=boxing&' + ADMIN);
+      await dv.waitForFunction(() => /Jugs in/.test((document.querySelector('#detail .pm-tabbody') || {}).textContent || '') && !!document.querySelector('#pmtabs [data-pmtab="boxing"]'));
+      assert.equal(await dv.$('#pmtabs [data-pmtab="fill"]'), null, 'no Fill weight tab on Boxing');
+      const d = (await dv.textContent('#detail .pm-tabbody')).replace(/ /g, ' ');
       assert.match(d, /Jugs in 450\s+Boxes 100 × 4 = 400 jugs boxed\s+Not boxed 50/);
-      assert.match(d, /Bags/);
       await fits(dv, 'the Boxing shift view at ' + w);
       await dv.$eval('#detail', e => e.scrollIntoView({ block: 'start' }));
       await shot(dv, 'bags-boxing-shift-' + w);
       assert.deepEqual(dv.errors, []);
       await dv.close();
     }
-    results.push('Production Lines: Jugs in 450 · Boxed 400 · Not boxed 50 on the Boxing card; the shift view has the feeding fillers and the bag fill weight checks');
+    results.push('Production Lines: Jugs in 450 · Boxed 400 · Not boxed 50 on the Boxing card; the shift view has the feeding fillers and no fill weight tab');
   } finally {
     await browser.close();
   }

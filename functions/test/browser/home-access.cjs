@@ -253,10 +253,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForSelector('.hq-main[data-side="production"]');
     // Joe 10/11: Plant Production (still Under Construction) opens for an administrator.
     // Joe 10/26: on its front page (the Plant Distribution layout: report, four machine cards, Production Checks, Shift Notes).
+    // Joe 10/26 later: Fillers, HTST, Boxing and Totes (Blow Mold off the front page; Boxing and Totes each their own card).
     await Promise.all([mods.waitForURL(/production-home\.html/), mods.click('.hq-main[data-side="production"]')]);
     await mods.waitForSelector('.mc-depts .dp-card');
     assert.deepEqual(await mods.$$eval('.mc-depts .dp-card', c => c.map(x => x.dataset.href)),
-      ['production.html?kind=FILLER', 'production.html?kind=HTST', 'production.html?kind=PACK', 'production.html?kind=BLOWMOLD']);
+      ['production.html?kind=FILLER', 'production.html?kind=HTST', 'production.html?kind=BOXING', 'production.html?kind=TOTES']);
     assert.equal(await mods.getAttribute('.sidemenu a.side-name', 'data-side'), 'production');
     assert.deepEqual(mods.errors, []);
     await mods.close();

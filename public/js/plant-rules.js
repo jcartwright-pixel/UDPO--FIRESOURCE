@@ -258,12 +258,14 @@
     return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r; }).concat(extra);
   }
   // Joe 10/25 ("Gmail report is not showing the boxing loading"): the report's loads are the loadouts' loads, Scheduler loads
-  // included (most box loads are Scheduler loads). A Scheduler load of its own leaves at its pickup time on its load day.
+  // included (most box loads are Scheduler loads). A Scheduler load of its own leaves at its pickup time on its delivery day,
+  // the day the Scheduler shows it on (Joe 10/26: 847 Pals Shake, loaded Monday, "is not leaving until Thursday at 2 p.m.", so
+  // it is not behind on Monday).
   function reportLoads(live, todays, customers) {
     return withScheduleLoads(live, todays, customers).map(function (r) {
       if (!r.sched) return r;
       var x = r.sched, delivery = text(x.date), load = text(x.loadDate) || delivery;
-      return Object.assign({}, r, { loadDate: load, deliveryDate: delivery, departureDate: delivery, leavesOn: 'LOAD DAY', dispatchTime: text(x.pickupTime) });
+      return Object.assign({}, r, { loadDate: load, deliveryDate: delivery, departureDate: delivery, leavesOn: 'DELIVERY DAY', dispatchTime: text(x.pickupTime) });
     });
   }
 
@@ -1312,15 +1314,16 @@
     // A cut that leaves under 4 letters of the last word drops that word ("Zanesville D" reads "Zanesville").
     function brief(v) { v = text(v); if (v.length <= 12) return v; v = v.replace(/\bLoad (\d+)$/, 'L$1'); if (v.length <= 12) return v;
       var cut = v.slice(0, 12), sp = cut.lastIndexOf(' '); return (sp > 0 && cut.length - sp - 1 < 4 ? cut.slice(0, sp) : cut).trim(); }
-    function grid(list, doneHead) {
+    // mixed: loaded and not loaded in one list, so the Done column says "est." in front of a time that is only estimated.
+    function grid(list, doneHead, mixed) {
       var th = function (t, al) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + GREY + '">' + t + '</td>'; };
       var td = function (x, t, al, w) { return '<td' + (al ? ' align="right"' : '') + ' style="' + F + 'padding:8px;font-size:' + (w ? '16px' : '15px') + ';font-weight:' + (w ? 800 : 600) + ';color:' + x.fg + ';background:' + x.bg + ';white-space:nowrap;border-bottom:' + (x.bg === PLAIN ? '1px solid #e3e7ec' : '3px solid #ffffff') + '">' + t + '</td>'; };
       var last = null;
       return '<tr><td style="padding:2px 14px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + th('Route') + th('Run') + (doneHead ? '<td align="right" style="' + F + 'padding:0 8px 3px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + INK + '">' + doneHead + '</td>' : th('Done', 1)) + th('Dispatch', 1) + '</tr>' + list.map(function (x) {
         var sep = '';
-        var key = hasPrior ? (x.prior ? 'prior' : 'today') : x.day;
-        if ((splitDays || hasPrior) && key !== last) { last = key; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + (key === 'prior' ? '#9a5b00' : INK) + ';border-bottom:2px solid ' + (key === 'prior' ? '#e8a317' : INK) + '">' + e(hasPrior ? (x.prior ? 'Left over from ' + leftFrom(x.loadDate) : 'Today ' + todayLabel) : deliversLabel(x.day)) + '</td></tr>'; }
-        return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : x.est ? (x.est.late ? '<span style="display:inline-block;padding:1px 6px;border-radius:5px;background:' + RED + ';color:#ffffff;font-weight:800" title="' + e(x.est.reason) + '">' + e(x.est.estText) + ' &#9888;</span>' : '<span style="color:' + GREEN + ';font-weight:800">' + e(x.est.estText) + '</span>') : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
+        var key = x.prior ? 'prior' : splitDays ? x.day : 'today';
+        if ((splitDays || hasPrior) && key !== last) { last = key; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + (key === 'prior' ? '#9a5b00' : INK) + ';border-bottom:2px solid ' + (key === 'prior' ? '#e8a317' : INK) + '">' + e(x.prior ? 'Left over from ' + leftFrom(x.loadDate) : splitDays ? deliversLabel(x.day) : 'Today ' + todayLabel) + '</td></tr>'; }
+        return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : x.est ? (x.est.late ? '<span style="display:inline-block;padding:1px 6px;border-radius:5px;background:' + RED + ';color:#ffffff;font-weight:800" title="' + e(x.est.reason) + '">' + (mixed ? 'est. ' : '') + e(x.est.estText) + ' &#9888;</span>' : '<span style="color:' + GREEN + ';font-weight:800">' + (mixed ? 'est. ' : '') + e(x.est.estText) + '</span>') : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
     // Short words so a name or heading fits one row on a phone: "HALF GALLON FILLER 1" -> "HALF GAL FILLER 1",
@@ -1370,8 +1373,10 @@
     var loadOrder = function (a, b) { var x = fcAt[a.id], y = fcAt[b.id]; return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y) || a.loadSequence - b.loadSequence || untilOf(a) - untilOf(b); };
     var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || loadOrder(a, b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
       .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: PLAIN, fg: INK }; });
-    var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (dayNum(x.day) !== null) days[x.day] = 1; });
+    // Joe 10/26: the delivery-day headings are for today's loads (what is left over from yesterday has its own heading).
+    var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (!x.prior && dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
+    var sectionOf = function (x) { if (x.prior) return -1e9; var n = dayNum(x.day); return n === null ? 1e9 : splitDays ? n : 0; };
     var H = [];
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
@@ -1386,8 +1391,13 @@
       if (g) H.push('<tr><td style="padding:' + (firstGroup ? '8px' : '18px') + ' 14px 0">' + (firstGroup ? '' : '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>') +
         '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[g]) + ' (' + (ld.length + nl.length) + ')</div></td></tr>');
       firstGroup = false;
-      if (ld.length) { H.push(head('Loaded (' + ld.length + ')', null, GREEN)); H.push(grid(ld)); }
-      if (nl.length) { H.push(head('Not loaded (' + nl.length + ')', null, nl.some(function (x) { return x.word; }) ? RED : GREY)); H.push(grid(nl, nl.some(function (x) { return x.est; }) ? 'Est. Done' : '')); }
+      // Joe 10/26 ("It should list all the deliveries for Monday, and then all the deliveries for Tuesday"): one list per type,
+      // what is left over from yesterday first, then each delivery day once; inside a day, the loaded ones (green, in the order
+      // they finished) and then the ones not loaded (in load order). The heading says how many of each.
+      var all = ld.concat(nl).map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return sectionOf(a.x) - sectionOf(b.x) || a.i - b.i; }).map(function (a) { return a.x; });
+      H.push(head([ld.length ? ld.length + ' loaded' : '', nl.length ? nl.length + ' not loaded' : ''].filter(Boolean).join(' · '), null, nl.some(function (x) { return x.word; }) ? RED : ld.length && !nl.length ? GREEN : GREY));
+      var anyEst = nl.some(function (x) { return x.est; });
+      H.push(grid(all, anyEst && !ld.length ? 'Est. Done' : '', anyEst && ld.length > 0));
     });
     if (!loaded.length && !notLoaded.length) H.push(plain('No loads on the dispatch sheet for this day.'));
     var pickups = r.pickups || [], down = r.down || [], lines = r.lines || [], temps = r.temperatures || [];

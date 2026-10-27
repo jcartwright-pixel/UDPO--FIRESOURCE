@@ -10,6 +10,7 @@ import {
   getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, doc, getDoc, onSnapshot,
   getFunctions, httpsCallable, connectFunctionsEmulator
 } from './firebase.js';
+import { helpHref } from './help.js';
 
 export const DOMAIN = 'uniteddairy.com';
 
@@ -735,6 +736,19 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   nav.append(h);
   brand.after(nav);
   if (here === 'index.html') plantHomeBack();
+  // Joe 10/26 (picked mock-up 2): a "? Help" button on the right, just before Administration, on every screen. It opens the
+  // Help guide on this screen's part, in this window (no pop-up over the screen); Back on the guide comes straight back here.
+  // The words are in help.md (js/help.js).
+  if (here !== 'help.html') {
+    const q = document.createElement('a');
+    q.className = 'hdr-btn hdr-help'; q.id = 'go-help';
+    q.innerHTML = '<b class="hdr-q" aria-hidden="true">?</b><span>Help</span>';
+    q.title = 'Help for this screen'; q.setAttribute('aria-label', 'Help for this screen');
+    q.href = helpHref();
+    q.addEventListener('click', () => { q.href = helpHref(); });
+    const who = bar.querySelector('.who, #signout');
+    if (who) who.before(q); else bar.append(q);
+  }
   if (here !== 'administration.html') {
     const adm = headerButton('go-admin', 'gear', 'Administration', 'Administration');
     adm.classList.add('hdr-admin');
@@ -754,7 +768,7 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
     const box = document.createElement('div');
     box.className = 'hdr-version';
     box.title = 'The version of the app on this screen and when it was last updated';
-    const right = [...bar.children].find(el => el.matches('.hdr-admin, .who, #who, #signout, #change'));
+    const right = [...bar.children].find(el => el.matches('.hdr-help, .hdr-admin, .who, #who, #signout, #change'));
     if (right) right.before(box); else bar.append(box);
     return box;
   });
@@ -1289,6 +1303,7 @@ export function shortTime(v) {
   return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 }
 
+// A cell marked .no-fit is left as it is (Joe 10/26: a machine's product names stay on one line; the table scrolls instead).
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are
 // never cut off. Joe's later rule (10/10) is never to shrink table text to fit: it stops at 16px (review item 56, Joe 10/13), and a cell that still does
 // not fit wraps onto a second line (.fit-wrap) instead. Headers keep their size. Runs after every redraw and on resize.
@@ -1317,7 +1332,7 @@ const weeklyFitMin = () => window.innerWidth <= 1024 ? 16 : WEEKLY_FIT_MIN;
 function fitMin(td) { return td.classList.contains('day') && !td.classList.contains('c-vacation-needs') && td.closest('.weekly-page .sheet.week') ? weeklyFitMin() : FIT_MIN; }
 function fitCells() {
   fitQueued = false;
-  const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && td.colSpan === 1);
+  const cells = [...document.querySelectorAll('tbody td')].filter(td => td.offsetParent && td.textContent.trim() && !td.querySelector('input, textarea, select, table') && !td.classList.contains('details-cell') && !td.classList.contains('no-fit') && td.colSpan === 1);
   cells.forEach(td => { if (td.dataset.fit) { td.style.fontSize = ''; delete td.dataset.fit; } td.classList.remove('fit-wrap'); });
   let over = cells.filter(tooWide);
   const wrap = [];

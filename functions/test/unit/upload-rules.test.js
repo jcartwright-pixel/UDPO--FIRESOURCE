@@ -268,8 +268,9 @@ test('the app\'s rules on each tab: run days, relief drivers, several runs a day
     L({ 'Line Name': 'QUART FILLER', 'Empty Jug (g)': '2001', 'Cap (g)': '201', 'Light When Under By (g)': '1001', 'Jug Weight High (g)': '501' }), L({ 'Line Name': 'TOTES', 'Per Box': '1001', 'Counted By': 'Tablet' })])]), {});
   assert.deepEqual(lines.tabs.lines.rows.map(x => x.problems.join(' / ')), [
     'Jug Weight Target (g): BLOW MOLD only (GALLON FILLER is Fillers) / Per Box: BOXING, RAYPAK and TOTES only (GALLON FILLER is Fillers)',
-    'Empty Jug (g): fillers and the RAYPAK / BOXING bag fillers only (BLOW MOLD is Blow Mold) / Jug Weight Low is above High',
-    'Fill Check Every needs Fill Check Due of Every so many minutes or jugs / Fed By: BLOW MOLD is not a filler / Fed By: NOPE is not on the Lines tab',
+    'Empty Jug (g): fillers and the RAYPAK bag filler only (BLOW MOLD is Blow Mold) / Jug Weight Low is above High',
+    // Joe 10/26: Boxing has no fill weight check.
+    'Fill Check Every: fillers and the RAYPAK bag filler only (BOXING is Boxing & Totes) / Fill Check Every needs Fill Check Due of Every so many minutes or jugs / Fed By: BLOW MOLD is not a filler / Fed By: NOPE is not on the Lines tab',
     'Changeover Minutes: type a number from 0 to 600 ("601") / Wash (CIP) Every Hours: type a number from 0 to 72 ("73")',
     'Jug Weight High (g): type a number from 0 to 500 ("501") / Empty Jug (g): type a number from 0 to 2000 ("2001") / Cap (g): type a number from 0 to 200 ("201") / Light When Under By (g): type a number from 0 to 1000 ("1001")',
     'Counted By: pick one of: ' + U.COUNTED_BY.join(', ') + ' ("Tablet") / Per Box: type a number from 0 to 1000 ("1001")']);

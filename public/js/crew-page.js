@@ -152,13 +152,18 @@ function setupHtml() {
         '<td><input type="checkbox" data-k="relief"' + (j.relief ? ' checked' : '') + dis() + '></td><td>' + (j.id ? inUse(j) : '') + '</td></tr>').join('') || empty(7)) + '</tbody></table>';
   } else if (tab === 'people') {
     const rows = (blank ? [{ id: '', name: '', areaId: area || '', shift: shift, daysOff: [0, 6] }] : []).concat(data.people.filter(p => !area || p.areaId === area).sort((a, b) => String(a.name).localeCompare(b.name)));
-    html = '<table><thead><tr><th class="left">Name</th><th>Employee ID</th><th>Phone</th><th>Area</th><th>Shift</th><th>Usual job</th><th>Days off</th><th>Hire date</th><th>In use</th></tr></thead><tbody>' +
+    // Joe 10/27: the maintenance mechanics are the plant Maintenance Station's names; each one's station login ID is typed here
+    // (5 or 6 digits, never shown again: the box only says whether one is set).
+    const maint = team === 'maint';
+    const login = (p) => !maint ? '' : '<td class="nowrap">' + (p.id ? '<input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="short" data-login="1" aria-label="Station login ID" placeholder="' +
+      (p.loginSet ? 'Change' : '5 or 6 digits') + '"' + dis() + '>' + (p.loginSet ? ' <span class="crew-set">Set</span>' : '') : '') + '</td>';
+    html = '<table><thead><tr><th class="left">Name</th><th>Employee ID</th><th>Phone</th><th>Area</th><th>Shift</th><th>Usual job</th><th>Days off</th><th>Hire date</th>' + (maint ? '<th>Station login ID</th>' : '') + '<th>In use</th></tr></thead><tbody>' +
       (rows.map(p => '<tr data-op="person" data-id="' + esc(p.id) + '"><td class="left"><input data-k="name" maxlength="60" value="' + esc(p.name) + '" placeholder="LAST, FIRST"' + dis() + '></td>' +
         '<td><input data-k="employeeId" maxlength="20" class="short" value="' + esc(p.employeeId || '') + '"' + dis() + '></td><td><input data-k="phone" maxlength="20" class="short" value="' + esc(p.phone || '') + '"' + dis() + '></td>' +
         '<td><select data-k="areaId"' + dis() + '>' + opt('', p.areaId || '', '') + areas().map(a => opt(a.id, p.areaId, a.name)).join('') + '</select></td>' +
         '<td><select data-k="shift"' + dis() + '>' + R.SHIFTS.map(s => opt(String(s), String(p.shift || 1), R.SHIFT_NAMES[s])).join('') + '</select></td>' +
         '<td><select data-k="jobId"' + dis() + '>' + opt('', p.jobId || '', '') + jobsOf(p.areaId).map(j => opt(j.id, p.jobId, j.name)).join('') + '</select></td>' +
-        '<td>' + daysBoxes(p.daysOff, 'daysOff') + '</td><td><input type="date" data-k="hireDate" value="' + esc(p.hireDate || '') + '"' + dis() + '></td><td>' + (p.id ? inUse(p) : '') + '</td></tr>').join('') || empty(9)) + '</tbody></table>';
+        '<td>' + daysBoxes(p.daysOff, 'daysOff') + '</td><td><input type="date" data-k="hireDate" value="' + esc(p.hireDate || '') + '"' + dis() + '></td>' + login(p) + '<td>' + (p.id ? inUse(p) : '') + '</td></tr>').join('') || empty(maint ? 10 : 9)) + '</tbody></table>';
   } else {
     const r = rules();
     html = '<div class="crew-limits"><label>Most people off a day, per area and shift<input type="number" min="0" max="50" data-rule="maxOff" value="' + esc(r.maxOff) + '"' + dis() + '></label>' +
@@ -166,7 +171,7 @@ function setupHtml() {
   }
   const starter = testCopy && canSetup() && data.read.people && !data.people.length ? '<div class="crew-starter">Test copy: <button type="button" id="starter">Fill in a made-up starting list</button> (made-up people, so the screens can be tried before the real list is loaded)</div>' : '';
   return starter + '<div class="sheet scroll-list crew-setup">' + html + '</div><div class="foot">' + (canSetup() ? 'Every box saves when you leave it. ' : 'View only: a manager or administrator changes the setup. ') +
-    'Only name, employee ID, phone, area, shift, usual job, days off and hire date are kept.</div>';
+    'Only name, employee ID, phone, area, shift, usual job, days off and hire date are kept' + (team === 'maint' ? ', and a hidden copy of each station login ID' : '') + '.</div>';
 }
 
 function render(force) {
@@ -229,6 +234,12 @@ body.addEventListener('change', e => {
   if (!row || !canSetup()) return;
   const op = row.dataset.op, id = row.dataset.id, fields = {};
   if (t.dataset.status) return send('saveCrewSetup', { op, id, status: t.value }, 'That line').catch(() => {});
+  if (t.dataset.login) {
+    const loginId = t.value.trim();
+    t.value = '';
+    if (loginId) send('saveCrewSetup', { op: 'login', id, loginId }, 'The login ID').catch(() => {});
+    return;
+  }
   if (t.dataset.day !== undefined) fields[t.dataset.k] = [...row.querySelectorAll('input[data-k="' + t.dataset.k + '"]:checked')].map(x => Number(x.dataset.day));
   else if (t.dataset.end) {
     const s = t.dataset.shift, start = row.querySelector('[data-shift="' + s + '"][data-end="start"]').value, end = row.querySelector('[data-shift="' + s + '"][data-end="end"]').value;

@@ -3,7 +3,8 @@
  * The rules are crew-rules.js (shared with the screens). Everything here is kept in the app only (no sheet).
  *
  * saveCrewSetup     Setup (also under Administration): an area and its shift times, a job and how many it needs, a person,
- *                   the vacation limits; and, on the test copy only, a made-up starting list (op 'starter').
+ *                   the vacation limits; and, on the test copy only, a made-up starting list (op 'starter'). On the
+ *                   Maintenance Schedule, a mechanic's Maintenance Station login ID (op 'login', Joe 10/27; plantmaint.js).
  * saveCrewDay       Schedule Board: one person's job (or Off) on one day of one week; '' puts them back on their usual.
  * saveCrewVacation  Vacations: one person's time off, with the driver Vacation Schedule's rules counted by area and shift.
  */
@@ -37,13 +38,21 @@ const daysList = (v, SaveError) => {
 function validateSetup(input, SaveError) {
   const out = base(input, SaveError);
   out.op = text(input.op);
-  if (['area', 'job', 'person', 'rules', 'starter'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'Unknown setup.');
+  if (['area', 'job', 'person', 'rules', 'starter', 'login'].indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'Unknown setup.');
   out.id = text(input.id);
   if (out.id && !isId(out.id)) throw new SaveError('BAD_REQUEST', 'Pick the line to change.');
   const status = text(input.status).toUpperCase();
   if (status && ['ACTIVE', 'RETIRED'].indexOf(status) < 0) throw new SaveError('BAD_REQUEST', 'A line is in use or taken off.');
   out.status = status;
   const f = input.fields && typeof input.fields === 'object' ? input.fields : {}, o = {};
+  if (out.op === 'login') {
+    if (out.team !== 'maint') throw new SaveError('BAD_REQUEST', 'Login IDs are for the maintenance mechanics.');
+    if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the mechanic.');
+    out.loginId = text(input.loginId);
+    if (!/^\d{5,6}$/.test(out.loginId)) throw new SaveError('BAD_REQUEST', 'The login ID is 5 or 6 digits.');
+    out.fields = {};
+    return out;
+  }
   if (out.op === 'area') {
     if (f.name !== undefined) o.name = text(f.name).slice(0, 40);
     if (f.order !== undefined) o.order = count(f.order, SaveError, 'The order');
@@ -107,6 +116,17 @@ async function saveSetup(tx, db, req, email, stamp, logRef, mode, SaveError) {
     s.people.forEach(p => tx.set(db.collection('crewPeople').doc(docId(p.id)), Object.assign({}, p, own, stampIt)));
     const result = { ok: true, requestId: req.requestId, message: 'Made-up starting list added: ' + s.people.length + ' people.' };
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, team: req.team, op: 'starter', result });
+    return result;
+  }
+  if (req.op === 'login') {
+    const ref = db.collection('crewPeople').doc(docId(req.id)), had = await tx.get(ref), was = had.exists ? had.data() : null;
+    if (!was || was.facilityId !== req.facilityId || was.team !== req.team) throw new SaveError('NOT_FOUND', 'That person is not on this list.');
+    const write = await require('./plantmaint').setMechanicLogin(tx, db, req.facilityId, req.id, req.loginId, stamp, email);
+    write();
+    tx.update(ref, Object.assign({ loginSet: true, loginSetAt: stamp }, stampIt));
+    const result = { ok: true, requestId: req.requestId, id: req.id, message: was.name + ': login ID saved.' };
+    // The login ID itself is never logged.
+    tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, facilityId: req.facilityId, team: req.team, op: 'login', id: req.id, result });
     return result;
   }
   if (req.op === 'rules') {
