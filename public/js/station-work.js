@@ -24,7 +24,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   let runs = [], pickups = [], week = [], queue = [], sheetWash = [], appWash = [], app = {}, products = [], gpsDays = [];
   // Boxing: the Plant Operations Scheduler's Shipping and Receiving loads (read only while a Boxing station is open).
   const sched = { SHIPPING: [], RECEIVING: [] };
-  let routeDocs = [];   // Route Master (coverage_type, Drop and Hook), for a United Dairy account; a station-code tablet cannot read it
+  let routeDocs = [];   // Route Master (coverage_type, Drop and Hook); [] until it is read
   const got = { runs: false, week: false, SHIPPING: false, RECEIVING: false };
   const pending = {};       // card id -> what is shown before the server has it
   const drafts = {};        // card id -> { field: typed value } until it is saved
@@ -94,7 +94,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const list = U.scheduleEntries(sched.SHIPPING, 'SHIPPING');
     return U.numberLoads(list, U.scheduleCustomers(slotRoutes()));
   }
-  // Route Master's runs; a station-code tablet cannot read them, so it uses the runs on this week's loads.
+  // Route Master's runs; until they are read, the runs on this week's loads.
   function slotRoutes() {
     if (routeDocs.length) return routeDocs;
     const seen = {};
