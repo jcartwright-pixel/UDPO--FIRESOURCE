@@ -20,15 +20,17 @@ sudo raspi-config nonint do_boot_behaviour B4
 sudo raspi-config nonint do_wayland W3 || true
 sudo raspi-config nonint do_blanking 1 || true
 
-# The browser: full screen, no "restore pages" bubble after a power cut, video plays with no button press,
-# and it starts again by itself if it ever closes.
+# The browser: full screen, no "restore pages" bubble after a power cut, video plays with no button press, the board's
+# timers never slowed down as if it were in the background (Joe 10/27: the lists stopped rolling), and it starts again by
+# itself if it ever closes.
 mkdir -p "$HOME_DIR/.local/bin" "$HOME_DIR/.config/labwc"
 cat > "$HOME_DIR/.local/bin/ud-board" <<SH
 #!/bin/bash
 P="$HOME_DIR/.config/chromium/Default/Preferences"
 [ -f "\$P" ] && sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[A-Za-z]*"/"exit_type":"Normal"/' "\$P"
 exec "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --password-store=basic \
-  --autoplay-policy=no-user-gesture-required --check-for-update-interval=31536000 "$URL"
+  --autoplay-policy=no-user-gesture-required --check-for-update-interval=31536000 \
+  --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding "$URL"
 SH
 chmod +x "$HOME_DIR/.local/bin/ud-board"
 

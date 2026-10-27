@@ -141,15 +141,30 @@
     }
 
     // TV: both lists roll on their own when they are longer than the screen (1 px every 45 ms and 50 ms, as on the old TV).
+    // Joe 10/27 (Raspberry Pi on the Driver Room TV): the roll stopped. The position is now kept here, not read back from the
+    // list (a screen that rounds to whole screen dots dropped every 1 px step), the TV link keeps rolling even when the
+    // browser says it is in the background, and a list that grows past the screen after the page opens (the screen size
+    // changing, the kiosk going full screen) is redrawn so it starts to roll.
     function roll(id, ms) {
+      let pos = 0;
       setInterval(() => {
         const el = document.getElementById(id);
-        if (!tv || document.hidden || !el.querySelector('.ds-band')) return;
-        el.scrollTop += 1;
-        if (el.scrollTop >= el.scrollHeight / 2) el.scrollTop = 0;
+        if (!tv || (document.hidden && !full)) return;
+        if (!el.querySelector('.ds-band')) { pos = 0; return; }
+        if (Math.abs(el.scrollTop - pos) > 2) pos = el.scrollTop;
+        pos += 1;
+        if (pos >= el.scrollHeight / 2) pos = 0;
+        el.scrollTop = pos;
       }, ms);
     }
     roll('board-scroll', 45); roll('week-scroll', 50);
+    const redraw = () => { sig = ''; weekSig = ''; render(); };
+    window.addEventListener('resize', () => { if (tv && sig) redraw(); });
+    setInterval(() => {
+      if (!tv) return;
+      const grew = (id, rows) => !document.querySelector('#' + id + ' .ds-band') && document.querySelector(rows) && overflows(id);
+      if (grew('board-scroll', '#board .ds-row') || grew('week-scroll', '#week-rows td.strong')) redraw();
+    }, 5000);
 
     // The weather window: Open-Meteo (free, no key) every 15 minutes; the last reading stays if one read fails.
     async function weather() {

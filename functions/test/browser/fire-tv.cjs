@@ -71,6 +71,33 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await shot(page, 'fire-tv-3-board-awake-1920.png');
     results.push('TV link: a silent video plays behind the board, over and over, to keep the TV\'s screen saver away');
 
+    // Joe 10/27 (Raspberry Pi): the lists keep rolling. A list that grows past the screen starts to roll, it rolls on a
+    // screen that rounds to whole screen dots (zoomed out, as a 4K TV can be), and a screen that gets shorter starts it too.
+    const scrolled = (id) => page.evaluate((i) => document.getElementById(i).scrollTop, id);
+    const rolls = async (id, what) => {
+      await page.waitForSelector('#' + id + ' .ds-band', { timeout: 15000 });
+      const a = await scrolled(id); await page.waitForTimeout(2500); const b = await scrolled(id);
+      assert.ok(b > a + 10, what + ' rolls (' + a + ' -> ' + b + ')');
+    };
+    const batch = db().batch();
+    for (let i = 0; i < 40; i++) {
+      const rt = String(810 + i);
+      batch.set(db().collection('runs').doc(wk + '__run_tv' + rt), { weekStart: wk, route: rt, run: 'UT DSD ' + rt, routeId: 'rte_tv' + rt, runId: 'run_tv' + rt, rev: 0,
+        days: { [L.dayPrefix(today)]: { runs: true, loadSequence: 20 + i, driverId: 'drv_tv' + rt, driver: 'DRIVER ' + rt, truck: '9' + rt, trailer: 'T-' + rt } } });
+    }
+    await batch.commit();
+    await rolls('board-scroll', 'the loadout list (grown past the screen)');
+    await rolls('week-scroll', 'the weekly schedule');
+    await page.evaluate(() => { document.body.style.zoom = '0.6'; });
+    await page.waitForTimeout(500);
+    await rolls('board-scroll', 'the loadout list zoomed out');
+    await page.evaluate(() => { document.body.style.zoom = ''; });
+    await page.setViewportSize({ width: 1920, height: 6000 });
+    await page.waitForFunction(() => !document.querySelector('#board .ds-band'), null, { timeout: 15000 });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await rolls('board-scroll', 'the loadout list after the screen got shorter');
+    results.push('TV: both lists roll when they grow past the screen, keep rolling zoomed out, and start again when the screen gets shorter');
+
     await page.reload();
     await page.waitForSelector('.ds-row:not(.ds-headrow):has-text("805")', { timeout: 20000 });
     assert.equal(await page.isVisible('#signin'), false, 'still signed in after a reload (as after a power loss)');
