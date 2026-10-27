@@ -37,7 +37,10 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
       route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
     });
-    await page.route(/api\.open-meteo\.com/, route => route.abort());
+    // Joe 10/27 (Raspberry Pi): the weather sign is drawn by the page, not a picture-letter the screen may not have.
+    await page.route(/api\.open-meteo\.com/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+      current: { temperature_2m: 63, weather_code: 1, wind_speed_10m: 6 },
+      daily: { weather_code: [1, 3], temperature_2m_max: [68, 70], temperature_2m_min: [44, 47], precipitation_probability_max: [1, 10] } }) }));
     await localCalls(page);
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
@@ -62,6 +65,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     assert.equal(await page.isVisible('#code-box'), false, 'no second code screen');
     assert.equal(await page.$('#ds-score iframe'), null, 'no scorecard panel (it needs a UD sign-in)');
     await page.waitForFunction(() => /\d+ routes?/.test(document.getElementById('foot').textContent));
+    await page.waitForSelector('#weather-sym svg');
+    assert.match(await page.textContent('#weather-now'), /63°F · Mostly clear/);
     await shot(page, 'fire-tv-2-board-1920.png');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
 

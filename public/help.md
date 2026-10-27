@@ -262,6 +262,8 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
 - A screen opened with a code has no Back, Home or Sign out. `Release` at the bottom (with the manager release code) is the only way out.
 
+> On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
+
 !> Do not sign a TV in with your own Google account. Use the TV's code so it comes back by itself after a power cut.
 
 ## Sheet Conflicts

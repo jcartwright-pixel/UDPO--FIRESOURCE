@@ -60,7 +60,7 @@
           <div class="ds-row ds-headrow"><span>ROUTE</span><span>RUN</span><span>DRIVER</span><span>TRAILER</span><span>CASES</span><span>LOAD STATUS</span><span>PICKUP</span></div>
           <div class="ds-scroll" id="board-scroll"><div id="board"></div></div>
         </section>
-        <aside class="ds-weather" id="weather" hidden><span class="sym" id="weather-sym" aria-hidden="true">&#9728;</span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p></aside>
+        <aside class="ds-weather" id="weather" hidden><span class="sym" id="weather-sym" aria-hidden="true"></span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p></aside>
         <section class="ds-week" aria-label="Driver weekly schedule">
           <div class="ds-week-title"><b>DRIVER WEEKLY SCHEDULE</b><span id="week-of"></span></div>
           <div class="ds-scroll" id="week-scroll"><table class="ds-week-table"><thead id="week-head"></thead><tbody id="week-rows"></tbody></table></div>
@@ -173,7 +173,7 @@
         const res = await fetch(W.forecastUrl(W.PLANTS.Uniontown));
         const w = res.ok ? W.summary(await res.json()) : null;
         if (!w) throw new Error('no forecast');
-        set('weather-sym', w.symbol); set('weather-now', w.now); set('weather-today', w.today); set('weather-next', w.tomorrow);
+        document.getElementById('weather-sym').innerHTML = W.iconSvg(w.icon); set('weather-now', w.now); set('weather-today', w.today); set('weather-next', w.tomorrow);
       } catch (e) {
         if (/Reading/.test(document.getElementById('weather-now').textContent)) set('weather-now', 'The weather is not available right now.');
       }
@@ -184,9 +184,12 @@
     // of the schedule, then 40 of the scorecard. The desk view keeps the schedule only.
     function scoreTurns() {
       const box = document.getElementById('ds-score'), week = document.querySelector('.ds-week:not(.ds-score)');
-      box.innerHTML = '<iframe src="scorecard.html?kiosk=1" title="Driver Scorecard grades" loading="lazy"></iframe>';
+      // Joe 10/27 (Raspberry Pi froze, the scorecard panel showed a broken page): the scorecard is a whole second screen, so it
+      // is opened fresh each time its turn comes and closed when the schedule comes back, instead of staying open all day.
+      const frame = '<iframe src="scorecard.html?kiosk=1" title="Driver Scorecard grades"></iframe>';
+      box.dataset.on = '1';
       let showing = false;
-      const flip = () => { showing = !showing; box.hidden = !showing; week.hidden = showing; setTimeout(flip, showing ? 40000 : 60000); };
+      const flip = () => { showing = !showing; box.innerHTML = showing ? frame : ''; box.hidden = !showing; week.hidden = showing; setTimeout(flip, showing ? 40000 : 60000); };
       setTimeout(flip, 60000);
       window.udShowScorecard = () => { showing = false; flip(); };
     }
@@ -249,7 +252,7 @@
       document.getElementById('eyebrow').textContent = kiosk ? kiosk.name + ' · ' + kiosk.plant : eyebrow;
       sig = ''; weekSig = ''; render();
       // The scorecard's grades need a United Dairy sign-in, so a TV signed in by its code shows the schedule only.
-      if (tv && !signedTv && !document.querySelector('#ds-score iframe')) scoreTurns();
+      if (tv && !signedTv && !document.getElementById('ds-score').dataset.on) scoreTurns();
     }
     const release = (why) => askRelease(document.getElementById('release-box'), { why, status: () => stationCall('status', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown' }),
       release: (code) => stationCall('release', { facilityId: kiosk ? kiosk.facilityId : 'fac_uniontown', code }), onError: showError, mustHave: true });
@@ -288,7 +291,10 @@
     // Joe 10/23 (LG TV, its own Web Browser): the TV's screen saver turned the board off after a few minutes. LG keeps the screen
     // saver away only while a video plays, so the TV link plays a silent video the board's own color behind the whole screen,
     // over and over. MP4 for the TV; WebM for a browser with no MP4.
-    if (full) {
+    // Joe 10/27: a Raspberry Pi on the TV's HDMI needs no video (the TV's screen saver never runs over a plugged-in device),
+    // and playing one costs the small computer for nothing, so a Pi skips it.
+    const onPi = /Linux (aarch64|arm)/.test(navigator.userAgent) && !/Web0S|webOS|SmartTV|Android/.test(navigator.userAgent);
+    if (full && !onPi) {
       const awake = document.createElement('video');
       awake.id = 'ds-awake';
       Object.assign(awake, { muted: true, loop: true, autoplay: true, playsInline: true });
