@@ -788,7 +788,19 @@ What the weekly walk looks at, and how often. Each line is one thing to look at:
 id: production-home
 screens: production-home.html
 
-The front page for Plant Production (being built, administrators only for now). One card per kind of machine, plus Quality Checks, Cooler Temperature and Shift Notes. Click a card to open its lines.
+The front page for Plant Production (being built, administrators only for now). It fits on one screen without scrolling.
+
+- **Send Current Report** on the left: a preview of the plant report. `Edit / Add` opens it to add a note; `SEND CURRENT REPORT` emails it to the Plant Managers group.
+- **Fillers**, **HTST**, **Boxing** and **Totes**: one card each, with how many lines are running, stopped and what they made. Boxing and Totes sit side by side. The Raypak counts with Boxing.
+- **Production Checks** along the bottom: Quality Checks, Cooler Temperature and the line tablets, each with `Check now` and `View`.
+- **Shift Notes** beside it: breakdowns still open, handoffs and carryover.
+
+1. Click a machine card to open just those lines on Production Lines.
+2. Click `Check now` on a check that is due or past due.
+
+> Blow Mold has its own page: open it from the Production Lines menu.
+
+!> Do not wait for a red card to clear on its own. Open it and see which line is stopped or off its speed.
 
 ## Production Lines
 id: production

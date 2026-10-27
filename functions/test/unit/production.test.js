@@ -60,6 +60,11 @@ test('Joe 10/11: speed flashes over or under the product\'s range; the code date
   assert.equal(P.codeDate('2026-10-11', ''), '');
 });
 
+// Joe 10/26: the Plant Production front page has a Boxing card and a Totes card; the Raypak (Dairy Queen) goes with Boxing.
+test('Joe 10/26: Boxing and Totes each have their own card on the Plant Production front page', () => {
+  assert.deepEqual(['Boxing', 'RAYPAK', 'Dairy Queen Manual', 'Totes', 'TOTES', ' totes '].map(P.packSide), ['BOXING', 'BOXING', 'BOXING', 'TOTES', 'TOTES', 'TOTES']);
+});
+
 // Joe 10/14 ("all of your picks", mock-ups A to H): the kind of line, changeovers, CIP, waste, checks, efficiency, each hour and the timeline.
 test('Joe 10/14: each line has a kind that picks its waste reasons, checklist and quality check', () => {
   assert.deepEqual(['HTST #1', 'HTST #2', 'BLOW MOLD', 'Boxing', 'RAYPAK', 'Totes', 'GALLON FILLER', 'Old 1/2 Gallon'].map(P.lineKind), ['HTST', 'HTST', 'BLOWMOLD', 'PACK', 'PACK', 'PACK', 'FILLER', 'FILLER']);
