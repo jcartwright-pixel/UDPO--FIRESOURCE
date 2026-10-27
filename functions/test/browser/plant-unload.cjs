@@ -64,7 +64,7 @@ async function shots(page, name, w) {
       await shots(page, 'unloading', w);
       await page.click('[data-tab="all"]');
       await page.waitForSelector(row('802'));
-      assert.match(await page.textContent(row('802') + ' td:nth-child(6)'), /Wash/, 'T-951 asked for a wash: 802 (unloaded) shows the Wash button');
+      assert.match(await page.textContent(row('802') + ' td:nth-child(9)'), /Wash/, 'T-951 asked for a wash: 802 (unloaded) shows the Wash button');
       await fits(page, 'Unloading & Washing (All Loads) ' + w + 'x' + h);
       assert.deepEqual(page.errors, []);
       await page.close();
@@ -90,7 +90,7 @@ async function shots(page, name, w) {
         };
       });
       assert.equal(look.card, 'grid', 'a load is a card at ' + w);
-      assert.deepEqual(look.labels, ['"Trailer"', '"Status"', '"Cases In"', '"RTA"', '"Washed"', '"Start / End"', '"Total Time"'], 'every box is named on the card at ' + w);
+      assert.deepEqual(look.labels, ['"Trailer"', '"Status"', '"Cases Out"', '"Driver Said"', '"Cases Returned"', '"Lost"', '"RTA"', '"Washed"', '"Start / End"', '"Total Time"'], 'every box is named on the card at ' + w);
       assert.deepEqual([look.next, look.stats, look.switches, look.tiles, look.sideways, look.menu], [false, [], [], [], false, false], 'nothing cut, no sideways scroll, no side-menu strip at ' + w + ' ' + JSON.stringify(look));
       await shots(page, 'unloading-cards', w);
       assert.deepEqual(page.errors, []);
@@ -151,7 +151,7 @@ async function shots(page, name, w) {
     await dock.click('[data-tab="all"]');
     await watcher.click('[data-tab="all"]');
     await dock.click(row('802') + ' button.wash');
-    await watcher.waitForFunction(k => /Washed/.test(document.querySelector('tr[data-key="' + k + '"] td:nth-child(6)').textContent), DATE + '|802|UT DSD MILK', { timeout: 8000 });
+    await watcher.waitForFunction(k => /Washed/.test(document.querySelector('tr[data-key="' + k + '"] td:nth-child(9)').textContent), DATE + '|802|UT DSD MILK', { timeout: 8000 });
     results.push('Wash on 802: T-951 shows Washed on the other screen');
     assert.deepEqual(dock.errors, []);
     assert.deepEqual(watcher.errors, []);

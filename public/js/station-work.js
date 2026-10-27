@@ -57,8 +57,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
   // A scheduled load saves through the Scheduler's save, which follows the Plant Operations switch (not Plant Loading).
   const canSched = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.savePlantSchedule);
   const myName = () => (station && station.name) || '';
-  const weekDays = () => { const s = L.weekStart(date), out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
+  // The week so far, and always yesterday (on a Sunday, last Saturday: its trailers can carry over to today, Joe 10/27 hd).
+  const weekDays = () => { const y = L.addDays(date, -1), s = L.weekStart(date) < y ? L.weekStart(date) : y, out = []; for (let d = s; d <= date; d = L.addDays(d, 1)) out.push(d); return out; };
   const dayJournal = () => week.filter(d => d.date === date);
+  const mmdd = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) : ''; };
 
   // ---- what each view lists
   const area = () => (station && station.area) || '';
@@ -71,7 +73,8 @@ export function mountStationWork({ db, box, person, onDraw }) {
   }
   function unloads() {
     const rets = returnsList();
-    return P.unloadRows(runs, date, dayJournal(), rets, P.loadoutRows(runs, date), routeDocs).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r));
+    const y = L.addDays(date, -1), carried = P.carriedUnloads(runs, date, week.filter(d => d.date === y || d.date === date), routeDocs);
+    return P.unloadRows(runs, date, dayJournal(), rets, P.loadoutRows(runs, date), routeDocs).concat(carried).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior)));
   }
   function washes() {
     const earlier = weekDays().filter(d => d < date).flatMap(d => P.washItems(d, [], [], week).filter(w => w.kind === 'UNLOAD'));
@@ -397,35 +400,48 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const left = rows.filter(r => r.status !== 'COMPLETE').length;
     const transfers = rows.filter(r => r.transfer && r.status !== 'COMPLETE');
     const places = [...new Set(transfers.map(r => r.name).filter(Boolean))];
-    let html = '';
+    const prior = rows.filter(r => r.prior && r.status !== 'COMPLETE').length;
+    // Joe 10/27 (hd, mock-up 2): a trailer that is on no load goes on the list to unload or only to wash, at the top.
+    let html = ck ? '<form class="sw-add unl" data-form="unl"><h3>A trailer that is not on the list</h3>' + field('add-unl', 'trailer', 'Trailer', '') +
+      '<button type="submit" class="sw-btn primary" data-kind="UNLOAD">UNLOAD IT</button><button type="submit" class="sw-btn wash" data-kind="WASH">WASH ONLY</button></form>' : '';
     rows.forEach(r => {
       const s = r.status, isOpen = s === 'UNLOADING' ? !closed[r.key] : !!opened[r.key], ws = P.washesForRow(r, wash), done = s === 'COMPLETE';
+      const from = r.prior ? '<i class="from">From ' + escapeHtml(mmdd(r.date)) + ' · not unloaded</i>' : r.added ? '<i class="add">' + (r.washOnly ? 'Added · wash only' : 'Added') + '</i>' : '';
       const where = done || s === 'UNLOADING' ? '' : r.transfer ? '<i class="tt">Transfer trailer</i>' : r.back ? '<i class="back">&#10003; Back ' + escapeHtml(P.clock(r.back)) + '</i>' : r.road ? '<i class="road">On the road</i>' : '';
-      const chips = [where, r.casesIn !== '' ? '<i class="ok">' + unit + ' · ' + escapeHtml(r.casesIn) + ' confirmed</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
+      const chips = [from, where, r.casesIn !== '' ? '<i class="ok">' + unit + ' returned · ' + escapeHtml(r.casesIn) + '</i>' : '', r.pendingReturns.length ? '<i class="ret">Product return</i>' : r.returns.length ? '<i class="ok">Returned to the cooler</i>' : '',
         ws.length ? '<i class="wash">Wash required</i>' : r.washed ? '<i class="ok">Washed</i>' : ''].join('');
       const status = done ? badge('COMPLETE', 'done') : s === 'UNLOADING' ? badge('UNLOADING', 'going') : r.transfer ? badge('NEEDS A TRAILER') : badge('WAITING');
-      const quick = ck && s === 'WAITING' && !isOpen && !r.road && !r.transfer ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
+      const quick = !ck || s !== 'WAITING' || isOpen ? '' : r.washOnly ? (ws.length ? '<span class="sw-quick">' + btn('CONFIRM WASHED', 'uwash', r.key, 'good') + '</span>' : '') :
+        !r.road && !r.transfer ? '<span class="sw-quick">' + btn('START UNLOADING', 'ustart', r.key, 'primary') + '</span>' : '';
       // Joe 10/27: a drop-and-hook load leads with its name (Ferry Product 1, Lancaster Transfer), never a trailer number.
       const title = (r.order ? '<span class="sw-order">' + r.order + '</span>' : '') + (r.dropAndHook ? '<span class="sw-trailer">' + escapeHtml(r.name) + '</span>' :
-        (r.trailer ? '<span class="sw-trailer">' + escapeHtml(r.trailer) + '</span>' : '') + escapeHtml(r.run));
-      html += '<article class="sw-card ' + (done ? 'done' : s === 'UNLOADING' ? 'run' : '') + (r.pendingReturns.length ? ' ret' : '') + (r.road ? ' road' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.key) + '">' +
+        (r.trailer ? '<span class="sw-trailer">' + escapeHtml(r.trailer) + '</span>' : '') + escapeHtml(r.added ? r.forRoute : r.run));
+      html += '<article class="sw-card ' + (done ? 'done' : s === 'UNLOADING' ? 'run' : '') + (r.prior && !done ? ' prior' : '') + (r.pendingReturns.length ? ' ret' : '') + (r.road ? ' road' : '') + (isOpen ? ' open' : '') + '" data-sw="' + escapeHtml(r.key) + '">' +
         '<div class="sw-head tall" data-toggle="' + escapeHtml(r.key) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title unload"><b>' + title + '</b>' +
         (!r.trailer && !r.dropAndHook ? '<small>Trailer not typed yet</small>' : '') + '<span class="sw-chips">' + chips + '</span></span>' +
         '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>';
-      if (isOpen) {
+      if (isOpen && r.washOnly) {
+        html += '<div class="sw-body"><div class="sw-step' + (ws.length ? ' wash' : '') + '"><b>1</b><span><strong>Washing</strong><small>' + escapeHtml((r.trailer || 'Trailer') + ' · only to be washed') + '</small></span>' +
+          (ws.length ? (ck ? btn('CONFIRM WASHED', 'uwash', r.key, 'good') : badge('WASH NEEDED', 'wash')) : badge('DONE', 'done')) + '</div>' +
+          (ck && !done ? '<div class="sw-actions">' + btn('TAKE OFF THE LIST', 'udrop', r.key) + '</div>' : '') + '</div>';
+      } else if (isOpen) {
         const dis = !ck || done;
-        html += '<div class="sw-body"><div class="sw-fields two">' + field(r.key, 'casesIn', unit + ' in', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) + field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + '</div>' +
+        // Joe 10/27 (hg): Cases out (from the loadout), Cases returned (typed here) and Lost, as on the office screen.
+        const typedIn = String(val(r.key, 'casesIn', r.casesIn)).trim().replace(/,/g, ''), lost = P.lostCases(Object.assign({}, r, { casesIn: /^\d+$/.test(typedIn) ? typedIn : '' }));
+        html += '<div class="sw-body"><div class="sw-fields">' + field(r.key + ':out', 'casesOut', unit + ' out', r.casesOut === '' ? '' : Number(r.casesOut).toLocaleString(), { disabled: true }) +
+          field(r.key, 'casesIn', unit + ' returned', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) +
+          '<label class="sw-field"><span>Lost</span><input value="' + (lost === null ? '' : lost < 0 ? (-lost).toLocaleString() + ' extra' : lost.toLocaleString()) + '" disabled' + (lost > 0 ? ' style="color:#b42332;font-weight:900"' : '') + '></label>' + field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis }) + '</div>' +
           field(r.key, 'notes', 'Notes', r.notes, { wide: true, disabled: dis || s !== 'UNLOADING' }) +
           '<div class="sw-step' + (r.pendingReturns.length ? ' need' : '') + '"><b>2</b><span><strong>Returned product</strong><small>' + escapeHtml(r.pendingReturns.length ? r.pendingReturns.map(x => x.detail).join('; ') : r.returns.length ? 'Back in the cooler' : 'No return assigned') + '</small></span>' +
           (r.pendingReturns.length ? (ck ? btn('BACK IN THE COOLER (RTA)', 'urta', r.key, 'danger') : badge('PENDING', 'ret')) : badge(r.returns.length ? 'DONE' : 'NOT REQUIRED', r.returns.length ? 'done' : '')) + '</div>' +
           '<div class="sw-step' + (ws.length ? ' wash' : '') + '"><b>3</b><span><strong>Washing</strong><small>' + escapeHtml(ws.length ? (r.trailer || 'Trailer') + ' · ' + ws.map(w => w.need).join('; ') : r.washed ? 'Washed' : 'No wash listed') + '</small></span>' +
           (ws.length ? (ck ? btn('CONFIRM WASHED', 'uwash', r.key, 'good') : badge('WASH NEEDED', 'wash')) : badge(r.washed ? 'DONE' : 'NOT REQUIRED', r.washed ? 'done' : '')) + '</div>' +
-          (ck ? '<div class="sw-actions">' + (s === 'WAITING' ? btn('START UNLOADING', 'ustart', r.key, 'primary') : s === 'UNLOADING' ? btn('COMPLETE', 'uend', r.key, 'good') : badge('COMPLETE', 'done')) + '</div>' : '') + '</div>';
+          (ck ? '<div class="sw-actions">' + ((r.added || r.prior) && s === 'WAITING' ? btn('TAKE OFF THE LIST', 'udrop', r.key) : '') + (s === 'WAITING' ? btn('START UNLOADING', 'ustart', r.key, 'primary') : s === 'UNLOADING' ? btn('COMPLETE', 'uend', r.key, 'good') : badge('COMPLETE', 'done')) + '</div>' : '') + '</div>';
       }
       html += '</article>';
     });
     if (!rows.length) html = '<p class="sw-empty">' + (got.runs ? 'No trucks are back for unloading today.' : 'Reading today\'s loads&hellip;') + '</p>';
-    const need = transfers.length ? '<i class="sw-need">' + plural(transfers.length, 'transfer trailer') + ' needed' + (places.length ? ' (' + escapeHtml(places.join(', ')) + ')' : '') + '</i> ' : '';
+    const need = (prior ? '<i class="sw-need from">' + plural(prior, 'trailer') + ' from yesterday</i> ' : '') + (transfers.length ? '<i class="sw-need">' + plural(transfers.length, 'transfer trailer') + ' needed' + (places.length ? ' (' + escapeHtml(places.join(', ')) + ')' : '') + '</i> ' : '');
     return panel('Unloading', need + left + ' to unload of ' + plural(rows.length, 'item'), '<div class="sw-list">' + html + '</div>');
   }
 
@@ -537,7 +553,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   async function saveUnload(r, fields, shown) {
     const done = show(r.key, shown);
     if (fields.returnIds) fields.returnIds.forEach(id => { returned[id] = true; });
-    const turn = (chain[r.key] || Promise.resolve()).then(() => save('saveUnloading', { date, route: r.route, run: r.run, runDocId: r.runDocId, day: r.day, fields }));
+    const turn = (chain[r.key] || Promise.resolve()).then(() => save('saveUnloading', { date: r.date || date, route: r.route, run: r.run, runDocId: r.runDocId, day: r.day, fields }));
     chain[r.key] = turn.catch(() => {});
     let ok = true, res;
     try { res = await turn; showError(''); } catch (e) { ok = false; showError(r.route + ' ' + r.run + ': ' + (e.message || e)); }
@@ -679,7 +695,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       }
       return;
     }
-    if (['ustart', 'uend', 'urta', 'uwash'].indexOf(a) >= 0) {
+    if (['ustart', 'uend', 'urta', 'uwash', 'udrop'].indexOf(a) >= 0) {
       const all = unloads(), r = all.find(x => x.key === id);
       if (!r) return;
       if (a === 'ustart') {
@@ -689,12 +705,13 @@ export function mountStationWork({ db, box, person, onDraw }) {
         saveUnload(r, { start: true }, { status: 'UNLOADING', startedAt: now });
       } else if (a === 'uend') {
         const typed = String(val(r.key, 'casesIn', r.casesIn)).trim().replace(/,/g, '');
-        if (!/^\d+$/.test(typed)) { showError('Enter the ' + P.UNLOAD_UNIT[area() || 'CASE'].toLowerCase() + ' in before completing (0 if none).'); const f = box.querySelector('[data-id="' + CSS.escape(r.key) + '"][data-k="casesIn"]'); if (f) f.focus(); return; }
+        if (!/^\d+$/.test(typed)) { showError('Enter the ' + P.UNLOAD_UNIT[area() || 'CASE'].toLowerCase() + ' returned before completing (0 if none).'); const f = box.querySelector('[data-id="' + CSS.escape(r.key) + '"][data-k="casesIn"]'); if (f) f.focus(); return; }
         if (r.pendingReturns.length) { showError('Put the returned product back in the cooler (RTA) before completing.'); return; }
         const first = typed !== r.casesIn ? saveUnload(r, { casesIn: String(Number(typed)) }, { casesIn: String(Number(typed)) }) : Promise.resolve(true);
         first.then(ok => { if (!ok) return; delete drafts[r.key]; const x = unloads().find(y => y.key === r.key); if (x) saveUnload(x, { end: true }, { status: 'COMPLETE', completedAt: new Date().toISOString() }); });
       } else if (a === 'urta') saveUnload(r, { returnIds: r.pendingReturns.map(x => x.id) }, {});
       else if (a === 'uwash') { const ws = P.washesForRow(r, washes()); if (ws.length) washTrailer(ws[0].trailer); }
+      else if (a === 'udrop') { delete opened[r.key]; saveUnload(r, { dropped: true }, { dropped: true }); }
       return;
     }
     if (a === 'wash') { const w = washes().find(x => x.id === id); if (w) washTrailer(w.trailer); return; }
@@ -769,6 +786,14 @@ export function mountStationWork({ db, box, person, onDraw }) {
     e.preventDefault();
     const form = e.target.closest('[data-form]');
     if (!form || !canSave()) return;
+    if (form.dataset.form === 'unl') {
+      const v = U.trailerText(val('add-unl', 'trailer', '')), kind = (e.submitter && e.submitter.dataset.kind) || 'UNLOAD';
+      if (!v) { showError('Type the trailer number, then press Unload It or Wash Only.'); return; }
+      delete drafts['add-unl'];
+      const r = { key: U.unloadKey(date, P.ADDED_ROUTE, P.addedRun(v)), route: P.ADDED_ROUTE, run: P.addedRun(v), runDocId: '', day: '', date };
+      saveUnload(r, { added: kind, trailer: v, area: area() || 'CASE' }, {});
+      return;
+    }
     if (form.dataset.form === 'wash') {
       const v = U.trailerText(val('add-wash', 'trailer', ''));
       if (!v) { showError('Type the trailer number, then press Confirm Washed.'); return; }

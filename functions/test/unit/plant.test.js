@@ -134,6 +134,18 @@ test('unloading saves: whole quantities, T- trailers, one press at a time', () =
   assert.throws(() => P.validateWash({ date: '2026-10-08', trailer: '' }, SaveError), /trailer number/);
 });
 
+// Joe 10/27 (hd): + Add a Trailer is its own row (route ADDED, run = the trailer), to unload or only to wash.
+test('unloading saves: + Add a Trailer and Take Off the List', () => {
+  const v = (route, run, fields, extra) => P.validateUnload(Object.assign({ date: '2026-10-27', route, run, fields }, extra || {}), SaveError).unload;
+  assert.deepEqual(v('ADDED', '517', { added: 'UNLOAD', trailer: '517', area: 'CASE', forRoute: '808' }), { trailer: 'T-517', added: 'UNLOAD', area: 'CASE', forRoute: '808' });
+  assert.deepEqual(v('ADDED', '902', { added: 'WASH', trailer: 'T-902', area: 'nope' }), { trailer: 'T-902', added: 'WASH', area: 'CASE', forRoute: '' });
+  assert.throws(() => v('ADDED', '517', { added: 'MAYBE', trailer: '517' }), /Unload it or Wash only/);
+  assert.throws(() => v('ADDED', '517', { added: 'UNLOAD' }), /trailer number/);
+  assert.throws(() => v('808', 'UT DSD MILK', { added: 'UNLOAD', trailer: '517' }), /on no load/);
+  assert.throws(() => v('ADDED', '517', { added: 'UNLOAD', trailer: '517' }, { runDocId: '2026-10-25__run_p808' }), /on no load/);
+  assert.deepEqual(v('808', 'UT DSD MILK', { dropped: true }), { dropped: true });
+});
+
 /* ---------- the Plant Operations Scheduler ---------- */
 
 test('scheduler: pickup times, the newest copy of a load, deleted loads off, Sunday-first holidays', () => {

@@ -40,6 +40,41 @@ test('Unloading: one at a time, End needs the count, the count goes on the Live 
   assert.equal(R.latestUnloads(await journal(), DATE)[DATE + '|811|UT DSD MILK'].trailer, 'T-977');
 });
 
+// Joe 10/27 (hd): + Add a Trailer: its own row that never touches a week's load; a wash-only one cannot be started; one
+// added by mistake (or carried over from yesterday and in fact unloaded) is taken off the list until it is started.
+test('Add a Trailer: unload it or wash only, taken off the list, added again fresh', async () => {
+  const add = (trailer, kind, extra) => unload('ADDED', R.unitKey(trailer), Object.assign({ added: kind, trailer, area: 'CASE' }, extra || {}));
+  await unload('805', 'UT DSD MILK', { casesIn: '25' });
+  await unload('805', 'UT DSD MILK', { end: true });
+  await add('517', 'UNLOAD', { forRoute: '808' });
+  await add('T-902', 'WASH');
+  await assert.rejects(unload('ADDED', '902', { start: true }), /only to be washed/);
+  await assert.rejects(unload('ADDED', '777', { start: true }), /no longer on the list/);
+  let now = R.latestUnloads(await journal(), DATE);
+  const k517 = DATE + '|ADDED|517', k902 = DATE + '|ADDED|902';
+  assert.equal(now[k517].added, 'UNLOAD');
+  assert.equal(now[k517].forRoute, '808');
+  assert.equal(now[k517].trailer, 'T-517');
+  assert.equal(now[k902].added, 'WASH');
+  assert.equal(now[k902].status, 'WAITING');
+  assert.equal((await unload('ADDED', '517', { start: true })).status, 'UNLOADING');
+  await assert.rejects(unload('ADDED', '517', { dropped: true }), /was started/);
+  await unload('ADDED', '517', { casesIn: '40' });
+  assert.equal((await unload('ADDED', '517', { end: true })).status, 'COMPLETE');
+  await unload('ADDED', '902', { dropped: true });
+  now = R.latestUnloads(await journal(), DATE);
+  assert.equal(now[k902].dropped, true);
+  assert.equal(now[k517].casesIn, '40');
+  // The same trailer back again later: a fresh row.
+  await add('517', 'UNLOAD');
+  now = R.latestUnloads(await journal(), DATE);
+  assert.equal(now[k517].status, 'WAITING');
+  assert.equal(now[k517].casesIn, '');
+  // Nothing went on a week's load.
+  const runs = (await db().collection('runs').get()).docs.map(d => d.data());
+  assert.ok(!runs.some(r => Object.values(r.days || {}).some(d => d && d.plantCaseReturn === 40)));
+});
+
 test('RTA: the dock\'s returns and the driver check-in\'s return go back to the cooler; an unknown return is refused', async () => {
   await unload('805', 'UT DSD MILK', { returnIds: ['ret805'] });
   await unload('811', 'UT DSD MILK', { returnIds: ['CHECKIN|2026-10-04__run_p811|thu'] }, { runDocId: '2026-10-04__run_p811', day: 'thu' });
