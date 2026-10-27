@@ -1136,12 +1136,19 @@ Each plant's left menu in its own order. Move a section up or down, or to anothe
 id: uploads
 screens: uploads.html, administration.html?item=upload-center
 
-Brings a new plant's data (routes, drivers, the plant, people and email) in from one Excel workbook.
+Brings a new plant's data (routes, drivers, the plant, people and email) in from one Excel workbook. A save fills that plant's own screens (its Route Editor, Driver Roster, days off, lines, machines and the rest). Nothing shows on another plant's screens.
 
-1. `Download Workbook` and have each person fill in their own tabs.
-2. `Upload Workbook`.
-3. Check every row: new, changed or a problem. `Download Problem List` saves the problems.
-4. `Save` once it is right.
+1. Pick the plant.
+2. `Download Workbook` and have each person fill in their own tabs.
+3. `Upload Workbook`.
+4. Check every row: new, changed or a problem. `Download Problem List` saves the problems.
+5. `Save` once it is right.
+
+> You can fill a few tabs now and the rest later. A tab left empty keeps what was saved before. Uploading the same workbook again changes nothing, and a row you take out of a tab comes off that plant's screen.
+
+> People in the workbook are added to People & Roles for that plant. Someone already there keeps their role and just gains the plant.
+
+> Station codes and the Driver Check-In Email switch are not in the workbook. Make the codes on Station Codes and turn the check-in on in Driver Check-In Email.
 
 !> Do not save with problems on the list. Fix the workbook and upload it again.
 

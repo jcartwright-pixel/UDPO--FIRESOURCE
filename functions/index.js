@@ -266,6 +266,8 @@ function adminDeps() {
   const setup = transferSetup(), live = process.env.WRITEBACK_JSON && process.env.DEMO_DATA !== '1' && !realLive() ? JSON.parse(process.env.WRITEBACK_JSON).spreadsheetId : '';
   return {
     env: process.env,
+    // The Upload Center fills a plant's own database only once that database is made (plantReady).
+    plantDb: (plant) => { const p = L.PLANTS.find(x => x.id === plant); return p && plantReady(p) ? PLANTS.dbFor(plant, db) : null; },
     sources: setup && process.env.DEMO_DATA !== '1' ? setup.sources : null,
     sheets: setup && process.env.DEMO_DATA !== '1' ? () => makeSheetsWriter() : null,
     liveId: live,
