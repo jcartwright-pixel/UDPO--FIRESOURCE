@@ -58,7 +58,9 @@ async function openPage(browser, width, height, url, touch) {
     assert.equal(first.trailer, 'T-888');
     assert.match(first.chips, /From 10-7 · not unloaded/);
     assert.match(await t.textContent('#work .sw-panel-head span'), /1 trailer from yesterday/);
-    assert.equal(await t.$eval('#work .sw-card.prior .sw-chips i.from', i => getComputedStyle(i).color), 'rgb(180, 35, 24)', 'red');
+    // Read the tag's color in one step once it is drawn and styled (a tag caught mid-redraw is detached and has no style).
+    const red = await (await t.waitForFunction(() => { const i = document.querySelector('#work .sw-card.prior .sw-chips i.from'); return i && i.isConnected && getComputedStyle(i).color ? getComputedStyle(i).color : null; }, null, { timeout: 8000 })).jsonValue();
+    assert.equal(red, 'rgb(180, 35, 24)', 'red');
     await t.fill('[data-form="unl"] input[data-k="trailer"]', '640');
     await t.click('[data-form="unl"] button[data-kind="UNLOAD"]');
     await t.waitForFunction(() => [...document.querySelectorAll('#work .sw-card[data-sw]')].some(c => /ADDED\|640$/.test(c.dataset.sw) && /Added/.test(c.textContent)));
