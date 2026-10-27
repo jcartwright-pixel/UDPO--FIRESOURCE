@@ -96,8 +96,9 @@
       const loads = P.loadoutRows(runs, date);
       // Joe 10/27: the same order as the tablet: what today's loadout needs first, a trailer that is here ahead of one on the road.
       // Joe 10/27 (hd): yesterday's trailers nobody pressed End on come over by themselves, at the top in red.
-      const carried = P.carriedUnloads(runs, date, prevJournal.concat(journal), routes);
-      const rows = P.unloadOrder(P.unloadRows(runs, date, journal, returns, loads, routes).concat(carried).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior))), gpsDays);
+      const two = prevJournal.concat(journal), carried = P.carriedUnloads(runs, date, two, routes), list = P.unloadRows(runs, date, journal, returns, loads, routes).concat(carried);
+      // Joe 10/27: every trailer today's loadout needs is on the list, also one that did not deliver today.
+      const rows = P.unloadOrder(list.concat(P.neededUnloads(runs, date, two, routes, list, loads)).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed))), gpsDays);
       const prevWash = P.washItems(L.addDays(date, -1), [], [], prevJournal.concat(journal)).filter(w => /^ADDED\|/.test(w.id) && carried.some(r => r.washOnly && U.unitKey(r.trailer) === U.unitKey(w.trailer)));
       const wash = P.washItems(date, sheetWash, appWash, journal).concat(prevWash).filter(w => !washedNow[w.id]);
       return { returns, rows, wash };
@@ -131,7 +132,7 @@
       const prior = mine.filter(r => r.prior).length;
       document.getElementById('add-open').hidden = !check();
       if (!check()) document.getElementById('addbox').hidden = true;
-      const routeBox = document.getElementById('add-route'), routeNow = routeBox.value, routeList = [...new Set(mine.filter(r => !r.added && !r.prior).map(r => r.route))];
+      const routeBox = document.getElementById('add-route'), routeNow = routeBox.value, routeList = [...new Set(mine.filter(r => !r.added && !r.prior && !r.needed).map(r => r.route))];
       routeBox.innerHTML = '<option value=""></option>' + routeList.map(x => '<option' + (x === routeNow ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('');
       document.getElementById('banner').innerHTML = (prior ? '<div class="uw-banner"><b>' + prior + ' trailer' + (prior === 1 ? '' : 's') + ' from yesterday ' + (prior === 1 ? 'was' : 'were') + ' not unloaded</b><span>They are at the top of the list. Unload them, or press Wash if they only need washing.</span></div>' : '') +
         (retLoads ? '<div class="uw-banner"><b>Product returns need attention · ' + retLoads + ' load' + (retLoads === 1 ? '' : 's') + '</b><span>Assigned product must be returned to the cooler. Do not dump.</span><a href="returns.html?date=' + date + '">Open Returns &rarr;</a></div>' : '');
@@ -171,9 +172,9 @@
           '<td>' + clockCell + '</td><td>' + time + '</td><td>' + (ck ? '<button type="button" class="edit-row" data-do="edit"' + k(r) + '>Edit</button>' : '') + '</td></tr>';
         if (ck && editKey === r.key) {
           html += '<tr class="editrow"><td colspan="' + ncol + '"><div class="editbar"><b>Edit · ' + escapeHtml(r.route + ' ' + r.run) + '</b><span class="read">Started ' + escapeHtml(P.clock(r.startedAt) || '—') + ' · Finished ' + escapeHtml(P.clock(r.completedAt) || '—') + '</span>' +
-            '<label>' + unit + ' Returned<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label><label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>' +
+            '<label>' + unit + ' Returned<input data-e="casesIn" inputmode="numeric" value="' + escapeHtml(r.casesIn) + '"></label>' + (r.needed ? '' : '<label>Trailer Back<input data-e="trailer" value="' + escapeHtml(r.trailer) + '"></label>') +
             '<label class="grow">Notes<input data-e="notes" maxlength="1200" value="' + escapeHtml(r.notes) + '"></label>' +
-            ((r.added || r.prior) && !r.startedAt ? '<button type="button" data-do="drop"' + k(r) + '>Take Off the List</button>' : '') + '<button type="button" data-do="editclose">Close</button></div></td></tr>';
+            ((r.added || r.prior || r.needed) && !r.startedAt ? '<button type="button" data-do="drop"' + k(r) + '>Take Off the List</button>' : '') + '<button type="button" data-do="editclose">Close</button></div></td></tr>';
         }
       });
       const focused = document.activeElement && document.activeElement.dataset && (document.activeElement.dataset.f || document.activeElement.dataset.e) ? document.activeElement : null;
@@ -199,7 +200,7 @@
     const mmdd = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) : ''; };
     function routeCell(r) {
       const tag = r.prior ? '<span class="uw-tag from">From ' + escapeHtml(mmdd(r.date)) + '</span>' : r.added ? '<span class="uw-tag add">' + (r.washOnly ? 'Wash only' : 'Added') + '</span>' : '';
-      return (r.added && !r.forRoute ? '' : '<b>' + escapeHtml(r.added ? r.forRoute : r.route) + '</b>') + tag;
+      return (r.added && !r.forRoute ? '' : '<b>' + escapeHtml(r.added || r.needed ? r.forRoute : r.route) + '</b>') + tag;
     }
 
     // + Add a Trailer (Joe 10/27, hd mock-up 2): a trailer that is on no load, to unload or only to wash. It goes to the top.
@@ -226,6 +227,8 @@
     let saveNo = 0;
     const chain = {};
     async function saveUnload(r, fields, shown) {
+      // A trailer today's loadout needs that did not deliver today is saved, on its first press, as a trailer added for that load.
+      if (r.needed) fields = Object.assign({}, fields, { added: 'UNLOAD', trailer: r.trailer, area: r.area, forRoute: r.forRoute });
       const mine = ++saveNo, p = pending[r.key] = Object.assign({}, pending[r.key], shown, { _no: mine });
       if (fields.returnIds) { pending.returns = pending.returns || {}; fields.returnIds.forEach(id => { pending.returns[id] = true; }); }
       render();

@@ -445,6 +445,31 @@ export function carriedUnloads(runs, date, journal, routes, plantStart) {
 }
 
 /*
+ * Joe 10/27 ("not matching the trailers that I need to load today for tomorrow"): every trailer on today's loadout is on
+ * the list, not only the ones that delivered today. A trailer a load needs today that is on none of today's rows (it came
+ * back on an earlier day, or it is a spare) gets its own row, in the order its load leaves, named for that load. Not when
+ * yesterday's unloading of it was finished, and not once it was taken off the list today. Nothing is saved until Start
+ * (or Take Off the List): it is then saved as a trailer added for that load (route ADDED, as + Add a Trailer).
+ * rows = today's rows (with yesterday's carried over and the added ones); loads = loadoutRows of the date;
+ * journal = the plant journal of yesterday and today.
+ */
+export function neededUnloads(runs, date, journal, routes, rows, loads) {
+  const have = {}, y = L.addDays(date, -1), today = U.latestUnloads(journal, date), out = [];
+  (rows || []).forEach(r => { const u = U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)); if (u) have[u] = true; });
+  unloadRows(runs, y, journal, [], [], routes).forEach(r => { const u = U.unitKey(r.trailer); if (u && r.status === 'COMPLETE') have[u] = true; });
+  (loads || []).forEach((l, i) => {
+    const unit = U.unitKey(l.trailer), key = U.unloadKey(date, ADDED_ROUTE, unit);
+    if (!unit || l.state === 'DONE' || have[unit] || today[key]) return;
+    have[unit] = true;
+    out.push({ id: key, key, runDocId: '', day: '', route: ADDED_ROUTE, run: unit, runId: '', area: l.area || 'CASE', driver: '', truck: '', trailer: txt(l.trailer),
+      casesOut: '', driverSaid: '', trailerTyped: true, dropped: false, dropAndHook: false, name: '', casesIn: '', startedAt: '', completedAt: '', notes: '', status: 'WAITING',
+      returns: [], pendingReturns: [], washed: false, checkedIn: false, checkinAt: '', date, needed: true, forRoute: txt(l.run) || txt(l.route),
+      nextLoad: { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }, nextRank: i });
+  });
+  return out;
+}
+
+/*
  * Case Unloading's order on the Plant Station (Joe 10/15, mock-up A): the trailers in the order the next loads leave (the
  * first unfinished load that needs the same trailer, by departure), with no times or routes shown. Each card says whether
  * the trailer is back: Verizon Connect Fleet's yard return (gpsDays yardIn after yardOut, the trailer's unit first, else its
@@ -453,6 +478,7 @@ export function carriedUnloads(runs, date, journal, routes, plantStart) {
  * still needed. Joe 10/27: the trailers today's loadout needs come first (by when their load leaves), then the ones not
  * needed today; a trailer that is here goes ahead of one still on the road. Order: yesterday's and added trailers (hd);
  * unloading now; here and needed; here and not needed (all numbered 1, 2, 3...); on the road and needed; on the road and not needed; transfer trailers; done.
+ * A trailer today's loadout needs that did not deliver today is on the list too (neededUnloads).
  * gpsDays: the gpsDays docs of the days around `date` ([] when the tablet cannot read them: then no one is On the road).
  */
 export function unloadOrder(rows, gpsDays) {

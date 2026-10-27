@@ -56,6 +56,8 @@ async function openPage(browser, width, height, url, touch) {
   // Fleet: T-953 left the yard at 1:00 AM and came back at 9:42 AM; T-955 left at 2:00 AM and is still out.
   await d.collection('gpsDays').doc('2026-10-08__T953').set({ tag: 'T-953', date: '2026-10-08', yardOut: '2026-10-08T05:00:00Z', yardIn: '2026-10-08T13:42:00Z' });
   await d.collection('gpsDays').doc('2026-10-08__T955').set({ tag: 'T-955', date: '2026-10-08', yardOut: '2026-10-08T06:00:00Z' });
+  // Joe 10/27: 812's Friday load (loaded today) takes T-777, which did not deliver today: it is on the list all the same.
+  await d.collection('runs').doc('2026-10-04__run_p812').update({ 'days.fri.trailer': 'T-777' });
   // When each trailer is next needed: its Friday load (loaded today), unless that load is already loaded. A load made the day
   // before leaves in the operating day before (the day rolls at 6 a.m., Joe 10/19): 6 a.m. on is Thursday, earlier is Friday.
   const nextDepart = {};
@@ -91,6 +93,10 @@ async function openPage(browser, width, height, url, touch) {
       assert.ok(t953.size >= 26, 'the trailer is in big type');
       assert.match(t955.chips, /On the road/);
       assert.ok(t955.road && !t955.order && !t955.quick, 'T-955 is on the road: greyed, no number, no Start');
+      const t777 = cards.find(c => c.trailer === 'T-777');
+      assert.ok(t777, 'T-777, needed for a load today but not back today, is on the list');
+      assert.ok(t777.order && t777.quick && t777.badge === 'WAITING', 'T-777 is numbered with Start Unloading');
+      assert.match(t777.title, /UT DSD MILK/, 'T-777 is named for the load it goes on');
       assert.equal(road.length, 1);
       assert.equal(transfer.length, 1);
       assert.equal(transfer[0].title, 'Marietta 1', 'a drop-and-hook load shows its name');
@@ -119,6 +125,23 @@ async function openPage(browser, width, height, url, touch) {
     assert.equal(await cell.$('input'), null, 'no Trailer # box on a drop-and-hook load');
     assert.deepEqual(o.errors, []);
     results.push('office: Marietta 1 in the Trailer column');
+    // T-777 (needed today, did not deliver today) is on the office list too; Take Off the List saves it as a trailer added for 812.
+    const add = await o.waitForSelector('#rows tr[data-key*="ADDED"]');
+    assert.match(await add.textContent(), /T-777/);
+    assert.match(await add.textContent(), /UT DSD MILK/);
+    await add.$eval('[data-do="edit"]', b => b.click());
+    await o.click('[data-do="drop"]');
+    await o.waitForFunction(() => !document.querySelector('#rows tr[data-key*="ADDED"]'));
+    let saved;
+    for (let i = 0; i < 40 && !saved; i++) {
+      saved = (await d.collection('plantJournal').where('type', '==', 'UNLOADING').get()).docs.map(x => x.data()).find(x => x.route === 'ADDED');
+      if (!saved) await new Promise(r => setTimeout(r, 250));
+    }
+    await o.waitForTimeout(500);
+    assert.equal(await o.$('#rows tr[data-key*="ADDED"]'), null, 'T-777 stays off the list once saved');
+    assert.ok(saved && saved.payload.dropped && saved.payload.added === 'UNLOAD' && saved.payload.forRoute === 'UT DSD MILK' && saved.trailer === 'T-777', 'saved as taken off, for 812: ' + JSON.stringify(saved));
+    assert.deepEqual(o.errors, []);
+    results.push('office: T-777 listed for UT DSD MILK, Take Off the List saved');
     await o.close();
   } finally {
     await browser.close();
