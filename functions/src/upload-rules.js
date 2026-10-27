@@ -97,7 +97,7 @@
       col('Employee ID', 'employeeId', true, 'id', 'Payroll / Enterprise ID. Leading zeros are fine.', 'Driver Master employee_id (also the phone sign-in)'),
       col('Driver Name', 'name', true, 'text', 'First and last name, the way dispatch says it.', 'Driver Master name', null, { max: 120 }),
       col('Status', 'status', true, 'choice', 'Active or Inactive.', 'Driver Master status', ['Active', 'Inactive']),
-      col('Cell Phone', 'phone', false, 'phone', '10 digits. One number per driver: the mobile Schedule Texts go to.', 'Driver Roster mobile phone (driverPhones, Schedule Texts)'),
+      col('Cell Phone', 'phone', false, 'phone', '10 digits. One number per driver: the mobile work texts go to.', 'Driver Roster mobile phone (driverPhones, Texts)'),
       col('Relief Driver', 'relief', false, 'yesno', 'Yes if the driver fills in on other routes.', 'Driver Master relief_driver', YN),
       col('Hire Date', 'hired', false, 'date', 'Like 10-8-26.', 'Driver Master hire_date'),
       col('Seniority Date', 'seniority', false, 'date', 'Sets the Weekly board order and vacation picks. Blank = hire date.', 'Driver Master seniority_date'),
