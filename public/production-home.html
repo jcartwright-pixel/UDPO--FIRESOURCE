@@ -35,8 +35,9 @@
     <div class="notice error" id="error" hidden></div>
     <div class="view mc-shell">
       <!-- Joe 10/26 (mock-up 6b, "the plant production is right"): the same front page as Plant Distribution. Send Current Report on
-           the left, the four kinds of machines two by two (Fillers, HTST, Boxing & Totes, Blow Mold), then Production Checks
-           (Quality Checks, Cooler Temperature, the line tablets) and Shift Notes along the bottom. -->
+           the left, the machines two by two, then Production Checks (Quality Checks, Cooler Temperature, the line tablets) and
+           Shift Notes along the bottom. Joe 10/26: Fillers, HTST, Boxing and Totes (Boxing and Totes each their own card, Blow Mold
+           off this page; it keeps its own machine page), shrunk to fit his window without scrolling. -->
       <section class="mc-grid" id="grid">
         <div class="mc-card mc-report" style="--accent:#c62828">
           <div class="mc-bar"><strong>Send Current Report</strong></div>
@@ -74,7 +75,8 @@
     const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortTime(t) : 'None'; };
     const personName = (v) => String(v || '').split('@')[0].split(/[._-]+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
     const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
-    const KINDS = [['FILLER', 'Fillers', '#1976d2'], ['HTST', 'HTST', '#0f766e'], ['PACK', 'Boxing & Totes', '#f28a00'], ['BLOWMOLD', 'Blow Mold', '#7b35b5']];
+    const R = window.UDProduction, side = (v) => v.kind === 'PACK' ? R.packSide(v.line.name) : v.kind;
+    const KINDS = [['FILLER', 'Fillers', '#1976d2'], ['HTST', 'HTST', '#0f766e'], ['BOXING', 'Boxing', '#f28a00'], ['TOTES', 'Totes', '#b45309']];
     const stateWord = (v) => v.state === 'IDLE' ? 'Not started' : v.state === 'STOPPED' ? 'Stopped ' + v.stoppedMin + ' min' : v.state === 'CHANGEOVER' ? 'Changeover' : v.state === 'CIP' ? 'CIP wash' : v.kind === 'HTST' && v.diverting ? 'In divert' : 'Running';
     const speedOff = (v) => v.speedFlag === 'OVER' || v.speedFlag === 'UNDER';
     const checkDue = (v) => !!(v.check && !v.check.done && v.state !== 'IDLE');
@@ -113,9 +115,9 @@
       document.getElementById('pv-list').innerHTML = '<span class="mc-pvh">Lines<em>' + (soFar ? pct(made, soFar) + '% of target so far' : 'no target yet') + '</em></span>' +
         (attn.length ? '<span class="mc-pvh bad">Needs attention<em>' + attn.length + '</em></span>' + attn.map(([v, w, k]) => '<span class="mc-pvrow ' + k + '"><b>' + escapeHtml(v.line.name) + '</b> ' + escapeHtml(w) + '</span>').join('') : '<span class="mc-pvnone">Nothing needs attention right now.</span>') +
         '<span class="mc-pvnone">Tap to see the full report.</span>';
-      // The four kinds of machines, each a small card that opens Production Lines on that kind.
+      // Fillers, HTST, Boxing and Totes, each a small card that opens Production Lines on those lines.
       document.querySelector('[data-card="dept"]').innerHTML = KINDS.map(([k, title, color]) => {
-        const vs = views.filter(v => v.kind === k), st = vs.filter(v => v.state === 'STOPPED'), sp = vs.filter(speedOff), ck = vs.filter(checkDue), cc = vs.filter(v => v.state === 'CHANGEOVER' || v.state === 'CIP');
+        const vs = views.filter(v => side(v) === k), st = vs.filter(v => v.state === 'STOPPED'), sp = vs.filter(speedOff), ck = vs.filter(checkDue), cc = vs.filter(v => v.state === 'CHANGEOVER' || v.state === 'CIP');
         const m = vs.reduce((n, v) => n + (Number(v.made) || 0), 0), so = vs.reduce((n, v) => n + (Number(v.soFar) || 0), 0), href = 'production.html?kind=' + k;
         return deptCard(href, title, color, [[vs.length, 'Lines'], [vs.filter(v => v.state === 'RUNNING').length, 'Running', 'good'], [st.length, 'Stopped'], [fmt(m), 'Made']], m, so,
           so ? fmt(m) + ' of ' + fmt(so) + ' so far · ' + pct(m, so) + '%' : vs.length ? 'no target yet this shift' : 'no lines set up',

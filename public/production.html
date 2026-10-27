@@ -80,7 +80,8 @@
     let pmTab = params.get('tab') || '';
     let weekView = !tv && params.get('view') === 'week', weekOf = params.get('week') || '', weekRuns = [], weekKey = '', stopWeek = null;
     const R = window.UDProduction, KINDS = [['ALL', 'All lines'], ['FILLER', 'Fillers'], ['HTST', 'HTST'], ['PACK', 'Boxing & Totes'], ['BLOWMOLD', 'Blow Mold'], ['ATTN', 'Needs attention']];
-    if (KINDS.some(k => k[0] === params.get('kind'))) kindFilter = params.get('kind');
+    // Joe 10/26: the front page's Boxing and Totes cards open just their own lines (?kind=BOXING or ?kind=TOTES).
+    if (KINDS.some(k => k[0] === params.get('kind')) || ['BOXING', 'TOTES'].indexOf(params.get('kind')) >= 0) kindFilter = params.get('kind');
     // Joe 10/14: line efficiency is for managers only (not the tablets or the TV).
     const manager = () => !tv && !!person && L.hasRole(person, L.REORDER_ROLES);
     const clockOf = (iso) => { const x = Date.parse(iso || ''); return isFinite(x) ? new Date(x).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
@@ -115,7 +116,7 @@
       document.getElementById('hstats').innerHTML = [['Lines', views.length, ''], ['Running', running, 'good'], ['Stopped', stopped, stopped ? 'bad' : ''], ['Speed off', flagged, flagged ? 'bad' : ''], ['Changeover', cos, cos ? 'blue' : ''], ['CIP wash', cips, cips ? 'blue' : '']].map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
       drawTop(views, t);
       if (!tv) drawMenu(views);
-      const shown = views.filter(v => kindFilter === 'ALL' || (kindFilter === 'ATTN' ? attention(v) : v.kind === kindFilter));
+      const shown = views.filter(v => kindFilter === 'ALL' || (kindFilter === 'ATTN' ? attention(v) : kindFilter === 'BOXING' || kindFilter === 'TOTES' ? v.kind === 'PACK' && R.packSide(v.line.name) === kindFilter : v.kind === kindFilter));
       document.getElementById('tiles').innerHTML = shown.map(v => {
         const word = v.state === 'IDLE' ? 'NOT STARTED' : v.state === 'STOPPED' ? 'STOPPED ' + v.stoppedMin + ' MIN' : v.state === 'CHANGEOVER' ? 'CHANGEOVER ' + v.changeover.minutes + ' MIN' : v.state === 'CIP' ? 'CIP WASH ' + v.cip.minutes + ' MIN' : v.kind === 'HTST' && v.diverting ? 'IN DIVERT' : 'RUNNING';
         const sp = v.speedFlag === 'OVER' ? 'TOO FAST ' + v.speed + '/MIN' : v.speedFlag === 'UNDER' ? 'TOO SLOW ' + v.speed + '/MIN' : v.speed !== null && v.state === 'RUNNING' ? v.speed + '/MIN' : '';
@@ -189,7 +190,7 @@
       if (tv) return;
       if (one) return drawDetail(views.find(v => v.line.operationId === lineId), views, t);
       document.getElementById('filters').innerHTML = KINDS.filter(k => k[0] === 'ALL' || k[0] === 'ATTN' || views.some(v => v.kind === k[0]))
-        .map(k => { const n = k[0] === 'ATTN' ? views.filter(attention).length : 0; return '<button type="button" data-kind="' + k[0] + '"' + (kindFilter === k[0] ? ' class="on"' : '') + '>' + escapeHtml(k[1]) + (n ? '<b>' + n + '</b>' : '') + '</button>'; }).join('');
+        .map(k => { const n = k[0] === 'ATTN' ? views.filter(attention).length : 0; return '<button type="button" data-kind="' + k[0] + '"' + (kindFilter === k[0] || (k[0] === 'PACK' && (kindFilter === 'BOXING' || kindFilter === 'TOTES')) ? ' class="on"' : '') + '>' + escapeHtml(k[1]) + (n ? '<b>' + n + '</b>' : '') + '</button>'; }).join('');
       const sum = (f) => views.reduce((n, v) => n + (f(v) || 0), 0), effs = views.filter(v => v.efficiency && v.efficiency.oee !== null && v.efficiency.plannedMin > 0);
       const plantEff = effs.length ? Math.round(effs.reduce((n, v) => n + v.efficiency.oee * v.efficiency.plannedMin, 0) / effs.reduce((n, v) => n + v.efficiency.plannedMin, 0)) : null;
       const nextCip = views.filter(v => v.cipHours && v.lastCipAt && !v.cip).map(v => ({ v, at: Date.parse(v.lastCipAt) + v.cipHours * 3600000 })).sort((a, b) => a.at - b.at)[0];
