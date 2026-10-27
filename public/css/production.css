@@ -636,3 +636,16 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 .lb-head .lb-actions:has(> button:nth-child(7)) { gap: 6px; }
 .lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 17px; padding: 4px; }
 @media (min-width: 1100px) and (max-width: 1300px) { .lb-head:has(.lb-actions > button:nth-child(7)) .lb-title { max-width: 330px; } .lb-head .lb-actions:has(> button:nth-child(7)) button { font-size: 16px; } }
+/* Full practice test 10/27: the line tablet fits a tablet held upright (768) and a phone (390) with no sideways scroll and
+   nothing cut off. The header wraps; a long product name, a long table or a long label stays inside the page. */
+@media (max-width: 1000px) { .lt-tablet #ps-top { flex-wrap: wrap; row-gap: 6px; } }
+.lt-tablet .view :is(.lb-card, .lb-mach-row > *, .lb-runs, .lb-field) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.lt-tablet .lb-field :is(select, .lb-in) { max-width: 100%; min-width: 0; }
+.lt-tablet .view .eyebrow { overflow-wrap: anywhere; }
+@media (max-width: 500px) {
+  .lb-head .lb-actions button { flex: 1 1 40%; }
+  #std-cards { grid-template-columns: minmax(0, 1fr); }
+  #status .lb-sbtns { flex-wrap: wrap; }
+  #status .lb-sbtns button { min-width: 0; flex: 1 1 auto; padding: 0 12px; }
+  .lt-tablet :is(.lb-tog, .lb-pick) button { min-width: 0; padding: 4px 6px; font-size: 16px; overflow-wrap: anywhere; }
+}
