@@ -81,16 +81,18 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       assert.equal(await tx.isDisabled('#turn'), true, 'On needs the Twilio account first');
       assert.deepEqual(await tx.$$eval('#form input', i => i.map(x => x.value + '|' + x.placeholder)), ['|', '|', '|'], 'empty boxes, no placeholder that looks saved');
       await tx.waitForSelector('#preview tr td');
-      assert.deepEqual(await tx.$$eval('#preview tr', r => r.map(x => x.textContent)), ['ADAMS, PATNo number', 'CASEY, LEE330-555-1234']);
-      assert.match(await tx.textContent('#mode'), /Test copy: texts are written to the log only/);
+      // Joe 10/26: only the drivers ticked Schedule on the Driver Roster (none here).
+      await tx.waitForFunction(() => document.getElementById('preview-count').textContent === '0 ticked');
+      assert.match(await tx.textContent('#preview'), /Nobody ticked yet/);
+      assert.match(await tx.textContent('#mode'), /Test copy: texts are written to the list at the bottom only/);
       await tx.waitForSelector('#log tr.texts-in');
       const log = await tx.$$eval('#log tr', r => r.map(x => [...x.cells].map(c => c.textContent)));
       const rows = log.map(x => [x[1], x[2], x[3], x[5]].join('|'));
       assert.equal(rows[0], 'CASEY, LEE|Reply|330-555-1234|Received');
-      assert.deepEqual(rows.slice(1).sort(), ['ADAMS, PAT|Sent||No number', 'CASEY, LEE|Sent|330-555-1234|Test copy, not sent']);
+      assert.deepEqual(rows.slice(1).sort(), ['ADAMS, PAT|Schedule||No number', 'CASEY, LEE|Schedule|330-555-1234|Test copy, not sent']);
       assert.equal(log[0][4], 'Got it. Can I swap Tuesday?', 'the newest, the reply, on top');
-      assert.ok(await fits(tx) <= 0, 'no side scroll on Schedule Texts at ' + w);
-      assert.deepEqual(await small(tx), [], 'Schedule Texts: no text under 16px at ' + w);
+      assert.ok(await fits(tx) <= 0, 'no side scroll on Texts at ' + w);
+      assert.deepEqual(await small(tx), [], 'Texts: no text under 16px at ' + w);
       if (SHOTS) await tx.screenshot({ path: path.join(SHOTS, 'after-texts-' + w + '.png') });
       if (SHOTS) { await tx.$eval('#log', e => e.closest('section').scrollIntoView()); await tx.screenshot({ path: path.join(SHOTS, 'after-replies-' + w + '.png') }); await tx.evaluate(() => window.scrollTo(0, 0)); }
       if (w === 1920) {

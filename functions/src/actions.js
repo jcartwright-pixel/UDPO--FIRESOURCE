@@ -31,7 +31,7 @@ const { isHome, companyDb } = require('./plants');
 // Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
 const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
 const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
-const { editDriver, setDriverPhone, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
+const { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
@@ -66,6 +66,8 @@ const ACTIONS = Object.freeze({
   setDriverRelief: { roles: DRIVER_ROLES, screen: 'drivers' },
   // Joe 10/15: the driver's mobile phone for Schedule Texts (driverPhones, app only).
   setDriverPhone: { roles: DRIVER_ROLES, screen: 'drivers' },
+  // Joe 10/26: the Texts ticks (Schedule, Load), who gets each kind of text (driverPhones, app only).
+  setDriverText: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriver: { roles: DRIVER_ROLES, screen: 'drivers' },
   removeDrivers: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriverException: { roles: SAVE_ROLES, screen: 'drivers' },
@@ -561,6 +563,14 @@ function validate(input) {
     if (raw && !out.phone) throw new SaveError('BAD_REQUEST', 'Type the mobile phone number as 10 digits, like 330-555-1234.');
     return out;
   }
+  if (action === 'setDriverText') {
+    out.driverId = text(input.driverId);
+    if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
+    out.kind = text(input.kind).toUpperCase();
+    if (['SCHEDULE', 'LOAD'].indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'kind must be SCHEDULE or LOAD');
+    out.on = input.on === true;
+    return out;
+  }
   if (DRIVER_ACTIONS.indexOf(action) >= 0) {
     out.driverId = text(input.driverId);
     if (!out.driverId) throw new SaveError('BAD_REQUEST', 'driverId is required');
@@ -853,6 +863,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'clearConflict') return clearConflict(tx, db, req, email, stamp, logRef, mode);
     if (DRIVER_ACTIONS.indexOf(req.action) >= 0) return editDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setDriverPhone') return setDriverPhone(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setDriverText') return setDriverText(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'removeDrivers') return removeDrivers(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverException') return saveDriverException(tx, db, req, email, stamp, logRef, mode);

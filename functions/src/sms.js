@@ -20,6 +20,7 @@
 
 const crypto = require('crypto');
 const L = require('./logic');
+const B = require('./board-rules');
 const { COLLECTIONS: C, safeIdPart } = require('./model');
 
 const ROLES = ['ADMINISTRATOR', 'ADMIN'];
@@ -53,29 +54,43 @@ async function adminOnly(db, user) {
   // The one Users list (Uniontown's database), whichever plant this is for.
   const snap = await require('./plants').companyDb(db).collection(C.users).doc(safeIdPart(email)).get();
   const person = snap.exists ? snap.data() : null;
-  if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ROLES)) throw new SmsError('NOT_ALLOWED', 'Only an administrator can change Schedule Texts');
+  if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ROLES)) throw new SmsError('NOT_ALLOWED', 'Only an administrator can change Texts');
   return email;
 }
 
-// Every active driver on the week (a run that runs with his id on it), with the number he would be texted at.
+// Every active driver on the week (a run that runs with his id on it) with Schedule ticked under Texts on the Driver Roster
+// (Joe 10/26: "the driver's roster ... will control who gets them"), with the number he would be texted at.
 async function weekDrivers(db, week) {
   const [runs, drivers, phones] = await Promise.all([db.collection(C.runs).where('weekStart', '==', week).get(), db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
   const on = new Set();
   L.weeklyRows(runs.docs.map(d => Object.assign({}, d.data(), { id: d.id })), week).forEach(r => L.DAYS.forEach(p => { if (r.days[p].runs && r.days[p].driverId) on.add(r.days[p].driverId); }));
   const typed = {};
-  phones.docs.forEach(d => { typed[d.id] = d.data().phone || ''; });
-  return drivers.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => on.has(d.id) && L.driverActive(d))
-    .map(d => ({ driverId: d.id, name: d.name || '', phone: phoneE164(typed[safeIdPart(d.id)] || d.phone || '') }))
+  phones.docs.forEach(d => { typed[d.id] = d.data(); });
+  return drivers.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => on.has(d.id) && L.driverActive(d) && (typed[safeIdPart(d.id)] || {}).scheduleText === true)
+    .map(d => ({ driverId: d.id, name: d.name || '', phone: phoneE164((typed[safeIdPart(d.id)] || {}).phone || d.phone || '') }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
+async function activeDrivers(db) {
+  const [drivers, phones] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
+  const typed = {};
+  phones.docs.forEach(d => { typed[d.id] = d.data(); });
+  return drivers.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => d.name && L.driverActive(d))
+    .map(d => { const t = typed[safeIdPart(d.id)] || {};
+      return { driverId: d.id, name: d.name || '', phone: phoneE164(t.phone || d.phone || ''), scheduleText: t.scheduleText === true, loadText: t.loadText === true, loadTextAt: t.loadTextAt || '', stoppedAt: t.stoppedAt || '' }; })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const status = (d, env, project) => ({ replyAddress: project ? replyAddress(project) : '', on: !!d.on, hasSid: !!d.accountSid, hasToken: !!d.authToken, from: d.fromNumber ? phoneText(d.fromNumber) : '', live: liveTexts(env),
-  savedAt: d.savedAt || '', savedBy: d.savedBy || '', switchedAt: d.switchedAt || '', switchedBy: d.switchedBy || '', lastWeek: d.lastWeek || '', lastSend: d.lastSend || null });
+  savedAt: d.savedAt || '', savedBy: d.savedBy || '', switchedAt: d.switchedAt || '', switchedBy: d.switchedBy || '', lastWeek: d.lastWeek || '', lastSend: d.lastSend || null,
+  doneOn: !!d.doneOn, doneAskedAt: d.doneAskedAt || '', ask: ASK, doneSwitchedAt: d.doneSwitchedAt || '', doneSwitchedBy: d.doneSwitchedBy || '' });
 
-/* input.op: status | save {accountSid, authToken, fromNumber} | clear | setOn {on} | preview */
+/* input.op: status | save {accountSid, authToken, fromNumber} | clear | setOn {on} | preview
+ *           | doneList | setDoneOn {on} | test {phone} | doneAsk   (Load Done Texts, below; the drivers are ticked on the Driver Roster) */
 async function smsCall(db, user, input, options) {
   input = input || {};
-  const o = Object.assign({ now: () => new Date(), env: process.env, project: process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || '' }, options || {});
+  const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a), project: process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || '' }, options || {});
   const email = await adminOnly(db, user);
   const ref = PRIVATE(db), d = (await ref.get()).data() || {}, op = String(input.op || 'status');
   const stamp = o.now().toISOString();
@@ -93,7 +108,7 @@ async function smsCall(db, user, input, options) {
     return status(next, o.env, o.project);
   }
   if (op === 'clear') {
-    const next = { on: false, lastWeek: d.lastWeek || '', savedAt: stamp, savedBy: email, switchedAt: stamp, switchedBy: email };
+    const next = { on: false, lastWeek: d.lastWeek || '', doneOn: false, savedAt: stamp, savedBy: email, switchedAt: stamp, switchedBy: email };
     await ref.set(next);
     return status(next, o.env, o.project);
   }
@@ -109,12 +124,65 @@ async function smsCall(db, user, input, options) {
   if (op === 'preview') {
     const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
     const week = live.next || live.current || '';
-    const list = week ? await weekDrivers(db, week) : [];
-    return Object.assign(status(d, o.env, o.project), { week, message: week ? messageFor(week) : '', drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+    const list = (await activeDrivers(db)).filter(x => x.scheduleText);
+    return Object.assign(status(d, o.env, o.project), { week, message: messageFor(week || L.weekStart(L.operatingDay(o.now()))), drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+  }
+  if (op === 'doneList') {
+    const list = await activeDrivers(db);
+    return Object.assign(status(d, o.env, o.project), { sample: sampleMessage(),
+      drivers: list.filter(x => x.loadText).map(x => ({ driverId: x.driverId, name: x.name, phone: phoneText(x.phone) })) });
+  }
+  if (op === 'setDoneOn') {
+    const on = input.on === true;
+    if (on && !(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account on Schedule Texts first.');
+    // Turning it On never texts a load that was already done: only loads finished from now on.
+    const next = Object.assign({}, d, { doneOn: on, doneSwitchedAt: stamp, doneSwitchedBy: email });
+    await ref.set(next);
+    return status(next, o.env, o.project);
+  }
+  // Joe 10/26 ("I want to do just sample"): a test text to one number typed on the screen, nobody else. Works with every
+  // switch Off; the test copy only writes it to the log.
+  if (op === 'test') {
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account on Schedule Texts first.');
+    const to = phoneE164(input.phone);
+    if (!to) throw new SmsError('BAD_REQUEST', 'Type the phone number as 10 digits, like 330-555-1234.');
+    const body = TEST_TEXT, log = { direction: 'out', kind: 'TEST', name: 'Test text', driverId: '', to, body, at: stamp, by: email };
+    if (!liveTexts(o.env)) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+    else {
+      let r;
+      try { r = await sendOne(d, to, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+    }
+    await db.collection('textLog').doc('test_' + stamp.replace(/[^0-9]/g, '')).set(log);
+    return Object.assign(status(d, o.env, o.project), { test: { to: phoneText(to), status: log.status, reason: log.reason } });
+  }
+  // Joe 10/26 ("send the text out to opt in or out. And then it tick marks"): ask each active driver with a mobile phone
+  // who is not ticked for both yet; a YES reply ticks Schedule and Load on the Driver Roster, STOP unticks both (replyCheck).
+  if (op === 'doneAsk') {
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account on Schedule Texts first.');
+    const live = liveTexts(o.env), list = (await activeDrivers(db)).filter(x => x.phone && !(x.loadText && x.scheduleText) && !x.stoppedAt);
+    let sent = 0, failed = 0;
+    for (const x of list) {
+      const log = { direction: 'out', kind: 'ASK', driverId: x.driverId, name: x.name, to: x.phone, body: ASK, at: stamp, by: email };
+      if (!live) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+      else {
+        let r;
+        try { r = await sendOne(d, x.phone, ASK, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+        if (r.ok) sent++; else failed++;
+        Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+        if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
+      }
+      await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, askedAt: stamp }, { merge: true });
+      await db.collection('textLog').doc('doneask_' + stamp.replace(/[^0-9]/g, '') + '_' + safeIdPart(x.driverId)).set(log);
+    }
+    const next = Object.assign({}, d, { doneAskedAt: stamp, doneRepliesAfter: d.doneRepliesAfter || stamp });
+    await ref.set(next);
+    return Object.assign(status(next, o.env, o.project), { asked: { drivers: list.length, sent, failed, live } });
   }
   throw new SmsError('BAD_REQUEST', 'Unknown Schedule Texts step ' + op.slice(0, 30));
 }
 
+const STOPPED = 21610;
 async function sendOne(d, to, body, fetchFn) {
   const res = await fetchFn(TWILIO + encodeURIComponent(d.accountSid) + '/Messages.json', {
     method: 'POST',
@@ -122,8 +190,10 @@ async function sendOne(d, to, body, fetchFn) {
     body: new URLSearchParams({ To: to, From: d.fromNumber, Body: body }).toString()
   });
   if (res.ok) return { ok: true };
-  let why = '';
-  try { const j = await res.json(); why = j && j.message || ''; } catch (e) { why = ''; }
+  let why = '', code = 0;
+  try { const j = await res.json(); why = j && j.message || ''; code = Number(j && j.code) || 0; } catch (e) { why = ''; }
+  // 21610: the person texted STOP to the number, so Twilio will not text them until they text START.
+  if (code === STOPPED) return { ok: false, stopped: true, reason: 'Replied STOP: Twilio will not text this number until they text START.' };
   return { ok: false, reason: 'Twilio refused (' + res.status + ')' + (why ? ': ' + String(why).slice(0, 200) : '') };
 }
 
@@ -155,7 +225,9 @@ async function postedCheck(db, options) {
       let r;
       try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
       if (r.ok) sent++; else failed++;
-      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: 'FAILED', reason: r.reason });
+      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+      // A driver who replied STOP is unticked on the Driver Roster (Joe 10/26).
+      if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
     }
     await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId)).set(log);
   }
@@ -198,4 +270,106 @@ async function handleReply(db, url, headers, params, options) {
   return [200, TWIML];
 }
 
-module.exports = { smsCall, postedCheck, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };
+/*
+ * Load Done Texts (Joe 10/26: "text temporarily a few people when the load is complete ... that their load is done, and if
+ * they have any pickups"): the drivers with Load ticked under Texts on the Driver Roster (Joe 10/26: "can't we add a tick for
+ * that driver") get one text when the plant finishes their load (the Loadout's Done / End time), with its open pickups. Its own On / Off switch, Off by default;
+ * it uses the Twilio account saved on Schedule Texts, and the test copy only writes to the log, as Schedule Texts does.
+ */
+const nice = (n) => { const x = Number(n); return n === '' || n === null || n === undefined || !isFinite(x) ? '' : x.toLocaleString('en-US'); };
+function doneMessage(r) {
+  const what = ['Route ' + (r.route || ''), r.run || ''].filter(Boolean).join(' ').trim();
+  const bits = [r.trailer ? 'trailer ' + r.trailer : '', nice(r.cases) ? nice(r.cases) + ' cases' : ''].filter(Boolean);
+  return 'United Dairy: your load is done. ' + what + (bits.length ? ', ' + bits.join(', ') : '') + '. ' +
+    (r.pickupText ? 'Pickups: ' + r.pickupText + '.' : 'No pickups.');
+}
+const TEST_TEXT = 'United Dairy: this is a test text from Operations. No need to reply.';
+const ASK = 'United Dairy work texts: your schedule when it is posted and when your load is done, with any pickups. Reply YES to get them. Reply STOP to stop.';
+const sampleMessage = () => doneMessage({ route: '801', run: 'UT DSD MILK', trailer: 'T-901', cases: 1200, pickupText: '2 crates chocolate milk' });
+// Loads finished longer ago than this are never texted (a load marked done late, or the switch turned back On days later).
+const DONE_WINDOW_MS = 12 * 3600 * 1000;
+
+/* The minute job: each load the plant finished today for a ticked driver gets one text. Returns what it did, or null. */
+async function loadDoneCheck(db, options) {
+  const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a) }, options || {});
+  const d = (await PRIVATE(db).get()).data() || {};
+  if (!d.doneOn || !(d.accountSid && d.authToken && d.fromNumber)) return null;
+  const picked = {};
+  (await activeDrivers(db)).forEach(x => { if (x.loadText) picked[safeIdPart(x.driverId)] = x; });
+  if (!Object.keys(picked).length) return null;
+  const now = o.now(), stamp = now.toISOString(), date = L.operatingDay(now), week = L.weekStart(date), live = liveTexts(o.env);
+  // The loads the plant loads on this operating day and their open pickups, as the Driver Room board shows them.
+  const runs = (await db.collection(C.runs).where('weekStart', 'in', [week, L.addDays(week, 7)]).get()).docs.map(x => Object.assign({}, x.data(), { id: x.id }));
+  const pickups = (await db.collection('pickups').where('date', 'in', [date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(x => x.data());
+  const byId = {};
+  runs.forEach(r => { byId[r.id] = r; });
+  const since = Date.parse(d.doneSwitchedAt || '') || 0;
+  let sent = 0, failed = 0, logged = 0;
+  for (const r of B.loadoutBoardRows(runs, pickups, date)) {
+    if (r.state !== 'LOADED') continue;
+    const day = ((byId[r.runDocId] || {}).days || {})[r.day] || {}, driverId = safeIdPart(day.driverId || '');
+    if (!driverId || !picked[driverId]) continue;
+    // Only a load finished after the switch went On and the driver was ticked, and not long ago.
+    const ended = Date.parse(day.completeTime || '');
+    if (isFinite(ended) && (ended < since || ended < (Date.parse(picked[driverId].loadTextAt) || 0) || now - ended > DONE_WINDOW_MS)) continue;
+    const ref = db.collection('textLog').doc('done_' + date + '_' + safeIdPart(r.runDocId) + '_' + r.day);
+    const phone = picked[driverId].phone;
+    const body = doneMessage({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, trailer: r.trailer, cases: r.cases, pickupText: r.pickupText });
+    const log = { direction: 'out', kind: 'LOAD_DONE', date, runDocId: r.runDocId, day: r.day, driverId, name: r.driver || '', to: phone, body, at: stamp };
+    // Claim the load first (create fails when it is there), so two minute runs never text the same load twice.
+    try { await ref.create(Object.assign({}, log, { status: 'SENDING' })); } catch (e) { continue; }
+    if (!phone) Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' });
+    else if (!live) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+    else {
+      let res;
+      try { res = await sendOne(d, phone, body, o.fetch); } catch (e) { res = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+      if (res.ok) sent++; else failed++;
+      Object.assign(log, res.ok ? { status: 'SENT', reason: '' } : { status: res.stopped ? 'STOPPED' : 'FAILED', reason: res.reason });
+      // Joe 10/26 ("if they reply back opt-out, will it automatically untick"): a driver who replied STOP is unticked and
+      // the Driver Roster says so; a text that goes through again clears it.
+      if (res.stopped) await db.collection('driverPhones').doc(driverId).set({ scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
+      else if (res.ok && picked[driverId].stoppedAt) await db.collection('driverPhones').doc(driverId).set({ stoppedAt: '' }, { merge: true });
+    }
+    logged++;
+    await ref.set(log);
+  }
+  return logged ? { date, at: stamp, logged, sent, failed, live } : null;
+}
+
+/*
+ * The minute job: the drivers' YES and STOP replies to the texting number. Replies are sent to the other United Dairy app
+ * (UDMS keeps the number's reply address), so this reads them back from Twilio instead, without changing that address.
+ * YES ticks Schedule and Load under Texts on the Driver Roster, STOP unticks both. Only after Ask drivers was pressed, and only on the live app.
+ */
+const YES = /^(yes|y|start|unstop|ok|okay)\b/i, NO = /^(stop|stopall|unsubscribe|cancel|end|quit|no)\b/i;
+async function replyCheck(db, options) {
+  const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a) }, options || {});
+  const ref = PRIVATE(db), d = (await ref.get()).data() || {};
+  if (!d.doneRepliesAfter || !(d.accountSid && d.authToken && d.fromNumber) || !liveTexts(o.env)) return null;
+  // Five minutes back from the last look, so a reply that came in during it is not missed (each reply is kept once).
+  const after = d.doneRepliesAt ? new Date(Math.max(Date.parse(d.doneRepliesAfter), Date.parse(d.doneRepliesAt) - 300000)).toISOString() : d.doneRepliesAfter, stamp = o.now().toISOString();
+  const url = TWILIO + encodeURIComponent(d.accountSid) + '/Messages.json?' + new URLSearchParams({ To: d.fromNumber, 'DateSent>': after.slice(0, 10), PageSize: '200' }).toString();
+  const res = await o.fetch(url, { headers: { Authorization: 'Basic ' + Buffer.from(d.accountSid + ':' + d.authToken).toString('base64') } });
+  if (!res.ok) throw new Error('Twilio refused the reply list (' + res.status + ')');
+  const list = ((await res.json()) || {}).messages || [];
+  const byPhone = {};
+  (await activeDrivers(db)).forEach(x => { if (x.phone) byPhone[x.phone] = x; });
+  let yes = 0, stop = 0;
+  // Oldest first, so a driver's last word wins.
+  const replies = list.filter(m => m && m.direction === 'inbound' && byPhone[phoneE164(m.from)] && Date.parse(m.date_created || m.date_sent || '') > Date.parse(after))
+    .sort((a, b) => Date.parse(a.date_created || a.date_sent) - Date.parse(b.date_created || b.date_sent));
+  for (const m of replies) {
+    const x = byPhone[phoneE164(m.from)], body = String(m.body || '').trim(), sid = String(m.sid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+    const word = YES.test(body) ? 'YES' : NO.test(body) ? 'STOP' : '';
+    if (!sid || !word) continue;
+    try { await db.collection('textLog').doc('doneReply_' + sid).create({ direction: 'in', kind: 'SIGN_UP', from: phoneE164(m.from), driverId: x.driverId, name: x.name, body: body.slice(0, 1600), at: new Date(Date.parse(m.date_created || m.date_sent)).toISOString(), status: 'RECEIVED' }); }
+    catch (e) { continue; }
+    const at = new Date(Date.parse(m.date_created || m.date_sent)).toISOString();
+    await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set(word === 'YES' ? { driverId: x.driverId, scheduleText: true, loadText: true, loadTextAt: at, stoppedAt: '' } : { driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: at }, { merge: true });
+    if (word === 'YES') yes++; else stop++;
+  }
+  await ref.set({ doneRepliesAt: stamp }, { merge: true });
+  return { yes, stop };
+}
+
+module.exports = { TEST_TEXT, smsCall, postedCheck, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };

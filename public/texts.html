@@ -7,14 +7,16 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Schedule Texts · Operations</title>
+  <title>Texts · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <script src="js/logic.js"></script>
 </head>
-<!-- Joe 10/15: when a new week is posted, each driver on it gets a text. Built ready, Off until an administrator turns it On. -->
+<!-- Joe 10/15: when a new week is posted, each driver on it gets a text. Joe 10/26: one Texts screen with a part for each kind
+     of text (Schedule texts, Load done texts, more later), each with its own On / Off; who gets each kind is ticked on the
+     Driver Roster ("the driver's roster ... will control who gets them. This will just show you a quick list"). -->
 <body class="gps-page texts-page">
   <div class="signin" id="signin" hidden>
-    <h1>Schedule Texts</h1>
+    <h1>Texts</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -26,19 +28,13 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Schedule Texts</h1><small>When Dispatch posts a new week, every driver on it with a mobile phone number gets one text: his schedule is posted, open My Schedule.</small></div>
+      <div class="title"><h1>Texts</h1><small>Texts to drivers from the company's Twilio number. Each kind has its own On / Off here. Who gets each kind is ticked on the <a href="drivers.html">Driver Roster</a>, under Texts.</small></div>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <p class="hint texts-mode" id="mode"></p>
     <div class="gps-grid">
       <section class="gps-card">
-        <h2>1. Texts <span class="pill" id="state">-</span></h2>
-        <p class="hint" id="state-text"></p>
-        <div class="gps-buttons"><button type="button" class="primary big" id="turn"></button></div>
-        <p class="hint" id="mode"></p>
-        <p class="hint" id="last"></p>
-      </section>
-      <section class="gps-card">
-        <h2>2. Twilio texting account <span class="pill" id="keys">-</span></h2>
+        <h2>1. Twilio texting account <span class="pill" id="keys">-</span></h2>
         <p class="hint">Type these here only, never in a chat or email. They are locked away on the server and never shown again. Leave a box blank to keep what is saved.</p>
         <form id="form" autocomplete="off" onsubmit="return false">
           <label>Account SID<input id="f-sid" autocomplete="off" spellcheck="false" maxlength="40"></label>
@@ -50,20 +46,60 @@
           </div>
         </form>
         <p class="hint" id="saved"></p>
-        <p class="hint" id="reply-hint" hidden>So replies show below: in Twilio, open the phone number and set "A message comes in" to Webhook, HTTP POST, <b id="reply-url"></b></p>
       </section>
-      <section class="gps-card wide">
-        <h2>3. Who would get the next text</h2>
-        <p class="hint" id="preview-head"></p>
-        <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
-          <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
-        <p class="hint">Mobile phone numbers are typed on the <a href="drivers.html">Driver Roster</a>.</p>
+      <section class="gps-card">
+        <h2>2. Try it and sign drivers up</h2>
+        <!-- Joe 10/26 ("I want to do just sample"): a test text to one phone only, with every switch Off. -->
+        <form class="texts-test" autocomplete="off" onsubmit="return false">
+          <label>Send a test text to<input id="test-phone" type="tel" inputmode="tel" maxlength="20" placeholder="330-555-1234"></label>
+          <button type="button" class="primary" id="test-send">Send test text</button>
+        </form>
+        <p class="hint" id="test-result">Only that phone gets it.</p>
+        <!-- Joe 10/26 ("send the text out to opt in or out. And then it tick marks"). -->
+        <div class="gps-buttons"><button type="button" id="ask">Ask drivers to sign up</button></div>
+        <p class="hint" id="ask-text"></p>
+        <p class="hint">Their <b>YES</b> and <b>STOP</b> replies are picked up here by themselves. Do not change the reply setting in Twilio; the other United Dairy app uses it.</p>
+      </section>
+      <section class="gps-card wide texts-kind">
+        <h2>3. Schedule texts <span class="pill" id="state">-</span></h2>
+        <div class="texts-kind-grid">
+          <div>
+            <p class="hint" id="state-text"></p>
+            <div class="gps-buttons"><button type="button" class="primary big" id="turn"></button></div>
+            <p class="hint" id="last"></p>
+            <p class="hint">The text:</p>
+            <p class="texts-sample" id="preview-text"></p>
+          </div>
+          <div>
+            <h3>Who gets them <span class="pill" id="preview-count">-</span></h3>
+            <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
+              <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
+            <p class="hint">Drivers ticked <b>Schedule</b> on the Driver Roster. Only the ones on the posted week get a text.</p>
+          </div>
+        </div>
+      </section>
+      <section class="gps-card wide texts-kind">
+        <h2>4. Load done texts <span class="pill" id="done-state">-</span></h2>
+        <div class="texts-kind-grid">
+          <div>
+            <p class="hint" id="done-state-text"></p>
+            <div class="gps-buttons"><button type="button" class="primary big" id="done-turn"></button></div>
+            <p class="hint">The text, when the plant finishes their load (this one is an example; with no open pickups it ends "No pickups."):</p>
+            <p class="texts-sample" id="sample"></p>
+          </div>
+          <div>
+            <h3>Who gets them <span class="pill" id="count">-</span></h3>
+            <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
+              <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="drivers"></tbody></table>
+            <p class="hint">Drivers ticked <b>Load</b> on the Driver Roster.</p>
+          </div>
+        </div>
       </section>
       <!-- Joe 10/15 ("so I could have a list of replies or communication"): every text sent and every reply, newest first. -->
       <section class="gps-card wide">
-        <h2>4. Texts and replies</h2>
-        <table class="gps-check texts-list texts-log"><colgroup><col style="width:15%"><col style="width:17%"><col style="width:9%"><col style="width:13%"><col style="width:34%"><col style="width:12%"></colgroup>
-          <thead><tr><th>When</th><th>Driver</th><th>Way</th><th>Phone</th><th>Message</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="6" class="hint">Loading…</td></tr></tbody></table>
+        <h2>5. Texts and replies</h2>
+        <table class="gps-check texts-list texts-log"><colgroup><col style="width:14%"><col style="width:15%"><col style="width:11%"><col style="width:12%"><col style="width:34%"><col style="width:14%"></colgroup>
+          <thead><tr><th>When</th><th>Driver</th><th>Kind</th><th>Phone</th><th>Message</th><th>Status</th></tr></thead><tbody id="log"><tr><td colspan="6" class="hint">Loading…</td></tr></tbody></table>
       </section>
     </div>
   </div>
@@ -72,41 +108,59 @@
     import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText, serverText } from './js/app.js';
     import { collection, query, orderBy, limit, onSnapshot } from './js/firebase.js';
 
-    let s = null, armed = null;
+    let s = null, armed = null, askArmed = null;
     const $ = (id) => document.getElementById(id);
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
     const day = (k) => { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
+    const list = (rows) => rows.map(d => '<tr><td>' + escapeHtml(d.name) + '</td><td>' + (d.phone ? escapeHtml(d.phone) : '<span class="texts-none">No number</span>') + '</td></tr>').join('') ||
+      '<tr><td colspan="2" class="hint">Nobody ticked yet.</td></tr>';
+    const pill = (el, on) => { el.textContent = on ? 'On' : 'Off'; el.className = 'pill ' + (on ? 'yes' : 'no'); };
     function render() {
       if (!s) return;
-      const keys = s.hasSid && s.hasToken && s.from, some = s.hasSid || s.hasToken || s.from;
-      $('state').textContent = s.on ? 'On' : 'Off'; $('state').className = 'pill ' + (s.on ? 'yes' : 'no');
-      $('state-text').textContent = s.on ? 'On: the next week Dispatch posts is texted to its drivers once.' : 'Off: no texts are sent.' + (keys ? '' : ' Save the Twilio account first, then turn it On.');
-      $('turn').textContent = s.on ? 'Turn Off' : 'Turn On';
-      $('turn').disabled = !s.on && !keys;
-      $('mode').textContent = s.live ? '' : 'Test copy: texts are written to the log only and never sent to anyone.';
+      const keys = s.hasSid && s.hasToken && s.from, some = s.hasSid || s.hasToken || s.from, need = keys ? '' : ' Save the Twilio account first, then turn it On.';
+      $('mode').textContent = s.live ? '' : 'Test copy: texts are written to the list at the bottom only and never sent to anyone.';
       $('mode').hidden = s.live;
-      const l = s.lastSend;
-      $('last').textContent = l ? 'Last posted week ' + day(l.week) + ', ' + stamp(l.at) + ': ' + (l.live ? l.sent + ' sent, ' + l.failed + ' failed' : l.drivers + ' written to the log') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'No texts yet.';
       $('keys').textContent = keys ? 'Saved' : some ? 'Partly saved' : 'Not saved'; $('keys').className = 'pill ' + (keys ? 'yes' : some ? 'warn' : 'no');
       $('f-sid').placeholder = s.hasSid ? 'saved (type to change)' : '';
       $('f-token').placeholder = s.hasToken ? 'saved (type to change)' : '';
       $('f-from').placeholder = s.from ? 'saved: ' + s.from + ' (type to change)' : '';
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
-      $('reply-hint').hidden = !s.replyAddress; $('reply-url').textContent = s.replyAddress || '';
-      if (s.drivers) {
-        const none = s.drivers.filter(d => !d.phone).length;
-        $('preview-head').textContent = s.week ? 'Week of ' + day(s.week) + ': ' + s.drivers.length + ' drivers, ' + (s.drivers.length - none) + ' with a number' + (none ? ', ' + none + ' without' : '') + '. The text: "' + s.message + '"' : 'No week to post yet.';
-        $('preview').innerHTML = s.drivers.map(d => '<tr><td>' + escapeHtml(d.name) + '</td><td>' + (d.phone ? escapeHtml(d.phone) : '<span class="texts-none">No number</span>') + '</td></tr>').join('') || '<tr><td colspan="2" class="hint">No drivers on that week yet.</td></tr>';
-      }
+      $('test-send').disabled = !keys; $('ask').disabled = !keys;
+      $('ask-text').textContent = 'Texts every driver with a mobile phone who is not ticked yet: "' + (s.ask || '') + '" A YES reply ticks Schedule and Load on the Driver Roster; STOP unticks them.' + (s.doneAskedAt ? ' Last asked ' + stamp(s.doneAskedAt) + '.' : '');
+      // Schedule texts
+      pill($('state'), s.on);
+      $('state-text').textContent = s.on ? 'On: when Dispatch posts a new week, each ticked driver on it gets one text.' : 'Off: no schedule texts are sent.' + need;
+      $('turn').textContent = s.on ? 'Turn Off' : 'Turn On'; $('turn').disabled = !s.on && !keys;
+      const l = s.lastSend;
+      $('last').textContent = l ? 'Last posted week ' + day(l.week) + ', ' + stamp(l.at) + ': ' + (l.live ? l.sent + ' sent, ' + l.failed + ' failed' : l.drivers + ' written to the list') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'No schedule texts yet.';
+      $('preview-text').textContent = s.message || '';
+      const sched = s.drivers || [];
+      $('preview-count').textContent = sched.length + ' ticked'; $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
+      $('preview').innerHTML = list(sched);
+      // Load done texts
+      pill($('done-state'), s.doneOn);
+      $('done-state-text').textContent = s.doneOn ? 'On: each ticked driver gets a text when the plant finishes their load.' : 'Off: no load done texts are sent.' + need;
+      $('done-turn').textContent = s.doneOn ? 'Turn Off' : 'Turn On'; $('done-turn').disabled = !s.doneOn && !keys;
+      $('sample').textContent = s.sample || '';
+      const load = s.loadDrivers || [];
+      $('count').textContent = load.length + ' ticked'; $('count').className = 'pill ' + (load.length ? 'yes' : 'no');
+      $('drivers').innerHTML = list(load);
     }
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
-      try { const keep = s && s.drivers ? { drivers: s.drivers, week: s.week, message: s.message } : {}; s = Object.assign(keep, await callServer('sms', fields)); render(); return s; }
-      catch (e) { showError(serverText(e, 'Schedule Texts')); return null; }
+      try { s = Object.assign({}, s || {}, await callServer('sms', fields)); return s; }
+      catch (e) { showError(serverText(e, 'Texts')); return null; }
       finally { if (button) button.disabled = false; render(); }
     }
+    // Both lists of who gets each kind (the Driver Roster's ticks).
+    async function refresh() {
+      const p = await call({ op: 'preview' });
+      const d = await call({ op: 'doneList' });
+      if (d) { s.loadDrivers = d.drivers; s.drivers = p ? p.drivers : []; render(); }
+    }
     $('turn').onclick = () => call({ op: 'setOn', on: !s.on }, $('turn'));
+    $('done-turn').onclick = () => call({ op: 'setDoneOn', on: !s.doneOn }, $('done-turn'));
     $('save').onclick = async () => {
       const r = await call({ op: 'save', accountSid: $('f-sid').value, authToken: $('f-token').value, fromNumber: $('f-from').value }, $('save'));
       if (r) ['f-sid', 'f-token', 'f-from'].forEach(id => { $(id).value = ''; });
@@ -119,18 +173,34 @@
       await call({ op: 'clear' }, b);
     };
     ['f-sid', 'f-token', 'f-from'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
+    // The test text: only the number typed gets it.
+    const TEST = { SENT: 'sent. Check that phone.', FAILED: 'not sent.', STOPPED: 'not sent.', 'NOT SENT': 'test copy, written to the list at the bottom only.' };
+    $('test-send').onclick = async () => {
+      const r = await call({ op: 'test', phone: $('test-phone').value }, $('test-send'));
+      if (r && r.test) $('test-result').textContent = r.test.to + ': ' + (TEST[r.test.status] || r.test.status) + (r.test.reason && r.test.status !== 'NOT SENT' ? ' ' + r.test.reason : '');
+    };
+    $('test-phone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('test-send').click(); } });
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds texts the drivers.
+    $('ask').onclick = async () => {
+      const b = $('ask');
+      if (!askArmed) { b.textContent = 'Tap again to text the drivers'; b.classList.add('armed'); askArmed = setTimeout(() => { askArmed = null; b.textContent = 'Ask drivers to sign up'; b.classList.remove('armed'); }, 5000); return; }
+      clearTimeout(askArmed); askArmed = null; b.textContent = 'Ask drivers to sign up'; b.classList.remove('armed');
+      const r = await call({ op: 'doneAsk' }, b);
+      if (r && r.asked) $('ask-text').textContent = r.asked.live ? r.asked.sent + ' drivers asked' + (r.asked.failed ? ', ' + r.asked.failed + ' not sent' : '') + '. Their replies tick them on the Driver Roster.' : r.asked.drivers + ' drivers: test copy, written to the list at the bottom only.';
+    };
     // The texts and replies (textLog), newest first; the list follows new ones as they come.
-    const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received' };
+    const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received', SENDING: 'Sending', STOPPED: 'Replied STOP' };
+    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply' };
     const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
     function watchLog(db) {
-      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(200)), snap => {
+      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(300)), snap => {
         $('log').innerHTML = snap.docs.map(x => x.data()).map(m => { const inbound = m.direction === 'in';
-          return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td>' + escapeHtml(stamp(m.at)) + '</td><td>' + escapeHtml(m.name || 'Unknown number') + '</td><td>' + (inbound ? '<b>Reply</b>' : 'Sent') + '</td><td>' + escapeHtml(phone(inbound ? m.from : m.to)) +
-            '</td><td>' + escapeHtml(m.body || '') + '</td><td>' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && m.status === 'FAILED' ? '<br>' + escapeHtml(m.reason) : '') + '</td></tr>'; }).join('') ||
+          return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td>' + escapeHtml(stamp(m.at)) + '</td><td>' + escapeHtml(m.name || 'Unknown number') + '</td><td>' + escapeHtml(KIND[m.kind] || (inbound ? 'Reply' : 'Schedule')) + '</td><td>' + escapeHtml(phone(inbound ? m.from : m.to)) +
+            '</td><td>' + escapeHtml(m.body || '') + '</td><td>' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && ['FAILED', 'STOPPED'].indexOf(m.status) >= 0 ? '<br>' + escapeHtml(m.reason) : '') + '</td></tr>'; }).join('') ||
           '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
       }, e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
     }
-    requireSignIn(async () => { const { db } = await start(); watchLog(db); await call({ op: 'preview' }); });
+    requireSignIn(async () => { const { db } = await start(); watchLog(db); await refresh(); });
   </script>
 </body>
 </html>

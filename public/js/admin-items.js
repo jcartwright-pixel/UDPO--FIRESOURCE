@@ -58,7 +58,9 @@ export const ADMIN_GROUPS = [
     ['machine-connections', 'Machine Connections', "Every machine's hookups, by plant then machine: how each line is counted, its counter box, machine controller or label reader, its RedZone line, and the thermometers. Read only: nothing is changed on a machine or in RedZone.", '', 'factory'],
     ['mocreo', 'MOCREO Key', 'The MOCREO API key (never shown again once saved) and asset ID, and Test Connection. The thermometers are in Machine Connections.', 'mocreo.html?part=key', 'temperatures.webp'],
     // Joe 10/15: built ready and kept Off; the drivers' mobile phones are typed on the Driver Roster.
-    ['schedule-texts', 'Schedule Texts', 'Texts each driver when a new week is posted. Off until turned On here; the Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
+    // Joe 10/26: one Texts screen, a part per kind of text (Schedule, Load done) each with its own On / Off; who gets them is
+    // ticked on the Driver Roster.
+    ['schedule-texts', 'Texts', 'Texts to drivers: schedule texts when a week is posted, and load done texts with any pickups. Each kind has its own On / Off; who gets them is ticked on the Driver Roster. The Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
     // Joe 10/11: RedZone's API sign-in (token, or client ID and secret), Test Connection; Products then gets Get from RedZone.
     // Joe 10/22 (the case counter hookup guide): the palletizer's counter box, and the case returns one, read-only by the plant PC.
     // Joe 10/26: the counter boxes are machines in Machine Connections now; Find a setting and ?item= still open this one.

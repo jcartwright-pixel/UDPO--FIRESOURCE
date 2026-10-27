@@ -126,6 +126,10 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
   // Joe 10/15: Schedule Texts, once a new week is the Live Current week (Off until an administrator turns it On).
   try { await SMS.postedCheck(db); } catch (e) { console.error('Schedule Texts failed: ' + (e && e.message || e)); }
+  // Joe 10/26: Load Done Texts, a picked driver's load finished at the plant (Off until an administrator turns it On).
+  // Their YES / STOP replies tick or untick Load Text on the Driver Roster (read back from Twilio).
+  try { await SMS.replyCheck(db); } catch (e) { console.error('Load Done Texts replies failed: ' + (e && e.message || e)); }
+  try { await SMS.loadDoneCheck(db); } catch (e) { console.error('Load Done Texts failed: ' + (e && e.message || e)); }
 });
 
 // Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js): on the test
