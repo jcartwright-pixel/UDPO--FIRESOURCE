@@ -370,7 +370,7 @@
       document.getElementById('rz-checks').innerHTML = list.slice(0, 200).map(c => '<tr' + (c.result === 'FAIL' ? ' class="rz-fail"' : '') + '><td>' + escapeHtml(dateTimeText(new Date(c.at))) + '</td><td><b>' + escapeHtml(where(c)) + '</b></td><td>' + escapeHtml(c.name) + '</td>' +
         '<td><span class="qc-res ' + (c.result === 'FAIL' ? 'st-down' : c.result === 'WARN' ? 'st-review' : c.result === 'PASS' ? 'st-running' : 'st-finished') + '">' + escapeHtml(RZ_RESULT[c.result] || c.result || '') + '</span></td><td class="detail">' +
         (c.items || []).filter(it => it.values.length || it.result === 'FAIL').slice(0, 12).map(item).join(' · ') + '</td></tr>').join('') ||
-        '<tr><td colspan="5" class="empty">' + escapeHtml(rzChecks === null ? 'Loading RedZone\'s checks…' : rzStatus && rzStatus.ok === false ? 'RedZone did not give its check sheets (' + rzStatus.status + '). Administration > RedZone: check the connection.' : 'No RedZone check sheets in the last 3 days. They are read in every 5 minutes.') + '</td></tr>';
+        '<tr><td colspan="5" class="empty">' + escapeHtml(rzChecks === null ? 'Loading RedZone\'s checks…' : rzStatus && rzStatus.ok === false ? 'RedZone did not give its check sheets (' + rzStatus.status + '). Administration > RedZone Sign-In: check the connection.' : 'No RedZone check sheets in the last 3 days. They are read in every 5 minutes.') + '</td></tr>';
       if (pane === 'redzone') document.getElementById('foot').textContent = list.length + ' RedZone check sheet' + (list.length === 1 ? '' : 's') + ' in the last 3 days, failed first' + (rzStatus && rzStatus.at ? ' · read ' + dateTimeText(new Date(rzStatus.at)) : '') + '. Read-only: change them in RedZone.';
     }
 

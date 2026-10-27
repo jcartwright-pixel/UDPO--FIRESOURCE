@@ -16,6 +16,9 @@
   <script src="js/production-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page quality-page lt-page">
+  <!-- Joe 10/26 (Machine Connections, mock-up 1): ?hookups=1 shows only what is hooked up to the one line (how it is counted,
+       its controller or label reader, its RedZone line): the machine's page in Administration > Machine Connections. -->
+  <script>if (new URLSearchParams(location.search).get('hookups')) document.body.classList.add('lt-hookups');</script>
   <div class="signin" id="signin" hidden>
     <h1>Line Targets</h1>
     <p>Sign in with your United Dairy Google account.</p>
@@ -279,7 +282,7 @@
       const box = document.getElementById('rz');
       box.hidden = false;
       if (box.contains(document.activeElement) && document.activeElement.matches('select')) return;
-      if (!rz || !(rz.locations || []).length) { box.innerHTML = '<h3>RedZone</h3><p>Not read in yet. Administration &gt; RedZone &gt; Read RedZone into Operations.</p>'; return; }
+      if (!rz || !(rz.locations || []).length) { box.innerHTML = '<h3>RedZone</h3><p>Not read in yet. Administration &gt; RedZone Sign-In &gt; Read RedZone into Operations.</p>'; return; }
       const info = data.lineInfo[line.operationId] || {}, loc = R.rzLocationFor(line.name, info, rz), guess = R.rzGuess(line.name, rz.locations), saved = info.redzoneLocation || '';
       const pick = '<label class="lt-counter">RedZone line <select id="rz-loc" aria-label="Which RedZone line goes with ' + escapeHtml(line.name) + '"' + (ck ? '' : ' disabled') + '>' +
         opt('', saved, 'Match by name' + (guess ? ' (' + guess.name + ')' : ' (none)')) + rz.locations.map(l => opt(l.uuid, saved, l.name)).join('') + opt('NONE', saved, 'None') + '</select></label>';

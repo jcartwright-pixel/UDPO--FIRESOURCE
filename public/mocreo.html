@@ -14,8 +14,11 @@
   <script src="js/plant-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page gps-page mocreo-page">
+  <!-- Joe 10/26 (Machine Connections): ?part=key is Administration > MOCREO Key (the key and Test Connection), ?part=thermometers
+       is the Thermometers machine in Machine Connections; with neither the page shows both, as before. -->
+  <script>(function () { var p = new URLSearchParams(location.search).get('part'); if (p === 'key' || p === 'thermometers') document.body.classList.add('mc-part-' + p); })();</script>
   <div class="signin" id="signin" hidden>
-    <h1>MOCREO &amp; Sensors</h1>
+    <h1 id="mc-title">MOCREO &amp; Sensors</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -33,6 +36,7 @@
       <button type="button" id="add" data-top>Add Thermometer</button>
     </div>
     <div class="notice error" id="error" hidden></div>
+    <script>(function () { var b = document.body.classList, t = document.getElementById('mc-title'); if (b.contains('mc-part-key')) t.textContent = 'MOCREO Key'; if (b.contains('mc-part-thermometers')) t.textContent = 'Thermometers'; })();</script>
     <div class="mc-grid">
       <div class="mc-left">
         <section class="gps-card">
@@ -58,7 +62,7 @@
         </section>
       </div>
       <section class="gps-card mc-therm">
-        <h2>3. Thermometers</h2>
+        <h2><span class="mc-num">3. </span>Thermometers</h2>
         <p class="hint">Every sensor MOCREO sends is listed by the name you gave it on the MOCREO website. Pick your location for each one; it saves as you pick, and a location can be on one sensor only. Your locations are below: each box saves as you leave it, a location on no sensor is read by hand, Off leaves it off Cooler Temperatures and Remove (press twice) takes it off the list.</p>
         <div class="mc-match" id="match-box" hidden></div>
         <div class="mc-scroll">
