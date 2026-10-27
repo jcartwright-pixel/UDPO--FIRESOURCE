@@ -998,6 +998,7 @@ body.yard-page .head .badge-test { order: 6; }
 .plant-page .clock-cell { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; align-items: center; max-width: 100%; }
 .plant-page .clock-cell button.clock { min-width: 56px; padding: 0 8px; }
 .plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid #bd7a00; background: #fff6df; color: #855400; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.skip.off { border-color: #9aa3ad; background: #eef0f3; color: #4b5560; }
 .plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: #8d5d00; font-size: 16px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
 .plant-page tr.skipped > td { background: #fffaf0 !important; }
 /* Joe 10/15: a load dragged out of the sheet's order has a green MOVED (or SKIPPED) tag beside the run, Done or not.

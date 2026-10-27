@@ -511,6 +511,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw .sw-btn.primary { background: #0b6eaa; border-color: #0b6eaa; color: #fff; }
 .sw .sw-btn.good { background: #177242; border-color: #177242; color: #fff; }
 .sw .sw-btn.warn { background: #fff6df; border-color: #bd7a00; color: #855400; }
+.sw .sw-btn.warn.off { background: #eef0f3; border-color: #9aa3ad; color: #4b5560; }
 .sw .sw-btn.danger { background: #b42318; border-color: #b42318; color: #fff; }
 .sw .sw-btn.pick { border: 2px solid #b42318; color: #b42318; }
 .sw .sw-btn:active { transform: scale(.98); }
