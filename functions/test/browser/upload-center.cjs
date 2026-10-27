@@ -2,15 +2,15 @@
 /*
  * Joe 10/18: the Upload Center (Administration > Plant Setup), his pick B: one workbook for a new plant, each person filling
  * their own tabs; no trucks or trailers (the Fleet List has them). Download the workbook, fill it, upload it: every row is
- * New, Changed, Same, a Problem (red, with why) or Taken off, and nothing saves while any problem is left. Saves are kept for
- * that plant only (plantUploads), so nothing shows on Uniontown's screens; on the live app saving waits for Joe's OK.
+ * New, Changed, Same, a Problem (red, with why) or Taken off, and nothing saves while any problem is left. A save fills that
+ * plant's own screens (its own database), so nothing shows on Uniontown's screens; on the live app saving waits for Joe's OK.
  * Pictures at 1536 and 1920 go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, plantDb } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const U = require('../../src/upload-rules');
@@ -93,7 +93,7 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
       assert.equal(await page.getAttribute('#download', 'download'), 'Charleston Setup Workbook.xlsx');
       assert.equal(await page.$$eval('#tabs tr:not(.up-group)', r => r.length), U.SPEC.length);
       assert.deepEqual(await page.$$eval('#tabs tr.up-group', r => r.map(x => x.textContent)), ['Routes', 'Drivers', 'Plant', 'People and Email']);
-      assert.match(await page.textContent('#where'), /Practice version: saves are kept for Charleston only/);
+      assert.match(await page.textContent('#where'), /Practice version: a save fills Charleston's own screens only, never Uniontown's/);
       // The workbook the page hands out is the Upload Center's own: every tab, every heading, no trucks or trailers.
       await page.evaluate(() => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }));
       const book = await page.evaluate(async () => { const X = window.XLSX, wb = X.read(await (await fetch('templates/Plant-Setup-Workbook.xlsx')).arrayBuffer(), { type: 'array' });
@@ -129,7 +129,7 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
       assert.equal(await page.textContent('#save'), 'Save 4 Tabs');
       await page.click('#save');
       await page.waitForFunction(() => !document.getElementById('saved').hidden);
-      assert.equal(await page.textContent('#saved'), 'Charleston: 4 tabs saved (7 new, 0 changed, 0 the same, 0 taken off).');
+      assert.equal(await page.textContent('#saved'), 'Charleston: 4 tabs saved (7 new, 0 changed, 0 the same, 0 taken off). Charleston\'s screens now show them.');
       const saved = (await db().collection('plantUploads').doc('fac_charleston__drivers').get()).data();
       assert.equal(saved.facilityId, 'fac_charleston');
       assert.deepEqual(saved.rows.map(r => [r.employeeId, r.name, r.phone, r.hired]), [['00731', 'Sam Porter', '3045550131', '2012-06-01'], ['744', 'Jo Rivers', '', '2020-09-09']]);
@@ -137,6 +137,8 @@ const WEEK = [['731', 'Off', '', 'Yes', '905 Load 1', 'Yes', '', 'Yes', '905 Loa
       // Kept apart: Uniontown's drivers and routes are exactly as they were.
       assert.equal((await db().collection('drivers').get()).size, uniontownDrivers);
       assert.equal((await db().collection('routes').get()).size, uniontownRoutes);
+      // Charleston's own screens have them, in Charleston's own database.
+      assert.deepEqual((await plantDb('fac_charleston').collection('drivers').get()).docs.map(d => d.data().name).sort(), ['Jo Rivers', 'Sam Porter']);
       assert.equal((await db().collection('plantUploadLog').where('facilityId', '==', 'fac_charleston').get()).size, 1);
       assert.match(await page.textContent('#tabs'), /Drivers\s*Dispatch\s*2/);
 
