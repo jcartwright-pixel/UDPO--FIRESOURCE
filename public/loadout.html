@@ -137,7 +137,7 @@
     let date = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
     let area = P.AREAS.indexOf(String(params.get('area') || '').toUpperCase()) >= 0 ? String(params.get('area')).toUpperCase() : 'CASE';
     const today = () => L.operatingDay(new Date());
-    let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [];
+    let runs = [], pickups = [], person = null, app = {}, schedDocs = [], routeDocs = [], unloadDocs = null;
     // Case counters (Joe 10/23): what the palletizer's counter counted on each Case load, beside the Cases Out typed before loading.
     let caseCounts = {}, palletizer = null;
     const counting = () => area === 'CASE' && !!(palletizer && palletizer.controller && palletizer.controller.ip);
@@ -161,6 +161,13 @@
     const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
     const canSched = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.savePlantSchedule);
     const qty = (v) => (v === null || v === undefined || v === '' ? '' : String(v));
+
+    // The Unloading list's rows (as unloading.html builds them), for the trailer's green / red on each load.
+    function unloadList(loads) {
+      const today = unloadDocs.filter(d => d.date === date), carried = P.nextLoads(P.carriedUnloads(runs, date, unloadDocs, routeDocs), loads);
+      const list = P.unloadRows(runs, date, today, [], loads, routeDocs).concat(carried);
+      return list.concat(P.neededUnloads(runs, date, unloadDocs, routeDocs, list, loads));
+    }
 
     function rowsNow() {
       return P.loadoutRows(runs, date).map(r => {
@@ -266,6 +273,9 @@
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
       // Still open from a prior day first, then today's loads in the loading order.
       const rows = byArea[area].map((r, i) => ({ r, i, k: r.prior ? 0 : 2 })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
+      // Joe 10/27: just the trailer, green once it is unloaded, red while it still waits on the Unloading list (the same list).
+      const urows = unloadDocs ? unloadList(live) : [];
+      const trlInput = (r, input) => { const ok = r.state === 'DONE' || !unloadDocs ? null : P.trailerUnloaded(r.trailer, urows); return ok === null ? input('trailer', r.trailer) : input('trailer', r.trailer).replace('<input ', '<input class="' + (ok ? 'unl-ok' : 'unl-no') + '" '); };
       const c = P.counts(rows), info = P.AREA[area];
       document.getElementById('title').textContent = info.title;
       document.title = info.title + ' · Operations';
@@ -347,11 +357,11 @@
         const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (isMoved ? ' moved' : '');
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(L.runText(r)) + movedTag + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
-            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
+            '<td>' + input('truck', r.truck) + '</td><td>' + trlInput(r, input) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
             '<td>' + status + '</td><td>' + escapeHtml(r.shift) + '</td><td>' + puBtn + '</td><td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         } else {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
-            '<td>' + input('truck', r.truck) + '</td><td>' + input('trailer', r.trailer) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' + (counting() ? countedCell(r) : '') +
+            '<td>' + input('truck', r.truck) + '</td><td>' + trlInput(r, input) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' + (counting() ? countedCell(r) : '') +
             '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         }
@@ -885,6 +895,7 @@
     let db = null;
     function watchRuns() {
       while (unsubs.length) unsubs.pop()();
+      unloadDocs = null;
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
       unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = withShownOrder(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the loads: ' + e.message)));
       const days = [-1, 0, 1, 2].map(n => L.addDays(date, n));
@@ -892,6 +903,7 @@
       // Joe 10/18 (screen speed): the Shipping schedule's entries from 14 days before the shown day on, as the Plant Station
       // reads them (review item 73), not every entry ever made, so the screen does not slow down as the schedule grows.
       unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.LOAD_TYPE.SHIPPING), where('date', '>=', L.addDays(date, -14))), s => { schedDocs = s.docs.map(d => d.data()); render(); }, () => { schedDocs = []; }));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', [L.addDays(date, -1), date])), s => { unloadDocs = s.docs.map(d => d.data()); render(); }, () => { unloadDocs = null; }));
       unsubs.push(onSnapshot(query(collection(db, 'caseCounts'), where('date', 'in', [L.addDays(date, -1), date])), s => {
         caseCounts = {};
         s.docs.forEach(d => { const c = d.data(); if (c.kind === 'LOAD') caseCounts[c.runDocId + '|' + c.day] = c; });

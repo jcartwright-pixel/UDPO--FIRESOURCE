@@ -417,7 +417,13 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
       notes: u.notes || '', status: washOnly ? (washed ? 'COMPLETE' : 'WAITING') : u.status || 'WAITING', returns: [], pendingReturns: [], washed, checkedIn: false, checkinAt: '',
       nextLoad: null, nextRank: 999999, added: u.added, washOnly, forRoute: u.forRoute || '', addedAt: u.addedAt || '' });
   });
-  // When each trailer is next needed: the first unfinished load (in loading order) that uses the same unit.
+  nextLoads(rows, loads);
+  const order = { UNLOADING: 0, WAITING: 2, COMPLETE: 3 };
+  return rows.sort((a, b) => (order[a.status] - order[b.status]) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+}
+
+// When each trailer is next needed: the first unfinished load (in loading order) that uses the same unit. loads = loadoutRows.
+export function nextLoads(rows, loads) {
   (loads || []).forEach((l, i) => {
     if (l.state === 'DONE') return;
     const unit = U.unitKey(l.trailer || l.truck);
@@ -427,8 +433,17 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
       r.nextLoad = { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }; r.nextRank = i;
     });
   });
-  const order = { UNLOADING: 0, WAITING: 2, COMPLETE: 3 };
-  return rows.sort((a, b) => (order[a.status] - order[b.status]) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }));
+  return rows;
+}
+
+/*
+ * Joe 10/27: Case Loadout colours just the trailer: green when it is unloaded (or has nothing to unload), red while it is still
+ * on the Unloading list not unloaded. urows = the Unloading list's rows (unloadRows + carriedUnloads + neededUnloads).
+ */
+export function trailerUnloaded(trailer, urows) {
+  const unit = U.unitKey(trailer);
+  if (!unit) return null;
+  return !(urows || []).some(r => U.unitKey(r.trailer) === unit && r.status !== 'COMPLETE' && !r.dropped && !r.washOnly);
 }
 
 // Joe 10/27 (hd): + Add a Trailer's rows are route ADDED, run = the trailer (the server checks the same).
@@ -449,14 +464,40 @@ export function carriedUnloads(runs, date, journal, routes, plantStart) {
 }
 
 /*
+ * Joe 10/27 ("not matching the trailers that I need to load today for tomorrow"): every trailer on today's loadout is on
+ * the list, not only the ones that delivered today. A trailer a load needs today that is on none of today's rows (it came
+ * back on an earlier day, or it is a spare) gets its own row, in the order its load leaves, named for that load. Not when
+ * yesterday's unloading of it was finished, and not once it was taken off the list today. Nothing is saved until Start
+ * (or Take Off the List): it is then saved as a trailer added for that load (route ADDED, as + Add a Trailer).
+ * rows = today's rows (with yesterday's carried over and the added ones); loads = loadoutRows of the date;
+ * journal = the plant journal of yesterday and today.
+ */
+export function neededUnloads(runs, date, journal, routes, rows, loads) {
+  const have = {}, y = L.addDays(date, -1), today = U.latestUnloads(journal, date), out = [];
+  (rows || []).forEach(r => { const u = U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)); if (u) have[u] = true; });
+  unloadRows(runs, y, journal, [], [], routes).forEach(r => { const u = U.unitKey(r.trailer); if (u && r.status === 'COMPLETE') have[u] = true; });
+  (loads || []).forEach((l, i) => {
+    const unit = U.unitKey(l.trailer), key = U.unloadKey(date, ADDED_ROUTE, unit);
+    if (!unit || l.state === 'DONE' || have[unit] || today[key]) return;
+    have[unit] = true;
+    out.push({ id: key, key, runDocId: '', day: '', route: ADDED_ROUTE, run: unit, runId: '', area: l.area || 'CASE', driver: '', truck: '', trailer: txt(l.trailer),
+      casesOut: '', driverSaid: '', trailerTyped: true, dropped: false, dropAndHook: false, name: '', casesIn: '', startedAt: '', completedAt: '', notes: '', status: 'WAITING',
+      returns: [], pendingReturns: [], washed: false, checkedIn: false, checkinAt: '', date, needed: true, forRoute: txt(l.run) || txt(l.route),
+      nextLoad: { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }, nextRank: i });
+  });
+  return out;
+}
+
+/*
  * Case Unloading's order on the Plant Station (Joe 10/15, mock-up A): the trailers in the order the next loads leave (the
  * first unfinished load that needs the same trailer, by departure), with no times or routes shown. Each card says whether
  * the trailer is back: Verizon Connect Fleet's yard return (gpsDays yardIn after yardOut, the trailer's unit first, else its
  * truck), else the driver's check-in. A trailer Fleet shows out of the yard is "On the road" and goes below the ones that
  * are back. A drop-and-hook load (Route Master drop and hook, e.g. Marietta) with no trailer typed is a transfer trailer
- * still needed. Joe 10/27: the trailers today's loadout needs come first (by when their load leaves), then the ones not
- * needed today; a trailer that is here goes ahead of one still on the road. Order: yesterday's and added trailers (hd);
- * unloading now; here and needed; here and not needed (all numbered 1, 2, 3...); on the road and needed; on the road and not needed; transfer trailers; done.
+ * still needed. Joe 10/27: the trailers today's loadout needs come first, in the order they are loaded, here or on the road
+ * (yesterday's ones not unloaded too, where they fall in that order); then the rest to unload: yesterday's and added ones,
+ * the ones here, the ones on the road; transfer trailers; done. The one being unloaded now is at the top.
+ * A trailer today's loadout needs that did not deliver today is on the list too (neededUnloads); rows need nextLoads first.
  * gpsDays: the gpsDays docs of the days around `date` ([] when the tablet cannot read them: then no one is On the road).
  */
 export function unloadOrder(rows, gpsDays) {
@@ -468,8 +509,10 @@ export function unloadOrder(rows, gpsDays) {
     if (back && (!out || back > out)) return { back };
     return out ? { road: true } : null;
   };
-  // Yesterday's trailers and the ones added by hand go to the top, above the one unloading now (Joe 10/27, hd, mock-up 2).
-  const rank = (r) => r.status === 'COMPLETE' ? 7 : r.prior || r.added ? 0 : r.status === 'UNLOADING' ? 1 : r.transfer ? 6 : (r.road ? 4 : 2) + (r.nextLoad ? 0 : 1);
+  // Joe 10/27: first the trailers today's loadout needs, in the order they are loaded (Case Loadout's sequence), all of them,
+  // here or not; then the rest that need unloading: yesterday's and added ones, here, on the road; transfer trailers; done.
+  // The one being unloaded now stays at the top. Every card but On the road (not needed), transfer and done is numbered.
+  const rank = (r) => r.status === 'COMPLETE' ? 6 : r.status === 'UNLOADING' ? 0 : r.transfer ? 5 : r.nextLoad ? 1 : r.prior || r.added ? 2 : r.road ? 4 : 3;
   const out = (rows || []).map(r => {
     const transfer = r.dropAndHook && !r.trailer;
     const y = transfer ? null : r.trailer && yard(r.trailer) || yard(r.truck);
@@ -478,8 +521,7 @@ export function unloadOrder(rows, gpsDays) {
     return Object.assign({}, r, { transfer, back, road, order: 0 });
   });
   const firstIn = (r) => (r.prior ? 0 : 1);
-  const dep = (r) => (r.nextLoad && r.nextLoad.depart !== null && r.nextLoad.depart !== undefined ? r.nextLoad.depart : 1e12);
-  out.sort((a, b) => rank(a) - rank(b) || firstIn(a) - firstIn(b) || dep(a) - dep(b) || a.nextRank - b.nextRank || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
+  out.sort((a, b) => rank(a) - rank(b) || a.nextRank - b.nextRank || firstIn(a) - firstIn(b) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
   let n = 0;
   out.forEach(r => { if (rank(r) <= 3) r.order = ++n; });
   return out;

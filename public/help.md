@@ -521,6 +521,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 - `Delete Load` (press twice) takes a Scheduler load off this screen and off the Scheduler.
 - **Pickups:** `Add Pickup` adds a customer's pickup; `Pickup Complete` finishes it.
 - A plant note on a load shows as a yellow line under it.
+- **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
@@ -555,10 +556,12 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 4. `Edit` fixes the Cases Returned count, the Trailer Back and Notes.
 5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
-- **The order:** the trailers today's loadout needs come first, by when their load leaves, then the ones that came back but are not needed today. A trailer that is here goes ahead of one still on the road.
+- **The order:** the trailer being unloaded is at the top. Then every trailer you load today, in the order Case Loadout loads them, whether it is here or still on the road. Then the rest that came back and still need unloading: yesterday's and added ones, then the ones here, then the ones on the road.
+- **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
+- A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
 - A **Wash only** trailer has a `Wash` button and no `Start`. It is done once washed.
-- An added trailer, or one from yesterday that was in fact unloaded, can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
+- An added trailer, one from yesterday that was in fact unloaded, or one of today's loadout trailers that is already empty can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
 - On the plant tablet the box **A trailer that is not on the list** does the same: type the trailer, then `UNLOAD IT` or `WASH ONLY`.
 - **Cases Out** comes from the loadout and **Driver Said** is what the driver typed at check-in. You don't type either one.
 - **Lost** is Cases Out minus Cases Returned, in red. The box on the right adds up the day.

@@ -47,6 +47,9 @@
 .plant-page table.loadout td input { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: inherit; color: var(--ink); background: #fff; }
 .plant-page table.loadout td input:focus { outline: 2px solid var(--ud-blue); border-color: var(--ud-blue); }
 .plant-page table.loadout td input:disabled { background: transparent; border-color: transparent; }
+/* Joe 10/27: the trailer on a load is green once unloaded, red while it still waits on the Unloading list. */
+.plant-page table.loadout td input.unl-ok, .plant-page table.loadout td input.unl-ok:disabled { background: #1f7a3a; border-color: #1f7a3a; color: #fff; font-weight: 700; }
+.plant-page table.loadout td input.unl-no, .plant-page table.loadout td input.unl-no:disabled { background: #b42332; border-color: #b42332; color: #fff; font-weight: 700; }
 .plant-page tr.divider td { height: 30px; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-align: left; padding-left: 14px; }
 .plant-page tr.divider.prior td { background: #fff1dc !important; color: #a35400; }
 .plant-page tr.divider.today td { background: var(--band) !important; color: var(--ud-blue); }

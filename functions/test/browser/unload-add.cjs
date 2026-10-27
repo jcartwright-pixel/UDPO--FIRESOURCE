@@ -53,8 +53,9 @@ async function openPage(browser, width, height, url, touch) {
     // The tablet: yesterday's trailer first, in red; a trailer typed in the box goes on the list.
     const t = await openPage(browser, 1024, 768, '/plant-station.html?' + MANAGER + '&station=CASE_UNLOADING', true);
     await t.waitForSelector('#work .sw-card.prior', { timeout: 15000 });
-    const first = await t.$eval('#work .sw-card[data-sw]', c => ({ prior: c.classList.contains('prior'), trailer: (c.querySelector('.sw-trailer') || {}).textContent || '', chips: c.querySelector('.sw-chips').textContent }));
-    assert.ok(first.prior, 'yesterday\'s trailer is the first card');
+    // Joe 10/27: the trailers today's loadout needs come first, in loading order; T-888 is not needed today, so it leads the rest.
+    const first = await t.$eval('#work .sw-card.prior', c => ({ prior: c.classList.contains('prior'), trailer: (c.querySelector('.sw-trailer') || {}).textContent || '', chips: c.querySelector('.sw-chips').textContent }));
+    assert.ok(first.prior, 'yesterday\'s trailer is on the list');
     assert.equal(first.trailer, 'T-888');
     assert.match(first.chips, /From 10-7 · not unloaded/);
     assert.match(await t.textContent('#work .sw-panel-head span'), /1 trailer from yesterday/);
@@ -65,11 +66,12 @@ async function openPage(browser, width, height, url, touch) {
     await t.click('[data-form="unl"] button[data-kind="UNLOAD"]');
     await t.waitForFunction(() => [...document.querySelectorAll('#work .sw-card[data-sw]')].some(c => /ADDED\|640$/.test(c.dataset.sw) && /Added/.test(c.textContent)));
     const keys = await t.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => c.dataset.sw));
-    assert.ok(/850/.test(keys[0]) && /ADDED\|640$/.test(keys[1]), 'yesterday\'s trailer, then the one just added, at the top: ' + keys.slice(0, 3).join(', '));
+    const i850 = keys.findIndex(k => /850/.test(k));
+    assert.ok(i850 >= 0 && /ADDED\|640$/.test(keys[i850 + 1]), 'yesterday\'s trailer, then the one just added, ahead of the rest not needed today: ' + keys.join(', '));
     assert.ok(await t.$('#work .sw-card[data-sw$="ADDED|640"] .sw-quick [data-act="ustart"]'), 'an added trailer to unload has Start Unloading');
     if (SHOTS) await t.screenshot({ path: path.join(SHOTS, 'tablet-1024.png') });
     assert.deepEqual(t.errors, []);
-    results.push('tablet: T-888 from 10-7 first in red, T-640 added under it');
+    results.push('tablet: T-888 from 10-7 in red, T-640 added under it');
     await t.close();
 
     // The office: the banner, + Add a Trailer (Unload it / Wash only), Wash, and Take Off the List.
@@ -91,7 +93,8 @@ async function openPage(browser, width, height, url, touch) {
     assert.ok(await wash.$('button[data-do="wash"]'), 'a wash-only trailer has a Wash button');
     assert.equal(await wash.$('button[data-do="start"]'), null, 'and no Start');
     const order = await o.$$eval('#rows tr[data-key]', rs => rs.map(r => r.dataset.key));
-    assert.ok(/850/.test(order[0]) && order.slice(1, 3).some(k => /ADDED\|640$/.test(k)) && order.slice(1, 3).some(k => /ADDED\|902$/.test(k)), 'yesterday\'s, then the added trailers, at the top: ' + order.slice(0, 4).join(', '));
+    const o850 = order.findIndex(k => /850/.test(k));
+    assert.ok(o850 >= 0 && order.slice(o850 + 1, o850 + 3).some(k => /ADDED\|640$/.test(k)) && order.slice(o850 + 1, o850 + 3).some(k => /ADDED\|902$/.test(k)), 'yesterday\'s, then the added trailers: ' + order.join(', '));
     if (SHOTS) {
       await o.click('#add-open');
       await o.screenshot({ path: path.join(SHOTS, 'office-1536.png') });
