@@ -96,7 +96,7 @@
       const loads = P.loadoutRows(runs, date);
       // Joe 10/27: the same order as the tablet: what today's loadout needs first, a trailer that is here ahead of one on the road.
       // Joe 10/27 (hd): yesterday's trailers nobody pressed End on come over by themselves, at the top in red.
-      const two = prevJournal.concat(journal), carried = P.carriedUnloads(runs, date, two, routes), list = P.unloadRows(runs, date, journal, returns, loads, routes).concat(carried);
+      const two = prevJournal.concat(journal), carried = P.nextLoads(P.carriedUnloads(runs, date, two, routes), loads), list = P.unloadRows(runs, date, journal, returns, loads, routes).concat(carried);
       // Joe 10/27: every trailer today's loadout needs is on the list, also one that did not deliver today.
       const rows = P.unloadOrder(list.concat(P.neededUnloads(runs, date, two, routes, list, loads)).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed))), gpsDays);
       const prevWash = P.washItems(L.addDays(date, -1), [], [], prevJournal.concat(journal)).filter(w => /^ADDED\|/.test(w.id) && carried.some(r => r.washOnly && U.unitKey(r.trailer) === U.unitKey(w.trailer)));

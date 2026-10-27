@@ -73,7 +73,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   }
   function unloads() {
     const rets = returnsList();
-    const y = L.addDays(date, -1), two = week.filter(d => d.date === y || d.date === date), carried = P.carriedUnloads(runs, date, two, routeDocs), todays = P.loadoutRows(runs, date);
+    const y = L.addDays(date, -1), two = week.filter(d => d.date === y || d.date === date), todays = P.loadoutRows(runs, date), carried = P.nextLoads(P.carriedUnloads(runs, date, two, routeDocs), todays);
     const rows = P.unloadRows(runs, date, dayJournal(), rets, todays, routeDocs).concat(carried);
     // Joe 10/27: every trailer today's loadout needs is on the list, also one that did not deliver today.
     return rows.concat(P.neededUnloads(runs, date, two, routeDocs, rows, todays)).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed)));
@@ -188,7 +188,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
 
   function loadingView() {
     const all = loads(), ck = canSave(), unit = P.AREA[area() || 'CASE'];
-    const rows = inOrder(all), below = skippable(rows);
+    const rows = inOrder(all), below = skippable(rows), urows = unloads();
+    // Joe 10/27: just the trailer, green once it is unloaded, red while it is still waiting on the Unloading list.
+    const trl = (r) => { const ok = r.state === 'DONE' ? null : P.trailerUnloaded(r.trailer, urows); return ok === null ? '' : ok ? ' unl-ok' : ' unl-no'; };
     const pk = P.withNotePickups(all, pickups), ships = shipments(), box = boxing();
     // A box load the Scheduler marks Carrier is a carrier's load (the Scheduler's line itself is worked on this card).
     const carried = box ? numbered().filter(x => (x.loadDate || x.date) === date && x.scheduleType === 'CARRIER' && !x.overSlots).map(x => (x.slot ? Object.assign({}, x, x.slot) : x)) : [];
@@ -222,7 +224,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
       const by = box ? hauler(r, carried.some(x => sameRun(r, x))) : '';
       html += '<article class="sw-card ' + (done ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(r.id) + '">' +
         '<div class="sw-head" data-toggle="' + escapeHtml(r.id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
-        '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer">' + escapeHtml(r.trailer || '—') + '</span>' +
+        '<b class="route">' + escapeHtml(r.route) + '</b><b class="run">' + escapeHtml(r.run) + (by ? who(by) : '') + '</b><span class="truck">' + escapeHtml(r.truck || '—') + '</span><span class="trailer' + trl(r) + '">' + escapeHtml(r.trailer || '—') + '</span>' +
         '<span class="sw-state">' + status + (open ? '<i class="sw-flag pu">' + plural(open, 'PICKUP') + '</i>' : '') + (moved ? '<i class="sw-flag skip" title="' + escapeHtml(moved.title) + '">' + moved.word + (moved.word === 'SKIPPED' && moved.initials ? ' · ' + escapeHtml(moved.initials) : '') + '</i>' : '') + '</span>' + quick + chev(isOpen) + '</div>' + refusal(r.id);
       if (isOpen) {
         const dis = !ck || done;
