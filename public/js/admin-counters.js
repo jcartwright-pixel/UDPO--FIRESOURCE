@@ -14,7 +14,8 @@ const call = (fields) => callServer('lineReader', fields);
 const readsAddress = () => 'https://us-east4-' + (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'demo-ud-distribution' : location.hostname.split('.')[0]) + '.cloudfunctions.net/deviceReads';
 const fmt = (n) => Number(n).toLocaleString('en-US');
 
-export async function renderCaseCounters(box) {
+// Joe 10/26 (Machine Connections, mock-up 1): each counter also opens on its own, as that machine's page there (only = its id).
+export async function renderCaseCounters(box, ctx, only) {
   let data = null, shownKey = null, timer = null;
   box.innerHTML = '<div class="ap"><div class="ap-msg" hidden></div><div class="ap-scroll" id="cc-list" style="padding:10px;display:flex;flex-direction:column;gap:12px"></div></div>';
   const list = box.querySelector('#cc-list');
@@ -48,7 +49,7 @@ export async function renderCaseCounters(box) {
   function render() {
     if (!data || !box.isConnected) return;
     if (list.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
-    list.innerHTML = data.counters.map(c => section(c.id)).join('');
+    list.innerHTML = data.counters.filter(c => !only || c.id === only).map(c => section(c.id)).join('');
   }
   async function load() {
     try { data = await call({ op: 'counters' }); render(); } catch (err) { say(box, errText(err), 'bad'); }

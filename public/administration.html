@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/admin-pages.css">
   <script src="js/logic.js"></script>
   <script src="js/vendor/qrcode.js"></script>
+  <script src="js/plant-rules.js"></script>
   <script src="js/production-rules.js"></script>
 </head>
 <body class="fill admin-center-page">
@@ -46,11 +47,12 @@
     import { TOOL_PAGES } from './js/admin-tools.js';
     import { renderGoLive } from './js/admin-golive.js';
     import { renderCaseCounters } from './js/admin-counters.js';
+    import { renderMachineConnections } from './js/admin-machines.js';
     import { doc, onSnapshot } from './js/firebase.js';
     const L = window.UDLogic;
     const testEmail = new URLSearchParams(location.search).get('testEmail');
     // Pages built here (js/admin-pages.js), not a separate screen: they go through the server, Administrators only.
-    const PANELS = Object.assign({}, PAGES, TOOL_PAGES, { switch: renderGoLive, 'case-counters': renderCaseCounters });
+    const PANELS = Object.assign({}, PAGES, TOOL_PAGES, { switch: renderGoLive, 'case-counters': renderCaseCounters, 'machine-connections': renderMachineConnections });
     let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
     // Review item 54 (Joe 10/13): ?item=<key> opens that item first (Phone Screens' one line points to Links & Codes this way).
     { const want = new URLSearchParams(location.search).get('item'); if (want && adminItem(want)) current = want; }
@@ -121,7 +123,10 @@
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; renderNav(); });
     requireSignIn(async (user) => {
       const { db } = await start();
+      // Machine Connections reads each plant's machines itself, for the plants this person may see.
+      CTX.db = db;
       watchPerson(db, user, p => {
+        CTX.person = p;
         const was = admin;
         admin = L.isAdmin(p);
         if (was !== admin) render();

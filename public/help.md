@@ -843,6 +843,8 @@ Each line's setup: its products' speeds and targets (full speed, target %, lowes
 - `Start Test Feed (1 hour)` sends made-up counts to a line to test the screens; `Stop Test Feed` stops it.
 - `Test read` reads a sensor once to check it.
 
+> How a line is counted, its controller and its RedZone line are also on the line's page in [Machine Connections](#machine-connections). Both save the same way.
+
 !> Do not leave a test feed on. Its made-up counts show on the line's numbers until it stops.
 
 ## Product Sheet
@@ -863,11 +865,11 @@ screens: machine-setup.html
 
 Which products each machine runs. Pick a machine, then move products between **On** and **Not on** with `Take off` and `Add`.
 
-## RedZone
+## RedZone Sign-In
 id: redzone
 screens: redzone.html
 
-The connection to RedZone (administrators). RedZone is read only; nothing is ever written back.
+The connection to RedZone (administrators). RedZone is read only; nothing is ever written back. Which RedZone line goes with each machine is picked in [Machine Connections](#machine-connections).
 
 1. Type the RedZone sign-in and `Save`.
 2. `Test Connection` checks it works.
@@ -1048,11 +1050,37 @@ Which screens are switched on, and the emergency stop.
 
 > Use Pause if something is writing wrong values to the sheets. Nothing is lost while paused.
 
+## Machine Connections
+id: machine-connections
+screens: administration.html?item=machine-connections, linetargets.html?hookups=1, mocreo.html?part=thermometers
+
+Everything hooked up to a machine, in one place: pick the plant, then the machine, then fill in that machine's details. Each plant has its own machines; nothing is shared between plants.
+
+1. Press the plant at the top (`Uniontown`, `Charleston` or `Martins Ferry`). You only see the plants you work at.
+2. Pick the machine on the left. The machines are grouped by area: Fillers, HTST, Boxing & Totes, Blow Mold, Shipping & Returns (the Palletizer and Case Returns counter boxes) and Coolers & Freezers (the thermometers). `Find a machine` narrows the list.
+3. Fill in the machine on the right. Each box saves as you leave it.
+   - **A production line:** `Counted by` (typed on the tablet, a sensor, a label reader or the machine controller), then the controller's brand, network address and where each reading is, with `Test read`, and its **RedZone line**.
+   - **Palletizer or Case Returns:** the counter box's brand, network address, port and where the case total is, `Test read`, and `Make Counter Key` for the plant PC.
+   - **Thermometers:** each MOCREO sensor's location, low and high limits, and on or off.
+
+Each machine in the list says how it is doing:
+
+- **Working** (green): it is hooked up and sending.
+- **No answer** (red): it is set up but nothing has come in for 10 minutes. It stays red until it sends again.
+- **Typed on tablet** (blue): the operator types the counts on the line tablet.
+- **Not set up** (grey): nothing is hooked up yet.
+
+> A line's products, speeds and targets stay on Line Targets. The MOCREO key is in MOCREO Key and the RedZone sign-in is in RedZone Sign-In.
+
+!> Do not type a network address you are not sure of, and never one of RedZone's own boxes. Operations only reads a machine; it never changes anything on it or in RedZone.
+
 ## Case Counters
 id: admin-counters
 screens: administration.html?item=case-counters
 
 The Palletizer and Case Returns counter boxes: brand, network address and where the case total is. `Test read` reads it once. Read only: nothing is changed on the counter box.
+
+> These are machines in [Machine Connections](#machine-connections) now, under Shipping & Returns. `Find a setting` still finds Case Counters.
 
 ## Tools
 id: admin-tools
@@ -1068,15 +1096,15 @@ screens: administration.html?item=window-test, administration.html?item=prefligh
 
 !> Do not press Update Live Sheets or Start Plant Fresh in the middle of a shift. They change what every screen shows.
 
-## MOCREO & Sensors
+## MOCREO Key
 id: mocreo
 screens: mocreo.html, administration.html?item=mocreo
 
-The MOCREO temperature sensors.
+The MOCREO temperature sensors' key. The thermometers themselves are in [Machine Connections](#machine-connections), under Coolers & Freezers.
 
 1. Paste the MOCREO key once (it is never shown again). `Replace Key` changes it.
 2. `Test Connection` checks it works.
-3. Under **Thermometers**, each location has its sensor, low and high limits, and on or off. `Add Thermometer` adds one.
+3. In Machine Connections, **Thermometers**: each location has its sensor, low and high limits, and on or off. `Add Thermometer` adds one.
 4. `Match to MOCREO Names` pairs your location names with the sensor names on the MOCREO website. Check the pairs, then `Save Matches`.
 
 > A sensor already on another cooler says which, so one sensor is not picked twice.

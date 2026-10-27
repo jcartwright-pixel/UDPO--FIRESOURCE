@@ -858,6 +858,11 @@ body.yard-page .head .badge-test { order: 6; }
 .mocreo-page .mc-left .hint { font-size: 16px; }
 .mocreo-page .mc-left .gps-buttons button.big { min-height: 42px; font-size: 16px; }
 .mocreo-page .mc-therm { min-width: 0; }
+/* Joe 10/26 (Machine Connections): one part of the page at a time. */
+.mocreo-page.mc-part-key .mc-therm, .mocreo-page.mc-part-thermometers .mc-left { display: none; }
+.mocreo-page.mc-part-key .mc-grid, .mocreo-page.mc-part-thermometers .mc-grid { grid-template-columns: minmax(0, 1fr); }
+.mocreo-page.mc-part-key .mc-left { max-width: 640px; }
+.mocreo-page.mc-part-thermometers .mc-num { display: none; }
 .mocreo-page .mc-scroll { max-height: calc(100vh - 330px); overflow: auto; }
 .mocreo-page .mc-table { width: 100%; table-layout: fixed; }
 .mocreo-page .mc-table input:not([type="checkbox"]), .mocreo-page .mc-table select { width: 100%; height: 36px; font-size: 16px; box-sizing: border-box; padding: 0 6px; text-align: left; }
