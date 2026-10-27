@@ -68,6 +68,8 @@ const SCREENS = [
     // Joe 10/26: Send Current Report on the left with the four department cards two by two beside it, then the Manager
     // Walkthrough under the report card with Shift Notes at its right.
     const box = (sel) => side.$eval(sel, x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.bottom), Math.round(r.right)]; });
+    // The department cards are drawn once the loads arrive; measure them only after all four are on the page.
+    await side.waitForFunction(() => { const c = document.querySelectorAll('[data-card="dept"] .dp-card'); return c.length === 4 && [...c].every(x => x.getBoundingClientRect().width > 0); });
     const rep = await box('#grid > .mc-report'), dept = await box('[data-card="dept"]'), walk = await box('[data-card="walk"]'), notes = await box('[data-card="notes"]');
     const cards = await side.$$eval('[data-card="dept"] .dp-card', c => c.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
     assert.ok(dept[0] > rep[3] && Math.abs(dept[1] - rep[1]) <= 2, 'the departments sit right of the report card ' + JSON.stringify([rep, dept]));
