@@ -1717,8 +1717,8 @@ a.wp-more { color: var(--ud-blue); }
    Lines"), and Production Checks and Shift Notes share the bottom row. */
 @media (min-width: 1501px) {
   .prod-home .mc-grid, .prod-home .mc-grid:has(.mc-alert) { grid-template-columns: repeat(16, minmax(0, 1fr)); grid-template-rows: minmax(min-content, 1fr) auto; gap: 8px; }
-  .prod-home .mc-report { grid-row: 1; grid-column: 1 / span 6; }
-  .prod-home .mc-grid [data-card="dept"] { grid-column: 7 / span 10; grid-row: 1; }
+  .prod-home .mc-report { grid-row: 1; grid-column: 1 / span 5; }
+  .prod-home .mc-grid [data-card="dept"] { grid-column: 6 / span 11; grid-row: 1; }
   .prod-home .mc-grid [data-card="walk"] { grid-column: 1 / span 11; grid-row: 2; }
   .prod-home .mc-grid [data-card="notes"] { grid-column: 12 / span 5; grid-row: 2; }
   .prod-home .mc-grid [data-card="notes"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
@@ -1729,6 +1729,8 @@ a.wp-more { color: var(--ud-blue); }
   .prod-home .mc-grid [data-card="walk"] .mc-tile, .prod-home .mc-grid [data-card="notes"] .mc-tile { padding-left: 10px; padding-right: 10px; }
   .prod-home .mc-card { padding: 8px 12px 9px; gap: 3px; }
   .prod-home .mc-depts { gap: 8px; }
+  .prod-home .mc-report .mc-btn { min-width: 0; padding: 0 8px; }
+  .prod-home .mc-report .mc-btn:first-child { flex: 0 1 130px; }
   .prod-home .dp-head { flex-direction: row; align-items: baseline; gap: 10px; }
   .prod-home .dp-card .dp-head strong { order: -1; font-size: 22px; }
   .prod-home .dp-counts span { padding: 1px 2px; }
@@ -1736,7 +1738,7 @@ a.wp-more { color: var(--ud-blue); }
   .prod-home .dp-counts b { font-size: 22px; line-height: 1.05; }
   .prod-home .dp-bar { height: 6px; }
   .prod-home .dp-note { margin: 0; }
-  .prod-home .dp-line { padding: 1px 10px; }
+  .prod-home .dp-line { padding: 1px 8px; gap: 8px; }
   .prod-home .dp-line b { font-size: 22px; }
   .prod-home .dp-line span { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
   .prod-home .dp-line small { display: inline; }
