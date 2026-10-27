@@ -8,9 +8,10 @@
  *                 refuses it while any row has a problem, then saves each filled tab's rows for the plant. A tab left empty in
  *                 the file keeps what is saved. Every save is logged in plantUploadLog.
  *
- * Where it is kept: plantUploads/<plant>__<tab>, one document per tab, the plant on every one, read only by the server. Nothing
- * goes into Uniontown's lists (routes, drivers, the plant screens), so a new plant's data never shows on Uniontown's screens;
- * it moves into the app's own lists when that plant is turned on.
+ * Where it is kept: plantUploads/<plant>__<tab>, one document per tab, the plant on every one, read only by the server. Then
+ * the saved tabs fill that plant's own lists in that plant's own database (upload-apply.js: routes, drivers, days off, lines,
+ * machines and the rest), the records its screens read. Nothing goes into Uniontown's lists, so a new plant's data never shows
+ * on Uniontown's screens.
  *
  * The live app: saving needs Joe's OK naming the load, so on the live app (project ud-distribution) uploadSave refuses until an
  * Administrator turns it on for that plant (private/uploadsLive {plants: {<plant>: true}}), which nothing here does.
@@ -19,6 +20,7 @@
 
 const L = require('./logic');
 const U = require('./upload-rules');
+const { applyUploads } = require('./upload-apply');
 
 // Errors are Administration's own (AdminError), so the screen gets the plain words.
 const { fail } = require('./admin');
@@ -89,9 +91,15 @@ async function uploadSave(db, email, input, stamp, d) {
   Object.keys(result.tabs).forEach(k => { counts[k] = result.tabs[k].counts; });
   batch.set(db.collection('plantUploadLog').doc(), { facilityId: p.id, fileName, at: stamp, by: email, totals: result.totals, counts });
   await batch.commit();
+  // The plant's own screens: the saved tabs fill that plant's lists in its own database.
+  const pdb = d && d.plantDb ? d.plantDb(p.id) : require('./plants').dbFor(p.id, db);
+  const applied = pdb ? await applyUploads(db, pdb, p.id, (await savedFor(db, p.id)).saved, Object.keys(rows), { stamp, email })
+    : { written: {}, notes: [], waiting: true };
   const t = result.totals, n = Object.keys(rows).length;
   return Object.assign(await uploadStatus(db, email, { plant: p.id }, stamp, d), {
-    ok: true, message: p.name + ': ' + n + ' tab' + (n === 1 ? '' : 's') + ' saved (' + t.NEW + ' new, ' + t.CHANGED + ' changed, ' + t.SAME + ' the same, ' + t.OFF + ' taken off).'
+    ok: true, applied: applied.written,
+    message: p.name + ': ' + n + ' tab' + (n === 1 ? '' : 's') + ' saved (' + t.NEW + ' new, ' + t.CHANGED + ' changed, ' + t.SAME + ' the same, ' + t.OFF + ' taken off). ' +
+      (applied.waiting ? p.name + '\'s screens fill from it once its database is made.' : p.name + '\'s screens now show them.') + (applied.notes.length ? ' ' + applied.notes.join(' ') : '')
   });
 }
 

@@ -100,8 +100,8 @@
       const saves = Object.values(st.tabs || {}).filter(t => t.savedAt).sort((a, b) => a.savedAt < b.savedAt ? 1 : -1);
       $('last').textContent = saves.length ? 'Last saved ' + stamp(saves[0].savedAt) + (saves[0].savedBy ? ' by ' + saves[0].savedBy : '') : 'Nothing saved yet';
       $('last').className = 'up-pill' + (saves.length ? ' ok' : '');
-      $('where').textContent = st.live ? (st.savingOn ? 'Saves for ' + name + ' are on for the live app.' : 'Live app: an upload is checked, but saving waits for Joe\'s OK for this load.') :
-        'Practice version: saves are kept for ' + name + ' only and do not show on Uniontown\'s screens.';
+      $('where').textContent = st.live ? (st.savingOn ? 'Saves for ' + name + ' are on for the live app. A save fills ' + name + '\'s own screens.' : 'Live app: an upload is checked, but saving waits for Joe\'s OK for this load.') :
+        'Practice version: a save fills ' + name + '\'s own screens only, never Uniontown\'s.';
       let part = '';
       $('tabs').innerHTML = U.SPEC.map(t => {
         const s = (st.tabs || {})[t.key];
