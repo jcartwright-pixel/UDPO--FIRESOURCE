@@ -211,15 +211,15 @@ body.ds-tv .side-main { margin-left: 0 !important; }
 body.ds-tv .head { background: linear-gradient(90deg, #073861, #126aa5, #0b4d83); color: #fff; }
 body.ds-tv .head h1 { font-size: 38px; color: #fff; } body.ds-tv .ds-day { color: #f4c542; } body.ds-tv .eyebrow { color: #cfe3f6; }
 /* Joe 10/27: the bottom panel a little bigger. */
-body.ds-tv .ds-grid { grid-template-columns: 2.56fr 1fr; grid-template-rows: minmax(0, 1fr) 390px; }
+body.ds-tv .ds-grid { grid-template-columns: 2.56fr 1fr; grid-template-rows: minmax(0, 1fr) 424px; }
 body.ds-tv .ds-board { grid-row: 1; grid-column: 1; } body.ds-tv .ds-weather { grid-row: 1; grid-column: 2; } body.ds-tv .ds-week { grid-row: 2; grid-column: 1 / 3; }
 /* The small window on the right, as on the old Driver Room board: local weather on a blue panel. */
 body.ds-tv .ds-weather { display: flex; flex-direction: column; justify-content: center; padding: 24px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 18px; background: linear-gradient(145deg, #177ab8, #164f86); color: #fff; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
 body.ds-tv .ds-weather .sym { font-size: 42px; line-height: 1; } body.ds-tv .ds-weather .sym svg { width: 56px; height: 56px; display: block; } body.ds-tv .ds-weather b { font-size: 16px; letter-spacing: .13em; opacity: .8; }
 body.ds-tv .ds-weather h3 { margin: 12px 0 0; font-size: 32px; } body.ds-tv .ds-weather p.now { font-size: 30px; font-weight: 800; color: #fff; } body.ds-tv .ds-weather p.next { color: #d7ebf9; font-size: 17px; } body.ds-tv .ds-weather p { margin: 12px 0 0; font-size: 19px; line-height: 1.4; color: rgba(255, 255, 255, .92); }
 /* Joe 10/27: Run further right (a wider Route), Trailer through Pickup a little to the left (a narrower Driver). */
-body.ds-tv .ds-row { min-height: 75px; font-size: 23px; grid-template-columns: 160px minmax(180px, 1fr) minmax(220px, .85fr) 134px 90px 155px 85px; }
-body.ds-tv .ds-row .rt { font-size: 30px; } body.ds-tv .ds-scroll { overflow: hidden; }
+body.ds-tv .ds-row { min-height: 64px; font-size: 23px; grid-template-columns: 160px minmax(180px, 1fr) minmax(220px, .85fr) 134px 90px 155px 85px; }
+body.ds-tv .ds-row .rt { font-size: 30px; } body.ds-tv .ds-headrow { min-height: 58px; font-size: 19px; } body.ds-tv .ds-scroll { overflow: hidden; }
 body.ds-tv .foot { color: #cfe3f6; }
 @media (max-width: 1550px) { body.ds-tv .ds-grid { grid-template-columns: 1fr 300px; } }
 @media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none !important; } body.ds-tv .ds-week { grid-column: 1; } }

@@ -30,6 +30,12 @@ cat > "$HOME_DIR/.local/bin/ud-board" <<SH
 #!/bin/bash
 P="$HOME_DIR/.config/chromium/Default/Preferences"
 [ -f "\$P" ] && sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[A-Za-z]*"/"exit_type":"Normal"/' "\$P"
+# Joe 10/27: a zoom set on the board once stayed after every restart (the board came out too big and cut off). Each
+# start puts the zoom back to normal; the page is sized for the TV itself.
+[ -f "\$P" ] && python3 -c 'import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d.get("partition",{}).pop("per_host_zoom_levels",None); d.get("partition",{}).pop("default_zoom_level",None)
+json.dump(d,open(p,"w"))' "\$P" 2>/dev/null || true
 exec "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run --password-store=basic \
   --autoplay-policy=no-user-gesture-required --check-for-update-interval=31536000 \
   --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding \

@@ -93,6 +93,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await batch.commit();
     await rolls('board-scroll', 'the loadout list (grown past the screen)');
     await rolls('week-scroll', 'the weekly schedule');
+    await page.waitForTimeout(1500);
+    await shot(page, 'fire-tv-4-board-full-1920.png');
     await page.evaluate(() => { document.body.style.zoom = '0.6'; });
     await page.waitForTimeout(500);
     await rolls('board-scroll', 'the loadout list zoomed out');
