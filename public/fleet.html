@@ -46,7 +46,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, showError, watchPerson } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, shortDate, showError, watchPerson, currentPlant } from './js/app.js';
     import { printSaved } from './js/print-sheet.js';
     import { plantFor } from './js/pmaint.js';
     import { collection, doc, onSnapshot, httpsCallable } from './js/firebase.js';
@@ -437,7 +437,7 @@
       waiting = waitingJobs.filter(j => !linked[j.writeUp]);
     };
     async function loadWaiting() {
-      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office' }); waitingJobs = (r.data && r.data.jobs) || []; unlinked(); } catch (err) { /* the work orders still show */ }
+      try { const r = await httpsCallable((await start()).functions, 'garage')({ op: 'office', udPlant: currentPlant() }); waitingJobs = (r.data && r.data.jobs) || []; unlinked(); } catch (err) { /* the work orders still show */ }
     }
     setInterval(() => { if (!document.hidden) loadWaiting().then(render); }, 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) loadWaiting().then(render); });

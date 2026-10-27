@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, plantDb, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 
@@ -55,8 +55,11 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
     await p.press('#ce-to', 'Tab');
     // Batch 5: no Save button; the box saves when it is left.
     assert.equal(await p.$('#ce-save'), null, 'no Save button');
-    for (let i = 0; i < 100; i++) { const c = (await db().collection('private').doc('checkinEmail_fac_charleston').get()).data(); if (c && c.recipient === 'chdrivercheckin@uniteddairy.com') break; await new Promise(r => setTimeout(r, 200)); }
-    assert.equal((await db().collection('private').doc('checkinEmail_fac_charleston').get()).data().subject, 'CHARLESTON DRIVER CHECK IN');
+    // Joe 10/26: Charleston's settings are kept in Charleston's own database.
+    const chDoc = () => plantDb('fac_charleston').collection('private').doc('checkinEmail_fac_charleston').get();
+    for (let i = 0; i < 100; i++) { const c = (await chDoc()).data(); if (c && c.recipient === 'chdrivercheckin@uniteddairy.com') break; await new Promise(r => setTimeout(r, 200)); }
+    assert.equal((await chDoc()).data().subject, 'CHARLESTON DRIVER CHECK IN');
+    assert.equal((await db().collection('private').doc('checkinEmail_fac_charleston').get()).exists, false, 'nothing of Charleston\'s is kept in Uniontown\'s database');
     await shot(p, 'after-charleston-1920.png');
     await p.selectOption('#ce-plant', 'fac_uniontown');
     await p.waitForFunction(() => document.querySelector('#ce-to').value === 'utdrivercheckin@uniteddairy.com');

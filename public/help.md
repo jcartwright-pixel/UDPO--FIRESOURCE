@@ -23,9 +23,13 @@ id: start
 
 Operations is United Dairy's app for dispatch, the plant floor, fleet and maintenance. Every screen has the same three parts:
 
-- **The blue bar across the top.** The United Dairy logo, then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
+- **The blue bar across the top.** The United Dairy logo with the plant you are in written in yellow (Uniontown, Charleston or Martins Ferry), then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
 - **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in.
 - **The screen.** Filters and the date sit on the right. Lists have headings that stay put when you scroll.
+
+### Each plant is separate
+
+Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, trucks, settings and lists. A screen shows only the plant named in the top bar, and nothing you change there touches another plant. Only Home's **Operations Overview** shows all the plants together. You see a plant only when People & Roles gives it to you.
 
 ### Buttons you see everywhere
 
@@ -1041,7 +1045,7 @@ Where email goes and who it comes from:
 - **Email Senders:** email comes from the person who presses Send, and each plant's own address for automatic email.
 - **Manager Report Recipients:** who gets the plant report at each plant. Remove is pressed twice.
 - **Sent Email Log:** every email the app sent, newest first.
-- **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`.
+- **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`. Pick the plant with `Location`; each plant keeps its own mailbox settings and its own check-ins.
 
 ## Refresh Rates
 id: admin-refresh

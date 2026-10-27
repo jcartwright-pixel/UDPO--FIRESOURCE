@@ -80,7 +80,7 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml, requireSignIn } from './js/app.js';
+    import { start, escapeHtml, requireSignIn, currentPlant } from './js/app.js';
     import { startOffline, offlineCall, isNoConnection, onWaitingChange } from './js/offline-saves.js';
     import { httpsCallable } from './js/firebase.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
@@ -105,7 +105,7 @@
     const CODE_KEY = 'udGarageStationCode';
     let station = null;
     async function call(op, fields) {
-      try { return (await (await fn())(Object.assign({ op }, fields || {}, station ? { station: { key: station.key, version: station.version } } : {}))).data; } catch (err) {
+      try { return (await (await fn())(Object.assign({ op, udPlant: currentPlant() }, fields || {}, station ? { station: { key: station.key, version: station.version } } : {}))).data; } catch (err) {
         const m = /STATION_CODE: (.*)$/.exec(String(err.message || ''));
         if (!m) throw err;
         station = null; remember(CODE_KEY, null); if (S.shownView() !== 'code') gate(m[1].replace(/\s*\[\d{3}\]\s*$/, '')).catch(() => {});
