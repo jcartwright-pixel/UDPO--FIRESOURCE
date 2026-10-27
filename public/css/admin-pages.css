@@ -194,3 +194,27 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 /* Joe 10/26: Home screen drop-down on each person's row (People & Roles). */
 .people-table td.hs-cell { padding: 6px 8px; }
 .people-table select.hs-pick { width: 100%; font-size: 16px; padding: 6px 8px; border: 1px solid #9fb3c8; border-radius: 6px; background: #fff; color: #0b2545; }
+/* Machine Connections (Joe 10/26, mock-up 1): the plant buttons across the top, the machines down the left, the picked machine on the right. */
+.mx { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.mx-top { flex: none; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mx-lbl { font-weight: 900; color: #0b3d6b; }
+.mx-plants { display: flex; gap: 6px; flex-wrap: wrap; }
+.ap .mx-plants button.ap-btn { min-height: 40px; min-width: 0; }
+.ap .mx-top input[type=search] { margin-left: auto; width: 240px; max-width: 100%; }
+.mx-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 10px; }
+.mx-list { overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; background: #fff; padding: 6px; }
+.mx-list h4 { margin: 10px 8px 4px; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: #5a6b7d; }
+.mx-m { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: center; width: 100%; text-align: left; border: 0; background: none;
+  padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 16px; color: #12263a; cursor: pointer; }
+.mx-m:hover { background: #eef5fc; }
+.mx-m b { font-weight: 800; }
+.mx-m > span:not(.ap-chip) { grid-column: 1 / -1; }
+.mx-m.on, .mx-m.on:hover { background: #0b3d6b; color: #fff; }
+.mx-m.on .ap-chip { background: #fff; }
+.mx-none { padding: 10px; }
+.mx-det { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e6ecf2; border-radius: 10px; background: #fff; padding: 12px 14px; }
+.mx-head h3 { margin: 0; font-size: 22px; color: #0b3d6b; }
+.mx-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: #f2f5f9; border-radius: 8px; }
+.mx-cc { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mx-cc .ap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 900px) { .mx-split { grid-template-columns: 1fr; grid-template-rows: auto minmax(480px, 1fr); } .mx-list { max-height: 260px; } .ap .mx-top input[type=search] { margin-left: 0; width: 100%; } }

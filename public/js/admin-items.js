@@ -53,15 +53,19 @@ export const ADMIN_GROUPS = [
   ]],
   // Joe 10/10: every API key the app uses is pasted and replaced here, never in a chat. MOCREO first; Verizon GPS later.
   ['Connections & Keys', 'The API keys the app uses: paste, replace and test them here', [
-    ['mocreo', 'MOCREO & Sensors', 'The MOCREO API key (never shown again once saved) and asset ID, Test Connection, and the thermometers: location, cooler, sensor, low and high limits, on or off.', 'mocreo.html', 'temperatures.webp'],
+    // Joe 10/26 (mock-up 1, "gs"): one item for everything hooked up to a machine, by plant then machine. The counter boxes,
+    // each line's controller, label reader and RedZone line, and the thermometers are set up there; the keys stay here.
+    ['machine-connections', 'Machine Connections', "Every machine's hookups, by plant then machine: how each line is counted, its counter box, machine controller or label reader, its RedZone line, and the thermometers. Read only: nothing is changed on a machine or in RedZone.", '', 'factory'],
+    ['mocreo', 'MOCREO Key', 'The MOCREO API key (never shown again once saved) and asset ID, and Test Connection. The thermometers are in Machine Connections.', 'mocreo.html?part=key', 'temperatures.webp'],
     // Joe 10/15: built ready and kept Off; the drivers' mobile phones are typed on the Driver Roster.
     // Joe 10/26: one Texts screen, a part per kind of text (Schedule, Load done) each with its own On / Off; who gets them is
     // ticked on the Driver Roster.
     ['schedule-texts', 'Texts', 'Texts to drivers: schedule texts when a week is posted, and load done texts with any pickups. Each kind has its own On / Off; who gets them is ticked on the Driver Roster. The Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
     // Joe 10/11: RedZone's API sign-in (token, or client ID and secret), Test Connection; Products then gets Get from RedZone.
     // Joe 10/22 (the case counter hookup guide): the palletizer's counter box, and the case returns one, read-only by the plant PC.
-    ['case-counters', 'Case Counters', 'The Palletizer and Case Returns counter boxes: brand, IP address and where the case total is, Test read, and the counter key for the plant PC. Read only: nothing is changed on the counter box.', '', 'factory'],
-    ['redzone', 'RedZone', 'The RedZone API sign-in (never shown again once saved), Test Connection, and where to find it in RedZone. Read only: nothing is changed in RedZone.', 'redzone.html', 'production.webp']
+    // Joe 10/26: the counter boxes are machines in Machine Connections now; Find a setting and ?item= still open this one.
+    ['case-counters', 'Case Counters', 'The Palletizer and Case Returns counter boxes: brand, IP address and where the case total is, Test read, and the counter key for the plant PC. Read only: nothing is changed on the counter box. Also in Machine Connections.', '', 'factory', 'moved'],
+    ['redzone', 'RedZone Sign-In', 'The RedZone API sign-in (never shown again once saved), Test Connection, what RedZone gives us and Read RedZone into Operations. Each line\'s RedZone line is picked in Machine Connections. Read only: nothing is changed in RedZone.', 'redzone.html', 'production.webp']
   ]],
   ['Fleet & GPS Setup', 'Set-up for the maintenance side', [
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],

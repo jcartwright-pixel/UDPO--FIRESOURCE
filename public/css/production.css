@@ -16,6 +16,10 @@
 .lt-counter select { height: 38px; border: 2px solid #9fb3c8; border-radius: 9px; font: inherit; font-size: 16px; font-weight: 800; color: var(--ud-blue-dark); padding: 0 8px; background: #fff; }
 .lt-page .qc-form .qc-last { margin-left: 0; }
 .lt-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* Joe 10/26 (Machine Connections): one line's hookups only; the products, targets and line list stay on Line Targets. */
+.lt-hookups .qc-lines, .lt-hookups .lt-form > .lt-scroll, .lt-hookups #setup, .lt-hookups #foot, .lt-hookups .head, .lt-hookups #form-title { display: none !important; }
+.lt-hookups .qc-split { margin: 0; }
+.lt-hookups .lt-form { flex: 1 1 auto; min-width: 0; overflow: auto; gap: 12px; }
 .lt-table { width: 100%; table-layout: fixed; }
 .lt-table thead th { position: sticky; top: 0; z-index: 1; white-space: normal; line-height: 1.15; vertical-align: bottom; }
 .lt-table td { padding: 4px 6px; font-size: 16px; }
