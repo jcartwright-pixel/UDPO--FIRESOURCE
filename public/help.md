@@ -52,6 +52,7 @@ screens: index.html, company.html, group.html
 The first screen after you sign in. Big cards open each part of Operations: **Plant Operations** and **Route Distribution** (each opens its own page of department cards), **Reports** and **Safety Walkthrough**. Under a card, its main screens have their own buttons and a few numbers (open truck issues, open garage work orders).
 
 - A card marked **Under Construction** opens only for administrators while it is being built.
+- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving, **Debag** (the jug trailers in the lot) and the **Labeling Room** (Under Construction: its screens come later).
 - Someone who sees more than one plant starts on the **Operations Overview**: one tile per plant with today's numbers and recent activity. Click a plant to open its Home.
 - An administrator can give a person their own Home screen (People & Roles); they then start there, and `Home` still comes here.
 
@@ -654,6 +655,29 @@ Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made 
 - Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
 - `Print` prints the list.
 
+# Debag
+
+## Jug Trailers
+id: jug-trailers
+screens: jug-trailers.html
+
+The jug trailers (dry boxes) parked in the plant's lot: how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+
+1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
+2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
+3. Under **What is on it**, type each item on its own line with how many pallets (for example "Gallon jugs" and 22). A new empty line appears for the next item. To take an item off, clear its line.
+4. **Notes** is for anything else the plant should know.
+5. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
+
+- Every box saves when you leave it; there is no Save button.
+- **History** under the trailer shows what changed, when and who changed it.
+- The drop-down at the top right shows only the Loaded, Half Full or Empty trailers.
+- Each plant has its own list. A trailer added by its number is kept on this list only; it is not added to the main trailer list or the sheets.
+
+> A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
+
+!> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
+
 # Plant Checks
 
 ## Shift Notes
@@ -1225,6 +1249,8 @@ id: soon
 screens: soon.html
 
 A screen that is still being built opens this page, with a button to the screen to use meanwhile. Nothing here opens the old app.
+
+The **Labeling Room** card on Plant Operations opens this page until its screens are built (administrators only).
 
 # Phones and Stations
 

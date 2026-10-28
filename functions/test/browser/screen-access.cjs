@@ -44,7 +44,7 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => [...new Set(a.f
     let m = await openPage(browser, 1536, 864, '/index.html?testEmail=' + MAINT);
     await m.waitForFunction(() => document.querySelectorAll('#sides a[data-side]').length > 0 && document.getElementById('plant-name').textContent.trim());
     await m.waitForTimeout(500);
-    assert.deepEqual(await visibleCards(m), ['plant', 'production', 'pmaint', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety'], 'nothing ticked yet: every department');
+    assert.deepEqual(await visibleCards(m), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'labeling', 'distribution', 'fleet', 'garage', 'reports', 'safety'], 'nothing ticked yet: every department');
     await m.close();
     results.push('Nothing ticked yet: the manager sees every Home card, as before');
 

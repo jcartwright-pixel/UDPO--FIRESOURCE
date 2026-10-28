@@ -41,8 +41,17 @@
     const sub = (s, [label, href]) => '<a class="hq-sub' + bld(s) + (s.buildingSections && /inventory\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
     const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
       (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
+    // Joe 10/28: departments with no screens of their own under them (Debag, Labeling Room) sit two to a row, so the card still fits.
+    const solo = (s) => !!s && !(s.quick || []).length && s.key !== 'fleet' && s.key !== 'garage';
+    const pairUp = (list) => {
+      let html = '';
+      for (let i = 0; i < list.length; i++) {
+        if (solo(list[i]) && solo(list[i + 1])) { html += '<div class="hq-pair">' + dept(list[i]) + dept(list[i + 1]) + '</div>'; i++; } else html += dept(list[i]);
+      }
+      return html;
+    };
     const groupCard = (g) => '<div class="launch-card hq-card" data-group="' + g.key + '"><a class="launch-art" href="' + g.home + '" tabindex="-1">' + art(g) + '</a><strong>' + escapeHtml(g.name) + '</strong>' +
-      '<a class="open-text" href="' + g.home + '">Open ' + escapeHtml(g.name) + ' &rarr;</a><div class="hq-list">' + groupSides(g.key).filter(s => !s.menuOnly).map(dept).join('') + '</div></div>';
+      '<a class="open-text" href="' + g.home + '">Open ' + escapeHtml(g.name) + ' &rarr;</a><div class="hq-list">' + pairUp(groupSides(g.key).filter(s => !s.menuOnly)) + '</div></div>';
     const sideCard = (s) => '<div class="launch-card hq-card' + bld(s) + (s.bannerInPic ? ' banner-pic' : '') + '" data-card-side="' + s.key + '"><a class="launch-art" data-side="' + s.key + '" href="' + s.home + '" tabindex="-1">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</a>' +
       '<strong>' + escapeHtml(s.name) + '</strong><a class="open-text" data-side="' + s.key + '" href="' + s.home + '">Open ' + escapeHtml(s.short || s.name) + ' &rarr;</a>' +
       (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '<div class="hq-list">' + (s.quick || []).map(q => sub(s, q)).join('') + '</div></div>';

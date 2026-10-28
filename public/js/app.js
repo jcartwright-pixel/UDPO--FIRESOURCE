@@ -161,6 +161,7 @@ export const MENU = [
   // the PM schedule and the mechanics' tablet.
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
+  ['Debag', [['Jug Trailers', 'jug-trailers.html', 'truck']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
   ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
@@ -184,6 +185,10 @@ export const SIDES = [
   // Distribution Scheduler and the Inventory card). Inventory is still being built, so it opens only for administrators (buildingSections).
   { key: 'shipping', group: 'plantops', name: 'Shipping & Receiving', home: 'scheduler.html', pic: 'forklift-truck-v1-560.webp', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'], buildingSections: ['Inventory'],
     quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html']] },
+  // Joe 10/28: two more plant areas: Debag (where the jugs come out of their bags), with Jug Trailers, the trailers parked in the
+  // lot; and the Labeling Room, Under Construction until it has screens.
+  { key: 'debag', group: 'plantops', name: 'Debag', home: 'jug-trailers.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Jug trailers in the lot: how full each one is and what is on it', sections: ['Debag'], flatFirst: true },
+  { key: 'labeling', group: 'plantops', name: 'Labeling Room', home: 'soon.html?what=labeling-room', pic: 'box-v1.webp', note: 'The labeling room', sections: [], building: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
