@@ -834,7 +834,8 @@ async function noScroll(page) {
     const fsMod = require('fs'), pathMod = require('path');
     // Review item 49 (Joe 10/13): the Maintenance Station and Plant Performance are stations too: only the Release bar (checked below).
     const LOCKED = ['maint-station.html', 'plant-kiosk.html'];
-    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html' && LOCKED.indexOf(f) < 0);
+    // Joe 10/27: the Plant Station has no Back or Home at all, not even while picking a station (tablet-lock.cjs checks it).
+    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html' && f !== 'plant-station.html' && LOCKED.indexOf(f) < 0);
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
     const missing = [];
     for (const pg of pages) {
