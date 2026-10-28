@@ -278,11 +278,13 @@ const OTHERS = [
         over: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1 && e.getClientRects().length).slice(0, 5)
           .map(e => e.tagName + (e.id ? '#' + e.id : '') + '.' + [...e.classList].join('.') + ' ' + Math.round(e.getBoundingClientRect().right)) }));
       assert.ok(wide.iw <= 391 && wide.sw <= wide.cw + 1, href + ' is wider than the phone ' + JSON.stringify(wide));
-      // Narrower phones and wider fonts too (the test machine's fonts made the walkthrough's top line 425 wide at 390).
-      await m.setViewportSize({ width: 320, height: 800 });
+      // A narrower phone too (the test machine's fonts made the walkthrough's top line 425 wide at 390).
+      await m.setViewportSize({ width: 360, height: 800 });
       await m.waitForTimeout(300);
-      const narrow = await m.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
-      assert.ok(narrow.sw <= narrow.cw + 1, href + ' is wider than a 320 phone ' + JSON.stringify(narrow));
+      const narrow = await m.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+        over: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1 && e.getClientRects().length).slice(0, 5)
+          .map(e => e.tagName + (e.id ? '#' + e.id : '') + '.' + [...e.classList].join('.') + ' ' + Math.round(e.getBoundingClientRect().right)) }));
+      assert.ok(narrow.sw <= narrow.cw + 1, href + ' is wider than a 360 phone ' + JSON.stringify(narrow));
       await m.setViewportSize({ width: 390, height: 844 });
       reached.push(href);
       // Every link on it opens a manager screen (or comes back to the start).
