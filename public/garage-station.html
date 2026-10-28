@@ -120,6 +120,36 @@
       station = null; remember(CODE_KEY, null); gate().catch(err => S.message(err.message));
     });
     const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
+    // Joe 10/28 evening: 688 and 9737 are yard trucks and say so.
+    const typeName = (j) => j.yard ? 'Yard Truck' : TYPE[j.type] || 'Truck';
+    // Joe 10/28 evening ("it's going to be overwhelming"): drivers' write-ups (DVIR, check-in) always on top, newest first; then the
+    // office's, the garage's and engine codes, newest first; services last, the most overdue first. No more than 15 on a card:
+    // a service nobody has started fills only a spot that is left, and comes on as the others are done.
+    const LIMIT = 15;
+    const group = (j) => j.source === 'WRITE_UP' ? 0 : j.source === 'SERVICE' ? 2 : 1;
+    const waiting = (j) => j.source === 'SERVICE' && j.status === 'NEW' && !j.onNow.length;
+    function sorted(list) {
+      return list.slice().sort((a, b) => group(a) - group(b) ||
+        (group(a) === 2 ? String(a.dueAt).localeCompare(String(b.dueAt)) : String(b.createdAt).localeCompare(String(a.createdAt))));
+    }
+    function arrange(list) {
+      const all = sorted(list);
+      let room = Math.max(0, LIMIT - all.filter(j => !waiting(j)).length);
+      return all.filter(j => !waiting(j) || room-- > 0);
+    }
+    // Joe 10/28 evening ("if there's something new that come up, I think it should flash"): a write-up or work order this tablet
+    // has not opened yet flashes, and so does its card, until a mechanic opens it. The first list a tablet sees counts as seen.
+    const SEEN_KEY = 'udGarageSeen';
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); } catch (e) { seen = null; }
+    const keysOf = (j) => [j.id, j.writeUp, j.sourceKey].concat(j.writeUps || []).filter(Boolean);
+    const isNew = (j) => !!seen && !keysOf(j).some(k => seen[k]);
+    function markSeen(list) {
+      seen = seen || {}; list.forEach(j => keysOf(j).forEach(k => { seen[k] = 1; }));
+      const keep = {}; board.forEach(j => keysOf(j).forEach(k => { if (seen[k]) keep[k] = 1; })); list.forEach(j => keysOf(j).forEach(k => { keep[k] = 1; }));
+      seen = keep;
+      try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) { /* full */ }
+    }
     // The three cards, in Joe's order.
     // Joe 10/28: the app's own pictures (the same as the Truck, Trailer and Fork Truck Issues screens) so the cards read at a glance.
     const CARDS = [['TRUCK', 'Trucks', 'maintenance-tractor-v1-560.webp'], ['TRAILER', 'Trailers', 'maintenance-trailer-v1-560.webp'], ['FORK_TRUCK', 'Fork trucks', 'forklift-truck-v1-560.webp']];
@@ -137,6 +167,7 @@
     const S = mountJobStation({
       call, views: ['code', 'home'], forms: [], simple: true, safeYes: 'Yes, safe', officeSource: 'OFFICE', downWord: 'CAN\'T RUN', unitClass: 'unit',
       filter: (j) => (TYPE[j.type] ? j.type : 'TRUCK') === pick,
+      arrange,
       jobsTitle: (list) => CARDS.find(c => c[0] === pick)[1] + ' · ' + list.length + ' open',
       emptyJobs: () => 'No open work orders for ' + CARDS.find(c => c[0] === pick)[1].toLowerCase() + ' right now.',
       noTechs: 'No mechanics yet. The office adds them on Fleet Service Setup.',
@@ -145,9 +176,11 @@
         try { const r = await call('board'); try { localStorage.setItem('udGarageBoard', JSON.stringify(r)); } catch (e) { /* full */ } return r; }
         catch (err) { const kept = isNoConnection(err) ? JSON.parse(localStorage.getItem('udGarageBoard') || 'null') : null; if (!kept) throw err; return kept; }
       },
-      onBoard: (r) => { board = r.jobs || []; drawCards(); },
+      onBoard: (r) => { board = r.jobs || []; if (!seen) markSeen(board); drawCards(); },
+      isNew,
+      onOpen: (j) => { markSeen([j]); drawCards(); },
       jobKey: (j) => j.id || j.writeUp,
-      jobLine: (j) => (TYPE[j.type] || 'Truck') + ' · ' + (j.from || ''),
+      jobLine: (j) => typeName(j) + ' · ' + (j.from || ''),
       problem: (j) => j.problem || j.category,
       // Joe 10/28: the day it was first written up and how many times, plain to see on the list and the work order.
       written: (j) => {
@@ -155,7 +188,9 @@
         if (j.source === 'WRITE_UP') return 'Written up ' + n + (n === 1 ? ' time' : ' times') + (day ? ' · first ' + day : '');
         return day ? 'Opened ' + day : '';
       },
-      jobHead: (j) => j.unit + ' · ' + (TYPE[j.type] || 'Truck'),
+      // Joe 10/28 evening: a service shows the unit's latest miles and hours beside its number.
+      jobHead: (j) => j.unit + ' · ' + typeName(j) + (j.reading && j.reading.miles != null ? ' · ' + j.reading.miles.toLocaleString('en-US') + ' mi' : '') +
+        (j.reading && j.reading.hours != null ? ' · ' + j.reading.hours.toLocaleString('en-US') + ' h' : ''),
       jobLabel: (j) => j.source === 'SERVICE' ? 'Service due (Fleet Service)' : j.source === 'OFFICE' ? 'Sent by the office' : j.source === 'TECH' ? 'Reported at the garage' :
         'From ' + (j.from || 'a write-up'),
       // Joe 10/13: with no signal the name and login ID go with each step kept on the tablet and are checked when it is sent.
@@ -163,6 +198,8 @@
         try { return Object.assign(await call('signIn', { techId: picked.id, loginId: typed, tokens: [] }), { loginId: typed }); }
         catch (err) { if (isNoConnection(err)) return { id: picked.id, name: picked.name, loginId: typed, offline: true }; throw err; }
       },
+      // Joe 10/28 evening: a mechanic's signature, signed once, kept on file (sent when there is signal, like a step).
+      saveSignature: (who, signature) => offlineCall('garage', { op: 'saveSignature', tokens: who.token ? [who.token] : [], signIn: { techId: who.id, loginId: who.loginId }, requestId: rid(), signature }),
       step: (who, job, op, extra) => stepCall(who, Object.assign({ step: op }, onJob(job), extra || {})),
       // A service (it has a checklist) needs no "What did you fix?": it is the service.
       serviceFix: (j) => j.checklist ? (j.serviceKey === 'DOT' ? 'Annual inspection' : 'Oil / PM service') : '',
@@ -180,12 +217,14 @@
     /* ---------- the three cards (Joe 10/28) ---------- */
     function drawCards() {
       $('cards').innerHTML = CARDS.map(([type, name, pic]) => {
-        const list = board.filter(j => (TYPE[j.type] ? j.type : 'TRUCK') === type), down = list.filter(j => !j.canRun && j.status !== 'PARTS').length;
+        const all = board.filter(j => (TYPE[j.type] ? j.type : 'TRUCK') === type), list = arrange(all), later = all.length - list.length, down = list.filter(j => !j.canRun && j.status !== 'PARTS').length;
         const working = list.filter(j => j.onNow.length), parts = list.filter(j => j.status === 'PARTS').length;
         const lines = [down ? '<small class="red">' + down + ' can\'t run</small>' : '',
           working.length ? '<small class="green">' + escapeHtml(working.map(j => names(j.onNow.map(p => first(p.name))) + ' on ' + j.unit).join(' · ')) + '</small>' : '',
-          parts ? '<small>' + parts + ' waiting on parts</small>' : ''].filter(Boolean);
-        return '<button type="button" class="gs-bigcard" data-type="' + type + '"><img src="img/library/' + pic + '" alt=""><b>' + list.length + '</b><span>' + name + '</span><small>open work order' + (list.length === 1 ? '' : 's') + '</small>' + lines.join('') + '</button>';
+          parts ? '<small>' + parts + ' waiting on parts</small>' : '',
+          list.some(isNew) ? '<small class="red">New: ' + list.filter(isNew).length + '</small>' : '',
+          later ? '<small>' + later + ' more service' + (later === 1 ? '' : 's') + ' come on as these are done</small>' : ''].filter(Boolean);
+        return '<button type="button" class="gs-bigcard' + (list.some(isNew) ? ' gs-new' : '') + '" data-type="' + type + '"><img src="img/library/' + pic + '" alt=""><b>' + list.length + '</b><span>' + name + '</span><small>open work order' + (list.length === 1 ? '' : 's') + '</small>' + lines.join('') + '</button>';
       }).join('');
     }
     $('cards').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (!b) return; pick = b.dataset.type; S.message(''); S.closeJob(); S.redraw(); S.view('jobs'); S.load().catch(() => {}); });
@@ -193,10 +232,10 @@
     // Back on the tablet (Android's own Back button): the list goes back to the cards.
     const backOne = window.udBack;
     window.udBack = () => { if (S.shownView() === 'jobs') { S.view('home'); return true; } return backOne(); };
-    // Left on a list or a work order for 10 minutes, the tablet goes back to the cards (what is typed stays on the tablet).
+    // Joe 10/28 evening: 20 minutes with no taps and the tablet goes back to the cards (what is typed stays on the tablet).
     let touched = Date.now();
     ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { touched = Date.now(); }, true));
-    setInterval(() => { if (['jobs', 'job'].indexOf(S.shownView()) >= 0 && Date.now() - touched > 10 * 60000 && !S.busy) { S.closeJob(); S.view('home'); } }, 30000);
+    setInterval(() => { if (['home', 'code'].indexOf(S.shownView()) < 0 && Date.now() - touched > 20 * 60000 && !S.busy) { S.closeJob(); S.view('home'); } }, 30000);
 
     S.view('home');
     startOffline(['garage-station.html'], { scopes: ['garage-station'], device: 'tablet', files: [] });

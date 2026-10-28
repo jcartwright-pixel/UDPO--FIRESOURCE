@@ -9,6 +9,12 @@
 'use strict';
 
 const RESULTS = Object.freeze(['OK', 'FIX', 'NA']);
+// Joe 10/28 evening: the tread depth line takes all 8 tires, each measured (in 32nds of an inch), before Complete.
+const TIRES = Object.freeze([['lfo', 'Left front outer'], ['lfi', 'Left front inner'], ['rfo', 'Right front outer'], ['rfi', 'Right front inner'],
+  ['rro', 'Right rear outer'], ['rri', 'Right rear inner'], ['lro', 'Left rear outer'], ['lri', 'Left rear inner']]);
+const tiresOf = (id) => id === 'tread' ? TIRES.map(([key, name]) => ({ key, name })) : null;
+const DEPTH = /^\d{1,2}(\.\d{1,2})?$/;
+const depthOk = (v) => DEPTH.test(String(v == null ? '' : v).trim()) && Number(v) <= 32;
 
 // [section, [[id, text], ...]]
 const LISTS = {
@@ -55,7 +61,7 @@ const LISTS = {
     ['Tires and wheels', [
       ['wheels', 'Wheels: no cracks'],
       ['tires', 'Tire condition and air pressure'],
-      ['tread', 'Tread depth on every tire'],
+      ['tread', 'Tread depth on all 8 tires (32nds of an inch)'],
       ['lugnuts', 'Lug nuts and axle nuts tight']]],
     ['Body', [
       ['body', 'Body damage; grease locks, latches, hinges, rollers and track'],
@@ -90,7 +96,7 @@ const LISTS = {
     ['Tires and wheels', [
       ['wheels', 'Wheels: no cracks'],
       ['tires', 'Tire condition and air pressure'],
-      ['tread', 'Tread depth on every tire'],
+      ['tread', 'Tread depth on all 8 tires (32nds of an inch)'],
       ['lugnuts', 'Lug nuts and axle nuts tight']]],
     ['Body', [
       ['lights', 'All trailer lights work'],
@@ -123,7 +129,7 @@ const LISTS = {
     ['Tires and wheels', [
       ['wheels', 'Wheels: no cracks'],
       ['tires', 'Tire condition and air pressure'],
-      ['tread', 'Tread depth on every tire'],
+      ['tread', 'Tread depth on all 8 tires (32nds of an inch)'],
       ['lugnuts', 'Lug nuts and axle nuts tight']]],
     ['Body', [
       ['body', 'Body: no damage; locks, latches and hinges work'],
@@ -144,7 +150,7 @@ const LISTS = {
     ['Tires and wheels', [
       ['wheels', 'Wheels: no cracks'],
       ['tires', 'Tire condition and air pressure'],
-      ['tread', 'Tread depth on every tire'],
+      ['tread', 'Tread depth on all 8 tires (32nds of an inch)'],
       ['lugnuts', 'Lug nuts and axle nuts tight']]],
     ['Lights and body', [
       ['lights', 'All trailer lights work'],
@@ -164,13 +170,13 @@ function listFor(serviceKey, unitType) {
 // Every item of a list, in order: [{id, text, section}].
 function items(name) {
   const out = [];
-  (LISTS[name] || []).forEach(([section, list]) => list.forEach(([id, text]) => out.push({ id, text, section })));
+  (LISTS[name] || []).forEach(([section, list]) => list.forEach(([id, text]) => out.push(Object.assign({ id, text, section }, tiresOf(id) ? { tires: tiresOf(id) } : {}))));
   return out;
 }
 // The tablet's copy: {name: [{section, items: [{id, text}]}]}.
 function forTablet() {
   const out = {};
-  Object.keys(LISTS).forEach(n => { out[n] = LISTS[n].map(([section, list]) => ({ section, items: list.map(([id, text]) => ({ id, text })) })); });
+  Object.keys(LISTS).forEach(n => { out[n] = LISTS[n].map(([section, list]) => ({ section, items: list.map(([id, text]) => Object.assign({ id, text }, tiresOf(id) ? { tires: tiresOf(id) } : {})) })); });
   return out;
 }
 /*
@@ -180,12 +186,21 @@ function forTablet() {
 function checkAnswers(name, answers) {
   const list = items(name);
   if (!list.length) return { rows: [], fix: [] };
-  const given = {};
-  (Array.isArray(answers) ? answers : []).forEach(a => { if (a && typeof a === 'object' && typeof a.id === 'string') given[a.id] = String(a.r || '').toUpperCase(); });
+  const given = {}, depth = {};
+  (Array.isArray(answers) ? answers : []).forEach(a => {
+    if (!a || typeof a !== 'object' || typeof a.id !== 'string') return;
+    given[a.id] = String(a.r || '').toUpperCase();
+    if (a.depth && typeof a.depth === 'object') depth[a.id] = a.depth;
+  });
   const missing = list.filter(i => RESULTS.indexOf(given[i.id]) < 0);
   if (missing.length) return { error: 'Answer every line of the checklist (' + missing.length + ' left).' };
-  const rows = list.map(i => ({ id: i.id, section: i.section, item: i.text, result: given[i.id] }));
+  for (const i of list.filter(x => x.tires)) {
+    const left = i.tires.filter(t => !depthOk((depth[i.id] || {})[t.key])).length;
+    if (left) return { error: 'Enter the tread depth on all 8 tires (' + left + ' left).' };
+  }
+  const rows = list.map(i => Object.assign({ id: i.id, section: i.section, item: i.text, result: given[i.id] },
+    i.tires ? { depth: i.tires.reduce((o, t) => { o[t.key] = String(depth[i.id][t.key]).trim(); return o; }, {}) } : {}));
   return { rows, fix: rows.filter(r => r.result === 'FIX').map(r => r.item) };
 }
 
-module.exports = { RESULTS, LISTS, listFor, items, forTablet, checkAnswers };
+module.exports = { RESULTS, TIRES, LISTS, listFor, items, forTablet, checkAnswers };

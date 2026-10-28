@@ -52,6 +52,7 @@ screens: index.html, company.html, group.html
 The first screen after you sign in. Big cards open each part of Operations: **Plant Operations** and **Route Distribution** (each opens its own page of department cards), **Reports** and **Safety Walkthrough**. Under a card, its main screens have their own buttons and a few numbers (open truck issues, open garage work orders).
 
 - A card marked **Under Construction** opens only for administrators while it is being built.
+- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving, **Debag** (the jug trailers in the lot) and the **Labeling Room** (Under Construction: its screens come later).
 - Someone who sees more than one plant starts on the **Operations Overview**: one tile per plant with today's numbers and recent activity. Click a plant to open its Home.
 - An administrator can give a person their own Home screen (People & Roles); they then start there, and `Home` still comes here.
 
@@ -388,23 +389,34 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 
 1. Tap a card to see its open work orders. `← All work orders` goes back to the cards.
 2. Tap `Open` on a work order. The big yellow `← Back` goes back to the list.
-3. `Start Work`: tap your name, then your login ID. Your clock starts. A second mechanic taps `Start Work` with their own name to join; everyone on the job shows with their time.
+3. `Start Work`: tap your name, then your login ID. The first time, sign once with your finger and tap `Keep my signature`: it is kept on file and signs every work order you complete. Your clock starts. A second mechanic taps `Start Work` with their own name to join; everyone on the job shows with their time.
 4. Type (or tap `Talk` and say) what you did in **Notes / what I did today** and the parts in **Parts put on**. They go on the work order with your name when you press `Pause`, `Waiting on Parts` or `Complete`.
 5. `Pause` stops your clock. The job stays open.
 6. `Waiting on Parts`: name the parts you need in your own words, then `Waiting on Parts` again and your login ID. When they come in, `Parts are here` starts it again.
-7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, safe to drive, and sign with your finger.
+7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, then safe to drive. Your signature on file signs it.
 
 - What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
 - A leased truck's write-up comes only when the office sends it to the garage.
 - Each work order says how many times the unit was written up and the day of the first one ("Written up 2 times · first 10-16-26"). A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
-- A service that is due has its checklist on the work order. Tap `OK`, `Needs work` or `N/A` on every line before `Complete`. The **Needs work** lines are kept on the work order.
-- Left alone for 10 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
+- The list: drivers' write-ups (DVIR and check-in) on top, newest first; then the office's and the garage's; services last, the most overdue first. A card shows no more than 15. Services wait their turn ("3 more services come on as these are done").
+- Something new (a write-up or work order this tablet has not opened yet) flashes, and so does its card, until a mechanic opens it.
+- Yard trucks (688 and 9737) say **Yard Truck**.
+- A service that is due has its checklist on the work order. `Complete` stays gray until it is all filled in:
+  - every line marked `OK`, `Needs work` or `N/A`;
+  - the tread depth of all 8 tires (left front outer and inner, right front, right rear, left rear), in 32nds of an inch;
+  - the **Hours** and, on a truck, the **Miles**. They come from the GPS when the unit has it (and show beside the unit number); otherwise type them;
+  - the **Day finished** (today unless you change it);
+  - and the work order scrolled all the way down.
+- Tapped early, `Complete` says what is left and shows it in red. The **Needs work** lines are kept on the work order.
+- Left with no taps for 20 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
 - With no signal the station keeps working and sends everything when the signal is back.
 - A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app.
 
 > `Talk` uses the tablet's microphone. The first time, the tablet asks to allow it: tap Allow.
 
 > A garage mechanic's sign-in works only here; the plant's mechanics sign in on their own plant's Maintenance Station.
+
+!> Do not sign for someone else. Each mechanic's signature is their own, and it goes on every work order they complete.
 
 !> Do not tap `Complete` until the work is done. A work order that is waiting on something is `Pause` or `Waiting on Parts`.
 
@@ -670,6 +682,29 @@ Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made 
 - Pick a supplier on the right to narrow the list.
 - Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
 - `Print` prints the list.
+
+# Debag
+
+## Jug Trailers
+id: jug-trailers
+screens: jug-trailers.html
+
+The jug trailers (dry boxes) parked in the plant's lot: how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+
+1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
+2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
+3. Under **What is on it**, type each item on its own line with how many pallets (for example "Gallon jugs" and 22). A new empty line appears for the next item. To take an item off, clear its line.
+4. **Notes** is for anything else the plant should know.
+5. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
+
+- Every box saves when you leave it; there is no Save button.
+- **History** under the trailer shows what changed, when and who changed it.
+- The drop-down at the top right shows only the Loaded, Half Full or Empty trailers.
+- Each plant has its own list. A trailer added by its number is kept on this list only; it is not added to the main trailer list or the sheets.
+
+> A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
+
+!> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
 
 # Plant Checks
 
@@ -1242,6 +1277,8 @@ id: soon
 screens: soon.html
 
 A screen that is still being built opens this page, with a button to the screen to use meanwhile. Nothing here opens the old app.
+
+The **Labeling Room** card on Plant Operations opens this page until its screens are built (administrators only).
 
 # Phones and Stations
 

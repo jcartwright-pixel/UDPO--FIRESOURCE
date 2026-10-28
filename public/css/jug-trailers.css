@@ -1,0 +1,38 @@
+/* Joe 10/28 (mock-up 2): Debag's Jug Trailers. Built on the Machinery list + card (pmaint.css). */
+.jt-page .jt-sum { display: flex; gap: 10px; margin: 0 16px 10px; flex-wrap: wrap; }
+.jt-page .jt-sum span { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px; font-size: 18px; font-weight: 800; color: var(--ud-blue-dark); }
+.jt-page .jt-sum span b { font-size: 22px; margin-right: 6px; }
+.jt-page .jt-in { height: 40px; min-height: 40px; box-sizing: border-box; width: 100%; border: 1px solid #9fb3c8; border-radius: 8px; font: inherit; font-size: 16px; padding: 0 8px; background: #fff; }
+.jt-page select.jt-in { font-weight: 800; color: var(--ud-blue-dark); }
+.jt-page .jt-in:disabled { background: #f3f6f9; }
+.pm-pill.jt-LOADED { background: var(--pill-blue-bg); color: var(--pill-blue-ink); }
+.pm-pill.jt-HALF { background: var(--pill-amber-bg); color: var(--pill-amber-ink); }
+.pm-pill.jt-EMPTY { background: var(--pill-gray-bg); color: var(--muted); }
+.jt-page .jt-none { color: var(--muted); }
+.jt-page .jt-phone { display: none; }
+.jt-page .jt-big { display: flex; gap: 10px; margin: 10px 0 14px; }
+.jt-page .jt-big button { flex: 1; min-height: 56px; border-radius: 10px; border: 2px solid #9fb3c8; background: #fff; font: inherit; font-size: 20px; font-weight: 900; color: var(--ud-blue-dark); cursor: pointer; }
+.jt-page .jt-big button.on { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.jt-page .jt-big button:disabled { cursor: default; }
+.jt-page .jt-card h3 { margin: 14px 0 6px; font-size: 18px; color: var(--ud-blue-dark); }
+.jt-page .jt-lines { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 8px; }
+.jt-page .jt-lines .h { font-size: 16px; font-weight: 800; color: var(--muted); }
+.jt-page .jt-hist { margin: 0; padding: 0; list-style: none; }
+.jt-page .jt-hist li { padding: 6px 0; border-bottom: 1px solid #e3eaf1; font-size: 16px; }
+.jt-page .jt-add { display: grid; gap: 12px; margin-top: 10px; }
+.jt-page .jt-add label { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 800; color: var(--muted); }
+.jt-page .jt-or { font-size: 16px; font-weight: 800; color: var(--muted); text-align: center; }
+.jt-page .jt-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.jt-page .jt-help { color: var(--muted); font-size: 16px; margin: 6px 0 0; }
+@media (max-width: 900px) {
+  .jt-page .mach-split { grid-template-columns: 1fr; }
+  .jt-page .jt-big button { font-size: 18px; }
+}
+@media (max-width: 600px) {
+  .jt-page.pm-page table.pm-table th { white-space: normal; }
+  .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding: 7px 6px; }
+  .jt-page .jt-big { gap: 6px; }
+  /* On a phone the status sits under the trailer number, so what is on it has the room. */
+  .jt-page.pm-page table.pm-table tr > :nth-child(2) { display: none; }
+  .jt-page .jt-phone { display: table; margin-top: 4px; }
+}

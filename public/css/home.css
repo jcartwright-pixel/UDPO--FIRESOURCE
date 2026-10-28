@@ -53,9 +53,11 @@ body:not(.is-admin) .launch-card.building .uc-admin-only { display: inline-block
 .hq-list { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; padding-top: 10px; border-top: 1px solid #dfe6ee; }
 .hq-list:empty { display: none; }
 .hq-main, .hq-sub { display: flex; align-items: center; justify-content: center; white-space: nowrap; border-radius: 9px; font-size: 16px; font-weight: 800; text-decoration: none; }
-.hq-main { min-height: 40px; margin-top: 6px; background: #0b3d6b; color: #fff; border: 2px solid #0b3d6b; }
+.hq-main { min-height: 36px; margin-top: 6px; background: #0b3d6b; color: #fff; border: 2px solid #0b3d6b; }
 .hq-main:first-child { margin-top: 0; }
-.hq-sub { min-height: 32px; background: #e3eefa; color: #0b3d6b; border: 2px solid #9cc0e8; }
+.hq-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.hq-pair .hq-main { margin-top: 0; }
+.hq-sub { min-height: 30px; background: #e3eefa; color: #0b3d6b; border: 2px solid #9cc0e8; }
 .hq-main:hover, .hq-sub:hover { border-color: #1f6feb; }
 .hq-note { font-size: 16px; font-weight: 700; color: #4a6b8d; text-align: center; white-space: nowrap; }
 .hq-note b { margin: 0; padding: 0; background: none; color: #0b3d6b; font-size: 16px; }

@@ -22,6 +22,7 @@ const SC = require('./sc-core');
 const SAFE = require('./safety');
 const PMAINT = require('./plantmaint');
 const RECV = require('./receiving');
+const JUG = require('./jugtrailers');
 const CREW = require('./crew');
 const MENUS = require('./menu-setup');
 const GARAGE = require('./garage');
@@ -143,6 +144,8 @@ const ACTIONS = Object.freeze({
   // Receiving scan-in (receiving.js): each scan on a delivery, and the list of what the plant receives.
   saveReceivingScan: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   saveReceivingItem: { roles: REORDER_ROLES, screen: 'plant' },
+  // Joe 10/28: Debag's Jug Trailers, the trailers parked in the lot (jugtrailers.js).
+  saveJugTrailer: { roles: PLANT.PLANT_ROLES, screen: 'plant' },
   // Plant Vacations & Schedule (crew.js, Joe 10/25): the Schedule Board's days and the time off by the plant's supervisors;
   // the setup (areas, shifts, jobs, people, limits) by a manager or administrator.
   saveCrewDay: { roles: L.SAVE_ROLES, screen: 'plant' },
@@ -545,6 +548,7 @@ function validate(input) {
   if (action === 'saveSafetyChecklist') return Object.assign(out, SAFE.validateChecklist(input, SaveError));
   if (action === 'saveLocationAreas') return Object.assign(out, SAFE.validateLocations(input, SaveError));
   if (action === 'saveMachine') return Object.assign(out, PMAINT.validateMachine(input, SaveError));
+  if (action === 'saveJugTrailer') return Object.assign(out, JUG.validateJugTrailer(input, SaveError));
   if (action === 'saveCrewSetup') return Object.assign(out, CREW.validateSetup(input, SaveError));
   if (action === 'saveMenuSetup') return Object.assign(out, MENUS.validateMenu(input, SaveError));
   if (action === 'saveCrewDay') return Object.assign(out, CREW.validateDay(input, SaveError));
@@ -912,6 +916,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveSafetyChecklist') return SAFE.saveChecklist(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveLocationAreas') return SAFE.saveLocations(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMachine') return PMAINT.saveMachine(tx, db, req, email, stamp, logRef, mode, SaveError);
+    if (req.action === 'saveJugTrailer') return JUG.saveJugTrailer(tx, db, Object.assign({}, req, { saverName: (person && person.name) || '' }), email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveCrewSetup') return CREW.saveSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMenuSetup') return MENUS.saveMenu(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveCrewDay') return CREW.saveDay(tx, db, req, email, stamp, logRef, mode, SaveError);
