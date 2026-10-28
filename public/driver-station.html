@@ -142,8 +142,18 @@
         const wr = document.getElementById('week-rows');
         wr.innerHTML = body || '<tr><td colspan="8" class="empty">No weekly driver assignments are available.</td></tr>';
         if (tv && body && overflows('week-scroll')) wr.innerHTML = body + '<tr class="ds-band end"><td colspan="8">&#9632; END OF LIST</td></tr><tr class="ds-band start"><td colspan="8">&#9660; START OF LIST</td></tr>' + body;
+        if (tv) fitCells(wr);
       }
       document.getElementById('foot').textContent = 'Uniontown · ' + (navigator.onLine ? 'Updated ' : 'No signal · last board from ') + (updated || new Date()).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
+    }
+
+    // Joe 10/28 (TV schedule as big as the Loadout): a name or route too wide for its cell even when wrapped is made
+    // smaller, a step at a time, until it fits (never below 16px), so nothing is cut off.
+    function fitCells(box) {
+      box.querySelectorAll('td').forEach(td => {
+        td.style.fontSize = '';
+        for (let px = parseFloat(getComputedStyle(td).fontSize); td.scrollWidth > td.clientWidth && px > 16; px--) td.style.fontSize = (px - 1) + 'px';
+      });
     }
 
     // TV: both lists roll on their own when they are longer than the screen (1 px every 45 ms and 50 ms, as on the old TV).
@@ -193,22 +203,35 @@
     // weather; with no scores yet the box stays on the weather. The weekly schedule stays as it is.
     const FOX_WEATHER = 'UC1FbPiXx59_ltnFVx7IxWow', TURN = 30000;
     let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0;
-    // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows.
-    function failLive() { liveOk = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn(); }
+    // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows,
+    // and the live picture is tried again in 10 minutes (Joe 10/28: a stream that is down for a while comes back by itself).
+    let liveTimer = 0, retryTimer = 0;
+    function failLive() {
+      clearTimeout(liveTimer); liveOk = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
+      clearTimeout(retryTimer); retryTimer = setTimeout(startLive, 600000);
+    }
     function startLive() {
       // The channel's live stream, whatever today's video is; the player script only watches it play or fail.
-      document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="FOX Weather live" allow="autoplay; encrypted-media" src="https://www.youtube.com/embed/live_stream?channel=' +
+      // Joe 10/28 (the TV showed only the local weather): YouTube refuses to play an embedded video when it is not told
+      // which site it is on (its "Error 153"), and Operations tells other sites nothing (Referrer-Policy: same-origin in
+      // firebase.json). The video's own frame sends just the site's address (no page, no sign-in) to YouTube.
+      document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="FOX Weather live" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/live_stream?channel=' +
         FOX_WEATHER + '&autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
-      window.onYouTubeIframeAPIReady = () => {
+      const ready = () => {
         player = new window.YT.Player('live-frame', { events: {
-          onReady: (e) => { liveOk = true; e.target.mute(); showTurn(); },
+          onReady: (e) => { liveOk = true; clearTimeout(liveTimer); e.target.mute(); showTurn(); },
           onError: failLive } });
       };
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      tag.onerror = failLive;
-      document.head.appendChild(tag);
-      setTimeout(() => { if (!liveOk) failLive(); }, 20000);
+      if (window.YT && window.YT.Player) ready();
+      else {
+        window.onYouTubeIframeAPIReady = ready;
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.onerror = failLive;
+        document.head.appendChild(tag);
+      }
+      // A Pi takes a while to start a video; 45 seconds with no picture counts as none.
+      clearTimeout(liveTimer); liveTimer = setTimeout(() => { if (!liveOk) failLive(); }, 45000);
     }
     function showTurn() {
       const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && liveOk;
