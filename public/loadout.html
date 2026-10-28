@@ -944,7 +944,7 @@
       onSnapshot(doc(db, 'caseCounters', 'palletizer'), s => { palletizer = s.data() || null; render(); }, () => { palletizer = null; });
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
-        const all = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)));
+        const all = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, 'fac_uniontown', true));
         ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });
         render();
       }, () => {});

@@ -109,6 +109,10 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
 
+The lists show only this plant's units, using the plant the fleet list gives each one. A few trailers the fleet list puts at another plant (533, 824, 876 and 950) are counted as Uniontown's. If a trailer you use is missing from the list, check its location on the fleet list.
+
+> When a route's regular trailer is down, its Trailer box is left blank. Pick another trailer from the list.
+
 > The dispatch sheet always wins on time, driver and truck. A scheduled driver is never swapped to PLANT LOAD.
 
 !> Do not use OVR to put a down truck on a load. Fix the truck first on Truck Issues.

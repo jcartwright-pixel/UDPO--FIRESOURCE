@@ -210,7 +210,7 @@
       allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
-        trailers = s.docs.map(d => d.data()).filter(e => e.unit && (!e.facilityId || e.facilityId === 'fac_uniontown') && (!e.location || /UNIONTOWN/i.test(e.location)) && e.sourcePresent !== false);
+        trailers = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, 'fac_uniontown', true) && e.sourcePresent !== false);
         trailersFailed = false;
         render();
       }, () => { trailersFailed = true; render(); });
