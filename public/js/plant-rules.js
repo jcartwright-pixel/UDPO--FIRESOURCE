@@ -1346,7 +1346,7 @@
   function followWord(v) { v = text(v).toUpperCase(); return v === 'RESOLVED' ? 'RESOLVED' : v === 'MONITOR' ? 'MONITOR' : 'NEEDS ATTENTION'; }
   function reportHtml(r, note) {
     function e(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-    var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', GREY = '#5b6775', INK = '#1c2733';
+    var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', YELLOW = '#f5c518', GREY = '#5b6775', INK = '#1c2733';
     // Joe 10/20: red only for a load that is behind; a load not loaded yet but on time has no shading.
     var PLAIN = '#ffffff';
     function head(title, count, color) { return '<tr><td style="' + F + 'padding:16px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (color || GREY) + '">' + e(title) + (count !== null && count !== undefined ? '<span style="float:right;color:' + (color || INK) + '">' + e(count) + '</span>' : '') + '</td></tr>'; }
@@ -1428,7 +1428,9 @@
     var splitDays = Object.keys(days).length > 1;
     var sectionOf = function (x) { if (x.prior) return -1e9; var n = dayNum(x.day); return n === null ? 1e9 : splitDays ? n : 0; };
     var H = [];
-    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : GREEN) + ';color:#ffffff"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
+    // Joe 10/28: no route behind but the forecast has loads potentially late = a yellow banner that says so (never green on-time).
+    var late = !behind && fc && fc.late > 0 ? fc.late : 0;
+    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : late ? YELLOW : GREEN) + ';color:' + (late ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? '' : 'S') + ' POTENTIALLY LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     if (fc) H.push(forecastBox(fc));
     H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
