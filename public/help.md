@@ -571,7 +571,7 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 - **Two at a time:** two people can each unload a trailer at once. While two are unloading, a third `Start` says to finish one first.
 - **Cases Out** comes from the loadout and **Driver Said** is what the driver typed at check-in. You don't type either one.
 - **Lost** is Cases Out minus Cases Returned, in red. The box on the right adds up the day.
-- On the plant tablet the open card shows Cases out, Cases returned, Lost, Trailer and **Unloaded by** on one line. While two are unloading, the other cards say **2 unloading now. Finish one first.** where `START UNLOADING` was.
+- On the plant tablet the open card shows Cases returned, Trailer and **Unloaded by** on one line. It is a blind count: the tablet does not show Cases Out, Driver Said or Lost, so the count is what was really on the trailer. This screen still shows them. While two are unloading, the other cards say **2 unloading now. Finish one first.** where `START UNLOADING` was.
 - **Return day** (top right) with the arrows picks the day.
 - On a phone or small tablet each load is a card with every box named.
 - A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be, here and on the plant tablets.

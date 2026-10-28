@@ -507,7 +507,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .sw-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* Joe 10/28 (gz): Case Unloading's boxes about a third as wide, with Unloaded By on the same line; the name shows by the status. */
-.sw-fields.unl { grid-template-columns: repeat(4, minmax(120px, 170px)) minmax(220px, 340px); }
+.sw-fields.unl { grid-template-columns: repeat(2, minmax(120px, 170px)) minmax(220px, 340px); }
 .sw-who { display: inline-block; padding: 6px 10px; border-radius: 8px; background: #e8f1fb; color: #0b2f55; font-size: 18px; font-weight: 800; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sw-full { display: inline-block; max-width: 330px; padding: 10px 12px; border-radius: 8px; background: #fff7e8; color: #7a3e00; font-size: 17px; font-weight: 800; }
 .sw-field { display: block; }
@@ -548,8 +548,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-cols, .sw-head { grid-template-columns: 70px minmax(0, 1fr) 100px 100px 150px 300px 24px; gap: 8px; }
   .sw-cols span:nth-child(5), .sw-cols span:last-child { grid-column: auto; }
   .sw-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sw-fields.unl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sw-fields.unl .who { grid-column: 1 / span 2; }
+  .sw-fields.unl { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 2fr); }
 }
 /* A tablet up to 1024 wide (Joe 10/12 photo, about 800 wide): the one-line columns ran the run name into the truck, so the
    card puts route, run, truck and trailer on one line and the status and big buttons under it. */
@@ -571,6 +570,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-band i { margin-left: 0; }
   .sw-fields, .sw-fields.two, .sw-puform, .sw-add, .sw-add.ret { grid-template-columns: 1fr; }
   .sw-fields.unl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sw-fields.unl .who { grid-column: 1 / -1; }
   .sw-list { padding: 8px; }
   .sw-step { flex-wrap: wrap; }
 }

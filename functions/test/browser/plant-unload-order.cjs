@@ -181,10 +181,12 @@ async function openPage(browser, width, height, url, touch) {
     await cu.click('[data-part="unload"]');
     await cu.waitForSelector('#work .sw-card.run .sw-fields.unl', { timeout: 15000 });
     const row = await cu.$eval('#work .sw-card.run .sw-fields.unl', f => [...f.querySelectorAll('.sw-field')].map(l => { const b = l.getBoundingClientRect(); return { label: l.querySelector('span').textContent, top: Math.round(b.top), width: Math.round(b.width), list: (l.querySelector('input') || {}).getAttribute('list') }; }));
-    assert.deepEqual(row.map(x => x.label), ['Cases out', 'Cases returned', 'Lost', 'Trailer', 'Unloaded by']);
-    assert.ok(row.every(x => x.top === row[0].top), 'all five boxes on one line ' + JSON.stringify(row));
-    assert.ok(row.slice(0, 4).every(x => x.width <= 180), 'the four boxes are narrow ' + JSON.stringify(row));
-    assert.equal(row[4].list, 'sw-people', 'Unloaded By suggests the plant people');
+    // Joe 10/28: a blind count: no Cases Out, Driver Said or Lost on the tablet.
+    assert.deepEqual(row.map(x => x.label), ['Cases returned', 'Trailer', 'Unloaded by']);
+    assert.doesNotMatch(await cu.textContent('#work .sw-card.run .sw-body'), /Cases out|Lost|Driver said|502/i, 'nothing on the card hints how many to count');
+    assert.ok(row.every(x => x.top === row[0].top), 'all three boxes on one line ' + JSON.stringify(row));
+    assert.ok(row.slice(0, 2).every(x => x.width <= 180), 'the two boxes are narrow ' + JSON.stringify(row));
+    assert.equal(row[2].list, 'sw-people', 'Unloaded By suggests the plant people');
     const who = '#work .sw-card.run [data-k="unloadedBy"]';
     await cu.fill(who, 'Riley Moss');
     await cu.press(who, 'Enter');
@@ -198,7 +200,7 @@ async function openPage(browser, width, height, url, touch) {
     assert.ok(Object.values(savedNow).some(u => u.unloadedBy === 'Riley Moss' && u.status === 'UNLOADING'), 'Unloaded By saved');
     if (SHOTS) await cu.screenshot({ path: path.join(SHOTS, 'after-two-unloading-1536.png') });
     assert.deepEqual(cu.errors, []);
-    results.push('Case Unloading tablet: narrow boxes and Unloaded By on one line; Riley Moss typed shows by UNLOADING; a second Start makes 2 unloading and the rest say "2 unloading now. Finish one first."');
+    results.push('Case Unloading tablet: blind count (no Cases out, Lost or Driver said); narrow boxes and Unloaded By on one line; Riley Moss typed shows by UNLOADING; a second Start makes 2 unloading and the rest say "2 unloading now. Finish one first."');
     await cu.close();
     await o.close();
   } finally {

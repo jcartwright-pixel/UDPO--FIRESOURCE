@@ -437,11 +437,10 @@ export function mountStationWork({ db, box, person, onDraw }) {
           (ck && !done ? '<div class="sw-actions">' + btn('TAKE OFF THE LIST', 'udrop', r.key) + '</div>' : '') + '</div>';
       } else if (isOpen) {
         const dis = !ck || done;
-        // Joe 10/27 (hg): Cases out (from the loadout), Cases returned (typed here) and Lost, as on the office screen.
-        const typedIn = String(val(r.key, 'casesIn', r.casesIn)).trim().replace(/,/g, ''), lost = P.lostCases(Object.assign({}, r, { casesIn: /^\d+$/.test(typedIn) ? typedIn : '' }));
-        html += '<div class="sw-body"><div class="sw-fields unl">' + field(r.key + ':out', 'casesOut', unit + ' out', r.casesOut === '' ? '' : Number(r.casesOut).toLocaleString(), { disabled: true }) +
-          field(r.key, 'casesIn', unit + ' returned', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) +
-          '<label class="sw-field"><span>Lost</span><input value="' + (lost === null ? '' : lost < 0 ? (-lost).toLocaleString() + ' extra' : lost.toLocaleString()) + '" disabled' + (lost > 0 ? ' style="color:#b42332;font-weight:900"' : '') + '></label>' + field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis || r.needed }) +
+        // Joe 10/28: a blind count. The unloaders see no Cases Out, Lost or Driver Said (they hint how many to count); the office
+        // Unloading screen keeps them. Cases returned (typed here), Trailer and Unloaded by, on one line.
+        html += '<div class="sw-body"><div class="sw-fields unl">' + field(r.key, 'casesIn', unit + ' returned', r.casesIn, { mode: 'numeric', disabled: dis || s !== 'UNLOADING' }) +
+          field(r.key, 'trailer', 'Trailer', r.trailer, { disabled: dis || r.needed }) +
           field(r.key, 'unloadedBy', 'Unloaded by', r.unloadedBy, { disabled: dis, list: 'sw-people', cls: 'who' }) + '</div>' +
           field(r.key, 'notes', 'Notes', r.notes, { wide: true, disabled: dis || s !== 'UNLOADING' }) +
           '<div class="sw-step' + (r.pendingReturns.length ? ' need' : '') + '"><b>2</b><span><strong>Returned product</strong><small>' + escapeHtml(r.pendingReturns.length ? r.pendingReturns.map(x => x.detail).join('; ') : r.returns.length ? 'Back in the cooler' : 'No return assigned') + '</small></span>' +
