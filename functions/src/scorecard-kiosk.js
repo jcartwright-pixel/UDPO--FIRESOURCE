@@ -9,6 +9,7 @@
 
 const L = require('./logic');
 const S = require('./sc-core');
+const { findLiveWeather } = require('./live-weather');
 
 const HOME_FACILITY = 'fac_uniontown';
 const all = async (q) => (await q.get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
@@ -38,9 +39,10 @@ async function buildKioskScores({ db, now = new Date(), view = null }) {
   return { label, through: board.through, areas: (s.kioskAreas || []).slice(), rows: S.scKioskRows_(board, s) };
 }
 
-async function writeKioskScores({ db, now = new Date() }) {
-  const k = await buildKioskScores({ db, now });
-  await db.collection('scorecard').doc('kiosk').set(Object.assign(k, { at: now.toISOString() }));
+// The FOX Weather video the TV plays (live-weather.js) goes with the scores, in the one document the TV may read.
+async function writeKioskScores({ db, now = new Date(), findLive = findLiveWeather }) {
+  const [k, live] = await Promise.all([buildKioskScores({ db, now }), findLive({ now })]);
+  await db.collection('scorecard').doc('kiosk').set(Object.assign(k, { live, at: now.toISOString() }));
   return k;
 }
 
