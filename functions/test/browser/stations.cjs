@@ -242,6 +242,10 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     assert.equal(await ps.textContent('#title'), 'Case Loadout', 'the tablet remembers its station');
     await ps.click('#change');
     await ps.click('[data-station="CASE_UNLOADING"]');
+    // Joe 10/27: Case Unloading opens on the choice of Case Unloading or Trailer Assignments.
+    assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Case Unloading', 'Trailer Assignments']);
+    await ps.click('[data-part="unload"]');
+    await ps.waitForSelector('[data-view="unloading"]');
     assert.deepEqual(await ps.$$eval('.ps-tab b', b => b.map(x => x.textContent)), ['Unloading', 'Washing', 'Returns']);
     // Joe 10/14: the Tote Loadout station loads, unloads and washes.
     await ps.click('#change');
@@ -251,19 +255,21 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await ps.click('[data-view="washing"]');
     await ps.waitForSelector('#work .sw-panel-head h2:text-is("Washing")');
     assert.deepEqual(ps.errors, []);
-    results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows Unloading, Washing and Returns, Tote Loadout shows Loading, Unloading and Washing');
+    results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows the choice of Case Unloading (Unloading, Washing and Returns) or Trailer Assignments, Tote Loadout shows Loading, Unloading and Washing');
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
     assert.equal(await tab.$('.sidemenu'), null, 'no desktop side menu on the Plant Station');
-    assert.ok(await tab.isVisible('#go-back') && await tab.isVisible('#go-home'), 'Back and Home in the slim header while picking the station');
+    // Joe 10/27: a plant tablet goes nowhere else, so no Back or Home even while picking the station.
+    assert.equal(await tab.isVisible('#go-back') || await tab.isVisible('#go-home'), false, 'no Back or Home into the app while picking the station');
     assert.ok(await fits(tab), 'the Plant Station fits a tablet');
     await shot(tab, 'plant-station-tablet-pick-1280.png');
     await tab.click('[data-station="CASE_UNLOADING"]');
+    await tab.click('[data-part="unload"]');
     await tab.waitForSelector('#work .sw-panel');
     await shot(tab, 'plant-station-tablet-unloading-1280.png');
     assert.deepEqual(tab.errors, []);
-    results.push('Plant Station: tablet layout with a slim header (Back, Home) and no desktop menu');
+    results.push('Plant Station: tablet layout with a slim header (no Back or Home) and no desktop menu');
 
     // Joe 10/12: "This should only be a mobile view. and not be able to see all the information. This is for the employees."
     // A station shows its own work on this page (today, its area, cards), with no way into the manager screens.

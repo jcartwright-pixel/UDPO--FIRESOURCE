@@ -52,6 +52,8 @@ async function openPage(browser, width, height, url, touch) {
   try {
     // The tablet: yesterday's trailer first, in red; a trailer typed in the box goes on the list.
     const t = await openPage(browser, 1024, 768, '/plant-station.html?' + MANAGER + '&station=CASE_UNLOADING', true);
+    // Joe 10/27: the Case Unloading tablet opens on the choice of Case Unloading or Trailer Assignments.
+    await t.click('[data-part="unload"]');
     await t.waitForSelector('#work .sw-card.prior', { timeout: 15000 });
     // Joe 10/27: the trailers today's loadout needs come first, in loading order; T-888 is not needed today, so it leads the rest.
     const first = await t.$eval('#work .sw-card.prior', c => ({ prior: c.classList.contains('prior'), trailer: (c.querySelector('.sw-trailer') || {}).textContent || '', chips: c.querySelector('.sw-chips').textContent }));

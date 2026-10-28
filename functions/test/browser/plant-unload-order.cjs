@@ -74,6 +74,8 @@ async function openPage(browser, width, height, url, touch) {
   try {
     for (const [w, h] of [[1024, 768], [800, 1280]]) {
       const p = await openPage(browser, w, h, '/plant-station.html?' + MANAGER + '&station=CASE_UNLOADING', true);
+      // Joe 10/27: the Case Unloading tablet opens on the choice of Case Unloading or Trailer Assignments.
+      await p.click('[data-part="unload"]');
       await p.waitForSelector('#work .sw-card .sw-chips i.back', { timeout: 15000 });
       await p.waitForSelector('#work .sw-card.road');
       // Route Master (the Drop and Hook tick) is read on its own, after the loads: wait for the transfer card it makes.
