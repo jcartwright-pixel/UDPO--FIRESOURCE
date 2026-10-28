@@ -524,7 +524,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
 4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done, or until it is back in its place in the sheet's order (for example when the load that went past it is skipped back down). One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
-5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag.
+5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag. On a phone, hold a finger still on the load for a moment to pick it up; a swipe scrolls the list.
 
 - `+ Add Load` adds a load nobody scheduled. Fill in the route, schedule type, load type, dates, time, trailer and cases, then `Confirm`. Nothing saves until Confirm.
 - `Ended Up Not Running` (in the load's box, press twice) marks a load that never went.
@@ -533,6 +533,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 - A plant note on a load shows as a yellow line under it.
 - **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
+- On a phone the four loadout buttons (Case, Tote, Box, Tanker) sit in two rows.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
 

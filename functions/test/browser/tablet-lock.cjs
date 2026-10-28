@@ -273,6 +273,9 @@ const OTHERS = [
       assert.ok(MANAGER_PAGES.indexOf(pageOf(m.url())) >= 0, href + ' is a manager screen');
       await bare(href);
       assert.ok(await m.isVisible('#pm-home'), href + ' has the Plant Managers button back to the start');
+      // 10/28 (practice test): nothing wider than the phone, so a finger swipe moves the list, not a zoomed page sideways.
+      const wide = await m.evaluate(() => ({ iw: innerWidth, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      assert.ok(wide.iw <= 391 && wide.sw <= wide.cw + 1, href + ' is wider than the phone ' + JSON.stringify(wide));
       reached.push(href);
       // Every link on it opens a manager screen (or comes back to the start).
       const links = await m.$$eval('#screen a[href]', a => [...new Set(a.filter(x => x.getClientRects().length).map(x => x.getAttribute('href')).filter(h => !/^(#|javascript:|mailto:|tel:|https?:)/.test(h)))]);
