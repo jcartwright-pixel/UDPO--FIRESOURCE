@@ -48,6 +48,9 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await localCalls(page);
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    // The server's copy for the TV: no scores yet, and FOX Weather's live video as read from its YouTube page.
+    const LIVE = { video: 'FoxWxLive01', channel: 'UCaaaaaaaaaaaaaaaaaaaaaa', live: true, embed: true, at: new Date().toISOString(), problem: '' };
+    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '', areas: [], rows: [], live: LIVE, at: new Date().toISOString() });
     await page.goto(HOSTING + '/driver-station.html?tv=1');
     await page.waitForSelector('#tvacct:not([hidden])');
     assert.match(await page.textContent('#signin-text'), /No United Dairy account is needed/);
@@ -73,7 +76,7 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     assert.match(await page.textContent('#wx'), /63°F · Mostly clear/);
     // Joe 10/27: the right-hand box: FOX Weather live first (the weather is in the top bar), then the Driver Scorecard,
     // 30 seconds each. The TV's own code reads the server's copy of the overall scores (scorecard/kiosk).
-    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="live_stream?channel=UC1FbPiXx59_ltnFVx7IxWow"]');
+    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="youtube.com/embed/FoxWxLive01?"]');
     // Joe 10/28: YouTube plays an embedded video only when it is told the site's address (the app tells other sites nothing).
     assert.equal(await page.getAttribute('#live-frame', 'referrerpolicy'), 'strict-origin-when-cross-origin');
     // Joe 10/28: the weekly schedule is the same size as the Loadout list above it.
@@ -83,7 +86,7 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     assert.deepEqual(await page.$$eval('#week-rows td', t => t.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent)), []);
     assert.equal(await page.isVisible('#turn-weather'), false);
     await shot(page, 'fire-tv-2-board-1920.png');
-    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], at: new Date().toISOString(),
+    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], live: LIVE, at: new Date().toISOString(),
       rows: [{ rank: 1, driver: 'PRICE, LEE', score: 98, grade: 'A' }, { rank: 2, driver: 'MILLER, DANA', score: 84, grade: 'B' }] });
     await page.evaluate(() => window.udTurn());
     await page.waitForSelector('#turn-score:not([hidden]) #sc-rows tr');
@@ -93,7 +96,7 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     assert.ok(await page.evaluate(() => window.udLivePaused > 0), 'the live picture pauses during the Scorecard turn');
     await shot(page, 'fire-tv-2b-scorecard-turn-1920.png');
     // Joe 10/28: two-digit ranks were cut off; every rank shows whole.
-    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], at: new Date().toISOString(),
+    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], live: LIVE, at: new Date().toISOString(),
       rows: Array.from({ length: 14 }, (x, i) => ({ rank: i + 1, driver: 'DRIVER ' + (i + 1) + ', LONGNAME', score: 99 - i, grade: 'A' })) });
     await page.waitForFunction(() => document.querySelectorAll('#sc-rows tr').length === 14);
     assert.deepEqual(await page.$$eval('#sc-rows td.rk', t => t.filter(c => c.scrollWidth > c.clientWidth || c.getBoundingClientRect().width < 50).map(c => c.textContent)), []);
@@ -101,6 +104,14 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await shot(page, 'fire-tv-2c-scorecard-ranks-1920.png');
     await page.evaluate(() => window.udTurn());
     await page.waitForSelector('#turn-live:not([hidden])');
+    // Joe 10/28: FOX starts another live video: the TV changes to it. A video YouTube won't let other sites show: local weather.
+    await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02' }) });
+    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="youtube.com/embed/FoxWxLive02?"]');
+    await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02', embed: false }) });
+    await page.waitForSelector('#turn-weather:not([hidden]) .now');
+    assert.equal(await page.$('#live-frame'), null);
+    await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
+    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="youtube.com/embed/FoxWxLive01?"]');
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
 
