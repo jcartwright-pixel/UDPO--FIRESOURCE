@@ -30,7 +30,10 @@
 .gs-btn.pick-on { box-shadow: inset 0 0 0 6px rgba(0, 0, 0, .35); }
 .gs-btn:disabled { opacity: .55; cursor: default; }
 .gs-bar { display: flex; align-items: center; gap: 16px; }
-.gs-bar h2 { flex: 1; }
+.gs-bar h2 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Practice test 10-28 (Garage Station at 390: "Trailers · 6 open" beside the back button ran past a phone's edge): on a
+   phone the title takes its own line under the buttons. */
+@media (max-width: 500px) { .gs-bar { flex-wrap: wrap; gap: 10px; } .gs-bar h2 { flex: 1 1 100%; } }
 .gs-card { background: #fff; border-radius: 16px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); min-height: 0; }
 .gs-sign { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
 .gs-sign .gs-card { display: flex; flex-direction: column; gap: 10px; }
