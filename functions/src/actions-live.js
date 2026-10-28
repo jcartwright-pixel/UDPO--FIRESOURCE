@@ -102,8 +102,11 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       if (i < 0) i = 0;
       const run = rows[i].data(), day = (run.days || {})[p] || {}, want = (m.days || {})[p] || {}, ch = {};
       if (loadDay(week, p, day.loadDayOffset) < today) return;
+      // Joe 10/28 (847 PALS SHAKE MIX): a day marked as changed by hand that still matches the normal week as it was before this save
+      // (not a one-week change) follows the new normal week, unless its load has started.
+      const followed = !!(req && req.wasActive && p in req.wasActive) && !!day.runs === req.wasActive[p] && !day.plantStartedAt && !day.completeTime && !String(day.loadStatus || '').trim();
       // Joe 10/10: a day with a driver always runs, so Route Master never turns such a day off.
-      if (!byHand(run, p, 'route_override') && !!day.runs !== !!want.active && (want.active || !day.driver)) ch.runs = !!want.active;
+      if ((followed || !byHand(run, p, 'route_override')) && !!day.runs !== !!want.active && (want.active || !day.driver)) ch.runs = !!want.active;
       if (want.dispatchTime !== null && want.dispatchTime !== undefined) {
         if (!byHand(run, p, 'dispatch_time_override') && day.dispatchTime !== want.dispatchTime) ch.dispatchTime = want.dispatchTime;
         if (!byHand(run, p, 'start_time_override') && day.startTime !== want.dispatchTime) ch.startTime = want.dispatchTime;

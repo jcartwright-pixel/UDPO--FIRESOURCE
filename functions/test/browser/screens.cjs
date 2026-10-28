@@ -279,7 +279,14 @@ async function noScroll(page) {
     await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6].classList.contains('c-plant'), null, { timeout: 5000 });
     await wkEdit.click(thu801);
-    assert.match(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), /PLANT LOAD/);
+    assert.equal(await wkEdit.$eval('.popover select[data-kind="driver"] option', o => o.textContent), '\u2014 PLANT LOAD \u2014');
+    // Joe 10/28 (8305 USDA): a plain NEEDS DRIVER choice puts the day on with no driver; Plant Load stays its own choice.
+    assert.equal(await wkEdit.$eval('.popover select[data-kind="driver"] option[value="__NEEDS__"]', o => o.textContent), '\u2014 NEEDS DRIVER \u2014');
+    await wkEdit.selectOption('.popover select[data-kind="driver"]', '__NEEDS__');
+    await wkEdit.waitForSelector('.popover', { state: 'detached' });
+    await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return td.classList.contains('c-needs') && /NEEDS DRIVER/.test(td.textContent); }, null, { timeout: 5000 });
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-needs-driver-1920.png') });
+    await wkEdit.click(thu801);
     await wkEdit.selectOption('.popover select[data-kind="driver"]', 'drv_test_adams');
     await wkEdit.waitForSelector('.popover', { state: 'detached' });
     await wkEdit.waitForFunction(() => { const td = [...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '801').children[6]; return /ADAMS/.test(td.textContent) && td.classList.contains('plant-load') && !td.classList.contains('c-plant'); }, null, { timeout: 5000 });
@@ -290,8 +297,15 @@ async function noScroll(page) {
       if (thu.runs === true && thu.driverId === 'drv_test_adams') break;
       await new Promise(r => setTimeout(r, 200));
     }
-    // Route Run Days opens Route Week Override at this week (as in the current app); 802 Thursday turned on there needs a driver here.
-    await Promise.all([wkEdit.waitForURL(/routeweek\.html\?week=2026-10-04/), wkEdit.click('#run-days')]);
+    // Joe 10/28: Route Run Days opens the normal week (Route Days) with Normal Week / Holiday Week tabs; the Holiday Week tab opens
+    // Route Week Override at this week. 802 Thursday turned on there needs a driver here.
+    await Promise.all([wkEdit.waitForURL(/routes\.html\?week=2026-10-04/), wkEdit.click('#run-days')]);
+    await wkEdit.waitForSelector('#week-tabs:not([hidden]) #tab-normal[aria-selected="true"]');
+    assert.equal(await wkEdit.textContent('#work-title'), 'Route Days', 'Route Run Days opens the normal week');
+    await wkEdit.waitForSelector('#table button[data-runday]');
+    if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'route-days-tabs-1920.png') });
+    await Promise.all([wkEdit.waitForURL(/routeweek\.html\?week=2026-10-04/), wkEdit.click('#tab-holiday')]);
+    await wkEdit.waitForSelector('#tab-holiday[aria-selected="true"]');
     await wkEdit.click('xpath=//tbody[@id="rows"]/tr[td[1][text()="802"]]/td[2+5]/button');
     await wkEdit.waitForFunction(() => /RUNS/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent) && !/NOT/.test([...document.querySelectorAll('#rows tr')].find(tr => tr.children[0].textContent === '802').children[6].textContent), null, { timeout: 5000 });
     if (SHOTS) await wkEdit.screenshot({ path: path.join(SHOTS, 'weekly-run-days-1920.png') });
@@ -301,6 +315,8 @@ async function noScroll(page) {
       thu802 = (await db().collection('runs').doc('2026-10-04__run_t802').get()).data().days.thu;
       if (thu802.runs !== true) await new Promise(r => setTimeout(r, 200));
     }
+    await wkEdit.goBack();
+    await wkEdit.waitForURL(/routes\.html/);
     await wkEdit.goBack();
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 8000 });
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).

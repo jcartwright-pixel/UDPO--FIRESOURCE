@@ -57,6 +57,10 @@ async function saveRoute(tx, db, req, email, stamp, logRef, mode) {
   // transfer.js), so Weekly follows at once instead of after the next copy. Reads come before any write in a transaction.
   const weeklyRuns = snap.exists && typeof req.fields.displayWeekly === 'boolean'
     ? (await tx.get(db.collection(C.runs).where('runId', '==', before.id || id))).docs : [];
+  // Joe 10/28 (847 PALS SHAKE MIX): each day switched here, as it was before the save, so a week day that was only following the
+  // normal week follows the new one even when it was once touched by hand (routeLiveFollow / routeToLive).
+  req.wasActive = {};
+  Object.keys(req.days).forEach(p => { if ('active' in req.days[p]) req.wasActive[p] = !!(before && before.days && before.days[p] && before.days[p].active); });
   const update = Object.assign({}, req.fields, { testEdited: true, editedAt: stamp, editedBy: email });
   Object.keys(req.days).forEach(p => Object.keys(req.days[p]).forEach(k => { update['days.' + p + '.' + k] = req.days[p][k]; }));
   if (snap.exists) {
