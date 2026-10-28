@@ -138,9 +138,11 @@ Use the arrows beside **Week starting**. The week you pick stays picked on this 
 4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm.
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
+- On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
+- Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
 - **BACKUP** means the driver is a backup that day. A **Day Note** (for example "riding with...") shows in teal in place of AVAILABLE.
 - A down truck or trailer still on a run says **DOWN** in red.
-- `Route Run Days` opens Route Week Override for this week, to change which days a route runs.
+- `Route Run Days` opens Route Days, the normal week for every run. Its `Holiday Week` tab changes this week only.
 - `Reset Week` rebuilds the whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay. Press it twice to confirm.
 - `Print Weekly Dispatch` prints the Driver Assignment Board on one page.
 - Managers can grab a route's line and drag it up or down to change the order.
@@ -172,6 +174,7 @@ The list at the top picks the view: Start Times, Mileage, Hours and Return, Load
 - `+ Add Route` adds a new route; `+ Add Run / Destination` adds a run under a route.
 - `Edit Route` opens the full form for one run.
 - `Holiday Week Editor` opens Route Week Override.
+- On **Days and Visibility** (Route Days) two tabs sit at the top: `Normal Week` (this screen, every week) and `Holiday Week` (Route Week Override, one week only). Both can be changed.
 
 > The Day box is the delivery day.
 
@@ -188,6 +191,7 @@ Which days each route runs for **one week only** (a holiday week, for example). 
 3. Pick the **Holiday this week** if there is one, and type a **Reason for this week's changes**.
 
 - `Changed Only` shows only the routes changed this week; `All Routes` shows them all.
+- The `Normal Week` tab at the top goes back to Route Days, the days every week runs.
 - `Reset Week to Normal` puts the week back to the normal days.
 
 !> Do not use this screen to change a route for good. Change the route in the Route Editor instead.

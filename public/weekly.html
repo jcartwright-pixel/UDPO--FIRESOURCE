@@ -258,8 +258,10 @@
       const who = String(d.driver || '').toUpperCase();
       // Joe 10/13 (836 PECK): a plant load can be marked Not running here too, and put back to needing a driver.
       const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && (L.plantCarrier(plant) || L.coveredRoute(row));
-      const plantText = pickup ? 'CARRIER PICKUP' : 'PLANT LOAD &mdash; NEEDS DRIVER';
+      // Joe 10/28 (8305 USDA): a day that does not run (a plant load too) can be put on as a plain NEEDS DRIVER; Plant Load stays its own choice.
+      const plantText = pickup ? 'CARRIER PICKUP' : 'PLANT LOAD';
       let html = '<option value="">' + (d.runs ? '&mdash; NEEDS DRIVER &mdash;' : plantOpen ? '&mdash; ' + plantText + ' &mdash;' : '&mdash; DOES NOT RUN &mdash;') + '</option>' +
+        (d.runs ? '' : '<option value="__NEEDS__">&mdash; NEEDS DRIVER &mdash;</option>') +
         '<option value="__CARRIER__"' + (who === 'CARRIER' ? ' selected' : '') + '>CARRIER</option><option value="__OPEN__"' + (who === 'OPEN' ? ' selected' : '') + '>OPEN</option>' +
         (d.runs || plantOpen ? '<option value="__OFF__">NOT RUNNING</option>' : '') + (plantOff ? '<option value="__PLANT__">' + plantText + '</option>' : '');
       const relief = [], regular = [], blocked = [];
@@ -290,6 +292,7 @@
       // A day with a plant load is marked so it stays off instead of showing PLANT LOAD again.
       const plant = !!L.plantFor(plantCtx, row, day);
       if (value === '__OFF__') return saveRunChange(getRuns, row.runDocId, day, 'setRuns', plant ? { runs: false, plantLoadOff: true } : { runs: false }, x => { x.runs = false; if (plant) x.plantLoadOff = true; }, render);
+      if (value === '__NEEDS__') return saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: true }, x => { x.runs = true; }, render);
       if (value === '__PLANT__') return saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: false, plantLoadOff: false }, x => { x.plantLoadOff = false; }, render);
       // A day that does not run is turned on first, then the driver is saved (both wait in line for the same run).
       if (!d.runs && value) saveRunChange(getRuns, row.runDocId, day, 'setRuns', { runs: true }, x => { x.runs = true; }, render);
@@ -454,8 +457,8 @@
       document.getElementById('days-rows').innerHTML = rows.map((r, i) => '<tr data-index="' + i + '"><td><b>' + escapeHtml(routeNumber(r.route)) + '</b></td><td>' + escapeHtml(L.runText(r)) + '</td>' +
         L.DAYS.map(p => '<td><button type="button" class="toggle' + (r.days[p].runs ? ' on' : '') + '" data-runday="' + p + '" aria-pressed="' + !!r.days[p].runs + '" aria-label="' + escapeHtml(routeNumber(r.route) + ' ' + L.runText(r) + ', ' + L.DAY_NAMES[L.DAYS.indexOf(p)]) + '">' + (r.days[p].runs ? 'RUNS' : 'NO RUN') + '</button></td>').join('') + '</tr>').join('');
     }
-    // As in the current app (WeeklyDispatch.html weeklyRoutes): Route Run Days opens Route Week Override at the week shown here.
-    document.getElementById('run-days').onclick = () => { location.href = 'routeweek.html?week=' + encodeURIComponent(week); };
+    // Joe 10/28: Route Run Days opens the normal week's Route Days (Route Editor); its Holiday Week tab opens Route Week Override at the week shown here.
+    document.getElementById('run-days').onclick = () => { location.href = 'routes.html?week=' + encodeURIComponent(week); };
     document.getElementById('days-rows').addEventListener('click', e => {
       const b = e.target.closest('button[data-runday]');
       if (!b) return;

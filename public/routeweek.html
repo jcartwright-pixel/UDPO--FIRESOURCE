@@ -28,6 +28,11 @@
     </div>
     <div class="head">
       <div class="title"><h1>Route Week Override</h1><small>Which days each route runs this one week; the normal week stays in Route Master</small></div>
+      <!-- Joe 10/28: the same two tabs as Route Days: Normal Week opens Route Days, Holiday Week is this screen. -->
+      <div class="tabs week-tabs" role="tablist" aria-label="Which week">
+        <button type="button" role="tab" aria-selected="false" id="tab-normal">Normal Week</button>
+        <button type="button" role="tab" aria-selected="true" id="tab-holiday">Holiday Week</button>
+      </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span>Each click saves at once</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -156,6 +161,7 @@
       const r = runs.find(x => x.id === b.closest('tr').dataset.id);
       if (r) toggle(r, b.dataset.day);
     });
+    document.getElementById('tab-normal').onclick = () => { location.href = 'routes.html' + (week ? '?week=' + encodeURIComponent(week) : ''); };
     document.getElementById('hol-pick').onchange = (e) => { holPick = e.target.value; render(); };
     // Move to: the load comes off the holiday and runs on the day picked (Not running: off only). Changing it again puts
     // the old day back first; the blank choice puts the load back on the holiday. One save per day changed, as the boxes do.

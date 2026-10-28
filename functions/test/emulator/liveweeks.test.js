@@ -54,6 +54,14 @@ test('a run turned off in Route Master stays on for a day that has a driver (Joe
   assert.equal((await run('2026-10-11__run_t802')).days.tue.runs, false, '802 Tuesday has no driver, so it stops running');
 });
 
+test('Joe 10/28 (847): a day touched by hand that still runs as the normal week did follows a Route Master day turned off', async () => {
+  // 802 Tuesday 10/13 has no driver; it was touched by hand on Weekly but still runs, as the normal week says.
+  await save(DISPATCHER, { action: 'setRuns', runDocId: '2026-10-11__run_t802', day: 'tue', runs: true });
+  assert.equal((await run('2026-10-11__run_t802')).days.tue.routeOverride, 'TRUE');
+  await save(MANAGER, { action: 'saveRoute', runId: 'run_t802', fields: {}, days: { tue: { active: false } } });
+  assert.equal((await run('2026-10-11__run_t802')).days.tue.runs, false, 'Tuesday was only following the normal week, so it stops running');
+});
+
 test('a new run gets a Live row in both weeks, and the write-back adds it to the sandbox Live tab', async () => {
   await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
   const out = await save(MANAGER, { action: 'saveRoute', fields: { route: '805', routeName: 'NEW STOP', run: 'MARIETTA', coverageOwner: 'Marietta' }, days: { thu: { active: true, dispatchTime: '7 AM' }, sat: { active: true } } });
