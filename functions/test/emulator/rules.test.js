@@ -114,6 +114,12 @@ test('a Driver\'s Kiosk Station TV signed in by its code reads only the board, w
   await assertFails(getDocs(collection(tv('v1'), 'weeks')));
   await assertFails(getDocs(collection(tv('v1'), 'equipment')));
   await assertFails(getDoc(doc(tv('v1'), 'stationAccess/tv')));
+  // Joe 10/27: the TV's Driver Scorecard turn: only the overall scores the server keeps (scorecard/kiosk), never the
+  // scorecard's settings or the lists it is built from.
+  await assertSucceeds(getDoc(doc(tv('v1'), 'scorecard/kiosk')));
+  await assertFails(getDoc(doc(tv('v1'), 'scorecard/settings')));
+  await assertFails(getDocs(collection(tv('v1'), 'gpsAlerts')));
+  await assertFails(getDocs(collection(tv('v1'), 'driverIncidents')));
   await assertFails(setDoc(doc(tv('v1'), 'runs/x'), { route: '1' }));
   // A new code on the station (or Remove) shuts the old sign-in out.
   await setAccess({ keys: { ds: 'v2' } });

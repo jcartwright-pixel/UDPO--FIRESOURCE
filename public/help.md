@@ -257,10 +257,14 @@ screens: driver-station.html
 
 The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; the station code decides what opens.
 
-- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups, the local weather and the drivers' weekly schedule. It rolls by itself and shows the Driver Scorecard in turn.
+- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Both lists roll by themselves. The local weather is in the top bar.
+- **The box on the right** takes turns: 30 seconds of FOX Weather live (no sound), then 30 seconds of the Driver Scorecard (each driver's overall score, best first, for the month so far). The scores on the TV are brought up to date every 15 minutes.
+- With no live picture (no internet, or YouTube is down) the weather turn shows the local weather instead.
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
 - A screen opened with a code has no Back, Home or Sign out. `Release` at the bottom (with the manager release code) is the only way out.
+
+> On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
 
 !> Do not sign a TV in with your own Google account. Use the TV's code so it comes back by itself after a power cut.
 
@@ -414,7 +418,7 @@ How each driver is doing: one grade per area and an overall score, with rewards 
 - Click a grade to see that driver's days in that area and why each one cost or earned points.
 - `Excuse` on a miss (a hard stop for a deer, FMLA) takes its points off. `Undo excuse` puts them back.
 - `Rate truck cleanliness` rates a driver's truck 1 (very dirty) to 5 (spotless), about once a month.
-- **Settings** sets the points for each area, the date the scorecard counts from, and what the Driver Station TV shows.
+- **Settings** sets the points for each area, the date the scorecard counts from, and which area grades the Driver Station TV shows next to the overall score.
 - **No driver dispatched** lists GPS alerts on a truck nobody was put on. Put the driver on Daily Dispatch so it counts.
 - `Print` prints the board.
 

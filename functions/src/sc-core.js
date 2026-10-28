@@ -828,5 +828,113 @@ function scSummary_(rows, settings, minDays) {
     leader: leader ? leader.driver : ''};
 }
 
-  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scOffDays_: scOffDays_, scDepartDate_: scDepartDate_, scAlertWindows_: scAlertWindows_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_, scPdaStep_: scPdaStep_ };
+
+/**
+ * Joe 10/27: the board the Driver Scorecard screen shows, built from the app's own lists, so the screen and the server (the
+ * Driver Room TV's copy of the overall scores, scorecard/kiosk) come out the same. L is the dispatch rules (logic.js).
+ * d: {runs, events, gpsDays, gpsAlerts, drivers, exceptions, ratings, incidents, excuses, routes, units, alertsEver}
+ * view: {mode: 'week' | 'month' | 'year', weekStart, year, month, today}
+ */
+function scRouteMaps_(L, routes) {
+  var miles = {}, times = {}, sleeper = {};
+  L.DAYS.forEach(function (p) { miles[p] = {}; times[p] = {}; });
+  (routes || []).forEach(function (r) {
+    if (r.sleeper) sleeper[r.id] = true;
+    L.DAYS.forEach(function (p) {
+      var d = r.days && r.days[p];
+      if (d && (d.dispatchTime != null || d.hours)) times[p][r.id] = {dispatchTime: d.dispatchTime, hours: d.hours};
+      if (d && d.miles) miles[p][r.id] = d.miles;
+    });
+  });
+  return {miles: miles, times: times, sleeper: sleeper};
+}
+
+function scBoard_(L, d, s, view) {
+  var rm = d.routeMaps || scRouteMaps_(L, d.routes), routeMiles = rm.miles, routeTimes = rm.times, routeSleeper = rm.sleeper;
+  var gpsDays = d.gpsDays || [], gpsAlerts = d.gpsAlerts || [], incidents = d.incidents || [];
+  var names = {};
+  (d.drivers || []).forEach(function (x) { if (!x.name) return; if (x.id) names[scPersonKey_(x.id)] = x.name; names[scPersonKey_(x.name)] = x.name; });
+  var ex = (d.exceptions || []).map(function (e) { return Object.assign({}, e.cells || {}, {driver_id: (e.cells || {}).driver_id || e.driverId || ''}); });
+  // Every day in the copied Live weeks, built the current app's way (scBuildDay_).
+  var byDate = {}, ev = {};
+  (d.events || []).forEach(function (e) { (ev[e.date] = ev[e.date] || []).push({eventType: e.type, payload: {route: e.route, run: e.run, checks: e.defect ? ['Defect found'] : []}}); });
+  (d.runs || []).forEach(function (run) {
+    L.DAYS.forEach(function (p, i) {
+      var x = run.days && run.days[p]; if (!x) return;
+      var date = L.addDays(run.weekStart, i), rt = (routeTimes[p] || {})[run.runId] || {};
+      (byDate[date] = byDate[date] || []).push({runId: run.runId, route: run.route, run: run.run, runs: x.runs ? 'TRUE' : '', driver: x.driver || '', driverId: x.driverId || '',
+        casesOut: x.casesOut, plantCaseReturn: x.plantCaseReturn, driverCaseReturn: x.driverCaseReturn,
+        // Joe 10/14: checked in the same way Driver Check-ins counts it: a check-in made in the app (phone, Driver Room station,
+        // the answering-service email the app read) or the cases delivered the driver reported (the current app's email intake).
+        checkedIn: !!(x.checkinCompletedAt || (x.casesDelivered !== null && x.casesDelivered !== undefined && x.casesDelivered !== '')),
+        truck: x.truck || '', startTime: x.startTime || '', departure: L.dateKey(x.departureDate) || '',
+        // Joe 10/13 Time grade: the day's dispatch time and expected hours, else Route Master's for that weekday.
+        dispatchTime: x.dispatchTime || rt.dispatchTime, routeHours: x.routeHours || rt.hours,
+        // Joe 10/13: Route Master's Sleeper yes/no; idling on a sleeper route counts less.
+        sleeper: x.sleeper || run.sleeper || routeSleeper[run.runId] ? 'TRUE' : ''});
+    });
+  });
+  var days = {}, gd = {}, ga = {}, unassigned = {};
+  gpsDays.forEach(function (g) { (gd[g.date] = gd[g.date] || []).push(g); });
+  gpsAlerts.forEach(function (a) { (ga[a.date] = ga[a.date] || []).push(a); });
+  // Joe 10/14: only our drivers (Driver Master; never CARRIER), never on a day off, and only alerts while the truck was out.
+  var who = {known: names, off: scOffDays_(ex, '2000-01-01', '2999-12-31')}, trucks = {}, byDepart = {};
+  Object.keys(byDate).forEach(function (date) {
+    var p = L.DAYS[scWeekday_(date)], rows = byDate[date];
+    // A check-in typed on Driver Check-ins counts like the phone's ROUTE_CHECKIN event.
+    var dayEv = (ev[date] || []).concat(rows.filter(function (r) { return r.checkedIn; }).map(function (r) { return {eventType: 'ROUTE_CHECKIN', payload: {route: r.route, run: r.run}}; }));
+    days[date] = scBuildDay_(date, rows, dayEv, routeMiles[p] || {}, who);
+    // Joe 10/14: a run's GPS is the day it leaves (most loads leave the day after they are loaded).
+    days[date].forEach(function (r) { (byDepart[r.departDate] = byDepart[r.departDate] || []).push(r); var k = scUnitKey_(r.truck); if (k) (trucks[r.departDate] = trucks[r.departDate] || {})[k] = true; });
+  });
+  var inWindow = scAlertWindows_(ga, gd, trucks, view.today);
+  // Each truck's GPS and alerts go to the driver Daily Dispatch put in it for the run leaving that day; the rest wait under No
+  // driver dispatched (only our Uniontown units, d.units).
+  Object.keys(byDepart).concat(Object.keys(inWindow)).filter(function (x, i, a) { return a.indexOf(x) === i; }).forEach(function (day) {
+    var m = scMatchGps_(day, byDepart[day] || [], gd[day] || [], inWindow[day] || [], d.units || []);
+    if (m.unassigned.length) unassigned[day] = m.unassigned;
+  });
+
+  var yesterday = scAddDays_(view.today, -1);
+  // Joe 10/14: No driver dispatched starts at Scorecard counted from too.
+  var lost = function (a, z) { return Object.keys(unassigned).filter(function (x) { return x >= a && x <= z && x >= s.countFrom; }).sort().reduce(function (l, x) { return l.concat(unassigned[x]); }, []); };
+  var exMap = {};
+  (d.excuses || []).forEach(function (x) { if (x.key) exMap[x.key] = {reason: x.reason || '', by: x.by || '', at: x.at || ''}; });
+  // Accidents (12 months), PDAs (9) and complaints (6) look back past the period, fading as they age.
+  var ratingsIn = function (a, z) { return (d.ratings || []).filter(function (x) { return x.date >= a && x.date <= z; }); };
+  var opts = function (a, z, ratingEnd) { return {alertsOn: d.alertsEver !== false || gpsAlerts.length > 0, seatbeltOn: gpsAlerts.some(function (x) { return scAlertKind_(x.type) === 'seatbelt'; }), ratings: ratingsIn(a, ratingEnd),
+    excuses: exMap, incidents: incidents, accidentsOn: incidents.some(function (x) { return x.kind === 'accident'; }), complaintsOn: incidents.some(function (x) { return x.kind === 'complaint'; }), pdaOn: incidents.some(function (x) { return x.kind === 'pda'; }), start: a, asOf: z}; };
+  // Joe 10/16: call-offs count through the calendar year, so read them from January 1.
+  var offs = function (a, z) { return scCallOffDays_(ex, a.slice(0, 4) + '-01-01', z, s); };
+  var span = function (a, z) { var list = []; for (var x = a; x <= z; x = scAddDays_(x, 1)) list = list.concat(days[x] || []); return list; };
+  if (view.mode === 'week') {
+    var w = scWeekRange_(view.weekStart), wend = w.end < yesterday ? w.end : yesterday;
+    var wrows = w.start > yesterday ? [] : scScoreMonth_(span(w.start, wend), offs(w.start, wend), s, names, opts(w.start, wend, wend));
+    return {rows: wrows, minDays: 99, summary: scSummary_(wrows, s, 99), through: wend < w.start ? w.start : wend, days: Object.keys(days).sort(), unassigned: lost(w.start, wend)};
+  }
+  var first = view.mode === 'year' ? 1 : view.month, last = view.mode === 'year' ? 12 : view.month, months = [];
+  for (var mo = first; mo <= last; mo++) {
+    var range = scMonthRange_(view.year, mo);
+    if (range.start > yesterday) break;
+    var end = range.end < yesterday ? range.end : yesterday;
+    months.push({month: mo, rows: scScoreMonth_(span(range.start, end), offs(range.start, end), s, names, opts(range.start, end, range.end))});
+  }
+  var rows = view.mode === 'year' ? scScoreYear_(months, s) : (months[0] ? months[0].rows : []);
+  var minDays = view.mode === 'year' ? Math.round(s.monthMinDays * months.length / 2) : s.monthMinDays;
+  var pr = view.mode === 'year' ? {start: view.year + '-01-01', end: view.year + '-12-31'} : scMonthRange_(view.year, view.month);
+  return {rows: rows, minDays: minDays, summary: scSummary_(rows, s, minDays), through: yesterday, days: Object.keys(days).sort(), unassigned: lost(pr.start, pr.end < yesterday ? pr.end : yesterday)};
+}
+
+// Joe 10/27: what the Driver Room TV shows in its Scorecard turn (scorecard/kiosk): the month so far, each driver's overall
+// score and grade best first, and the grades of the areas ticked on Settings > Areas shown on kiosk. Nothing else is kept.
+function scKioskRows_(board, settings) {
+  var areas = (settings.kioskAreas || []).filter(function (k) { return SC_CORE.AREAS.some(function (a) { return a[0] === k; }); });
+  return board.rows.filter(function (r) { return r.runDays || r.callOffs; }).map(function (r) {
+    var out = {rank: r.rank, driver: r.driver, score: r.score, grade: r.grade};
+    if (areas.length) { out.areas = {}; areas.forEach(function (k) { var g = r.areas && r.areas[k]; out.areas[k] = g && g.grade ? g.grade : ''; }); }
+    return out;
+  });
+}
+
+  return { SC_CORE: SC_CORE, scPad_: scPad_, scDateKey_: scDateKey_, scParseKey_: scParseKey_, scAddDays_: scAddDays_, scWeekday_: scWeekday_, scMonthRange_: scMonthRange_, scKeyOf_: scKeyOf_, scNum_: scNum_, scTruthy_: scTruthy_, scPersonKey_: scPersonKey_, scIsDriver_: scIsDriver_, scUnitKey_: scUnitKey_, scWeekRange_: scWeekRange_, scAlertKind_: scAlertKind_, scNyMinutes_: scNyMinutes_, scClock_: scClock_, scMatchGps_: scMatchGps_, scAlertText_: scAlertText_, scAreas_: scAreas_, scCleanPoints_: scCleanPoints_, scAreaScore_: scAreaScore_, scMinutesOf_: scMinutesOf_, scHoursOf_: scHoursOf_, scSettings_: scSettings_, scGrade_: scGrade_, scBuildDay_: scBuildDay_, scCallOffDays_: scCallOffDays_, scOffDays_: scOffDays_, scDepartDate_: scDepartDate_, scAlertWindows_: scAlertWindows_, scScoreMonth_: scScoreMonth_, scRank_: scRank_, scScoreYear_: scScoreYear_, scLeader_: scLeader_, scSummary_: scSummary_, scMonthsBetween_: scMonthsBetween_, scFade_: scFade_, scMissKey_: scMissKey_, scAlertKey_: scAlertKey_, scIncidentPoints_: scIncidentPoints_, scIncidentText_: scIncidentText_, scDayMpg_: scDayMpg_, scAlertWeight_: scAlertWeight_, scPdaStep_: scPdaStep_, scRouteMaps_: scRouteMaps_, scBoard_: scBoard_, scKioskRows_: scKioskRows_ };
 });

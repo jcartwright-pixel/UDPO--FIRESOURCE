@@ -14,6 +14,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
+const { buildKioskScores } = require('../../src/scorecard-kiosk');
 const F = require('../fixtures/fake-sheets');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
@@ -260,6 +261,12 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       assert.equal(await k.$$eval('tr.sc-misses, .sc-excuse, #sc-how', l => l.length), 0, 'no reasons or misses on the kiosk');
       assert.equal(await k.$eval('#kpis', e => e.offsetParent === null), true, 'no counts or buttons on the kiosk');
       if (SHOTS) await k.screenshot({ path: path.join(SHOTS, 'after-kiosk-1920.png') });
+      // Joe 10/27: the Driver Room TV's Scorecard turn reads the server's copy (scorecard/kiosk); it has the same drivers,
+      // order and overall scores as this screen.
+      const onScreen = await k.$$eval('table.sc-board tbody tr', t => t.filter(r => r.querySelector('td.strong')).map(r => r.querySelector('td.strong').textContent + ' ' + r.querySelector('.sc-overall').textContent));
+      const kept = await buildKioskScores({ db: db(), view: { mode: 'month', year: 2026, month: 10 } });
+      assert.deepEqual(kept.rows.map(r => r.driver + ' ' + r.score + ' ' + r.grade), onScreen, 'the TV copy matches the screen');
+      assert.equal(kept.label, 'Oct 26');
       assert.deepEqual(k.errors, []);
       await k.close();
       // Joe 10/13: the Driver Roster counts each driver's accidents and complaints and enters them under Edit.
