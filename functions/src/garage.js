@@ -34,6 +34,7 @@ const A = () => require('./actions');
 const MAINT = require('./maintenance');
 const { queueMaster } = require('./masterwrite');
 const CLOCK = require('./job-clock');
+const CHECK = require('./garage-checklists');
 
 const C = M.COLLECTIONS;
 const SaveErr = (code, message) => new (A().SaveError)(code, message);
@@ -113,7 +114,7 @@ function writeUpFrom(r) {
 const canRunGuess = (s) => !/OUT OF SERVICE|\bOOS\b|CAN.?T RUN|DOWN/i.test(String(s || ''));
 const writeUpKey = (r) => (KIND_KEYS[String(r.kind).toUpperCase()] || 'trucks') + '|' + r.record_id;
 const unitType = (v) => { const t = String(v || '').toUpperCase(); return t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK'; };
-const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues', FLEET: 'Verizon Fleet' };
+const FROM = { OFFICE: 'Office (Fleet Service)', TECH: 'Garage', WRITE_UP: 'Equipment Issues', FLEET: 'Verizon Fleet', SERVICE: 'Fleet Service (due)' };
 // A work order's labour: one entry per mechanic per clock (start, end, minutes); an open one has no end yet (job-clock.js).
 const { laborOf, joinNames } = CLOCK;
 
@@ -126,14 +127,21 @@ function jobOf(o) {
     fixed: o.fixed || '', fixedNote: o.fixed_note || '', safe: o.safe || '', signedBy: o.signed_by || '', minutes: o.minutes || '',
     from: o.source_from || FROM[String(o.source || '').toUpperCase()] || '', completedBy: o.completed_by || '',
     onNow: labor.filter(s => !s.end).map(s => ({ id: s.tech_id, name: s.name, since: s.start })), labor: labor.filter(s => s.end).map(s => ({ id: s.tech_id, name: s.name, minutes: s.minutes })),
-    laborMinutes: labor.reduce((n, s) => n + (s.end ? s.minutes : 0), 0) };
+    laborMinutes: labor.reduce((n, s) => n + (s.end ? s.minutes : 0), 0),
+    // Joe 10/28: a service has its checklist (garage-checklists.js); a work order made from 2 or more write-ups on one unit keeps the others.
+    checklist: CHECK.listFor(o.service_key, o.unit_type), dueAt: o.due_at || '', more: Array.isArray(o.more_problems) ? o.more_problems : [],
+    // Joe 10/28: the mechanics' notes (what they did, the parts put on, the parts waited on), newest last; the parts waited on now.
+    notesLog: Array.isArray(o.notes_log) ? o.notes_log.slice(-20) : [], partsNeeded: String(o.status || '').toUpperCase() === 'PARTS' ? o.parts_needed || '' : '', partsUsed: o.parts_used || '' };
 }
 
 // The hub list (udpoV7276GarageList_ + udpoV7276OrderJobs_): open work orders, then write-ups with no work order yet.
 function garageJobs(orders, records, units) {
   const mine = (orders || []).filter(o => o.work_order_id && (!o.facility_id || o.facility_id === FACILITY));
   const linked = {};
-  mine.forEach(o => { if (o.source_kind && o.source_id) linked[o.source_kind + '|' + o.source_id] = true; });
+  mine.forEach(o => {
+    if (o.source_kind && o.source_id) linked[o.source_kind + '|' + o.source_id] = true;
+    (Array.isArray(o.also_ids) ? o.also_ids : []).forEach(id => { if (o.source_kind) linked[o.source_kind + '|' + id] = true; });
+  });
   const byUnit = {};
   (units || []).forEach(u => { byUnit[alnum(u.unit)] = u; byUnit[alnum(u.unit).replace(/^T/, '')] = byUnit[alnum(u.unit).replace(/^T/, '')] || u; });
   const jobs = mine.filter(o => String(o.status || '').toUpperCase() !== 'DONE').map(jobOf);
@@ -141,25 +149,42 @@ function garageJobs(orders, records, units) {
   // job: none when a copy already has a work order, was repaired or removed (L.issueRows), else only its first copy.
   const reportOf = {}, listed = {}, byId = {};
   (records || []).forEach(r => { byId[String(r.kind).toUpperCase() + '|' + r.record_id] = r; });
+  const byUnitJob = {};
+  // Oldest first, so a unit's line shows its first write-up.
+  records = (records || []).slice().sort((a, b) => String(a.opened_at || a.service_date || '').localeCompare(String(b.opened_at || b.service_date || '')));
   Object.keys(KIND_KEYS).forEach(kind => L.issueRows(records || [], kind).forEach(row => {
     const key = kind + '|' + row.report, has = row.recordIds.some(id => linked[KIND_KEYS[kind] + '|' + id] || L.garageOff((byId[kind + '|' + id] || {}).notes));
     row.recordIds.forEach(id => { reportOf[kind + '|' + id] = has ? '' : key; });
   }));
   (records || []).forEach(r => {
     const kind = String(r.kind || '').toUpperCase(), report = reportOf[kind + '|' + r.record_id];
-    if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)] || !report || listed[report]) return;
+    if (!KIND_KEYS[kind] || !realWriteUp(r) || linked[writeUpKey(r)] || !report) return;
+    // Another copy of a report already on the list (the same email, or the same day's check-in and DVIR): Start and Complete take it too.
+    if (listed[report]) { if (listed[report].writeUps) listed[report].writeUps.push(writeUpKey(r)); return; }
     listed[report] = true;
     const raw = text(rawUnit(r)), unit = kind === 'FORK_TRUCK' ? null : byUnit[alnum(raw)] || byUnit[alnum(raw).replace(/^T/, '')];
-    // A leased unit's write-up goes to the lessor unless the office sent it to our garage.
-    if (unit && unit.leased && !L.garageSent(r.notes)) return;
+    // A leased truck's write-up goes to the lessor unless the office sent it to our garage. Joe 10/28: anything on a trailer
+    // always comes to our garage.
+    if (unit && unit.leased && kind !== 'TRAILER' && !L.garageSent(r.notes)) return;
     // Joe 10/14: a manager took it off the garage list (Delete on Fleet Service's Work Orders).
     if (L.garageOff(r.notes)) return;
-    const problem = text(r.issue_details || r.notes, 300);
-    jobs.push({ id: '', writeUp: writeUpKey(r), unit: unit ? unit.unit : unitText(raw, kind), type: kind, problem, category: '', canRun: canRunGuess(problem + ' ' + (r.priority || '')),
-      source: 'WRITE_UP', serviceKey: '', status: 'NEW', techs: [], startedAt: '', createdAt: String(r.opened_at || r.service_date || ''), driver: r.driver || '',
-      from: writeUpFrom(r), onNow: [], labor: [], laborMinutes: 0, completedBy: '' });
+    const problem = text(r.issue_details || r.notes, 300), unitName = unit ? unit.unit : unitText(raw, kind);
+    // Joe 10/28 (326 was on the tablet twice): a unit's write-ups nobody has started are one line, the first one's problem with
+    // the others under it; Start makes one work order for all of them.
+    const same = byUnitJob[kind + '|' + alnum(unitName)];
+    if (same) {
+      listed[report] = same;
+      same.writeUps.push(writeUpKey(r)); same.more.push(problem);
+      if (!canRunGuess(problem + ' ' + (r.priority || ''))) same.canRun = false;
+      return;
+    }
+    const job = { id: '', writeUp: writeUpKey(r), writeUps: [writeUpKey(r)], unit: unitName, type: kind, problem, more: [], category: '', canRun: canRunGuess(problem + ' ' + (r.priority || '')),
+      source: 'WRITE_UP', serviceKey: '', checklist: '', status: 'NEW', techs: [], startedAt: '', createdAt: String(r.opened_at || r.service_date || ''), driver: r.driver || '',
+      from: writeUpFrom(r), onNow: [], labor: [], laborMinutes: 0, completedBy: '' };
+    byUnitJob[kind + '|' + alnum(unitName)] = job; listed[report] = job;
+    jobs.push(job);
   });
-  const rank = (j) => j.status === 'PARTS' ? 4 : !j.canRun ? 0 : j.status === 'WORKING' ? 1 : j.source === 'OFFICE' ? 3 : 2;
+  const rank = (j) => j.status === 'PARTS' ? 4 : !j.canRun ? 0 : j.status === 'WORKING' ? 1 : j.source === 'OFFICE' || j.source === 'SERVICE' ? 3 : 2;
   return jobs.sort((a, b) => rank(a) - rank(b) || String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 
@@ -182,6 +207,8 @@ async function garageLists(db, nowMs) {
     .filter(r => KIND_KEYS[String(r.kind || '').toUpperCase()]);
   const ids = [...new Set(records.filter(realWriteUp).map(r => String(r.record_id)))], linkReads = [];
   for (let i = 0; i < ids.length; i += 30) linkReads.push(O.where('source_id', 'in', ids.slice(i, i + 30)).get());
+  // A work order made from a unit's 2 or more write-ups names the others in also_ids (Joe 10/28).
+  for (let i = 0; i < ids.length; i += 10) linkReads.push(O.where('also_ids', 'array-contains-any', ids.slice(i, i + 10)).get());
   const orders = byId(await Promise.all([O.where('status', 'not-in', ['DONE', 'done', 'Done']).get(), O.where('created_at', '>=', since).get()].concat(linkReads)));
   return { orders, records };
 }
@@ -292,7 +319,7 @@ async function board(db, nowMs) {
   const jobs = garageJobs(orders, records, units).map(j => { const c = Object.assign({}, j); delete c.driver; return c; });
   const open = {}; jobs.forEach(j => { if (j.id) open[j.id] = j; });
   return { techs: techs.map(t => { const c = clocks[t.id], j = c && open[c.workOrderId]; return Object.assign({}, t, { on: j ? { id: j.id, unit: j.unit, since: c.since } : null }); }),
-    jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES, now: new Date(nowMs).toISOString() };
+    jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES, checklists: CHECK.forTablet(), now: new Date(nowMs).toISOString() };
 }
 
 /* ---------- the job steps ---------- */
@@ -304,6 +331,10 @@ function validateStep(input) {
   const requestId = text(input.requestId, 80);
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) throw SaveErr('BAD_REQUEST', 'Each step needs a requestId');
   const out = { op, requestId, id: text(input.id, 40), writeUp: text(input.writeUp, 320) };
+  // Joe 10/28: Start on a unit's line with 2 or more write-ups names the others; one work order covers them all.
+  // Joe 10/28: what the mechanic did and the parts put on (typed or spoken on the work order), and the parts Waiting on Parts is for.
+  out.did = text(input.did, 1000); out.used = text(input.used, 600); out.partsNeeded = op === 'PARTS' ? text(input.partsNeeded, 600) : '';
+  out.also = (Array.isArray(input.also) ? input.also : []).map(k => text(k, 320)).filter(k => /^(trucks|trailers|forks)\|.+/.test(k) && k !== out.writeUp).slice(0, 9);
   if (op === 'REPORT') {
     out.unit = text(input.unit, 12);
     out.category = text(input.category, 40);
@@ -320,9 +351,11 @@ function validateStep(input) {
     if (G.FIXES.indexOf(out.fixed) < 0) throw SaveErr('BAD_REQUEST', 'Tap what you fixed.');
     if (typeof input.safe !== 'boolean') throw SaveErr('BAD_REQUEST', 'Tap Yes or No for "Safe to drive?".');
     out.safe = input.safe;
-    out.note = text(input.note, 300);
+    out.note = text(input.note, 1000);
     out.signature = String(input.signature || '');
     if (out.signature.length > G.SIGNATURE_MAX || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(out.signature)) throw SaveErr('BAD_REQUEST', 'Sign with your finger in the box.');
+    // A service's checklist (Joe 10/28), checked against its list once the work order is read.
+    out.checklist = Array.isArray(input.checklist) ? input.checklist.slice(0, 200) : null;
   }
   return out;
 }
@@ -384,6 +417,16 @@ async function step(db, input, nowMs) {
         if (!w.exists || !realWriteUp(w.data())) throw SaveErr('NOT_FOUND', 'That write-up was already fixed or removed.');
         order = Object.assign(writeUpOrder(w.data(), kindName, stamp, by), { version: 0, isNew: true });
         ref = db.collection(WORK_ORDERS).doc(docId(order.work_order_id));
+        // The unit's other write-ups on the same line: still open, the same kind, and on no other work order.
+        const also = [], more = [];
+        for (const k of req.also.filter(k => k.split('|')[0] === kindName)) {
+          const id = k.slice(k.indexOf('|') + 1);
+          const [o1, o2, ws] = await Promise.all([tx.get(db.collection(WORK_ORDERS).where('source_id', '==', id)), tx.get(db.collection(WORK_ORDERS).where('also_ids', 'array-contains', id)),
+            tx.get(db.collection(C.maintenance).doc(MAINT.docId(id)))]);
+          if (o1.docs.concat(o2.docs).some(d => d.data().source_kind === kindName) || !ws.exists || !realWriteUp(ws.data())) continue;
+          also.push(id); more.push(text(ws.data().issue_details || ws.data().notes, 300));
+        }
+        if (also.length) Object.assign(order, { also_ids: also, more_problems: more });
       }
       if (w.exists) writeUp = w.data();
     }
@@ -391,7 +434,19 @@ async function step(db, input, nowMs) {
 
     // DONE needs the write-up (to mark it repaired), the newest odometer and Fleet Service's row, read before any write.
     let odometer = null, gpsHours = null, setupRef = null, setup = null, rules = fleetRules(null);
+    // Joe 10/28: a service's Complete carries its checklist, every line answered.
+    let checked = null;
+    if (req.op === 'DONE' && CHECK.listFor(order.service_key, order.unit_type)) {
+      checked = CHECK.checkAnswers(CHECK.listFor(order.service_key, order.unit_type), req.checklist);
+      if (checked.error) throw SaveErr('BAD_REQUEST', checked.error);
+    }
+    let alsoUps = [];
     if (req.op === 'DONE' && req.safe) {
+      // The unit's other write-ups this work order covers are repaired with it.
+      for (const id of (Array.isArray(order.also_ids) ? order.also_ids : [])) {
+        const r = db.collection(C.maintenance).doc(MAINT.docId(id)), w = await tx.get(r);
+        if (w.exists) alsoUps.push({ ref: r, data: w.data() });
+      }
       if (order.source_id && order.source !== 'FLEET' && !writeUp) { writeUpRef = db.collection(C.maintenance).doc(MAINT.docId(order.source_id)); const w = await tx.get(writeUpRef); writeUp = w.exists ? w.data() : null; }
       // Joe 10/13: the newer of the driver's DVIR odometer and Verizon Connect Fleet's (gpsTrucks); a trailer's GPS hours are its reefer hours.
       const unitKey = String(order.unit).toUpperCase().replace(/\s+/g, ''), gpsId = M.safeIdPart(unitKey);
@@ -416,8 +471,20 @@ async function step(db, input, nowMs) {
     const was = String(order.status || 'NEW').toUpperCase(), techs = String(order.techs || '').split(/\s*,\s*/).filter(Boolean);
     const change = Object.assign({ techs: joinNames(techs.concat(names)), started_at: order.started_at || stamp, updated_at: stamp, updated_by: by, version: (Number(order.version) || 0) + 1 }, moved.laborFields(labor),
       CLOCK.stepStatus(req.op, was, 'parts_at', stamp));
+    // Joe 10/28: the notes go on the work order under the mechanic's name; Complete's own answers are its notes.
+    const said = req.op === 'DONE' ? { did: req.note, used: req.used } : { did: req.did, used: req.used };
+    if (said.did || said.used || req.partsNeeded) {
+      change.notes_log = (Array.isArray(order.notes_log) ? order.notes_log : []).concat([Object.assign({ at: stamp, by: names[0], step: req.op },
+        said.did ? { did: said.did } : {}, said.used ? { used: said.used } : {}, req.partsNeeded ? { parts: req.partsNeeded } : {})]).slice(-100);
+    }
+    if (req.op === 'PARTS') change.parts_needed = req.partsNeeded;
+    if (req.op === 'DONE' && req.used) change.parts_used = (order.parts_used ? order.parts_used + '; ' : '') + req.used;
     if (req.op === 'DONE') {
       Object.assign(change, { fixed: req.fixed, fixed_note: req.note, safe: req.safe ? 'YES' : 'NO', signed_by: names[0], signature: req.signature });
+      if (checked) {
+        change.checklist = checked.rows;
+        if (checked.fix.length) change.fixed_note = 'Needs work: ' + checked.fix.join('; ') + (req.note ? '. ' + req.note : '');
+      }
       if (!req.safe) Object.assign(change, { status: 'WORKING', can_run: 'NO' });
       else {
         Object.assign(change, { status: 'DONE', completed_at: stamp, completed_by: names[0], can_run: 'YES', minutes: moved.minutesFrom(change.started_at) });
@@ -432,13 +499,15 @@ async function step(db, input, nowMs) {
 
     if (req.op === 'DONE' && req.safe) {
       // The write-up is repaired (Equipment Issues' Mark Repaired), and Fleet Service's dates move on.
-      if (writeUp && writeUpRef && !DONE_STATUS.test(String(writeUp.status || ''))) {
+      const ups = (writeUp && writeUpRef ? [{ ref: writeUpRef, data: writeUp }] : []).concat(alsoUps);
+      ups.forEach(({ ref: wRef, data: w }, i) => {
+        if (DONE_STATUS.test(String(w.status || ''))) return;
         const close = { status: 'COMPLETE', available: 'TRUE', out_of_service: 'FALSE', completed_at: stamp, completed_by: by, resolution: 'COMPLETED', resolution_notes: req.fixed + (req.note ? ': ' + req.note : '') + ' (Garage Station ' + after.work_order_id + ')', updated_at: stamp, updated_by: by };
-        tx.update(writeUpRef, Object.assign({}, close, { testEdited: true, editedAt: stamp, editedBy: by }));
-        const list = MAINT.LISTS[String(writeUp.kind || '').toUpperCase()];
-        if (list) queueMaster(tx, db, mode, req.requestId, 'issue', writeUpRef, writeUp.record_id, writeUp.createdInApp ? Object.assign({}, writeUp, close) : close, !!writeUp.createdInApp, stamp, by, list);
+        tx.update(wRef, Object.assign({}, close, { testEdited: true, editedAt: stamp, editedBy: by }));
+        const list = MAINT.LISTS[String(w.kind || '').toUpperCase()];
+        if (list) queueMaster(tx, db, mode, req.requestId + (i ? '-' + i : ''), 'issue', wRef, w.record_id, w.createdInApp ? Object.assign({}, w, close) : close, !!w.createdInApp, stamp, by, list);
         result.writeUpClosed = true;
-      }
+      });
       if (setupRef) {
         const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
@@ -452,6 +521,7 @@ async function step(db, input, nowMs) {
     result.job = jobOf(after);
     const before = {}; Object.keys(change).forEach(k => { before[k] = order[k] === undefined ? null : order[k]; });
     const logged = Object.assign({}, change); if (logged.signature) logged.signature = '(signature, ' + logged.signature.length + ' characters)';
+    if (logged.checklist) logged.checklist = '(' + logged.checklist.length + ' lines)';
     tx.set(logRef, { action: 'garage' + req.op, by, at: stamp, mode: mode.mode, workOrderId: after.work_order_id, before, after: logged, result });
     return result;
   }).then(r => { if (r && r.wrong) throw SaveErr('NOT_ALLOWED', 'Wrong login ID. Try again.'); return r; });
@@ -546,6 +616,44 @@ async function engineCodeOrders(db, faults, stamp) {
     });
   }
   return { made, counted };
+}
+
+/*
+ * Joe 10/28 ("whenever it's due for services too, it should come up with the list of stuff that I normally check off"): a PM,
+ * reefer service or Annual Inspection that Fleet Service shows Due soon or Overdue becomes a work order on the Garage Station by
+ * itself, with its checklist (garage-checklists.js). Fleet Service's own list decides (L.fleetDue: our own trucks and this
+ * plant's trailers, the same rules and miles); one open work order per unit and service, as Send to Garage. One the office
+ * deleted is not made again for the same due date (source_id "<unit>|<service>|<due>"). Plates never go. Uniontown's garage.
+ */
+async function serviceOrders(db, nowMs) {
+  const [equipment, ownershipDoc, setup, odometers, gps, rulesDoc, open] = await Promise.all([
+    db.collection(C.equipment).get(), db.collection('config').doc('fleetOwnership').get(), db.collection('fleetSetup').get(), db.collection('odometers').get(),
+    db.collection('gpsTrucks').get(), db.collection('config').doc(RULES_DOC).get(), db.collection(WORK_ORDERS).where('status', 'not-in', ['DONE', 'done', 'Done']).get()]);
+  const owned = ownershipDoc.exists && ownershipDoc.data().units ? ownershipDoc.data() : null, seen = {};
+  const units = equipment.docs.map(d => d.data()).map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && (!e.facilityId || e.facilityId === FACILITY) &&
+    e.sourcePresent !== false && L.fleetOwnedHere(e, FACILITY, owned) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
+    .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true));
+  const openOrders = open.docs.map(d => d.data()).filter(o => !o.facility_id || o.facility_id === FACILITY);
+  const today = L.operatingDay(new Date(nowMs)), stamp = new Date(nowMs).toISOString();
+  const due = L.fleetDue(units, setup.docs.map(d => d.data()), L.latestReadings(odometers.docs.map(d => d.data()), gps.docs.map(d => d.data())), openOrders,
+    fleetRules(rulesDoc.exists ? rulesDoc.data() : null), today);
+  const want = due.items.filter(i => G.SERVICES[i.key] && (i.status === 'OVERDUE' || i.status === 'DUE_SOON'));
+  let made = 0;
+  for (const i of want) {
+    const sid = i.unit + '|' + i.key + '|' + i.dueAt;
+    await db.runTransaction(async tx => {
+      const [mine, gone] = await Promise.all([tx.get(db.collection(WORK_ORDERS).where('unit', '==', i.unit)), tx.get(db.collection(DELETED).where('source_id', '==', sid))]);
+      if (gone.docs.length || mine.docs.some(d => d.data().service_key === i.key && String(d.data().status || '').toUpperCase() !== 'DONE')) return;
+      const id = newOrderId(), late = i.status === 'OVERDUE';
+      const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^(\d{4})-(\d\d)-(\d\d)$/, (m, y, mo, d) => Number(mo) + '-' + Number(d) + '-' + y.slice(2));
+      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), { work_order_id: id, facility_id: FACILITY, unit: i.unit, unit_type: i.type, problem: G.SERVICES[i.key] + (late ? ' overdue' : ' due') + (when ? ' ' + when : ''),
+        category: '', can_run: 'YES', source: 'SERVICE', source_from: FROM.SERVICE, source_kind: 'service', source_id: sid, service_key: i.key, due_at: String(i.dueAt), status: 'NEW', created_at: stamp,
+        created_by: 'Fleet Service', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '',
+        updated_at: stamp, updated_by: 'Fleet Service', version: 1, createdInApp: true });
+      made++;
+    });
+  }
+  return { made, due: want.length };
 }
 
 /*
@@ -838,4 +946,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };
+module.exports = { G, engineCodeOrders, serviceOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };

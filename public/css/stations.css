@@ -104,6 +104,54 @@
 #view-job .gs-two .gs-btn { min-height: 84px; font-size: 30px; }
 #view-job .gs-done { min-height: 80px; }
 .gs-now:empty { display: none; }
+/* Joe 10/28 (mock-up 1): the Garage Station opens on three big cards, Trucks, Trailers and Fork trucks, with their open work
+   orders. A work order has a big yellow Back, normal-size buttons (Joe: "entirely too big"), notes typed or spoken, and a
+   service's checklist (OK / Needs work / N/A, as his paper forms). */
+.gs-cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-content: center; }
+.gs-bigcard { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 300px; padding: 18px; border: 4px solid transparent; border-radius: 20px;
+  background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .14); color: #1b2a3a; font: inherit; text-align: center; cursor: pointer; touch-action: manipulation; }
+.gs-bigcard:active, .gs-bigcard:focus-visible { border-color: #0b4f86; background: #eaf3fc; }
+.gs-bigcard img { width: 100%; max-width: 260px; height: 150px; object-fit: contain; }
+.gs-bigcard b { font-size: 84px; line-height: 1; font-weight: 900; color: #0b4f86; }
+.gs-bigcard span { font-size: 38px; font-weight: 800; }
+.gs-bigcard small { font-size: 20px; font-weight: 700; color: #6b7b8c; }
+.gs-bigcard small.red { color: #b42318; } .gs-bigcard small.green { color: #1c7c4a; }
+.gs-btn.gs-back { background: #f2b705; color: #1b2a3a; font-size: 26px; min-height: 64px; padding: 0 24px; flex: none; }
+.gs-btn.amber { background: #c2410c; }
+/* Joe 10/28: when it was first written up and how many times. */
+.gs-written { font-size: 20px; font-weight: 800; color: #0b4f86; }
+.gs-job .what small.gs-written { color: #0b4f86; font-weight: 800; }
+.gs-simple#view-job, .gs-simple#view-fix { overflow: hidden; }
+.gs-simple#view-job > .gs-scroll, .gs-simple#view-fix > .gs-scroll { flex: 1 1 auto; min-height: 0; }
+.gs-simple#view-job > :not(.gs-scroll) { flex: none; }
+.gs-simple .gs-bar h2 { font-size: 30px; }
+.gs-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.gs-scroll > * { flex: none; }
+.gs-four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex: none; }
+.gs-four .gs-btn, .gs-simple .gs-go { font-size: 22px; min-height: 60px; padding: 6px 12px; }
+.gs-four .gs-btn[hidden] { display: none; }
+.gs-simple .gs-problem { font-size: 28px; }
+.gs-simple .gs-clock { grid-template-columns: 44px 1fr auto; } .gs-simple .gs-clock i { width: 44px; height: 44px; } .gs-simple .gs-clock .t { font-size: 28px; }
+.gs-notes { display: flex; flex-direction: column; gap: 6px; }
+.gs-nl { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gs-nl label { font-size: 20px; font-weight: 800; color: #1b2a3a; }
+.gs-notes textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 10px 12px; border: 2px solid #c9d6e3; border-radius: 12px; resize: vertical; }
+.gs-mic { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 2px solid #0b4f86; border-radius: 22px; background: #fff; color: #0b4f86;
+  font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; touch-action: manipulation; flex: none; }
+.gs-mic svg { width: 22px; height: 22px; fill: currentColor; }
+.gs-mic.on { background: #b42318; border-color: #b42318; color: #fff; }
+.gs-mic[hidden] { display: none; }
+.gs-log { display: flex; flex-direction: column; gap: 4px; font-size: 18px; color: #33475b; }
+.gs-log:empty { display: none; }
+.gs-checks h3 { margin: 10px 0 4px; font-size: 20px; color: #123f70; }
+.gs-ck { display: grid; grid-template-columns: 1fr repeat(3, auto); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; font-size: 19px; font-weight: 700; }
+.gs-ck:nth-of-type(odd) { background: #f5f8fb; }
+.gs-ck.ok { background: #e3f5ea; } .gs-ck.fix { background: #fdecea; } .gs-ck.na { background: #eef1f4; }
+.gs-ckb { min-height: 44px; min-width: 84px; padding: 0 12px; border: 2px solid #c9d6e3; border-radius: 10px; background: #fff; color: #1b2a3a; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.gs-ckb.on[data-r="OK"] { background: #1c7c4a; border-color: #1c7c4a; color: #fff; }
+.gs-ckb.on[data-r="FIX"] { background: #b42318; border-color: #b42318; color: #fff; }
+.gs-ckb.on[data-r="NA"] { background: #6b7b8c; border-color: #6b7b8c; color: #fff; }
+.gs-simple .gs-fixes .gs-btn { min-height: 64px; font-size: 22px; }
 @media (max-width: 1100px) {
   .gs-sign, .gs-report { grid-template-columns: 1fr; overflow: auto; }
   .gs-job { grid-template-columns: 120px 1fr 140px; } .gs-job .unit { font-size: 28px; }
@@ -115,6 +163,8 @@
   .gs-btn { font-size: 22px; min-height: 60px; }
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
+  .gs-cards { grid-template-columns: 1fr; align-content: start; } .gs-bigcard { min-height: 0; flex-direction: row; flex-wrap: wrap; gap: 4px 14px; } .gs-bigcard b { font-size: 56px; } .gs-bigcard img { width: 96px; height: 64px; }
+  .gs-four { grid-template-columns: 1fr 1fr; } .gs-ck { grid-template-columns: 1fr 1fr 1fr; } .gs-ck span { grid-column: 1 / -1; }
   .gs-clock { grid-template-columns: 40px 1fr auto; } .gs-clock i { width: 40px; height: 40px; } .gs-clock .gs-btn { grid-column: 1 / -1; }
   /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
   .gs-page .view { padding: 0 8px 10px; }
