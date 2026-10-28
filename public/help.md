@@ -380,7 +380,7 @@ Every work order at the garage: unit, problem, category, whether the unit can ru
 id: garage-station
 screens: garage-station.html
 
-The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with the number of open work orders. Mechanics sign in with their name and login ID for each step.
+The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with its picture and the number of open work orders. Mechanics sign in with their name and login ID for each step.
 
 1. Tap a card to see its open work orders. `← All work orders` goes back to the cards.
 2. Tap `Open` on a work order. The big yellow `← Back` goes back to the list.

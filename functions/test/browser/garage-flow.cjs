@@ -79,11 +79,14 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
     await gs.waitForFunction(() => document.querySelectorAll('#cards [data-type]').length === 3 && /Tom on PJ-7/.test(document.getElementById('cards').textContent), null, { timeout: 15000 });
     assert.deepEqual(await gs.$$eval('#cards [data-type]', b => b.map(x => x.querySelector('span').textContent + ' ' + x.querySelector('b').textContent)), ['Trucks 2', 'Trailers 1', 'Fork trucks 1']);
     assert.match(await gs.textContent('[data-type="TRAILER"]'), /1 can't run/);
+    // Joe 10/28: each card shows the app's own picture of a truck, a trailer or a fork truck.
+    await gs.waitForFunction(() => [...document.querySelectorAll('#cards img')].every(i => i.complete && i.naturalWidth > 0), null, { timeout: 10000 });
+    assert.deepEqual(await gs.$$eval('#cards [data-type] img', i => i.map(x => x.getAttribute('src').replace('img/library/', ''))), ['maintenance-tractor-v1-560.webp', 'maintenance-trailer-v1-560.webp', 'forklift-truck-v1-560.webp']);
     assert.equal(await gs.isVisible('#view-sign'), false, 'no sign-in before the cards');
     for (const gone of ['#strip', '#to-report', '#people', '#go-back', '#go-home', '.sidemenu']) assert.equal(await gs.$(gone), null, gone + ' is gone');
     assert.ok(await fits(gs), 'the cards fit the tablet');
     await shot(gs, '1-cards-tablet-1280.png');
-    results.push('Three big cards first, no sign-in: Trucks 2, Trailers 1 (can\'t run), Fork trucks 1 with Tom on PJ-7; no mechanics row, no Report a Problem');
+    results.push('Three big cards first, each with its picture, no sign-in: Trucks 2, Trailers 1 (can\'t run), Fork trucks 1 with Tom on PJ-7; no mechanics row, no Report a Problem');
 
     // 2. Trucks: 900001 once with both write-ups, and the PM that is due.
     await gs.click('[data-type="TRUCK"]');

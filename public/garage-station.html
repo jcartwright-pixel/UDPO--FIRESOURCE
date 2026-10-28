@@ -121,7 +121,8 @@
     });
     const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
     // The three cards, in Joe's order.
-    const CARDS = [['TRUCK', 'Trucks'], ['TRAILER', 'Trailers'], ['FORK_TRUCK', 'Fork trucks']];
+    // Joe 10/28: the app's own pictures (the same as the Truck, Trailer and Fork Truck Issues screens) so the cards read at a glance.
+    const CARDS = [['TRUCK', 'Trucks', 'maintenance-tractor-v1-560.webp'], ['TRAILER', 'Trailers', 'maintenance-trailer-v1-560.webp'], ['FORK_TRUCK', 'Fork trucks', 'forklift-truck-v1-560.webp']];
     let pick = 'TRUCK', board = [];
 
     // One step: sent now with the mechanic's sign-in, or (no signal) kept on the tablet with their name and login ID, sent in
@@ -172,13 +173,13 @@
 
     /* ---------- the three cards (Joe 10/28) ---------- */
     function drawCards() {
-      $('cards').innerHTML = CARDS.map(([type, name]) => {
+      $('cards').innerHTML = CARDS.map(([type, name, pic]) => {
         const list = board.filter(j => (TYPE[j.type] ? j.type : 'TRUCK') === type), down = list.filter(j => !j.canRun && j.status !== 'PARTS').length;
         const working = list.filter(j => j.onNow.length), parts = list.filter(j => j.status === 'PARTS').length;
         const lines = [down ? '<small class="red">' + down + ' can\'t run</small>' : '',
           working.length ? '<small class="green">' + escapeHtml(working.map(j => names(j.onNow.map(p => first(p.name))) + ' on ' + j.unit).join(' · ')) + '</small>' : '',
           parts ? '<small>' + parts + ' waiting on parts</small>' : ''].filter(Boolean);
-        return '<button type="button" class="gs-bigcard" data-type="' + type + '"><b>' + list.length + '</b><span>' + name + '</span><small>open work order' + (list.length === 1 ? '' : 's') + '</small>' + lines.join('') + '</button>';
+        return '<button type="button" class="gs-bigcard" data-type="' + type + '"><img src="img/library/' + pic + '" alt=""><b>' + list.length + '</b><span>' + name + '</span><small>open work order' + (list.length === 1 ? '' : 's') + '</small>' + lines.join('') + '</button>';
       }).join('');
     }
     $('cards').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (!b) return; pick = b.dataset.type; S.message(''); S.closeJob(); S.redraw(); S.view('jobs'); S.load().catch(() => {}); });

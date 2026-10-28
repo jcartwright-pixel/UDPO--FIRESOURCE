@@ -111,7 +111,8 @@
 .gs-bigcard { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 300px; padding: 18px; border: 4px solid transparent; border-radius: 20px;
   background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .14); color: #1b2a3a; font: inherit; text-align: center; cursor: pointer; touch-action: manipulation; }
 .gs-bigcard:active, .gs-bigcard:focus-visible { border-color: #0b4f86; background: #eaf3fc; }
-.gs-bigcard b { font-size: 110px; line-height: 1; font-weight: 900; color: #0b4f86; }
+.gs-bigcard img { width: 100%; max-width: 260px; height: 150px; object-fit: contain; }
+.gs-bigcard b { font-size: 84px; line-height: 1; font-weight: 900; color: #0b4f86; }
 .gs-bigcard span { font-size: 38px; font-weight: 800; }
 .gs-bigcard small { font-size: 20px; font-weight: 700; color: #6b7b8c; }
 .gs-bigcard small.red { color: #b42318; } .gs-bigcard small.green { color: #1c7c4a; }
@@ -159,7 +160,7 @@
   .gs-btn { font-size: 22px; min-height: 60px; }
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
-  .gs-cards { grid-template-columns: 1fr; align-content: start; } .gs-bigcard { min-height: 0; flex-direction: row; flex-wrap: wrap; gap: 4px 14px; } .gs-bigcard b { font-size: 56px; }
+  .gs-cards { grid-template-columns: 1fr; align-content: start; } .gs-bigcard { min-height: 0; flex-direction: row; flex-wrap: wrap; gap: 4px 14px; } .gs-bigcard b { font-size: 56px; } .gs-bigcard img { width: 96px; height: 64px; }
   .gs-four { grid-template-columns: 1fr 1fr; } .gs-ck { grid-template-columns: 1fr 1fr 1fr; } .gs-ck span { grid-column: 1 / -1; }
   .gs-clock { grid-template-columns: 40px 1fr auto; } .gs-clock i { width: 40px; height: 40px; } .gs-clock .gs-btn { grid-column: 1 / -1; }
   /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
