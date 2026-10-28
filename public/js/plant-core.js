@@ -429,7 +429,9 @@ export function nextLoads(rows, loads) {
     const unit = U.unitKey(l.trailer || l.truck);
     if (!unit) return;
     rows.forEach(r => {
-      if (r.nextLoad || U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)) !== unit || (l.prior && l.runDocId === r.runDocId)) return;
+      // A load is not the next use of the trailer that came back from that same load (same run and delivery day, e.g. a leftover
+      // load nobody pressed Done on). Yesterday's delivery of the same run is another trip: its trailer goes on that load's place.
+      if (r.nextLoad || U.unitKey(r.trailer || (r.dropAndHook ? '' : r.truck)) !== unit || (l.runDocId === r.runDocId && l.day === r.day)) return;
       r.nextLoad = { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }; r.nextRank = i;
     });
   });
