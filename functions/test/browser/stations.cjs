@@ -62,17 +62,23 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Garage Station: the technicians' names, then the login ID on the keypad, then the jobs.
+    // Garage Station (Joe 10/28): the Trucks card, a work order, Start Work: the technicians' names, then the login ID on the keypad.
     const gs = await openPage(browser, 1920, 1080, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
-    await gs.waitForSelector('[data-tech="TECH-JT"]', { timeout: 10000 });
+    await gs.waitForSelector('[data-type="TRUCK"]', { timeout: 10000 });
+    await gs.waitForFunction(() => /\b1\b/.test(document.querySelector('[data-type="TRUCK"] b').textContent), null, { timeout: 10000 });
+    await gs.click('[data-type="TRUCK"]');
+    await gs.waitForFunction(() => /Air leak/.test(document.getElementById('jobs').textContent), null, { timeout: 10000 });
+    await shot(gs, 'garage-station-jobs-1920.png');
+    await gs.click('.gs-job:has-text("900001") button');
+    await gs.click('#job-start');
+    await gs.waitForSelector('[data-who="TECH-JT"]');
     await shot(gs, 'garage-station-sign-in-1920.png');
-    await gs.click('[data-tech="TECH-JT"]');
+    await gs.click('[data-who="TECH-JT"]');
     for (const k of '48213') await gs.click('[data-key="' + k + '"]');
     await gs.click('[data-key="go"]');
-    await gs.waitForFunction(() => /Air leak/.test(document.body.textContent), null, { timeout: 10000 });
-    await shot(gs, 'garage-station-jobs-1920.png');
+    await gs.waitForFunction(() => /JELLICK Tom started on 900001/.test(document.getElementById('gs-message').textContent), null, { timeout: 10000 });
     assert.deepEqual(gs.errors, []);
-    results.push('Garage Station: JELLICK Tom signed in with his login ID and sees the open jobs');
+    results.push('Garage Station: the Trucks card shows 900001; JELLICK Tom starts it with his name and login ID');
 
     // The drivers' phone page: View Loadout and DVIR, with the Route Distribution code.
     const { code } = await newRouteCode(db(), { email: 'manager.test@uniteddairy.com' });

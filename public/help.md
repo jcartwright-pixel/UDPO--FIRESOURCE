@@ -380,22 +380,35 @@ Every work order at the garage: unit, problem, category, whether the unit can ru
 id: garage-station
 screens: garage-station.html
 
-The garage's tablet. Mechanics sign in with their name and login ID, start and finish jobs, and report new problems.
+The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with the number of open work orders. Mechanics sign in with their name and login ID for each step.
 
-1. Pick a work order on **Work Orders** to start or finish your time on it.
-2. `+ Report a Problem` reports a new problem: pick the unit, say what is wrong, answer whether it can still run (`Yes` or `No, it's down`), then `Send`.
+1. Tap a card to see its open work orders. `← All work orders` goes back to the cards.
+2. Tap `Open` on a work order. The big yellow `← Back` goes back to the list.
+3. `Start Work`: tap your name, then your login ID. Your clock starts. A second mechanic taps `Start Work` with their own name to join; everyone on the job shows with their time.
+4. Type (or tap `Talk` and say) what you did in **Notes / what I did today** and the parts in **Parts put on**. They go on the work order with your name when you press `Pause`, `Waiting on Parts` or `Complete`.
+5. `Pause` stops your clock. The job stays open.
+6. `Waiting on Parts`: name the parts you need in your own words, then `Waiting on Parts` again and your login ID. When they come in, `Parts are here` starts it again.
+7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, safe to drive, and sign with your finger.
 
+- What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
+- A leased truck's write-up comes only when the office sends it to the garage.
+- A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
+- A service that is due has its checklist on the work order. Tap `OK`, `Needs work` or `N/A` on every line before `Complete`. The **Needs work** lines are kept on the work order.
+- Left alone for 10 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
 - With no signal the station keeps working and sends everything when the signal is back.
-- A tablet opened with a station code has no Back or Home. `Release` (with the manager release code) is the only way out.
-- `Release` goes back to the code screen, never into the app. Once a code has opened it, the tablet opens only the Garage Station: any other screen typed in goes straight back.
+- A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app.
 
-> A mechanic's sign-in works only on their own plant's Maintenance Station.
+> `Talk` uses the tablet's microphone. The first time, the tablet asks to allow it: tap Allow.
+
+> A garage mechanic's sign-in works only here; the plant's mechanics sign in on their own plant's Maintenance Station.
+
+!> Do not tap `Complete` until the work is done. A work order that is waiting on something is `Pause` or `Waiting on Parts`.
 
 !> Do not type the garage station code on your own computer. It then opens only the Garage Station.
 
 !> Do not add the plant's mechanics on Fleet Service Setup. That list is the garage's mechanics, and they show only on the Garage Station.
 
-!> Do not sign in as another mechanic. Each mechanic's time goes on their own name.
+!> Do not sign in as another mechanic. Each mechanic's time and notes go on their own name.
 
 ## Fleet Service
 id: fleet
@@ -408,7 +421,7 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - **History** shows the last 12 months.
 - **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup.
 - To start a unit's dates, click its PM / Reefer or Annual Inspection on **Due**, or `Edit dates`. Type the last service date and miles, reefer hours, inspection due and plate expiry.
-- `Send to Garage` makes a work order for a unit that is due.
+- A PM, reefer service or Annual Inspection that is due soon or overdue goes onto the Garage Station by itself, with its checklist. `Send to Garage` sends one sooner.
 - `Print Fleet Service Report` prints the report.
 
 > Miles marked GPS come from Verizon Connect Fleet; others come from the driver's DVIR or were typed.

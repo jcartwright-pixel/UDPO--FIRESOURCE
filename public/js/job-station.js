@@ -16,6 +16,11 @@
  *   step(who, job, op)   one clock step; complete(job, who, fields) the Complete step and doneText(job, who, safe, r)
  *   jobKey, jobLine, jobHead, jobLabel, problem, officeSource, downWord, unitClass, emptyJobs, noTechs, hideEmptyStrip, emptyStrip,
  *   completeName, safeQ, safeWord, safeYes   the words and looks that differ
+ *   simple               Joe 10/28 (Garage Station, "mechanics that are not too technologically advanced"): one work order has a
+ *                        big Back and three big buttons, Start Work, Pause and Complete (no Need Parts, no Stop per mechanic)
+ *   filter, jobsTitle    the work orders the list shows (the Garage Station's card: trucks, trailers or fork trucks) and its title
+ *   serviceFix(job)      a service's Complete skips "What did you fix?" (what it returns is the answer); its checklist
+ *                        (job.checklist names one of the board's checklists) is answered on the work order first
  */
 import { escapeHtml, goBack, hoursMinutesText } from './app.js';
 
@@ -29,12 +34,67 @@ export const age = (iso) => { const m = mins(iso); if (!iso || !isFinite(Date.pa
 export const first = (name) => { const p = String(name || '').split(/\s+/); return p.length > 1 && p[0] === p[0].toUpperCase() ? p.slice(1).join(' ') : p[0]; };
 export const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 
-// The shared screens, put in after the work orders: one work order, Who are you?, and Complete's two steps.
-function sharedScreens(safeYes) {
+// Joe 10/28 (Garage Station, "mechanics that are not too technologically advanced"): a talk button by each notes box types what is said.
+const MIC = (target) => '<button type="button" class="gs-mic" data-mic="%s" title="Talk instead of typing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12z"/></svg>Talk</button>'.replace('%s', target);
+function simpleJob() {
   return `
+        <!-- Joe 10/28 (Garage Station): one work order has a big Back, what is wrong, who is on it, the notes (what I did today and the
+             parts put on, typed or spoken), the service checklist, and four buttons. -->
+        <section id="view-job" class="gs-stack gs-simple" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn gs-back" data-go="jobs">&larr; Back</button><h2 id="job-unit"></h2></div>
+          <div class="gs-scroll">
+            <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-label" id="job-more"></div><div class="gs-now" id="job-now"></div></div>
+            <div class="gs-card gs-crew"><div class="gs-label">Working on it now</div><div id="crew"></div><div class="gs-label" id="crew-done"></div></div>
+            <div class="gs-card gs-notes">
+              <div class="gs-nl"><label for="job-did">Notes / what I did today</label>${MIC('job-did')}</div>
+              <textarea id="job-did" maxlength="1000" rows="2"></textarea>
+              <div class="gs-nl"><label for="job-used">Parts put on</label>${MIC('job-used')}</div>
+              <textarea id="job-used" maxlength="600" rows="2"></textarea>
+              <p class="gs-hint">These go on the work order with your name when you press Pause, Waiting on Parts or Complete.</p>
+              <div class="gs-log" id="job-log"></div>
+            </div>
+            <div class="gs-card gs-checks" id="job-checks" hidden></div>
+          </div>
+          <div class="gs-four">
+            <button type="button" class="gs-btn" id="job-start">Start Work</button>
+            <button type="button" class="gs-btn amber" id="job-pause">Pause</button>
+            <button type="button" class="gs-btn gray" id="job-parts">Waiting on Parts</button>
+            <button type="button" class="gs-btn green" id="job-done">Complete</button>
+          </div>
+        </section>
+
+        <!-- Waiting on Parts: the parts in the mechanic's own words. -->
+        <section id="view-parts" class="gs-stack gs-simple" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn gs-back" data-go="job">&larr; Back</button><h2 id="parts-unit"></h2></div>
+          <div class="gs-card gs-notes">
+            <div class="gs-nl"><label for="parts-need">What parts do you need? Name them your own way.</label>${MIC('parts-need')}</div>
+            <textarea id="parts-need" maxlength="600" rows="4"></textarea>
+          </div>
+          <button type="button" class="gs-btn gray gs-go" id="parts-send">Waiting on Parts</button>
+        </section>
+
+        <!-- Complete, step 1: what was fixed, what you did and the parts put on (filled in from the notes). -->
+        <section id="view-fix" class="gs-stack gs-simple" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn gs-back" data-go="job">&larr; Back</button><h2 id="fix-unit"></h2><span class="gs-progress"><i class="on"></i><i></i></span></div>
+          <div class="gs-scroll">
+            <div class="gs-card" id="fix-pick"><div class="gs-label">What did you fix?</div><div class="gs-fixes" id="fixes"></div></div>
+            <div class="gs-card gs-notes">
+              <div class="gs-nl"><label for="fix-note">What did you do?</label>${MIC('fix-note')}</div>
+              <textarea id="fix-note" maxlength="1000" rows="3"></textarea>
+              <div class="gs-nl"><label for="fix-used">Parts put on</label>${MIC('fix-used')}</div>
+              <textarea id="fix-used" maxlength="600" rows="2"></textarea>
+            </div>
+          </div>
+          <button type="button" class="gs-btn green gs-go" id="fix-next">Next</button>
+        </section>
+`;
+}
+// The shared screens, put in after the work orders: one work order, Who are you?, and Complete's two steps.
+function sharedScreens(safeYes, simple) {
+  return (simple ? simpleJob() : '') + `
         <!-- One work order: who is on it, each mechanic's clock, Start / Add another mechanic / Need Parts / Complete.
              Review item 57 (Joe 10/13): these buttons are words only (no ▶ ⏳ ✔ ■ icons). -->
-        <section id="view-job" class="gs-stack" hidden>
+        ${simple ? '' : `<section id="view-job" class="gs-stack" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Work Orders</button><h2 id="job-unit"></h2></div>
           <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-now" id="job-now"></div></div>
           <div class="gs-card gs-crew"><div class="gs-label">On this job</div><div id="crew"></div><div class="gs-label" id="crew-done"></div></div>
@@ -43,7 +103,7 @@ function sharedScreens(safeYes) {
             <button type="button" class="gs-btn gray" id="job-parts">Need Parts</button>
           </div>
           <button type="button" class="gs-btn green gs-done" id="job-done">Complete</button>
-        </section>
+        </section>`}
 
         <!-- Who are you? Name, then the login ID, for every step. -->
         <section class="gs-sign" id="view-sign" hidden>
@@ -60,13 +120,13 @@ function sharedScreens(safeYes) {
           </div>
         </section>
 
-        <!-- Complete, step 1: what was fixed -->
+        ${simple ? '' : `<!-- Complete, step 1: what was fixed -->
         <section id="view-fix" class="gs-stack" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="job">&larr; Back</button><h2 id="fix-unit"></h2><span class="gs-progress"><i class="on"></i><i></i></span></div>
           <p class="gs-q">What did you fix?</p>
           <input class="gs-note" id="fix-note" maxlength="300" placeholder="Anything to add? (you can leave this empty)">
           <div class="gs-fixes" id="fixes"></div>
-        </section>
+        </section>`}
 
         <!-- Complete, step 2: safe to drive (or run) + finger signature -->
         <section id="view-safe" class="gs-stack" hidden>
@@ -82,13 +142,37 @@ function sharedScreens(safeYes) {
 
 export function mountJobStation(cfg) {
   const forms = cfg.forms || ['report'];
-  const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe', 'report'].concat(cfg.views || []);
-  $('view-jobs').insertAdjacentHTML('afterend', sharedScreens(cfg.safeYes));
-  let techs = [], jobs = [], fixes = [];
+  const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe'].concat(cfg.simple ? ['parts'] : ['report'], cfg.views || []);
+  $('view-jobs').insertAdjacentHTML('afterend', sharedScreens(cfg.safeYes, cfg.simple));
+  let techs = [], jobs = [], fixes = [], checklists = {};
   let open = null, want = null, picked = null, typed = '', ready = null, finisher = null;
   let fixPick = '', safePick = null, inked = false, lastTouch = Date.now();
   // busy: a step is being sent; the page's own steps set it too.
   const S = { busy: false };
+
+  /* ---------- Joe 10/28 (simple): notes, checklist answers and talk-to-type, kept on the tablet until a step sends them ---------- */
+  const keep = (kind, j) => 'udJob' + kind + ':' + cfg.jobKey(j);
+  const kept = (kind, j) => { try { return JSON.parse(localStorage.getItem(keep(kind, j)) || 'null') || {}; } catch (e) { return {}; } };
+  const putKept = (kind, j, v) => { try { if (v) localStorage.setItem(keep(kind, j), JSON.stringify(v)); else localStorage.removeItem(keep(kind, j)); } catch (e) { /* full */ } };
+  // A job started from a write-up gets its work order number: what was kept under the write-up moves to it.
+  const moveKept = (from, to) => ['Notes', 'Checks'].forEach(k => { const v = kept(k, from); if (Object.keys(v).length && !Object.keys(kept(k, to)).length) { putKept(k, to, v); putKept(k, from, null); } });
+  const notesOf = (j) => { const n = kept('Notes', j); return { did: String(n.did || '').trim(), used: String(n.used || '').trim() }; };
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  document.querySelectorAll('[data-mic]').forEach(b => { b.hidden = !Rec; });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-mic]'); if (!b || !Rec) return;
+    if (b.rec) { b.rec.stop(); return; }
+    const box = $(b.dataset.mic), r = new Rec();
+    r.lang = 'en-US'; r.interimResults = false; r.continuous = false;
+    r.onresult = (ev) => {
+      const said = Array.from(ev.results).map(x => x[0].transcript).join(' ').trim();
+      if (said) { box.value = (box.value.trim() ? box.value.trim() + ' ' : '') + said; box.dispatchEvent(new Event('input', { bubbles: true })); }
+    };
+    r.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') message('The tablet did not let the app use the microphone. Type it instead.'); };
+    r.onend = () => { b.rec = null; b.classList.remove('on'); };
+    b.rec = r; b.classList.add('on');
+    try { r.start(); } catch (err) { b.rec = null; b.classList.remove('on'); }
+  });
 
   const signOut = (token) => { if (token) cfg.call('signOut', { tokens: [token] }).catch(() => {}); };
   function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
@@ -97,7 +181,7 @@ export function mountJobStation(cfg) {
 
   async function load() {
     const r = await cfg.board();
-    techs = r.techs; fixes = r.fixes; jobs = r.jobs;
+    techs = r.techs; fixes = r.fixes; jobs = r.jobs; checklists = r.checklists || {};
     if (cfg.onBoard) cfg.onBoard(r);
     if (open) open = jobs.find(j => cfg.jobKey(j) === cfg.jobKey(open) || (open.id && j.id === open.id)) || null;
     draw();
@@ -105,36 +189,43 @@ export function mountJobStation(cfg) {
   }
   function draw() {
     const on = techs.filter(t => t.on);
-    $('people').innerHTML = on.length ? '<span class="gs-onclock">On the clock:</span>' + on.map(t => '<span class="p"><i>' + escapeHtml(t.name.slice(0, 1)) + '</i>' + escapeHtml(first(t.name)) + ' <small>' + escapeHtml(t.on.unit) + '</small></span>').join('') : '';
+    if ($('people')) $('people').innerHTML = on.length ? '<span class="gs-onclock">On the clock:</span>' + on.map(t => '<span class="p"><i>' + escapeHtml(t.name.slice(0, 1)) + '</i>' + escapeHtml(first(t.name)) + ' <small>' + escapeHtml(t.on.unit) + '</small></span>').join('') : '';
     drawJobs(); drawSign();
     if (open) drawJob();
   }
 
   /* ---------- work orders ---------- */
   function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.onNow.length ? 'working' : !j.canRun ? 'down' : j.source === cfg.officeSource ? 'office' : ''; }
+  const shown = () => cfg.filter ? jobs.filter(cfg.filter) : jobs;
   function drawJobs() {
-    $('jobs-title').textContent = 'Work Orders' + (jobs.length ? ' · ' + jobs.length + ' open' : '');
-    // Review item 48 (Joe 10/13, Maintenance Station): no "Mechanics:" with nothing after it; the line shows once there are mechanics.
-    // Joe 10/27 (Maintenance Station): with no mechanics yet, the line says where they are added (cfg.emptyStrip) instead.
-    if (cfg.hideEmptyStrip) $('strip').hidden = !techs.length && !cfg.emptyStrip;
-    if (!techs.length && cfg.emptyStrip) { $('strip').innerHTML = '<span class="gs-hint">' + escapeHtml(cfg.emptyStrip) + '</span>'; }
-    else $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
-      '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
-    $('jobs').innerHTML = jobs.map((j, i) => {
+    const list = shown();
+    $('jobs-title').textContent = cfg.jobsTitle ? cfg.jobsTitle(list) : 'Work Orders' + (list.length ? ' · ' + list.length + ' open' : '');
+    if ($('strip')) drawStrip();
+    $('jobs').innerHTML = list.map((j, i) => {
       const subs = ['<small>' + escapeHtml(cfg.jobLine(j)) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + '</small>'];
+      if (j.more && j.more.length) subs.push('<small>Also written: ' + escapeHtml(j.more.join(' · ')) + '</small>');
       if (j.onNow.length) subs.push('<small class="green">On it now: ' + escapeHtml(names(j.onNow.map(p => first(p.name) + ' ' + clock(p.since)))) + '</small>');
       else if (j.status === 'WORKING') subs.push('<small>Started · nobody on it now</small>');
       if (j.status === 'PARTS') subs.push('<small>WAITING ON PARTS</small>');
       if (!j.canRun && j.status !== 'PARTS') subs.push('<small class="red">' + escapeHtml(cfg.downWord) + '</small>');
       return '<div class="gs-job ' + rowClass(j) + '" data-i="' + i + '"><span class="' + cfg.unitClass + '">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(cfg.problem(j)) + subs.join('') + '</span>' +
         '<button type="button" class="gs-btn ' + (j.onNow.length ? 'green' : j.status === 'PARTS' ? 'gray' : '') + '" data-i="' + i + '">Open</button></div>';
-    }).join('') || '<p class="gs-empty">' + escapeHtml(cfg.emptyJobs) + '</p>';
+    }).join('') || '<p class="gs-empty">' + escapeHtml(typeof cfg.emptyJobs === 'function' ? cfg.emptyJobs() : cfg.emptyJobs) + '</p>';
   }
-  $('jobs').addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (!row) return; open = jobs[Number(row.dataset.i)]; message(''); drawJob(); view('job'); });
+  function drawStrip() {
+    // Review item 48 (Joe 10/13, Maintenance Station): no "Mechanics:" with nothing after it; the line shows once there are mechanics.
+    // Joe 10/27 (Maintenance Station): with no mechanics yet, the line says where they are added (cfg.emptyStrip) instead.
+    if (cfg.hideEmptyStrip) $('strip').hidden = !techs.length && !cfg.emptyStrip;
+    if (!techs.length && cfg.emptyStrip) { $('strip').innerHTML = '<span class="gs-hint">' + escapeHtml(cfg.emptyStrip) + '</span>'; }
+    else $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
+      '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
+  }
+  $('jobs').addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (!row) return; open = shown()[Number(row.dataset.i)]; message(''); drawJob(); view('job'); });
   // A mechanic's own name: their job, or ready to tap one.
-  $('strip').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (b) ask('me', null, b.dataset.tech); });
+  if ($('strip')) $('strip').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (b) ask('me', null, b.dataset.tech); });
 
   function drawJob() {
+    if (cfg.simple) { drawSimpleJob(); return; }
     const j = open;
     $('job-unit').textContent = cfg.jobHead(j);
     $('job-label').textContent = cfg.jobLabel(j) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + (j.canRun ? '' : ' · ' + cfg.downWord);
@@ -149,9 +240,61 @@ export function mountJobStation(cfg) {
     $('job-start').hidden = j.status === 'PARTS';
     $('job-parts').innerHTML = j.status === 'PARTS' ? 'Parts are here' : 'Need Parts';
   }
-  $('job-start').addEventListener('click', () => ask(open.onNow.length ? 'helper' : 'start', open));
-  $('job-parts').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : 'parts', open));
-  $('job-done').addEventListener('click', () => ask('complete', open));
+  const when = (iso) => { const d = new Date(iso); return isFinite(d) ? (d.getMonth() + 1) + '-' + d.getDate() + '-' + String(d.getFullYear()).slice(2) : ''; };
+  // Joe 10/28: Start Work, Pause, Waiting on Parts (Parts are here once it waits) and Complete; the notes boxes; the checklist.
+  function drawSimpleJob() {
+    const j = open;
+    $('job-unit').textContent = cfg.jobHead(j);
+    $('job-label').textContent = cfg.jobLabel(j) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + (j.canRun ? '' : ' · ' + cfg.downWord);
+    $('job-problem').textContent = cfg.problem(j);
+    $('job-more').textContent = j.more && j.more.length ? 'Also written: ' + j.more.join(' · ') : '';
+    $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' + (j.partsNeeded ? ': ' + j.partsNeeded : '') : '';
+    $('crew').innerHTML = j.onNow.map(p => '<div class="gs-clock"><i>' + escapeHtml(p.name.slice(0, 1)) + '</i><b>' + escapeHtml(p.name) + '</b><span class="t">' + clock(p.since) + '</span></div>').join('') ||
+      '<p class="gs-hint">Nobody is working on it right now.</p>';
+    const done = {}; (j.labor || []).forEach(s => { done[s.name] = (done[s.name] || 0) + s.minutes; });
+    const list = Object.keys(done);
+    $('crew-done').textContent = list.length ? 'Time so far: ' + list.map(n => first(n) + ' ' + hm(done[n])).join(', ') + (list.length > 1 ? ' · total ' + hm(j.laborMinutes) : '') : '';
+    const n = kept('Notes', j);
+    if (document.activeElement !== $('job-did')) $('job-did').value = n.did || '';
+    if (document.activeElement !== $('job-used')) $('job-used').value = n.used || '';
+    $('job-log').innerHTML = (j.notesLog || []).slice().reverse().map(e => '<div><b>' + escapeHtml(when(e.at) + ' ' + first(e.by)) + ':</b> ' +
+      escapeHtml([e.did, e.used ? 'Parts put on: ' + e.used : '', e.parts ? 'Waiting on parts: ' + e.parts : ''].filter(Boolean).join(' · ')) + '</div>').join('');
+    $('job-start').textContent = j.status === 'PARTS' ? 'Parts are here' : 'Start Work';
+    $('job-parts').hidden = j.status === 'PARTS';
+    drawChecks();
+  }
+  function checkList(j) { return j && j.checklist ? checklists[j.checklist] || null : null; }
+  function checksLeft(j) { const list = checkList(j), a = kept('Checks', j); return list ? list.reduce((n, sec) => n + sec.items.filter(i => !a[i.id]).length, 0) : 0; }
+  function drawChecks() {
+    const j = open, list = checkList(j), box = $('job-checks');
+    box.hidden = !list;
+    if (!list) { box.innerHTML = ''; return; }
+    const a = kept('Checks', j), all = list.reduce((n, sec) => n + sec.items.length, 0);
+    const R = [['OK', 'OK'], ['FIX', 'Needs work'], ['NA', 'N/A']];
+    box.innerHTML = '<div class="gs-label">Checklist · ' + (all - checksLeft(j)) + ' of ' + all + ' done</div>' + list.map(sec => '<h3>' + escapeHtml(sec.section) + '</h3>' +
+      sec.items.map(i => '<div class="gs-ck' + (a[i.id] ? ' ' + a[i.id].toLowerCase() : '') + '"><span>' + escapeHtml(i.text) + '</span>' +
+        R.map(([r, w]) => '<button type="button" class="gs-ckb' + (a[i.id] === r ? ' on' : '') + '" data-ck="' + escapeHtml(i.id) + '" data-r="' + r + '">' + w + '</button>').join('') + '</div>').join('')).join('');
+  }
+  if (cfg.simple) {
+    $('job-checks').addEventListener('click', e => {
+      const b = e.target.closest('[data-ck]'); if (!b || !open) return;
+      const a = kept('Checks', open); a[b.dataset.ck] = a[b.dataset.ck] === b.dataset.r ? undefined : b.dataset.r; putKept('Checks', open, a); drawChecks();
+    });
+    ['job-did', 'job-used'].forEach(id => $(id).addEventListener('input', () => { if (!open) return; const n = kept('Notes', open); n[id === 'job-did' ? 'did' : 'used'] = $(id).value; putKept('Notes', open, n); }));
+    $('job-start').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : open.onNow.length ? 'helper' : 'start', open));
+    $('job-pause').addEventListener('click', () => { if (!open.onNow.length) { message('Nobody is working on ' + open.unit + ' right now.'); return; } ask('stop', open); });
+    $('job-parts').addEventListener('click', () => { $('parts-unit').textContent = 'Waiting on parts: ' + open.unit; $('parts-need').value = ''; message(''); view('parts'); });
+    $('parts-send').addEventListener('click', () => { if (!$('parts-need').value.trim()) { message('Name the parts you need.'); return; } ask('parts', open); });
+    $('job-done').addEventListener('click', () => {
+      const left = checksLeft(open);
+      if (left) { message('Answer every line of the checklist first (' + left + ' left).'); $('job-checks').scrollIntoView({ block: 'start' }); return; }
+      ask('complete', open);
+    });
+  } else {
+    $('job-start').addEventListener('click', () => ask(open.onNow.length ? 'helper' : 'start', open));
+    $('job-parts').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : 'parts', open));
+    $('job-done').addEventListener('click', () => ask('complete', open));
+  }
   $('crew').addEventListener('click', e => { const b = e.target.closest('[data-stop]'); if (b) ask('stop', open, b.dataset.stop); });
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.go; if (v === 'jobs') { open = null; drawJobs(); } view(v); }));
 
@@ -159,7 +302,7 @@ export function mountJobStation(cfg) {
   const ASK = Object.assign({
     start: (j) => ['Start work on ' + j.unit, 'Tap your name, then your login ID. Your clock starts.'],
     helper: (j) => ['Add another mechanic to ' + j.unit, 'The mechanic joining taps their name, then their login ID.'],
-    stop: (j) => ['Stop your clock on ' + j.unit, 'The job stays open. Enter your login ID.'],
+    stop: (j) => [(cfg.simple ? 'Pause ' : 'Stop your clock on ') + j.unit, (cfg.simple ? 'Your clock stops. ' : '') + 'The job stays open. Enter your login ID.'],
     parts: (j) => ['Need parts for ' + j.unit, 'Every clock on this job stops until the parts are here.'],
     resume: (j) => ['Parts are here: ' + j.unit, 'Tap your name, then your login ID. Your clock starts.'],
     complete: (j) => ['Complete ' + j.unit, 'Who completed it? Tap your name, then your login ID.'],
@@ -204,7 +347,7 @@ export function mountJobStation(cfg) {
     await run(w.purpose, w.job, who);
     drawSign();
   });
-  function cancelSign() { const w = want; want = null; picked = null; typed = ''; drawSign(); view(w && w.job ? 'job' : w && forms.indexOf(w.purpose) >= 0 ? w.purpose : 'jobs'); }
+  function cancelSign() { const w = want; want = null; picked = null; typed = ''; drawSign(); view(w && w.job ? (cfg.simple && w.purpose === 'parts' ? 'parts' : 'job') : w && forms.indexOf(w.purpose) >= 0 ? w.purpose : 'jobs'); }
   $('sign-cancel').addEventListener('click', cancelSign);
 
   // One step for the mechanic who just entered their login ID.
@@ -220,7 +363,12 @@ export function mountJobStation(cfg) {
     const op = { start: 'START', helper: 'HELPER', resume: 'RESUME', stop: 'STOP', parts: 'PARTS' }[purpose];
     S.busy = true; message('Saving…', true);
     try {
-      const r = await cfg.step(who, job, op);
+      // Joe 10/28 (simple): the notes typed on the work order (and the parts waited on) go with the step under this mechanic's name.
+      const notes = cfg.simple && op !== 'HELPER' && op !== 'START' && op !== 'RESUME' ? notesOf(job) : null;
+      const extra = notes ? Object.assign({ did: notes.did, used: notes.used }, op === 'PARTS' ? { partsNeeded: $('parts-need').value.trim() } : {}) : {};
+      const r = await cfg.step(who, job, op, extra);
+      if (notes) putKept('Notes', job, null);
+      if (r.job && r.job.id && !job.id) moveKept(job, r.job);
       if (r.queued) { message(who.name + ': saved on this tablet. It will send when you have signal.', true); open = null; view('jobs'); return; }
       const moved = r.stoppedOn && r.stoppedOn.length ? ' Stopped ' + first(who.name) + '\'s clock on ' + r.stoppedOn.join(', ') + ' (still open).' : '';
       message({ START: who.name + ' started on ' + job.unit + '.', HELPER: who.name + ' joined ' + job.unit + '.', RESUME: who.name + ' started on ' + job.unit + ' again.',
@@ -233,10 +381,27 @@ export function mountJobStation(cfg) {
   }
 
   /* ---------- Complete ---------- */
-  function startComplete() { fixPick = ''; $('fix-note').value = ''; $('fix-unit').textContent = cfg.completeName(open) + ' · Complete'; drawFixes(); view('fix'); }
+  function startComplete() {
+    fixPick = ''; $('fix-note').value = ''; $('fix-unit').textContent = cfg.completeName(open) + ' · Complete'; drawFixes();
+    if (cfg.simple) {
+      // Joe 10/28: Complete asks what you did and the parts put on, filled in from the notes typed while working.
+      const n = notesOf(open), service = cfg.serviceFix ? cfg.serviceFix(open) : '';
+      $('fix-note').value = n.did; $('fix-used').value = n.used; $('fix-pick').hidden = !!service; fixPick = service || '';
+    }
+    view('fix');
+  }
+  if (cfg.simple) $('fix-next').addEventListener('click', () => {
+    if (!fixPick) { message('Tap what you fixed.'); return; }
+    message(''); safePick = null; clearSig();
+    $('safe-unit').textContent = cfg.completeName(open) + ' · Complete';
+    $('safe-q').textContent = cfg.safeQ(open);
+    $('sign-line').textContent = (finisher ? finisher.name + ', sign' : 'Sign') + ' with your finger';
+    drawSafe(); view('safe');
+  });
   function drawFixes() { $('fixes').innerHTML = fixes.map(f => '<button type="button" class="gs-btn' + (f === fixPick ? ' pick-on' : '') + '" data-fix="' + escapeHtml(f) + '">' + escapeHtml(f) + '</button>').join(''); }
   $('fixes').addEventListener('click', e => {
     const b = e.target.closest('[data-fix]'); if (!b) return;
+    if (cfg.simple) { fixPick = b.dataset.fix; drawFixes(); return; }
     fixPick = b.dataset.fix; safePick = null; clearSig();
     $('safe-unit').textContent = cfg.completeName(open) + ' · Complete';
     $('safe-q').textContent = cfg.safeQ(open);
@@ -278,7 +443,14 @@ export function mountJobStation(cfg) {
     const j = open, who = finisher;
     S.busy = true; message('Saving…', true);
     try {
-      const r = await cfg.complete(j, who, { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() });
+      const fields = { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() };
+      if (cfg.simple) {
+        fields.used = $('fix-used').value.trim();
+        const a = kept('Checks', j); if (checkList(j)) fields.checklist = Object.keys(a).filter(k => a[k]).map(k => ({ id: k, r: a[k] }));
+      }
+      const r = await cfg.complete(j, who, fields);
+      if (cfg.simple && !r.queued && safePick) { putKept('Notes', j, null); putKept('Checks', j, null); if (r.job) { putKept('Notes', r.job, null); putKept('Checks', r.job, null); } }
+      if (cfg.simple && !r.queued && !safePick) putKept('Notes', j, null);
       if (r.queued) { message(j.unit + ': saved on this tablet. It will send when you have signal.', true); open = null; finisher = null; view('jobs'); return; }
       message(cfg.doneText(j, who, safePick, r), true);
       open = null; finisher = null; view('jobs');
@@ -290,13 +462,13 @@ export function mountJobStation(cfg) {
   window.udBack = () => {
     const v = shownView();
     if (v === 'safe') { view('fix'); return true; }
-    if (v === 'fix') { view('job'); return true; }
+    if (v === 'fix' || v === 'parts') { view('job'); return true; }
     if (v === 'sign') { cancelSign(); return true; }
     if (v === 'job' || forms.indexOf(v) >= 0) { open = null; view('jobs'); drawJobs(); return true; }
     return false;
   };
-  $('go-back').addEventListener('click', goBack);
-  $('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+  if ($('go-back')) $('go-back').addEventListener('click', goBack);
+  if ($('go-home')) $('go-home').addEventListener('click', () => { location.href = 'index.html'; });
   ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { lastTouch = Date.now(); }, true));
   // The clocks tick every 30 seconds; the list comes back fresh every 30 seconds while nobody is typing a login ID.
   setInterval(() => {
@@ -307,5 +479,5 @@ export function mountJobStation(cfg) {
     }
   }, 30000);
 
-  return Object.assign(S, { message, view, shownView, load, ask, signOut, closeJob: () => { open = null; } });
+  return Object.assign(S, { message, view, shownView, load, ask, signOut, closeJob: () => { open = null; }, redraw: () => drawJobs() });
 }

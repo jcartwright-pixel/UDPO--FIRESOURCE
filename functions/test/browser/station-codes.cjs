@@ -214,14 +214,15 @@ async function codeFitsPhones(p, name) {
     await gs.waitForSelector('#view-code form.st-code');
     await gs.fill('#view-code input', codes.garage);
     await gs.click('#view-code button');
-    await gs.waitForSelector('[data-tech]');
+    // Joe 10/28: it opens on the three cards (Trucks, Trailers, Fork trucks).
+    await gs.waitForSelector('#view-home:not([hidden]) [data-type="TRUCK"]');
     assert.match(await gs.textContent('#title'), /^Garage · Uniontown$/);
     await locked(gs, '#gs-change', 'garage');
     await shot(gs, '6-garage-station-opened-1536.png');
     await gs.click('#gs-change');
     await gs.waitForSelector('#gs-message:not([hidden])');
     assert.match(await gs.textContent('#gs-message'), /stays here until the plant has a manager release code/);
-    assert.ok(await gs.isVisible('[data-tech]'), 'no release code: the garage station stays');
+    assert.ok(await gs.isVisible('[data-type="TRUCK"]'), 'no release code: the garage station stays');
     assert.deepEqual(gs.errors, []);
     results.push('Garage Station: asks for the garage code, then the work orders; no Back or Home; Release in the bottom-right corner refuses until a manager release code is set');
 

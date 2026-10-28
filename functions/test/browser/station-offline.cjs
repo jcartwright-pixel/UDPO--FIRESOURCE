@@ -148,11 +148,15 @@ async function kept(page, files) {
     {
       const { ctx, page, errors, offline } = await tablet(browser);
       await page.goto(HOSTING + '/garage-station.html' + MANAGER);
+      // Joe 10/28: the station opens on its three cards; Trucks shows 900001.
+      await page.click('[data-type="TRUCK"]');
       await page.waitForFunction(() => /900001/.test(document.getElementById('jobs').textContent), null, { timeout: 15000 });
       await page.waitForTimeout(6500);
       await kept(page, ['garage-station.html', 'js/offline-saves.js', 'js/station-code.js']);
       await offline(true);
       await page.reload();
+      await page.waitForSelector('[data-type="TRUCK"]', { timeout: 20000 });
+      await page.click('[data-type="TRUCK"]');
       await page.waitForFunction(() => /900001/.test(document.getElementById('jobs').textContent), null, { timeout: 20000 });
       assert.match(await page.textContent('#offline-line'), /No signal\. What you enter is saved on this tablet/);
       await page.click('.gs-job:has-text("900001") button');
