@@ -47,12 +47,24 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
 const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth + 1);
 const msg = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('gs-message').textContent), re.source, { timeout: 10000 })
   .catch(async (e) => { throw new Error('Waited for "' + re.source + '"; the message says "' + (await page.textContent('#gs-message')) + '"' + (SHOTS ? '' : '') + ' (' + e.message.split('\n')[0] + ')'); });
+// Joe 10/28 evening: a mechanic's first sign-in on the Garage Station asks for their signature once (kept on file).
+async function signOnce(page) {
+  await page.waitForSelector('#view-mysig:not([hidden])');
+  await page.waitForTimeout(200);
+  const b = await page.locator('#mysig-pad').boundingBox();
+  await page.mouse.move(b.x + 30, b.y + b.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + 120, b.y + 30, { steps: 5 }); await page.mouse.move(b.x + 220, b.y + b.height - 30, { steps: 5 }); await page.mouse.up();
+  await page.click('#mysig-save');
+}
 async function login(page, techId, digits) {
   await page.waitForSelector('#view-sign:not([hidden])');
   await page.click('[data-who="' + techId + '"]');
   for (const k of digits) await page.click('[data-key="' + k + '"]');
   await page.click('[data-key="go"]');
+  await page.waitForFunction(() => document.getElementById('view-sign').hidden, null, { timeout: 10000 });
+  if (await page.isVisible('#view-mysig')) { if (!signShot) { signShot = true; await shot(page, '3b-sign-once-tablet-1280.png'); } await signOnce(page); }
 }
+let signShot = false;
 const order = async (unit) => (await db().collection('workOrders').where('unit', '==', unit).get()).docs.map(d => d.data()).find(o => o.status !== 'DONE');
 
 (async () => {
@@ -92,6 +104,7 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
     await gs.click('[data-type="TRUCK"]');
     await gs.waitForSelector('#view-jobs:not([hidden])');
     assert.match(await gs.textContent('#jobs-title'), /^Trucks · 2 open$/);
+    assert.deepEqual(await gs.$$eval('.gs-job .unit', r => r.map(x => x.textContent)), ['900001', '900002'], 'the driver write-up above the service');
     assert.equal(await gs.$$eval('.gs-job', r => r.filter(x => /900001/.test(x.textContent)).length), 1, '900001 is one line');
     assert.match(await gs.textContent('.gs-job:has-text("900001")'), /Also written: Brake light out on the right side/);
     // Joe 10/28: the day it was first written up and how many times.
@@ -174,48 +187,71 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
     await gs.click('#fix-next');
     await gs.waitForSelector('#view-safe:not([hidden])');
     await gs.click('[data-safe="yes"]');
-    const box = await gs.$('#sig'), b = await box.boundingBox();
-    await gs.mouse.move(b.x + 40, b.y + b.height / 2); await gs.mouse.down();
-    for (let i = 1; i <= 12; i++) await gs.mouse.move(b.x + 40 + i * 30, b.y + b.height / 2 + (i % 2 ? -25 : 25));
-    await gs.mouse.up();
+    // Joe 10/28 evening: John's signature on file signs it; nothing to draw.
+    assert.match(await gs.textContent('#sign-line'), /Signed by MYERS John \(signature on file\)/);
+    assert.equal(await gs.isVisible('#sig'), false);
+    assert.equal(await gs.isVisible('#sig-file'), true);
     await gs.click('#finish');
     await msg(gs, /completed by MYERS John/);
     await gs.waitForFunction(() => !/900001/.test(document.getElementById('jobs').textContent), null, { timeout: 10000 });
     const done = (await db().collection('workOrders').where('unit', '==', '900001').get()).docs[0].data();
     assert.deepEqual([done.status, done.completed_by, done.fixed_note, done.parts_used], ['DONE', 'MYERS John', 'Put in the new chamber', 'Brake chamber']);
+    assert.equal(done.signature, (await db().collection('garageSignatures').doc('TECH-JM').get()).data().signature, 'the work order carries John\'s signature on file');
     for (const id of ['TRK-1', 'TRK-9']) assert.equal((await db().collection('maintenance').doc(id).get()).data().status, 'COMPLETE', id + ' repaired');
-    results.push('Complete asks what was done and the parts put on (filled in from the notes), then safe + signature; both write-ups are repaired');
+    results.push('Complete asks what was done and the parts put on (filled in from the notes), then safe; signed with the signature on file (each mechanic signed once at first sign-in); both write-ups are repaired');
 
-    // 7. The PM that is due: its checklist (OK / Needs work / N/A) has to be answered before Complete.
+    // 7. The PM that is due: its checklist (OK / Needs work / N/A), the 8 tires' tread depth, the hours, miles and day finished,
+    // and the whole work order looked over, before Complete (Joe 10/28 evening).
     await gs.click('.gs-job:has-text("900002") button');
     await gs.waitForSelector('#job-checks:not([hidden])');
     const lines = CHECK.items('PM_TRUCK').length;
     assert.equal(await gs.$$eval('#job-checks .gs-ck', r => r.length), lines);
+    assert.equal(await gs.evaluate(() => document.getElementById('job-done').classList.contains('locked')), true, 'Complete is locked');
     await gs.click('#job-done');
-    await msg(gs, new RegExp('Answer every line of the checklist first \\(' + lines + ' left\\)'));
+    await msg(gs, new RegExp('Mark every line of the checklist before Complete: ' + lines + ' left \\(in red\\)'));
+    assert.equal(await gs.$$eval('#job-checks .gs-ck.need', r => r.length), lines, 'every line not marked is red');
     // Each tap redraws the list, so each line's button is looked up fresh.
     const tapAll = (ids) => gs.evaluate((list) => list.forEach(id => { const b = document.querySelector('#job-checks [data-ck="' + id + '"][data-r="OK"]'); if (!b.classList.contains('on')) b.click(); }), ids);
     await tapAll(CHECK.items('PM_TRUCK').slice(0, 12).map(i => i.id));
     await gs.click('#job-checks [data-ck="tires"][data-r="FIX"]');
-    await gs.evaluate(() => { const box = document.querySelector('#view-job .gs-scroll'); box.scrollTop = document.getElementById('job-checks').offsetTop - box.offsetTop; });
-    await shot(gs, '6-service-checklist-tablet-1280.png');
     await tapAll(CHECK.items('PM_TRUCK').filter(i => i.id !== 'tires').map(i => i.id));
-    assert.match(await gs.textContent('#job-checks .gs-label'), new RegExp(lines + ' of ' + lines + ' done'));
+    assert.equal(await gs.$$eval('#job-checks [data-ck="tread"]', b => b.map(x => x.textContent).join(',')), 'OK,Needs work', 'tread depth has no N/A');
+    assert.match(await gs.textContent('#ck-count'), new RegExp((lines - 1) + ' of ' + lines + ' done'), 'the tread line waits for its 8 tires');
+    const depths = ['12', '12', '11', '11', '9', '9', '10', '8'];
+    const tires = await gs.$$('#job-checks [data-tire]');
+    assert.equal(tires.length, 8);
+    for (let i = 0; i < 8; i++) await tires[i].fill(depths[i]);
+    assert.match(await gs.textContent('#ck-count'), new RegExp(lines + ' of ' + lines + ' done'));
+    await gs.evaluate(() => document.querySelector('#job-checks [data-row="tread"]').scrollIntoView({ block: 'center' }));
+    await shot(gs, '6b-tread-depth-tablet-1280.png');
+    await gs.evaluate(() => { const box = document.querySelector('#view-job .gs-scroll'); box.scrollTop = document.getElementById('job-reading').offsetTop - box.offsetTop - 20; });
+    await shot(gs, '6-service-checklist-tablet-1280.png');
+    // No GPS on 900002: the hours and miles are typed; the day finished starts as today.
+    await gs.click('#job-done');
+    await msg(gs, /Fill in the hours and the miles before Complete/);
+    await gs.fill('[data-read="~hours"]', '8,240');
+    await gs.fill('[data-read="~miles"]', '97500');
+    await gs.evaluate(() => { const box = document.querySelector('#view-job .gs-scroll'); box.scrollTop = 0; box.dispatchEvent(new Event('scroll')); });
+    await gs.click('#job-done');
+    await msg(gs, /Scroll down and look over the whole work order before Complete/);
+    await gs.evaluate(() => { const box = document.querySelector('#view-job .gs-scroll'); box.scrollTop = box.scrollHeight; box.dispatchEvent(new Event('scroll')); });
+    await gs.waitForFunction(() => !document.getElementById('job-done').classList.contains('locked'), null, { timeout: 5000 });
     await gs.click('#job-done');
     await login(gs, 'TECH-JN', '70001');
     await gs.waitForSelector('#view-fix:not([hidden])');
     assert.equal(await gs.isVisible('#fix-pick'), false, 'a service needs no "What did you fix?"');
     await gs.click('#fix-next');
     await gs.click('[data-safe="yes"]');
-    const box2 = await gs.$('#sig'), b2 = await box2.boundingBox();
-    await gs.mouse.move(b2.x + 40, b2.y + 40); await gs.mouse.down(); await gs.mouse.move(b2.x + 200, b2.y + 80); await gs.mouse.up();
     await gs.click('#finish');
     await msg(gs, /900002 completed by NARD Jaxon/);
     const pm = (await db().collection('workOrders').doc('WO-PM1').get()).data();
     assert.equal(pm.status, 'DONE');
     assert.equal(pm.checklist.length, lines);
+    assert.deepEqual(pm.checklist.find(r => r.id === 'tread').depth, { lfo: '12', lfi: '12', rfo: '11', rfi: '11', rro: '9', rri: '9', lro: '10', lri: '8' });
+    assert.deepEqual([pm.hours, pm.odometer], [8240, 97500]);
+    assert.match(pm.completed_on, /^\d{4}-\d\d-\d\d$/);
     assert.match(pm.fixed_note, /^Needs work: Tire condition and air pressure/);
-    results.push('A PM that is due: its ' + lines + '-line checklist must be answered; Complete keeps it, with the Needs work lines on the work order');
+    results.push('A PM that is due: Complete stays locked until all ' + lines + ' lines (8 tires\' tread depth too), the hours and miles are in and the work order was scrolled to the bottom; the unmarked lines show red');
 
     // 8. Back to the cards; the pallet jack stayed open with Tom's earlier time; Android's Back goes list -> cards.
     await gs.click('#to-home');
@@ -247,6 +283,48 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
       await p.close();
     }
     results.push('The cards and a work order fit 1920, 1536 and a 390 phone');
+
+    // 10. Joe 10/28 evening: drivers' write-ups on top, newest first; services last and no more than 15 on a card; 688 says Yard
+    // Truck; something new flashes until it is opened; 20 minutes with no taps goes back to the cards.
+    const svc = (n, unit, due) => db().collection('workOrders').doc('WO-S' + n).set({ work_order_id: 'WO-S' + n, facility_id: 'fac_uniontown', unit, unit_type: 'TRUCK', problem: 'PM service due',
+      source: 'SERVICE', source_from: 'Fleet Service (due)', service_key: 'PM', status: 'NEW', can_run: 'YES', due_at: due, created_at: new Date(Date.now() - 7200000).toISOString(), version: 1 });
+    for (let n = 1; n <= 17; n++) await svc(n, String(910000 + n), '2026-11-' + String(n + 5).padStart(2, '0'));
+    await svc(18, '688', '2026-10-01');
+    const p2 = await openPage(browser, 1280, 800, '/garage-station.html?testEmail=manager.test@uniteddairy.com');
+    await p2.waitForFunction(() => document.querySelectorAll('#cards [data-type]').length === 3, null, { timeout: 15000 });
+    // The first list this tablet sees counts as seen: nothing flashes.
+    assert.equal(await p2.$$eval('.gs-new', r => r.length), 0);
+    assert.match(await p2.textContent('[data-type="TRUCK"]'), /15\s*Trucks.*3 more services come on as these are done/);
+    // A driver writes up 900001 again: the Trucks card and the new line flash.
+    await db().collection('maintenance').doc('TRK-20').set(Object.assign({}, trk1, { record_id: 'TRK-20', status: 'OPEN', opened_at: new Date().toISOString(), issue_details: 'Mirror cracked' }));
+    // The next time the tablet reads the list (here: a tap on Trucks), the new line flashes, and back on the cards so does Trucks.
+    await p2.click('[data-type="TRUCK"]');
+    await p2.waitForSelector('.gs-job.gs-new:has-text("Mirror cracked")', { timeout: 15000 });
+    await p2.click('#to-home');
+    await p2.waitForSelector('[data-type="TRUCK"].gs-new');
+    assert.match(await p2.textContent('[data-type="TRUCK"]'), /New: 1/);
+    await p2.clock.fastForward(1000);
+    await shot(p2, '9-new-flashes-tablet-1280.png');
+    await p2.click('[data-type="TRUCK"]');
+    const rows = await p2.$$eval('.gs-job', r => r.map(x => x.querySelector('.what').firstChild.textContent + (x.classList.contains('gs-new') ? ' (new)' : '')));
+    assert.equal(rows.length, 15, 'no more than 15');
+    assert.equal(rows[0], 'Mirror cracked (new)', 'the newest write-up on top, flashing');
+    assert.equal(rows[1], 'PM service due', 'then the services, the most overdue (688) first');
+    assert.match(await p2.textContent('.gs-job:has-text("688")'), /Yard Truck/);
+    await shot(p2, '10-list-order-tablet-1280.png');
+    await p2.click('.gs-job.gs-new button');
+    await p2.waitForSelector('#view-job:not([hidden])');
+    await p2.click('#view-job .gs-back');
+    assert.equal(await p2.$$eval('.gs-new', r => r.length), 0, 'opened: it stops flashing');
+    await p2.click('.gs-job:has-text("688") button');
+    assert.match(await p2.textContent('#job-unit'), /^688 · Yard Truck/);
+    await p2.clock.fastForward('19:00');
+    assert.equal(await p2.isVisible('#view-job'), true, 'still there after 19 minutes');
+    await p2.clock.fastForward('02:00');
+    await p2.waitForSelector('#view-home:not([hidden])', { timeout: 10000 });
+    assert.deepEqual(p2.errors, []);
+    await p2.close();
+    results.push('Write-ups on top (newest first), services last, 15 a card ("4 more services come on as these are done"); 688 says Yard Truck; a new write-up flashes until opened; 20 minutes with no taps goes back to the cards');
   } finally {
     await browser.close();
   }

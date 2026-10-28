@@ -47,7 +47,7 @@ const G = Object.freeze({
   MAX_TECHS: 2, SESSION_MS: 30 * 60000, SIGNATURE_MAX: 30000, TECH_FAILS: 5, TECH_LOCK_MS: 5 * 60000, STATION_FAILS_PER_MINUTE: 30,
   GARAGE_MARK: 'Sent to garage'
 });
-const WORK_ORDERS = 'workOrders', DELETED = 'workOrdersDeleted', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks', CLOCKS = 'garageClocks';
+const WORK_ORDERS = 'workOrders', DELETED = 'workOrdersDeleted', TECHS = 'garageTechs', LOGINS = 'garageLogins', SESSIONS = 'garageSessions', LOCKS = 'garageLocks', CLOCKS = 'garageClocks', SIGNATURES = 'garageSignatures';
 // The write-up queues the garage works from, as the job key's first part (Equipment Issues' TRUCK / TRAILER / FORK_TRUCK).
 const KIND_KEYS = Object.freeze({ TRUCK: 'trucks', TRAILER: 'trailers', FORK_TRUCK: 'forks' });
 const KEY_KINDS = Object.freeze({ trucks: 'TRUCK', trailers: 'TRAILER', forks: 'FORK_TRUCK' });
@@ -121,7 +121,7 @@ const { laborOf, joinNames } = CLOCK;
 // One job as the tablet shows it (udpoV7276Job_).
 function jobOf(o) {
   const labor = laborOf(o);
-  return { id: o.work_order_id, unit: o.unit || '', type: unitType(o.unit_type), problem: o.problem || '', category: o.category || '',
+  return { id: o.work_order_id, sourceKey: o.source_kind && o.source_id ? o.source_kind + '|' + o.source_id : '', unit: o.unit || '', type: unitType(o.unit_type), problem: o.problem || '', category: o.category || '',
     canRun: o.can_run === undefined || o.can_run === '' ? true : yes(o.can_run), source: String(o.source || '').toUpperCase(), serviceKey: o.service_key || '', status: String(o.status || 'NEW').toUpperCase(),
     techs: String(o.techs || '').split(/\s*,\s*/).filter(Boolean), startedAt: o.started_at || '', partsAt: o.parts_at || '', completedAt: o.completed_at || '', createdAt: o.created_at || '', createdBy: o.created_by || '',
     fixed: o.fixed || '', fixedNote: o.fixed_note || '', safe: o.safe || '', signedBy: o.signed_by || '', minutes: o.minutes || '',
@@ -279,12 +279,38 @@ async function signIn(db, input, nowMs, source) {
     if (checked.wrong) return checked;
     const tech = checked.tech, lockRef = db.collection(src.locks).doc(docId(techId));
     const others = (await signedInTechs(tx, db, input.tokens, nowMs, want)).filter(p => p.id !== techId);
+    // Joe 10/28 evening: the Garage Station keeps each mechanic's signature on file (signed once, on every work order they complete).
+    const sig = source ? null : await tx.get(db.collection(SIGNATURES).doc(docId(techId)));
     if (others.length >= G.MAX_TECHS) throw SaveErr('NOT_ALLOWED', 'Two technicians are already signed in. Sign one out first.');
     const token = crypto.randomBytes(24).toString('base64url');
     tx.delete(lockRef);
     tx.set(db.collection(SESSIONS).doc(sha(token)), Object.assign({ techId, name: tech.name, at: stamp, expiresAt: new Date(nowMs + G.SESSION_MS).toISOString() }, want || {}));
     renew((ref, data) => tx.update(ref, data), others, nowMs);
+    if (sig) return { token, id: techId, name: tech.name, signature: sig.exists ? sig.data().signature || '' : '' };
     return { token, id: techId, name: tech.name };
+  }).then(r => { if (r.wrong) throw SaveErr('NOT_ALLOWED', 'Wrong login ID. Try again.'); return r; });
+}
+
+/*
+ * Joe 10/28 evening ("when they first sign into a work order, they have to have an electronic signature on file"): a mechanic
+ * signs once; the tablet sends that signature with every Complete. Signed in, or (no signal) with the name and login ID.
+ */
+async function saveSignature(db, input, nowMs) {
+  const signature = String(input.signature || '');
+  if (signature.length > G.SIGNATURE_MAX || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature)) throw SaveErr('BAD_REQUEST', 'Sign with your finger in the box.');
+  return db.runTransaction(async tx => {
+    let people = await signedInTechs(tx, db, input.tokens, nowMs);
+    if (!people.length && input.signIn && typeof input.signIn === 'object') {
+      const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
+      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
+      if (checked.wrong) return { wrong: true };
+      people = [{ id: techId, name: checked.tech.name }];
+    }
+    if (!people.length) throw SaveErr('NOT_ALLOWED', 'GARAGE_SIGN_IN_REQUIRED: ' + SIGN_IN_REQUIRED);
+    const stamp = new Date(nowMs).toISOString();
+    tx.set(db.collection(SIGNATURES).doc(docId(people[0].id)), { techId: people[0].id, name: people[0].name, signature, at: stamp });
+    return { ok: true, id: people[0].id };
   }).then(r => { if (r.wrong) throw SaveErr('NOT_ALLOWED', 'Wrong login ID. Try again.'); return r; });
 }
 
@@ -317,6 +343,21 @@ async function board(db, nowMs) {
   const clocks = {};
   (await db.collection(CLOCKS).get()).docs.forEach(d => { const c = d.data(); if (c.techId) clocks[c.techId] = c; });
   const jobs = garageJobs(orders, records, units).map(j => { const c = Object.assign({}, j); delete c.driver; return c; });
+  // Joe 10/28 evening: yard trucks (688, 9737) say so, and a service shows the unit's latest miles and hours (GPS, else the driver's
+  // DVIR miles) at the top, filled in on Complete.
+  const keyOf = (u) => String(u || '').toUpperCase().replace(/\s+/g, '');
+  const serviceUnits = Array.from(new Set(jobs.filter(j => j.checklist).map(j => keyOf(j.unit)))).slice(0, 60);
+  const reads = {};
+  await Promise.all(serviceUnits.map(async u => {
+    const id = M.safeIdPart(u); if (!id) return;
+    const [gps, odo] = await Promise.all([db.collection('gpsTrucks').doc(id).get(), db.collection('odometers').where('unit', '==', u).get()]);
+    reads[u] = L.latestReadings(odo.docs.map(d => d.data()), gps.exists ? [gps.data()] : [])[u] || null;
+  }));
+  jobs.forEach(j => {
+    j.yard = j.type === 'TRUCK' && !!L.FLEET_BY_DAYS[L.fleetUnitKey(j.unit)];
+    const r = j.checklist ? reads[keyOf(j.unit)] : null;
+    if (r) j.reading = { miles: j.type === 'TRUCK' && r.miles != null ? r.miles : null, milesFrom: r.source || '', hours: r.hours > 0 ? r.hours : null };
+  });
   const open = {}; jobs.forEach(j => { if (j.id) open[j.id] = j; });
   return { techs: techs.map(t => { const c = clocks[t.id], j = c && open[c.workOrderId]; return Object.assign({}, t, { on: j ? { id: j.id, unit: j.unit, since: c.since } : null }); }),
     jobs, units: units.map(u => u.unit), categories: G.CATEGORIES, fixes: G.FIXES, checklists: CHECK.forTablet(), now: new Date(nowMs).toISOString() };
@@ -356,6 +397,10 @@ function validateStep(input) {
     if (out.signature.length > G.SIGNATURE_MAX || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(out.signature)) throw SaveErr('BAD_REQUEST', 'Sign with your finger in the box.');
     // A service's checklist (Joe 10/28), checked against its list once the work order is read.
     out.checklist = Array.isArray(input.checklist) ? input.checklist.slice(0, 200) : null;
+    // Joe 10/28 evening: a service's hours, miles and the day it was finished (checked once the work order is read).
+    out.hours = String(input.hours == null ? '' : input.hours).replace(/[,\s]/g, '').slice(0, 12);
+    out.miles = String(input.miles == null ? '' : input.miles).replace(/[,\s]/g, '').slice(0, 12);
+    out.completedOn = String(input.completedOn || '').slice(0, 10);
   }
   return out;
 }
@@ -455,9 +500,28 @@ async function step(db, input, nowMs) {
         const odo = (await tx.get(db.collection('odometers').where('unit', '==', unitKey))).docs.map(d => d.data());
         const read = L.latestReadings(odo, gps && gps.exists ? [gps.data()] : [])[unitKey];
         odometer = read && read.miles != null ? read.miles : null;
+        if (checked) gpsHours = read && read.hours > 0 ? read.hours : null;
       } else if (gps && gps.exists) { const read = L.latestReadings([], [gps.data()])[unitKey]; gpsHours = read && read.hours > 0 ? read.hours : null; }
       if (G.SERVICES[order.service_key]) { setupRef = db.collection('fleetSetup').doc(docId(order.unit)); const s = await tx.get(setupRef); setup = s.exists ? s.data() : null; }
       if (order.service_key === 'DOT') { const r = await tx.get(db.collection('config').doc(RULES_DOC)); rules = fleetRules(r.exists ? r.data() : null); }
+    }
+
+    // Joe 10/28 evening: a service records the hours (the GPS's when it has them, else typed: trailers' reefer hours, yard trucks),
+    // a truck's miles the same way, and the day it was finished (today unless typed, up to 30 days back).
+    let reading = null;
+    if (checked && req.safe) {
+      const today = L.operatingDay(new Date(nowMs)), num = (v) => /^\d+(\.\d+)?$/.test(v) ? Math.round(Number(v)) : null;
+      const hours = req.hours ? num(req.hours) : gpsHours, miles = unitType(order.unit_type) === 'TRUCK' ? (req.miles ? num(req.miles) : odometer) : null;
+      if (req.hours && (hours == null || hours > 999999)) throw SaveErr('BAD_REQUEST', 'Type the hours as a number.');
+      if (hours == null) throw SaveErr('BAD_REQUEST', 'Type the hours (no GPS reading for ' + order.unit + ').');
+      if (unitType(order.unit_type) === 'TRUCK') {
+        if (req.miles && (miles == null || miles > 3000000)) throw SaveErr('BAD_REQUEST', 'Type the miles as a number.');
+        if (miles == null) throw SaveErr('BAD_REQUEST', 'Type the miles (no GPS reading for ' + order.unit + ').');
+      }
+      const on = req.completedOn || today;
+      if (!L.isDateKey(on) || on > today || L.daysBetween(on, today) > 30) throw SaveErr('BAD_REQUEST', 'The day it was finished must be today or in the last 30 days.');
+      reading = { hours, miles, on };
+      if (miles != null) odometer = miles;
     }
 
     // The clocks: each signed-in mechanic's own (one job at a time), and every clock still running on this job (job-clock.js,
@@ -489,6 +553,7 @@ async function step(db, input, nowMs) {
       else {
         Object.assign(change, { status: 'DONE', completed_at: stamp, completed_by: names[0], can_run: 'YES', minutes: moved.minutesFrom(change.started_at) });
         if (odometer) change.odometer = odometer;
+        if (reading) Object.assign(change, { hours: reading.hours, completed_on: reading.on });
       }
     }
     const after = Object.assign({}, order, change);
@@ -509,9 +574,11 @@ async function step(db, input, nowMs) {
         result.writeUpClosed = true;
       });
       if (setupRef) {
-        const today = L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
+        const today = reading ? reading.on : L.operatingDay(new Date(nowMs)), move = { updated_at: stamp, updated_by: by };
         if (order.service_key === 'PM') { move.last_service_date = today; if (odometer) move.last_service_miles = String(odometer); }
-        if (order.service_key === 'REEFER') { move.last_service_date = today; if (gpsHours) move.last_service_hours = String(gpsHours); else if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
+        if (order.service_key === 'REEFER') { move.last_service_date = today; if (reading) move.last_service_hours = String(reading.hours); else if (gpsHours) move.last_service_hours = String(gpsHours); else if (setup && String(setup.current_hours || '').trim()) move.last_service_hours = String(setup.current_hours); }
+        // The hours typed for a unit with no GPS (Joe: "the trailer we could store that") are its latest hours.
+        if (reading && req.hours) move.current_hours = String(reading.hours);
         if (order.service_key === 'DOT') move.dot_due = L.addMonths(today, L.fleetRule(rules, String(order.unit_type || '').toUpperCase() === 'TRAILER' ? 'TRAILER' : 'TRUCK', 'dotMonths'));
         if (setup) tx.update(setupRef, Object.assign({}, move, { testEdited: true, editedAt: stamp }));
         else tx.set(setupRef, Object.assign({ unit: order.unit, unit_type: order.unit_type, facility_id: FACILITY, track: 'YES', createdInApp: true }, move));
@@ -943,6 +1010,7 @@ async function garageCall(db, input, now, caller) {
   if (op === 'signIn') return signIn(db, input, nowMs);
   if (op === 'signOut') return signOutCall(db, input, nowMs, null);
   if (op === 'step') return step(db, input, nowMs);
+  if (op === 'saveSignature') return saveSignature(db, input, nowMs);
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 

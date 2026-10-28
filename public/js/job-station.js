@@ -53,6 +53,7 @@ function simpleJob() {
               <p class="gs-hint">These go on the work order with your name when you press Pause, Waiting on Parts or Complete.</p>
               <div class="gs-log" id="job-log"></div>
             </div>
+            <div class="gs-card gs-reading" id="job-reading" hidden></div>
             <div class="gs-card gs-checks" id="job-checks" hidden></div>
           </div>
           <div class="gs-four">
@@ -71,6 +72,14 @@ function simpleJob() {
             <textarea id="parts-need" maxlength="600" rows="4"></textarea>
           </div>
           <button type="button" class="gs-btn gray gs-go" id="parts-send">Waiting on Parts</button>
+        </section>
+
+        <!-- Joe 10/28 evening: a mechanic's first time, they sign once; it is kept on file and goes on every work order they complete. -->
+        <section id="view-mysig" class="gs-stack gs-simple" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn gs-back" id="mysig-back">&larr; Back</button><h2 id="mysig-title"></h2></div>
+          <p class="gs-hint">Sign once with your finger. Your signature is kept on file and goes on every work order you complete.</p>
+          <div class="gs-sigbox"><button type="button" class="gs-btn dark" id="mysig-clear">Clear</button><canvas id="mysig-pad"></canvas></div>
+          <button type="button" class="gs-btn green gs-go" id="mysig-save">Keep my signature</button>
         </section>
 
         <!-- Complete, step 1: what was fixed, what you did and the parts put on (filled in from the notes). -->
@@ -135,14 +144,41 @@ function sharedScreens(safeYes, simple) {
           <div class="gs-yesno"><button type="button" class="gs-btn green" data-safe="yes">${escapeHtml(safeYes)}</button><button type="button" class="gs-btn line" data-safe="no">No, still down</button></div>
           <div class="gs-label" id="sign-line">Sign with your finger</div>
           <div class="gs-sigbox"><button type="button" class="gs-btn dark" id="sig-clear">Clear</button><canvas id="sig"></canvas></div>
+          <img id="sig-file" class="gs-sigfile" alt="Signature on file" hidden>
           <button type="button" class="gs-btn green" id="finish">Complete Work Order</button>
         </section>
 `;
 }
 
+// A finger signature box: draw, clear, and a small PNG of it (kept under 29,000 characters).
+function makePad(canvas) {
+  const ctx = canvas.getContext('2d');
+  let inked = false, drawing = false;
+  const pt = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  canvas.addEventListener('pointerdown', e => { drawing = true; canvas.setPointerCapture(e.pointerId); const [x, y] = pt(e); ctx.beginPath(); ctx.moveTo(x, y); });
+  canvas.addEventListener('pointermove', e => { if (!drawing) return; const [x, y] = pt(e); ctx.lineTo(x, y); ctx.stroke(); inked = true; });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => canvas.addEventListener(t, () => { drawing = false; }));
+  const small = (scale) => {
+    const w = Math.min(480, canvas.width) * (scale || 1), h = Math.round(canvas.height * w / canvas.width), c = document.createElement('canvas');
+    c.width = Math.round(w); c.height = h;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(canvas, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/png');
+    return url.length > 29000 && (scale || 1) > 0.2 ? small((scale || 1) / 2) : url;
+  };
+  return {
+    size: () => requestAnimationFrame(() => {
+      const r = canvas.getBoundingClientRect(); if (!r.width) return;
+      canvas.width = Math.round(r.width); canvas.height = Math.round(r.height); inked = false;
+      ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0b4f86';
+    }),
+    clear: () => { inked = false; ctx.clearRect(0, 0, canvas.width, canvas.height); },
+    inked: () => inked, small: () => small()
+  };
+}
+
 export function mountJobStation(cfg) {
   const forms = cfg.forms || ['report'];
-  const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe'].concat(cfg.simple ? ['parts'] : ['report'], cfg.views || []);
+  const VIEWS = ['sign', 'jobs', 'job', 'fix', 'safe'].concat(cfg.simple ? ['parts', 'mysig'] : ['report'], cfg.views || []);
   $('view-jobs').insertAdjacentHTML('afterend', sharedScreens(cfg.safeYes, cfg.simple));
   let techs = [], jobs = [], fixes = [], checklists = {};
   let open = null, want = null, picked = null, typed = '', ready = null, finisher = null;
@@ -176,7 +212,7 @@ export function mountJobStation(cfg) {
 
   const signOut = (token) => { if (token) cfg.call('signOut', { tokens: [token] }).catch(() => {}); };
   function message(text, ok) { const m = $('gs-message'); m.textContent = text || ''; m.hidden = !text; m.classList.toggle('ok', !!ok); }
-  function view(v) { VIEWS.forEach(k => { $('view-' + k).hidden = k !== v; }); if (v === 'safe') sizeCanvas(); }
+  function view(v) { VIEWS.forEach(k => { $('view-' + k).hidden = k !== v; }); if (v === 'safe') sizeCanvas(); if (v === 'mysig') myPad.size(); }
   const shownView = () => VIEWS.find(k => !$('view-' + k).hidden);
 
   async function load() {
@@ -196,7 +232,7 @@ export function mountJobStation(cfg) {
 
   /* ---------- work orders ---------- */
   function rowClass(j) { return j.status === 'PARTS' ? 'parts' : j.onNow.length ? 'working' : !j.canRun ? 'down' : j.source === cfg.officeSource ? 'office' : ''; }
-  const shown = () => cfg.filter ? jobs.filter(cfg.filter) : jobs;
+  const shown = () => { const list = cfg.filter ? jobs.filter(cfg.filter) : jobs; return cfg.arrange ? cfg.arrange(list) : list; };
   function drawJobs() {
     const list = shown();
     $('jobs-title').textContent = cfg.jobsTitle ? cfg.jobsTitle(list) : 'Work Orders' + (list.length ? ' · ' + list.length + ' open' : '');
@@ -209,7 +245,7 @@ export function mountJobStation(cfg) {
       else if (j.status === 'WORKING') subs.push('<small>Started · nobody on it now</small>');
       if (j.status === 'PARTS') subs.push('<small>WAITING ON PARTS</small>');
       if (!j.canRun && j.status !== 'PARTS') subs.push('<small class="red">' + escapeHtml(cfg.downWord) + '</small>');
-      return '<div class="gs-job ' + rowClass(j) + '" data-i="' + i + '"><span class="' + cfg.unitClass + '">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(cfg.problem(j)) + subs.join('') + '</span>' +
+      return '<div class="gs-job ' + rowClass(j) + (cfg.isNew && cfg.isNew(j) ? ' gs-new' : '') + '" data-i="' + i + '"><span class="' + cfg.unitClass + '">' + escapeHtml(j.unit) + '</span><span class="what">' + escapeHtml(cfg.problem(j)) + subs.join('') + '</span>' +
         '<button type="button" class="gs-btn ' + (j.onNow.length ? 'green' : j.status === 'PARTS' ? 'gray' : '') + '" data-i="' + i + '">Open</button></div>';
     }).join('') || '<p class="gs-empty">' + escapeHtml(typeof cfg.emptyJobs === 'function' ? cfg.emptyJobs() : cfg.emptyJobs) + '</p>';
   }
@@ -221,7 +257,7 @@ export function mountJobStation(cfg) {
     else $('strip').innerHTML = '<span class="gs-label">Mechanics:</span>' + techs.map(t => '<button type="button" class="gs-chip' + (t.on ? ' on' : '') + '" data-tech="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) +
       '<small>' + (t.on ? escapeHtml(t.on.unit) + ' · ' + clock(t.on.since) : 'free') + '</small></button>').join('');
   }
-  $('jobs').addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (!row) return; open = shown()[Number(row.dataset.i)]; message(''); drawJob(); view('job'); });
+  $('jobs').addEventListener('click', e => { const row = e.target.closest('[data-i]'); if (!row) return; open = shown()[Number(row.dataset.i)]; if (cfg.onOpen) cfg.onOpen(open); message(''); drawJob(); view('job'); });
   // A mechanic's own name: their job, or ready to tap one.
   if ($('strip')) $('strip').addEventListener('click', e => { const b = e.target.closest('[data-tech]'); if (b) ask('me', null, b.dataset.tech); });
 
@@ -263,33 +299,103 @@ export function mountJobStation(cfg) {
       escapeHtml([e.did, e.used ? 'Parts put on: ' + e.used : '', e.parts ? 'Waiting on parts: ' + e.parts : ''].filter(Boolean).join(' · ')) + '</div>').join('');
     $('job-start').textContent = j.status === 'PARTS' ? 'Parts are here' : 'Start Work';
     $('job-parts').hidden = j.status === 'PARTS';
+    const key = cfg.jobKey ? cfg.jobKey(j) : j.id;
+    if (key !== seenKey) { seenKey = key; seenBottom = false; showNeed = false; }
     drawChecks();
+    requestAnimationFrame(() => { if (atBottom()) seenBottom = true; drawLock(); });
   }
+  // Joe 10/28 evening: on a service, Complete stays locked until every checklist line is marked and the mechanic has scrolled to
+  // the bottom of the work order. Pressed early, it says what is left and takes them to the first line not marked (red).
+  let seenBottom = false, seenKey = '', showNeed = false;
+  const scroller = () => document.querySelector('#view-job .gs-scroll');
+  function atBottom() { const s = scroller(); return !s || s.scrollTop + s.clientHeight >= s.scrollHeight - 8; }
+  function doneLocked(j) { return !!checkList(j) && (checksLeft(j) > 0 || readingLeft(j).length > 0 || !seenBottom); }
+  // Joe 10/28 evening: a service's hours, a truck's miles (the GPS's filled in when it has them) and the day it was finished.
+  const todayKey = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  function readingOf(j) {
+    const a = kept('Checks', j), r = j.reading || {}, pick = (k, v) => a[k] !== undefined ? a[k] : v == null ? '' : String(v);
+    return { hours: pick('~hours', r.hours), miles: j.type === 'TRUCK' ? pick('~miles', r.miles) : null, on: pick('~on', todayKey()) };
+  }
+  function readingLeft(j) {
+    const v = readingOf(j);
+    return [['hours', 'the hours'], ['miles', 'the miles'], ['on', 'the day it was finished']].filter(([k]) => v[k] !== null && !String(v[k]).trim()).map(([, w]) => w);
+  }
+  function drawReading() {
+    const j = open, box = $('job-reading');
+    box.hidden = !checkList(j);
+    if (box.hidden) { box.innerHTML = ''; return; }
+    const v = readingOf(j), r = j.reading || {}, from = (k) => r[k] != null ? ' <small>(GPS' + (k === 'miles' && r.milesFrom === 'DVIR' ? ' / driver' : '') + ')</small>' : '';
+    const need = (k) => showNeed && !String(v[k]).trim() ? ' need' : '';
+    box.innerHTML = '<div class="gs-label">Hours, miles and the day it was finished</div><div class="gs-read">' +
+      '<label class="' + need('hours') + '"><span>Hours' + from('hours') + '</span><input type="text" inputmode="decimal" maxlength="9" data-read="~hours" value="' + escapeHtml(v.hours) + '"></label>' +
+      (v.miles !== null ? '<label class="' + need('miles') + '"><span>Miles' + from('miles') + '</span><input type="text" inputmode="numeric" maxlength="9" data-read="~miles" value="' + escapeHtml(v.miles) + '"></label>' : '') +
+      '<label class="' + need('on') + '"><span>Day finished</span><input type="date" max="' + todayKey() + '" data-read="~on" value="' + escapeHtml(v.on) + '"></label></div>';
+  }
+  function drawLock() { if (cfg.simple && open) $('job-done').classList.toggle('locked', doneLocked(open)); }
   function checkList(j) { return j && j.checklist ? checklists[j.checklist] || null : null; }
-  function checksLeft(j) { const list = checkList(j), a = kept('Checks', j); return list ? list.reduce((n, sec) => n + sec.items.filter(i => !a[i.id]).length, 0) : 0; }
+  // A line is done once it is marked, and (tread depth) each of its 8 tires has a depth; the depths are kept as 'tread~lfo'.
+  const lineDone = (i, a) => !!a[i.id] && (!i.tires || i.tires.every(t => String(a[i.id + '~' + t.key] || '').trim() !== ''));
+  function checksLeft(j) { const list = checkList(j), a = kept('Checks', j); return list ? list.reduce((n, sec) => n + sec.items.filter(i => !lineDone(i, a)).length, 0) : 0; }
+  function checkCount() {
+    const list = checkList(open); if (!list || !$('ck-count')) return;
+    const all = list.reduce((n, sec) => n + sec.items.length, 0); $('ck-count').textContent = 'Checklist · ' + (all - checksLeft(open)) + ' of ' + all + ' done';
+  }
   function drawChecks() {
     const j = open, list = checkList(j), box = $('job-checks');
     box.hidden = !list;
+    drawReading();
     if (!list) { box.innerHTML = ''; return; }
     const a = kept('Checks', j), all = list.reduce((n, sec) => n + sec.items.length, 0);
     const R = [['OK', 'OK'], ['FIX', 'Needs work'], ['NA', 'N/A']];
-    box.innerHTML = '<div class="gs-label">Checklist · ' + (all - checksLeft(j)) + ' of ' + all + ' done</div>' + list.map(sec => '<h3>' + escapeHtml(sec.section) + '</h3>' +
-      sec.items.map(i => '<div class="gs-ck' + (a[i.id] ? ' ' + a[i.id].toLowerCase() : '') + '"><span>' + escapeHtml(i.text) + '</span>' +
-        R.map(([r, w]) => '<button type="button" class="gs-ckb' + (a[i.id] === r ? ' on' : '') + '" data-ck="' + escapeHtml(i.id) + '" data-r="' + r + '">' + w + '</button>').join('') + '</div>').join('')).join('');
+    box.innerHTML = '<div class="gs-label" id="ck-count"></div>' + list.map(sec => '<h3>' + escapeHtml(sec.section) + '</h3>' +
+      sec.items.map(i => '<div class="gs-ck' + (a[i.id] ? ' ' + a[i.id].toLowerCase() : '') + (showNeed && !lineDone(i, a) ? ' need' : '') + '" data-row="' + escapeHtml(i.id) + '"><span>' + escapeHtml(i.text) + '</span>' +
+        R.filter(([r]) => !(i.tires && r === 'NA')).map(([r, w]) => '<button type="button" class="gs-ckb' + (a[i.id] === r ? ' on' : '') + '" data-ck="' + escapeHtml(i.id) + '" data-r="' + r + '">' + w + '</button>').join('') +
+        (i.tires ? '<div class="gs-tires">' + i.tires.map(t => '<label><span>' + escapeHtml(t.name) + '</span><input type="text" inputmode="decimal" maxlength="5" data-tire="' + escapeHtml(i.id + '~' + t.key) + '" value="' +
+          escapeHtml(a[i.id + '~' + t.key] || '') + '"></label>').join('') + '</div>' : '') + '</div>').join('')).join('');
+    checkCount();
+    drawLock();
   }
   if (cfg.simple) {
     $('job-checks').addEventListener('click', e => {
       const b = e.target.closest('[data-ck]'); if (!b || !open) return;
       const a = kept('Checks', open); a[b.dataset.ck] = a[b.dataset.ck] === b.dataset.r ? undefined : b.dataset.r; putKept('Checks', open, a); drawChecks();
     });
+    $('job-reading').addEventListener('input', e => {
+      const t = e.target.closest('[data-read]'); if (!t || !open) return;
+      const a = kept('Checks', open); a[t.dataset.read] = t.dataset.read === '~on' ? t.value : t.value.replace(/[^\d.,]/g, ''); putKept('Checks', open, a);
+      if (showNeed) t.closest('label').classList.toggle('need', !t.value.trim());
+      drawLock();
+    });
+    // A tire's depth: kept as it is typed (no redraw, so the box keeps the cursor); the count and Complete follow it.
+    $('job-checks').addEventListener('input', e => {
+      const t = e.target.closest('[data-tire]'); if (!t || !open) return;
+      const a = kept('Checks', open); a[t.dataset.tire] = t.value.replace(/[^\d.]/g, ''); putKept('Checks', open, a);
+      const id = t.dataset.tire.split('~')[0], i = checkList(open).flatMap(s => s.items).find(x => x.id === id), row = t.closest('.gs-ck');
+      if (row && showNeed) row.classList.toggle('need', !lineDone(i, a));
+      checkCount(); drawLock();
+    });
     ['job-did', 'job-used'].forEach(id => $(id).addEventListener('input', () => { if (!open) return; const n = kept('Notes', open); n[id === 'job-did' ? 'did' : 'used'] = $(id).value; putKept('Notes', open, n); }));
     $('job-start').addEventListener('click', () => ask(open.status === 'PARTS' ? 'resume' : open.onNow.length ? 'helper' : 'start', open));
     $('job-pause').addEventListener('click', () => { if (!open.onNow.length) { message('Nobody is working on ' + open.unit + ' right now.'); return; } ask('stop', open); });
     $('job-parts').addEventListener('click', () => { $('parts-unit').textContent = 'Waiting on parts: ' + open.unit; $('parts-need').value = ''; message(''); view('parts'); });
     $('parts-send').addEventListener('click', () => { if (!$('parts-need').value.trim()) { message('Name the parts you need.'); return; } ask('parts', open); });
+    scroller().addEventListener('scroll', () => { if (!seenBottom && open && atBottom()) { seenBottom = true; drawLock(); } }, { passive: true });
     $('job-done').addEventListener('click', () => {
       const left = checksLeft(open);
-      if (left) { message('Answer every line of the checklist first (' + left + ' left).'); $('job-checks').scrollIntoView({ block: 'start' }); return; }
+      if (left) {
+        showNeed = true; drawChecks();
+        message('Mark every line of the checklist before Complete: ' + left + ' left (in red).');
+        const row = $('job-checks').querySelector('.gs-ck.need'); if (row) row.scrollIntoView({ block: 'center' });
+        return;
+      }
+      const read = checkList(open) ? readingLeft(open) : [];
+      if (read.length) {
+        showNeed = true; drawReading();
+        message('Fill in ' + read.join(' and ') + ' before Complete (in red).');
+        $('job-reading').scrollIntoView({ block: 'center' });
+        return;
+      }
+      if (doneLocked(open)) { message('Scroll down and look over the whole work order before Complete.'); return; }
       ask('complete', open);
     });
   } else {
@@ -346,9 +452,34 @@ export function mountJobStation(cfg) {
     catch (err) { typed = ''; message(err.message); S.busy = false; drawSign(); return; }
     const w = want || { purpose: 'me' };
     want = null; picked = null; typed = ''; S.busy = false;
+    // Joe 10/28 evening: no signature on file yet, so this mechanic signs once before the step.
+    if (cfg.simple) {
+      who.signature = who.signature || sigOnTablet(who.id);
+      if (who.signature) keepSig(who.id, who.signature);
+      else { signing = { w, who }; $('mysig-title').textContent = who.name + ', sign once'; myPad.clear(); view('mysig'); drawSign(); return; }
+    }
     await run(w.purpose, w.job, who);
     drawSign();
   });
+  // The signature on file: the server's (from sign-in), kept on the tablet too for when there is no signal.
+  let signing = null;
+  const sigOnTablet = (id) => { try { return localStorage.getItem('udGarageSig:' + id) || ''; } catch (e) { return ''; } };
+  const keepSig = (id, url) => { try { localStorage.setItem('udGarageSig:' + id, url); } catch (e) { /* full */ } };
+  const myPad = cfg.simple ? makePad($('mysig-pad')) : null;
+  if (cfg.simple) {
+    $('mysig-clear').addEventListener('click', () => myPad.clear());
+    $('mysig-back').addEventListener('click', () => { const s = signing; signing = null; message(''); if (s && s.who.token) signOut(s.who.token); view(s && s.w.job ? 'job' : 'jobs'); });
+    $('mysig-save').addEventListener('click', async () => {
+      if (!signing || S.busy) return;
+      if (!myPad.inked()) { message('Sign with your finger in the box.'); return; }
+      const { w, who } = signing, url = myPad.small();
+      S.busy = true; message('Saving…', true);
+      try { await cfg.saveSignature(who, url); }
+      catch (err) { S.busy = false; message(err.message); return; }
+      S.busy = false; signing = null; who.signature = url; keepSig(who.id, url);
+      await run(w.purpose, w.job, who);
+    });
+  }
   function cancelSign() { const w = want; want = null; picked = null; typed = ''; drawSign(); view(w && w.job ? (cfg.simple && w.purpose === 'parts' ? 'parts' : 'job') : w && forms.indexOf(w.purpose) >= 0 ? w.purpose : 'jobs'); }
   $('sign-cancel').addEventListener('click', cancelSign);
 
@@ -397,7 +528,10 @@ export function mountJobStation(cfg) {
     message(''); safePick = null; clearSig();
     $('safe-unit').textContent = cfg.completeName(open) + ' · Complete';
     $('safe-q').textContent = cfg.safeQ(open);
-    $('sign-line').textContent = (finisher ? finisher.name + ', sign' : 'Sign') + ' with your finger';
+    // Joe 10/28 evening: the mechanic's signature on file signs it; nothing to draw.
+    $('sign-line').textContent = 'Signed by ' + (finisher ? finisher.name : '') + ' (signature on file)';
+    document.querySelector('#view-safe .gs-sigbox').hidden = true;
+    const img = $('sig-file'); img.src = finisher && finisher.signature || ''; img.hidden = !img.src;
     drawSafe(); view('safe');
   });
   function drawFixes() { $('fixes').innerHTML = fixes.map(f => '<button type="button" class="gs-btn' + (f === fixPick ? ' pick-on' : '') + '" data-fix="' + escapeHtml(f) + '">' + escapeHtml(f) + '</button>').join(''); }
@@ -440,15 +574,21 @@ export function mountJobStation(cfg) {
   }
   $('finish').addEventListener('click', async () => {
     if (safePick === null) { message('Tap Yes or No for "' + cfg.safeWord + '".'); return; }
-    if (!inked) { message('Sign with your finger in the box.'); return; }
+    if (!cfg.simple && !inked) { message('Sign with your finger in the box.'); return; }
+    if (cfg.simple && !(finisher && finisher.signature)) { message('No signature on file. Go back and sign in again.'); return; }
     if (S.busy) return;
     const j = open, who = finisher;
     S.busy = true; message('Saving…', true);
     try {
-      const fields = { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: smallSignature() };
+      const fields = { fixed: fixPick, note: $('fix-note').value.trim(), safe: safePick, signature: cfg.simple ? who.signature : smallSignature() };
       if (cfg.simple) {
         fields.used = $('fix-used').value.trim();
-        const a = kept('Checks', j); if (checkList(j)) fields.checklist = Object.keys(a).filter(k => a[k]).map(k => ({ id: k, r: a[k] }));
+        const a = kept('Checks', j);
+        if (checkList(j)) { const v = readingOf(j); Object.assign(fields, { hours: v.hours, miles: v.miles || '', completedOn: v.on }); }
+        if (checkList(j)) fields.checklist = Object.keys(a).filter(k => a[k] && k.indexOf('~') < 0).map(k => {
+          const tires = Object.keys(a).filter(t => t.indexOf(k + '~') === 0);
+          return tires.length ? { id: k, r: a[k], depth: tires.reduce((o, t) => { o[t.slice(k.length + 1)] = a[t]; return o; }, {}) } : { id: k, r: a[k] };
+        });
       }
       const r = await cfg.complete(j, who, fields);
       if (cfg.simple && !r.queued && safePick) { putKept('Notes', j, null); putKept('Checks', j, null); if (r.job) { putKept('Notes', r.job, null); putKept('Checks', r.job, null); } }
@@ -466,6 +606,7 @@ export function mountJobStation(cfg) {
     if (v === 'safe') { view('fix'); return true; }
     if (v === 'fix' || v === 'parts') { view('job'); return true; }
     if (v === 'sign') { cancelSign(); return true; }
+    if (v === 'mysig') { $('mysig-back').click(); return true; }
     if (v === 'job' || forms.indexOf(v) >= 0) { open = null; view('jobs'); drawJobs(); return true; }
     return false;
   };
