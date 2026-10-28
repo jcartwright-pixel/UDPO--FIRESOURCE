@@ -30,6 +30,45 @@ document.querySelectorAll('.topbar').forEach(bar => {
 export const EMBED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 if (EMBED) document.body.classList.add('embed');
 
+/*
+ * Joe 10/27: "these are just the plant apps for the plant tablets. And they should be able to go no other places than where
+ * we designed them to go." Once a station has been opened on a plant tablet, the tablet is a Plant Station tablet: every
+ * other screen typed in or followed by a link goes straight back to the Plant Station (its station, or the code screen after
+ * Release). Only the Plant Station's own Unlock (manager release code) makes it a normal device again.
+ */
+export const DEVICE_KEY = 'udStationDevice';
+const HERE_PAGE = location.pathname.split('/').pop() || 'index.html';
+const HERE_QS = new URLSearchParams(location.search);
+// The screens each locked device may open: its own page, and the plant's own screens only inside the station's frame.
+export const DEVICE_PAGES = Object.freeze({ PLANT: { home: 'plant-station.html', pages: ['plant-station.html'], frames: ['trailers.html', 'yard.html'] } });
+export const STATION_DEVICE = (() => { try { const d = localStorage.getItem(DEVICE_KEY) || ''; return DEVICE_PAGES[d] ? d : ''; } catch (e) { return ''; } })();
+export function lockDevice(kind) { try { if (kind) localStorage.setItem(DEVICE_KEY, kind); else localStorage.removeItem(DEVICE_KEY); } catch (e) { /* private window: not remembered */ } }
+// Joe 10/27 "I don't want to see the whole darn program": the Plant Managers app (walkthrough.html?view=home&app=1) is the
+// managers' phone screens only: the walkthrough and its Yard, Coolers and Production, Loading and Unloading. No menu, no Home
+// into the full app; anything else goes back to the Plant Managers start.
+export const MANAGER_APP_HOME = 'walkthrough.html?view=home&app=1';
+// Unloading's own Returns and Washing count as Unloading.
+export const MANAGER_APP_PAGES = Object.freeze(['walkthrough.html', 'yard.html', 'temps.html', 'quality.html', 'loadout.html', 'unloading.html', 'returns.html', 'washing.html']);
+try { if (HERE_PAGE === 'walkthrough.html' && HERE_QS.get('app') === '1') sessionStorage.setItem('udPlantManagers', '1'); } catch (e) { /* private window */ }
+export const MANAGER_APP = !STATION_DEVICE && !EMBED && (() => { try { return sessionStorage.getItem('udPlantManagers') === '1'; } catch (e) { return HERE_QS.get('app') === '1'; } })();
+// Opens the device's own screen instead; this screen stops before any of it runs (below: the page's own script never starts).
+let leaving = false;
+function leaveFor(page) {
+  leaving = true;
+  document.documentElement.style.visibility = 'hidden';
+  try { (EMBED ? window.top : window).location.replace(page); } catch (e) { location.replace(page); }
+}
+if (STATION_DEVICE) {
+  const d = DEVICE_PAGES[STATION_DEVICE];
+  const inFrame = EMBED && HERE_QS.get('inStation') === '1' && d.frames.indexOf(HERE_PAGE) >= 0;
+  if (d.pages.indexOf(HERE_PAGE) < 0 && !inFrame) leaveFor(d.home);
+} else if (MANAGER_APP) {
+  if (MANAGER_APP_PAGES.indexOf(HERE_PAGE) < 0) leaveFor(MANAGER_APP_HOME);
+  else document.body.classList.add('pm-app');
+}
+// A screen that is not this device's waits here for ever (no error), so nothing of it runs while the device's screen opens.
+if (leaving) await new Promise(() => {});
+
 // The menu on the left (Joe, 10/9: "the action buttons ... supposed to be a menu option to the left"), the same on every
 // screen. A link marked with the small arrow still opens the current app in a new tab. On a laptop it folds to icons;
 // the button at its top opens it.
@@ -351,7 +390,7 @@ function limitPlants() {
 }
 function addSideMenu() {
   const screen = document.getElementById('screen'), bar = screen && screen.querySelector('.topbar');
-  if (!bar || document.body.classList.contains('phone') || screen.querySelector('.sidemenu')) return;
+  if (!bar || document.body.classList.contains('phone') || MANAGER_APP || screen.querySelector('.sidemenu')) return;
   const here = (location.pathname.split('/').pop() || 'index.html');
   // Joe 10/10 evening: the menu is words only, on every page (no pictures or icons).
   // Review item 57 (Joe 10/13): no ▸ beside a section and no ↗ beside a link to the current app either.
@@ -503,6 +542,24 @@ function addSideMenu() {
 }
 useMenuSetup();
 addSideMenu();
+// The Plant Managers app's header: the logo and one button back to the Plant Managers start (no Home, Help or Administration
+// into the full app).
+(function managerAppHeader() {
+  if (!MANAGER_APP) return;
+  const bar = document.querySelector('#screen > .topbar'), brand = bar && bar.querySelector('.brand');
+  if (brand) {
+    brand.href = MANAGER_APP_HOME;
+    const name = brand.querySelector('strong'), small = brand.querySelector('small');
+    if (name) name.textContent = 'Plant Managers';
+    if (small) small.textContent = 'UNITED DAIRY';
+  }
+  if (!bar || bar.querySelector('#pm-home') || (HERE_PAGE === 'walkthrough.html' && HERE_QS.get('view') === 'home')) return;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'hdr-btn pm-home'; b.id = 'pm-home'; b.title = 'Back to the Plant Managers start';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON.back + '</svg><span>Plant Managers</span>';
+  b.onclick = () => { location.href = MANAGER_APP_HOME; };
+  if (brand) brand.after(b); else bar.prepend(b);
+})();
 // The header's second line names the side the screen is on (just United Dairy above the sides).
 (function headerSide() {
   const small = document.querySelector('#screen > .topbar .brand small');
@@ -974,7 +1031,10 @@ export async function requireSignIn(ready) {
       if (out) out.hidden = true;
       const who = document.getElementById('who');
       if (who) { who.textContent = station.name; who.title = station.name + ' · ' + station.plant + ' (no UD account)'; }
-      if ((station.tv ? TV_PAGES : STATION_PAGES).indexOf(location.pathname.split('/').pop() || 'index.html') < 0) {
+      // Joe 10/27: the Plant Station's own Trailer Assignments and Yard Checks frames open for it too (they showed a Google
+      // sign-in inside the station before).
+      const here = location.pathname.split('/').pop() || 'index.html', framed = !station.tv && EMBED && HERE_QS.get('inStation') === '1' && DEVICE_PAGES.PLANT.frames.indexOf(here) >= 0;
+      if ((station.tv ? TV_PAGES : STATION_PAGES).indexOf(here) < 0 && !framed) {
         screen.hidden = true;
         gate.hidden = false;
         showError(station.tv ? 'This TV is signed in as the ' + station.name + ' (no UD account). Only the Driver Station board opens on it.'

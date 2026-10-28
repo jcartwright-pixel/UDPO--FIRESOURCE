@@ -3,7 +3,8 @@
  * Browser check of station codes (Joe 10/12, like the current app): Administration > Plant Station Codes, Garage Station
  * Codes and Driver Station Codes each show one link and a list of stations; + Add makes a station and Create code gives it
  * its own code. On a tablet, the Plant Station, Garage Station and Driver Room kiosk then ask for a code, open that station
- * when it is typed, and Release in the bottom-right corner (manager release code) sends them to the Home menu. Pictures at Joe's 1536 width go to SHOTS_DIR.
+ * when it is typed, and Release in the bottom-right corner (manager release code) sends the Plant Station back to its code
+ * screen (Joe 10/27) and the Garage Station and Driver Room kiosk to the Home menu. Pictures at Joe's 1536 width go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -182,10 +183,12 @@ async function codeFitsPhones(p, name) {
     await na.waitForTimeout(1500);
     assert.equal(await na.isVisible('#error'), false, 'no read error on the station\'s loads with no UD account: ' + await na.textContent('#error'));
     await shot(na, '12-no-account-loadout-1536.png');
-    // Any other screen says it needs a UD account, the manager's Loadout Center too (Joe 10/12: the station is for the employees).
+    // Any other screen goes straight back to the station, the manager's Loadout Center too (Joe 10/12: the station is for the
+    // employees; Joe 10/27: a plant tablet goes nowhere else).
     for (const other of ['/daily.html', '/loadout.html?area=CASE', '/unloading.html']) {
       await na.goto(HOSTING + other);
-      await na.waitForSelector('#signin-error:text("Only the Plant Station screens")');
+      await na.waitForURL(/plant-station\.html$/);
+      await na.waitForSelector('#work .sw-panel');
     }
     // Turn Off (press twice): back on the Plant Station, the tablet is sent to the code screen.
     await p.click('[data-na-off]');
@@ -309,18 +312,30 @@ async function codeFitsPhones(p, name) {
     await shot(ds, '7b-driver-room-setup-code-screen-1536.png');
     results.push('Driver Room kiosk: Release asks for the manager release code (Cancel keeps it), then the tablet forgets its code and goes Home; set up again, its code screen names only the Check-In Station');
 
-    // The Plant Station and the Garage Station: Release with the manager release code frees them to the code screen.
+    // Joe 10/27 (replaces 10/13's Home menu for the plant tablets): the Plant Station's Release with the manager release code
+    // goes back to the station code screen, never the app; the tablet still opens no other screen (only Unlock does that).
     await ps.click('#change');
     await ps.waitForSelector('#release:not([hidden])');
     await ps.fill('#release-code', release);
     assert.deepEqual(ps.errors, []);
-    await Promise.all([ps.waitForURL(/index\.html$/), ps.click('#release-go')]);
+    await ps.click('#release-go');
+    await ps.waitForSelector('#code-box form.st-code');
+    assert.match(ps.url(), /plant-station\.html/);
+    for (const gone of ['#go-back', '#go-home', '#signout', '#change']) assert.equal(await ps.isVisible(gone), false, gone + ' is not on the code screen after Release');
+    assert.equal(await ps.isVisible('#unlock'), true);
+    await Promise.all([ps.waitForURL(/plant-station\.html/), ps.goto(HOSTING + '/index.html' + ADMIN)]);
+    await ps.waitForSelector('#code-box form.st-code');
+    // Unlock with the manager release code: the tablet is a normal device again and opens Home.
+    await ps.click('#unlock');
+    await ps.fill('#unlock-box input', release);
+    await Promise.all([ps.waitForURL(/index\.html$/), ps.click('#unlock-box button[type=submit]')]);
+    assert.equal(await ps.evaluate(() => localStorage.getItem('udStationDevice')), null);
     await gs.click('#gs-change');
     await gs.waitForSelector('#gs-release form');
     await gs.fill('#gs-release input', release);
     assert.deepEqual(gs.errors, []);
     await Promise.all([gs.waitForURL(/index\.html$/), gs.click('#gs-release button[type=submit]')]);
-    results.push('Plant Station and Garage Station: Release with the manager release code frees the tablet to the normal Home menu');
+    results.push('Plant Station: Release with the manager release code goes back to the code screen and the tablet opens nothing else; Unlock (manager release code) frees it. Garage Station: Release goes to the normal Home menu');
   } finally {
     await browser.close();
   }

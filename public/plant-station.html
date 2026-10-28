@@ -42,10 +42,10 @@
   <div id="screen" hidden>
     <!-- Joe 10/10: the Plant Station is a tablet screen, like the drivers' phone page: a slim header, no desktop menu. -->
     <header class="topbar" id="ps-top">
-      <!-- Review item 50 (Joe 10/13): the logo first, then Back and Home, as on the desktop screens. -->
+      <!-- Joe 10/27: a plant tablet goes nowhere but its station: no Back or Home into the app, ever. A station with two
+           parts (Case Unloading and Trailer Assignments) has its own Back to the choice of the two. -->
       <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
-      <button type="button" id="go-back" title="Back one screen">&#8249; Back</button>
-      <button type="button" id="go-home" title="Home">Home</button>
+      <button type="button" id="ps-back" title="Back to the choice of work" hidden>&#8249; Back</button>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
       <button type="button" id="change" hidden>Release</button>
       <span class="who" id="who"></span>
@@ -75,14 +75,18 @@
           <span class="ps-release-msg" id="release-msg"></span>
         </form>
       </section>
+      <!-- Joe 10/27: after Release the tablet stays on the code screen. Unlock (manager release code) is the only way to use it
+           for anything else again. -->
+      <div id="unlock-box" hidden></div>
+      <button type="button" id="unlock" class="station-release" title="A manager types the manager release code to use this tablet for other screens" hidden>Unlock tablet</button>
     </div>
   </div>
 
   <script type="module">
     import { startOffline } from './js/offline-saves.js';
-    import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, goBack, callServer, stationCodeSignIn, signOutHere } from './js/app.js';
+    import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, callServer, stationCodeSignIn, signOutHere, lockDevice, STATION_DEVICE } from './js/app.js';
     import { collection, query, where, onSnapshot } from './js/firebase.js';
-    import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
+    import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
     import { fullScreenOnTap } from './js/full-screen.js';
 
@@ -95,7 +99,11 @@
     const L = window.UDLogic;
     const STATIONS = [
       { id: 'CASE', label: 'Case Loadout', what: 'Case loading only (unloading is the Case Unloading station)', area: 'CASE', views: ['loading'] },
-      { id: 'CASE_UNLOADING', label: 'Case Unloading', what: 'Case unloading, product returns and trailer washing (no loading)', area: 'CASE', views: ['unloading', 'washing', 'returns'] },
+      // Joe 10/27: the Case Unloading tablet also does the yard's Trailer Assignments. It opens on the choice of the two; Back
+      // goes back to the choice.
+      { id: 'CASE_UNLOADING', label: 'Case Unloading', what: 'Case unloading, product returns, trailer washing and trailer assignments (no loading)', area: 'CASE', views: ['unloading', 'washing', 'returns', 'trailers'],
+        parts: [{ id: 'unload', label: 'Case Unloading', what: 'Unloading, trailer washing and product returns', views: ['unloading', 'washing', 'returns'], pic: 'case-unloading-v1-560.webp', accent: '#168a55', tone: '#e8f8ef' },
+          { id: 'trailers', label: 'Trailer Assignments', what: 'The trailer for each route', views: ['trailers'], pic: 'yard-checks.webp', accent: '#1976d2', tone: '#e8f3ff' }] },
       // Joe 10/14: the tote station also washes trailers, as the tote crew does today.
       { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading, tote unloading and trailer washing', area: 'TOTES', views: ['loading', 'unloading', 'washing'] },
       // Joe 10/12: Boxing loads its box loads and every carrier and branch shipment on one list (Shipping / Loadout), and
@@ -120,8 +128,13 @@
     // Boxing's Loading tab is its Shipping / Loadout: the box loads and the scheduled shipments together.
     const viewLabel = (st, v) => (st.id === 'BOXING' && v === 'loading' ? { label: 'Shipping / Loadout', what: 'Box loads and every carrier and branch shipment' } : VIEWS[v]);
     // The tab shown (remembered on this tablet for the visit), and the station's work under the tabs.
-    const VIEW_KEY = 'udPlantStationView';
+    const VIEW_KEY = 'udPlantStationView', PART_KEY = 'udPlantStationPart';
     let view = (() => { try { return sessionStorage.getItem(VIEW_KEY) || ''; } catch (e) { return ''; } })(), work = null, person = null;
+    // The part picked on a two-part station ('' = the choice of the two shows).
+    let part = (() => { try { return sessionStorage.getItem(PART_KEY) || ''; } catch (e) { return ''; } })();
+    const setPart = (v) => { part = v; try { if (v) sessionStorage.setItem(PART_KEY, v); else sessionStorage.removeItem(PART_KEY); } catch (e) { /* private window */ } };
+    // Joe 10/27: once a station has opened here, this tablet is a Plant Station tablet: it opens no other screen (app.js).
+    let deviceLocked = STATION_DEVICE === 'PLANT';
     const KEY = 'udPlantStation';
     const read = () => { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } };
     const write = (v) => { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window: not remembered */ } };
@@ -166,19 +179,24 @@
 
     function render() {
       const st = STATIONS.find(s => s.id === stationId);
-      if (st && st.views.indexOf(view) < 0) view = st.views[0];
-      if (work) work.set(st ? { id: st.id, area: st.area, name: named ? named.name : st.label } : null, st ? view : '');
-      // A station's tablet is locked to the station: Back and Home (into the rest of the app) show only while picking a station.
-      document.getElementById('go-back').hidden = !!st;
-      document.getElementById('go-home').hidden = !!st;
+      if (st && !deviceLocked) { deviceLocked = true; lockDevice('PLANT'); }
+      const parts = st && st.parts, pick = parts ? parts.find(x => x.id === part) : null;
+      if (parts && part && !pick) setPart('');
+      const views = parts ? (pick ? pick.views : []) : st ? st.views : [];
+      if (views.length && views.indexOf(view) < 0) view = views[0];
+      if (work) work.set(st ? { id: st.id, area: st.area, name: named ? named.name : st.label } : null, views.length ? view : '');
+      document.getElementById('ps-back').hidden = !pick;
       document.getElementById('code-box').hidden = mode !== 'ask';
       document.getElementById('pick').hidden = !!st || mode !== 'free';
       document.getElementById('station').hidden = !st;
       // Joe 10/12: a station has no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
       lockStation(document.getElementById('change'), !!st);
+      // The code screen of a locked tablet: no Sign out either; Unlock in the corner instead of Release.
+      document.body.classList.toggle('station-locked', !!st || deviceLocked);
+      document.getElementById('unlock').hidden = !!st || !deviceLocked || !!signedAs || mode === 'wait';
       document.getElementById('pill').hidden = !st;
       document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
-      document.getElementById('title').textContent = st ? (named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
+      document.getElementById('title').textContent = st ? (pick ? pick.label : named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
       if (!st) {
         if (mode !== 'free') return;
         document.getElementById('stations').innerHTML = STATIONS.map(s => '<button type="button" class="ps-station" data-station="' + s.id + '"><b>' + escapeHtml(s.label) + '</b><span>' + escapeHtml(s.what) + '</span></button>').join('');
@@ -186,14 +204,21 @@
       }
       const date = L.operatingDay(new Date());
       document.getElementById('pill').textContent = (named ? named.plant : 'Uniontown') + ' · ' + shortDate(date);
-      const actions = st.views.every(v => VIEWS[v].action);
+      if (parts && !pick) {
+        // The choice of the station's two parts, each a big button.
+        document.getElementById('tabs').classList.remove('actions', 'one');
+        document.getElementById('tabs').innerHTML = parts.map(x => '<button type="button" class="ps-tab ps-part" data-part="' + x.id + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + x.pic + '" alt=""><span><b>' + escapeHtml(x.label) + '</b><small>' + escapeHtml(x.what) + '</small></span></button>').join('');
+        document.getElementById('foot').textContent = 'Pick the work. Back at the top comes back to this choice. A manager uses Release in the bottom-right corner to move this tablet.';
+        return;
+      }
+      const actions = views.every(v => VIEWS[v].action);
       document.getElementById('tabs').classList.toggle('actions', actions);
-      document.getElementById('tabs').innerHTML = actions ? st.views.map(v => '<button type="button" role="tab" class="ps-tab ps-action" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + VIEWS[v].accent + ';--tone:' + VIEWS[v].tone + '"><b>' + VIEWS[v].label + '</b></button>').join('') : st.views.map(v => {
+      document.getElementById('tabs').innerHTML = actions ? views.map(v => '<button type="button" role="tab" class="ps-tab ps-action" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + VIEWS[v].accent + ';--tone:' + VIEWS[v].tone + '"><b>' + VIEWS[v].label + '</b></button>').join('') : views.map(v => {
         const x = VIEWS[v], words = viewLabel(st, v), pic = typeof x.pic === 'string' ? x.pic : x.pic[st.area];
         return '<button type="button" role="tab" class="ps-tab" data-view="' + v + '" aria-selected="' + (v === view) + '" style="--accent:' + x.accent + ';--tone:' + x.tone + '"><img src="img/library/' + pic + '" alt=""><span><b>' + words.label + '</b><small>' + words.what + '</small><span class="ps-count" data-count="' + v + '"></span></span></button>';
       }).join('');
       counts();
-      document.getElementById('tabs').classList.toggle('one', st.views.length === 1);
+      document.getElementById('tabs').classList.toggle('one', views.length === 1);
       document.getElementById('foot').textContent = st.what + '. This tablet opens this station each time; a manager uses Release in the bottom-right corner to move it.';
     }
 
@@ -206,6 +231,8 @@
       });
     }
     document.getElementById('tabs').addEventListener('click', e => {
+      const p = e.target.closest('[data-part]');
+      if (p) { setPart(p.dataset.part); view = ''; showError(''); render(); return; }
       const b = e.target.closest('[data-view]');
       if (!b) return;
       view = b.dataset.view;
@@ -218,14 +245,14 @@
       if (!b) return;
       stationId = b.dataset.station; write(stationId); render();
     });
-    document.getElementById('go-back').addEventListener('click', goBack);
-    document.getElementById('go-home').addEventListener('click', () => { location.href = 'index.html'; });
+    document.getElementById('ps-back').addEventListener('click', () => { setPart(''); view = ''; showError(''); render(); });
     const leave = () => {
-      stationId = ''; write(''); remember(CODE_KEY, null); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
-      if (signedAs) { signedAs = null; away = true; if (work) work.stop(); signOutHere(); return; } // back to the station code screen (reads stopped first)
-      // Joe 10/13: a station opened with its code goes to the normal Home menu (same window); a plant with no station codes
-      // yet goes back to its list of stations.
-      if (mode === 'code') { location.replace('index.html'); return; }
+      stationId = ''; write(''); remember(CODE_KEY, null); setPart(''); history.replaceState(null, '', location.pathname); document.getElementById('release').hidden = true;
+      // Back to the station code screen (reads stopped first); the Release button (kept at the bottom of the page) goes too.
+      if (signedAs) { signedAs = null; away = true; if (work) work.stop(); lockStation(document.getElementById('change'), false); signOutHere(); return; }
+      // Joe 10/27 (replaces 10/13's Home menu): Release always goes back to the screen where the station code is typed (or,
+      // at a plant with no station codes yet, its list of stations). The tablet never opens the rest of the app.
+      mode = 'wait';
       decide().catch(err => showError(err.message));
     };
     const releaseCall = (f) => callServer(signedAs ? 'stationSignIn' : 'stationRelease', f);
@@ -245,6 +272,15 @@
       releaseBox.hidden = false; releaseBox.scrollIntoView({ block: 'end' }); releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
     });
     document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
+    // Unlock (Joe 10/27): with the manager release code, this tablet stops being a Plant Station tablet and opens the app's Home.
+    document.getElementById('unlock').addEventListener('click', async () => {
+      const call = (op, f) => callServer('stationRelease', Object.assign({ op, facilityId: 'fac_uniontown' }, f));
+      const ok = await askRelease(document.getElementById('unlock-box'), { status: () => call('status'), release: (code) => call('release', { code }), onError: showError, mustHave: true,
+        why: 'A manager must type the manager release code to use this tablet for other screens. It stops being a Plant Station tablet.' });
+      if (!ok) return;
+      lockDevice(''); deviceLocked = false;
+      location.replace('index.html');
+    });
     releaseBox.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       releaseMsg.textContent = 'Checking…';
@@ -264,6 +300,7 @@
       // never covers the code screen's message (Off shows "turned off", not a read error).
       const turnedAway = async (message) => {
         away = true; signedAs = null; write('');
+        lockStation(document.getElementById('change'), false);
         if (stop) { stop(); stop = null; }
         if (work) work.stop();
         await signOutHere();

@@ -706,9 +706,12 @@ The plant manager's phone walkthrough. The Plant Managers app opens on three cho
 
 - Press a stop to open its check.
 - **Pictures:** `Take Picture` opens the camera; the pictures go with the next Send Current Report.
-- Send Report and Trailer Assignments are in the full app (`Open the full Operations app`).
+- The Plant Managers app shows only these screens: the walkthrough (Yard, Coolers, Production), Loading and Unloading (with its Returns and Washing). There is no menu on the left, no `Home` and no `Administration`. The `Plant Managers` button at the top (and the logo) goes back to the three choices.
+- Any other screen opened in the Plant Managers app goes back to its three choices. Send Report and Trailer Assignments are in the full Operations app: open it from its own link, not from the Plant Managers app.
 - On a phone, swipe up to see the rest of the screen.
 - For managers only.
+
+> Opened from its normal link (not the Plant Managers app) on a computer, `Open the full Operations app` is still at the bottom.
 
 # Reports
 
@@ -1227,6 +1230,26 @@ The plant floor tablets. Each one is opened once with its **Station code** (`OPE
 
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
-- A station has no Back, Home or Sign out. `RELEASE THIS STATION` at the very bottom, with the **Manager release code**, is the only way out.
+- A station has no Home, Sign out or menu. Nothing on it opens any other screen of the app, and an address typed into the tablet comes straight back to the station.
+
+### Case Unloading tablet
+
+The Case Unloading tablet does two jobs. It opens on a choice of two big buttons:
+
+1. Press `Case Unloading` for unloading, trailer washing and product returns, or `Trailer Assignments` for the trailer on each route.
+2. Do the work.
+3. Press `‹ Back` at the top to come back to the choice and pick the other one.
+
+### Release and the code screen
+
+1. A manager presses `Release` in the bottom-right corner.
+2. The manager types the **Manager release code** and presses `RELEASE THIS STATION`.
+3. The tablet goes back to the screen where a **Station code** is typed. That is all it can do until a station code is typed again.
+
+- `Unlock tablet` in the bottom-right corner of the code screen, with the **Manager release code**, stops the tablet being a Plant Station tablet so it can open the rest of the app. Use it only when the tablet is taken off the plant floor.
+
+> A tablet signed in with its station code alone (no United Dairy account) goes back to its station code box after Release.
 
 !> Do not release a station to use the tablet for something else in the middle of a shift.
+
+!> Do not unlock a plant floor tablet. Release it and type the new station's code instead.

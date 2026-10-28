@@ -156,5 +156,5 @@ test('a no-account Plant Station may make only the plant-floor saves', async () 
   const out = await applyAction(db(), station, { action: 'completeWash', requestId: 'r-station-2', date: '2026-10-09', trailer: 'T-993' });
   assert.equal(out.ok, true);
   assert.equal((await db().collection('actions').doc('r-station-2').get()).data().by, 'station:x');
-  assert.deepEqual(ST.STATION_ACTIONS, ['savePlantLoad', 'addPickup', 'completePickup', 'reorderPlantLoads', 'saveUnloading', 'completeWash', 'addReturn']);
+  assert.deepEqual(ST.STATION_ACTIONS, ['savePlantLoad', 'addPickup', 'completePickup', 'reorderPlantLoads', 'saveUnloading', 'completeWash', 'addReturn', 'saveYardCheck']);
 });

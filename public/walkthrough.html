@@ -154,7 +154,9 @@
 
     document.getElementById('title').textContent = home ? (appMode ? 'Plant Managers' : 'Operations') : 'Manager Walkthrough';
     document.getElementById('ask').textContent = home ? 'What are you doing?' : 'Walk in this order';
-    document.getElementById('full').hidden = !home;
+    // Joe 10/27: the Plant Managers app never opens the full app (no link out of it).
+    document.getElementById('full').hidden = !home || appMode;
+    if (appMode) document.querySelector('#not-manager a').hidden = true;
     if (home) document.title = appMode ? 'Plant Managers' : 'Manager · Operations';
 
     // The Plant Managers code (Administration > Links & Codes > Plant Managers App), asked once on this phone.

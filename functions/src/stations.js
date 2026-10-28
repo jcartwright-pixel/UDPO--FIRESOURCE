@@ -51,9 +51,10 @@ const STARTERS = [
 // (Remove takes the code off, so the starter coming back has no code and the app opens as before).
 const LATER_KINDS = ['MANAGER'];
 const MAX_FAILS_PER_MINUTE = 30;
-// The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing
-// and returns (the screens the Plant Station opens). Nothing else.
-const STATION_ACTIONS = Object.freeze(['savePlantLoad', 'addPickup', 'completePickup', 'reorderPlantLoads', 'saveUnloading', 'completeWash', 'addReturn']);
+// The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing,
+// returns and yard checks (the screens the Plant Station opens). Nothing else.
+// Joe 10/27: and Yard Services' Check Temperatures (saveYardCheck); its Assign Trailer saves through savePlantLoad.
+const STATION_ACTIONS = Object.freeze(['savePlantLoad', 'addPickup', 'completePickup', 'reorderPlantLoads', 'saveUnloading', 'completeWash', 'addReturn', 'saveYardCheck']);
 const ACCESS = (db, facilityId) => db.collection('stationAccess').doc(facilityId);
 
 const text = (v, max) => String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80);
