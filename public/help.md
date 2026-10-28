@@ -1246,10 +1246,8 @@ The Case Unloading tablet does two jobs. It opens on a choice of two big buttons
 2. The manager types the **Manager release code** and presses `RELEASE THIS STATION`.
 3. The tablet goes back to the screen where a **Station code** is typed. That is all it can do until a station code is typed again.
 
-- `Unlock tablet` in the bottom-right corner of the code screen, with the **Manager release code**, stops the tablet being a Plant Station tablet so it can open the rest of the app. Use it only when the tablet is taken off the plant floor.
-
 > A tablet signed in with its station code alone (no United Dairy account) goes back to its station code box after Release.
 
 !> Do not release a station to use the tablet for something else in the middle of a shift.
 
-!> Do not unlock a plant floor tablet. Release it and type the new station's code instead.
+!> Do not type a station code on your own computer or phone to try it: that device then opens only the Plant Station until its browser data for the app is cleared.

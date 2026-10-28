@@ -75,10 +75,6 @@
           <span class="ps-release-msg" id="release-msg"></span>
         </form>
       </section>
-      <!-- Joe 10/27: after Release the tablet stays on the code screen. Unlock (manager release code) is the only way to use it
-           for anything else again. -->
-      <div id="unlock-box" hidden></div>
-      <button type="button" id="unlock" class="station-release" title="A manager types the manager release code to use this tablet for other screens" hidden>Unlock tablet</button>
     </div>
   </div>
 
@@ -86,7 +82,7 @@
     import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, callServer, stationCodeSignIn, signOutHere, lockDevice, STATION_DEVICE } from './js/app.js';
     import { collection, query, where, onSnapshot } from './js/firebase.js';
-    import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
+    import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
     import { fullScreenOnTap } from './js/full-screen.js';
 
@@ -191,9 +187,8 @@
       document.getElementById('station').hidden = !st;
       // Joe 10/12: a station has no Back, Home or Sign out; Release at the very bottom (manager release code) is the only way out.
       lockStation(document.getElementById('change'), !!st);
-      // The code screen of a locked tablet: no Sign out either; Unlock in the corner instead of Release.
+      // The code screen of a locked tablet: no Sign out either. Joe 10/27: the code screen is the only thing it is allowed.
       document.body.classList.toggle('station-locked', !!st || deviceLocked);
-      document.getElementById('unlock').hidden = !!st || !deviceLocked || !!signedAs || mode === 'wait';
       document.getElementById('pill').hidden = !st;
       document.getElementById('eyebrow').textContent = st ? 'Assigned Plant Station' : 'Plant Station';
       document.getElementById('title').textContent = st ? (pick ? pick.label : named ? named.name : st.label) : mode === 'ask' ? 'Station code' : 'Pick this tablet\'s station';
@@ -272,15 +267,6 @@
       releaseBox.hidden = false; releaseBox.scrollIntoView({ block: 'end' }); releaseMsg.textContent = ''; document.getElementById('release-code').value = ''; document.getElementById('release-code').focus();
     });
     document.getElementById('release-cancel').addEventListener('click', () => { releaseBox.hidden = true; });
-    // Unlock (Joe 10/27): with the manager release code, this tablet stops being a Plant Station tablet and opens the app's Home.
-    document.getElementById('unlock').addEventListener('click', async () => {
-      const call = (op, f) => callServer('stationRelease', Object.assign({ op, facilityId: 'fac_uniontown' }, f));
-      const ok = await askRelease(document.getElementById('unlock-box'), { status: () => call('status'), release: (code) => call('release', { code }), onError: showError, mustHave: true,
-        why: 'A manager must type the manager release code to use this tablet for other screens. It stops being a Plant Station tablet.' });
-      if (!ok) return;
-      lockDevice(''); deviceLocked = false;
-      location.replace('index.html');
-    });
     releaseBox.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       releaseMsg.textContent = 'Checking…';

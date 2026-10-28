@@ -90,7 +90,7 @@ async function typedAll(page, pages, home, allowed) {
 async function pressAll(page) {
   const pressed = [];
   const pick = 'button:visible, a[href]:visible, [role="tab"]:visible, [data-card]:visible, [data-open]:visible';
-  const skip = (t) => /^(Release|Unlock tablet|RELEASE THIS STATION)$/i.test(t);
+  const skip = (t) => /^(Release|RELEASE THIS STATION)$/i.test(t);
   for (const where of ['top', 'frame']) {
     for (let i = 0; i < 60; i++) {
       const scope = where === 'top' ? page.mainFrame() : page.frames().find(f => f !== page.mainFrame() && /inStation=1/.test(f.url()));
@@ -98,7 +98,7 @@ async function pressAll(page) {
       const all = await scope.$$(pick).catch(() => []);
       if (i >= all.length) break;
       const el = all[i], label = ((await el.textContent().catch(() => '')) || (await el.getAttribute('title').catch(() => '')) || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-      if (skip(label) || await el.evaluate(e => !!e.closest('#release, #unlock-box, #release-box, .sw-frame') || e.type === 'submit').catch(() => true)) continue;
+      if (skip(label) || await el.evaluate(e => !!e.closest('#release, #release-box, .sw-frame') || e.type === 'submit').catch(() => true)) continue;
       await el.click({ timeout: 2000, trial: false }).catch(() => {});
       await page.waitForTimeout(250);
       // A pop-up box or a form the button opened: Escape and the screen's own Cancel close it again.
@@ -191,30 +191,6 @@ const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], [
         await p.context().close();
       }
     }
-
-    // Unlock: only the manager release code makes a Plant Station tablet a normal device again.
-    const u = await openPage(browser, tablet(), '/plant-station.html' + UD);
-    await u.waitForSelector('#code-box form.st-code');
-    await u.fill('#code-box input', codes.CASE);
-    await u.click('#code-box button');
-    await u.waitForFunction(() => !document.getElementById('station').hidden && !document.getElementById('screen').hidden);
-    await u.click('#change');
-    await u.fill('#release-code', release);
-    await u.click('#release-go');
-    await u.waitForSelector('#code-box form.st-code');
-    await u.click('#unlock');
-    await u.fill('#unlock-box input', 'WRONG1');
-    await u.click('#unlock-box button[type=submit]');
-    await u.waitForFunction(() => /\S/.test(document.querySelector('#unlock-box .ps-release-msg').textContent) && !/Checking/.test(document.querySelector('#unlock-box .ps-release-msg').textContent));
-    assert.equal(pageOf(u.url()), 'plant-station.html', 'a wrong code keeps the tablet locked');
-    await u.fill('#unlock-box input', release);
-    await Promise.all([u.waitForURL(/index\.html$/), u.click('#unlock-box button[type=submit]')]);
-    await u.goto(HOSTING + '/daily.html');
-    await u.waitForTimeout(1500);
-    assert.equal(pageOf(u.url()), 'daily.html', 'once unlocked, the device opens other screens again');
-    await u.context().close();
-    results.push('Unlock tablet (on the code screen): a wrong code keeps the tablet locked; the manager release code makes it a normal device again');
-    audit.push('## Unlock tablet', '', '- Only on the code screen after Release. With the manager release code the tablet stops being a Plant Station tablet.', '');
 
     // The Plant Managers app on a phone.
     const m = await openPage(browser, phone(), '/walkthrough.html?view=home&app=1&' + MANAGER);

@@ -34,7 +34,7 @@ if (EMBED) document.body.classList.add('embed');
  * Joe 10/27: "these are just the plant apps for the plant tablets. And they should be able to go no other places than where
  * we designed them to go." Once a station has been opened on a plant tablet, the tablet is a Plant Station tablet: every
  * other screen typed in or followed by a link goes straight back to the Plant Station (its station, or the code screen after
- * Release). Only the Plant Station's own Unlock (manager release code) makes it a normal device again.
+ * Release); "that's the only thing it's allowed". Clearing the browser's data for the app is the only way to free the device.
  */
 export const DEVICE_KEY = 'udStationDevice';
 const HERE_PAGE = location.pathname.split('/').pop() || 'index.html';
