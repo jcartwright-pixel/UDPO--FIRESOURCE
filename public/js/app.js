@@ -40,7 +40,16 @@ export const DEVICE_KEY = 'udStationDevice';
 const HERE_PAGE = location.pathname.split('/').pop() || 'index.html';
 const HERE_QS = new URLSearchParams(location.search);
 // The screens each locked device may open: its own page, and the plant's own screens only inside the station's frame.
-export const DEVICE_PAGES = Object.freeze({ PLANT: { home: 'plant-station.html', pages: ['plant-station.html'], frames: ['trailers.html', 'yard.html'] } });
+// Joe 10/28 "you need to block that exact same way": the Garage Station, the Maintenance Station, the Driver Room's tablet and
+// TV, and the line tablets are locked the same way once a station code has opened them. only: a page that opens for the device
+// only with that address (the Driver Room tablet is the drivers' phone page with ?room=1).
+export const DEVICE_PAGES = Object.freeze({
+  PLANT: { home: 'plant-station.html', pages: ['plant-station.html'], frames: ['trailers.html', 'yard.html'] },
+  GARAGE: { home: 'garage-station.html', pages: ['garage-station.html'], frames: [] },
+  MAINT: { home: 'maint-station.html', pages: ['maint-station.html'], frames: [] },
+  KIOSK: { home: 'driver-station.html', pages: ['driver-station.html', 'route.html'], frames: [], only: { 'route.html': ['room', '1'] } },
+  LINE: { home: 'line.html', pages: ['line.html'], frames: [] }
+});
 export const STATION_DEVICE = (() => { try { const d = localStorage.getItem(DEVICE_KEY) || ''; return DEVICE_PAGES[d] ? d : ''; } catch (e) { return ''; } })();
 export function lockDevice(kind) { try { if (kind) localStorage.setItem(DEVICE_KEY, kind); else localStorage.removeItem(DEVICE_KEY); } catch (e) { /* private window: not remembered */ } }
 // Joe 10/27 "I don't want to see the whole darn program": the Plant Managers app (walkthrough.html?view=home&app=1) is the
@@ -60,8 +69,8 @@ function leaveFor(page) {
 }
 if (STATION_DEVICE) {
   const d = DEVICE_PAGES[STATION_DEVICE];
-  const inFrame = EMBED && HERE_QS.get('inStation') === '1' && d.frames.indexOf(HERE_PAGE) >= 0;
-  if (d.pages.indexOf(HERE_PAGE) < 0 && !inFrame) leaveFor(d.home);
+  const inFrame = EMBED && HERE_QS.get('inStation') === '1' && d.frames.indexOf(HERE_PAGE) >= 0, only = (d.only || {})[HERE_PAGE];
+  if ((d.pages.indexOf(HERE_PAGE) < 0 || (only && HERE_QS.get(only[0]) !== only[1])) && !inFrame) leaveFor(d.home);
 } else if (MANAGER_APP) {
   if (MANAGER_APP_PAGES.indexOf(HERE_PAGE) < 0) leaveFor(MANAGER_APP_HOME);
   else document.body.classList.add('pm-app');

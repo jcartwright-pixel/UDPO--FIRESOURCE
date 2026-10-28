@@ -10,6 +10,7 @@
  *   - Release with the manager release code goes back to the code screen, which has no Back, Home or Sign out, and the
  *     tablet still opens no other screen.
  * The Case Unloading tablet opens on the choice of Case Unloading or Trailer Assignments, with Back to the choice.
+ * Joe 10/28: the Garage Station, Maintenance Station, a line tablet and the Driver Room TV and tablet the same way (OTHERS).
  * The Plant Managers app (phone): no menu, no Home, Help or Administration; it opens exactly the managers' screens (the
  * walkthrough, Yard, Coolers, Production, Loading, Unloading with its Returns and Washing) and every other screen goes back
  * to its start. What each one reached is printed (and saved as tablet-lock-audit.md in SHOTS_DIR).
@@ -86,8 +87,10 @@ async function typedAll(page, pages, home, allowed) {
 }
 
 // Press every button, tab and link on the station (and inside its frame) one at a time; after each, the tablet must still be on
-// the Plant Station. Release and the Release box are left out (Release is checked on its own). Returns what was pressed.
-async function pressAll(page) {
+// the Plant Station (or `home`, a test of the page's address). Release and the Release box are left out (Release is checked on
+// its own). Returns what was pressed.
+async function pressAll(page, home) {
+  const onHome = home || ((u) => pageOf(u) === 'plant-station.html');
   const pressed = [];
   const pick = 'button:visible, a[href]:visible, [role="tab"]:visible, [data-card]:visible, [data-open]:visible';
   const skip = (t) => /^(Release|RELEASE THIS STATION)$/i.test(t);
@@ -98,13 +101,13 @@ async function pressAll(page) {
       const all = await scope.$$(pick).catch(() => []);
       if (i >= all.length) break;
       const el = all[i], label = ((await el.textContent().catch(() => '')) || (await el.getAttribute('title').catch(() => '')) || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-      if (skip(label) || await el.evaluate(e => !!e.closest('#release, #release-box, .sw-frame') || e.type === 'submit').catch(() => true)) continue;
+      if (skip(label) || await el.evaluate(e => !!e.closest('#release, #release-box, #gs-release, #ms-release, .sw-frame') || e.type === 'submit').catch(() => true)) continue;
       await el.click({ timeout: 2000, trial: false }).catch(() => {});
       await page.waitForTimeout(250);
       // A pop-up box or a form the button opened: Escape and the screen's own Cancel close it again.
       await page.keyboard.press('Escape').catch(() => {});
       pressed.push((where === 'frame' ? 'frame: ' : '') + (label || '(no words)'));
-      assert.equal(pageOf(page.url()), 'plant-station.html', 'pressing "' + label + '" left the Plant Station for ' + page.url());
+      assert.ok(onHome(page.url()), 'pressing "' + label + '" left the station for ' + page.url());
       const f = page.frames().find(x => x !== page.mainFrame() && /\.html/.test(x.url()));
       if (f) assert.ok(['trailers.html', 'yard.html'].indexOf(pageOf(f.url())) >= 0, 'pressing "' + label + '" opened ' + f.url() + ' inside the station');
     }
@@ -114,16 +117,34 @@ async function pressAll(page) {
 
 const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], ['TOTES', 'Tote Loadout'], ['BOXING', 'Boxing Loadout'], ['YARD_SERVICES', 'Yard Services']];
 
+/*
+ * Joe 10/28 "you need to block that exact same way": the Garage Station, the Maintenance Station, a line tablet, the Driver Room
+ * TV (Driver's Kiosk Station) and the Driver Room tablet (Driver Room Check-In Station). Each: its link, its code, then
+ * every button pressed (still on its screen), every screen typed in (back to its screen), and Release with the manager release
+ * code (back to its code screen, no Back, Home or Sign out, nothing else opens).
+ *   open: the address it is set up from; key: its station; code: where its code is typed; ready: its screen once open;
+ *   home: its page; onHome: the addresses it may be on; release / box: its Release button and the release code box.
+ */
+const OTHERS = [
+  { name: 'Garage Station', key: 'fac_uniontown_garage_garage', open: '/garage-station.html?' + MANAGER, code: '#view-code', ready: 'body.station-locked #view-jobs:not([hidden])', home: 'garage-station.html', release: '#gs-change', box: '#gs-release', gone: ['#go-back', '#go-home'] },
+  { name: 'Maintenance Station', key: 'fac_uniontown_maint_maint', open: '/maint-station.html', code: '#view-code', ready: 'body.station-locked #view-jobs:not([hidden])', home: 'maint-station.html', release: '#ms-change', box: '#ms-release', gone: ['#go-back', '#go-home'] },
+  { name: 'Line tablet', key: 'fac_uniontown_line_line', open: '/line.html' + UD + '&tablet=1', code: '#code-box', pick: '#line-list [data-line]', ready: 'body.station-locked #line-head:not([hidden])', home: 'line.html', release: '#lt-release', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#change'] },
+  { name: 'Driver Room TV (Driver\'s Kiosk Station)', key: 'fac_uniontown_kiosk_tv', open: '/driver-station.html' + UD, code: '#code-box', ready: 'body.station-locked #ds-grid:not([hidden])', home: 'driver-station.html', release: '#change', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#tv-exit'] },
+  { name: 'Driver Room tablet (Driver Room Check-In Station)', key: 'fac_uniontown_kiosk_driver', open: '/driver-station.html?for=room&' + MANAGER, code: '#code-box', ready: 'body.room.station-locked #m-station', home: 'route.html', onHome: (u) => pageOf(u) === 'route.html' && /[?&]room=1/.test(u),
+    release: '#m-station', box: '#release-box', gone: ['#go-back', '#go-home', '#signout'], after: 'driver-station.html' }
+];
+
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date(NOW) });
   const at = new Date().toISOString(), codes = {};
   for (const [type] of PLANT) codes[type] = (await STATIONS.stationCode(db(), ADMIN, { key: 'fac_uniontown_plant_' + type.toLowerCase() }, at)).code;
   codes.managers = (await STATIONS.stationCode(db(), ADMIN, { key: 'fac_uniontown_manager_managers' }, at)).code;
+  for (const o of OTHERS) codes[o.key] = (await STATIONS.stationCode(db(), ADMIN, { key: o.key }, at)).code;
   await STATIONS.noAccountSet(db(), ADMIN, { facilityId: 'fac_uniontown', on: true }, at);
   const release = (await require('../../src/admin').adminCall(db(), { email: ADMIN }, { op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
   const browser = await chromium.launch();
-  const results = [], audit = ['# Plant tablets and the Plant Managers app: where each one can go', ''];
+  const results = [], audit = ['# Plant tablets, the garage, maintenance and line tablets, the Driver Room and the Plant Managers app: where each one can go', ''];
   try {
     for (const [type, name] of PLANT) {
       for (const how of ['ud', 'code']) {
@@ -190,6 +211,45 @@ const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], [
         results.push(what + ': ' + pressed.length + ' buttons pressed and ' + typed.length + ' screens typed in, all stayed on the station; Release went back to the code screen');
         await p.context().close();
       }
+    }
+
+    // The Garage Station, the Maintenance Station, a line tablet and the Driver Room's TV and tablet (Joe 10/28).
+    for (const o of OTHERS) {
+      const p = await openPage(browser, tablet(), o.open);
+      const onHome = o.onHome || ((u) => pageOf(u) === o.home);
+      await p.waitForSelector(o.code + ' form.st-code');
+      await p.fill(o.code + ' input', codes[o.key]);
+      await p.click(o.code + ' button');
+      if (o.pick) { await p.waitForSelector(o.pick); await p.click(o.pick); }
+      await p.waitForSelector(o.ready);
+      assert.ok(onHome(p.url()), o.name + ': its code opens its own screen (' + p.url() + ')');
+      for (const gone of o.gone.concat(['#go-admin', '#go-help', '.sidemenu'])) assert.equal(await p.isVisible(gone), false, o.name + ': ' + gone + ' is not on the station');
+      assert.equal((await p.textContent(o.release)).trim(), 'Release');
+      await p.waitForTimeout(2000);
+      await shot(p, 'tablet-lock-' + o.home.replace('.html', '') + '-1024');
+      const pressed = await pressAll(p, onHome);
+      const typed = o.home === 'garage-station.html' ? PAGES : ['index.html', 'company.html', 'administration.html', 'manager.html', 'daily.html', 'garage.html', 'pmaint.html', 'production.html', 'route.html', 'driver-station.html', 'line.html', 'garage-station.html', 'maint-station.html', 'plant-station.html', 'help.html'];
+      const leaks = await typedAll(p, typed, o.home);
+      assert.deepEqual(leaks, [], o.name + ': typed screens that did not go back to the station');
+      await p.waitForSelector(o.ready);
+      assert.ok(onHome(p.url()), o.name + ': back on its own screen (' + p.url() + ')');
+      // Release with the manager release code: back to the code screen, and still nothing else opens.
+      await p.click(o.release);
+      await p.waitForSelector(o.box + ' form');
+      await p.fill(o.box + ' input', release);
+      await p.click(o.box + ' button[type=submit]');
+      await p.waitForSelector(o.code + ' form.st-code');
+      assert.equal(pageOf(p.url()), o.after || o.home, o.name + ': Release stays on its own page');
+      for (const gone of o.gone.concat([o.release, '#go-admin', '.sidemenu'])) assert.equal(await p.isVisible(gone), false, o.name + ': ' + gone + ' is not on the code screen');
+      await shot(p, 'tablet-lock-' + o.home.replace('.html', '') + '-after-release-1024');
+      const after = await typedAll(p, ['index.html', 'company.html', 'administration.html', 'manager.html', 'route.html', 'plant-station.html'], o.after || o.home);
+      assert.deepEqual(after, [], o.name + ': after Release, typed screens that did not go back to the code screen');
+      assert.deepEqual(p.errors.filter(e => !/Missing or insufficient permissions/.test(e)), [], o.name + ': no errors or new windows');
+      audit.push('## ' + o.name, '', '- Opens: its own screen only (' + o.home + (o.onHome ? ' with ?room=1' : '') + ').',
+        '- Pressed ' + pressed.length + ' buttons, tabs and links (' + [...new Set(pressed)].join(', ') + '): all stayed on it.', '- Typed ' + typed.length + ' other screens into the address bar: every one came back to it.',
+        '- Release (manager release code): back to the code screen; nothing else opens after it.', '');
+      results.push(o.name + ': ' + pressed.length + ' buttons pressed and ' + typed.length + ' screens typed in, all stayed on it; Release went back to the code screen');
+      await p.context().close();
     }
 
     // The Plant Managers app on a phone.

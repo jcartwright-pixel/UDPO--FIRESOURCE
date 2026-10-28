@@ -32,11 +32,15 @@
       <button type="button" id="go-home" title="Home">Home</button>
       <span class="ps-pill" id="pill" hidden></span>
       <button type="button" id="change" hidden>Change Line</button>
+      <button type="button" id="lt-release" hidden>Release</button>
       <span class="who" id="who"></span>
       <button type="button" id="signout">Sign out</button>
     </header>
     <div class="notice error" id="error" hidden></div>
     <div class="view" id="view">
+      <!-- Joe 10/28: a line tablet on the floor (the Line Tablet link) types its station code once (Administration > Plant Station Codes). -->
+      <div id="release-box" hidden></div>
+      <section id="code-box" hidden></section>
       <section id="pick" hidden>
         <div class="ps-title"><span class="eyebrow">Plant Production · Line tablet</span><h1>Pick this tablet's line</h1></div>
         <p class="ps-intro">Pick the production line this tablet is at. The tablet remembers it and opens straight to that line next time.</p>
@@ -104,7 +108,8 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate, watchPerson } from './js/app.js';
+    import { start, requireSignIn, save, escapeHtml, showError, goBack, shortDate, watchPerson, callServer, lockDevice, STATION_DEVICE } from './js/app.js';
+    import { resolveStation, askCode, askRelease, lockStation, remember } from './js/station-code.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, clock, shiftText } from './js/production.js';
 
@@ -129,6 +134,35 @@
       if (id) room.stop = onSnapshot(doc(db, 'sensors', id), s => { room.value = s.exists() ? s.data() : null; if (data) render(); }, () => {});
     }
     if (lineId && !read()) write(lineId);
+    // Joe 10/28 "you need to block that exact same way": a line tablet on the floor opens the Line Tablet link (?tablet=1). Once
+    // the plant has a Line Tablet code, it types the code once, picks its line, and is then a line tablet: it opens no other
+    // screen (app.js), has no Back, Home, Sign out or Change Line, and Release (the manager release code) goes back to the code
+    // screen only. A computer opening the Line Tablet from the menus works as before.
+    const CODE_KEY = 'udLineTabletCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
+    const TABLET = params.get('tablet') === '1' || STATION_DEVICE === 'LINE' || (() => { try { return !!localStorage.getItem(CODE_KEY); } catch (e) { return false; } })();
+    let station = null, asking = false, deviceLocked = STATION_DEVICE === 'LINE';
+    async function gate() {
+      if (!TABLET) return;
+      const r = await resolveStation('LINE', CODE_KEY, stationCall);
+      if (r.needCode) {
+        station = null; asking = true; lockStation(document.getElementById('lt-release'), false); document.body.classList.toggle('station-locked', deviceLocked); render();
+        station = await askCode(document.getElementById('code-box'), { kind: 'LINE', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
+          hint: 'A manager gives the line tablets their code (Administration > Plant Station Codes). The tablet remembers it after this.', message: r.message });
+        asking = false;
+      } else station = r.station || null;
+      if (station) { deviceLocked = true; lockDevice('LINE'); }
+      lockStation(document.getElementById('lt-release'), !!station);
+      document.body.classList.toggle('station-locked', !!station || deviceLocked);
+      render();
+    }
+    document.getElementById('lt-release').addEventListener('click', async () => {
+      const fac = station ? station.facilityId : plant();
+      const ok = await askRelease(document.getElementById('release-box'), { status: () => stationCall('status', { facilityId: fac }), release: (code) => stationCall('release', { facilityId: fac, code }),
+        onError: showError, mustHave: true, why: 'A manager must type the manager release code to take this tablet off its line.' });
+      if (!ok) return;
+      station = null; remember(CODE_KEY, null); lineId = ''; write(''); pane = ''; history.replaceState(null, '', location.pathname);
+      gate().catch(err => showError('Could not check this tablet\'s code: ' + (err.message || err)));
+    });
     const plant = () => { const ids = person ? L.plantsFor(person) : []; return params.get('plant') || ids[0] || 'fac_uniontown'; };
     const plantName = (id) => ((L.PLANTS || []).find(p => p.id === id) || { name: 'Uniontown' }).name;
 
@@ -145,6 +179,9 @@
     // Not reasons to be down: Changeover is its own button, the wash is the CIP tab.
     const NOT_DOWN = ['Changeover', 'Changeover / flush', 'Sanitation / CIP', 'Mold change'];
     function render() {
+      // The code screen: nothing else shows until the code is typed.
+      document.getElementById('code-box').hidden = !asking;
+      if (asking) { ['pick', 'line-head', 'board', 'product-pane', 'count-pane', 'more-pane', 'change', 'pill'].forEach(id => { document.getElementById(id).hidden = true; }); return; }
       if (!data) return;
       const line = data.lines.find(l => l.operationId === lineId) || null;
       if (lineId && !line && data.read.setup) { lineId = ''; write(''); }
@@ -154,7 +191,7 @@
       document.getElementById('product-pane').hidden = pane !== 'product';
       document.getElementById('count-pane').hidden = pane !== 'count';
       document.getElementById('more-pane').hidden = !MORE[pane];
-      document.getElementById('change').hidden = !line;
+      document.getElementById('change').hidden = !line || !!station;
       document.getElementById('pill').hidden = !line;
       if (!line) {
         document.getElementById('line-list').innerHTML = data.lines.map(l => '<button type="button" class="ps-station" data-line="' + escapeHtml(l.operationId) + '"><b>' + escapeHtml(l.name) + '</b><span>' + (data.products[l.operationId] || []).length + ' products</span></button>').join('') ||
@@ -781,6 +818,7 @@
 
     requireSignIn(async (user) => {
       ({ db } = await start());
+      gate().catch(err => showError('Could not check this tablet\'s code: ' + (err.message || err)));
       watchPerson(db, user, p => {
         person = p;
         if (!stop) stop = watchProduction(db, plant(), d => { data = d; render(); }, e => showError('Could not read the line (' + e.message + '). Check the network.'), now);

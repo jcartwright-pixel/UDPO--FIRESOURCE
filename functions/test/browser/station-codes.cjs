@@ -86,7 +86,9 @@ async function codeFitsPhones(p, name) {
     };
 
     await open('station-codes');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public', 'line']);
+    // Joe 10/28: the line tablets' code sits under the Plant Stations.
+    assert.deepEqual(await p.$$eval('#lt-list .ap-item b', b => b.map(x => x.textContent)), ['Line Tablet']);
     // Joe 10/12: the no-account link is built now (it was "Being built"), with its On / Off.
     assert.match(await p.textContent('.ap-link[data-link="public"]'), /Code, no account/);
     assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services']);
@@ -102,7 +104,10 @@ async function codeFitsPhones(p, name) {
 
     await open('garage-codes');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['garage', 'maint']);
+    // Joe 10/28: the Maintenance Station's own code sits under the garage stations; each list answers its own buttons.
+    assert.deepEqual(await p.$$eval('#ms-list .ap-item b', b => b.map(x => x.textContent)), ['Maintenance Station']);
     codes.garage = await makeCode('Garage');
+    assert.equal(await p.$$eval('#ms-list code', c => c.length), 0, 'a garage code leaves the Maintenance Station without one');
     await twoShots(p, '2-garage-station-codes');
     results.push('Garage Station Codes: its own page with the Garage Station link and its stations');
 
@@ -285,10 +290,16 @@ async function codeFitsPhones(p, name) {
     await tv.waitForFunction(() => /\S/.test(document.querySelector('.ps-release-msg').textContent) && !/Checking/.test(document.querySelector('.ps-release-msg').textContent));
     assert.match(tv.url(), /tv=1/);
     await tv.fill('#release-box input', release);
-    // Joe 10/13 "when I released this ... it went out too": the right code goes to the normal Home menu, and the TV forgets its code.
-    await Promise.all([tv.waitForURL(/index\.html$/), tv.click('#release-box button[type=submit]')]);
+    // Joe 10/28 "you need to block that exact same way" (replaces 10/13's Home menu): the right code unattaches the TV and goes back
+    // to its code screen only, with no Back, Home or Sign out; the TV forgets its code and opens nothing else.
+    await tv.click('#release-box button[type=submit]');
+    await tv.waitForSelector('#code-box form.st-code');
+    assert.match(tv.url(), /driver-station\.html\?tv=1$/);
     assert.equal(await tv.evaluate(() => localStorage.getItem('udKioskCode')), null);
-    results.push('Driver Room TV: Release asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it and goes to the normal Home menu');
+    for (const gone of ['#go-back', '#go-home', '#signout', '#change']) assert.equal(await tv.isVisible(gone), false, gone + ' is not on the TV\'s code screen after Release');
+    await Promise.all([tv.waitForURL(/driver-station\.html/), tv.goto(HOSTING + '/index.html')]);
+    await tv.waitForSelector('#code-box form.st-code');
+    results.push('Driver Room TV: Release asks for the manager release code (Cancel and a wrong code keep the TV), the right code unattaches it and goes back to its code screen; the TV opens nothing else');
 
     // The Driver Room kiosk tablet: Release asks for the release code; Cancel keeps it, the right code frees it.
     await ds.click('#m-station');
@@ -297,7 +308,10 @@ async function codeFitsPhones(p, name) {
     assert.equal(await ds.isVisible('#m-checkin'), true);
     await ds.click('#m-station');
     await ds.fill('#release-box input', release);
-    await Promise.all([ds.waitForURL(/index\.html$/), ds.click('#release-box button[type=submit]')]);
+    // Joe 10/28: back to the Check-In Station's code screen only (it went to the Home menu before).
+    await Promise.all([ds.waitForURL(/driver-station\.html\?for=room$/), ds.click('#release-box button[type=submit]')]);
+    await ds.waitForSelector('#code-box form.st-code');
+    for (const gone of ['#go-back', '#go-home', '#signout']) assert.equal(await ds.isVisible(gone), false, gone + ' is not on the Check-In Station\'s code screen after Release');
     assert.equal(await ds.evaluate(() => localStorage.getItem('udRoomStation')), null);
     assert.equal(await ds.evaluate(() => localStorage.getItem('udKioskCode')), null, 'the existing link forgets it too');
     assert.deepEqual(tv.errors, []);
@@ -310,7 +324,7 @@ async function codeFitsPhones(p, name) {
     assert.equal(await ds.isVisible('#tv'), false);
     assert.equal(await ds.isVisible('#refresh'), false);
     await shot(ds, '7b-driver-room-setup-code-screen-1536.png');
-    results.push('Driver Room kiosk: Release asks for the manager release code (Cancel keeps it), then the tablet forgets its code and goes Home; set up again, its code screen names only the Check-In Station');
+    results.push('Driver Room kiosk: Release asks for the manager release code (Cancel keeps it), then the tablet forgets its code and goes back to the code screen, which names only the Check-In Station; the tablet opens nothing else');
 
     // Joe 10/27 (replaces 10/13's Home menu for the plant tablets): the Plant Station's Release with the manager release code
     // goes back to the station code screen, never the app; the tablet still opens no other screen (Joe 10/27: "that's the only thing it's allowed").
@@ -328,8 +342,14 @@ async function codeFitsPhones(p, name) {
     await gs.waitForSelector('#gs-release form');
     await gs.fill('#gs-release input', release);
     assert.deepEqual(gs.errors, []);
-    await Promise.all([gs.waitForURL(/index\.html$/), gs.click('#gs-release button[type=submit]')]);
-    results.push('Plant Station: Release with the manager release code goes back to the code screen and the tablet opens nothing else. Garage Station: Release goes to the normal Home menu');
+    // Joe 10/28: the Garage Station the same way: back to its code screen, never the Home menu.
+    await gs.click('#gs-release button[type=submit]');
+    await gs.waitForSelector('#view-code form.st-code');
+    assert.match(gs.url(), /garage-station\.html/);
+    for (const gone of ['#go-back', '#go-home', '#gs-change']) assert.equal(await gs.isVisible(gone), false, gone + ' is not on the garage code screen after Release');
+    await Promise.all([gs.waitForURL(/garage-station\.html/), gs.goto(HOSTING + '/index.html' + ADMIN)]);
+    await gs.waitForSelector('#view-code form.st-code');
+    results.push('Plant Station and Garage Station: Release with the manager release code goes back to the code screen and the tablet opens nothing else');
   } finally {
     await browser.close();
   }

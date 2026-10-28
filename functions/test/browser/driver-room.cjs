@@ -146,10 +146,11 @@ async function touchPage(browser, width, height, url, mobile) {
         // Release with the manager release code.
         await p.click('#m-station');
         await p.fill('#release-box input', release);
-        // Joe 10/13: Release goes to the normal Home menu, not the code screen.
-        await Promise.all([p.waitForURL(/index\.html$/), p.click('#release-box button[type=submit]')]);
+        // Joe 10/28 "you need to block that exact same way" (replaces 10/13's Home menu): Release goes back to the code screen only.
+        await Promise.all([p.waitForURL(/driver-station\.html\?for=room$/), p.click('#release-box button[type=submit]')]);
+        await p.waitForSelector('#code-box form.st-code');
         assert.equal(await p.evaluate(() => localStorage.getItem('udRoomStation')), null);
-        results.push('Driver Room: Release asks for the manager release code, then goes to the normal Home menu (still signed in)');
+        results.push('Driver Room: Release asks for the manager release code, then goes back to the Check-In Station\'s code screen (still signed in)');
       }
       assert.deepEqual(p.errors, []);
       await p.close();

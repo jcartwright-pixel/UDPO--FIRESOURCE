@@ -190,9 +190,9 @@
     if (room && !station) location.replace('driver-station.html?for=room');
     // Done (signed out, back to the three choices), Back (still signed in), or 5 minutes idle (signed out, View Loadout).
     // The tablet lost its station (a new code, removed): back to the code screen.
-    // Joe 10/13 "when I released this ... it went out too": Release goes to the normal Home menu (same window). Only a lost or
-    // changed code goes back to the code screen, which then asks only for the Check-In Station's code.
-    const roomBack = (home) => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); localStorage.removeItem('udRoomStation'); localStorage.removeItem('udKioskCode'); } catch (e) {} location.replace(home ? 'index.html' : 'driver-station.html?for=room'); };
+    // Joe 10/28 "you need to block that exact same way": Release, like a lost or changed code, goes back to the code screen
+    // only, which then asks only for the Check-In Station's code (it used to go to the Home menu).
+    const roomBack = () => { try { sessionStorage.removeItem('udRoom.driverId'); sessionStorage.removeItem('udRoom.driverName'); localStorage.removeItem('udRoomStation'); localStorage.removeItem('udKioskCode'); } catch (e) {} location.replace('driver-station.html?for=room'); };
     // Kept on the phone (the code and the name); the page works without it, it just asks again.
     const keep = () => room ? sessionStorage : localStorage, prefix = room ? 'udRoom.' : 'udRoute.';
     const store = {
@@ -415,7 +415,7 @@
         // The release box sits under the three choices: the driver is signed out and the choices come back first.
         if (document.getElementById('step-menu').hidden) { signOut(); want = ''; clearInterval(boardTimer); await show(); }
         const ok = await askRelease(document.getElementById('release-box'), { status: () => call('roomStatus', { facilityId: fac }), release: (c) => call('roomRelease', { facilityId: fac, code: c }), onError: showError, mustHave: true });
-        if (ok) roomBack(true);
+        if (ok) roomBack();
       });
     }
     document.getElementById('days').addEventListener('click', run(async (e) => { const b = e.target.closest('[data-date]'); if (b) { date = b.dataset.date; await show(); } }));

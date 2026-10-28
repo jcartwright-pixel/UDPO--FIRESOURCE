@@ -784,8 +784,11 @@ async function maintBoardAllowed(db, input, caller) {
   if (plantStation && plantStation.facilityId === facilityId) return;
   const st = input.station || {};
   if (st.key) {
-    const ok = await ST.check(db, 'GARAGE', st.key, st.version);
-    if (ok.ok && ok.station.set && ok.station.facilityId === facilityId) return;
+    // Its own Maintenance Station code (Joe 10/28), or a garage station's as before.
+    for (const kind of ['MAINT', 'GARAGE']) {
+      const ok = await ST.check(db, kind, st.key, st.version);
+      if (ok.ok && ok.station.set && ok.station.facilityId === facilityId) return;
+    }
   }
   throw SaveErr('NOT_ALLOWED', 'Sign in with a United Dairy account, or enter the station code, to open the Maintenance Station.');
 }
@@ -809,9 +812,10 @@ async function garageCall(db, input, now, caller) {
   // Garage station codes (Joe 10/12, stations.js): once the garage has a code, the tablet types it once and sends the
   // station it opened with every call; Change needs the plant's manager release code.
   const ST = require('./stations'), asSave = (e) => { if (e instanceof ST.StationError || e instanceof require('./admin').AdminError) throw SaveErr(e.code, e.message); throw e; };
-  if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: FACILITY, who: input.who }, () => new Date(nowMs)).catch(asSave);
   // Review item 49 (Joe 10/13): the Maintenance Station (maint: true) locks too; its Release checks its own plant's manager release code.
   const releaseFac = input.maint === true && /^fac_[a-z_]{1,40}$/.test(String(input.facilityId || '')) ? input.facilityId : FACILITY;
+  // Joe 10/28: the Maintenance Station has its own station codes (kind MAINT, at its own plant).
+  if (op === 'station') return ST.tabletCall(db, { op: input.step, kind: input.maint === true ? 'MAINT' : 'GARAGE', code: input.code, key: input.key, version: input.version, facilityId: input.maint === true ? releaseFac : FACILITY, who: input.who }, () => new Date(nowMs)).catch(asSave);
   if (op === 'release') return require('./admin').releaseCheck(db, { op: input.step === 'status' ? 'status' : 'release', facilityId: releaseFac, code: input.code, who: input.who }, () => new Date(nowMs)).catch(asSave);
   // Plant Maintenance's Maintenance Station (Joe 10/12): the plant's work orders. It is not the garage tablet, so the garage's
   // station code does not lock it; every step still needs a mechanic's login ID. Joe 10/27: its mechanics are the plant's own

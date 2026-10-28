@@ -169,7 +169,7 @@ async function until(check, what) {
     // Joe 10/12: one Plant Station link and the no-account phone app link, then the stations with their own codes; the
     // Garage Station has its own page, and Driver Station Codes lists the kiosks (station-codes.cjs types the codes).
     await open('station-codes', '#st-list .ap-item');
-    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public']);
+    assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public', 'line']);
     assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 5);
     // The release codes moved to Manager Links: one line here points there.
     assert.equal(await p.$('#sc-list'), null);
