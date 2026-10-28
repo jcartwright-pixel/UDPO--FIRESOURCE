@@ -346,3 +346,18 @@ test('paused minutes are not loading time: Total Time, the clean loading time an
   assert.equal(R.cleanMinutes(done('852', '14:00', '16:20', 1150, { pauseMark: m })), 90);
   assert.equal(R.cleanMinutes(done('852', '14:00', '16:20', 1150)), 140);
 });
+
+// Joe 10/28: "ALL ROUTES ON TIME" in green over "7 loads potentially late" misled; the banner turns yellow and says so.
+test('the banner is yellow and says potentially late when the forecast has late loads and no route is behind', () => {
+  const base = { dayLabel: 'Tue', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [], totalLoads: 27, leftToLoad: 11 };
+  const fc = (late) => ({ asOf: '11:54 PM', late, loads: [], due: { loads: 0, cases: 0, late: 0 }, dueByText: '5:00 AM', allDoneText: '', casesLeft: 0, byTime: [] });
+  const banner = (html) => html.match(/<td style="[^"]*padding:16px 14px;background:(#[0-9a-f]+)[^>]*><div[^>]*>([^<]*)/);
+  const late = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(7) }), ''));
+  assert.equal(late[1], '#f5c518');
+  assert.equal(late[2], '&#9888; 7 LOADS POTENTIALLY LATE');
+  assert.equal(banner(R.reportHtml(Object.assign({}, base, { forecast: fc(1) }), ''))[2], '&#9888; 1 LOAD POTENTIALLY LATE');
+  const ok = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(0) }), ''));
+  assert.deepEqual([ok[1], ok[2]], ['#1f7a4d', '&#10003; ALL ROUTES ON TIME']);
+  const behind = banner(R.reportHtml(Object.assign({}, base, { behind: [{ route: '855' }], forecast: fc(7) }), ''));
+  assert.deepEqual([behind[1], behind[2]], ['#b42318', '&#9888; 1 ROUTE BEHIND'], 'a route already behind stays red');
+});

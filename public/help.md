@@ -498,6 +498,7 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - `Copy` copies the report; `Print` prints it.
 - Only what was checked since the last report went out is in it; the rest says "Not checked".
 - The loads are the ones loaded today, by type (Case, Box, Tote, Tanker). Inside each type, each delivery day once: the loaded loads (green), then the ones not loaded yet.
+- The banner at the top is red when a route is behind, yellow with "Potentially late" when no route is behind yet but the forecast says one or more loads will be late, and green only when everything is on time.
 - A load says BEHIND when it is not loaded 45 minutes after it leaves. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not behind before then.
 
 !> Do not send the report twice for one shift. Use Send Test to Me to check it first.

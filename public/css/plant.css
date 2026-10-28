@@ -697,6 +697,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-note textarea { min-height: 64px; border: 1px solid #b8cadb; border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 16px; color: var(--ink); resize: vertical; }
 .manager-page .mc-banner { border-radius: 10px; padding: 12px 14px; color: #fff; display: flex; flex-direction: column; gap: 2px; }
 .manager-page .mc-banner.bad { background: #b42318; } .manager-page .mc-banner.good { background: #1f7a4d; }
+.manager-page .mc-banner.warn { background: #f5c518; color: #1c2733; }
 .manager-page .mc-banner b { font-size: 22px; }
 .manager-page .mc-report-body section { border-bottom: 1px solid var(--line); padding: 8px 0; }
 .manager-page .mc-report-body h3 { margin: 0 0 6px; font-size: 16px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #5b6775; display: flex; }

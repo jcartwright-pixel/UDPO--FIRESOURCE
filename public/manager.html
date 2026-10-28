@@ -291,9 +291,11 @@
       document.getElementById('rp-subject').textContent = r.subject;
       // Joe 10/14: a tile is the route number and the run's short name; green is loaded, red is not (only BEHIND has a word).
       const tile = (z, k, word) => '<span class="' + k + '"><b>' + escapeHtml(U.routeNumber(z.route)) + (U.shortRun(z) ? ' <small>' + escapeHtml(U.shortRun(z)) + '</small>' : '') + '</b>' + (word ? '<i>' + word + '</i>' : '') + '</span>';
+      // Joe 10/28: no route behind but loads potentially late = yellow banner, as the email.
+      const late = r.forecast && r.forecast.late > 0 ? r.forecast.late : 0;
       const loaded = r.loaded.map(z => tile(z, 'ok')), notLoaded = r.behind.map(z => tile(z, 'behind', 'BEHIND')).concat(r.nextUp.map(z => tile(z, 'no')));
       document.getElementById('rp-body').innerHTML =
-        '<div class="mc-banner ' + (r.behind.length ? 'bad' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
+        '<div class="mc-banner ' + (r.behind.length ? 'bad' : late ? 'warn' : 'good') + '"><b>' + (r.behind.length ? '&#9888; ' + r.behind.length + ' ROUTE' + (r.behind.length === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? '' : 'S') + ' POTENTIALLY LATE' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</span></div>' +
         // Joe 10/20: how far behind, not the list of every late load.
         (r.forecast ? sect('Late forecast (estimated) at ' + r.forecast.asOf, r.forecast.late ? r.forecast.late + ' potentially late' : 'on time', r.forecast.late ? 'bad' : '',
           // Joe 10/22 (option az): last night's left-over loads on their own line, then today's; every time has its day.
