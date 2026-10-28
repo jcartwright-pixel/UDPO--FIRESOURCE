@@ -221,6 +221,10 @@ body.ds-tv .ds-weather h3 { margin: 12px 0 0; font-size: 32px; } body.ds-tv .ds-
 body.ds-tv .ds-row { min-height: 64px; font-size: 23px; grid-template-columns: 160px minmax(180px, 1fr) minmax(220px, .85fr) 134px 90px 155px 85px; }
 body.ds-tv .ds-row .rt { font-size: 30px; } body.ds-tv .ds-headrow { min-height: 58px; font-size: 19px; } body.ds-tv .ds-scroll { overflow: hidden; }
 body.ds-tv .foot { color: #cfe3f6; }
+/* Joe 10/28: the weekly schedule a little bigger on the TV ("hard to read"). */
+body.ds-tv .ds-week-title { font-size: 19px; } body.ds-tv .ds-week-table { font-size: 20px; }
+body.ds-tv .ds-week-table th { font-size: 18px; padding: 6px 4px; } body.ds-tv .ds-week-table th small { font-size: 17px; }
+body.ds-tv .ds-week-table td { padding: 8px 6px; font-weight: 600; }
 @media (max-width: 1550px) { body.ds-tv .ds-grid { grid-template-columns: 1fr 300px; } }
 @media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none !important; } body.ds-tv .ds-week { grid-column: 1; } }
 @media (max-width: 760px) {

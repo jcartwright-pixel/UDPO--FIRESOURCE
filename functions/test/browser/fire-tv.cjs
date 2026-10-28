@@ -125,9 +125,20 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await rolls('board-scroll', 'the loadout list after the screen got shorter');
     results.push('TV: both lists roll when they grow past the screen, keep rolling zoomed out, and start again when the screen gets shorter');
 
+    // Joe 10/28: a release published while the TV is on reloads the board by itself (nobody presses Refresh on a TV).
+    let release = 'aaa111';
+    await page.route(/\/version\.json/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ label: 'test', commit: release }) }));
     await page.reload();
     await page.waitForSelector('.ds-row:not(.ds-headrow):has-text("805")', { timeout: 20000 });
     assert.equal(await page.isVisible('#signin'), false, 'still signed in after a reload (as after a power loss)');
+    await page.evaluate(() => { window.udBeforeRelease = 1; return window.udTvVersionCheck(); });
+    assert.equal(await page.evaluate(() => window.udBeforeRelease), 1, 'the same version: no reload');
+    release = 'bbb222';
+    await Promise.all([page.waitForNavigation(), page.evaluate(() => window.udTvVersionCheck())]);
+    await page.waitForSelector('.ds-row:not(.ds-headrow):has-text("805")', { timeout: 20000 });
+    assert.equal(await page.evaluate(() => window.udBeforeRelease), undefined, 'a new version reloads the board');
+    await page.unroute(/\/version\.json/);
+    results.push('TV: a new version published reloads the board by itself');
     results.push('Fire Stick TV: a reload (as after a power loss) opens the board again with nothing typed');
 
     await ST.stationCode(db(), 'admin.test@uniteddairy.com', { key: TV }, new Date().toISOString());
