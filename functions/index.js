@@ -208,7 +208,8 @@ exports.phone = onCall({ maxInstances: 3 }, async (request) => {
 exports.garage = onCall({ maxInstances: 3 }, async (request) => {
   try {
     // Joe 10/12: a Garage Station with its code is signed in with a United Dairy account first (as every station).
-    if (request.data && request.data.station && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
+    // The plant's Maintenance Station (maint: true) has no United Dairy sign-in: its own code is enough (Joe 10/28).
+    if (request.data && request.data.station && request.data.maint !== true && !unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with the tablet\'s United Dairy account on the Garage Station first.');
     // Review item 68 (Joe 10/13): who is calling, so the Maintenance Station board can ask for a sign-in or a station code.
     const user = unitedDairyUser(request.auth);
     const pdb = user ? await plantDb(request, user) : namedPlantDb(request.data);

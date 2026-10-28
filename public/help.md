@@ -263,10 +263,13 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
 - A screen opened with a code has no Back, Home or Sign out. `Release` at the bottom (with the manager release code) is the only way out.
+- `Release` goes back to the code screen, never into the app. Once a code has opened it, the TV or tablet opens only the Driver Room screens: any other screen typed in goes straight back.
 
 > On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
 
 !> Do not sign a TV in with your own Google account. Use the TV's code so it comes back by itself after a power cut.
+
+!> Do not type a TV or Driver Room code on your own computer. It then opens only the Driver Room screens.
 
 ## Sheet Conflicts
 id: conflicts
@@ -383,8 +386,11 @@ The garage's tablet. Mechanics sign in with their name and login ID, start and f
 
 - With no signal the station keeps working and sends everything when the signal is back.
 - A tablet opened with a station code has no Back or Home. `Release` (with the manager release code) is the only way out.
+- `Release` goes back to the code screen, never into the app. Once a code has opened it, the tablet opens only the Garage Station: any other screen typed in goes straight back.
 
 > A mechanic's sign-in works only on their own plant's Maintenance Station.
+
+!> Do not type the garage station code on your own computer. It then opens only the Garage Station.
 
 !> Do not add the plant's mechanics on Fleet Service Setup. That list is the garage's mechanics, and they show only on the Garage Station.
 
@@ -518,7 +524,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
 4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done, or until it is back in its place in the sheet's order (for example when the load that went past it is skipped back down). One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
-5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag.
+5. Drag a load that is not loaded yet up or down to change the order. A load moved out of the sheet's order gets a green MOVED tag. On a phone, hold a finger still on the load for a moment to pick it up; a swipe scrolls the list.
 
 - `+ Add Load` adds a load nobody scheduled. Fill in the route, schedule type, load type, dates, time, trailer and cases, then `Confirm`. Nothing saves until Confirm.
 - `Ended Up Not Running` (in the load's box, press twice) marks a load that never went.
@@ -527,6 +533,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 - A plant note on a load shows as a yellow line under it.
 - **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
+- On a phone the four loadout buttons (Case, Tote, Box, Tanker) sit in two rows.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
 
@@ -856,7 +863,7 @@ screens: line.html
 
 The tablet at a production line. The operator signs on and keeps the line's count, product and checks. Everything fits on one screen: the line's name, its buttons across the top, the **Running / Changeover / Down** bar right under them with a clock of how long, then the cards.
 
-1. Pick this tablet's line the first time (`Change Line` changes it later).
+1. Pick this tablet's line the first time (`Change Line` changes it later). A tablet set up with the Line Tablet link and its code types the code first, then picks its line.
 2. `Change Product` picks what is running. **Running now** shows the product's **code date** in big letters. The label reader checks the jug's label; WRONG LABEL means the label is not one of this line's products.
 3. Type **How many to run** of that product. **Left to run** counts down as the count goes up, and says DONE when it is all made. The amount set with `Set Next` comes along by itself when that product starts.
 4. `Enter Count` types how many were made this shift so far (when the machine does not count). It saves when you press Enter.
@@ -873,12 +880,15 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
 - `Set Next` sets what runs next on this line and how many.
 
+**A line tablet on the floor:** open the Line Tablet link (Administration, Plant Station Codes) on the tablet. Once the plant has a Line Tablet code, the tablet types it once and picks its line. After that it has no Back, Home, Sign out or `Change Line`, and it opens no other screen. To move it to another line, a manager taps `Release` in the bottom-right corner and types the manager release code; the tablet goes back to the code screen. A computer opening Line Tablet from the menus works as before.
+
 > No code date on Running now? Set the product's shelf life on Line Targets.
 
 !> Do not type a check you did not do. A recorded check cannot be changed from the tablet.
 !> Do not leave How many to run blank when you know the amount. Without it there is no countdown.
 !> Do not type a weight from memory or from the last jug. Weigh a jug each time the box says NOW.
 !> Do not tap `DOWN` for a product change. Tap `CHANGEOVER`, so the time counts as a changeover, not as down.
+!> Do not type the Line Tablet code on your own computer. It then opens only the Line Tablet.
 
 ## Line Targets
 id: linetargets
@@ -972,7 +982,10 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - **Work Orders:** pick one to start or finish your time on it.
 - `+ Report a Problem`: pick the machine, say what is wrong and whether it is down (`Yes, it's down` or `No, it runs`), then `Send`.
 - `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up, then `Record`.
-- A tablet opened with a station code has no Back or Home. `Release` (with the manager release code) is the only way out.
+- The station has no Back or Home. `Release` (with the manager release code) is the only way out.
+- **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
+
+!> Do not type the Maintenance Station code on your own computer. It then opens only the Maintenance Station.
 
 # Plant Schedule
 
@@ -1061,8 +1074,9 @@ screens: administration.html?item=app-links, administration.html?item=station-co
 Every link and code people use to reach the app:
 
 - **Manager Links:** the full app, the phone link, the Plant Managers App and personal phone links (copy, print a QR, `Launch`), and each plant's manager release code to move a tablet or leave a kiosk.
-- **Plant Station Codes:** the one Plant Station link, then each station's code (typed on the tablet to open that station). `+ Add Station`, `New code`, `Remove`.
-- **Garage Station Codes:** the Garage Station and Maintenance Station links and each station's code.
+- **Plant Station Codes:** the one Plant Station link, then each station's code (typed on the tablet to open that station). `+ Add Station`, `New code`, `Remove`. Under them, the **Line Tablet** link and the **Line Tablets** code.
+- **Garage Station Codes:** the Garage Station and Maintenance Station links, each garage station's code, and the **Maintenance Station** code.
+- A tablet or TV opened with its code opens only its own screen. `Release` (manager release code) takes it back to its code screen, never into the app.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
 
@@ -1224,7 +1238,7 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **View Loadout** shows the route list and each load's status, updating by itself.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
 
-On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out.
+On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out, and it goes back to the code screen, never into the app. The tablet opens no other screen.
 
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
 

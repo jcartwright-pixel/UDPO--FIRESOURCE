@@ -492,7 +492,9 @@ const APP_LINKS = [
   { key: 'driver', title: 'Driver\'s Kiosk Station and Driver Room Check-In Station', label: 'Driver Station link', path: 'driver-station.html', who: 'ud', short: 'The TV (Driver\'s Kiosk Station) and the drivers\' tablet (Driver Room Check-In Station): each types its own station code once', opens: 'One link for the Driver Room (Joe 10/12). The TV types the Driver\'s Kiosk Station code: the rolling loadout, the rolling dispatch and the weather, full screen. The tablet types the Driver Room Check-In Station code: the drivers\' Check-In, exactly like their phones (View Loadout, DVIR, Check-In); 5 minutes with no taps signs the driver out and shows the rolling loads. Neither has Back, Home or Sign out into the app; Release in the bottom-right corner takes the manager release code (Manager Links).', shut: 'New code or Remove on the station, below.' },
   { key: 'garage', title: 'Garage Station', label: 'Garage tablet', path: 'garage-station.html', who: 'code', short: 'The station\'s code, then each mechanic\'s login ID', opens: 'One link for every garage station. Once a garage station has a code (Stations, below), the tablet types it once; mechanics then tap their name and type their login ID.', shut: 'New code or Remove on the station; turn a mechanic off in Fleet Service.' },
   { key: 'route', title: 'Route Distribution (drivers\' phones)', label: 'Browser link', path: 'route.html', who: 'code', short: 'Anyone with the Route Distribution code', opens: 'Drivers on their own phones: View Loadout, DVIR, Check-In and My Schedule. No company account needed.', shut: 'Turn Off stops the drivers\' phone link (UD sign-in links keep working). A new code makes every phone ask for it again.', code: true },
-  { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'Each mechanic\'s name and login ID (Plant Maintenance is under construction)', opens: 'The plant machinery work orders and PMs, like the Garage Station: tap a work order, then your name and login ID.', shut: 'Turn a mechanic off in Fleet Service > Garage Technicians.' },
+  { key: 'maint', title: 'Maintenance Station (plant machinery)', label: 'Maintenance tablet', path: 'maint-station.html', who: 'code', short: 'The Maintenance Station\'s code, then each mechanic\'s name and login ID', opens: 'The plant machinery work orders and PMs, like the Garage Station. Once the plant\'s Maintenance Station has a code (Maintenance Station, below), the tablet types it once and then opens nothing else; mechanics tap a work order, then their name and login ID.', shut: 'New code or Remove on the station, below; turn a mechanic off on Maintenance Schedule, Setup, People.' },
+  // Joe 10/28: the line tablets on the floor, locked like the Plant Station once the code is typed.
+  { key: 'line', title: 'Line Tablet', label: 'Line tablet link', path: 'line.html?tablet=1', who: 'ud', short: 'A tablet at a production line with a UD account, then the Line Tablet code once', opens: 'The tablet at a production line. Once the plant has a Line Tablet code (Line Tablets, below), the tablet types it once and picks its line; after that it opens nothing else, with no Back, Home, Sign out or Change Line. Release in the bottom-right corner takes the manager release code (Manager Links) and goes back to the code screen. A computer opening Line Tablet from the menus works as before.', shut: 'New code or Remove on the Line Tablet, below.' },
   // Joe 10/18: the Plant Managers app ("send them the link and have a code").
   { key: 'managers', title: 'Plant Managers App', label: 'Plant Managers link', path: 'walkthrough.html?view=home&app=1', who: 'ud', short: 'The plant managers\' own app on their phone or tablet: UD account (Manager or Administrator role), then the Plant Managers code once (Plant Managers App page)', opens: 'The plant managers\' app on their phone, iPad or tablet: the Manager Walkthrough (Yard, Coolers, Production), Loading and Unloading. Send them the link; they sign in with their United Dairy account, type the Plant Managers code once (below) and add it to the home screen, where it is called Plant Managers. It is their own phone, so Sign out stays and there is no Release.', shut: 'New code (below) makes every phone ask for the new code; change their role in People & Roles.' },
   { key: 'distribution', title: 'Distribution Manager', label: 'Distribution Manager link', path: 'distribution.html', who: 'ud', short: 'The distribution manager (routes, trucks and drivers): UD account; opens Route Distribution in the full app', opens: 'Route Distribution, the distribution side of the full Operations app: dispatch, routes, trucks and drivers. Their role decides what they can change.', shut: 'Change their role in People & Roles.' },
@@ -503,7 +505,7 @@ const APP_LINKS = [
 // Joe 10/18: Plant Operations (the full app), the phone link, the Plant Managers App and the Distribution Manager (routes and trucks),
 // each named for what it is. The Garage Station keeps its own page (Garage Station Codes).
 const MANAGER_LINKS = ['company', 'phone', 'managers', 'distribution', 'personal'];
-const PLANT_LINKS = ['plant', 'public'];
+const PLANT_LINKS = ['plant', 'public', 'line'];
 const GARAGE_LINKS = ['garage', 'maint'];
 // Joe 10/12: the drivers like the plant: one Driver Station link, its stations right under it, then the drivers' phone link.
 const DRIVER_LINKS = ['driver'];
@@ -568,19 +570,25 @@ const STATION_PAGES = {
   PLANT: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each station has its own code. On the tablet, open the Plant Station link and type the station\'s code: the tablet opens that station and keeps it. To move a tablet, a manager taps Release in the bottom-right corner of the tablet and types the plant\'s manager release code (Manager Links); there is no Back, Home or Sign out on a station. Until a plant has a station code, its tablets pick their station from the list. The no-account link (above) uses the same codes while it is On.' },
   GARAGE: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each garage station has its own code. On the garage tablet, open the Garage Station link and type the code. To move a tablet, a manager taps Release in the bottom-right corner of the tablet and types the plant\'s manager release code (Manager Links); there is no Back, Home or Sign out on a station. Until a plant has a garage code, its garage tablet opens straight away.' },
   MANAGER: { title: 'Plant Managers code', add: '+ Add', what: 'Plant Managers code', help: 'Each plant has one Plant Managers code. A manager opens the Plant Managers link, signs in with their United Dairy account (Manager or Administrator role) and types the code once; the phone remembers it. New code makes every phone ask for the new one. Until a plant has a code, managers open the app with their sign-in alone.' },
+  MAINT: { title: 'Maintenance Station', add: '+ Add Station', what: 'Maintenance Station', help: 'Each plant\'s Maintenance Station can have its own code. On the maintenance tablet, open the Maintenance Station link and type the code once: the tablet opens only the Maintenance Station after that. To move it, a manager taps Release in the bottom-right corner and types the plant\'s manager release code (Manager Links); the tablet goes back to the code screen. Until a plant has a Maintenance Station code, its tablet opens straight away.' },
+  LINE: { title: 'Line Tablets', add: '+ Add Line Tablet', what: 'Line Tablet', help: 'The line tablets\' code. On the tablet at the line, open the Line Tablet link (above) and type the code once, then pick the line: the tablet opens only that line after that. To move it to another line, a manager taps Release in the bottom-right corner and types the plant\'s manager release code (Manager Links); the tablet goes back to the code screen. Until a plant has a Line Tablet code, the Line Tablet link opens straight away.' },
   KIOSK: { title: 'Stations', add: '+ Add Station', what: 'station', help: 'Each driver station has its own code, and a plant can have more than one. Both kinds open the Driver Station link: the TV types a Driver\'s Kiosk Station code (the rolling loadout, dispatch and weather, full screen); the drivers\' tablet types a Driver Room Check-In Station code (the drivers\' Check-In, like their phones). It keeps it after that. To move it, a manager taps Release in the bottom-right corner and types the plant\'s manager release code (Manager Links). Until a plant has a driver station code, its tablets and TVs open straight away.' }
 };
 
 // The station list for one kind under a page's link cards: name, type, plant, code; New code, Remove, and Add.
+// pre: the ids' start, so a page can show a second kind under the first (Joe 10/28: the Maintenance Station under the garage
+// stations, the Line Tablets under the Plant Stations).
+const ST_PRE = { MAINT: 'ms', LINE: 'lt' };
 function stationSection(kind) {
-  const p = STATION_PAGES[kind];
-  return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><details class="ap-how"><summary>How it works</summary><p>' + e(p.help) + '</p></details><div class="ap-list" id="st-list"></div>' +
-    '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="st-name" maxlength="60" placeholder="For example ' + (kind === 'MANAGER' ? 'Plant Managers' : kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : 'Case Loadout dock 2') + '"></label>' +
-    '<label class="ap-field">Type<select id="st-type"></select></label><label class="ap-field">Plant<select id="st-plant"></select></label>' +
-    '<div><button type="button" class="ap-btn main" id="st-add">' + p.add + '</button></div></div></div>';
+  const p = STATION_PAGES[kind], pre = ST_PRE[kind] || 'st';
+  return '<div class="ap-section" style="margin-top:10px" data-kind="' + kind + '"><h3>' + p.title + '</h3><details class="ap-how"><summary>How it works</summary><p>' + e(p.help) + '</p></details><div class="ap-list" id="' + pre + '-list"></div>' +
+    '<div class="ap-form" style="margin-top:8px"><label class="ap-field">New ' + p.what + ' name<input id="' + pre + '-name" maxlength="60" placeholder="For example ' + (kind === 'MANAGER' ? 'Plant Managers' : kind === 'KIOSK' ? 'Plant kiosk' : kind === 'GARAGE' ? 'Garage bay 2' : kind === 'MAINT' ? 'Maintenance shop' : kind === 'LINE' ? 'Filler line tablets' : 'Case Loadout dock 2') + '"></label>' +
+    '<label class="ap-field">Type<select id="' + pre + '-type"></select></label><label class="ap-field">Plant<select id="' + pre + '-plant"></select></label>' +
+    '<div><button type="button" class="ap-btn main" id="' + pre + '-add">' + p.add + '</button></div></div></div>';
 }
 function bindStations(box, kind) {
-  const $ = (s) => box.querySelector(s), what = STATION_PAGES[kind].what;
+  const pre = ST_PRE[kind] || 'st', what = STATION_PAGES[kind].what;
+  const $ = (s) => box.querySelector(s.replace(/#st-/g, '#' + pre + '-'));
   // The no-account On / Off sits in the link card, which may draw after the stations load (and again on Refresh).
   let noAccount = null;
   function drawNoAccount() {
@@ -599,7 +607,7 @@ function bindStations(box, kind) {
         $('#st-plant').disabled = data.plants.length < 2;
       }
       // The no-account Plant Station's On / Off for each plant (Plant Station Codes only).
-      noAccount = data.noAccount || null;
+      noAccount = kind === 'PLANT' ? data.noAccount || null : null;
       drawNoAccount();
       $('#st-list').innerHTML = data.stations.map(s => '<div class="ap-item" data-station-key="' + e(s.key) + '"><div><b>' + e(s.name) + '</b><small>' + e(s.typeName) + ' &middot; ' + e(s.plant) +
         (s.changedAt ? ' &middot; code changed ' + e(when(s.changedAt)) + ' by ' + e(s.changedBy) : '') + '</small></div>' +
@@ -612,15 +620,18 @@ function bindStations(box, kind) {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.id === 'al-reload') load();
+    // A second kind's section on the page answers its own buttons only.
+    const sec = b.closest('[data-kind]');
+    if (sec && sec.dataset.kind !== kind) return;
     if (b.dataset.stCopy) copyText(b, b.dataset.stCopy);
-    if (b.dataset.naOn) busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOn, on: true }); await load(out); say(box, ''); });
-    if (b.dataset.naOff) twice(b, 'Click Again to Turn Off', () => busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOff, on: false }); await load(out); say(box, ''); }));
+    if (b.dataset.naOn && kind === 'PLANT') busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOn, on: true }); await load(out); say(box, ''); });
+    if (b.dataset.naOff && kind === 'PLANT') twice(b, 'Click Again to Turn Off', () => busy(box, b, async () => { const out = await call('noAccountSet', { facilityId: b.dataset.naOff, on: false }); await load(out); say(box, ''); }));
     if (b.dataset.stCode) {
       const go = () => busy(box, b, async () => { const out = await call('stationCode', { key: b.dataset.stCode }); await load(out); say(box, ''); });
       if (b.dataset.again) twice(b, 'Press again to replace', go); else go();
     }
     if (b.dataset.stRemove) twice(b, 'Press again to remove', () => busy(box, b, async () => { const out = await call('stationRemove', { key: b.dataset.stRemove }); await load(out); say(box, ''); }));
-    if (b.id === 'st-add') busy(box, b, async () => {
+    if (b.id === pre + '-add') busy(box, b, async () => {
       const out = await call('stationAdd', { kind, type: $('#st-type').value, facilityId: $('#st-plant').value, name: $('#st-name').value });
       $('#st-name').value = '';
       await load(out); say(box, '');
@@ -632,7 +643,7 @@ function bindStations(box, kind) {
 /* ---------- Each plant's manager release code (Joe 10/12: on Manager Links, not Plant Station Codes) ---------- */
 
 const RELEASE_SECTION = '<div class="ap-section" id="release-codes" style="margin-top:10px"><h3>Manager release codes</h3>' +
-  '<details class="ap-how"><summary>How it works</summary><p>A tablet keeps its station. To move it (Plant Station, Garage Station, the Driver Room tablet or a kiosk), a manager taps Release in the bottom-right corner of the tablet and types the release code for that plant (the Driver Station TV too). A station has no Back, Home or Sign out, and with no release code set it cannot be moved at all. Five wrong release codes lock the release for ten minutes.</p></details>' +
+  '<details class="ap-how"><summary>How it works</summary><p>A tablet keeps its station. To move it (Plant Station, Garage Station, Maintenance Station, a line tablet, the Driver Room tablet or a kiosk), a manager taps Release in the bottom-right corner of the tablet and types the release code for that plant (the Driver Station TV too); the tablet goes back to its code screen, never into the app. A station has no Back, Home or Sign out, and with no release code set it cannot be moved at all. Five wrong release codes lock the release for ten minutes.</p></details>' +
   '<div class="ap-list" id="sc-list"></div></div>';
 
 function bindReleaseCodes(box) {
@@ -664,17 +675,17 @@ export async function renderManagerLinks(box, ctx) { await Promise.all([renderAp
 /* ---------- Plant Station Codes: the link and the stations (the release codes moved to Manager Links) ---------- */
 
 export async function renderStationCodes(box, ctx) {
-  const tail = stationSection('PLANT') + '<p class="ap-note" id="release-moved">Manager release codes (to move a tablet to another station) are in <a href="#" data-goto="app-links">Manager Links</a>.</p>';
+  const tail = stationSection('PLANT') + stationSection('LINE') + '<p class="ap-note" id="release-moved">Manager release codes (to move a tablet to another station) are in <a href="#" data-goto="app-links">Manager Links</a>.</p>';
   const links = renderAppLinks(box, ctx, PLANT_LINKS, tail);
   box.addEventListener('click', ev => {
     const a = ev.target.closest('a[data-goto]');
     if (a) { ev.preventDefault(); if (ctx && ctx.open) ctx.open(a.dataset.goto); }
   });
-  await Promise.all([links, bindStations(box, 'PLANT')]);
+  await Promise.all([links, bindStations(box, 'PLANT'), bindStations(box, 'LINE')]);
 }
 
 // Garage Station Codes and Driver Station Codes: the link, then the stations with their codes (drivers: then the phone link).
-export async function renderGarageCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, GARAGE_LINKS, stationSection('GARAGE')), bindStations(box, 'GARAGE')]); }
+export async function renderGarageCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, GARAGE_LINKS, stationSection('GARAGE') + stationSection('MAINT')), bindStations(box, 'GARAGE'), bindStations(box, 'MAINT')]); }
 // Joe 10/18: the Plant Managers app: its link, then each plant's Plant Managers code.
 export async function renderManagerAppCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, MANAGER_APP_LINKS, stationSection('MANAGER')), bindStations(box, 'MANAGER')]); }
 export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK'), DRIVER_MORE), bindStations(box, 'KIOSK')]); }

@@ -99,7 +99,8 @@ export function mountRowDrag({ box, canDrag, onMove, onEnd, keysInside = false, 
     if (!row || !box.contains(row) || e.target.closest(SKIP)) return;
     const touch = e.pointerType !== 'mouse';
     // The handle boxes (Route and Run on the loadout) drag straight away for a finger, as on Weekly Dispatch.
-    const td = e.target.closest('td'), onHandle = !!td && handle(td);
+    // 10/28: only on a table line; a phone's card (the row drawn as a card) needs the hold everywhere, so a swipe scrolls.
+    const td = e.target.closest('td'), onHandle = !!td && handle(td) && getComputedStyle(row).display === 'table-row';
     press = { row, x: e.clientX, y: e.clientY, pointerId: e.pointerId, touch: touch && !onHandle };
     // Elsewhere on the line a finger holds still to pick the row up; moving first is a scroll.
     if (press.touch) press.timer = setTimeout(() => { if (press && !drag) begin(); }, HOLD_MS);

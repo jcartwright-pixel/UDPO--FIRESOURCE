@@ -1083,6 +1083,14 @@ body.yard-page .head .badge-test { order: 6; }
   .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell { display: flex; gap: 8px; }
   .plant-page.loadout-page table.loadout tr[data-row] td .clock-cell button { flex: 1; }
   .plant-page.loadout-page table.loadout tr[data-row] td:empty { display: none; }
+  /* 10/28 (practice test, Plant Managers app): on a card a swipe from the Route or Run box scrolls the list; a finger picks
+     the load up only by holding still (js/row-drag.js), so a phone never moves a load by scrolling. */
+  .plant-page.loadout-page table.loadout tr[data-row] td { touch-action: pan-y; }
+}
+/* 10/28 (practice test): on a phone the four area buttons fit in two rows. They were wider than the phone, so the Plant
+   Managers app's Loading slid sideways and a finger swipe moved the zoomed page instead of the list. */
+@media (max-width: 600px) {
+  .plant-page.loadout-page .areas { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 8px; }
 }
 /* Joe 10/13: the Scheduler's Suppliers list (Receiving). */
 .sched-page .sc-supnote { margin: 0 0 12px; font-size: 16px; color: var(--muted); }
@@ -1399,6 +1407,9 @@ body.yard-page .head .badge-test { order: 6; }
 @media (max-width: 1000px) {
   body.fill.plant-page:not(.walk-page) { height: auto; min-height: 100dvh; overflow: visible; }
 }
+/* 10/28: on a phone the header's top line ("Plant Distribution · Phone and Tablet") wraps instead of making the page wider than
+   the screen, so a finger swipe scrolls the page and nothing hides off the side. */
+@media (max-width: 600px) { .walk-page .head .title { min-width: 0; } .walk-page .head .title .eyebrow { white-space: normal; overflow-wrap: anywhere; } }
 .walk-page .wk-ask { margin: 6px 2px 12px; font-size: 20px; color: var(--ink); }
 .walk-page .wk-list { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
 .walk-page .wk-choice { display: flex; align-items: center; gap: 14px; min-height: 120px; padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-left: 8px solid var(--ud-blue); border-radius: 14px; text-decoration: none; color: var(--ink); }

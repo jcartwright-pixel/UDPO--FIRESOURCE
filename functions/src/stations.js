@@ -8,6 +8,8 @@
  *   KIOSK   Driver Room kiosks and TVs (driver-station.html); a plant may have its own kiosk too
  *   MANAGER The Plant Managers app (walkthrough.html?view=home&app=1, Joe 10/18): a manager signed in with a United Dairy
  *           account (Manager or Administrator) types the plant's Plant Managers code once on their phone or tablet
+ *   MAINT   Maintenance Station tablets (maint-station.html, Joe 10/28: locked like the others)
+ *   LINE    Line tablets (the Line Tablet link, line.html?tablet=1, Joe 10/28): the code once, then the tablet picks its line
  *
  * Kept in private/stations (server only). A code is shown to administrators (like the release codes) and checked by its
  * salted hash; a new code changes the station's version, so every tablet on the old code asks again. Until a kind has a
@@ -39,17 +41,21 @@ const KINDS = Object.freeze({
   // dispatch and weather).
   KIOSK: { label: 'Kiosk', types: { DRIVER: 'Driver Room Check-In Station', TV: "Driver's Kiosk Station" } },
   // Joe 10/18: the Plant Managers app ("send them the link and have a code").
-  MANAGER: { label: 'Plant Managers', types: { MANAGERS: 'Plant Managers' } }
+  MANAGER: { label: 'Plant Managers', types: { MANAGERS: 'Plant Managers' } },
+  // Joe 10/28 "you need to block that exact same way": the Maintenance Station and the line tablets get codes too, so a tablet
+  // on the floor stays on its own screen and Release goes back to its code screen.
+  MAINT: { label: 'Maintenance Station', types: { MAINT: 'Maintenance Station' } },
+  LINE: { label: 'Line Tablet', types: { LINE: 'Line Tablet' } }
 });
 // What each plant starts with: the current app's five stations, its garage, and the Driver Room tablet and TV.
 const STARTERS = [
   ['PLANT', 'CASE', 'Case Loadout'], ['PLANT', 'CASE_UNLOADING', 'Case Unloading'], ['PLANT', 'TOTES', 'Tote Loadout'], ['PLANT', 'BOXING', 'Boxing Loadout'],
   ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room Check-In Station'], ['KIOSK', 'TV', "Driver's Kiosk Station"],
-  ['MANAGER', 'MANAGERS', 'Plant Managers']
+  ['MANAGER', 'MANAGERS', 'Plant Managers'], ['MAINT', 'MAINT', 'Maintenance Station'], ['LINE', 'LINE', 'Line Tablet']
 ];
 // Kinds added after a plant's list was first saved: each plant gets its starter until the list has one of that kind
 // (Remove takes the code off, so the starter coming back has no code and the app opens as before).
-const LATER_KINDS = ['MANAGER'];
+const LATER_KINDS = ['MANAGER', 'MAINT', 'LINE'];
 const MAX_FAILS_PER_MINUTE = 30;
 // The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing,
 // returns and yard checks (the screens the Plant Station opens). Nothing else.

@@ -243,7 +243,7 @@ function recipientDocs(plant, saved, stamp, email) {
   return out;
 }
 const STATION_OF = { 'Case Loadout': ['PLANT', 'CASE'], 'Case Unloading': ['PLANT', 'CASE_UNLOADING'], 'Tote Loadout': ['PLANT', 'TOTES'], 'Boxing Loadout': ['PLANT', 'BOXING'],
-  'Yard Services': ['PLANT', 'YARD_SERVICES'], Garage: ['GARAGE', 'GARAGE'], 'Driver Room Check-In Station': ['KIOSK', 'DRIVER'], "Driver's Kiosk Station": ['KIOSK', 'TV'], 'Plant Managers': ['MANAGER', 'MANAGERS'] };
+  'Yard Services': ['PLANT', 'YARD_SERVICES'], Garage: ['GARAGE', 'GARAGE'], 'Driver Room Check-In Station': ['KIOSK', 'DRIVER'], "Driver's Kiosk Station": ['KIOSK', 'TV'], 'Plant Managers': ['MANAGER', 'MANAGERS'], 'Maintenance Station': ['MAINT', 'MAINT'], 'Line Tablet': ['LINE', 'LINE'] };
 const ROLE_OF = (label) => (label === 'Driver Check-In' ? 'DRIVER_CHECKIN' : text(label).toUpperCase().replace(/[^A-Z]+/g, '_'));
 
 /* ---------- writing ---------- */

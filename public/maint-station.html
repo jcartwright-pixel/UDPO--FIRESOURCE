@@ -29,6 +29,7 @@
       <div class="gs">
         <p class="gs-msg" id="gs-message" role="alert" hidden></p>
         <div id="ms-release" hidden></div>
+        <section id="view-code" hidden></section>
 
         <!-- Work orders: the first screen, no sign-in (Joe 10/10). -->
         <section id="view-jobs" class="gs-stack">
@@ -80,9 +81,9 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml } from './js/app.js';
+    import { start, escapeHtml, lockDevice, STATION_DEVICE } from './js/app.js';
     import { httpsCallable } from './js/firebase.js';
-    import { askRelease, lockStation } from './js/station-code.js';
+    import { askRelease, lockStation, resolveStation, askCode, remember } from './js/station-code.js';
     import { mountJobStation, rid } from './js/job-station.js';
     import { fullScreenOnTap } from './js/full-screen.js';
 
@@ -95,17 +96,23 @@
      * order, Who are you?, Complete) are js/job-station.js (review item 74); here are the plant's own.
      */
     const $ = (id) => document.getElementById(id);
-    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || 'fac_uniontown';
+    // Joe 10/28: the Maintenance Station's own station code (Administration > Garage Station Codes); the tablet remembers its
+    // station, and its plant, after that.
+    const CODE_KEY = 'udMaintStationCode';
+    const kept = (() => { try { return JSON.parse(localStorage.getItem(CODE_KEY) || 'null') || {}; } catch (e) { return {}; } })();
+    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || kept.facilityId || 'fac_uniontown';
     // No plant picker: the plant shows in the title (Joe 10/12).
     document.getElementById('title').textContent = 'Maintenance Station · ' + ({ fac_uniontown: 'Uniontown', fac_charleston: 'Charleston', fac_martins_ferry: 'Martins Ferry' }[PLANT] || PLANT);
     let machines = [];
     let machinePick = '', downPick = null, reportDraft = null, brkPick = '', brkDraft = null;
 
     const fn = async () => httpsCallable((await start()).functions, 'garage');
-    async function call(op, fields) { return (await (await fn())(Object.assign({ op, facilityId: PLANT, maint: true }, fields || {}))).data; }
+    let station = null, deviceLocked = STATION_DEVICE === 'MAINT';
+    async function call(op, fields) { return (await (await fn())(Object.assign({ op, facilityId: PLANT, maint: true }, fields || {}, station ? { station: { key: station.key, version: station.version } } : {}))).data; }
+    const stationCall = (step, f) => call('station', Object.assign({ step }, f, { facilityId: PLANT }));
 
     const S = mountJobStation({
-      call, views: ['breakdown'], forms: ['report', 'breakdown'], safeYes: 'Yes, safe to run', officeSource: 'PM', downWord: 'LINE DOWN', unitClass: 'unit ms-unit',
+      call, views: ['breakdown', 'code'], forms: ['report', 'breakdown'], safeYes: 'Yes, safe to run', officeSource: 'PM', downWord: 'LINE DOWN', unitClass: 'unit ms-unit',
       emptyJobs: 'No open work orders right now. Requests the plant sends and PMs come in here.',
       noTechs: 'No plant mechanics yet. A manager adds them on Plant Maintenance, Maintenance Schedule, Setup, People, with each one\'s station login ID.',
       hideEmptyStrip: true,
@@ -178,18 +185,33 @@
     // Review item 49 (Joe 10/13): the Maintenance Station is a station, so it locks like the others: no Back, Home or Sign out,
     // only the Release bar at the bottom. Release asks for the plant's manager release code (when the plant has one), then
     // goes back to the screen it was opened from (Home when it was opened on its own).
-    lockStation($('ms-change'), true);
+    // Joe 10/28: once the plant's Maintenance Station has a code, the tablet types it once (the code screen) and is then a
+    // Maintenance Station tablet: it opens no other screen (app.js), and Release goes back to the code screen only.
+    async function gate() {
+      const r = await resolveStation('MAINT', CODE_KEY, stationCall);
+      if (r.needCode) {
+        station = null; lockStation($('ms-change'), false); document.body.classList.toggle('station-locked', deviceLocked); S.view('code');
+        station = await askCode($('view-code'), { kind: 'MAINT', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
+          hint: 'A manager gives the Maintenance Station its code (Administration > Garage Station Codes). The tablet remembers its station after this.', message: r.message });
+        S.view('jobs');
+      } else station = r.station || null;
+      if (station) { deviceLocked = true; lockDevice('MAINT'); }
+      lockStation($('ms-change'), true);
+      S.message('');
+      return S.load();
+    }
     $('ms-change').addEventListener('click', async () => {
       const ok = await askRelease($('ms-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: S.message,
         why: 'A manager must type the manager release code to take this tablet off the Maintenance Station.' });
       if (!ok) return;
+      if (station || deviceLocked) { station = null; remember(CODE_KEY, null); gate().catch(err => S.message(err.message)); return; }
       let from = '';
       try { from = document.referrer && new URL(document.referrer).origin === location.origin ? document.referrer : ''; } catch (e) { /* no referrer */ }
       location.href = from && !/maint-station\.html/.test(from) ? from : 'index.html';
     });
 
     S.view('jobs');
-    S.load().catch(err => S.message(err.message));
+    gate().catch(err => S.message(err.message));
   </script>
 </body>
 </html>

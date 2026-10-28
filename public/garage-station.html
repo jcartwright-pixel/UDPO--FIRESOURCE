@@ -80,7 +80,7 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml, requireSignIn, currentPlant } from './js/app.js';
+    import { start, escapeHtml, requireSignIn, currentPlant, lockDevice, STATION_DEVICE } from './js/app.js';
     import { startOffline, offlineCall, isNoConnection, onWaitingChange } from './js/offline-saves.js';
     import { httpsCallable } from './js/firebase.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
@@ -103,7 +103,7 @@
     // The garage station this tablet opened with its code (Administration > Garage Station Codes) goes with every call; a new
     // code or a removed station sends the tablet back to the code screen.
     const CODE_KEY = 'udGarageStationCode';
-    let station = null;
+    let station = null, deviceLocked = STATION_DEVICE === 'GARAGE';
     async function call(op, fields) {
       try { return (await (await fn())(Object.assign({ op, udPlant: currentPlant() }, fields || {}, station ? { station: { key: station.key, version: station.version } } : {}))).data; } catch (err) {
         const m = /STATION_CODE: (.*)$/.exec(String(err.message || ''));
@@ -117,13 +117,17 @@
     async function gate(msg) {
       const r = msg !== undefined ? { needCode: true, message: msg } : await resolveStation('GARAGE', CODE_KEY, stationCall);
       if (r.needCode) {
-        station = null; lockStation($('gs-change'), false); $('title').textContent = 'Garage Station'; S.view('code');
+        station = null; lockStation($('gs-change'), false); document.body.classList.toggle('station-locked', deviceLocked); $('title').textContent = 'Garage Station'; S.view('code');
         station = await askCode($('view-code'), { kind: 'GARAGE', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
           hint: 'A manager gives each garage station its code (Administration > Garage Station Codes). The tablet remembers its station after this.', message: r.message });
         S.view('jobs');
       } else station = r.station || null;
       // Joe 10/12: a coded station has no Back or Home; Release at the bottom (manager release code) is the only way out.
       lockStation($('gs-change'), !!station);
+      // Joe 10/28: once a code has opened it, this tablet is a Garage Station tablet: it opens no other screen (app.js), and its
+      // code screen has no Back or Home either.
+      if (station) { deviceLocked = true; lockDevice('GARAGE'); }
+      document.body.classList.toggle('station-locked', !!station || deviceLocked);
       if (station) $('title').textContent = station.name + ' · ' + station.plant;
       S.message('');
       return S.load();
@@ -131,8 +135,8 @@
     $('gs-change').addEventListener('click', async () => {
       const ok = await askRelease($('gs-release'), { status: () => call('release', { step: 'status' }), release: (code) => call('release', { step: 'release', code }), onError: S.message, mustHave: true });
       if (!ok) return;
-      // Joe 10/13: Release goes to the normal Home menu (same window), not back to the code screen.
-      station = null; remember(CODE_KEY, null); location.replace('index.html');
+      // Joe 10/28: Release goes back to the code screen only ("the only thing it's allowed"), not the Home menu.
+      station = null; remember(CODE_KEY, null); gate().catch(err => S.message(err.message));
     });
     const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
 
