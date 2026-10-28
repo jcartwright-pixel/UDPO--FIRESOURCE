@@ -556,6 +556,12 @@ exports.fleetOwnershipEvery30Minutes = onSchedule({ schedule: 'every 30 minutes'
   if (!r.ok) console.error('fleetOwnership', r.error);
 });
 
+// Joe 10/28: a PM, reefer service or Annual Inspection that Fleet Service shows due comes onto the Garage Station by itself,
+// with its checklist (src/garage.js serviceOrders). Work orders only, in the app; nothing goes to a sheet.
+exports.garageServicesEvery30Minutes = onSchedule({ schedule: 'every 30 minutes', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
+  try { await require('./src/garage').serviceOrders(db, Date.now()); } catch (e) { console.error('garageServices', e); }
+});
+
 // Joe 10/27: the Driver Room TV's Driver Scorecard turn (src/scorecard-kiosk.js): the month's overall scores, every 15 minutes.
 exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
   await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));

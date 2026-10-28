@@ -154,3 +154,18 @@ test('Fleet Service keeps owned trucks and every trailer at this plant, and drop
   assert.equal(L.fleetUnitKey('R639'), 'R-639');
   assert.equal(L.fleetUnitKey('00688'), '688');
 });
+
+test('Joe 10/28: T-533, T-824, T-876 and T-950 are Uniontown trailers on the pick lists, though the fleet list says Charleston', () => {
+  const L = require('../../src/logic');
+  const charleston = (unit) => ({ unit, type: 'TRAILER', facilityId: 'fac_charleston', location: 'Charleston WV Branch', status: 'ACTIVE' });
+  ['T-533', 'T-824', 'T-876', 'T-950'].forEach(u => {
+    assert.equal(L.unitAtPlant(charleston(u), 'fac_uniontown', true), true, u + ' is on Uniontown\'s trailer list');
+    assert.equal(L.unitAtPlant(charleston(u), 'fac_charleston', true), false, u + ' is not Charleston\'s');
+  });
+  assert.equal(L.unitAtPlant(charleston('T-534'), 'fac_uniontown', true), false, 'another Charleston trailer stays off');
+  assert.equal(L.unitAtPlant({ unit: 'T-946', facilityId: 'fac_uniontown', location: 'Uniontown PA Branch' }, 'fac_uniontown', true), true);
+  assert.equal(L.unitAtPlant({ unit: 'T-999' }, 'fac_uniontown', true), true, 'no plant or location: any plant');
+  assert.equal(L.unitAtPlant({ unit: 'T-998', facilityId: 'fac_uniontown', location: 'Marietta OH Branch' }, 'fac_uniontown', true), false, 'kept at a branch');
+  assert.equal(L.unitAtPlant({ unit: 'T-998', facilityId: 'fac_uniontown', location: 'Marietta OH Branch' }, 'fac_uniontown', false), true, 'plant only');
+  assert.equal(L.unitAtPlant(charleston('T-533'), 'fac_uniontown', true) && L.fleetOwnedHere(charleston('T-533'), 'fac_uniontown', null), true, 'Fleet Service agrees');
+});

@@ -9,6 +9,8 @@ const F = require('../fixtures/fake-sheets');
 
 // The Garage Station (garage.js): Joe 10/10, mechanics have no email; they tap their name and type their login ID.
 const { sheets, SOURCES } = require('../fixtures/garage-demo');
+// Joe 10/28: a service's Complete answers its checklist; every line OK (garage-checklists.js).
+const ALL_OK = Object.keys(require('../../src/garage-checklists').LISTS).flatMap(n => require('../../src/garage-checklists').items(n)).map(i => ({ id: i.id, r: 'OK' }));
 const now = (min) => () => new Date(Date.parse('2026-10-06T14:00:00Z') + (min || 0) * 60000);
 let n = 0;
 const rid = () => 'garage-request-' + (++n) + '-' + Date.now();
@@ -182,7 +184,7 @@ test('Report a Problem and the office\'s Send to Garage: a PM done safe moves Fl
   assert.deepEqual(jobs.map(j => [j.unit, j.source]), [['T-901', 'WRITE_UP'], ['T-902', 'TECH'], ['900001', 'WRITE_UP'], ['900002', 'OFFICE']]);
   await db().collection('odometers').doc('o3').set({ unit: '900002', miles: 98000, date: '2026-10-06', at: '2026-10-06T08:00:00Z' });
   await step({ step: 'START', id: sent.workOrderId });
-  await step({ step: 'DONE', id: sent.workOrderId, fixed: 'Oil / PM service', safe: true, signature: SIG }, 25);
+  await step({ step: 'DONE', id: sent.workOrderId, fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: ALL_OK }, 25);
   const setup = (await db().collection('fleetSetup').doc('900002').get()).data();
   assert.deepEqual([setup.last_service_date, setup.last_service_miles, setup.track], ['2026-10-06', '98000', 'YES']);
 });
@@ -221,7 +223,7 @@ test('a PM or reefer service done safe records the GPS miles or hours when they 
   const reefer = await applyAction(db(), mgr, { action: 'sendToGarage', requestId: rid(), unit: 'T-902', unitType: 'TRAILER', serviceKey: 'REEFER' });
   for (const id of [pm.workOrderId, reefer.workOrderId]) {
     await step({ step: 'START', id });
-    await step({ step: 'DONE', id, fixed: id === pm.workOrderId ? 'Oil / PM service' : 'Repaired', safe: true, signature: SIG }, 25);
+    await step({ step: 'DONE', id, fixed: id === pm.workOrderId ? 'Oil / PM service' : 'Repaired', safe: true, signature: SIG, checklist: ALL_OK }, 25);
   }
   assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().last_service_miles, '98123');
   assert.equal((await db().collection('workOrders').doc(pm.workOrderId).get()).data().odometer, 98123);

@@ -27,16 +27,12 @@
     <div class="notice error" id="signin-error" hidden></div>
   </div>
   <div id="screen" hidden>
-    <!-- Joe 10/10: a tablet screen on every screen size: a slim header with Back and Home, no desktop side menu. -->
+    <!-- Joe 10/28: the garage's tablet has no Back, Home or mechanics in its header; Release (bottom right) is the only way out. -->
     <div class="topbar">
-      <button type="button" class="gs-nav" id="go-back" title="Back one screen">&#8249; Back</button>
-      <button type="button" class="gs-nav" id="go-home" title="Home">Home</button>
       <button type="button" class="gs-nav" id="gs-change" hidden>Release</button>
-      <span class="gs-people" id="people"></span>
-      <button id="gs-signout" type="button" hidden>Sign Out</button>
     </div>
     <div class="head">
-      <div class="title"><h1 id="title">Garage Station</h1><small>Tap a work order, then your name and login ID to start, stop or complete it. No email needed.</small></div>
+      <div class="title"><h1 id="title">Garage Station</h1></div>
     </div>
     <div class="view">
       <div class="gs">
@@ -46,58 +42,43 @@
         <div id="gs-release" hidden></div>
         <section id="view-code" hidden></section>
 
-        <!-- Work orders: the first screen, no sign-in (Joe 10/10). -->
-        <section id="view-jobs" class="gs-stack">
-          <div class="gs-bar"><h2 id="jobs-title">Work Orders</h2><button type="button" class="gs-btn red" id="to-report">+ Report a Problem</button></div>
-          <div class="gs-strip" id="strip" aria-label="Mechanics"></div>
+        <!-- Joe 10/28 (mock-up 1): the first screen is three big cards, Trucks, Trailers and Fork trucks, each with its open work
+             orders; no sign-in. -->
+        <section id="view-home" class="gs-stack">
+          <p class="gs-hint">Tap a card to see its open work orders.</p>
+          <div class="gs-cards" id="cards"></div>
+        </section>
+        <!-- One card's open work orders. -->
+        <section id="view-jobs" class="gs-stack" hidden>
+          <div class="gs-bar"><button type="button" class="gs-btn gs-back" id="to-home">&larr; All work orders</button><h2 id="jobs-title">Work Orders</h2></div>
           <div class="gs-jobs" id="jobs"></div>
         </section>
-        <!-- One work order, Who are you? and Complete's two steps come here from js/job-station.js (shared with the Maintenance
-             Station, review item 74). -->
+        <!-- One work order (Start Work, Pause, Waiting on Parts, Complete), Who are you? and Complete's two steps come here from
+             js/job-station.js (shared with the Maintenance Station, review item 74). -->
 
-        <!-- Report a Problem -->
-        <section id="view-report" class="gs-stack" hidden>
-          <div class="gs-bar"><button type="button" class="gs-btn dark" data-go="jobs">&larr; Work Orders</button><h2>Report a Problem</h2></div>
-          <div class="gs-report">
-            <div class="gs-card">
-              <div class="gs-label">1. Truck or trailer number</div>
-              <div class="gs-typed"><span id="typed"></span><small id="typed-match"></small></div>
-              <div class="gs-matches" id="matches"></div>
-              <div class="gs-keys" id="unit-keys"></div>
-            </div>
-            <div class="gs-card">
-              <div class="gs-label">2. What's wrong?</div>
-              <div class="gs-cats" id="cats"></div>
-              <input class="gs-note" id="report-note" maxlength="300" placeholder="Anything to add? (you can leave this empty)">
-              <div class="gs-label">3. Can it run?</div>
-              <div class="gs-yesno"><button type="button" class="gs-btn green" data-run="yes">Yes</button><button type="button" class="gs-btn line" data-run="no">No, it's down</button></div>
-              <button type="button" class="gs-btn red" id="send-report">Send</button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   </div>
 
   <script type="module">
-    import { start, escapeHtml, requireSignIn, currentPlant, lockDevice, STATION_DEVICE } from './js/app.js';
+    import { start, escapeHtml, requireSignIn, currentPlant, lockDevice, STATION_DEVICE, shortDate } from './js/app.js';
     import { startOffline, offlineCall, isNoConnection, onWaitingChange } from './js/offline-saves.js';
     import { httpsCallable } from './js/firebase.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
-    import { mountJobStation, rid } from './js/job-station.js';
+    import { mountJobStation, rid, names, first } from './js/job-station.js';
     import { fullScreenOnTap } from './js/full-screen.js';
 
     fullScreenOnTap();
 
     /*
-     * The Garage Station: the fleet's work orders (trucks, trailers, fork trucks and pallet jacks). The screens it shares with
-     * the Maintenance Station (work orders, one work order, Who are you?, Complete) are js/job-station.js (review item 74);
-     * here are the garage's own: the tablet's sign-in and station code, Report a Problem by truck or trailer number, and
-     * (Joe 10/13) steps kept on the tablet with no signal. Fork truck and pallet jack write-ups are on the list too.
+     * The Garage Station: the fleet's work orders (trucks, trailers, fork trucks and pallet jacks). Joe 10/28 (mock-up 1, "set it
+     * up like for the garage"): three big cards, Trucks, Trailers and Fork trucks, each with its open work orders; a card shows its
+     * list; a work order has Start Work, Pause, Waiting on Parts and Complete, notes typed or spoken, and a service's checklist.
+     * No mechanics row and no Report a Problem. The screens it shares with the Maintenance Station (one work order, Who are you?,
+     * Complete) are js/job-station.js (review item 74, cfg.simple); here are the garage's own: the tablet's sign-in and station
+     * code, the cards, and (Joe 10/13) steps kept on the tablet with no signal.
      */
     const $ = (id) => document.getElementById(id);
-    let units = [], categories = [];
-    let unitTyped = '', unitPick = '', catPick = '', runPick = null, reportDraft = null;
 
     const fn = async () => httpsCallable((await start()).functions, 'garage');
     // The garage station this tablet opened with its code (Administration > Garage Station Codes) goes with every call; a new
@@ -120,7 +101,7 @@
         station = null; lockStation($('gs-change'), false); document.body.classList.toggle('station-locked', deviceLocked); $('title').textContent = 'Garage Station'; S.view('code');
         station = await askCode($('view-code'), { kind: 'GARAGE', storeKey: CODE_KEY, call: stationCall, title: 'Enter this tablet\'s station code',
           hint: 'A manager gives each garage station its code (Administration > Garage Station Codes). The tablet remembers its station after this.', message: r.message });
-        S.view('jobs');
+        S.view('home');
       } else station = r.station || null;
       // Joe 10/12: a coded station has no Back or Home; Release at the bottom (manager release code) is the only way out.
       lockStation($('gs-change'), !!station);
@@ -139,6 +120,10 @@
       station = null; remember(CODE_KEY, null); gate().catch(err => S.message(err.message));
     });
     const TYPE = { TRUCK: 'Truck', TRAILER: 'Trailer', FORK_TRUCK: 'Fork truck' };
+    // The three cards, in Joe's order.
+    // Joe 10/28: the app's own pictures (the same as the Truck, Trailer and Fork Truck Issues screens) so the cards read at a glance.
+    const CARDS = [['TRUCK', 'Trucks', 'maintenance-tractor-v1-560.webp'], ['TRAILER', 'Trailers', 'maintenance-trailer-v1-560.webp'], ['FORK_TRUCK', 'Fork trucks', 'forklift-truck-v1-560.webp']];
+    let pick = 'TRUCK', board = [];
 
     // One step: sent now with the mechanic's sign-in, or (no signal) kept on the tablet with their name and login ID, sent in
     // order once the signal is back and checked then (Joe 10/13). Each step keeps its requestId, so it is saved once.
@@ -146,93 +131,74 @@
       return offlineCall('garage', Object.assign({ op: 'step', tokens: who.token ? [who.token] : [], signIn: { techId: who.id, loginId: who.loginId }, requestId: rid() }, fields,
         station ? { station: { key: station.key, version: station.version } } : {}));
     }
+    // A unit's line with 2 or more write-ups (Joe 10/28): Start makes one work order for all of them.
+    const onJob = (job) => ({ id: job.id || '', writeUp: job.id ? '' : job.writeUp, also: job.id ? [] : (job.writeUps || []).slice(1) });
 
     const S = mountJobStation({
-      call, views: ['code'], forms: ['report'], safeYes: 'Yes, safe', officeSource: 'OFFICE', downWord: 'CAN\'T RUN', unitClass: 'unit',
-      emptyJobs: 'No open work orders right now.', noTechs: 'No mechanics yet. The office adds them on the GARAGE TECHNICIANS list.',
+      call, views: ['code', 'home'], forms: [], simple: true, safeYes: 'Yes, safe', officeSource: 'OFFICE', downWord: 'CAN\'T RUN', unitClass: 'unit',
+      filter: (j) => (TYPE[j.type] ? j.type : 'TRUCK') === pick,
+      jobsTitle: (list) => CARDS.find(c => c[0] === pick)[1] + ' · ' + list.length + ' open',
+      emptyJobs: () => 'No open work orders for ' + CARDS.find(c => c[0] === pick)[1].toLowerCase() + ' right now.',
+      noTechs: 'No mechanics yet. The office adds them on Fleet Service Setup.',
       // Joe 10/13: with no signal the station shows the last list it had (kept on the tablet).
       board: async () => {
         try { const r = await call('board'); try { localStorage.setItem('udGarageBoard', JSON.stringify(r)); } catch (e) { /* full */ } return r; }
         catch (err) { const kept = isNoConnection(err) ? JSON.parse(localStorage.getItem('udGarageBoard') || 'null') : null; if (!kept) throw err; return kept; }
       },
-      onBoard: (r) => { units = r.units; categories = r.categories; },
+      onBoard: (r) => { board = r.jobs || []; drawCards(); },
       jobKey: (j) => j.id || j.writeUp,
       jobLine: (j) => (TYPE[j.type] || 'Truck') + ' · ' + (j.from || ''),
       problem: (j) => j.problem || j.category,
+      // Joe 10/28: the day it was first written up and how many times, plain to see on the list and the work order.
+      written: (j) => {
+        const n = 1 + (j.more || []).length, day = j.createdAt ? shortDate(j.createdAt) : '';
+        if (j.source === 'WRITE_UP') return 'Written up ' + n + (n === 1 ? ' time' : ' times') + (day ? ' · first ' + day : '');
+        return day ? 'Opened ' + day : '';
+      },
       jobHead: (j) => j.unit + ' · ' + (TYPE[j.type] || 'Truck'),
-      jobLabel: (j) => j.source === 'OFFICE' ? 'Sent by the office' : j.source === 'TECH' ? 'Reported at the garage' : 'From ' + (j.from || 'a write-up'),
+      jobLabel: (j) => j.source === 'SERVICE' ? 'Service due (Fleet Service)' : j.source === 'OFFICE' ? 'Sent by the office' : j.source === 'TECH' ? 'Reported at the garage' :
+        'From ' + (j.from || 'a write-up'),
       // Joe 10/13: with no signal the name and login ID go with each step kept on the tablet and are checked when it is sent.
       signIn: async (picked, typed) => {
         try { return Object.assign(await call('signIn', { techId: picked.id, loginId: typed, tokens: [] }), { loginId: typed }); }
         catch (err) { if (isNoConnection(err)) return { id: picked.id, name: picked.name, loginId: typed, offline: true }; throw err; }
       },
-      step: (who, job, op) => stepCall(who, { step: op, id: job.id || '', writeUp: job.id ? '' : job.writeUp }),
+      step: (who, job, op, extra) => stepCall(who, Object.assign({ step: op }, onJob(job), extra || {})),
+      // A service (it has a checklist) needs no "What did you fix?": it is the service.
+      serviceFix: (j) => j.checklist ? (j.serviceKey === 'DOT' ? 'Annual inspection' : 'Oil / PM service') : '',
       completeName: (j) => j.unit,
       safeQ: (j) => 'Is ' + j.unit + ' safe to ' + (j.type === 'FORK_TRUCK' ? 'use' : 'drive') + '?',
       safeWord: 'Safe to drive?',
       complete: async (j, who, f) => {
         // A write-up nobody started becomes its work order first.
-        if (!j.id) { const s = await stepCall(who, { step: 'START', writeUp: j.writeUp }); if (s.job) j.id = s.job.id; }
+        if (!j.id) { const s = await stepCall(who, Object.assign({ step: 'START' }, onJob(j))); if (s.job) j.id = s.job.id; }
         return stepCall(who, Object.assign({ step: 'DONE', id: j.id || '', writeUp: j.id ? '' : j.writeUp }, f));
       },
-      doneText: (j, who, safe) => safe ? j.unit + ' completed by ' + who.name + '.' : j.unit + ' stays open: not safe yet.',
-      purposes: { report: sendReport }
+      doneText: (j, who, safe) => safe ? j.unit + ' completed by ' + who.name + '.' : j.unit + ' stays open: not safe yet.'
     });
 
-    /* ---------- Report a Problem ---------- */
-    const alnum = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    function matchUnit() {
-      const key = alnum(unitTyped);
-      if (!key) return { list: [] };
-      const exact = units.filter(u => alnum(u) === key || alnum(u) === 'T' + key);
-      if (exact.length === 1) return { unit: exact[0], exact: true, list: [] };
-      const ends = key.length >= 2 ? units.filter(u => alnum(u).endsWith(key)) : [];
-      if (ends.length === 1) return { unit: ends[0], list: [] };
-      return { list: (exact.length > 1 ? exact : ends).slice(0, 4), none: key.length >= 2 && !ends.length && !exact.length };
+    /* ---------- the three cards (Joe 10/28) ---------- */
+    function drawCards() {
+      $('cards').innerHTML = CARDS.map(([type, name, pic]) => {
+        const list = board.filter(j => (TYPE[j.type] ? j.type : 'TRUCK') === type), down = list.filter(j => !j.canRun && j.status !== 'PARTS').length;
+        const working = list.filter(j => j.onNow.length), parts = list.filter(j => j.status === 'PARTS').length;
+        const lines = [down ? '<small class="red">' + down + ' can\'t run</small>' : '',
+          working.length ? '<small class="green">' + escapeHtml(working.map(j => names(j.onNow.map(p => first(p.name))) + ' on ' + j.unit).join(' · ')) + '</small>' : '',
+          parts ? '<small>' + parts + ' waiting on parts</small>' : ''].filter(Boolean);
+        return '<button type="button" class="gs-bigcard" data-type="' + type + '"><img src="img/library/' + pic + '" alt=""><b>' + list.length + '</b><span>' + name + '</span><small>open work order' + (list.length === 1 ? '' : 's') + '</small>' + lines.join('') + '</button>';
+      }).join('');
     }
-    function drawReport() {
-      const m = matchUnit();
-      unitPick = m.unit || (m.list.indexOf(unitPick) >= 0 ? unitPick : '');
-      $('typed').textContent = unitTyped;
-      const s = $('typed-match');
-      s.className = m.none ? 'bad' : '';
-      s.textContent = m.unit ? (m.exact ? m.unit : '→ ' + m.unit) + ' ✔' : unitPick ? unitPick + ' ✔' : m.none ? 'not found' : '';
-      $('matches').innerHTML = m.list.map(u => '<button type="button" class="gs-btn dark' + (u === unitPick ? ' pick-on' : '') + '" data-unit="' + escapeHtml(u) + '">' + escapeHtml(u) + '</button>').join('');
-      $('unit-keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'T-', '0', 'del'].map(k => '<button type="button" data-k="' + k + '">' + (k === 'del' ? '&#9003;' : k) + '</button>').join('');
-      $('cats').innerHTML = categories.map(c => '<button type="button" class="gs-btn' + (c === catPick ? ' pick-on' : '') + '" data-cat="' + escapeHtml(c) + '">' + escapeHtml(c) + '</button>').join('');
-      document.querySelectorAll('[data-run]').forEach(b => b.classList.toggle('pick-on', runPick !== null && (b.dataset.run === 'yes') === runPick));
-    }
-    $('to-report').addEventListener('click', () => { unitTyped = ''; unitPick = ''; catPick = ''; runPick = null; $('report-note').value = ''; S.message(''); drawReport(); S.view('report'); });
-    $('unit-keys').addEventListener('click', e => {
-      const b = e.target.closest('[data-k]'); if (!b) return;
-      const k = b.dataset.k;
-      if (k === 'del') unitTyped = unitTyped.slice(0, -1);
-      else if (k === 'T-') { if (!/^T-/.test(unitTyped)) unitTyped = 'T-' + unitTyped; }
-      else if (unitTyped.length < 12) unitTyped += k;
-      drawReport();
-    });
-    $('matches').addEventListener('click', e => { const b = e.target.closest('[data-unit]'); if (b) { unitPick = b.dataset.unit; unitTyped = unitPick; drawReport(); } });
-    $('cats').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if (b) { catPick = b.dataset.cat; drawReport(); } });
-    document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => { runPick = b.dataset.run === 'yes'; drawReport(); }));
-    $('send-report').addEventListener('click', () => {
-      if (!unitPick) { S.message('Type the truck or trailer number.'); return; }
-      if (!catPick) { S.message('Tap what\'s wrong.'); return; }
-      if (runPick === null) { S.message('Tap Yes or No for "Can it run?".'); return; }
-      reportDraft = { unit: unitPick, category: catPick, canRun: runPick, problem: $('report-note').value.trim() };
-      S.ask('report', null);
-    });
-    async function sendReport(who) {
-      S.busy = true; S.message('Saving…', true);
-      try {
-        const r = await stepCall(who, Object.assign({ step: 'REPORT' }, reportDraft));
-        if (r.queued) { S.message(reportDraft.unit + ': saved on this tablet. It will send when you have signal.', true); reportDraft = null; S.view('jobs'); return; }
-        S.message(r.job.unit + ' is on the work orders.', true);
-        reportDraft = null; S.view('jobs'); await S.load();
-      } catch (err) { S.message(err.message); S.view('report'); }
-      finally { S.busy = false; S.signOut(who.token); }
-    }
+    $('cards').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (!b) return; pick = b.dataset.type; S.message(''); S.closeJob(); S.redraw(); S.view('jobs'); S.load().catch(() => {}); });
+    $('to-home').addEventListener('click', () => { S.message(''); S.view('home'); });
+    // Back on the tablet (Android's own Back button): the list goes back to the cards.
+    const backOne = window.udBack;
+    window.udBack = () => { if (S.shownView() === 'jobs') { S.view('home'); return true; } return backOne(); };
+    // Left on a list or a work order for 10 minutes, the tablet goes back to the cards (what is typed stays on the tablet).
+    let touched = Date.now();
+    ['pointerdown', 'keydown'].forEach(t => document.addEventListener(t, () => { touched = Date.now(); }, true));
+    setInterval(() => { if (['jobs', 'job'].indexOf(S.shownView()) >= 0 && Date.now() - touched > 10 * 60000 && !S.busy) { S.closeJob(); S.view('home'); } }, 30000);
 
-    S.view('jobs');
+    S.view('home');
     startOffline(['garage-station.html'], { scopes: ['garage-station'], device: 'tablet', files: [] });
     // Once what waited on the tablet has gone, the list is read again (and the "saved on this tablet" note goes).
     let waited = 0;

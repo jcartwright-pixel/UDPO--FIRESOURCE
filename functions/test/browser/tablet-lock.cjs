@@ -126,7 +126,7 @@ const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], [
  *   home: its page; onHome: the addresses it may be on; release / box: its Release button and the release code box.
  */
 const OTHERS = [
-  { name: 'Garage Station', key: 'fac_uniontown_garage_garage', open: '/garage-station.html?' + MANAGER, code: '#view-code', ready: 'body.station-locked #view-jobs:not([hidden])', home: 'garage-station.html', release: '#gs-change', box: '#gs-release', gone: ['#go-back', '#go-home'] },
+  { name: 'Garage Station', key: 'fac_uniontown_garage_garage', open: '/garage-station.html?' + MANAGER, code: '#view-code', ready: 'body.station-locked #view-home:not([hidden])', home: 'garage-station.html', release: '#gs-change', box: '#gs-release', gone: ['#go-back', '#go-home'] },
   { name: 'Maintenance Station', key: 'fac_uniontown_maint_maint', open: '/maint-station.html', code: '#view-code', ready: 'body.station-locked #view-jobs:not([hidden])', home: 'maint-station.html', release: '#ms-change', box: '#ms-release', gone: ['#go-back', '#go-home'] },
   { name: 'Line tablet', key: 'fac_uniontown_line_line', open: '/line.html' + UD + '&tablet=1', code: '#code-box', pick: '#line-list [data-line]', ready: 'body.station-locked #line-head:not([hidden])', home: 'line.html', release: '#lt-release', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#change'] },
   { name: 'Driver Room TV (Driver\'s Kiosk Station)', key: 'fac_uniontown_kiosk_tv', open: '/driver-station.html' + UD, code: '#code-box', ready: 'body.station-locked #ds-grid:not([hidden])', home: 'driver-station.html', release: '#change', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#tv-exit'] },

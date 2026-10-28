@@ -62,13 +62,14 @@ export async function watchLists(user, onChange) {
     // Only Uniontown's units (Equipment Master facility_id), like the current app's pickers; Charleston and Martins Ferry units are left out.
     // Every plant's units too (Trucks Today's All Fleet Units says which are ours and where each belongs, Joe 10/20).
     lists.equipmentAll = snap.docs.map(d => d.data());
-    const all = lists.equipmentAll.filter(e => !e.facilityId || e.facilityId === HOME_FACILITY);
+    const all = lists.equipmentAll.filter(e => L.unitAtPlant(e, HOME_FACILITY, false));
     const byUnit = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
     lists.fleetTrucks = all.filter(e => e.type === 'TRUCK').sort(byUnit);
     lists.fleetTrailers = all.filter(e => e.type === 'TRAILER').sort(byUnit);
     // Joe, 10/9: "This should only show the Uniontown fleet." The Equipment screen, its counts and the pickers show only units
     // whose Equipment Master location is Uniontown; units kept at the branches (Marietta, Beckley, Fairmont...) are left out.
-    const home = (e) => !e.location || /UNIONTOWN/i.test(e.location);
+    // Joe 10/28: units Joe named as ours (L.FLEET_ON, T-533) count whatever the fleet list says.
+    const home = (e) => L.unitAtPlant(e, HOME_FACILITY, true);
     lists.allTrucks = lists.fleetTrucks.filter(home);
     lists.allTrailers = lists.fleetTrailers.filter(home);
     // Down, inactive or out-of-service units are left out of the choices unless OVR is ticked.

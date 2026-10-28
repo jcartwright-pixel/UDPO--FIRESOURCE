@@ -74,6 +74,13 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     // Joe 10/27: the right-hand box: FOX Weather live first (the weather is in the top bar), then the Driver Scorecard,
     // 30 seconds each. The TV's own code reads the server's copy of the overall scores (scorecard/kiosk).
     await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="live_stream?channel=UC1FbPiXx59_ltnFVx7IxWow"]');
+    // Joe 10/28: YouTube plays an embedded video only when it is told the site's address (the app tells other sites nothing).
+    assert.equal(await page.getAttribute('#live-frame', 'referrerpolicy'), 'strict-origin-when-cross-origin');
+    // Joe 10/28: the weekly schedule is the same size as the Loadout list above it.
+    assert.deepEqual(await page.evaluate(() => { const st = (q) => getComputedStyle(document.querySelector(q)); return [st('#week-rows td').fontSize, st('.ds-row:not(.ds-headrow)').fontSize]; }), ['23px', '23px']);
+    assert.ok(await page.evaluate(() => document.querySelector('#week-rows tr').getBoundingClientRect().height >= 63), 'schedule rows as tall as the Loadout rows');
+    // Long names and routes wrap or get smaller; no cell is cut off.
+    assert.deepEqual(await page.$$eval('#week-rows td', t => t.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent)), []);
     assert.equal(await page.isVisible('#turn-weather'), false);
     await shot(page, 'fire-tv-2-board-1920.png');
     await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], at: new Date().toISOString(),
@@ -85,6 +92,13 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     assert.equal(await page.isVisible('#turn-live'), false);
     assert.ok(await page.evaluate(() => window.udLivePaused > 0), 'the live picture pauses during the Scorecard turn');
     await shot(page, 'fire-tv-2b-scorecard-turn-1920.png');
+    // Joe 10/28: two-digit ranks were cut off; every rank shows whole.
+    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], at: new Date().toISOString(),
+      rows: Array.from({ length: 14 }, (x, i) => ({ rank: i + 1, driver: 'DRIVER ' + (i + 1) + ', LONGNAME', score: 99 - i, grade: 'A' })) });
+    await page.waitForFunction(() => document.querySelectorAll('#sc-rows tr').length === 14);
+    assert.deepEqual(await page.$$eval('#sc-rows td.rk', t => t.filter(c => c.scrollWidth > c.clientWidth || c.getBoundingClientRect().width < 50).map(c => c.textContent)), []);
+    assert.equal(await page.$$eval('#sc-rows td.rk', t => t.map(c => c.textContent).join(',')), '1,2,3,4,5,6,7,8,9,10,11,12,13,14');
+    await shot(page, 'fire-tv-2c-scorecard-ranks-1920.png');
     await page.evaluate(() => window.udTurn());
     await page.waitForSelector('#turn-live:not([hidden])');
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');

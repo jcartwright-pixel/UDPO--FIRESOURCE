@@ -742,7 +742,10 @@
   // (its Equipment Master plant decides) unless its own notes say it is leased. FLEET_OFF: units Joe took off by name.
   var FLEET_OFF = { '221810': 'Joe 10/18: out of service, no longer available to us' };
   // FLEET_ON: units Joe said are a plant's own even though the fleet list puts them elsewhere.
-  var FLEET_ON = { 'T-10308': { plant: 'fac_uniontown', why: 'Joe 10/19: ours (fleet list says Marietta)' } };
+  // Joe 10/28 (533 on 815 "not on my master list"): T-533, T-824, T-876 and T-950 run out of Uniontown; the fleet list says Charleston.
+  var FLEET_ON = { 'T-10308': { plant: 'fac_uniontown', why: 'Joe 10/19: ours (fleet list says Marietta)' },
+    'T-533': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' }, 'T-824': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' },
+    'T-876': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' }, 'T-950': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' } };
   // FLEET_BY_DAYS: trucks with no GPS whose PM goes by the date (every truckDaysMonths), not miles.
   var FLEET_BY_DAYS = { '688': 'Joe 10/19: yard truck, no GPS, goes by days', '9737': 'Joe 10/19: yard truck, no GPS, goes by days' };
   function fleetUnitKey(u) {
@@ -752,6 +755,14 @@
   function plantOfLocation(loc) {
     var s = String(loc || '').toUpperCase();
     return s.indexOf('UNIONTOWN') >= 0 ? 'fac_uniontown' : s.indexOf('CHARLESTON') >= 0 ? 'fac_charleston' : s.indexOf('MARTINS FERRY') >= 0 ? 'fac_martins_ferry' : '';
+  }
+  // Whether a unit is one of this plant's for the pickers and lists (Daily, Weekly, Loadout, Trailer Assignments...): FLEET_ON decides
+  // first; else Equipment Master's plant (blank = any) and, withLocation, its location (blank = any) must be this plant.
+  function unitAtPlant(unit, plantId, withLocation) {
+    var on = FLEET_ON[fleetUnitKey(unit && unit.unit)];
+    if (on) return on.plant === plantId;
+    if (!unit || (unit.facilityId && unit.facilityId !== plantId)) return false;
+    return !withLocation || !unit.location || plantOfLocation(unit.location) === plantId;
   }
   function fleetOwnedHere(unit, plantId, ownership) {
     var key = fleetUnitKey(unit && unit.unit), trailer = fleetKind(unit && unit.type) === 'TRAILER';
@@ -1617,7 +1628,7 @@
     PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

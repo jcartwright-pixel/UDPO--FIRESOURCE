@@ -9,6 +9,8 @@ const F = require('../fixtures/fake-sheets');
 
 // Fleet Service Setup (the current app's FleetService.html Setup tab): rules, each unit's dates, and the garage technicians.
 const { sheets, SOURCES } = require('../fixtures/garage-demo');
+// Joe 10/28: a service's Complete answers its checklist; every line OK (garage-checklists.js).
+const ALL_OK = Object.keys(require('../../src/garage-checklists').LISTS).flatMap(n => require('../../src/garage-checklists').items(n)).map(i => ({ id: i.id, r: 'OK' }));
 const now = () => new Date('2026-10-06T14:00:00Z');
 const MANAGER = { email: 'manager.test@uniteddairy.com' }, DISPATCH = { email: 'dispatch.test@uniteddairy.com' };
 let n = 0;
@@ -72,7 +74,7 @@ test('a DOT finished at the garage moves the DOT due date by the saved rule', as
   const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now);
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now);
-  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG }, now);
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG, checklist: ALL_OK }, now);
   assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().dot_due, '2027-04-06');
 });
 
@@ -99,7 +101,7 @@ test('a trailer\'s DOT finished at the garage moves by the trailers\' own DOT ru
   const tom = await garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '48213' }, now);
   const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'START', id: sent.workOrderId }, now);
-  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG }, now);
+  await garageCall(db(), { op: 'step', tokens: [tom.token], requestId: rid(), step: 'DONE', id: sent.workOrderId, fixed: 'Annual inspection', safe: true, signature: SIG, checklist: ALL_OK }, now);
   assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().dot_due, '2027-10-06');
 });
 
