@@ -56,6 +56,15 @@ async function openPage(browser, width, height, url, clock, touch) {
 const shot = async (page, name, full) => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name), fullPage: !!full }); };
 const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth + 1);
 
+// Joe 10/28 evening: a mechanic's first sign-in on the Garage Station asks for their signature once (kept on file).
+async function signOnce(page) {
+  await page.waitForSelector('#view-mysig:not([hidden])');
+  await page.waitForTimeout(200);
+  const b = await page.locator('#mysig-pad').boundingBox();
+  await page.mouse.move(b.x + 30, b.y + b.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + 120, b.y + 30, { steps: 5 }); await page.mouse.move(b.x + 220, b.y + b.height - 30, { steps: 5 }); await page.mouse.up();
+  await page.click('#mysig-save');
+}
 (async () => {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(G.sheets()), sources: G.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
@@ -76,6 +85,7 @@ const fits = (page) => page.evaluate(() => document.scrollingElement.scrollWidth
     await gs.click('[data-who="TECH-JT"]');
     for (const k of '48213') await gs.click('[data-key="' + k + '"]');
     await gs.click('[data-key="go"]');
+    await signOnce(gs);
     await gs.waitForFunction(() => /JELLICK Tom started on 900001/.test(document.getElementById('gs-message').textContent), null, { timeout: 10000 });
     assert.deepEqual(gs.errors, []);
     results.push('Garage Station: the Trucks card shows 900001; JELLICK Tom starts it with his name and login ID');

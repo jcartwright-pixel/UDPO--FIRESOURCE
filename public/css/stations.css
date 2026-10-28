@@ -147,6 +147,23 @@
 .gs-ck { display: grid; grid-template-columns: 1fr repeat(3, auto); align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; font-size: 19px; font-weight: 700; }
 .gs-ck:nth-of-type(odd) { background: #f5f8fb; }
 .gs-ck.ok { background: #e3f5ea; } .gs-ck.fix { background: #fdecea; } .gs-ck.na { background: #eef1f4; }
+.gs-ck.need { background: #fff; box-shadow: inset 0 0 0 3px #b42318; } .gs-ck.need span { color: #b42318; }
+.gs-btn.locked { background: #9aa6b2; }
+.gs-sigfile { max-height: 140px; max-width: 100%; align-self: flex-start; background: #fff; border: 2px solid #d7e1ec; border-radius: 12px; padding: 6px; }
+/* Joe 10/28 evening: something new flashes until a mechanic opens it. */
+@keyframes gs-flash { 0%, 100% { box-shadow: 0 0 0 4px #f2b705; background: #fff8dc; } 50% { box-shadow: 0 0 0 4px transparent; background: #fff; } }
+.gs-bigcard.gs-new, .gs-job.gs-new { animation: gs-flash 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .gs-bigcard.gs-new, .gs-job.gs-new { animation: none; box-shadow: 0 0 0 4px #f2b705; background: #fff8dc; } }
+/* Joe 10/28 evening: a service's hours, miles and the day it was finished. */
+.gs-read { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gs-read label { display: flex; flex-direction: column; gap: 4px; font-size: 18px; font-weight: 800; color: #1b2a3a; padding: 4px; border-radius: 10px; }
+.gs-read label small { font-size: 16px; color: #1c7c4a; }
+.gs-read input { font: inherit; font-size: 24px; font-weight: 800; min-height: 52px; padding: 4px 10px; border: 2px solid #c9d6e3; border-radius: 10px; width: 100%; box-sizing: border-box; }
+.gs-read label.need { box-shadow: inset 0 0 0 3px #b42318; } .gs-read label.need span { color: #b42318; }
+/* Joe 10/28 evening: tread depth on all 8 tires. */
+.gs-tires { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.gs-tires label { display: flex; flex-direction: column; gap: 2px; font-size: 16px; font-weight: 700; color: #44515e; }
+.gs-tires input { font: inherit; font-size: 22px; font-weight: 800; min-height: 48px; padding: 4px 8px; border: 2px solid #c9d6e3; border-radius: 10px; width: 100%; box-sizing: border-box; }
 .gs-ckb { min-height: 44px; min-width: 84px; padding: 0 12px; border: 2px solid #c9d6e3; border-radius: 10px; background: #fff; color: #1b2a3a; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
 .gs-ckb.on[data-r="OK"] { background: #1c7c4a; border-color: #1c7c4a; color: #fff; }
 .gs-ckb.on[data-r="FIX"] { background: #b42318; border-color: #b42318; color: #fff; }
@@ -164,7 +181,7 @@
   .gs-job { grid-template-columns: 1fr; } .gs-job .gs-btn { width: 100%; }
   .gs-two { grid-template-columns: 1fr; }
   .gs-cards { grid-template-columns: 1fr; align-content: start; } .gs-bigcard { min-height: 0; flex-direction: row; flex-wrap: wrap; gap: 4px 14px; } .gs-bigcard b { font-size: 56px; } .gs-bigcard img { width: 96px; height: 64px; }
-  .gs-four { grid-template-columns: 1fr 1fr; } .gs-ck { grid-template-columns: 1fr 1fr 1fr; } .gs-ck span { grid-column: 1 / -1; }
+  .gs-four { grid-template-columns: 1fr 1fr; } .gs-ck { grid-template-columns: 1fr 1fr 1fr; } .gs-ck > span { grid-column: 1 / -1; } .gs-tires { grid-template-columns: 1fr 1fr; } .gs-read { grid-template-columns: 1fr; }
   .gs-clock { grid-template-columns: 40px 1fr auto; } .gs-clock i { width: 40px; height: 40px; } .gs-clock .gs-btn { grid-column: 1 / -1; }
   /* A phone: the names, the dots and the keypad shrink to fit the width instead of running off the right edge. */
   .gs-page .view { padding: 0 8px 10px; }

@@ -75,11 +75,26 @@ test('a service is completed with its checklist: every line answered, the Needs 
   const items = CHECK.items('PM_TRUCK');
   await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: items.slice(1).map(i => ({ id: i.id, r: 'OK' })) }, 10), /Answer every line of the checklist \(1 left\)/);
   const answers = items.map(i => ({ id: i.id, r: i.id === 'tires' ? 'FIX' : i.id === 'twospeed' ? 'NA' : 'OK' }));
-  await step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers }, 20);
+  // Joe 10/28 evening: the tread depth of all 8 tires, or no Complete.
+  const tread = answers.find(a => a.id === 'tread');
+  tread.depth = { lfo: '12', lfi: '11', rfo: '12', rfi: '10', rro: '9', rri: '9', lro: '8' };
+  await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers }, 15), /Enter the tread depth on all 8 tires \(1 left\)/);
+  tread.depth.lri = '40';
+  await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers }, 16), /tread depth on all 8 tires \(1 left\)/, 'more than 32 is not a depth');
+  tread.depth.lri = '7.5';
+  // Joe 10/28 evening: no GPS on 900002, so the hours and miles are typed; the day it was finished can be a day back.
+  await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers }, 17), /Type the hours \(no GPS reading for 900002\)/);
+  await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers, hours: '8200' }, 18), /Type the miles/);
+  await assert.rejects(step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers, hours: '8200', miles: '97500', completedOn: '2026-10-07' }, 19), /today or in the last 30 days/);
+  await step({ step: 'DONE', id: 'WO-SVC1', fixed: 'Oil / PM service', safe: true, signature: SIG, checklist: answers, hours: '8,200', miles: '97,500', completedOn: '2026-10-05' }, 20);
   const wo = (await db().collection('workOrders').doc('WO-SVC1').get()).data();
   assert.equal(wo.status, 'DONE');
   assert.equal(wo.checklist.length, items.length);
+  assert.deepEqual([wo.hours, wo.odometer, wo.completed_on], [8200, 97500, '2026-10-05']);
+  const setup = (await db().collection('fleetSetup').doc('900002').get()).data();
+  assert.deepEqual([setup.last_service_date, setup.last_service_miles, setup.current_hours], ['2026-10-05', '97500', '8200']);
   assert.match(wo.fixed_note, /^Needs work: Tire condition and air pressure/);
+  assert.deepEqual(wo.checklist.find(r => r.id === 'tread').depth, { lfo: '12', lfi: '11', rfo: '12', rfi: '10', rro: '9', rri: '9', lro: '8', lri: '7.5' });
 });
 
 test('a PM or Annual Inspection Fleet Service shows due becomes a work order by itself, once; one the office deleted is not made again', async () => {
@@ -92,6 +107,8 @@ test('a PM or Annual Inspection Fleet Service shows due becomes a work order by 
   assert.ok(made.every(o => o.source === 'SERVICE' && o.status === 'NEW'));
   const jobs = (await board()).filter(j => j.unit === '900002');
   assert.deepEqual(jobs.map(j => j.checklist).sort(), ['DOT_TRUCK', 'PM_TRUCK']);
+  // Joe 10/28 evening: the service shows the latest miles (the driver's, no GPS here) at the top.
+  assert.deepEqual(jobs[0].reading, { miles: 98000, milesFrom: 'DVIR', hours: null });
   assert.equal((await serviceOrders(db(), Date.parse('2026-10-06T14:30:00Z'))).made, 0, 'not made twice');
   // The office deletes the Annual Inspection one: it stays off for this due date.
   const dot = made.find(o => o.service_key === 'DOT');

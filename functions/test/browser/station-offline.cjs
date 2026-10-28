@@ -51,6 +51,15 @@ async function kept(page, files) {
   }, files, { timeout: 30000 }).catch(async () => { await page.reload(); await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 20000 }); await page.waitForTimeout(6000); });
 }
 
+// Joe 10/28 evening: a mechanic's first sign-in on the Garage Station asks for their signature once (kept on file).
+async function signOnce(page) {
+  await page.waitForSelector('#view-mysig:not([hidden])');
+  await page.waitForTimeout(200);
+  const b = await page.locator('#mysig-pad').boundingBox();
+  await page.mouse.move(b.x + 30, b.y + b.height / 2); await page.mouse.down();
+  await page.mouse.move(b.x + 120, b.y + 30, { steps: 5 }); await page.mouse.move(b.x + 220, b.y + b.height - 30, { steps: 5 }); await page.mouse.up();
+  await page.click('#mysig-save');
+}
 (async () => {
   const browser = await chromium.launch();
   const results = [];
@@ -166,8 +175,9 @@ async function kept(page, files) {
       await page.click('[data-who="TECH-JT"]');
       for (const k of '48213') await page.click('[data-key="' + k + '"]');
       await page.click('[data-key="go"]');
+      await signOnce(page);
       await page.waitForFunction(() => /JELLICK Tom: saved on this tablet/.test(document.getElementById('gs-message').textContent), null, { timeout: 10000 });
-      assert.match(await page.textContent('#offline-line'), /Saved on this tablet, will send when you have signal\. Waiting: 1/);
+      assert.match(await page.textContent('#offline-line'), /Saved on this tablet, will send when you have signal\. Waiting: 2/, 'his signature and the Start');
       await shot(page, 'station-offline-garage-saved-1024.png');
       assert.equal((await db().collection('workOrders').where('unit', '==', '900001').get()).size, 0, 'nothing reached the server yet');
       results.push('Garage Station: with no signal it opens from the tablet with the last work orders; Start with name and login ID is kept with "Saved on this tablet"');
@@ -176,6 +186,7 @@ async function kept(page, files) {
       const wos = (await db().collection('workOrders').where('unit', '==', '900001').get()).docs.map(d => d.data());
       assert.equal(wos.length, 1, 'one work order');
       assert.deepEqual([wos[0].status, wos[0].techs], ['WORKING', 'JELLICK Tom']);
+      assert.match((await db().collection('garageSignatures').doc('TECH-JT').get()).data().signature, /^data:image\/png;base64,/, 'his signature, signed with no signal, is on file');
       await page.waitForFunction(() => /On it now: Tom/.test(document.getElementById('jobs').textContent), null, { timeout: 15000 });
       assert.equal(await page.isVisible('#gs-message'), false, 'the "saved on this tablet" note goes once it is sent');
       await shot(page, 'station-offline-garage-sent-1024.png');
