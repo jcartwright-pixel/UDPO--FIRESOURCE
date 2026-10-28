@@ -499,6 +499,8 @@ function validateUnload(input, SaveError) {
   }
   if (f.trailer !== undefined) u.trailer = R.trailerText(f.trailer).slice(0, 60);
   if (f.notes !== undefined) u.notes = text(f.notes).slice(0, 1200);
+  // Joe 10/28 (gz): who is unloading, picked from the plant's people or typed (not everyone is on the list yet).
+  if (f.unloadedBy !== undefined) u.unloadedBy = text(f.unloadedBy).replace(/\s+/g, ' ').slice(0, 60);
   if (f.returnIds !== undefined) {
     if (!Array.isArray(f.returnIds) || f.returnIds.length > 30) throw new SaveError('BAD_REQUEST', 'returnIds must be a list');
     u.returnIds = f.returnIds.map(x => text(x).slice(0, 300)).filter(Boolean);
@@ -535,7 +537,7 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   // All reads are done; the rest works out the new record and writes it.
   const all = R.latestUnloads(dayDocs, req.date), prev = all[key] || { removed: [], casesIn: '', startedAt: '', completedAt: '', notes: '' };
   const next = { unloadKey: key, route: req.route, run: req.run, casesIn: prev.casesIn === undefined || prev.casesIn === null ? '' : String(prev.casesIn), startedAt: prev.startedAt || '',
-    completedAt: prev.completedAt || '', notes: prev.notes || '', productReturnRemovedIds: prev.removed.slice() };
+    completedAt: prev.completedAt || '', notes: prev.notes || '', unloadedBy: prev.unloadedBy || '', productReturnRemovedIds: prev.removed.slice() };
   if (prev.trailer !== undefined) next.trailer = prev.trailer;
   ['added', 'area', 'addedAt', 'forRoute'].forEach(k => { if (prev[k]) next[k] = prev[k]; });
   if (prev.dropped) next.dropped = true;
@@ -558,11 +560,12 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   }
   if (u.trailer !== undefined) next.trailer = u.trailer;
   if (u.notes !== undefined) next.notes = u.notes;
+  if (u.unloadedBy !== undefined) next.unloadedBy = u.unloadedBy;
   if (u.casesIn !== undefined) next.casesIn = u.casesIn;
   if (u.start && !next.startedAt) {
-    // One unload at a time, as on the current app.
-    const active = Object.keys(all).filter(k => k !== key && all[k].startedAt && !all[k].completedAt)[0];
-    if (active) throw new SaveError('CONFLICT', 'Stop unloading ' + all[active].route + ' · ' + all[active].run + ' before starting another.');
+    // Joe 10/28 (gz): two trailers can be unloading at once (two people working), never a third.
+    const full = R.unloadingFull(Object.values(all).filter(x => !x.dropped), key);
+    if (full) throw new SaveError('CONFLICT', full);
     next.startedAt = stamp;
     next.dropped = false;
   }

@@ -506,6 +506,10 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-body { padding: 4px 16px 16px; border-top: 1px solid #dde7ef; }
 .sw-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .sw-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Joe 10/28 (gz): Case Unloading's boxes about a third as wide, with Unloaded By on the same line; the name shows by the status. */
+.sw-fields.unl { grid-template-columns: repeat(4, minmax(120px, 170px)) minmax(220px, 340px); }
+.sw-who { display: inline-block; padding: 6px 10px; border-radius: 8px; background: #e8f1fb; color: #0b2f55; font-size: 18px; font-weight: 800; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-full { display: inline-block; max-width: 330px; padding: 10px 12px; border-radius: 8px; background: #fff7e8; color: #7a3e00; font-size: 17px; font-weight: 800; }
 .sw-field { display: block; }
 .sw-field span { display: block; color: #4a5b6c; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .sw-field input, .sw-field textarea, .sw-field select { box-sizing: border-box; width: 100%; margin-top: 5px; min-height: 52px; border: 1px solid #b7cadb; border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 21px; font-weight: 700; color: #0b2f55; background: #fff; }
@@ -544,6 +548,8 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-cols, .sw-head { grid-template-columns: 70px minmax(0, 1fr) 100px 100px 150px 300px 24px; gap: 8px; }
   .sw-cols span:nth-child(5), .sw-cols span:last-child { grid-column: auto; }
   .sw-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sw-fields.unl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sw-fields.unl .who { grid-column: 1 / span 2; }
 }
 /* A tablet up to 1024 wide (Joe 10/12 photo, about 800 wide): the one-line columns ran the run name into the truck, so the
    card puts route, run, truck and trailer on one line and the status and big buttons under it. */
@@ -564,6 +570,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
   .sw-band { flex-wrap: wrap; font-size: 17px; }
   .sw-band i { margin-left: 0; }
   .sw-fields, .sw-fields.two, .sw-puform, .sw-add, .sw-add.ret { grid-template-columns: 1fr; }
+  .sw-fields.unl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sw-list { padding: 8px; }
   .sw-step { flex-wrap: wrap; }
 }

@@ -23,6 +23,7 @@ const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
 const localCalls = require('./local-calls.cjs');
+const R = require('../../src/plant-rules');
 
 const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -174,6 +175,31 @@ async function openPage(browser, width, height, url, touch) {
     assert.deepEqual(st.errors, []);
     results.push('Plant Station Case Loadout: T-778 red, T-993 green');
     await st.close();
+    // Joe 10/28 (gz): the open card's boxes are narrow, on one line with Unloaded By (picked or typed); the name shows by the
+    // status; two trailers can be unloading, and while two are the other cards say so in place of Start Unloading.
+    const cu = await openPage(browser, 1536, 790, '/plant-station.html?' + MANAGER + '&station=CASE_UNLOADING', true);
+    await cu.click('[data-part="unload"]');
+    await cu.waitForSelector('#work .sw-card.run .sw-fields.unl', { timeout: 15000 });
+    const row = await cu.$eval('#work .sw-card.run .sw-fields.unl', f => [...f.querySelectorAll('.sw-field')].map(l => { const b = l.getBoundingClientRect(); return { label: l.querySelector('span').textContent, top: Math.round(b.top), width: Math.round(b.width), list: (l.querySelector('input') || {}).getAttribute('list') }; }));
+    assert.deepEqual(row.map(x => x.label), ['Cases out', 'Cases returned', 'Lost', 'Trailer', 'Unloaded by']);
+    assert.ok(row.every(x => x.top === row[0].top), 'all five boxes on one line ' + JSON.stringify(row));
+    assert.ok(row.slice(0, 4).every(x => x.width <= 180), 'the four boxes are narrow ' + JSON.stringify(row));
+    assert.equal(row[4].list, 'sw-people', 'Unloaded By suggests the plant people');
+    const who = '#work .sw-card.run [data-k="unloadedBy"]';
+    await cu.fill(who, 'Riley Moss');
+    await cu.press(who, 'Enter');
+    await cu.waitForFunction(() => (document.querySelector('#work .sw-card.run .sw-state .sw-who') || {}).textContent === 'Riley Moss', null, { timeout: 8000 });
+    await cu.click('#work .sw-card[data-sw$="|953|UT DSD MILK"] .sw-quick [data-act="ustart"], #work .sw-card .sw-quick [data-act="ustart"]');
+    await cu.waitForFunction(() => document.querySelectorAll('#work .sw-card.run').length === 2, null, { timeout: 8000 });
+    await cu.waitForSelector('#work .sw-quick .sw-full');
+    const waiting = await cu.$$eval('#work .sw-card:not(.run):not(.done):not(.road)', cs => cs.map(c => ({ start: !!c.querySelector('.sw-quick [data-act="ustart"]'), full: (c.querySelector('.sw-full') || {}).textContent || '' })).filter(c => c.start || c.full));
+    assert.ok(waiting.length >= 1 && waiting.every(c => !c.start && c.full === '2 unloading now. Finish one first.'), 'two unloading: no Start Unloading on the others ' + JSON.stringify(waiting));
+    const savedNow = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-08').get()).docs.map(x => x.data()), '2026-10-08');
+    assert.ok(Object.values(savedNow).some(u => u.unloadedBy === 'Riley Moss' && u.status === 'UNLOADING'), 'Unloaded By saved');
+    if (SHOTS) await cu.screenshot({ path: path.join(SHOTS, 'after-two-unloading-1536.png') });
+    assert.deepEqual(cu.errors, []);
+    results.push('Case Unloading tablet: narrow boxes and Unloaded By on one line; Riley Moss typed shows by UNLOADING; a second Start makes 2 unloading and the rest say "2 unloading now. Finish one first."');
+    await cu.close();
     await o.close();
   } finally {
     await browser.close();

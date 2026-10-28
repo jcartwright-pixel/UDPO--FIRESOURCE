@@ -403,7 +403,7 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
       // Joe 10/27 (hg): Cases Out from the loadout and the empty cases the driver said at check-in, beside Cases Returned.
       casesOut: num(d.casesOut), driverSaid: num(d.driverCaseReturn),
       trailerTyped: u.trailer !== undefined && u.trailer !== '', dropped: !!u.dropped, dropAndHook, name: dropAndHook ? dropHookName(Object.assign({}, m, run, { streamId: run.streamId || m.streamId })) : '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn),
-      startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
+      startedAt: u.startedAt || '', completedAt: u.completedAt || '', notes: u.notes || '', unloadedBy: u.unloadedBy || '', status: u.status || 'WAITING', returns: mine, pendingReturns: mine.filter(x => x.pending),
       washed: !!(wash && (!u.completedAt || U.when(wash.completedAt) >= U.when(u.completedAt))), checkedIn: !!d.checkinCompletedAt, checkinAt: d.checkinCompletedAt || '', nextLoad: null, nextRank: 999999 });
   });
   // Joe 10/27 (hd): a trailer added by hand (+ Add a Trailer) to unload or only to wash. A wash-only trailer is done once washed.
@@ -414,7 +414,7 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
     const washed = !!(wash && U.when(wash.completedAt) >= U.when(washOnly || !u.completedAt ? u.addedAt : u.completedAt));
     rows.push({ id: k, key: k, runDocId: '', day: '', route: u.route, run: u.run, runId: '', area: u.area || 'CASE', driver: '', truck: '', trailer, casesOut: '', driverSaid: '',
       trailerTyped: true, dropAndHook: false, name: '', casesIn: u.casesIn === undefined || u.casesIn === null ? '' : String(u.casesIn), startedAt: u.startedAt || '', completedAt: u.completedAt || '',
-      notes: u.notes || '', status: washOnly ? (washed ? 'COMPLETE' : 'WAITING') : u.status || 'WAITING', returns: [], pendingReturns: [], washed, checkedIn: false, checkinAt: '',
+      notes: u.notes || '', unloadedBy: u.unloadedBy || '', status: washOnly ? (washed ? 'COMPLETE' : 'WAITING') : u.status || 'WAITING', returns: [], pendingReturns: [], washed, checkedIn: false, checkinAt: '',
       nextLoad: null, nextRank: 999999, added: u.added, washOnly, forRoute: u.forRoute || '', addedAt: u.addedAt || '' });
   });
   nextLoads(rows, loads);
@@ -481,7 +481,7 @@ export function neededUnloads(runs, date, journal, routes, rows, loads) {
     if (!unit || l.state === 'DONE' || have[unit] || today[key]) return;
     have[unit] = true;
     out.push({ id: key, key, runDocId: '', day: '', route: ADDED_ROUTE, run: unit, runId: '', area: l.area || 'CASE', driver: '', truck: '', trailer: txt(l.trailer),
-      casesOut: '', driverSaid: '', trailerTyped: true, dropped: false, dropAndHook: false, name: '', casesIn: '', startedAt: '', completedAt: '', notes: '', status: 'WAITING',
+      casesOut: '', driverSaid: '', trailerTyped: true, dropped: false, dropAndHook: false, name: '', casesIn: '', startedAt: '', completedAt: '', notes: '', unloadedBy: '', status: 'WAITING',
       returns: [], pendingReturns: [], washed: false, checkedIn: false, checkinAt: '', date, needed: true, forRoute: txt(l.run) || txt(l.route),
       nextLoad: { route: l.route, run: l.run, time: timeOfDay(l.dispatchTime), depart: departWall(l) }, nextRank: i });
   });

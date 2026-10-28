@@ -555,9 +555,9 @@ screens: unloading.html
 Trucks back from the route: each load's trailer, the empty cases that went out and came back, RTA (returned to the plant) and whether the trailer was washed.
 
 1. Press `Check Off` to work the list (`View Only` just looks).
-2. On a load press `Start`, type the **Cases Returned** count, then `End`. One unload at a time.
+2. On a load press `Start`, type the **Cases Returned** count, then `End`. Up to two trailers can be unloading at the same time.
 3. Mark `RTA` for returns and `Wash` if the trailer needs washing.
-4. `Edit` fixes the Cases Returned count, the Trailer Back and Notes.
+4. `Edit` fixes the Cases Returned count, the Trailer Back, **Unloaded By** and Notes.
 5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
 - **The order:** the trailer being unloaded is at the top. Then every trailer you load today, in the order Case Loadout loads them, whether it is here or still on the road. Then the rest that came back and still need unloading: yesterday's and added ones, then the ones here, then the ones on the road.
@@ -567,16 +567,18 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 - A **Wash only** trailer has a `Wash` button and no `Start`. It is done once washed.
 - An added trailer, one from yesterday that was in fact unloaded, or one of today's loadout trailers that is already empty can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
 - On the plant tablet the box **A trailer that is not on the list** does the same: type the trailer, then `UNLOAD IT` or `WASH ONLY`.
+- **Unloaded By** is who is unloading the trailer. Pick a name from the list or type it if it is not there yet. The name shows under the trailer's status, here and on the plant tablet.
+- **Two at a time:** two people can each unload a trailer at once. While two are unloading, a third `Start` says to finish one first.
 - **Cases Out** comes from the loadout and **Driver Said** is what the driver typed at check-in. You don't type either one.
 - **Lost** is Cases Out minus Cases Returned, in red. The box on the right adds up the day.
-- On the plant tablet the open card shows Cases out, Cases returned and Lost the same way.
+- On the plant tablet the open card shows Cases out, Cases returned, Lost, Trailer and **Unloaded by** on one line. While two are unloading, the other cards say **2 unloading now. Finish one first.** where `START UNLOADING` was.
 - **Return day** (top right) with the arrows picks the day.
 - On a phone or small tablet each load is a card with every box named.
 - A drop-and-hook load (ticked **Drop and Hook** in the Route Editor) shows its name, like **Ferry Product 1**, **Lancaster Transfer** or **Fairmont Transfer**, where the trailer number would be, here and on the plant tablets.
 
 > To make a load show by name, open the Route Editor and tick **Drop and Hook** on that run.
 
-!> Do not start a second unload before ending the first one.
+!> Do not start a trailer for someone who is not unloading it. Each person unloads one trailer at a time, and no more than two trailers at once.
 
 !> Do not use `+ Add a Trailer` for a load that is already on the list. Find it and press `Start`.
 
