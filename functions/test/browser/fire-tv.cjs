@@ -106,12 +106,14 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await page.waitForSelector('#turn-live:not([hidden])');
     // Joe 10/28: FOX starts another live video: the TV changes to it. A video YouTube won't let other sites show: local weather.
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02' }) });
-    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="youtube.com/embed/FoxWxLive02?"]');
+    await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive02?"]', { state: 'attached' });
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02', embed: false }) });
+    await page.waitForFunction(() => !document.getElementById('live-frame') && document.getElementById('turn-live').hidden);
+    // The box may have moved on to the Scorecard turn by itself (30 seconds); its weather turn is the local weather.
+    await page.evaluate(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); });
     await page.waitForSelector('#turn-weather:not([hidden]) .now');
-    assert.equal(await page.$('#live-frame'), null);
     await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
-    await page.waitForSelector('#turn-live:not([hidden]) iframe[src*="youtube.com/embed/FoxWxLive01?"]');
+    await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive01?"]', { state: 'attached' });
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
 
