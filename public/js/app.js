@@ -1201,6 +1201,10 @@ export function serverText(e, what) {
 export async function allowedSaves(actions) {
   try { return (await callServer('save', { checkSaves: actions })).allowed || {}; } catch (e) { return {}; }
 }
+// Joe 10/28 (gz): the plant's people's names (First Last), for Case Unloading's "Unloaded By"; [] when they cannot be read.
+export async function plantNames() {
+  try { return (await callServer('save', { plantNames: true })).names || []; } catch (e) { return []; }
+}
 
 // Review item 69 (Joe 10/13): a call that failed with no clear answer (timed out, no connection, a server error) may still
 // have saved. Trying the same thing again reuses that try's requestId, so the server saves it once (a retry after a time-out

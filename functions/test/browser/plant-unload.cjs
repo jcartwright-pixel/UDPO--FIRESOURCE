@@ -103,9 +103,17 @@ async function shots(page, name, w) {
     const dock = await openPage(browser, 1920, 950, '/unloading.html?date=' + DATE + WORKER);
     await watcher.waitForSelector(row('805'));
     await dock.waitForSelector(row('811') + ' button.clock');
+    // Joe 10/28 (gz): two can be unloading at once (805 and 811), never a third.
     await dock.click(row('811') + ' button.clock');
-    await dock.waitForFunction(() => /Stop unloading 805/.test(document.getElementById('error').textContent));
-    results.push('Start on 811 while 805 is unloading: "Stop unloading 805 · UT DSD MILK before starting another."');
+    await dock.waitForSelector(row('811') + '.loading', { timeout: 8000 });
+    await watcher.waitForSelector(row('811') + '.loading', { timeout: 8000 });
+    await dock.waitForSelector(row('812') + ' button.clock');
+    await dock.click(row('812') + ' button.clock');
+    await dock.waitForFunction(() => /Two trailers are unloading now .*Finish one before starting another/.test(document.getElementById('error').textContent));
+    await new Promise(r => setTimeout(r, 1500));
+    assert.equal(await dock.$(row('812') + '.loading'), null, 'a third trailer does not start');
+    assert.match(await dock.textContent('#foot'), /Up to two unloads at a time/);
+    results.push('Start on 811 while 805 is unloading: both unloading; Start on 812 then: "Two trailers are unloading now (...). Finish one before starting another."');
     await dock.click(row('805') + ' button.clock.end');
     await dock.waitForFunction(() => /Enter the quantity before ending/.test(document.getElementById('error').textContent));
     await dock.fill(row('805') + ' input[data-f="casesIn"]', '25');
@@ -116,15 +124,7 @@ async function shots(page, name, w) {
       throw e;
     });
     results.push('805: 25 cases typed, End pressed; it left the other screen\'s Needs Unloading list in ' + (Date.now() - t0) + ' ms');
-    // The End is two saves (the count, then the end); Start 811 only once this screen too has 805 off its list, or the
-    // one-at-a-time rule rightly refuses it. Then this screen shows 811 unloading at once and the other screen follows.
     await dock.waitForFunction(k => !document.querySelector('tr[data-key="' + k + '"]'), DATE + '|805|UT DSD MILK', { timeout: 8000 });
-    await dock.click(row('811') + ' button.clock');
-    await dock.waitForSelector(row('811') + '.loading', { timeout: 8000 });
-    await watcher.waitForSelector(row('811') + '.loading', { timeout: 8000 }).catch(async e => {
-      console.error('DEBUG3', await dock.textContent('#error'), await dock.innerHTML(row('811')).catch(() => 'gone'), await watcher.innerHTML(row('811')).catch(() => 'gone'));
-      throw e;
-    });
 
     // Edit: trailer back typed as 977 is stored as T-977.
     await dock.click(row('811') + ' button.edit-row');
@@ -137,9 +137,13 @@ async function shots(page, name, w) {
       console.error('DEBUG2', await dock.textContent('#error'), await dock.innerHTML(row('811')).catch(() => 'gone'), await watcher.innerHTML(row('811')).catch(() => 'gone'));
       throw e;
     });
+    // Joe 10/28 (gz): Unloaded By, picked or typed; the name shows under the status on every screen.
+    await dock.fill('#rows [data-e="unloadedBy"]', 'Jordan Carter');
+    await dock.press('#rows [data-e="unloadedBy"]', 'Tab');
+    await watcher.waitForFunction(() => (document.querySelector('tr[data-key$="|811|UT DSD MILK"] small.who') || {}).textContent === 'Jordan Carter', null, { timeout: 8000 });
     await dock.click('#rows [data-do="editclose"]');
     await dock.waitForFunction(() => !document.querySelector('#rows tr.editrow'));
-    results.push('811 trailer back typed 977 and the box left (no Save button): the other screen shows T-977');
+    results.push('811 trailer back typed 977 and Unloaded By Jordan Carter, each box left (no Save button): the other screen shows T-977 and Jordan Carter');
 
     // RTA on 811 (the driver's check-in return); the banner drops to the one left (805, now on All Loads).
     await dock.click(row('811') + ' button.rta');

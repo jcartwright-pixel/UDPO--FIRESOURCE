@@ -20,9 +20,12 @@ const journal = async () => (await db().collection('plantJournal').where('date',
 
 test.beforeEach(async () => { await clear(); await copy(); });
 
-test('Unloading: one at a time, End needs the count, the count goes on the Live week, a typed trailer is T-', async () => {
+// Joe 10/28 (gz): two trailers can be unloading at once (two people working), never a third; who is unloading is saved.
+test('Unloading: two at a time, who is unloading, End needs the count, the count goes on the Live week, a typed trailer is T-', async () => {
   const r811 = '2026-10-04__run_p811';
-  await assert.rejects(unload('811', 'UT DSD MILK', { start: true }), /Stop unloading 805 · UT DSD MILK before starting another/);
+  assert.equal((await unload('811', 'UT DSD MILK', { start: true }, { runDocId: r811, day: 'thu' })).status, 'UNLOADING');
+  await unload('811', 'UT DSD MILK', { unloadedBy: '  Jordan   Carter ' }, { runDocId: r811, day: 'thu' });
+  await assert.rejects(unload('812', 'UT DSD MILK', { start: true }), /^.*Two trailers are unloading now \((?=.*805 UT DSD MILK)(?=.*811 UT DSD MILK).*\)\. Finish one before starting another\.$/);
   await assert.rejects(unload('805', 'UT DSD MILK', { end: true }), /Enter the quantity before ending/);
   const counted = await unload('805', 'UT DSD MILK', { casesIn: '25' }, { runDocId: '2026-10-04__run_p805', day: 'thu' });
   assert.equal(counted.status, 'UNLOADING');
@@ -35,6 +38,8 @@ test('Unloading: one at a time, End needs the count, the count goes on the Live 
   assert.equal(now[DATE + '|805|UT DSD MILK'].status, 'COMPLETE');
   assert.equal(now[DATE + '|811|UT DSD MILK'].trailer, 'T-977');
   assert.equal(now[DATE + '|811|UT DSD MILK'].status, 'UNLOADING');
+  assert.equal(now[DATE + '|811|UT DSD MILK'].unloadedBy, 'Jordan Carter');
+  assert.equal(now[DATE + '|812|UT DSD MILK'], undefined, 'the third start saved nothing');
   // The next copy from the sheets keeps what the app saved.
   await copy();
   assert.equal(R.latestUnloads(await journal(), DATE)[DATE + '|811|UT DSD MILK'].trailer, 'T-977');
@@ -435,4 +440,13 @@ test('Loading Rundown: the tablet and the desk are told apart, a changed time is
   await copy();
   const kept = (await db().collection('runs').doc(w.runDocId).get()).data().days[w.day];
   assert.deepEqual([kept.startMark.via, kept.endMark.station, kept.timeEdits.length], ['DESK', 'Case Loadout 2', 2]);
+});
+
+// Joe 10/28 (gz): Unloaded By suggests the plant's people: names only (First Last), not Plant Maintenance's mechanics or a
+// line taken off, and no ID or phone.
+test('Unloaded By: the plant people names list', async () => {
+  const people = [['p1', 'plant', 'CARTER, JORDAN', 'ACTIVE'], ['p2', 'plant', 'Riley Moss', ''], ['p3', 'maint', 'BAKER, SAM', 'ACTIVE'], ['p4', 'plant', 'GONE, OLD', 'RETIRED'], ['p5', 'plant', 'CARTER, JORDAN', 'ACTIVE']];
+  for (const [id, team, name, status] of people) await db().collection('crewPeople').doc(id).set({ facilityId: 'fac_uniontown', team, name, status, employeeId: '9001', phone: '555-0100' });
+  await db().collection('crewPeople').doc('other').set({ facilityId: 'fac_charleston', team: 'plant', name: 'ELSE, SOMEONE', status: 'ACTIVE' });
+  assert.deepEqual(await require('../../src/crew').plantNames(db(), 'fac_uniontown'), ['Jordan Carter', 'Riley Moss']);
 });

@@ -153,6 +153,8 @@
 .plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
 .plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 16px; font-weight: 800; border: 1px solid var(--line); background: var(--pill-gray-bg); color: #516273; }
 .plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+/* Joe 10/28 (gz): who is unloading, under the status on Unloading. */
+.plant-page table.unload small.who { display: block; margin-top: 4px; font-size: 16px; font-weight: 800; color: #0b2f55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
 .plant-page .pill.washp { background: #e0f4f9; color: #006b86; border-color: #9fd6e4; }

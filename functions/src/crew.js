@@ -241,4 +241,18 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode, SaveError) 
   return result;
 }
 
-module.exports = { validateSetup, saveSetup, validateDay, saveDay, validateVacation, saveVacation };
+// Joe 10/28 (gz): Case Unloading's "Unloaded By" suggests the plant's people (names only; no ID or phone leaves the server).
+// The list is written LAST, FIRST; the tablet shows First Last. Plant Maintenance's mechanics and lines taken off are left out.
+const nice = (w) => (w === w.toUpperCase() ? w.toLowerCase().replace(/(^|[\s'-])\S/g, c => c.toUpperCase()) : w);
+function shownName(name) {
+  const t = text(name).replace(/\s+/g, ' ');
+  const m = /^([^,]+),\s*(.+)$/.exec(t);
+  return nice(m ? m[2] + ' ' + m[1] : t);
+}
+async function plantNames(db, facilityId) {
+  const people = (await db.collection('crewPeople').where('facilityId', '==', facilityId).get()).docs.map(d => d.data());
+  const names = people.filter(p => p.team !== 'maint' && text(p.status).toUpperCase() !== 'RETIRED' && text(p.name)).map(p => shownName(p.name).slice(0, 60));
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+}
+
+module.exports = { validateSetup, saveSetup, validateDay, saveDay, validateVacation, saveVacation, plantNames, shownName };
