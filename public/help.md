@@ -392,7 +392,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 
 - What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
 - A leased truck's write-up comes only when the office sends it to the garage.
-- A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
+- Each work order says how many times the unit was written up and the day of the first one ("Written up 2 times · first 10-16-26"). A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
 - A service that is due has its checklist on the work order. Tap `OK`, `Needs work` or `N/A` on every line before `Complete`. The **Needs work** lines are kept on the work order.
 - Left alone for 10 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
 - With no signal the station keeps working and sends everything when the signal is back.

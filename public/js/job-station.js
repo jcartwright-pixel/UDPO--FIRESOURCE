@@ -43,7 +43,7 @@ function simpleJob() {
         <section id="view-job" class="gs-stack gs-simple" hidden>
           <div class="gs-bar"><button type="button" class="gs-btn gs-back" data-go="jobs">&larr; Back</button><h2 id="job-unit"></h2></div>
           <div class="gs-scroll">
-            <div class="gs-card"><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-label" id="job-more"></div><div class="gs-now" id="job-now"></div></div>
+            <div class="gs-card"><div class="gs-written" id="job-written"></div><div class="gs-label" id="job-label"></div><div class="gs-problem" id="job-problem"></div><div class="gs-label" id="job-more"></div><div class="gs-now" id="job-now"></div></div>
             <div class="gs-card gs-crew"><div class="gs-label">Working on it now</div><div id="crew"></div><div class="gs-label" id="crew-done"></div></div>
             <div class="gs-card gs-notes">
               <div class="gs-nl"><label for="job-did">Notes / what I did today</label>${MIC('job-did')}</div>
@@ -203,6 +203,7 @@ export function mountJobStation(cfg) {
     if ($('strip')) drawStrip();
     $('jobs').innerHTML = list.map((j, i) => {
       const subs = ['<small>' + escapeHtml(cfg.jobLine(j)) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + '</small>'];
+      if (cfg.written && cfg.written(j)) subs.unshift('<small class="gs-written">' + escapeHtml(cfg.written(j)) + '</small>');
       if (j.more && j.more.length) subs.push('<small>Also written: ' + escapeHtml(j.more.join(' · ')) + '</small>');
       if (j.onNow.length) subs.push('<small class="green">On it now: ' + escapeHtml(names(j.onNow.map(p => first(p.name) + ' ' + clock(p.since)))) + '</small>');
       else if (j.status === 'WORKING') subs.push('<small>Started · nobody on it now</small>');
@@ -247,6 +248,7 @@ export function mountJobStation(cfg) {
     $('job-unit').textContent = cfg.jobHead(j);
     $('job-label').textContent = cfg.jobLabel(j) + (j.createdAt ? ' · ' + age(j.createdAt) : '') + (j.canRun ? '' : ' · ' + cfg.downWord);
     $('job-problem').textContent = cfg.problem(j);
+    $('job-written').textContent = cfg.written ? cfg.written(j) : '';
     $('job-more').textContent = j.more && j.more.length ? 'Also written: ' + j.more.join(' · ') : '';
     $('job-now').textContent = j.status === 'PARTS' ? 'Waiting on parts' + (j.partsNeeded ? ': ' + j.partsNeeded : '') : '';
     $('crew').innerHTML = j.onNow.map(p => '<div class="gs-clock"><i>' + escapeHtml(p.name.slice(0, 1)) + '</i><b>' + escapeHtml(p.name) + '</b><span class="t">' + clock(p.since) + '</span></div>').join('') ||

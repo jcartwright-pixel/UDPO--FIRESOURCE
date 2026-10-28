@@ -61,7 +61,7 @@
   </div>
 
   <script type="module">
-    import { start, escapeHtml, requireSignIn, currentPlant, lockDevice, STATION_DEVICE } from './js/app.js';
+    import { start, escapeHtml, requireSignIn, currentPlant, lockDevice, STATION_DEVICE, shortDate } from './js/app.js';
     import { startOffline, offlineCall, isNoConnection, onWaitingChange } from './js/offline-saves.js';
     import { httpsCallable } from './js/firebase.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
@@ -147,11 +147,17 @@
       },
       onBoard: (r) => { board = r.jobs || []; drawCards(); },
       jobKey: (j) => j.id || j.writeUp,
-      jobLine: (j) => (TYPE[j.type] || 'Truck') + ' · ' + (j.more && j.more.length ? (j.more.length + 1) + ' write-ups' : (j.from || '')),
+      jobLine: (j) => (TYPE[j.type] || 'Truck') + ' · ' + (j.from || ''),
       problem: (j) => j.problem || j.category,
+      // Joe 10/28: the day it was first written up and how many times, plain to see on the list and the work order.
+      written: (j) => {
+        const n = 1 + (j.more || []).length, day = j.createdAt ? shortDate(j.createdAt) : '';
+        if (j.source === 'WRITE_UP') return 'Written up ' + n + (n === 1 ? ' time' : ' times') + (day ? ' · first ' + day : '');
+        return day ? 'Opened ' + day : '';
+      },
       jobHead: (j) => j.unit + ' · ' + (TYPE[j.type] || 'Truck'),
       jobLabel: (j) => j.source === 'SERVICE' ? 'Service due (Fleet Service)' : j.source === 'OFFICE' ? 'Sent by the office' : j.source === 'TECH' ? 'Reported at the garage' :
-        j.more && j.more.length ? (j.more.length + 1) + ' write-ups' : 'From ' + (j.from || 'a write-up'),
+        'From ' + (j.from || 'a write-up'),
       // Joe 10/13: with no signal the name and login ID go with each step kept on the tablet and are checked when it is sent.
       signIn: async (picked, typed) => {
         try { return Object.assign(await call('signIn', { techId: picked.id, loginId: typed, tokens: [] }), { loginId: typed }); }

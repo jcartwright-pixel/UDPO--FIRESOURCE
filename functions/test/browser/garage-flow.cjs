@@ -94,17 +94,20 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
     assert.match(await gs.textContent('#jobs-title'), /^Trucks · 2 open$/);
     assert.equal(await gs.$$eval('.gs-job', r => r.filter(x => /900001/.test(x.textContent)).length), 1, '900001 is one line');
     assert.match(await gs.textContent('.gs-job:has-text("900001")'), /Also written: Brake light out on the right side/);
+    // Joe 10/28: the day it was first written up and how many times.
+    assert.match(await gs.textContent('.gs-job:has-text("900001") .gs-written'), /^Written up 2 times · first \d{1,2}-\d{1,2}-\d\d$/);
     await shot(gs, '2-trucks-list-tablet-1280.png');
     await gs.click('#to-home');
     await gs.waitForSelector('#view-home:not([hidden])');
     await gs.click('[data-type="TRUCK"]');
-    results.push('Trucks: 900001 shows once with its two write-ups; the PM that is due is on the list; "All work orders" goes back to the cards');
+    results.push('Trucks: 900001 shows once with its two write-ups ("Written up 2 times", first day); the PM that is due is on the list; "All work orders" goes back to the cards');
 
     // 3. Open 900001: big Back, four buttons; Start Work with name + login ID (Tom's clock moves from PJ-7), John joins.
     await gs.click('.gs-job:has-text("900001") button');
     await gs.waitForSelector('#view-job:not([hidden])');
     assert.deepEqual(await gs.$$eval('#view-job .gs-four .gs-btn', b => b.filter(x => !x.hidden).map(x => x.textContent)), ['Start Work', 'Pause', 'Waiting on Parts', 'Complete']);
     assert.equal(await gs.isVisible('#view-job .gs-back'), true);
+    assert.match(await gs.textContent('#job-written'), /^Written up 2 times · first \d{1,2}-\d{1,2}-\d\d$/);
     await gs.click('#job-start');
     await login(gs, 'TECH-JT', '48213');
     await msg(gs, /Stopped Tom's clock on PJ-7/);
@@ -115,6 +118,7 @@ const order = async (unit) => (await db().collection('workOrders').where('unit',
     assert.deepEqual(await gs.$$eval('#crew .gs-clock b', b => b.map(x => x.textContent)), ['JELLICK Tom', 'MYERS John']);
     const wo = await order('900001');
     assert.deepEqual(wo.also_ids, ['TRK-9'], 'one work order for both write-ups');
+    assert.match(await gs.textContent('#job-written'), /^Written up 2 times · first /, 'the started work order keeps the count and first day');
     results.push('A work order: big Back, Start Work / Pause / Waiting on Parts / Complete; Tom starts (his clock leaves PJ-7), John joins with his own clock');
 
     // 4. Notes typed while working go with Pause under the mechanic's name.

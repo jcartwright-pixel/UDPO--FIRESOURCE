@@ -118,6 +118,9 @@
 .gs-bigcard small.red { color: #b42318; } .gs-bigcard small.green { color: #1c7c4a; }
 .gs-btn.gs-back { background: #f2b705; color: #1b2a3a; font-size: 26px; min-height: 64px; padding: 0 24px; flex: none; }
 .gs-btn.amber { background: #c2410c; }
+/* Joe 10/28: when it was first written up and how many times. */
+.gs-written { font-size: 20px; font-weight: 800; color: #0b4f86; }
+.gs-job .what small.gs-written { color: #0b4f86; font-weight: 800; }
 .gs-simple#view-job, .gs-simple#view-fix { overflow: hidden; }
 .gs-simple#view-job > .gs-scroll, .gs-simple#view-fix > .gs-scroll { flex: 1 1 auto; min-height: 0; }
 .gs-simple#view-job > :not(.gs-scroll) { flex: none; }
