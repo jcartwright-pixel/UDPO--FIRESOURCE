@@ -79,7 +79,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer, tvCodeSignIn, signOutHere, lockDevice, STATION_DEVICE } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goBack, callServer, tvCodeSignIn, signOutHere, lockDevice, STATION_DEVICE, appVersion } from './js/app.js';
     import { startOffline } from './js/offline-saves.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as W from './js/weather.js';
@@ -357,6 +357,14 @@
     if (full) {
       window.addEventListener('online', () => { if (!liveSinceLoad) setTimeout(() => location.reload(), 5000); });
       setInterval(() => { if (navigator.onLine && L.operatingDay(new Date()) !== loadedDay) location.reload(); }, 60000);
+      // Joe 10/28 (the TV still showed the old board after a release): nobody is there to press the Update ready banner's
+      // Refresh and nothing is typed on the TV, so a new version published reloads the board by itself (checked every 3 minutes).
+      const newVersion = async () => {
+        const first = await appVersion(), now = await fetch('version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+        if (first && first.commit && now && now.commit && now.commit !== first.commit) location.reload();
+      };
+      setInterval(newVersion, 180000);
+      window.udTvVersionCheck = newVersion;
     }
     startOffline(['driver-station.html'], { scopes: ['driver-station'], device: 'tablet', files: [] });
     requireSignIn(async (user) => {
