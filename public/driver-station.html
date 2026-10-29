@@ -303,7 +303,7 @@
       if (player && (liveOk || liveTrying) && player.playVideo) { try { live ? player.playVideo() : player.pauseVideo(); } catch (e) { /* the player came and went */ } }
       if (score) document.getElementById('sc-scroll').scrollTop = 0;
     }
-    function nextTurn() { clearTimeout(turnTimer); turn = turn === 'weather' ? 'score' : 'weather'; showTurn(); turnTimer = setTimeout(nextTurn, TURN); }
+    function nextTurn() { clearTimeout(turnTimer); turn = SCORE_TURNS && turn === 'weather' ? 'score' : 'weather'; showTurn(); turnTimer = setTimeout(nextTurn, TURN); }
     window.udTurn = nextTurn;
     function drawScores() {
       const k = scores || {}, areas = (k.areas || []);
@@ -313,6 +313,9 @@
         '<td class="ov"><span class="g g-' + escapeHtml(r.grade) + '">' + escapeHtml(String(r.score)) + ' ' + escapeHtml(r.grade) + '</span></td></tr>').join('');
       showTurn();
     }
+    // Joe 10/29 ("take the driver scorecard off of there for now ... just keep the weather up in that panel"): the Scorecard
+    // turn is off until he makes it look better; the box shows only the weather. Set SCORE_TURNS back to true to bring it back.
+    const SCORE_TURNS = false;
     // A list longer than the box rolls slowly during the turn.
     setInterval(() => { const el = document.getElementById('sc-scroll'); if (turn !== 'score' || el.scrollHeight <= el.clientHeight + 2) return; if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) el.scrollTop += 1; }, 60);
     function startTurns(db) {

@@ -93,20 +93,13 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await shot(page, 'fire-tv-2-board-1920.png');
     await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], live: LIVE, at: new Date().toISOString(),
       rows: [{ rank: 1, driver: 'PRICE, LEE', score: 98, grade: 'A' }, { rank: 2, driver: 'MILLER, DANA', score: 84, grade: 'B' }] });
+    // Joe 10/29: the Scorecard is off the TV for now; with scores ready the box still shows only the weather.
+    await page.waitForFunction(() => document.querySelectorAll('#sc-rows tr').length === 2);
     await page.evaluate(() => window.udTurn());
-    await page.waitForSelector('#turn-score:not([hidden]) #sc-rows tr');
-    assert.deepEqual(await page.$$eval('#sc-rows tr', t => t.map(r => r.textContent)), ['1PRICE, LEE98 A', '2MILLER, DANA84 B']);
-    assert.match(await page.textContent('#sc-label'), /Oct 26 · through 10-26-26/);
-    assert.equal(await page.isVisible('#turn-live'), false);
-    assert.ok(await page.evaluate(() => window.udLivePaused > 0), 'the live picture pauses during the Scorecard turn');
-    await shot(page, 'fire-tv-2b-scorecard-turn-1920.png');
-    // Joe 10/28: two-digit ranks were cut off; every rank shows whole.
-    await db().collection('scorecard').doc('kiosk').set({ label: 'Oct 26', through: '2026-10-26', areas: [], live: LIVE, at: new Date().toISOString(),
-      rows: Array.from({ length: 14 }, (x, i) => ({ rank: i + 1, driver: 'DRIVER ' + (i + 1) + ', LONGNAME', score: 99 - i, grade: 'A' })) });
-    await page.waitForFunction(() => document.querySelectorAll('#sc-rows tr').length === 14);
-    assert.deepEqual(await page.$$eval('#sc-rows td.rk', t => t.filter(c => c.scrollWidth > c.clientWidth || c.getBoundingClientRect().width < 50).map(c => c.textContent)), []);
-    assert.equal(await page.$$eval('#sc-rows td.rk', t => t.map(c => c.textContent).join(',')), '1,2,3,4,5,6,7,8,9,10,11,12,13,14');
-    await shot(page, 'fire-tv-2c-scorecard-ranks-1920.png');
+    await page.waitForTimeout(500);
+    assert.equal(await page.isVisible('#turn-score'), false, 'no Scorecard turn on the TV');
+    assert.equal(await page.isVisible('#turn-live'), true, 'the weather stays in the box');
+    await shot(page, 'fire-tv-2b-weather-only-1920.png');
     await page.evaluate(() => window.udTurn());
     await page.waitForSelector('#turn-live:not([hidden])');
     // Joe 10/28: FOX starts another live video: the TV changes to it. A video YouTube won't let other sites show: FOX
@@ -147,7 +140,7 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     // Joe 10/29 (6.71): the video starts in view, in the live box, during the weather turn (YouTube won't start a hidden one).
     await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); return !document.getElementById('turn-live').hidden; });
     await page.waitForFunction(() => document.getElementById('live-note').hidden);
-    results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
+    results.push('TV: weather in the top bar; the right-hand box shows only the live weather (the Scorecard turn is off for now)');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
 
     // Joe 10/23 (LG TV): a silent video plays behind the board so the TV's screen saver stays away.
