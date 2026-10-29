@@ -37,4 +37,6 @@ window.onYouTubeIframeAPIReady = ready;
     await ctx.close();
   }
   await browser.close();
+  // Stop the run here so the results are the last lines of the log.
+  process.exit(1);
 })();
