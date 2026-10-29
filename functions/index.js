@@ -341,6 +341,14 @@ exports.stationRelease = onCall({ maxInstances: 3 }, async (request) => {
   try { return await stationRelease(await plantDb(request, user), user, FAILS.withDevice(request, request.data)); } catch (error) { throw asHttps(error); }
 });
 
+// The station's sign-in (a custom token). The server's account signs it through IAM Credentials, so it needs Service Account
+// Token Creator on itself; without it Google refuses and the tablet or TV would only see "INTERNAL" (6.71 practice test).
+async function stationToken(uid, claims) {
+  try { return await admin.auth().createCustomToken(uid, claims); } catch (error) {
+    console.error('stationSignIn: could not make the station sign-in', uid, error);
+    throw new HttpsError('failed-precondition', 'The code is right, but the server could not sign this screen in. Tell an Administrator: the server account is not allowed to sign stations in.');
+  }
+}
 // Open to tablets with no United Dairy account (Joe 10/12, the old app's public Plant Station): a plant station's code, only
 // while that plant's switch is On. The token names the station and its code's version; the database rules and save check
 // both against stationAccess / private/stations each time, so Off, New code and Remove shut the tablet out at once.
@@ -353,8 +361,8 @@ exports.stationSignIn = onCall({ maxInstances: 3 }, async (request) => {
     const r = await STATIONS.signIn(pdb, input);
     if (!r.ok || input.op !== 'enter') return r;
     // The Driver's Kiosk Station TV (Joe 10/16): signed in as that TV station only (database rules: tvStation()).
-    if (input.tv === true) return Object.assign({ token: await admin.auth().createCustomToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name }) }, r);
-    const token = await admin.auth().createCustomToken('station-' + r.station.key, { udStation: r.station.key, udVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name, udType: r.station.type });
+    if (input.tv === true) return Object.assign({ token: await stationToken('tv-' + r.station.key, { udTv: r.station.key, udTvVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name }) }, r);
+    const token = await stationToken('station-' + r.station.key, { udStation: r.station.key, udVersion: r.station.version, udPlant: r.station.facilityId, udName: r.station.name, udType: r.station.type });
     return Object.assign({ token }, r);
   } catch (error) { throw asHttps(error); }
 });
