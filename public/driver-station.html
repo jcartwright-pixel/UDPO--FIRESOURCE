@@ -85,6 +85,7 @@
     import * as W from './js/weather.js';
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
     import { fullScreenOnTap } from './js/full-screen.js';
+    import { keepScreenAwake } from './js/keep-awake.js';
 
     fullScreenOnTap();
 
@@ -418,6 +419,8 @@
       play(); awake.addEventListener('pause', () => setTimeout(play, 1000)); setInterval(play, 30000);
       document.addEventListener('visibilitychange', play);
     }
+    // Joe 10/29: every Driver Room screen keeps the tablet's or TV's screen on (after the TV's own video, which it then uses).
+    keepScreenAwake();
     if (full) {
       window.addEventListener('online', () => { if (!liveSinceLoad) setTimeout(() => location.reload(), 5000); });
       setInterval(() => { if (navigator.onLine && L.operatingDay(new Date()) !== loadedDay) location.reload(); }, 60000);

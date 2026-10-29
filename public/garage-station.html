@@ -68,8 +68,10 @@
     import { resolveStation, askCode, askRelease, remember, lockStation } from './js/station-code.js';
     import { mountJobStation, rid, names, first } from './js/job-station.js';
     import { fullScreenOnTap } from './js/full-screen.js';
+    import { keepScreenAwake } from './js/keep-awake.js';
 
     fullScreenOnTap();
+    keepScreenAwake();
 
     /*
      * The Garage Station: the fleet's work orders (trucks, trailers, fork trucks and pallet jacks). Joe 10/28 (mock-up 1, "set it
