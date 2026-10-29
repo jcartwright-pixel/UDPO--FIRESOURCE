@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Weekly Dispatch · Operations</title>
+  <title>Weekly Dispatch Template · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/weekly.css">
   <style>
@@ -39,7 +39,7 @@
 </head>
 <body data-view="routes" class="fill weekly-page">
   <div class="signin" id="signin" hidden>
-    <h1>Weekly Dispatch</h1>
+    <h1>Weekly Dispatch Template</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -54,9 +54,10 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Weekly Dispatch</h1><small id="published"></small></div>
+      <div class="title"><h1 id="page-name">Weekly Dispatch Template</h1><small id="published"></small></div>
       <div class="actions in-head">
         <a class="button" id="go-daily" href="daily.html">Daily Dispatch</a>
+        <a class="button" id="go-other" href="weekly.html?view=live">Weekly Dispatch</a>
         <button type="button" id="run-days">Route Run Days</button>
         <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
         <button type="button" id="print-week">Print Weekly Dispatch</button>
@@ -137,6 +138,19 @@
     const L = window.UDLogic, R = window.UDPlant;
     const params = new URLSearchParams(location.search);
     const today = L.operatingDay(new Date());
+    // Joe 10/28: this page is two screens. Weekly Dispatch Template (weekly.html) is next week, the one he gets ready and publishes.
+    // Weekly Dispatch (weekly.html?view=live, Daily's Weekly Dispatch button) is the live Current week Daily Dispatch is running:
+    // it always shows that week and its changes save to it, so they show on Daily Dispatch at once (Joe picked "can change", hm).
+    const liveView = params.get('view') === 'live';
+    const testQuery = params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '';
+    if (liveView) {
+      document.title = 'Weekly Dispatch · Operations';
+      document.querySelectorAll('#page-name, #signin h1').forEach(h => { h.textContent = 'Weekly Dispatch'; });
+      ['run-days', 'reset', 'publish', 'prev', 'next'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+      document.getElementById('week-date').disabled = true;
+    }
+    document.getElementById('go-other').textContent = liveView ? 'Weekly Dispatch Template' : 'Weekly Dispatch';
+    document.getElementById('go-other').href = (liveView ? 'weekly.html?' : 'weekly.html?view=live') + (liveView ? testQuery.slice(1) : testQuery);
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
     let rowDrag = null, held = false, who = '';
     // Joe 10/23: the run whose name was clicked (shows "+ Extra this week", or Remove on an extra line), and a Remove waiting for its second click.
@@ -152,7 +166,7 @@
     let unsubscribe = null, unsubscribeWeek = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], plantCtx = null, runs = [], rows = [], popover = null, writeBack = false, override = false, tab = 'routes', avail = null, weekDoc = null;
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
-    let live = {}, routeList = null, unsubscribeRoutes = null, loaded = false;
+    let opened = false, live = {}, routeList = null, unsubscribeRoutes = null, loaded = false;
     const weekKind = () => (!live.previous ? 'live' : week < live.previous ? 'old' : live.next && week > live.next ? 'future' : 'live');
     function previewRuns() {
       if (!routeList) return [];
@@ -493,7 +507,8 @@
       const el = document.getElementById('wk-note');
       const text = noteText || (preview ? 'Future week preloaded from Route Master and Driver Master. Publish the stored Next Week (' + shortDate(live.next) + ') before editing this later week.'
         : kind === 'future' ? 'This week is after the Live Next week (' + shortDate(live.next) + '): view only until that week is published.'
-        : kind === 'old' ? 'This week is older than the Live weeks: view only.' : '');
+        : kind === 'old' ? 'This week is older than the Live weeks: view only.'
+        : liveView ? 'The live week, the one Daily Dispatch is running. Changes here go straight to Daily Dispatch.' : '');
       el.hidden = !text;
       el.textContent = text;
       el.className = 'wk-note' + (noteText ? ' ' + noteKind : ' warn');
@@ -531,7 +546,7 @@
     function showPublished() {
       const at = weekDoc && weekDoc.publishedAt ? new Date(weekDoc.publishedAt) : null;
       const done = at && !isNaN(at), el = document.getElementById('published');
-      el.textContent = done ? '' : 'Not published yet this week';
+      el.textContent = liveView ? 'Live week' : done ? '' : 'Not published yet this week';
       el.hidden = !!done;
       document.getElementById('publish').title = done ? 'Last published ' + shortDate(at) + ' ' + shortTime(at) + (weekDoc.publishedBy ? ' by ' + weekDoc.publishedBy.split('@')[0] : '') : '';
     }
@@ -580,11 +595,11 @@
       let dailyDay = '';
       try { dailyDay = localStorage.getItem('ud.daily.day.' + who) || ''; } catch (e) { /* storage off */ }
       document.getElementById("go-daily").href = 'daily.html?date=' + (inWeek(dailyDay) ? dailyDay : inWeek(opDay) ? opDay : L.addDays(week, -1)) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
-      history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
+      history.replaceState(null, '', '?' + (liveView ? 'view=live' : 'week=' + week) + testQuery + location.hash);
       // Joe 10/17: the week picked stays picked (per person, on this computer) after leaving the page and coming back, until he
       // changes it. Print Layouts' hidden copy does not change it.
       // Joe 10/28: with the Next week it was on at the time, so a Publish made elsewhere still brings in the new Next week.
-      try { if (who && window.self === window.top) { localStorage.setItem('ud.weekly.week.' + who, week); localStorage.setItem('ud.weekly.next.' + who, live.next || ''); } } catch (e) { /* storage off */ }
+      try { if (who && window.self === window.top && !liveView) { localStorage.setItem('ud.weekly.week.' + who, week); localStorage.setItem('ud.weekly.next.' + who, live.next || ''); } } catch (e) { /* storage off */ }
       loaded = false;
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         // Picks still saving stay on screen until the update holds them, as on Daily: an update from another save used to put the
@@ -624,6 +639,8 @@
         const c = snap.data() || {};
         writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         live = c.liveWeeks || {};
+        // Weekly Dispatch follows the live Current week: after a Publish it moves on with it.
+        if (liveView && L.isDateKey(live.current) && live.current !== week && opened) { week = live.current; watch(); }
         start().then(({ db }) => watchRoutes(db));
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
@@ -639,6 +656,11 @@
       // Joe 10/28 ("I do not want the date to change unless I change it. Whenever I change it, I publish to the new week, and then
       // it brings in the following next week"): Weekly opens on the week he last picked here; with none picked, or when the week he
       // was on has since been published, on the Live Next week. It never moves by the calendar.
+      if (liveView) {
+        const first = await getDoc(doc(db, 'config', 'app')).then(s => (s.data() || {}).liveWeeks || {}, () => ({}));
+        if (first.current) { live = first; week = first.current; }
+        opened = true; watch(); return;
+      }
       if (L.isDateKey(params.get('week'))) { watch(); return; }
       let kept = '', keptNext = '';
       try { kept = localStorage.getItem('ud.weekly.week.' + who) || ''; keptNext = localStorage.getItem('ud.weekly.next.' + who) || ''; } catch (e) { /* storage off */ }

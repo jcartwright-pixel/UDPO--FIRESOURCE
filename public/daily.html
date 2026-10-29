@@ -24,7 +24,7 @@
   <div id="screen" hidden>
     <div class="topbar">
       <a href="index.html">Home</a>
-      <a href="weekly.html" id="to-weekly">Weekly Dispatch</a>
+      <a href="weekly.html" id="to-weekly">Weekly Dispatch Template</a>
       <a href="conflicts.html" id="to-conflicts" hidden>Sheet conflicts</a>
       <span class="who" id="who"></span>
       <button id="signout" type="button">Sign out</button>
@@ -670,7 +670,7 @@
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
       }).join('');
-      document.getElementById('go-weekly').href = 'weekly.html?week=' + L.addDays(loadDate, 1) + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
+      document.getElementById('go-weekly').href = 'weekly.html?view=live' + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '');
       history.replaceState(null, '', '?date=' + loadDate + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : ''));
       // Joe 10/17: the day on screen is the day kept, however he got here (his own pick, or Weekly's Daily Dispatch tile), so going
       // back and forth never drops him on today. Print Layouts' hidden copy does not change it.

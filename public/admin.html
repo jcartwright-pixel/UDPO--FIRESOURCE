@@ -55,7 +55,7 @@
       // Batch 8, mock-up 2 (10/23): Go-Live Switches moved here from Administration's list (it opens inside Administration).
       ['Go-Live Switches', 'administration.html?item=switch', 'Which screens are on, and Pause / Resume writing to the sheets.']
     ];
-    const OPENS = {'Holiday Week Editor': 'Route Week Override', 'Schedule Template (Weekly)': 'Weekly Dispatch', 'Vacation Management': 'Vacation Schedule', 'Issue History': 'Equipment Issues', 'Data Quality': 'Sheet Conflicts', 'Unit Master': 'Equipment'};
+    const OPENS = {'Holiday Week Editor': 'Route Week Override', 'Schedule Template (Weekly)': 'Weekly Dispatch Template', 'Vacation Management': 'Vacation Schedule', 'Issue History': 'Equipment Issues', 'Data Quality': 'Sheet Conflicts', 'Unit Master': 'Equipment'};
     document.getElementById('grid').innerHTML = CARDS.map(([name, href, text]) => {
       // Polish item 2 (Joe 10/11): a card whose old-app name differs from the screen it opens says which screen that is.
       const opens = OPENS[name] ? '<em class="admin-opens">Opens ' + escapeHtml(OPENS[name]) + '</em>' : '';

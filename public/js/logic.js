@@ -543,7 +543,7 @@
   // The per-screen switch (switch.js): which app runs each screen. "old" = the current app (the new app shows a copy),
   // "new" = the new app saves and the write-back puts each save in the sheet. While every screen is "old" the new
   // app is a test copy and every screen may save; once one is "new", only "new" screens save in Operations.
-  var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch', checkIns: 'Driver Check-ins',
+  var SCREENS = { dailyDispatch: 'Daily Dispatch', weeklyDispatch: 'Weekly Dispatch Template', checkIns: 'Driver Check-ins',
     drivers: 'Drivers', vacations: 'Vacation Schedule', routes: 'Route Editor',
     // Joe 10/12: "Let the new app write plant loading to the real Live sheet." The Plant Distribution screens (Loadout Center,
     // Trailer Assignments, Unloading, Truck Washing, Product Returns): a load, its order and its case returns go to the Live week tabs.
@@ -1491,7 +1491,7 @@
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],
       ['pmCrew', 'Maintenance Schedule and Vacations', ['maint-crew.html']]] },
     { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', screens: [
-      ['daily', 'Daily Dispatch', ['daily.html']], ['weekly', 'Weekly Dispatch and Driver Assignment Board', ['weekly.html']], ['routes', 'Route Editor', ['routes.html']],
+      ['daily', 'Daily Dispatch', ['daily.html']], ['weekly', 'Weekly Dispatch Template, Weekly Dispatch and Driver Assignment Board', ['weekly.html']], ['routes', 'Route Editor', ['routes.html']],
       ['routeWeek', 'Route Week Override', ['routeweek.html']], ['drivers', 'Driver Roster', ['drivers.html']], ['template', 'Driver Weekly Template', ['template.html']],
       ['vacations', 'Vacation Schedule', ['vacations.html']], ['checkins', 'Driver Check-ins', ['checkins.html']], ['driverStation', 'Driver Station', ['driver-station.html']],
       ['conflicts', 'Sheet Conflicts', ['conflicts.html']], ['scorecard', 'Driver Scorecard', ['scorecard.html']], ['otr', 'Over the Road', ['otr.html']],

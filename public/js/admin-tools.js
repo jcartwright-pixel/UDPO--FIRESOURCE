@@ -170,7 +170,7 @@ export async function renderRefreshRates(box) {
 export const WINDOWS = [
   ['Home', 'index.html', 'Every sheet copy (summary numbers)'], ['Company Locations', 'company.html', 'Live weeks, PLANT_OPERATIONS'],
   ['Route Distribution', 'distribution.html', 'Live weeks'], ['Daily Dispatch', 'daily.html', 'Live weeks, DRIVERS_MASTER, EQUIPMENT_MASTER'],
-  ['Weekly Dispatch', 'weekly.html', 'Live weeks, DRIVERS_MASTER, DRIVER_EXCEPTIONS, DRIVER_VACATIONS'], ['Route Week Override', 'routeweek.html', 'Live weeks, ROUTES_MASTER'],
+  ['Weekly Dispatch Template', 'weekly.html', 'Live weeks, DRIVERS_MASTER, DRIVER_EXCEPTIONS, DRIVER_VACATIONS'], ['Route Week Override', 'routeweek.html', 'Live weeks, ROUTES_MASTER'],
   ['Driver Check-Ins', 'checkins.html', 'Live weeks'], ['Equipment Issues', 'issues.html', 'TRUCK / TRAILER / FORK TRUCK LIVE'],
   ['Fleet & Maintenance', 'maint.html', 'TRUCK / TRAILER / FORK TRUCK LIVE, EQUIPMENT_MASTER'], ['Equipment', 'equipment.html', 'EQUIPMENT_MASTER'],
   ['Fleet Service', 'fleet.html', 'FLEET SERVICE SETUP, EQUIPMENT_MASTER'], ['Garage', 'garage.html', 'GARAGE WORK ORDERS'],

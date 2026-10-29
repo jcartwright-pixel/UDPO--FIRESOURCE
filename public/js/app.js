@@ -110,7 +110,7 @@ export const ICON = {
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
-  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
+  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch Template', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
   // Joe 10/10: assigning drivers their routes has a plain link here (it came off the Route Editor); the board is under Dispatch too.
   ['Drivers', [['Driver Roster', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
@@ -190,7 +190,7 @@ export const SIDES = [
   { key: 'debag', group: 'plantops', name: 'Debag', home: 'jug-trailers.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Jug trailers in the lot: how full each one is and what is on it', sections: ['Debag'], flatFirst: true },
   { key: 'labeling', group: 'plantops', name: 'Labeling Room', home: 'soon.html?what=labeling-room', pic: 'box-v1.webp', note: 'The labeling room', sections: [], building: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
-  { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
+  { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch Template', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'garage', group: 'routeops', quick: [['Work Orders', 'garage.html']], name: 'Garage', home: 'garage.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Garage work orders and the garage station', sections: ['Garage'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Walkthrough Reports', 'Driver Reports', 'Plant Reports', 'Garage Reports'],
