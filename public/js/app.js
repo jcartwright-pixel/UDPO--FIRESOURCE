@@ -50,8 +50,29 @@ export const DEVICE_PAGES = Object.freeze({
   KIOSK: { home: 'driver-station.html', pages: ['driver-station.html', 'route.html'], frames: [], only: { 'route.html': ['room', '1'] } },
   LINE: { home: 'line.html', pages: ['line.html'], frames: [] }
 });
-export const STATION_DEVICE = (() => { try { const d = localStorage.getItem(DEVICE_KEY) || ''; return DEVICE_PAGES[d] ? d : ''; } catch (e) { return ''; } })();
-export function lockDevice(kind) { try { if (kind) localStorage.setItem(DEVICE_KEY, kind); else localStorage.removeItem(DEVICE_KEY); } catch (e) { /* private window: not remembered */ } }
+// Joe 10/29 "I need something that my account never gets locked out of": a device signed in with an Administrator's own
+// United Dairy account is never locked to a station. Its lock is cleared, it opens every screen, and the station's screen
+// keeps its menus. Tablets signed in by a station code alone, and everyone else, stay locked as before.
+export function adminHere() { try { return !!sessionStorage.getItem('udActive') && sessionStorage.getItem('udAdmin') === '1'; } catch (e) { return false; } }
+// Every station's tablet code, forgotten when an Administrator frees the device.
+const STATION_CODE_KEYS = ['udPlantStationCode', 'udGarageStationCode', 'udMaintStationCode', 'udKioskCode', 'udLineTabletCode'];
+export function lockDevice(kind) { try { if (kind && adminHere()) return; if (kind) localStorage.setItem(DEVICE_KEY, kind); else localStorage.removeItem(DEVICE_KEY); } catch (e) { /* private window: not remembered */ } }
+function freeDevice() { lockDevice(''); try { STATION_CODE_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) { /* private window */ } }
+export const STATION_DEVICE = (() => { try { const d = localStorage.getItem(DEVICE_KEY) || ''; if (d && adminHere()) { freeDevice(); return ''; } return DEVICE_PAGES[d] ? d : ''; } catch (e) { return ''; } })();
+// A station screen opened by an Administrator keeps its Back, Home and menus (station-locked hides them for everyone else).
+new MutationObserver(() => { if (document.body.classList.contains('station-locked') && adminHere()) document.body.classList.remove('station-locked'); })
+  .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+// The station screens have no Home of their own (and an installed app window has no address bar): an Administrator gets one
+// "Operations" button in the bottom-left corner back to the app.
+const STATION_HOMES = Object.keys(DEVICE_PAGES).map(k => DEVICE_PAGES[k].home);
+function adminWayOut() {
+  if (EMBED || !adminHere() || STATION_HOMES.indexOf(HERE_PAGE) < 0 || document.getElementById('admin-home')) return;
+  const a = document.createElement('a');
+  a.id = 'admin-home'; a.className = 'admin-home'; a.href = 'index.html'; a.textContent = 'Operations';
+  a.title = 'Administrators only: back to the Operations app';
+  document.body.appendChild(a);
+}
+adminWayOut();
 // Joe 10/27 "I don't want to see the whole darn program": the Plant Managers app (walkthrough.html?view=home&app=1) is the
 // managers' phone screens only: the walkthrough and its Yard, Coolers and Production, Loading and Unloading. No menu, no Home
 // into the full app; anything else goes back to the Plant Managers start.
@@ -968,6 +989,37 @@ export async function tvCodeSignIn(code) {
 }
 export async function signOutHere() { const { auth } = await start(); await signOut(auth); }
 
+// Joe 10/29 (the code screen's Administrator button): an Administrator signs in with their own account on a locked tablet, and
+// the tablet is freed (its lock and station code forgotten) and opens Operations. Anyone else is signed out again and the
+// tablet stays where it was. Resolves with a message to show, or never (the page is moving on).
+let freeing = false; // the device is already on its way to Operations (one move, not two)
+export async function adminFreeSignIn() {
+  const { auth, homeDb } = await start();
+  let user;
+  try {
+    const test = LOCAL && window.UDTestAdminSignIn;
+    if (test) {
+      const token = JSON.stringify({ sub: 'test-' + test, email: test, email_verified: true });
+      user = (await signInWithCredential(auth, GoogleAuthProvider.credential(token))).user;
+    } else {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ hd: DOMAIN, prompt: 'select_account' });
+      user = (await signInWithPopup(auth, provider)).user;
+    }
+  } catch (e) { return 'Sign-in did not finish: ' + (e.message || e); }
+  const email = String(user.email || '').toLowerCase();
+  const entry = isUnitedDairy(user) ? await getDoc(doc(homeDb, 'users', email)).catch(() => null) : null;
+  const person = entry && entry.exists() ? entry.data() : null;
+  if (!person || person.status !== 'ACTIVE' || !window.UDLogic || !window.UDLogic.isAdmin(person)) {
+    await signOut(auth).catch(() => {});
+    return 'Only an Administrator\'s own account frees this tablet. It stays on its station.';
+  }
+  try { sessionStorage.setItem('udActive', email); sessionStorage.setItem('udAdmin', '1'); } catch (e) { /* no storage */ }
+  freeDevice();
+  if (!freeing) { freeing = true; location.replace('index.html'); }
+  return new Promise(() => {});
+}
+
 // Shows the sign-in card until a United Dairy account is signed in, then calls ready(user).
 // Joe 10/26: a person's Home screen (Administration > People & Roles) opens when they open the app, instead of the Home
 // cards. Only once per tab: after that the Home button goes to the normal Home, and a bookmark to another screen stays put.
@@ -1095,6 +1147,16 @@ export async function requireSignIn(ready) {
       return;
     }
     remember(email);
+    // Joe 10/29: an Administrator signed in here frees a locked device (it opens again as itself, unlocked).
+    if (window.UDLogic && window.UDLogic.isAdmin(entry.data())) {
+      try { sessionStorage.setItem('udAdmin', '1'); } catch (e) { /* no storage */ }
+      let locked = false;
+      try { locked = !!localStorage.getItem(DEVICE_KEY); } catch (e) { /* private window */ }
+      if (freeing) return;
+      if (locked || STATION_DEVICE) { freeing = true; freeDevice(); location.replace('index.html'); return; }
+      document.body.classList.remove('station-locked');
+      adminWayOut();
+    }
     // Joe 10/14: the screens ticked for this person (People & Roles). A read that fails keeps what this tab already knew;
     // the server still refuses saves on a screen not ticked.
     const mine = await getDoc(doc(db, 'personRights', email)).then(d => d.exists() ? d.data() : {}).catch(() => undefined);

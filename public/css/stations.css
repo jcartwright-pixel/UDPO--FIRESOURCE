@@ -515,6 +515,10 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .st-code input { width: 100%; box-sizing: border-box; font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
 .st-code button { min-height: 58px; border: 0; border-radius: 10px; background: #0b3d6b; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
 .st-code .st-code-msg { min-height: 1.4em; color: #b3261e; font-weight: 700; }
+/* Joe 10/29: the Administrator's way off a locked tablet: a plain outline button under the code, not the main action. */
+.st-code button.st-admin { min-height: 48px; background: #fff; color: #0b3d6b; border: 2px solid #9fb6cc; font-size: 17px; font-weight: 700; justify-self: center; padding: 0 18px; }
+/* Joe 10/29: an Administrator on a station screen gets one way back to the app, bottom-left (Release keeps the bottom-right). */
+.admin-home { position: fixed; left: 12px; bottom: 10px; z-index: 50; min-height: 44px; display: inline-flex; align-items: center; padding: 0 18px; background: #fff; color: #0b3d6b; border: 2px solid #9fb6cc; border-radius: 10px; font-size: 17px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
 /* The Plant Station with no UD account: the station code form inside the sign-in card (Joe 10/12). */
 .signin .st-code { margin: 16px 0; padding: 18px; box-sizing: border-box; width: 100%; border-top-width: 1px; }
 .signin .st-code input, .signin .st-code button { width: 100%; box-sizing: border-box; }
