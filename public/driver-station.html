@@ -208,7 +208,12 @@
     let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0, liveKey = '';
     let liveTimer = 0, retryTimer = 0;
     // The video to play: FOX Weather's live video when YouTube lets other sites show it, else none.
-    const liveTarget = () => { const l = (scores && scores.live) || {}; return l.video && l.live !== false && l.embed !== false ? String(l.video) : ''; };
+    // With no video named but FOX Weather's real channel number known, YouTube is asked for that channel's live stream.
+    const liveTarget = () => {
+      const l = (scores && scores.live) || {};
+      if (l.video) return l.live !== false && l.embed !== false ? String(l.video) : '';
+      return /^UC[\w-]{22}$/.test(l.channel || '') ? 'channel:' + l.channel : '';
+    };
     // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows.
     function stopLive() {
       clearTimeout(liveTimer); clearTimeout(retryTimer); liveOk = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
@@ -221,7 +226,7 @@
       // firebase.json). The video's own frame sends just the site's address (no page, no sign-in) to YouTube.
       clearTimeout(retryTimer); liveOk = false;
       document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="FOX Weather live" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/' +
-        encodeURIComponent(liveKey) + '?autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
+        (liveKey.startsWith('channel:') ? 'live_stream?channel=' + encodeURIComponent(liveKey.slice(8)) + '&' : encodeURIComponent(liveKey) + '?') + 'autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
       const ready = () => {
         player = new window.YT.Player('live-frame', { events: {
           onReady: (e) => { liveOk = true; clearTimeout(liveTimer); e.target.mute(); showTurn(); },
