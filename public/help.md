@@ -301,6 +301,8 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 
 > On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
 
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
 !> Do not sign a TV in with your own Google account. Use the TV's code so it comes back by itself after a power cut.
 
 - An Administrator frees a TV or tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
@@ -445,6 +447,8 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 > `Talk` uses the tablet's microphone. The first time, the tablet asks to allow it: tap Allow.
 
 > A garage mechanic's sign-in works only here; the plant's mechanics sign in on their own plant's Maintenance Station.
+
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
 
 !> Do not sign for someone else. Each mechanic's signature is their own, and it goes on every work order they complete.
 
@@ -851,6 +855,8 @@ The plant's TV board for today: loads loaded, on time today, behind now, pickups
 - `TV display` fills the screen.
 - A TV or kiosk opened with a station code has no Back or Home. `Release` (with the manager release code) is the only way out.
 
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
 # Safety Walkthrough
 
 ## Weekly Walk
@@ -969,6 +975,8 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 
 > No code date on Running now? Set the product's shelf life on Line Targets.
 
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
 !> Do not type a check you did not do. A recorded check cannot be changed from the tablet.
 !> Do not leave How many to run blank when you know the amount. Without it there is no countdown.
 !> Do not type a weight from memory or from the last jug. Weigh a jug each time the box says NOW.
@@ -1071,6 +1079,8 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
 
 - An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
+
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
 
 !> Do not type the Maintenance Station code on your own computer. It then opens only the Maintenance Station (an Administrator's account frees it).
 
@@ -1328,6 +1338,8 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 
 On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out, and it goes back to the code screen, never into the app. The tablet opens no other screen.
 
+> The Driver Room tablet (not a driver's own phone) keeps its screen on by itself. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
 
 ## Plant Station tablet
@@ -1366,6 +1378,23 @@ An Administrator is never locked to a station. A computer or tablet signed in wi
 
 > Anyone who is not an Administrator is signed straight back out, and the tablet stays where it was.
 
+> The screen stays on by itself while this screen is open. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
 !> Do not release a station to use the tablet for something else in the middle of a shift.
 
 !> Do not type a station code on your own computer or phone to try it: that device then opens only the Plant Station. If you did, sign in with your Administrator account (or use `Administrator sign-in` on the code screen) to free it.
+
+## Keeping a tablet screen on
+id: screen-on
+
+The station tablets, the line tablets, the Driver Room tablet and the TVs keep their screen on by themselves while their screen is open. Nothing needs pressing. If a tablet's screen still goes dark, the tablet's own settings are turning it off. Check these on the tablet, one at a time:
+
+1. Plug the tablet in. A tablet left on its battery saves power by turning the screen off.
+2. Open the tablet's **Settings**, then **Battery** (on some tablets **Battery and device care**). Turn **Power saving** off.
+3. In **Settings**, open **Display**, then **Screen timeout**, and pick the longest time.
+4. In **Settings**, open **Apps**, then **Chrome** (or the browser the station runs in), then **Battery**, and pick **Unrestricted**.
+5. Open the station again and tap the screen once.
+
+> The Garage tablet is set up by IT. If its screen still goes dark, ask IT to let the screen stay on in the tablet's lock-down setup and to turn power saving off.
+
+!> Do not leave the station on a tablet that is not plugged in for a whole shift. It keeps the screen on, which uses up the battery.

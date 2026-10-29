@@ -177,6 +177,7 @@
     import { askRelease, lockStation } from './js/station-code.js';
     import { startQueue, send, waiting, onChange, keepRead, lastRead, isNoSignal } from './js/phone-queue.js';
     import { fullScreenOnTap } from './js/full-screen.js';
+    import { keepScreenAwake } from './js/keep-awake.js';
 
     fullScreenOnTap();
 
@@ -188,6 +189,8 @@
     let station = null;
     try { station = room ? JSON.parse(localStorage.getItem('udRoomStation') || 'null') : null; } catch (e) { station = null; }
     if (room && !station) location.replace('driver-station.html?for=room');
+    // The Driver Room tablet's screen stays on (a driver's own phone is left alone).
+    if (room) keepScreenAwake();
     // Done (signed out, back to the three choices), Back (still signed in), or 5 minutes idle (signed out, View Loadout).
     // The tablet lost its station (a new code, removed): back to the code screen.
     // Joe 10/28 "you need to block that exact same way": Release, like a lost or changed code, goes back to the code screen

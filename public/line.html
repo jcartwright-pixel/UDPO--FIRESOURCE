@@ -112,6 +112,7 @@
     import { resolveStation, askCode, askRelease, lockStation, remember } from './js/station-code.js';
     import { doc, onSnapshot } from './js/firebase.js';
     import { watchProduction, lineView, fmt, clock, shiftText } from './js/production.js';
+    import { keepScreenAwake } from './js/keep-awake.js';
 
     // The line tablet (Joe 10/11, mock-up A): at the line, big buttons. What is running, made vs target, the speed (Joe: it flashes
     // when the product is run under or over its allowed speed), the minutes stopped, the code date check, and "Line stopped,
@@ -141,6 +142,8 @@
     const CODE_KEY = 'udLineTabletCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
     const TABLET = params.get('tablet') === '1' || STATION_DEVICE === 'LINE' || (() => { try { return !!localStorage.getItem(CODE_KEY); } catch (e) { return false; } })();
     let station = null, asking = false, deviceLocked = STATION_DEVICE === 'LINE';
+    // A line tablet's screen stays on; a computer opening it from the menus is left alone.
+    if (TABLET) keepScreenAwake();
     async function gate() {
       if (!TABLET) return;
       const r = await resolveStation('LINE', CODE_KEY, stationCall);
