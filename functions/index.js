@@ -124,8 +124,8 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
       if (await TOOLS.jobDue(pdb, 'transfer')) await runTransfer({ db: pdb, reader: setup.reader, sources });
     } catch (e) { console.error('Copy of ' + p.name + "'s sheets failed: " + (e && e.message || e)); }
   }
-  // Nobody pressed Publish and the calendar reached the Next week: publish it, as the current app's scheduled refresh does.
-  try { await require('./src/weekroll').autoPublish(db); } catch (e) { console.error('Automatic Publish failed: ' + (e && e.message || e)); }
+  // Joe 10/28: "I do not want the date to change unless I change it". The weeks move only when someone presses Publish, so the
+  // calendar reaching the Next week no longer publishes it (weekroll.autoPublish is not run).
   // Joe 10/15: Schedule Texts, once a new week is the Live Current week (Off until an administrator turns it On).
   try { await SMS.postedCheck(db); } catch (e) { console.error('Schedule Texts failed: ' + (e && e.message || e)); }
   // Joe 10/26: Load Done Texts, a picked driver's load finished at the plant (Off until an administrator turns it On).

@@ -130,7 +130,7 @@
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
     // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
     const coverText = (c) => c ? String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '') : '\u2014 NEEDS DRIVER \u2014';
 
@@ -583,7 +583,8 @@
       history.replaceState(null, '', '?week=' + week + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + location.hash);
       // Joe 10/17: the week picked stays picked (per person, on this computer) after leaving the page and coming back, until he
       // changes it. Print Layouts' hidden copy does not change it.
-      try { if (who && window.self === window.top) localStorage.setItem('ud.weekly.week.' + who, week); } catch (e) { /* storage off */ }
+      // Joe 10/28: with the Next week it was on at the time, so a Publish made elsewhere still brings in the new Next week.
+      try { if (who && window.self === window.top) { localStorage.setItem('ud.weekly.week.' + who, week); localStorage.setItem('ud.weekly.next.' + who, live.next || ''); } } catch (e) { /* storage off */ }
       loaded = false;
       unsubscribe = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), snap => {
         // Picks still saving stay on screen until the update holds them, as on Daily: an update from another save used to put the
@@ -634,8 +635,17 @@
       document.getElementById('next').onclick = () => move(7);
       document.getElementById('week-date').onchange = e => { if (L.isDateKey(e.target.value)) { noteText = ''; week = L.weekStart(e.target.value); watch(); } };
       who = String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
-      if (!L.isDateKey(params.get('week'))) { try { const kept = localStorage.getItem('ud.weekly.week.' + who); if (L.isDateKey(kept)) week = L.weekStart(kept); } catch (e) { /* storage off */ } }
       window.addEventListener('resize', render);
+      // Joe 10/28 ("I do not want the date to change unless I change it. Whenever I change it, I publish to the new week, and then
+      // it brings in the following next week"): Weekly opens on the week he last picked here; with none picked, or when the week he
+      // was on has since been published, on the Live Next week. It never moves by the calendar.
+      if (L.isDateKey(params.get('week'))) { watch(); return; }
+      let kept = '', keptNext = '';
+      try { kept = localStorage.getItem('ud.weekly.week.' + who) || ''; keptNext = localStorage.getItem('ud.weekly.next.' + who) || ''; } catch (e) { /* storage off */ }
+      const first = await getDoc(doc(db, 'config', 'app')).then(s => (s.data() || {}).liveWeeks || {}, () => ({}));
+      if (first.next) live = first;
+      const published = L.isDateKey(kept) && L.weekStart(kept) === keptNext && !!first.next && first.next > keptNext;
+      week = L.isDateKey(kept) && !published ? L.weekStart(kept) : L.isDateKey(first.next) ? first.next : week;
       watch();
     });
   </script>

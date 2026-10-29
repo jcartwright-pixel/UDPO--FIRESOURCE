@@ -128,7 +128,7 @@ The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Ro
 
 ### Pick the week
 
-Use the arrows beside **Week starting**. The week you pick stays picked on this computer.
+Weekly Dispatch opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer.
 
 ### What to do
 
