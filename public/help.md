@@ -291,8 +291,8 @@ screens: driver-station.html
 The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; the station code decides what opens.
 
 - **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
-- **The box on the right** takes turns: 30 seconds of FOX Weather live (no sound), then 30 seconds of the Driver Scorecard (each driver's overall score, best first, for the month so far). The scores on the TV are brought up to date every 15 minutes.
-- The live picture is FOX Weather's free live stream on YouTube. If FOX's will not play, the TV tries AccuWeather NOW (also free, all day). If neither plays (no internet, or the channel does not let other sites show it), the weather turn shows the local weather with one line saying why, and the TV tries the live picture again every 10 minutes.
+- **The box on the right** takes turns: 30 seconds of live weather (no sound), then 30 seconds of the Driver Scorecard (each driver's overall score, best first, for the month so far). The scores on the TV are brought up to date every 15 minutes.
+- The live picture is FOX Weather's free live stream on YouTube, then AccuWeather's when it is live. FOX Weather does not let other sites show its stream at the moment, so most of the time the box shows the **live weather radar** for the Pittsburgh radar (it covers Uniontown) instead, with a fresh picture every 5 minutes. If the radar will not load either (no internet), the weather turn shows the local weather with one line saying why. The TV tries the live videos again every 10 minutes.
 - After an update to Operations the TV reloads the board by itself within a few minutes. Nobody has to press Refresh.
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
