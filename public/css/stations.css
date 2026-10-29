@@ -817,6 +817,7 @@ body.ds-tv .ds-weather.ds-boxed { padding: 0; background: none; border: 0; box-s
 body.ds-tv .ds-weather.ds-boxed .ds-turn { flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
 .ds-live { position: relative; background: #000; }
 .ds-live #live-player, .ds-live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.ds-live #live-radar { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .ds-live-tag { position: absolute; left: 14px; top: 12px; background: #c8102e; color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: 800; font-size: 16px; }
 .ds-live-cap { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .6); color: #fff; padding: 10px 14px; font-size: 18px; font-weight: 700; }
 .ds-sc { display: flex; flex-direction: column; background: #fff; color: #0b2d4d; }

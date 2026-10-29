@@ -27,7 +27,7 @@ async function openPage(browser, width, height, url, clock, touch) {
   if (clock) await page.clock.setFixedTime(new Date(clock));
   await localCalls(page);
   // Joe 10/27: no live weather picture in these checks (YouTube is refused), so the TV's weather turn shows the local weather.
-  await page.route(/youtube\.com/, route => route.abort());
+  await page.route(/youtube\.com|radar\.weather\.gov/, route => route.abort());
   // The public callables answer straight from the server code when no functions emulator runs (LOCAL_CALLS=1).
   if (process.env.LOCAL_CALLS) {
     await page.route(/:5001\/[^/]+\/[^/]+\/(garage|phone)$/, async (route) => {
@@ -216,7 +216,7 @@ async function signOnce(page) {
     assert.equal(await tv.textContent('#weather-today'), 'High 61° · Low 44° · Rain 20% · Wind 8 mph');
     assert.equal(await tv.textContent('#weather-next'), 'Tomorrow: Rain, 58° / 47°');
     await tv.waitForSelector('#turn-weather .now:visible', { timeout: 15000 });
-    assert.equal(await tv.isVisible('#turn-live'), false, 'no live picture: the local weather shows instead');
+    assert.equal(await tv.isVisible('#turn-live'), false, 'no live video or radar: the local weather shows instead');
     assert.deepEqual(ds.errors.concat(tv.errors), []);
     results.push('Driver Station: the board and the Driver Room TV open, with the weather window filled in');
 

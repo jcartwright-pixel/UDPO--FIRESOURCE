@@ -43,9 +43,12 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
       daily: { weather_code: [1, 3], temperature_2m_max: [68, 70], temperature_2m_min: [44, 47], precipitation_probability_max: [1, 10] } }) }));
     // Joe 10/27: the live weather turn. The check stands in for YouTube: its player script answers ready at once.
     await page.route(/youtube\.com\/iframe_api/, route => route.fulfill({ contentType: 'text/javascript',
-      // A stand-in player: it plays, unless the page's udYtFail names the video (then YouTube's error 150, "not on other sites").
+      // A stand-in player: it plays, unless the page's udYtFail named the video when it was made (then YouTube's error 150).
       // Like YouTube (Joe 10/29, 6.71), it starts playing only once the player is in view and at least 200 x 200.
-      body: 'window.YT = { Player: function (id, o) { const src = document.getElementById(id).src; const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => { o.events.onReady({ target: t }); if (window.udYtFail && window.udYtFail.test(src)) o.events.onError({ data: 150, target: t }); else { const f = document.getElementById(id), go = () => (f.isConnected && f.offsetWidth >= 200 && f.offsetHeight >= 200 ? o.events.onStateChange({ data: 1, target: t }) : setTimeout(go, 100)); go(); } }, 50); } }; window.onYouTubeIframeAPIReady();' }));
+      body: 'window.YT = { Player: function (id, o) { const src = document.getElementById(id).src, fail = !!(window.udYtFail && window.udYtFail.test(src)); const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => { o.events.onReady({ target: t }); if (fail) o.events.onError({ data: 150, target: t }); else { const f = document.getElementById(id), go = () => (f.isConnected && f.offsetWidth >= 200 && f.offsetHeight >= 200 ? o.events.onStateChange({ data: 1, target: t }) : setTimeout(go, 100)); go(); } }, 50); } }; window.onYouTubeIframeAPIReady();' }));
+    // The weather radar loop: a tiny stand-in picture, or none when the page's udRadarFail is set.
+    const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    await page.route(/radar\.weather\.gov\/ridge\/standard\/KPBZ_loop\.gif/, async route => (await page.evaluate(() => !!window.udRadarFail).catch(() => false) ? route.fulfill({ status: 404, body: '' }) : route.fulfill({ contentType: 'image/gif', body: GIF })));
     await page.route(/youtube\.com\/embed\//, route => route.fulfill({ contentType: 'text/html', body: '<body style="background:#123">live</body>' }));
     await localCalls(page);
     const errors = [];
@@ -116,17 +119,28 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await db().collection('scorecard').doc('kiosk').update({ live: null });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/live_stream?channel=UC1FbPiXx59_ltnFVx7IxWow&autoplay=1"]', { state: 'attached' });
     assert.match(await page.textContent('#turn-live .ds-live-cap'), /FOX Weather · live, no sound/);
-    // FOX won't let other sites show it: AccuWeather NOW. Neither: the local weather, saying why in one line.
-    await page.evaluate(() => { window.udYtFail = /live_stream/; });
+    // FOX won't let other sites show it: AccuWeather's channel. Neither (Joe 10/29, 6.72: "it says not allowed"): the live
+    // weather radar; no radar either: the local weather, saying why in one line.
+    await page.evaluate(() => { window.udYtFail = /channel=UCeeee/; });
     await db().collection('scorecard').doc('kiosk').update({ live: { video: null, channel: 'UCeeeeeeeeeeeeeeeeeeeeee', live: false } });
-    await page.waitForSelector('#live-frame[src*="youtube.com/embed/pSRlP1EZiS8?"]', { state: 'attached' });
-    await page.waitForFunction(() => /AccuWeather NOW · live, no sound/.test(document.querySelector('#turn-live .ds-live-cap').textContent));
+    await page.waitForSelector('#live-frame[src*="youtube.com/embed/live_stream?channel=UCuYqi3hOfz6-3Hdp6tEJjAg&autoplay=1"]', { state: 'attached' });
+    await page.waitForFunction(() => /AccuWeather · live, no sound/.test(document.querySelector('#turn-live .ds-live-cap').textContent));
     await page.evaluate(() => { window.udYtFail = /youtube/; });
     await db().collection('scorecard').doc('kiosk').update({ live: { video: null, channel: 'UCffffffffffffffffffffff', live: false } });
-    await page.waitForFunction(() => !document.getElementById('live-frame') && !document.getElementById('live-note').hidden);
-    assert.equal(await page.textContent('#live-note'), 'Live weather not showing: FOX Weather does not let other sites show it; AccuWeather NOW does not let other sites show it.');
+    await page.waitForFunction(() => !document.getElementById('live-frame') && document.getElementById('live-radar'));
+    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); return !document.getElementById('turn-live').hidden; }, null, { timeout: 30000 });
+    assert.equal(await page.textContent('#turn-live .ds-live-cap'), 'Weather radar · Pittsburgh · live loop');
+    assert.equal(await page.textContent('#turn-live .ds-live-tag'), 'RADAR');
+    assert.match(await page.getAttribute('#live-radar', 'src'), /^https:\/\/radar\.weather\.gov\/ridge\/standard\/KPBZ_loop\.gif\?t=\d+$/);
+    assert.equal(await page.textContent('#live-note'), 'Live weather not showing: FOX Weather is not showing on other sites; AccuWeather is not showing on other sites.');
+    await shot(page, 'fire-tv-2d-radar-1920.png');
+    // No radar either (no internet): the local weather and the one line.
+    await page.evaluate(() => { window.udRadarFail = true; });
+    await db().collection('scorecard').doc('kiosk').update({ live: { video: null, channel: 'UCgggggggggggggggggggggg', live: false } });
+    await page.waitForFunction(() => !document.getElementById('live-frame') && !document.getElementById('live-radar') && !document.getElementById('live-note').hidden);
     await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); const w = document.getElementById('turn-weather'); return !w.hidden && w.querySelector('.now'); }, null, { timeout: 30000 });
-    await shot(page, 'fire-tv-2d-no-live-weather-1920.png');
+    await shot(page, 'fire-tv-2e-no-live-weather-1920.png');
+    await page.evaluate(() => { window.udRadarFail = false; });
     await page.evaluate(() => { window.udYtFail = null; });
     await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive01?"]', { state: 'attached' });

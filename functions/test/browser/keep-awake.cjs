@@ -40,7 +40,7 @@ async function open(browser, url, opts) {
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
   });
-  await page.route(/api\.open-meteo\.com|youtube\.com/, route => route.abort());
+  await page.route(/api\.open-meteo\.com|youtube\.com|radar\.weather\.gov/, route => route.abort());
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(HOSTING + '/' + url);

@@ -205,24 +205,40 @@
     // Joe 10/28 ("not showing weather"): the server reads which video is live on FOX Weather's YouTube page every 15 minutes
     // (live-weather.js, scorecard/kiosk: live). 10/29: YouTube answers the server with its robot check, but the page still
     // names FOX Weather's channel (the number below), so the TV asks YouTube for that channel's live stream itself. When a
-    // live picture will not play, the next one on the list is tried (AccuWeather NOW, also free all day), and when none
+    // live picture will not play, the next one on the list is tried (AccuWeather), and when none
     // plays the local weather shows with one line saying why, so the reason can be read off the TV.
-    const TURN = 30000, FOX_CHANNEL = 'UC1FbPiXx59_ltnFVx7IxWow', ACCU_NOW = 'pSRlP1EZiS8';
+    // Joe 10/29 (6.72, "it says not allowed"): tried for real on YouTube, FOX Weather does not let other sites show its live
+    // stream, and the AccuWeather NOW video had ended (AccuWeather has no live stream most of the day). So after FOX Weather and
+    // AccuWeather's channel (both kept in case they open up or go live), the box shows the National Weather Service's live
+    // radar loop for the Pittsburgh radar (it covers Uniontown), refreshed every 5 minutes; only if that will not load either
+    // does the local weather show.
+    const TURN = 30000, FOX_CHANNEL = 'UC1FbPiXx59_ltnFVx7IxWow', ACCU_CHANNEL = 'UCuYqi3hOfz6-3Hdp6tEJjAg';
+    const RADAR = 'https://radar.weather.gov/ridge/standard/KPBZ_loop.gif';
     let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0, liveSig = '', liveIdx = 0, liveList = [], liveWhy = [];
-    let retryTimer = 0, liveTrying = false, liveSeen = 0;
+    let retryTimer = 0, liveTrying = false, liveSeen = 0, radarOk = false, radarTimer = 0;
     // The live pictures to try, in order.
     function liveChoices() {
       const l = (scores && scores.live) || {}, out = [];
       if (l.video && l.live !== false && l.embed !== false) out.push({ key: String(l.video), name: 'FOX Weather' });
       out.push({ key: 'channel:' + (/^UC[\w-]{22}$/.test(l.channel || '') ? l.channel : FOX_CHANNEL), name: 'FOX Weather' });
-      out.push({ key: ACCU_NOW, name: 'AccuWeather NOW' });
+      out.push({ key: 'channel:' + ACCU_CHANNEL, name: 'AccuWeather' });
       return out;
     }
-    const YT_WHY = { 2: 'would not play', 5: 'would not play', 100: 'has nothing live right now', 101: 'does not let other sites show it', 150: 'does not let other sites show it', 153: 'does not let other sites show it' };
+    const YT_WHY = { 2: 'would not play', 5: 'would not play', 100: 'has nothing live right now', 101: 'is not showing on other sites', 150: 'is not showing on other sites', 153: 'does not let other sites show it' };
     function liveNote(text) { const n = document.getElementById('live-note'); n.textContent = text; n.hidden = !text; }
     // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows.
     function stopLive() {
-      clearTimeout(retryTimer); liveOk = false; liveTrying = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
+      clearTimeout(retryTimer); clearInterval(radarTimer); liveOk = false; liveTrying = false; radarOk = false; player = null; document.getElementById('live-player').innerHTML = ''; liveTag('LIVE'); showTurn();
+    }
+    function liveTag(text) { document.querySelector('#turn-live .ds-live-tag').textContent = text; }
+    // No live video: the live radar loop, a fresh copy every 5 minutes; if it will not load, the local weather.
+    function startRadar() {
+      const img = new Image(), load = () => { img.src = RADAR + '?t=' + Date.now(); };
+      img.id = 'live-radar'; img.alt = 'Live weather radar, Pittsburgh';
+      img.onload = () => { if (!radarOk) { radarOk = true; liveTag('RADAR'); document.querySelector('#turn-live .ds-live-cap').textContent = 'Weather radar · Pittsburgh · live loop'; showTurn(); } };
+      img.onerror = () => { clearInterval(radarTimer); radarOk = false; img.remove(); showTurn(); };
+      document.getElementById('live-player').appendChild(img);
+      load(); radarTimer = setInterval(load, 300000);
     }
     // A picture that will not play: the next one is tried; with none left, the local weather and why, and the list is tried
     // again in 10 minutes (Joe 10/28: a stream that is down for a while comes back by itself).
@@ -232,7 +248,8 @@
       stopLive();
       if (++liveIdx < liveList.length) { startLive(); return; }
       liveNote('Live weather not showing: ' + liveWhy.join('; ') + '.');
-      retryTimer = setTimeout(() => { liveIdx = 0; liveWhy = []; startLive(); }, 600000);
+      startRadar();
+      retryTimer = setTimeout(() => { liveIdx = 0; liveWhy = []; stopLive(); startLive(); }, 600000);
     }
     function startLive() {
       const c = liveList[liveIdx];
@@ -278,7 +295,7 @@
       stopLive(); startLive();
     }
     function showTurn() {
-      const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && (liveOk || liveTrying);
+      const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && (liveOk || liveTrying || radarOk);
       document.getElementById('turn-score').hidden = !score;
       document.getElementById('turn-live').hidden = !live;
       document.getElementById('turn-weather').hidden = score || live;
