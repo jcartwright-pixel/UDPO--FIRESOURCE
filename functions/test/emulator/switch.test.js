@@ -54,7 +54,7 @@ test('once a screen is on the new app, only that screen saves there; the others 
   const ok = await applyAction(db(), DISPATCHER, assign('drv_test_adams'), tick);
   assert.equal(ok.ok, true);
   assert.equal((await db().collection('actions').doc(ok.requestId).get()).data().mode, 'live');
-  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick), /Weekly Dispatch is view only until it is switched on in Administration > Go-Live Switches/);
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-04' }, tick), /Weekly Dispatch Template is view only until it is switched on in Administration > Go-Live Switches/);
   // Audit batch 2: a screen that is on stays on, so its saves are never turned into view only.
   await assert.rejects(setSwitch(db(), ADMIN, { requestId: rid(), screen: 'dailyDispatch', owner: 'old' }, true), /Daily Dispatch stays on so it keeps saving/);
   assert.equal((await config()).screenOwners.dailyDispatch, 'new');

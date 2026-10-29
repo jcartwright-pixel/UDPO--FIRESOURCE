@@ -518,8 +518,9 @@ async function step(db, input, nowMs) {
         if (req.miles && (miles == null || miles > 3000000)) throw SaveErr('BAD_REQUEST', 'Type the miles as a number.');
         if (miles == null) throw SaveErr('BAD_REQUEST', 'Type the miles (no GPS reading for ' + order.unit + ').');
       }
-      const on = req.completedOn || today;
-      if (!L.isDateKey(on) || on > today || L.daysBetween(on, today) > 30) throw SaveErr('BAD_REQUEST', 'The day it was finished must be today or in the last 30 days.');
+      // The latest day allowed is New York's calendar day: a job finished after midnight but before the 6 AM roll is today's date.
+      const calendar = L.localDay(new Date(nowMs).toISOString()) || today, on = req.completedOn || today;
+      if (!L.isDateKey(on) || on > calendar || L.daysBetween(on, calendar) > 30) throw SaveErr('BAD_REQUEST', 'The day it was finished must be today or in the last 30 days.');
       reading = { hours, miles, on };
       if (miles != null) odometer = miles;
     }

@@ -44,16 +44,22 @@ const WHO = 'testEmail=dispatch.test@uniteddairy.com';
       await dailyDay('2026-10-06');
       await page.click('#next');
       await dailyDay('2026-10-07');
-      // The Weekly Dispatch tile opens Weekly in the same week.
-      await Promise.all([page.waitForURL(/weekly\.html\?week=2026-10-04/), page.click('#go-weekly')]);
-      await weeklyWeek('2026-10-04');
+      // The Weekly Dispatch tile opens Weekly Dispatch, the live Current week (the same week here).
+      await Promise.all([page.waitForURL(/weekly\.html\?view=live/), page.click('#go-weekly')]);
+      await page.waitForFunction(() => document.getElementById('week-date').value === '2026-10-04', null, { timeout: 10000 });
       // The Daily Dispatch tile comes back to Wednesday, the day he picked, not today or the week's Saturday.
       await page.waitForSelector('#go-daily[href*="date=2026-10-07"]');
       await Promise.all([page.waitForURL(/daily\.html\?date=2026-10-07/), page.click('#go-daily')]);
       await dailyDay('2026-10-07');
       await shot('daily-back-from-weekly');
 
-      // Weekly: pick the next week, leave, and open Weekly again from the menu (no week in the link).
+      // Weekly from the menu (no week in the link) with no week kept opens the Live Next week (Joe 10/28). Pick the week before,
+      // leave and come back: it is kept; then the next week again, kept the same way.
+      await page.goto(HOSTING + '/weekly.html?' + WHO);
+      await weeklyWeek('2026-10-11');
+      await page.click('#prev');
+      await weeklyWeek('2026-10-04');
+      await page.goto(HOSTING + '/ops.html?' + WHO);
       await page.goto(HOSTING + '/weekly.html?' + WHO);
       await weeklyWeek('2026-10-04');
       await page.click('#next');
