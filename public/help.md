@@ -104,6 +104,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Driver Call-Off` marks a driver off for the day.
 - `+ Add Route / Run` adds an extra load for this day.
 - `Print Dispatch Sheet` prints the day's sheet.
+- `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 
 ### OVR
@@ -120,15 +121,15 @@ The lists show only this plant's units, using the plant the fleet list gives eac
 
 !> Do not change a load in the Google Sheet and here at the same time. If both change, the line goes on Sheet Conflicts.
 
-## Weekly Dispatch
+## Weekly Dispatch Template
 id: weekly
 screens: weekly.html
 
-The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
+Next week, the week you get ready and then publish to Daily Dispatch. The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
 
 ### Pick the week
 
-Use the arrows beside **Week starting**. The week you pick stays picked on this computer.
+Weekly Dispatch Template opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer.
 
 ### What to do
 
@@ -145,11 +146,34 @@ Use the arrows beside **Week starting**. The week you pick stays picked on this 
 - `Route Run Days` opens Route Days, the normal week for every run. Its `Holiday Week` tab changes this week only.
 - `Reset Week` rebuilds the whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay. Press it twice to confirm.
 - `Print Weekly Dispatch` prints the Driver Assignment Board on one page.
+- `Weekly Dispatch` opens the live week, the one Daily Dispatch is running now.
 - Managers can grab a route's line and drag it up or down to change the order.
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
 
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
+
+## Weekly Dispatch
+id: weekly-live
+screens: weekly.html?view=live
+
+The live week, the one Daily Dispatch is running now, Sunday to Saturday. It looks just like the Weekly Dispatch Template, with the same two halves. Open it with the `Weekly Dispatch` button on Daily Dispatch.
+
+It always shows the live week. After next week is published, it moves on to that week by itself. There are no arrows and no Publish here: next week is changed and published on the [Weekly Dispatch Template](#weekly).
+
+### What to do
+
+1. Click a driver box on a route's day. The driver list opens right there. Pick a driver and it saves.
+2. The change shows on Daily Dispatch for that day straight away. There is nothing to publish.
+3. On the Driver Assignment Board, click a driver's day to set their availability, the same as on the template.
+
+- `Daily Dispatch` goes back to Daily Dispatch.
+- `Weekly Dispatch Template` opens next week, the week you are getting ready.
+- `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
+
+> To get next week ready, use the Weekly Dispatch Template, not this screen.
+
+!> Do not change a day here and on Daily Dispatch at the same time. They are the same load, so the last change wins.
 
 !> Do not press Publish until the week is checked. Publish moves the weeks on: Next becomes Current.
 
@@ -219,7 +243,7 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 id: template
 screens: template.html
 
-Each driver's normal week, set once. It becomes the starting point of every new week on Weekly Dispatch. Changes on Weekly Dispatch are for that week only and do not change the template.
+Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template. Changes there are for that week only and do not change the template.
 
 1. In a driver's day, pick **Available**, **Off** or **Assigned**.
 2. For Assigned, pick the run. `+ Add Run` adds a second run the same day.
@@ -227,7 +251,7 @@ Each driver's normal week, set once. It becomes the starting point of every new 
 
 - `Copy` under a driver's name copies their whole week. `Paste` puts it on another driver; `Paste + Add` adds it to what that driver already has.
 
-!> Do not use the template for one week's change. Change the week on Weekly Dispatch.
+!> Do not use the template for one week's change. Change the week on the Weekly Dispatch Template.
 
 ## Vacation Schedule
 id: vacations

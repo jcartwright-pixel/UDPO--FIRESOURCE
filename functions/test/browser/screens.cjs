@@ -1088,8 +1088,10 @@ async function noScroll(page) {
     results.push('Dispatch Administration: no card leaves the new app; Print Layouts, Dispatch Settings and Operational Assignments open here; a manager added Beckley and turned Marietta off, and Daily offers the active ones under Other CVG / Carriers; Garage Station opens the new Garage Station screen (Joe 10/10)');
     // Joe 10/10: Daily and Weekly each have a tile to the other (same window, same week); the menu's Driver Assignment Board opens Weekly at the board.
     const hop = await openPage(browser, 1920, 950, '/daily.html?date=2026-10-05&testEmail=dispatch.test@uniteddairy.com');
-    await hop.waitForSelector('#go-weekly[href*="week=2026-10-06"]');
-    await Promise.all([hop.waitForURL(/weekly\.html\?week=2026-10-04/), hop.click('#go-weekly')]);
+    // Joe 10/28: Daily's Weekly Dispatch button opens Weekly Dispatch, the live Current week (10-04 here).
+    await hop.waitForSelector('#go-weekly[href*="view=live"]');
+    await Promise.all([hop.waitForURL(/weekly\.html\?view=live/), hop.click('#go-weekly')]);
+    await hop.waitForFunction(() => document.getElementById('week-date').value === '2026-10-04');
     await hop.waitForSelector('#rows tr');
     assert.equal(await hop.$$eval('#legend i.assigned', a => a.length), 0, 'no Assigned key');
     await hop.waitForSelector('#go-daily[href*="daily.html?date="]');
@@ -1099,7 +1101,7 @@ async function noScroll(page) {
     await hop.waitForFunction(() => document.body.dataset.view === 'board' && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
     assert.deepEqual(hop.errors, []);
     await hop.close();
-    results.push('Daily and Weekly: a tile on each opens the other for the same week in this window; Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
+    results.push('Daily and Weekly: a tile on each opens the other for the same week in this window (Daily opens Weekly Dispatch, the live week); Weekly has no Assigned key; Menu > Driver Assignment Board opens Weekly at the board');
     // Joe 10/10: a menu fly-out draws above the screen (tables, cards, pop-ups), with the menu open and folded, on Daily and Manager Center
     // (Fleet & Maintenance lists its screens straight in the menu since 10/10 evening, so Equipment has no fly-out).
     for (const url of ['/daily.html?date=2026-10-05', '/manager.html?x=1']) {

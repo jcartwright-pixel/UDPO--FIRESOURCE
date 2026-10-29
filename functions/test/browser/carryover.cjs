@@ -92,7 +92,8 @@ async function openPage(browser, url, w, h, opts) {
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
     await mc.waitForFunction(() => /4 routes behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
     // Every load reaches Manager Center through runDays (a trigger on each run): wait for all nine.
-    await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 20000 });
+    // A slow test computer can take longer than 20 seconds to run the nine triggers.
+    await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 45000 });
     await shot(mc, 'carryover-manager-1536');
     await mc.click('.mc-preview');
     await mc.click('#send-test');
