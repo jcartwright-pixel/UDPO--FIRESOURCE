@@ -109,9 +109,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive02?"]', { state: 'attached' });
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02', embed: false }) });
     await page.waitForFunction(() => !document.getElementById('live-frame') && document.getElementById('turn-live').hidden);
-    // The box may have moved on to the Scorecard turn by itself (30 seconds); its weather turn is the local weather.
-    await page.evaluate(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); });
-    await page.waitForSelector('#turn-weather:not([hidden]) .now');
+    // The box may move on to the Scorecard turn by itself (every 30 seconds, also while this waits); its weather turn is the local weather.
+    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); const w = document.getElementById('turn-weather'); return !w.hidden && w.querySelector('.now'); }, null, { timeout: 30000 });
     // No video named, but FOX Weather's real channel number: YouTube is asked for that channel's live stream.
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: null, live: false, embed: null }) });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/live_stream?channel=UCaaaaaaaaaaaaaaaaaaaaaa&autoplay=1"]', { state: 'attached' });
