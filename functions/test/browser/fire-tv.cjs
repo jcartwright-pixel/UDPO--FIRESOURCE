@@ -110,8 +110,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02', embed: false }) });
     await page.waitForFunction(() => !document.getElementById('live-frame') && document.getElementById('turn-live').hidden);
     // The box may have moved on to the Scorecard turn by itself (30 seconds); its weather turn is the local weather.
-    await page.evaluate(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); });
-    await page.waitForSelector('#turn-weather:not([hidden]) .now');
+    // Checked again on each try, since the 30-second turn can also come round while waiting (a slow test computer).
+    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); return !document.getElementById('turn-weather').hidden && !!document.querySelector('#turn-weather .now'); }, null, { polling: 500, timeout: 30000 });
     await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive01?"]', { state: 'attached' });
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
