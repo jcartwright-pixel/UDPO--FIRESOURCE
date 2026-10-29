@@ -292,7 +292,7 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 
 - **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
 - **The box on the right** takes turns: 30 seconds of FOX Weather live (no sound), then 30 seconds of the Driver Scorecard (each driver's overall score, best first, for the month so far). The scores on the TV are brought up to date every 15 minutes.
-- Operations checks FOX Weather's YouTube page every 15 minutes for the video that is live and plays it. With no live picture (no internet, nothing live on FOX Weather's page, or FOX does not let other sites show it) the weather turn shows the local weather instead, and tries the live picture again every 10 minutes.
+- The live picture is FOX Weather's free live stream on YouTube. If FOX's will not play, the TV tries AccuWeather NOW (also free, all day). If neither plays (no internet, or the channel does not let other sites show it), the weather turn shows the local weather with one line saying why, and the TV tries the live picture again every 10 minutes.
 - After an update to Operations the TV reloads the board by itself within a few minutes. Nobody has to press Refresh.
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.

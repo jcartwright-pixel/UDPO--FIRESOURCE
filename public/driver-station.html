@@ -65,7 +65,7 @@
         <!-- Joe 10/27: the TV's right-hand box takes turns: 30 seconds of FOX Weather live (no sound), then 30 seconds of the
              Driver Scorecard. With no live picture the weather turn shows the local weather. -->
         <aside class="ds-weather" id="weather" hidden>
-          <div class="ds-turn ds-wcard" id="turn-weather"><span class="sym" id="weather-sym" aria-hidden="true"></span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p></div>
+          <div class="ds-turn ds-wcard" id="turn-weather"><span class="sym" id="weather-sym" aria-hidden="true"></span><b>LOCAL WEATHER</b><h3 id="weather-plant">Uniontown</h3><p class="now" id="weather-now">Reading the weather…</p><p id="weather-today"></p><p class="next" id="weather-next"></p><p class="next" id="live-note" hidden></p></div>
           <div class="ds-turn ds-live" id="turn-live" hidden><div id="live-player"></div><span class="ds-live-tag">LIVE</span><span class="ds-live-cap">FOX Weather · live, no sound</span></div>
           <div class="ds-turn ds-sc" id="turn-score" hidden><div class="ds-sc-title"><b>DRIVER SCORECARD</b><span id="sc-label"></span></div><div class="ds-sc-scroll" id="sc-scroll"><table><tbody id="sc-rows"></tbody></table></div></div>
         </aside>
@@ -201,54 +201,73 @@
     // (no sound), then the Driver Scorecard: each driver's overall score, best first (the server's copy, scorecard/kiosk, which
     // the TV's own code may read). With no live picture (no internet, YouTube refuses) the weather turn shows the local
     // weather; with no scores yet the box stays on the weather. The weekly schedule stays as it is.
-    // Joe 10/28 ("not showing weather"): the TV no longer guesses FOX Weather's channel. The server reads which video is live
-    // on FOX Weather's YouTube page every 15 minutes (live-weather.js) and keeps it in scorecard/kiosk as live; the TV plays
-    // that video, and changes to the new one when FOX starts another.
-    const TURN = 30000;
-    let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0, liveKey = '';
+    // Joe 10/28 ("not showing weather"): the server reads which video is live on FOX Weather's YouTube page every 15 minutes
+    // (live-weather.js, scorecard/kiosk: live). 10/29: YouTube answers the server with its robot check, but the page still
+    // names FOX Weather's channel (the number below), so the TV asks YouTube for that channel's live stream itself. When a
+    // live picture will not play, the next one on the list is tried (AccuWeather NOW, also free all day), and when none
+    // plays the local weather shows with one line saying why, so the reason can be read off the TV.
+    const TURN = 30000, FOX_CHANNEL = 'UC1FbPiXx59_ltnFVx7IxWow', ACCU_NOW = 'pSRlP1EZiS8';
+    let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0, liveSig = '', liveIdx = 0, liveList = [], liveWhy = [];
     let liveTimer = 0, retryTimer = 0;
-    // The video to play: FOX Weather's live video when YouTube lets other sites show it, else none.
-    // With no video named but FOX Weather's real channel number known, YouTube is asked for that channel's live stream.
-    const liveTarget = () => {
-      const l = (scores && scores.live) || {};
-      if (l.video) return l.live !== false && l.embed !== false ? String(l.video) : '';
-      return /^UC[\w-]{22}$/.test(l.channel || '') ? 'channel:' + l.channel : '';
-    };
+    // The live pictures to try, in order.
+    function liveChoices() {
+      const l = (scores && scores.live) || {}, out = [];
+      if (l.video && l.live !== false && l.embed !== false) out.push({ key: String(l.video), name: 'FOX Weather' });
+      out.push({ key: 'channel:' + (/^UC[\w-]{22}$/.test(l.channel || '') ? l.channel : FOX_CHANNEL), name: 'FOX Weather' });
+      out.push({ key: ACCU_NOW, name: 'AccuWeather NOW' });
+      return out;
+    }
+    const YT_WHY = { 2: 'would not play', 5: 'would not play', 100: 'has nothing live right now', 101: 'does not let other sites show it', 150: 'does not let other sites show it', 153: 'does not let other sites show it' };
+    function liveNote(text) { const n = document.getElementById('live-note'); n.textContent = text; n.hidden = !text; }
     // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows.
     function stopLive() {
       clearTimeout(liveTimer); clearTimeout(retryTimer); liveOk = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
     }
-    // A video that will not play is tried again in 10 minutes (Joe 10/28: a stream that is down for a while comes back by itself).
-    function failLive() { stopLive(); retryTimer = setTimeout(() => { if (liveKey) startLive(); }, 600000); }
+    // A picture that will not play: the next one is tried; with none left, the local weather and why, and the list is tried
+    // again in 10 minutes (Joe 10/28: a stream that is down for a while comes back by itself).
+    function failLive(why) {
+      const c = liveList[liveIdx];
+      if (c) liveWhy.push(c.name + ' ' + why);
+      stopLive();
+      if (++liveIdx < liveList.length) { startLive(); return; }
+      liveNote('Live weather not showing: ' + liveWhy.join('; ') + '.');
+      retryTimer = setTimeout(() => { liveIdx = 0; liveWhy = []; startLive(); }, 600000);
+    }
     function startLive() {
-      // Joe 10/28 (the TV showed only the local weather): YouTube refuses to play an embedded video when it is not told
-      // which site it is on (its "Error 153"), and Operations tells other sites nothing (Referrer-Policy: same-origin in
-      // firebase.json). The video's own frame sends just the site's address (no page, no sign-in) to YouTube.
+      const c = liveList[liveIdx];
+      if (!c) return;
+      // Joe 10/28: YouTube refuses to play an embedded video when it is not told which site it is on (its "Error 153"), and
+      // Operations tells other sites nothing (Referrer-Policy: same-origin in firebase.json). The video's own frame sends
+      // just the site's address (no page, no sign-in) to YouTube.
       clearTimeout(retryTimer); liveOk = false;
-      document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="FOX Weather live" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/' +
-        (liveKey.startsWith('channel:') ? 'live_stream?channel=' + encodeURIComponent(liveKey.slice(8)) + '&' : encodeURIComponent(liveKey) + '?') + 'autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
+      document.querySelector('#turn-live .ds-live-cap').textContent = c.name + ' · live, no sound';
+      document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="' + escapeHtml(c.name) + ' live" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/' +
+        (c.key.startsWith('channel:') ? 'live_stream?channel=' + encodeURIComponent(c.key.slice(8)) + '&' : encodeURIComponent(c.key) + '?') + 'autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
       const ready = () => {
         player = new window.YT.Player('live-frame', { events: {
-          onReady: (e) => { liveOk = true; clearTimeout(liveTimer); e.target.mute(); showTurn(); },
-          onError: failLive } });
+          onReady: (e) => { e.target.mute(); try { e.target.playVideo(); } catch (err) { /* it plays by itself */ } },
+          // The picture counts only once it is actually playing (a stream that is off the air loads but never plays).
+          onStateChange: (e) => { if (e.data === 1 && !liveOk) { liveOk = true; clearTimeout(liveTimer); liveNote(''); showTurn(); } },
+          onError: (e) => failLive(YT_WHY[e && e.data] || 'would not play') } });
       };
       if (window.YT && window.YT.Player) ready();
       else {
         window.onYouTubeIframeAPIReady = ready;
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
-        tag.onerror = failLive;
+        tag.onerror = () => { liveIdx = liveList.length - 1; failLive('could not be reached (YouTube)'); };
         document.head.appendChild(tag);
       }
       // A Pi takes a while to start a video; 45 seconds with no picture counts as none.
-      clearTimeout(liveTimer); liveTimer = setTimeout(() => { if (!liveOk) failLive(); }, 45000);
+      clearTimeout(liveTimer); liveTimer = setTimeout(() => { if (!liveOk) failLive('did not start'); }, 45000);
     }
     // The live picture plays only on the TV link (?tv=1), not on a computer opening the board.
     function followLive() {
-      const t = full ? liveTarget() : '';
-      if (t === liveKey) return;
-      liveKey = t;
-      if (t) startLive(); else stopLive();
+      if (!full) return;
+      const list = liveChoices(), sig = list.map(c => c.key).join('|');
+      if (sig === liveSig) return;
+      liveSig = sig; liveList = list; liveIdx = 0; liveWhy = [];
+      stopLive(); startLive();
     }
     function showTurn() {
       const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && liveOk;
@@ -273,7 +292,7 @@
     setInterval(() => { const el = document.getElementById('sc-scroll'); if (turn !== 'score' || el.scrollHeight <= el.clientHeight + 2) return; if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) el.scrollTop += 1; }, 60);
     function startTurns(db) {
       if (turnTimer) return;
-      onSnapshot(doc(db, 'scorecard', 'kiosk'), s => { scores = s.exists() ? s.data() : null; drawScores(); followLive(); }, () => { scores = null; showTurn(); });
+      onSnapshot(doc(db, 'scorecard', 'kiosk'), s => { scores = s.exists() ? s.data() : null; drawScores(); followLive(); }, () => { scores = null; showTurn(); followLive(); });
       turnTimer = setTimeout(nextTurn, TURN);
     }
 
