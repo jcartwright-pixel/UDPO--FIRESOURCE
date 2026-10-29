@@ -606,6 +606,7 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 - **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
 - A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
+- **Each trailer is on the list once.** If yesterday's trailer went out again today on the dispatch, or was loaded again today, it was never recorded here. Yesterday's card then leaves the list by itself and is saved as **Not recorded**, with a note saying why. Only today's card is left.
 - A **Wash only** trailer has a `Wash` button and no `Start`. It is done once washed.
 - An added trailer, one from yesterday that was in fact unloaded, or one of today's loadout trailers that is already empty can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
 - On the plant tablet the box **A trailer that is not on the list** does the same: type the trailer, then `UNLOAD IT` or `WASH ONLY`.

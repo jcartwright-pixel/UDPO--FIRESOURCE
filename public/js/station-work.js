@@ -80,6 +80,18 @@ export function mountStationWork({ db, box, person, onDraw }) {
     // Joe 10/27: every trailer today's loadout needs is on the list, also one that did not deliver today.
     return rows.concat(P.neededUnloads(runs, date, two, routeDocs, rows, todays)).filter(inArea).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed)));
   }
+  // Joe 10/28: yesterday's cards whose trailer went out again today are saved as "Not recorded" (once, by a station that can
+  // save, after yesterday's and today's records and the loads are read) and leave the list (carriedUnloads leaves them out).
+  const notRecordedSent = {};
+  function closeNotRecorded() {
+    if (!got.week || !got.runs || !canSave()) return;
+    const y = L.addDays(date, -1), two = week.filter(d => d.date === y || d.date === date);
+    P.carriedNotRecorded(runs, date, two, routeDocs).filter(inArea).forEach(r => {
+      if (notRecordedSent[r.key]) return;
+      notRecordedSent[r.key] = true;
+      saveUnload(r, { notRecorded: true, notRecordedNote: r.notRecordedNote }, { dropped: true });
+    });
+  }
   function washes() {
     const earlier = weekDays().filter(d => d < date).flatMap(d => P.washItems(d, [], [], week).filter(w => w.kind === 'UNLOAD'));
     return P.washItems(date, sheetWash, appWash, week).concat(earlier).filter(w => !washedNow[U.unitKey(w.trailer)]);
@@ -405,6 +417,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   // (no Start button on the card; it still opens). A drop-and-hook load with no trailer typed is a Transfer trailer card.
   function unloadingView() {
     const rows = P.unloadOrder(unloads(), gpsDays), ck = canSave(), unit = P.UNLOAD_UNIT[area() || 'CASE'], wash = washes();
+    setTimeout(closeNotRecorded, 0);
     const left = rows.filter(r => r.status !== 'COMPLETE').length;
     const transfers = rows.filter(r => r.transfer && r.status !== 'COMPLETE');
     const places = [...new Set(transfers.map(r => r.name).filter(Boolean))];

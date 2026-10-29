@@ -519,6 +519,9 @@ function validateUnload(input, SaveError) {
     u.forRoute = text(f.forRoute).slice(0, 60);
   }
   if (f.dropped === true) u.dropped = true;
+  // Joe 10/28: yesterday's trailer nobody pressed End on that went out again (today's dispatch or loadout) leaves the list as
+  // "Not recorded", with a note saying why, also when it was started.
+  if (f.notRecorded === true) { u.notRecorded = true; u.notRecordedNote = text(f.notRecordedNote).slice(0, 300) || 'Not recorded.'; }
   if (!Object.keys(u).length) throw new SaveError('BAD_REQUEST', 'Nothing to save');
   out.unload = u;
   return out;
@@ -539,7 +542,7 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   const next = { unloadKey: key, route: req.route, run: req.run, casesIn: prev.casesIn === undefined || prev.casesIn === null ? '' : String(prev.casesIn), startedAt: prev.startedAt || '',
     completedAt: prev.completedAt || '', notes: prev.notes || '', unloadedBy: prev.unloadedBy || '', productReturnRemovedIds: prev.removed.slice() };
   if (prev.trailer !== undefined) next.trailer = prev.trailer;
-  ['added', 'area', 'addedAt', 'forRoute'].forEach(k => { if (prev[k]) next[k] = prev[k]; });
+  ['added', 'area', 'addedAt', 'forRoute', 'notRecorded'].forEach(k => { if (prev[k]) next[k] = prev[k]; });
   if (prev.dropped) next.dropped = true;
   if (u.added) {
     next.added = u.added; next.area = u.area; next.forRoute = u.forRoute; next.addedAt = stamp; next.dropped = false;
@@ -549,6 +552,12 @@ async function saveUnload(tx, db, req, email, stamp, logRef, mode, SaveError, qu
   if (u.dropped) {
     if (next.startedAt) throw new SaveError('BAD_REQUEST', 'This trailer was started. Finish it instead of taking it off.');
     next.dropped = true;
+  }
+  // Already unloaded (another screen pressed End first): nothing to close.
+  if (u.notRecorded && !next.completedAt) {
+    if (!prev.notRecorded) next.notes = ((next.notes ? next.notes + '\n' : '') + u.notRecordedNote).slice(-1200);
+    next.dropped = true;
+    next.notRecorded = true;
   }
   if (u.start && next.added === 'WASH') throw new SaveError('BAD_REQUEST', 'This trailer is only to be washed. Press Wash when it is clean.');
   if (u.returnIds) {
