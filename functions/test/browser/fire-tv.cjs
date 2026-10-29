@@ -44,7 +44,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     // Joe 10/27: the live weather turn. The check stands in for YouTube: its player script answers ready at once.
     await page.route(/youtube\.com\/iframe_api/, route => route.fulfill({ contentType: 'text/javascript',
       // A stand-in player: it plays, unless the page's udYtFail names the video (then YouTube's error 150, "not on other sites").
-      body: 'window.YT = { Player: function (id, o) { const src = document.getElementById(id).src; const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => { o.events.onReady({ target: t }); if (window.udYtFail && window.udYtFail.test(src)) o.events.onError({ data: 150, target: t }); else o.events.onStateChange({ data: 1, target: t }); }, 50); } }; window.onYouTubeIframeAPIReady();' }));
+      // Like YouTube (Joe 10/29, 6.71), it starts playing only once the player is in view and at least 200 x 200.
+      body: 'window.YT = { Player: function (id, o) { const src = document.getElementById(id).src; const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => { o.events.onReady({ target: t }); if (window.udYtFail && window.udYtFail.test(src)) o.events.onError({ data: 150, target: t }); else { const f = document.getElementById(id), go = () => (f.isConnected && f.offsetWidth >= 200 && f.offsetHeight >= 200 ? o.events.onStateChange({ data: 1, target: t }) : setTimeout(go, 100)); go(); } }, 50); } }; window.onYouTubeIframeAPIReady();' }));
     await page.route(/youtube\.com\/embed\//, route => route.fulfill({ contentType: 'text/html', body: '<body style="background:#123">live</body>' }));
     await localCalls(page);
     const errors = [];
@@ -129,6 +130,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await page.evaluate(() => { window.udYtFail = null; });
     await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive01?"]', { state: 'attached' });
+    // Joe 10/29 (6.71): the video starts in view, in the live box, during the weather turn (YouTube won't start a hidden one).
+    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); return !document.getElementById('turn-live').hidden; });
     await page.waitForFunction(() => document.getElementById('live-note').hidden);
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');

@@ -209,7 +209,7 @@
     // plays the local weather shows with one line saying why, so the reason can be read off the TV.
     const TURN = 30000, FOX_CHANNEL = 'UC1FbPiXx59_ltnFVx7IxWow', ACCU_NOW = 'pSRlP1EZiS8';
     let player = null, liveOk = false, scores = null, turn = 'weather', turnTimer = 0, liveSig = '', liveIdx = 0, liveList = [], liveWhy = [];
-    let liveTimer = 0, retryTimer = 0;
+    let retryTimer = 0, liveTrying = false, liveSeen = 0;
     // The live pictures to try, in order.
     function liveChoices() {
       const l = (scores && scores.live) || {}, out = [];
@@ -222,7 +222,7 @@
     function liveNote(text) { const n = document.getElementById('live-note'); n.textContent = text; n.hidden = !text; }
     // No live picture: the video is taken away (a hidden video would still keep the Pi busy) and the local weather shows.
     function stopLive() {
-      clearTimeout(liveTimer); clearTimeout(retryTimer); liveOk = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
+      clearTimeout(retryTimer); liveOk = false; liveTrying = false; player = null; document.getElementById('live-player').innerHTML = ''; showTurn();
     }
     // A picture that will not play: the next one is tried; with none left, the local weather and why, and the list is tried
     // again in 10 minutes (Joe 10/28: a stream that is down for a while comes back by itself).
@@ -240,7 +240,7 @@
       // Joe 10/28: YouTube refuses to play an embedded video when it is not told which site it is on (its "Error 153"), and
       // Operations tells other sites nothing (Referrer-Policy: same-origin in firebase.json). The video's own frame sends
       // just the site's address (no page, no sign-in) to YouTube.
-      clearTimeout(retryTimer); liveOk = false;
+      clearTimeout(retryTimer); liveOk = false; liveTrying = true; liveSeen = 0;
       document.querySelector('#turn-live .ds-live-cap').textContent = c.name + ' · live, no sound';
       document.getElementById('live-player').innerHTML = '<iframe id="live-frame" title="' + escapeHtml(c.name) + ' live" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube.com/embed/' +
         (c.key.startsWith('channel:') ? 'live_stream?channel=' + encodeURIComponent(c.key.slice(8)) + '&' : encodeURIComponent(c.key) + '?') + 'autoplay=1&mute=1&controls=0&disablekb=1&fs=0&rel=0&playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin) + '"></iframe>';
@@ -248,7 +248,7 @@
         player = new window.YT.Player('live-frame', { events: {
           onReady: (e) => { e.target.mute(); try { e.target.playVideo(); } catch (err) { /* it plays by itself */ } },
           // The picture counts only once it is actually playing (a stream that is off the air loads but never plays).
-          onStateChange: (e) => { if (e.data === 1 && !liveOk) { liveOk = true; clearTimeout(liveTimer); liveNote(''); showTurn(); } },
+          onStateChange: (e) => { if (e.data === 1 && !liveOk) { liveOk = true; liveTrying = false; liveNote(''); showTurn(); } },
           onError: (e) => failLive(YT_WHY[e && e.data] || 'would not play') } });
       };
       if (window.YT && window.YT.Player) ready();
@@ -259,9 +259,16 @@
         tag.onerror = () => { liveIdx = liveList.length - 1; failLive('could not be reached (YouTube)'); };
         document.head.appendChild(tag);
       }
-      // A Pi takes a while to start a video; 45 seconds with no picture counts as none.
-      clearTimeout(liveTimer); liveTimer = setTimeout(() => { if (!liveOk) failLive('did not start'); }, 45000);
+      showTurn();
     }
+    // Joe 10/29 (6.71, "it still doesn't work"): the video was started inside the hidden live box and only shown once playing,
+    // but YouTube will not play a video it cannot see (a hidden player has no size), so it never started. The video now starts
+    // in view during the weather turn. A Pi takes a while to start a video: 40 seconds in view with no picture counts as none
+    // (the Scorecard's turns do not count).
+    setInterval(() => {
+      if (!liveTrying || liveOk || document.getElementById('turn-live').hidden) return;
+      if ((liveSeen += 1000) >= 40000) failLive('did not start');
+    }, 1000);
     // The live picture plays only on the TV link (?tv=1), not on a computer opening the board.
     function followLive() {
       if (!full) return;
@@ -271,12 +278,12 @@
       stopLive(); startLive();
     }
     function showTurn() {
-      const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && liveOk;
+      const score = turn === 'score' && scores && scores.rows && scores.rows.length, live = !score && (liveOk || liveTrying);
       document.getElementById('turn-score').hidden = !score;
       document.getElementById('turn-live').hidden = !live;
       document.getElementById('turn-weather').hidden = score || live;
       document.getElementById('weather').classList.toggle('ds-boxed', !!(score || live));
-      if (player && liveOk && player.playVideo) { try { live ? player.playVideo() : player.pauseVideo(); } catch (e) { /* the player came and went */ } }
+      if (player && (liveOk || liveTrying) && player.playVideo) { try { live ? player.playVideo() : player.pauseVideo(); } catch (e) { /* the player came and went */ } }
       if (score) document.getElementById('sc-scroll').scrollTop = 0;
     }
     function nextTurn() { clearTimeout(turnTimer); turn = turn === 'weather' ? 'score' : 'weather'; showTurn(); turnTimer = setTimeout(nextTurn, TURN); }
