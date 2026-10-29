@@ -510,7 +510,7 @@ async function step(db, input, nowMs) {
     // a truck's miles the same way, and the day it was finished (today unless typed, up to 30 days back).
     let reading = null;
     if (checked && req.safe) {
-      const num = (v) => /^\d+(\.\d+)?$/.test(v) ? Math.round(Number(v)) : null;
+      const today = L.operatingDay(new Date(nowMs)), num = (v) => /^\d+(\.\d+)?$/.test(v) ? Math.round(Number(v)) : null;
       const hours = req.hours ? num(req.hours) : gpsHours, miles = unitType(order.unit_type) === 'TRUCK' ? (req.miles ? num(req.miles) : odometer) : null;
       if (req.hours && (hours == null || hours > 999999)) throw SaveErr('BAD_REQUEST', 'Type the hours as a number.');
       if (hours == null) throw SaveErr('BAD_REQUEST', 'Type the hours (no GPS reading for ' + order.unit + ').');
@@ -518,9 +518,8 @@ async function step(db, input, nowMs) {
         if (req.miles && (miles == null || miles > 3000000)) throw SaveErr('BAD_REQUEST', 'Type the miles as a number.');
         if (miles == null) throw SaveErr('BAD_REQUEST', 'Type the miles (no GPS reading for ' + order.unit + ').');
       }
-      // "Today" here is the plant's calendar day: a job finished at 2 AM is finished on the new date, not the 6 AM day.
-      const calToday = L.localDay(new Date(nowMs).toISOString()), on = req.completedOn || calToday;
-      if (!L.isDateKey(on) || on > calToday || L.daysBetween(on, calToday) > 30) throw SaveErr('BAD_REQUEST', 'The day it was finished must be today or in the last 30 days.');
+      const on = req.completedOn || today;
+      if (!L.isDateKey(on) || on > today || L.daysBetween(on, today) > 30) throw SaveErr('BAD_REQUEST', 'The day it was finished must be today or in the last 30 days.');
       reading = { hours, miles, on };
       if (miles != null) odometer = miles;
     }
