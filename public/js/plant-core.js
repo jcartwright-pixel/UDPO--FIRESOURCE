@@ -459,10 +459,37 @@ export const addedRun = (trailer) => U.unitKey(trailer);
  * journal = the plant journal of yesterday and today (today's washes count for yesterday's wash-only trailers).
  */
 export function carriedUnloads(runs, date, journal, routes, plantStart) {
+  return carriedSplit(runs, date, journal, routes, plantStart).keep;
+}
+/*
+ * Joe 10/28 ("This is allowing more than 1 occurrence of a truck that needs unloaded ... if you see it loaded on the dispatch
+ * sheet then you can go ahead and remove it from the unloading"): a trailer is on the list once. Yesterday's card nobody
+ * pressed End on leaves the list once the same trailer went out again today on the dispatch (today's card is the one to unload) or was
+ * loaded again today (it was emptied). It is saved as "Not recorded" with a note on yesterday's record (carriedNotRecorded,
+ * saved by the screen that can save: notRecorded).
+ */
+function carriedSplit(runs, date, journal, routes, plantStart) {
   const y = L.addDays(date, -1), start = plantStart === undefined ? (typeof window !== 'undefined' && window.UDPlantStart) || '' : plantStart;
-  if ((start && y < start) || date > L.operatingDay(new Date())) return [];
-  return unloadRows(runs, y, journal, [], [], routes).filter(r => r.status !== 'COMPLETE' && !r.dropped && !(r.dropAndHook && !r.trailer))
+  if ((start && y < start) || date > L.operatingDay(new Date())) return { keep: [], skip: [] };
+  const old = unloadRows(runs, y, journal, [], [], routes).filter(r => r.status !== 'COMPLETE' && !r.dropped && !(r.dropAndHook && !r.trailer))
     .map(r => Object.assign(r, { prior: true, date: y }));
+  if (!old.length) return { keep: old, skip: [] };
+  const back = {}, loaded = {};
+  unloadRows(runs, date, journal, [], [], routes).forEach(r => { const u = U.unitKey(r.trailer); if (u && !back[u]) back[u] = r; });
+  loadoutRows(runs, date, plantStart).forEach(l => { const u = U.unitKey(l.trailer); if (u && !l.prior && l.state !== 'WAITING' && !loaded[u]) loaded[u] = l; });
+  const keep = [], skip = [];
+  old.forEach(r => {
+    const u = U.unitKey(r.trailer), b = u && back[u], l = u && loaded[u];
+    if (!b && !l) { keep.push(r); return; }
+    const why = b ? 'went out again on ' + shortDay(date) + ' (' + (b.route === ADDED_ROUTE ? 'added' : b.route) + ')' : 'loaded again on ' + shortDay(date) + ' (' + l.route + ')';
+    skip.push(Object.assign(r, { notRecordedNote: 'Not recorded: ' + txt(r.trailer) + ' ' + why + ' (nobody pressed End on it here).' }));
+  });
+  return { keep, skip };
+}
+const shortDay = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : d; };
+// Yesterday's cards that leave the list as "Not recorded" (see carriedSplit), each with its note.
+export function carriedNotRecorded(runs, date, journal, routes, plantStart) {
+  return carriedSplit(runs, date, journal, routes, plantStart).skip;
 }
 
 /*

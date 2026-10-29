@@ -2,7 +2,7 @@ import { start, requireSignIn, save, escapeHtml, dateTimeText, showError, goLive
 import { doc, onSnapshot, collection, query, where } from './firebase.js';
 import { plantFor } from './pmaint.js';
 
-// Jug Trailers (Joe 10/28, mock-up 2): the jug (dry box) trailers parked in the plant's lot, on Debag. The list on the left
+// Plant Material Trailers (Joe 10/28, mock-up 2; first called Jug Trailers): the dry box trailers parked in the plant's lot, on Debag / Labeling Room. The list on the left
 // says how full each one is and what is on it; the trailer picked opens on the right: Empty / Half Full / Loaded, a line for
 // each item with its pallets, notes, Left the Lot and its history. + Add Trailer picks one of United Dairy's trailers from the
 // main trailer list (Equipment Master) or takes a typed number for any other trailer; either way it is kept on this plant's
@@ -58,7 +58,7 @@ function drawCard(force) {
       '<div class="jt-add"><label>United Dairy trailer<select class="jt-in" id="add-unit"' + dis + '>' + unitChoices() + '</select></label>' +
       '<div class="jt-or">or</div><label>Trailer number (any other trailer)<input class="jt-in" id="add-number" maxlength="20" autocomplete="off"' + dis + '></label></div>' +
       '<div class="jt-row"><button type="button" class="pm-btn pri" id="add-go"' + dis + '>Add to the Lot</button><button type="button" class="pm-btn" id="add-cancel">Cancel</button></div>' +
-      '<p class="jt-help">The trailer goes on this plant\'s jug trailer list as Empty. A typed number is kept here only; it is not added to the main trailer list.</p>';
+      '<p class="jt-help">The trailer goes on this plant\'s material trailer list as Empty. A typed number is kept here only; it is not added to the main trailer list.</p>';
     return;
   }
   const t = trailer();

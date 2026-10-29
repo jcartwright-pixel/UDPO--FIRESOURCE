@@ -450,3 +450,23 @@ test('Unloaded By: the plant people names list', async () => {
   await db().collection('crewPeople').doc('other').set({ facilityId: 'fac_charleston', team: 'plant', name: 'ELSE, SOMEONE', status: 'ACTIVE' });
   assert.deepEqual(await require('../../src/crew').plantNames(db(), 'fac_uniontown'), ['Jordan Carter', 'Riley Moss']);
 });
+
+// Joe 10/28: yesterday's card whose trailer went out again leaves the list as "Not recorded" with its note, also when it was
+// started; saved twice (two screens), the note is added once; a trailer already unloaded is left as it was.
+test('Not recorded: closes yesterday\'s card once, with the note', async () => {
+  const note = 'Not recorded: T-955 went out again on 10-9-26 (808) (nobody pressed End on it here).';
+  await unload('805', 'UT DSD MILK', { notRecorded: true, notRecordedNote: note });
+  await unload('805', 'UT DSD MILK', { notRecorded: true, notRecordedNote: note });
+  let now = R.latestUnloads(await journal(), DATE)[DATE + '|805|UT DSD MILK'];
+  assert.equal(now.dropped, true);
+  assert.equal(now.notRecorded, true);
+  assert.equal(now.notes.split(note).length - 1, 1, 'the note once');
+  // It no longer counts as one of the two unloading: two others can start.
+  await unload('811', 'UT DSD MILK', { start: true });
+  assert.equal((await unload('812', 'UT DSD MILK', { start: true })).status, 'UNLOADING');
+  // A finished one stays finished.
+  await unload('802', 'UT DSD MILK', { notRecorded: true, notRecordedNote: note });
+  now = R.latestUnloads(await journal(), DATE)[DATE + '|802|UT DSD MILK'];
+  assert.equal(now.status, 'COMPLETE');
+  assert.ok(!now.notRecorded);
+});

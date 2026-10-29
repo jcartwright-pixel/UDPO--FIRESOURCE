@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Browser check of Joe's 10/28 Jug Trailers (mock-up 2) on the new Debag area: Plant Operations has Debag and Labeling Room
- * cards; + Add Trailer puts a United Dairy trailer (picked from the main trailer list, dry boxes first) or a typed number on
+ * Browser check of Joe's 10/28 Jug Trailers (mock-up 2) on the new Debag / Labeling Room area (one card on Plant
+ * Operations, Joe 10/28); + Add Trailer puts a United Dairy trailer (picked from the main trailer list, dry boxes first) or a typed number on
  * the plant's own list; Empty / Half Full / Loaded, what is on it and notes save on their own; Left the Lot takes it off and
  * a trailer coming back keeps its history. Pictures go to SHOTS_DIR.
  */
@@ -49,16 +49,17 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
   const browser = await chromium.launch();
   const results = [];
   try {
-    // Plant Operations: Debag opens Jug Trailers; the Labeling Room is Under Construction.
+    // Plant Operations: one Debag / Labeling Room card, which opens Plant Material Trailers.
     const g = await openPage(browser, 1536, 790, '/group.html?g=plantops&testEmail=' + ADMIN);
     await g.waitForSelector('#sides a[data-side="debag"]');
     assert.equal(await g.$eval('#sides a[data-side="debag"]', a => a.getAttribute('href')), 'jug-trailers.html');
-    assert.equal(await g.$eval('#sides a[data-side="labeling"]', a => a.classList.contains('building')), true, 'Labeling Room is Under Construction');
+    assert.equal(await g.$eval('#sides a[data-side="debag"] strong', a => a.textContent), 'Debag / Labeling Room');
+    assert.equal(await g.$('#sides a[data-side="labeling"]'), null, 'no separate Labeling Room card');
     await g.waitForTimeout(1200);
     await shot(g, '1-plant-operations-1536.png');
     assert.deepEqual(g.errors, []);
     await g.close();
-    results.push('Plant Operations has a Debag card (opens Jug Trailers) and a Labeling Room card (Under Construction)');
+    results.push('Plant Operations has one Debag / Labeling Room card, which opens Plant Material Trailers');
 
     // Sam, on the plant floor, adds the trailers and fills them in.
     const p = await openPage(browser, 1536, 790, '/jug-trailers.html?testEmail=' + SAM);
@@ -160,13 +161,6 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
       await v.close();
     }
     results.push('Fits at 1920, 1024 and 390 wide');
-
-    // The Labeling Room opens the being-built page for an administrator.
-    const lab = await openPage(browser, 1536, 790, '/soon.html?what=labeling-room&testEmail=' + ADMIN);
-    await lab.waitForSelector('#screen:not([hidden])');
-    await lab.waitForFunction(() => /Labeling Room is being built/.test(document.body.textContent));
-    await lab.close();
-    results.push('Labeling Room opens its being-built page');
   } finally {
     await browser.close();
   }

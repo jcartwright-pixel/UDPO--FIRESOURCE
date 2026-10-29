@@ -47,7 +47,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/26 (1E): four cards (Plant Operations, Route Distribution, Reports, Safety Walkthrough), each department a dark blue button
     // on its group's card with its main screens under it in light blue (Inventory is now inside Shipping & Receiving).
     assert.deepEqual(await sup.$$eval('.hq-card > strong', c => c.map(x => x.textContent)), ['Plant Operations', 'Route Distribution', 'Reports', 'Safety Walkthrough']);
-    assert.deepEqual(await sup.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'labeling', 'distribution', 'fleet', 'garage']);
+    assert.deepEqual(await sup.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'distribution', 'fleet', 'garage']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
@@ -55,15 +55,15 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // "Administrators only", and clicking one stays on the plant home; the menu links are locked; typing the address is refused.
     assert.deepEqual(await sup.$$eval('.hq-card.building', c => c.map(x => x.dataset.cardSide + ':' + x.querySelector('.uc-admin-only').innerText + ':' + getComputedStyle(x.querySelector('.open-text')).display)),
       ['safety:Administrators only while it is being built:none']);
-    assert.deepEqual(await sup.$$eval('.hq-main.building', c => c.map(x => x.dataset.side)), ['production', 'pmaint', 'labeling']);
+    assert.deepEqual(await sup.$$eval('.hq-main.building', c => c.map(x => x.dataset.side)), ['production', 'pmaint']);
     await sup.click('.hq-main[data-side="production"]');
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
-    assert.deepEqual(await sup.$$eval('.sidemenu a[data-building], .side-flyouts a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['safety:none', 'production:none', 'pmaint:none', 'labeling:none']);
+    assert.deepEqual(await sup.$$eval('.sidemenu a[data-building], .side-flyouts a[data-building]', a => a.map(x => x.dataset.side + ':' + getComputedStyle(x).pointerEvents)), ['safety:none', 'production:none', 'pmaint:none']);
     // Joe 10/26: the Plant Operations page has the plant's department cards; Under Construction ones stay closed there too.
     await sup.goto(HOSTING + '/group.html?g=plantops&testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('.launch-card[data-side="production"]');
-    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'labeling']);
+    assert.deepEqual(await sup.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag']);
     await sup.click('.launch-card[data-side="production"]');
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /group\.html/, 'a supervisor clicking Plant Production stays on the Plant Operations page');
@@ -126,7 +126,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForSelector('.hq-card[data-card-side="reports"]');
     // Joe 10/26 (1E): the four home cards; the departments' own cards (with their pictures) are on the Plant Operations and Route
     // Distribution pages, which the group cards open.
-    assert.deepEqual(await adm.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'labeling', 'distribution', 'fleet', 'garage']);
+    assert.deepEqual(await adm.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'pmaint', 'shipping', 'debag', 'distribution', 'fleet', 'garage']);
     assert.deepEqual(await adm.$$eval('.hq-card[data-card-side] .uc-banner', b => b.map(x => x.closest('.hq-card').dataset.cardSide)), ['safety']);
     const fits = await adm.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.hq-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
     assert.ok(fits.bottom <= fits.inner, 'the four cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
@@ -145,7 +145,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     const sizes = await adm.$$eval('.launch-card', c => c.map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)));
     assert.equal(new Set(sizes).size, 1, 'the four department cards are the same size: ' + sizes.join(' '));
     assert.equal(await adm.textContent('.sidemenu a.side-name'), 'Plant Operations');
-    assert.deepEqual(await adm.$$eval('.sidemenu a[data-side]', a => a.map(x => x.dataset.side)), ['plant', 'production', 'crew', 'pmaint', 'shipping', 'debag', 'labeling']);
+    assert.deepEqual(await adm.$$eval('.sidemenu a[data-side]', a => a.map(x => x.dataset.side)), ['plant', 'production', 'crew', 'pmaint', 'shipping', 'debag']);
     await adm.goto(HOSTING + '/group.html?g=routeops&testEmail=admin.test@uniteddairy.com');
     await adm.waitForSelector('.launch-card[data-side="garage"]');
     assert.deepEqual(await adm.$$eval('.launch-card', c => c.map(x => x.dataset.side)), ['distribution', 'fleet', 'garage']);
@@ -230,7 +230,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
-    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Vacations & Schedule', 'Plant Maintenance', 'Shipping & Receiving', 'Debag', 'Labeling Room', 'Route Distribution', 'Fleet & Maintenance', 'Garage', 'Reports', 'Safety Walkthrough']);
+    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Vacations & Schedule', 'Plant Maintenance', 'Shipping & Receiving', 'Debag / Labeling Room', 'Route Distribution', 'Fleet & Maintenance', 'Garage', 'Reports', 'Safety Walkthrough']);
     await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
     await mods.waitForSelector('.rc-card');
     assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Walkthrough Reports', 'Driver Reports', 'Plant Reports', 'Garage Reports']);

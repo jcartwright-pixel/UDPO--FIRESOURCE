@@ -52,7 +52,7 @@ screens: index.html, company.html, group.html
 The first screen after you sign in. Big cards open each part of Operations: **Plant Operations** and **Route Distribution** (each opens its own page of department cards), **Reports** and **Safety Walkthrough**. Under a card, its main screens have their own buttons and a few numbers (open truck issues, open garage work orders).
 
 - A card marked **Under Construction** opens only for administrators while it is being built.
-- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving, **Debag** (the jug trailers in the lot) and the **Labeling Room** (Under Construction: its screens come later).
+- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving and **Debag / Labeling Room** (the trailers in the lot).
 - Someone who sees more than one plant starts on the **Operations Overview**: one tile per plant with today's numbers and recent activity. Click a plant to open its Home.
 - An administrator can give a person their own Home screen (People & Roles); they then start there, and `Home` still comes here.
 
@@ -608,6 +608,7 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 - **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
 - A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
+- **Each trailer is on the list once.** If yesterday's trailer went out again today on the dispatch, or was loaded again today, it was never recorded here. Yesterday's card then leaves the list by itself and is saved as **Not recorded**, with a note saying why. Only today's card is left.
 - A **Wash only** trailer has a `Wash` button and no `Start`. It is done once washed.
 - An added trailer, one from yesterday that was in fact unloaded, or one of today's loadout trailers that is already empty can come off the list: `Edit`, then `Take Off the List` (only before `Start`).
 - On the plant tablet the box **A trailer that is not on the list** does the same: type the trailer, then `UNLOAD IT` or `WASH ONLY`.
@@ -689,13 +690,13 @@ Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made 
 - Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
 - `Print` prints the list.
 
-# Debag
+# Debag / Labeling Room
 
-## Jug Trailers
+## Plant Material Trailers
 id: jug-trailers
 screens: jug-trailers.html
 
-The jug trailers (dry boxes) parked in the plant's lot: how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
 1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
 2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
@@ -1286,8 +1287,6 @@ id: soon
 screens: soon.html
 
 A screen that is still being built opens this page, with a button to the screen to use meanwhile. Nothing here opens the old app.
-
-The **Labeling Room** card on Plant Operations opens this page until its screens are built (administrators only).
 
 # Phones and Stations
 

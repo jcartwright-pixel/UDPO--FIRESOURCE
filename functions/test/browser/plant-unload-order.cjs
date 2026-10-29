@@ -64,6 +64,13 @@ async function openPage(browser, width, height, url, touch) {
   await d.collection('runs').doc('2026-10-04__run_p815').update({ 'days.fri.trailer': 'T-993' });
   await d.collection('runs').doc('2026-10-04__run_p853').set(Object.assign({}, base, { route: '853', run: 'UT DSD MILK', routeId: 'rte_p853', runId: 'run_p853',
     days: { wed: Object.assign({}, base.days.thu, { trailer: 'T-778' }), fri: Object.assign({}, base.days.fri, { trailer: 'T-778', loadStatus: '', completeTime: '', plantStartedAt: '' }) } }));
+  // Joe 10/28 (a trailer is on the list once): 856 delivered yesterday on T-954 and nobody pressed End, but T-954 went out again
+  // today (it delivers today on another run); 857 delivered yesterday on T-889, which today's loadout already loaded again.
+  // Neither of yesterday's cards stays on the list: each is saved as "Not recorded" with a note.
+  await d.collection('runs').doc('2026-10-04__run_p856').set(Object.assign({}, base, { route: '856', run: 'UT DSD MILK', routeId: 'rte_p856', runId: 'run_p856',
+    days: { wed: Object.assign({}, base.days.thu, { trailer: 'T-954' }) } }));
+  await d.collection('runs').doc('2026-10-04__run_p857').set(Object.assign({}, base, { route: '857', run: 'UT DSD MILK', routeId: 'rte_p857', runId: 'run_p857',
+    days: { wed: Object.assign({}, base.days.thu, { trailer: 'T-889' }), fri: Object.assign({}, base.days.fri, { trailer: 'T-889', loadStatus: 'COMPLETE', plantStartedAt: '2026-10-08T12:00:00Z', completeTime: '2026-10-08T12:40:00Z' }) } }));
   // When each trailer is next needed: its Friday load (loaded today), unless that load is already loaded. A load made the day
   // before leaves in the operating day before (the day rolls at 6 a.m., Joe 10/19): 6 a.m. on is Thursday, earlier is Friday.
   // Joe 10/27: the trailers today's loadout needs are in the order they are loaded (Case Loadout's load sequence).
@@ -115,6 +122,8 @@ async function openPage(browser, width, height, url, touch) {
       assert.ok(!cards.some(c => /T-10285/.test(c.title)), 'never Dispatch\'s trailer number on a drop-and-hook load');
       assert.equal(transfer[0].badge, 'NEEDS A TRAILER');
       assert.ok(!transfer[0].quick, 'a transfer trailer has no Start on the card');
+      assert.equal(cards.filter(c => c.trailer === 'T-954').length, 1, 'T-954 once: today\'s card, not yesterday\'s too');
+      assert.ok(!cards.some(c => c.trailer === 'T-889'), 'T-889, loaded again today, is not on the list');
       assert.match(await p.textContent('#work .sw-panel-head span'), /^1 trailer from yesterday 1 transfer trailer needed \(Marietta 1\)/);
       assert.ok(done.length >= 1, 'the unloaded trailer is at the bottom');
       if (SHOTS) {
@@ -174,6 +183,13 @@ async function openPage(browser, width, height, url, touch) {
     if (SHOTS) await st.screenshot({ path: path.join(SHOTS, 'after-case-loadout-tablet-1024.png') });
     assert.deepEqual(st.errors, []);
     results.push('Plant Station Case Loadout: T-778 red, T-993 green');
+    // Yesterday's two cards were saved as Not recorded, with the reason in their notes.
+    const nr = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-07').get()).docs.map(x => x.data()), '2026-10-07');
+    const n954 = nr['2026-10-07|856|UT DSD MILK'], n889 = nr['2026-10-07|857|UT DSD MILK'];
+    assert.ok(n954 && n954.dropped && n954.notRecorded && /^Not recorded: T-954 went out again on 10-8-26/.test(n954.notes), 'T-954 yesterday: Not recorded ' + JSON.stringify(n954));
+    assert.ok(n889 && n889.dropped && n889.notRecorded && /^Not recorded: T-889 loaded again on 10-8-26 \(857\)/.test(n889.notes), 'T-889 yesterday: Not recorded ' + JSON.stringify(n889));
+    assert.ok(!nr['2026-10-07|853|UT DSD MILK'] || !nr['2026-10-07|853|UT DSD MILK'].notRecorded, 'T-778 (its load not loaded yet) stays on the list');
+    results.push('A trailer on the list once: yesterday\'s T-954 (went out again today) and T-889 (loaded again today) saved as Not recorded with a note, off the list; T-778 stays');
     await st.close();
     // Joe 10/28 (gz): the open card's boxes are narrow, on one line with Unloaded By (picked or typed); the name shows by the
     // status; two trailers can be unloading, and while two are the other cards say so in place of Start Unloading.
