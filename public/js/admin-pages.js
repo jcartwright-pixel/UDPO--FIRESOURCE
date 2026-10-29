@@ -145,7 +145,7 @@ export async function renderPeople(box) {
       return '<td class="sa-cell"><input type="checkbox" data-sa-plant="' + plant + '" data-sa-keys="' + keys.join(' ') + '"' + (n && n === keys.length ? ' checked' : '') + (n && n < keys.length ? ' data-part="1"' : '') +
         (off ? ' disabled' : '') + ' aria-label="' + e(extra) + ' at ' + e(plantName(plant)) + '"></td>';
     };
-    // An area with no screens yet (the Labeling Room, Joe 10/28) has nothing to tick.
+    // An area with no screens yet has nothing to tick.
     const rows = L.SCREEN_AREAS.filter(a => a.screens.length).map(a => {
       const keys = a.screens.map(x => x[0]), open = draft.openAreas.indexOf(a.key) >= 0;
       return '<tr class="sa-area"><td><button type="button" class="sa-toggle" data-sa-area="' + a.key + '" aria-expanded="' + open + '">' + (open ? 'Hide screens' : 'Show screens') + '</button> ' +

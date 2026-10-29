@@ -41,7 +41,7 @@
     const sub = (s, [label, href]) => '<a class="hq-sub' + bld(s) + (s.buildingSections && /inventory\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
     const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
       (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
-    // Joe 10/28: departments with no screens of their own under them (Debag, Labeling Room) sit two to a row, so the card still fits.
+    // Joe 10/28: departments with no screens of their own under them sit two to a row, so the card still fits.
     const solo = (s) => !!s && !(s.quick || []).length && s.key !== 'fleet' && s.key !== 'garage';
     const pairUp = (list) => {
       let html = '';
