@@ -311,7 +311,8 @@ export function mountJobStation(cfg) {
   function atBottom() { const s = scroller(); return !s || s.scrollTop + s.clientHeight >= s.scrollHeight - 8; }
   function doneLocked(j) { return !!checkList(j) && (checksLeft(j) > 0 || readingLeft(j).length > 0 || !seenBottom); }
   // Joe 10/28 evening: a service's hours, a truck's miles (the GPS's filled in when it has them) and the day it was finished.
-  const todayKey = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  // The plant's calendar day (New York), whatever clock the device is set to; the server checks the same day.
+  const todayKey = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   function readingOf(j) {
     const a = kept('Checks', j), r = j.reading || {}, pick = (k, v) => a[k] !== undefined ? a[k] : v == null ? '' : String(v);
     return { hours: pick('~hours', r.hours), miles: j.type === 'TRUCK' ? pick('~miles', r.miles) : null, on: pick('~on', todayKey()) };
