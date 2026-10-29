@@ -279,7 +279,9 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 
 !> Do not sign a TV in with your own Google account. Use the TV's code so it comes back by itself after a power cut.
 
-!> Do not type a TV or Driver Room code on your own computer. It then opens only the Driver Room screens.
+- An Administrator frees a TV or tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
+
+!> Do not type a TV or Driver Room code on your own computer. It then opens only the Driver Room screens (an Administrator's account frees it).
 
 ## Sheet Conflicts
 id: conflicts
@@ -414,7 +416,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 - Tapped early, `Complete` says what is left and shows it in red. The **Needs work** lines are kept on the work order.
 - Left with no taps for 20 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
 - With no signal the station keeps working and sends everything when the signal is back.
-- A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app.
+- A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app. An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account).
 
 > `Talk` uses the tablet's microphone. The first time, the tablet asks to allow it: tap Allow.
 
@@ -938,7 +940,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
 - `Set Next` sets what runs next on this line and how many.
 
-**A line tablet on the floor:** open the Line Tablet link (Administration, Plant Station Codes) on the tablet. Once the plant has a Line Tablet code, the tablet types it once and picks its line. After that it has no Back, Home, Sign out or `Change Line`, and it opens no other screen. To move it to another line, a manager taps `Release` in the bottom-right corner and types the manager release code; the tablet goes back to the code screen. A computer opening Line Tablet from the menus works as before.
+**A line tablet on the floor:** open the Line Tablet link (Administration, Plant Station Codes) on the tablet. Once the plant has a Line Tablet code, the tablet types it once and picks its line. After that it has no Back, Home, Sign out or `Change Line`, and it opens no other screen. To move it to another line, a manager taps `Release` in the bottom-right corner and types the manager release code; the tablet goes back to the code screen. An Administrator frees the tablet for good with `Administrator sign-in` on the code screen (their own account). A computer opening Line Tablet from the menus works as before.
 
 > No code date on Running now? Set the product's shelf life on Line Targets.
 
@@ -1043,7 +1045,9 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - The station has no Back or Home. `Release` (with the manager release code) is the only way out.
 - **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
 
-!> Do not type the Maintenance Station code on your own computer. It then opens only the Maintenance Station.
+- An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
+
+!> Do not type the Maintenance Station code on your own computer. It then opens only the Maintenance Station (an Administrator's account frees it).
 
 # Plant Schedule
 
@@ -1135,6 +1139,7 @@ Every link and code people use to reach the app:
 - **Plant Station Codes:** the one Plant Station link, then each station's code (typed on the tablet to open that station). `+ Add Station`, `New code`, `Remove`. Under them, the **Line Tablet** link and the **Line Tablets** code.
 - **Garage Station Codes:** the Garage Station and Maintenance Station links, each garage station's code, and the **Maintenance Station** code.
 - A tablet or TV opened with its code opens only its own screen. `Release` (manager release code) takes it back to its code screen, never into the app.
+- An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
 
@@ -1328,6 +1333,16 @@ The Case Unloading tablet does two jobs. It opens on a choice of two big buttons
 
 > A tablet signed in with its station code alone (no United Dairy account) goes back to its station code box after Release.
 
+### Administrator sign-in (taking a tablet off for good)
+
+An Administrator is never locked to a station. A computer or tablet signed in with an Administrator's own account is never held on the station: a station screen shows an `Operations` button in the bottom-left corner that goes back to the app, and every other screen opens. A computer that was locked before frees itself as soon as an Administrator signs in on it.
+
+1. On a locked tablet, a manager presses `Release` and types the manager release code. The code screen opens.
+2. Press `Administrator sign-in` under the code box.
+3. Sign in with your own United Dairy account. If you are an Administrator, the tablet forgets its station and opens Operations.
+
+> Anyone who is not an Administrator is signed straight back out, and the tablet stays where it was.
+
 !> Do not release a station to use the tablet for something else in the middle of a shift.
 
-!> Do not type a station code on your own computer or phone to try it: that device then opens only the Plant Station until its browser data for the app is cleared.
+!> Do not type a station code on your own computer or phone to try it: that device then opens only the Plant Station. If you did, sign in with your Administrator account (or use `Administrator sign-in` on the code screen) to free it.

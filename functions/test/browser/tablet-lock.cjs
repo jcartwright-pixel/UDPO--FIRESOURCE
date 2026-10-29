@@ -128,8 +128,7 @@ const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], [
 const OTHERS = [
   { name: 'Garage Station', key: 'fac_uniontown_garage_garage', open: '/garage-station.html?' + MANAGER, code: '#view-code', ready: 'body.station-locked #view-home:not([hidden])', home: 'garage-station.html', release: '#gs-change', box: '#gs-release', gone: ['#go-back', '#go-home'] },
   { name: 'Maintenance Station', key: 'fac_uniontown_maint_maint', open: '/maint-station.html', code: '#view-code', ready: 'body.station-locked #view-jobs:not([hidden])', home: 'maint-station.html', release: '#ms-change', box: '#ms-release', gone: ['#go-back', '#go-home'] },
-  { name: 'Line tablet', key: 'fac_uniontown_line_line', open: '/line.html' + UD + '&tablet=1', code: '#code-box', pick: '#line-list [data-line]', ready: 'body.station-locked #line-head:not([hidden])', home: 'line.html', release: '#lt-release', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#change'] },
-  { name: 'Driver Room TV (Driver\'s Kiosk Station)', key: 'fac_uniontown_kiosk_tv', open: '/driver-station.html' + UD, code: '#code-box', ready: 'body.station-locked #ds-grid:not([hidden])', home: 'driver-station.html', release: '#change', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#tv-exit'] },
+  { name: 'Driver Room TV (Driver\'s Kiosk Station)', key: 'fac_uniontown_kiosk_tv', open: '/driver-station.html?' + MANAGER, code: '#code-box', ready: 'body.station-locked #ds-grid:not([hidden])', home: 'driver-station.html', release: '#change', box: '#release-box', gone: ['#go-back', '#go-home', '#signout', '#tv-exit'] },
   { name: 'Driver Room tablet (Driver Room Check-In Station)', key: 'fac_uniontown_kiosk_driver', open: '/driver-station.html?for=room&' + MANAGER, code: '#code-box', ready: 'body.room.station-locked #m-station', home: 'route.html', onHome: (u) => pageOf(u) === 'route.html' && /[?&]room=1/.test(u),
     release: '#m-station', box: '#release-box', gone: ['#go-back', '#go-home', '#signout'], after: 'driver-station.html' }
 ];
@@ -140,7 +139,7 @@ const OTHERS = [
   const at = new Date().toISOString(), codes = {};
   for (const [type] of PLANT) codes[type] = (await STATIONS.stationCode(db(), ADMIN, { key: 'fac_uniontown_plant_' + type.toLowerCase() }, at)).code;
   codes.managers = (await STATIONS.stationCode(db(), ADMIN, { key: 'fac_uniontown_manager_managers' }, at)).code;
-  for (const o of OTHERS) codes[o.key] = (await STATIONS.stationCode(db(), ADMIN, { key: o.key }, at)).code;
+  for (const o of OTHERS.concat([{ key: 'fac_uniontown_line_line' }])) codes[o.key] = (await STATIONS.stationCode(db(), ADMIN, { key: o.key }, at)).code;
   await STATIONS.noAccountSet(db(), ADMIN, { facilityId: 'fac_uniontown', on: true }, at);
   const release = (await require('../../src/admin').adminCall(db(), { email: ADMIN }, { op: 'releaseCodeNew', facilityId: 'fac_uniontown' })).code;
   const browser = await chromium.launch();
@@ -149,7 +148,7 @@ const OTHERS = [
     for (const [type, name] of PLANT) {
       for (const how of ['ud', 'code']) {
         const what = name + (how === 'ud' ? ' (United Dairy account, then code)' : ' (code alone)');
-        const p = await openPage(browser, tablet(), how === 'ud' ? '/plant-station.html' + UD : '/plant-station.html?noaccount=1');
+        const p = await openPage(browser, tablet(), how === 'ud' ? '/plant-station.html?' + MANAGER : '/plant-station.html?noaccount=1');
         if (how === 'ud') {
           await p.waitForSelector('#code-box form.st-code');
           await p.fill('#code-box input', codes[type]);
@@ -250,6 +249,109 @@ const OTHERS = [
         '- Release (manager release code): back to the code screen; nothing else opens after it.', '');
       results.push(o.name + ': ' + pressed.length + ' buttons pressed and ' + typed.length + ' screens typed in, all stayed on it; Release went back to the code screen');
       await p.context().close();
+    }
+
+    // A line tablet (Joe 10/28). Plant Production is still open to Administrators only, and an Administrator is never locked
+    // (Joe 10/29), so the line tablet's code opens its line unlocked for now. The lock itself is checked as it will be once the
+    // line tablets are signed in with a floor account: a device locked as a line tablet opens only the Line Tablet.
+    {
+      const l = await openPage(browser, tablet(), '/line.html' + UD + '&tablet=1');
+      await l.waitForSelector('#code-box form.st-code');
+      await l.fill('#code-box input', codes.fac_uniontown_line_line);
+      await l.click('#code-box button[type="submit"]');
+      await l.waitForSelector('#line-list [data-line]');
+      await l.click('#line-list [data-line]');
+      await l.waitForSelector('#line-head:not([hidden])');
+      await l.waitForTimeout(1000);
+      assert.equal(await l.evaluate(() => localStorage.getItem('udStationDevice')), null, 'an Administrator\'s line tablet is not locked');
+      await l.context().close();
+      const g = await openPage(browser, tablet(), '/index.html?' + MANAGER);
+      await g.waitForTimeout(1500);
+      await g.evaluate(() => localStorage.setItem('udStationDevice', 'LINE'));
+      const leaks = await typedAll(g, ['index.html', 'company.html', 'administration.html', 'manager.html', 'production.html', 'plant-station.html', 'garage-station.html', 'route.html', 'help.html'], 'line.html');
+      assert.deepEqual(leaks, [], 'Line tablet: typed screens that did not go back to the Line Tablet');
+      await g.context().close();
+      audit.push('## Line tablet', '', '- Plant Production is open to Administrators only, and an Administrator is never locked: the code opens the line, unlocked.',
+        '- A device locked as a line tablet (a floor account): every other screen typed in comes back to the Line Tablet.', '');
+      results.push('Line tablet: an Administrator is not locked; a locked line tablet opens only the Line Tablet');
+    }
+
+    // Joe 10/29 "I need something that my account never gets locked out of": an Administrator is never locked to a station.
+    {
+      const locked = (p) => p.evaluate(() => localStorage.getItem('udStationDevice'));
+      // Operations' first screen: Home, or the plant choice for an Administrator of more than one plant.
+      const opsHome = (u) => ['index.html', 'company.html'].indexOf(pageOf(String(u))) >= 0;
+      // 1. An Administrator opening a station with its code: the station opens with its menus, nothing is locked, other screens open.
+      const a = await openPage(browser, tablet(), '/plant-station.html' + UD);
+      await a.waitForSelector('#code-box form.st-code');
+      await a.fill('#code-box input', codes.CASE);
+      await a.click('#code-box button[type="submit"]');
+      await a.waitForFunction(() => !document.getElementById('station').hidden && !document.getElementById('screen').hidden);
+      await a.waitForTimeout(1500);
+      assert.equal(await a.evaluate(() => document.body.classList.contains('station-locked')), false, 'an Administrator\'s station keeps its menus');
+      assert.equal(await locked(a), null, 'an Administrator\'s computer is not locked');
+      // A station page has no Home of its own: an Administrator gets the Operations button.
+      await shot(a, 'tablet-lock-admin-station-1024');
+      await a.click('#admin-home');
+      await a.waitForURL(opsHome, { timeout: 15000 });
+      await a.goto(HOSTING + '/administration.html');
+      await a.waitForTimeout(2000);
+      assert.equal(pageOf(a.url()), 'administration.html', 'an Administrator opens other screens after a station');
+      // 2. Joe's case: a computer already locked (a station opened on it), then opened fresh with an Administrator signed in.
+      await a.evaluate(() => { localStorage.setItem('udStationDevice', 'PLANT'); sessionStorage.clear(); });
+      await a.goto(HOSTING + '/administration.html');
+      await a.waitForURL(opsHome, { timeout: 20000 });
+      await a.waitForTimeout(1500);
+      assert.ok(opsHome(a.url()), 'a locked computer with an Administrator signed in opens Operations (' + a.url() + ')');
+      assert.equal(await locked(a), null, 'the Administrator\'s sign-in freed the computer');
+      await a.goto(HOSTING + '/administration.html');
+      await a.waitForTimeout(2000);
+      assert.equal(pageOf(a.url()), 'administration.html', 'a freed computer opens every screen');
+      assert.deepEqual(a.errors.filter(e => !/Missing or insufficient permissions/.test(e)), [], 'Administrator: no errors or new windows');
+      await a.context().close();
+      // 3. A locked tablet (a manager's account), released to its code screen: Administrator sign-in.
+      const t = await openPage(browser, tablet(), '/plant-station.html?' + MANAGER);
+      await t.waitForSelector('#code-box form.st-code');
+      await t.fill('#code-box input', codes.CASE);
+      await t.click('#code-box button[type="submit"]');
+      await t.waitForSelector('body.station-locked #change:not([hidden])');
+      assert.equal(await t.$('#admin-home'), null, 'a manager\'s tablet has no Operations button');
+      await t.click('#change');
+      await t.waitForSelector('#release:not([hidden])');
+      await t.fill('#release-code', release);
+      await t.click('#release-go');
+      await t.waitForSelector('#code-box form.st-code .st-admin');
+      assert.equal(await locked(t), 'PLANT');
+      await shot(t, 'tablet-lock-admin-sign-in-1024');
+      // Someone who is not an Administrator: signed back out, and the tablet stays locked.
+      await t.evaluate(() => { window.UDTestAdminSignIn = 'manager.test@uniteddairy.com'; });
+      await t.click('#code-box .st-admin');
+      await t.waitForFunction(() => /Only an Administrator/.test(document.querySelector('#code-box .st-code-msg').textContent));
+      assert.equal(pageOf(t.url()), 'plant-station.html', 'a manager stays on the code screen');
+      assert.equal(await locked(t), 'PLANT', 'a manager does not free the tablet');
+      const still = await typedAll(t, ['index.html', 'administration.html'], 'plant-station.html');
+      assert.deepEqual(still, [], 'after a manager tried Administrator sign-in, the tablet is still locked');
+      // An Administrator: the tablet forgets its station and opens Operations.
+      await t.waitForSelector('#code-box form.st-code .st-admin', { state: 'attached', timeout: 20000 }).catch(() => {});
+      const ask = await t.$('#code-box .st-admin');
+      if (!ask) {
+        // The manager was signed out: the Plant Station asks for a Google sign-in first; sign the manager in again.
+        await t.goto(HOSTING + '/plant-station.html?' + MANAGER);
+        await t.waitForSelector('#code-box form.st-code .st-admin');
+      }
+      await t.evaluate((who) => { window.UDTestAdminSignIn = who; }, ADMIN);
+      await t.click('#code-box .st-admin');
+      await t.waitForURL(opsHome, { timeout: 20000 });
+      assert.equal(await locked(t), null, 'Administrator sign-in freed the tablet');
+      assert.equal(await t.evaluate(() => localStorage.getItem('udPlantStationCode')), null, 'the tablet forgot its station');
+      await t.goto(HOSTING + '/administration.html');
+      await t.waitForTimeout(2000);
+      assert.equal(pageOf(t.url()), 'administration.html', 'the freed tablet opens every screen');
+      await t.context().close();
+      audit.push('## Administrators', '', '- An Administrator opening a station with its code: the station keeps its menus and the computer is not locked.',
+        '- A computer already locked, opened with an Administrator signed in: it is freed and opens Operations.',
+        '- A locked tablet\'s code screen: `Administrator sign-in` with a manager\'s account signs them back out and the tablet stays locked; with an Administrator\'s account the tablet forgets its station and opens Operations.', '');
+      results.push('Administrators: never locked; a signed-in Administrator frees a locked computer; Administrator sign-in on the code screen frees a tablet (a manager cannot)');
     }
 
     // The Plant Managers app on a phone.

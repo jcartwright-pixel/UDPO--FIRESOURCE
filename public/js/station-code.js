@@ -3,6 +3,8 @@
  * Driver Room kiosk ask for their station's code once, remember the station, and open it each time after. A new code or a
  * removed station sends the tablet back to the code screen. call(op, fields) is the page's server call for station steps.
  */
+import { adminFreeSignIn } from './app.js';
+
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
 export const remember = (k, v) => { try { if (v) localStorage.setItem(k, JSON.stringify(v)); else localStorage.removeItem(k); } catch (e) { /* private window: asked again next time */ } };
 
@@ -41,9 +43,13 @@ export function askCode(box, { kind, storeKey, call, title, hint, message, label
   return new Promise(resolve => {
     box.innerHTML = '<form class="st-code"><h2>' + title + '</h2><p>' + hint + '</p>' +
       '<label>' + label + ' <input name="code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"></label>' +
-      '<button type="submit">' + button + '</button><p class="st-code-msg" role="status"></p></form>';
-    const form = box.querySelector('form'), msg = box.querySelector('.st-code-msg');
+      '<button type="submit">' + button + '</button><p class="st-code-msg" role="status"></p>' +
+      // Joe 10/29: an Administrator frees the tablet with their own account (no Unlock button anyone else can use).
+      (kind === 'MANAGER' ? '' : '<button type="button" class="st-admin" title="An Administrator signs in with their own account to take this tablet off its station">Administrator sign-in</button>') +
+      '</form>';
+    const form = box.querySelector('form'), msg = box.querySelector('.st-code-msg'), admin = box.querySelector('.st-admin');
     msg.textContent = message || '';
+    if (admin) admin.addEventListener('click', async () => { msg.textContent = 'Signing in…'; msg.textContent = await adminFreeSignIn(); });
     form.code.focus();
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

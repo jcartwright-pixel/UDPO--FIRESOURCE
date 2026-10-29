@@ -20,6 +20,8 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
+// The stations themselves are opened with a manager's account: an Administrator is never locked to a station (Joe 10/29).
+const MGR = '?testEmail=manager.test@uniteddairy.com';
 
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
@@ -141,7 +143,7 @@ async function codeFitsPhones(p, name) {
 
     // The Plant Station tablet: the code screen, a wrong code, the right one opens Case Loadout; Release stays put until the
     // plant has a manager release code (Joe 10/12: no Back, Home or Sign out; Release in the bottom-right corner is the only way out).
-    const ps = await openPage(browser, 1536, 864, '/plant-station.html' + ADMIN);
+    const ps = await openPage(browser, 1536, 864, '/plant-station.html' + MGR);
     await ps.waitForSelector('#code-box form.st-code');
     assert.equal(await ps.isVisible('#pick'), false, 'no station list once the plant has codes');
     await shot(ps, '4-plant-station-code-screen-1536.png');
@@ -226,7 +228,7 @@ async function codeFitsPhones(p, name) {
     assert.deepEqual(gs.errors, []);
     results.push('Garage Station: asks for the garage code, then the work orders; no Back or Home; Release in the bottom-right corner refuses until a manager release code is set');
 
-    const ds = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
+    const ds = await openPage(browser, 1536, 864, '/driver-station.html' + MGR);
     await ds.waitForSelector('#code-box form.st-code');
     await codeFitsPhones(ds, 'Driver Station');
     await shot(ds, '7-driver-kiosk-code-screen-1536.png');
@@ -242,7 +244,7 @@ async function codeFitsPhones(p, name) {
     assert.ok(await ds.evaluate(() => localStorage.getItem('udKioskCode')), 'the existing link keeps it too');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
     // Reopening the existing link (or the old driver-room.html, via the Driver Station link) goes straight back to the drivers' Check-In.
-    await ds.goto(HOSTING + '/driver-station.html' + ADMIN);
+    await ds.goto(HOSTING + '/driver-station.html' + MGR);
     await ds.waitForURL(/route\.html\?room=1$/);
     await ds.goto(HOSTING + '/driver-room.html');
     await ds.waitForURL(/route\.html\?room=1$/);
@@ -258,7 +260,7 @@ async function codeFitsPhones(p, name) {
     assert.deepEqual(ds.errors, []);
     results.push('Driver Room kiosk: its code on the existing Driver Station link opens the drivers\' Check-In (the phone screens), which keeps it; no Back, Home or Sign out; with no manager release code set, Release refuses');
     // A TV's code typed on the tablet link opens the TV display (no header).
-    const tv = await openPage(browser, 1536, 864, '/driver-station.html' + ADMIN);
+    const tv = await openPage(browser, 1536, 864, '/driver-station.html' + MGR);
     await tv.waitForSelector('#code-box form.st-code');
     await tv.fill('#code-box input', codes.tv);
     await Promise.all([tv.waitForURL(/tv=1/), tv.click('#code-box button')]);
@@ -272,7 +274,7 @@ async function codeFitsPhones(p, name) {
     assert.match(await tv.textContent('#error'), /stays here/);
     assert.match(tv.url(), /tv=1/);
     // The TV keeps its code: opening the one Driver Station link again goes straight to the TV board.
-    await tv.goto(HOSTING + '/driver-station.html' + ADMIN);
+    await tv.goto(HOSTING + '/driver-station.html' + MGR);
     await tv.waitForURL(/tv=1/);
     await tv.waitForSelector('#eyebrow:text("Driver\'s Kiosk Station · Uniontown")');
     results.push('Driver Room TV: its code on the one Driver Station link opens the full-screen TV board, also when reopened; no Sign out or Exit, and Release refuses until a manager release code is set');
@@ -337,7 +339,7 @@ async function codeFitsPhones(p, name) {
     await ps.waitForSelector('#code-box form.st-code');
     assert.match(ps.url(), /plant-station\.html/);
     for (const gone of ['#go-back', '#go-home', '#signout', '#change']) assert.equal(await ps.isVisible(gone), false, gone + ' is not on the code screen after Release');
-    await Promise.all([ps.waitForURL(/plant-station\.html/), ps.goto(HOSTING + '/index.html' + ADMIN)]);
+    await Promise.all([ps.waitForURL(/plant-station\.html/), ps.goto(HOSTING + '/index.html' + MGR)]);
     await ps.waitForSelector('#code-box form.st-code');
     await gs.click('#gs-change');
     await gs.waitForSelector('#gs-release form');
@@ -348,7 +350,7 @@ async function codeFitsPhones(p, name) {
     await gs.waitForSelector('#view-code form.st-code');
     assert.match(gs.url(), /garage-station\.html/);
     for (const gone of ['#go-back', '#go-home', '#gs-change']) assert.equal(await gs.isVisible(gone), false, gone + ' is not on the garage code screen after Release');
-    await Promise.all([gs.waitForURL(/garage-station\.html/), gs.goto(HOSTING + '/index.html' + ADMIN)]);
+    await Promise.all([gs.waitForURL(/garage-station\.html/), gs.goto(HOSTING + '/index.html' + MGR)]);
     await gs.waitForSelector('#view-code form.st-code');
     results.push('Plant Station and Garage Station: Release with the manager release code goes back to the code screen and the tablet opens nothing else');
   } finally {
