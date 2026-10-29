@@ -116,7 +116,20 @@
       return '<datalist id="people">' + people.map(x => '<option value="' + escapeHtml(x) + '"></option>').join('') + '</datalist>';
     };
 
+    // Joe 10/28: yesterday's cards whose trailer went out again today are saved as "Not recorded" (once, while working the list,
+    // after the loads and both days' records are read) and leave the list (carriedUnloads leaves them out).
+    let read = { runs: false, journal: false, prev: false };
+    const notRecordedSent = {};
+    function closeNotRecorded() {
+      if (!check() || !read.runs || !read.journal || !read.prev) return;
+      P.carriedNotRecorded(runs, date, prevJournal.concat(journal), routes).forEach(r => {
+        if (notRecordedSent[r.key]) return;
+        notRecordedSent[r.key] = true;
+        saveUnload(r, { notRecorded: true, notRecordedNote: r.notRecordedNote }, { dropped: true });
+      });
+    }
     function render() {
+      setTimeout(closeNotRecorded, 0);
       const { returns, rows: all, wash } = data(), unit = P.UNLOAD_UNIT[area], name = P.UNLOAD_TILE[area];
       const c = P.unloadCounts(all), pendingReturns = returns.filter(x => x.pending);
       document.getElementById('work-date').value = date;
@@ -382,10 +395,11 @@
       while (unsubs.length) unsubs.pop()();
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date), L.weekStart(L.addDays(date, -1))]))];
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, fail('the loads')));
-      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the unloading list')));
+      read = { runs: false, journal: false, prev: false };
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); read.runs = true; render(); }, fail('the loads')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', date)), s => { journal = s.docs.map(d => d.data()); read.journal = true; render(); }, fail('the unloading list')));
       prevJournal = [];
-      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', L.addDays(date, -1))), s => { prevJournal = s.docs.map(d => d.data()); render(); }, fail('yesterday\'s unloading list')));
+      unsubs.push(onSnapshot(query(collection(db, 'plantJournal'), where('date', '==', L.addDays(date, -1))), s => { prevJournal = s.docs.map(d => d.data()); read.prev = true; render(); }, fail('yesterday\'s unloading list')));
       unsubs.push(onSnapshot(query(collection(db, 'caseCounts'), where('date', '==', date)), s => {
         caseCounts = {};
         s.docs.forEach(d => { const c = d.data(); if (c.kind === 'UNLOAD') caseCounts[c.unloadKey] = c; });

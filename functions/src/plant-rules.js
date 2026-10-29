@@ -78,7 +78,7 @@
         completedAt: p.completedAt || d.completedAt || '', trailer: Object.prototype.hasOwnProperty.call(p, 'trailer') ? p.trailer : (d.trailer || undefined),
         notes: p.notes || d.notes || '', unloadedBy: p.unloadedBy || '', removed: removed, recordedAt: d.recordedAt || '', route: p.route || d.route || '', run: p.run || d.run || '',
         // Joe 10/27 (hd): a trailer added by hand on Case Unloading (Unload it / Wash only), not on any load.
-        added: p.added || '', area: p.area || '', addedAt: p.addedAt || '', forRoute: p.forRoute || '', dropped: !!p.dropped };
+        added: p.added || '', area: p.area || '', addedAt: p.addedAt || '', forRoute: p.forRoute || '', dropped: !!p.dropped, notRecorded: !!p.notRecorded };
       out[key].status = out[key].completedAt ? 'COMPLETE' : out[key].startedAt ? 'UNLOADING' : 'WAITING';
     });
     return out;
