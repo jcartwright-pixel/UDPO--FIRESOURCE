@@ -53,6 +53,8 @@ body.pk-page .station-release { position: fixed; left: 0; right: 0; bottom: 0; z
   font: inherit; font-size: 18px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 body.pk-page .station-release[hidden] { display: none; }
 body.pk-page.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 56px); }
+/* An Administrator's (not locked) still has the Release bar: the screen stops above it too. */
+body.pk-page:not(.station-locked):has(> .station-release:not([hidden])).fill #screen:not([hidden]) { height: calc(100vh - 56px); }
 body.pk-page .ps-release { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; border: 2px solid #f0b46a; border-radius: 12px; background: #fff8ee; font-size: 18px; }
 body.pk-page .ps-release p { flex-basis: 100%; margin: 0; font-weight: 700; color: #7a3d00; }
 body.pk-page .ps-release input { font: inherit; min-height: 48px; padding: 0 12px; border: 1px solid #c9d5e1; border-radius: 8px; margin-left: 8px; text-transform: uppercase; }

@@ -316,6 +316,27 @@ const OTHERS = [
       assert.equal(pageOf(a.url()), 'administration.html', 'a freed computer opens every screen');
       assert.deepEqual(a.errors.filter(e => !/Missing or insufficient permissions/.test(e)), [], 'Administrator: no errors or new windows');
       await a.context().close();
+      // An Administrator's Garage Station keeps Release (and the Operations button) clear of the work order's buttons
+      // (6.71 full test: Release sat on Complete at 1024 x 768).
+      await db().collection('workOrders').doc('WO-LOCK1').set({ work_order_id: 'WO-LOCK1', facility_id: 'fac_uniontown', unit: '900002', unit_type: 'TRUCK', problem: 'PM service due 11-2-26',
+        source: 'SERVICE', source_from: 'Fleet Service (due)', service_key: 'PM', status: 'NEW', can_run: 'YES', created_at: new Date(Date.now() - 3600000).toISOString(), version: 1 });
+      const ga = await openPage(browser, tablet(), '/garage-station.html' + UD);
+      await ga.waitForSelector('#view-code form.st-code');
+      await ga.fill('#view-code input', codes.fac_uniontown_garage_garage);
+      await ga.click('#view-code button[type="submit"]');
+      await ga.click('[data-type="TRUCK"]');
+      await ga.waitForSelector('.gs-job button:visible', { timeout: 20000 });
+      await ga.click('.gs-job button:visible');
+      await ga.waitForSelector('#view-job:not([hidden])');
+      await ga.waitForTimeout(800);
+      const covered = await ga.evaluate(() => [...document.querySelectorAll('#view-job .gs-btn')].filter(b => b.getClientRects().length).map(b => {
+        b.scrollIntoView({ block: 'end' });
+        const r = b.getBoundingClientRect(), at = document.elementFromPoint(r.left + r.width / 2, r.bottom - 6);
+        return at && (at === b || b.contains(at)) ? null : b.textContent.trim() + ' under ' + (at ? (at.id || at.className) : 'nothing');
+      }).filter(Boolean));
+      assert.deepEqual(covered, [], 'an Administrator\'s Garage Station: buttons covered');
+      await shot(ga, 'tablet-lock-admin-garage-job-1024');
+      await ga.context().close();
       // 3. A locked tablet (a manager's account), released to its code screen: Administrator sign-in.
       const t = await openPage(browser, tablet(), '/plant-station.html?' + MANAGER);
       await t.waitForSelector('#code-box form.st-code');

@@ -668,6 +668,10 @@ body.station-locked .ds-exit { display: none !important; }
 .station-release[hidden] { display: none; }
 body.station-locked:not(.fill) { padding-bottom: 60px; box-sizing: border-box; }
 body.station-locked.fill #screen:not([hidden]) { height: calc(100vh - 60px); }
+/* An Administrator's station (not locked, Joe 10/29) still shows Release and the Operations button: the screen stops above them
+   too, so neither covers a button (6.71 full test: Release sat on the Garage Station's Complete). */
+body:not(.station-locked):has(> .station-release:not([hidden]), > #admin-home):not(.fill) { padding-bottom: 60px; box-sizing: border-box; }
+body:not(.station-locked):has(> .station-release:not([hidden]), > #admin-home).fill #screen:not([hidden]) { height: calc(100vh - 60px); }
 body.ds-full .station-release { background: #071a2c; color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.2); }
 body.ds-full .station-release:hover, body.ds-full .station-release:focus-visible { background: #0d2a44; color: #fff; }
 
