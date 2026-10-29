@@ -43,7 +43,8 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
       daily: { weather_code: [1, 3], temperature_2m_max: [68, 70], temperature_2m_min: [44, 47], precipitation_probability_max: [1, 10] } }) }));
     // Joe 10/27: the live weather turn. The check stands in for YouTube: its player script answers ready at once.
     await page.route(/youtube\.com\/iframe_api/, route => route.fulfill({ contentType: 'text/javascript',
-      body: 'window.YT = { Player: function (id, o) { const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => o.events.onReady({ target: t }), 50); } }; window.onYouTubeIframeAPIReady();' }));
+      // A stand-in player: it plays, unless the page's udYtFail names the video (then YouTube's error 150, "not on other sites").
+      body: 'window.YT = { Player: function (id, o) { const src = document.getElementById(id).src; const t = { mute() {}, playVideo() { window.udLivePlays = (window.udLivePlays || 0) + 1; }, pauseVideo() { window.udLivePaused = (window.udLivePaused || 0) + 1; } }; this.playVideo = t.playVideo; this.pauseVideo = t.pauseVideo; setTimeout(() => { o.events.onReady({ target: t }); if (window.udYtFail && window.udYtFail.test(src)) o.events.onError({ data: 150, target: t }); else o.events.onStateChange({ data: 1, target: t }); }, 50); } }; window.onYouTubeIframeAPIReady();' }));
     await page.route(/youtube\.com\/embed\//, route => route.fulfill({ contentType: 'text/html', body: '<body style="background:#123">live</body>' }));
     await localCalls(page);
     const errors = [];
@@ -104,18 +105,31 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
     await shot(page, 'fire-tv-2c-scorecard-ranks-1920.png');
     await page.evaluate(() => window.udTurn());
     await page.waitForSelector('#turn-live:not([hidden])');
-    // Joe 10/28: FOX starts another live video: the TV changes to it. A video YouTube won't let other sites show: local weather.
+    // Joe 10/28: FOX starts another live video: the TV changes to it. A video YouTube won't let other sites show: FOX
+    // Weather's channel live stream instead (10/29: the server only gets YouTube's robot check, which still names the channel).
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02' }) });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive02?"]', { state: 'attached' });
     await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: 'FoxWxLive02', embed: false }) });
-    await page.waitForFunction(() => !document.getElementById('live-frame') && document.getElementById('turn-live').hidden);
-    // The box may move on to the Scorecard turn by itself (every 30 seconds, also while this waits); its weather turn is the local weather.
-    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); const w = document.getElementById('turn-weather'); return !w.hidden && w.querySelector('.now'); }, null, { timeout: 30000 });
-    // No video named, but FOX Weather's real channel number: YouTube is asked for that channel's live stream.
-    await db().collection('scorecard').doc('kiosk').update({ live: Object.assign({}, LIVE, { video: null, live: false, embed: null }) });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/live_stream?channel=UCaaaaaaaaaaaaaaaaaaaaaa&autoplay=1"]', { state: 'attached' });
+    // Nothing from the server at all: FOX Weather's own channel number.
+    await db().collection('scorecard').doc('kiosk').update({ live: null });
+    await page.waitForSelector('#live-frame[src*="youtube.com/embed/live_stream?channel=UC1FbPiXx59_ltnFVx7IxWow&autoplay=1"]', { state: 'attached' });
+    assert.match(await page.textContent('#turn-live .ds-live-cap'), /FOX Weather · live, no sound/);
+    // FOX won't let other sites show it: AccuWeather NOW. Neither: the local weather, saying why in one line.
+    await page.evaluate(() => { window.udYtFail = /live_stream/; });
+    await db().collection('scorecard').doc('kiosk').update({ live: { video: null, channel: 'UCeeeeeeeeeeeeeeeeeeeeee', live: false } });
+    await page.waitForSelector('#live-frame[src*="youtube.com/embed/pSRlP1EZiS8?"]', { state: 'attached' });
+    await page.waitForFunction(() => /AccuWeather NOW · live, no sound/.test(document.querySelector('#turn-live .ds-live-cap').textContent));
+    await page.evaluate(() => { window.udYtFail = /youtube/; });
+    await db().collection('scorecard').doc('kiosk').update({ live: { video: null, channel: 'UCffffffffffffffffffffff', live: false } });
+    await page.waitForFunction(() => !document.getElementById('live-frame') && !document.getElementById('live-note').hidden);
+    assert.equal(await page.textContent('#live-note'), 'Live weather not showing: FOX Weather does not let other sites show it; AccuWeather NOW does not let other sites show it.');
+    await page.waitForFunction(() => { if (!document.getElementById('turn-score').hidden) window.udTurn(); const w = document.getElementById('turn-weather'); return !w.hidden && w.querySelector('.now'); }, null, { timeout: 30000 });
+    await shot(page, 'fire-tv-2d-no-live-weather-1920.png');
+    await page.evaluate(() => { window.udYtFail = null; });
     await db().collection('scorecard').doc('kiosk').update({ live: LIVE });
     await page.waitForSelector('#live-frame[src*="youtube.com/embed/FoxWxLive01?"]', { state: 'attached' });
+    await page.waitForFunction(() => document.getElementById('live-note').hidden);
     results.push('TV: weather in the top bar; the right-hand box takes turns: FOX Weather live (paused while hidden), then the Driver Scorecard\'s overall scores');
     results.push('Fire Stick TV: its code opens the board straight away, no Google sign-in, schedule only');
 
