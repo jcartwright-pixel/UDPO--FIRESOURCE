@@ -154,7 +154,8 @@ async function openPage(browser, width, height, url, touch) {
     await o.click('[data-do="drop"]');
     await o.waitForFunction(() => !document.querySelector('#rows tr[data-key*="ADDED"]'));
     let saved;
-    for (let i = 0; i < 40 && !saved; i++) {
+    // Up to 30 seconds: on a busy test machine one save has taken 10 to 17 seconds.
+    for (let i = 0; i < 120 && !saved; i++) {
       saved = (await d.collection('plantJournal').where('type', '==', 'UNLOADING').get()).docs.map(x => x.data()).find(x => x.route === 'ADDED');
       if (!saved) await new Promise(r => setTimeout(r, 250));
     }
