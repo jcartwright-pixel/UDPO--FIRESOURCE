@@ -992,6 +992,7 @@ export async function signOutHere() { const { auth } = await start(); await sign
 // Joe 10/29 (the code screen's Administrator button): an Administrator signs in with their own account on a locked tablet, and
 // the tablet is freed (its lock and station code forgotten) and opens Operations. Anyone else is signed out again and the
 // tablet stays where it was. Resolves with a message to show, or never (the page is moving on).
+let freeing = false; // the device is already on its way to Operations (one move, not two)
 export async function adminFreeSignIn() {
   const { auth, homeDb } = await start();
   let user;
@@ -1015,7 +1016,7 @@ export async function adminFreeSignIn() {
   }
   try { sessionStorage.setItem('udActive', email); sessionStorage.setItem('udAdmin', '1'); } catch (e) { /* no storage */ }
   freeDevice();
-  location.replace('index.html');
+  if (!freeing) { freeing = true; location.replace('index.html'); }
   return new Promise(() => {});
 }
 
@@ -1151,7 +1152,8 @@ export async function requireSignIn(ready) {
       try { sessionStorage.setItem('udAdmin', '1'); } catch (e) { /* no storage */ }
       let locked = false;
       try { locked = !!localStorage.getItem(DEVICE_KEY); } catch (e) { /* private window */ }
-      if (locked || STATION_DEVICE) { freeDevice(); location.replace('index.html'); return; }
+      if (freeing) return;
+      if (locked || STATION_DEVICE) { freeing = true; freeDevice(); location.replace('index.html'); return; }
       document.body.classList.remove('station-locked');
       adminWayOut();
     }

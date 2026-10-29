@@ -281,6 +281,13 @@ const OTHERS = [
       const locked = (p) => p.evaluate(() => localStorage.getItem('udStationDevice'));
       // Operations' first screen: Home, or the plant choice for an Administrator of more than one plant.
       const opsHome = (u) => ['index.html', 'company.html'].indexOf(pageOf(String(u))) >= 0;
+      // Waits until the page has settled on Operations' first screen (it may move on from Home to the plant choice on the way).
+      const toOps = async (p, ms) => {
+        for (const end = Date.now() + ms; Date.now() < end; await p.waitForTimeout(400)) {
+          if (opsHome(p.url()) && await p.evaluate(() => document.readyState === 'complete').catch(() => false)) return;
+        }
+        assert.fail('did not open Operations: ' + p.url());
+      };
       // 1. An Administrator opening a station with its code: the station opens with its menus, nothing is locked, other screens open.
       const a = await openPage(browser, tablet(), '/plant-station.html' + UD);
       await a.waitForSelector('#code-box form.st-code');
@@ -293,14 +300,14 @@ const OTHERS = [
       // A station page has no Home of its own: an Administrator gets the Operations button.
       await shot(a, 'tablet-lock-admin-station-1024');
       await a.click('#admin-home');
-      await a.waitForURL(opsHome, { timeout: 15000 });
+      await toOps(a, 15000);
       await a.goto(HOSTING + '/administration.html');
       await a.waitForTimeout(2000);
       assert.equal(pageOf(a.url()), 'administration.html', 'an Administrator opens other screens after a station');
       // 2. Joe's case: a computer already locked (a station opened on it), then opened fresh with an Administrator signed in.
       await a.evaluate(() => { localStorage.setItem('udStationDevice', 'PLANT'); sessionStorage.clear(); });
       await a.goto(HOSTING + '/administration.html');
-      await a.waitForURL(opsHome, { timeout: 20000 });
+      await toOps(a, 20000);
       await a.waitForTimeout(1500);
       assert.ok(opsHome(a.url()), 'a locked computer with an Administrator signed in opens Operations (' + a.url() + ')');
       assert.equal(await locked(a), null, 'the Administrator\'s sign-in freed the computer');
@@ -341,7 +348,7 @@ const OTHERS = [
       }
       await t.evaluate((who) => { window.UDTestAdminSignIn = who; }, ADMIN);
       await t.click('#code-box .st-admin');
-      await t.waitForURL(opsHome, { timeout: 20000 });
+      await toOps(t, 20000);
       assert.equal(await locked(t), null, 'Administrator sign-in freed the tablet');
       assert.equal(await t.evaluate(() => localStorage.getItem('udPlantStationCode')), null, 'the tablet forgot its station');
       await t.goto(HOSTING + '/administration.html');
