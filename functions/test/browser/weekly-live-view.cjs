@@ -63,6 +63,23 @@ const visible = (page, id) => page.$eval('#' + id, el => !!el.offsetParent);
       assert.deepEqual(page.errors, []);
       await page.close();
     }
+    // 6.71 full test: the Template's top line in a wider font (the test computer's) stays beside the title at 1536 and never runs
+    // off the right edge, down to a 1024 tablet.
+    for (const width of [1024, 1536, 1920]) {
+      const page = await open(browser, width, 790, '/weekly.html?week=2026-10-11&' + WHO);
+      await page.addStyleTag({ content: 'body, body * { font-family: "DejaVu Sans" !important }' });
+      await page.waitForSelector('#rows tr td.day');
+      await page.waitForTimeout(800);
+      const row = await page.evaluate(() => {
+        const t = document.querySelector('.head h1').getBoundingClientRect(), head = document.querySelector('.head').getBoundingClientRect();
+        const bs = [...document.querySelectorAll('.head .actions.in-head > *')].filter(x => x.offsetParent).map(x => x.getBoundingClientRect());
+        return { beside: Math.min(...bs.map(r => r.top)) < t.bottom, right: Math.max(...bs.map(r => r.right)), edge: head.right };
+      });
+      assert.ok(row.right <= row.edge, width + ': the buttons stay on screen: ' + JSON.stringify(row));
+      if (width >= 1536) assert.ok(row.beside, width + ': the buttons sit beside the title: ' + JSON.stringify(row));
+      assert.deepEqual(page.errors, []);
+      await page.close();
+    }
     // A pick on the live week saves to the live week's run, the one Daily Dispatch shows.
     const live = await open(browser, 1920, 950, '/weekly.html?view=live&' + WHO);
     await live.waitForSelector('tr td.day.editable[data-day="mon"]');

@@ -33,10 +33,18 @@
     .weekly-page #routes-sheet td.run-name .xr-plus { border: 2px solid #0b6a2d; background: #e8f6ec; color: #0b5a26; }
     .weekly-page #routes-sheet td.run-name .xr-remove { border: 2px solid #a21313; background: #fff; color: #a21313; }
     .weekly-page #routes-sheet td.run-name .xr-remove.armed { background: #a21313; color: #fff; }
-    /* Joe 10/28: the longer name Weekly Dispatch Template, plus its Weekly Dispatch button: when the title and the buttons do not
-       fit on one line, the buttons move to a line of their own instead of running off the screen. */
-    body.weekly-page .head.wrap-actions:has(.actions.in-head) { flex-wrap: wrap; row-gap: 6px; }
-    body.weekly-page .head.wrap-actions .actions.in-head { margin-left: auto; }
+    /* Joe 10/28: the longer name Weekly Dispatch Template and its added Weekly Dispatch button. From 1500 wide (Joe's 1536) the
+       buttons stay beside the title, a little closer together; narrower, they sit under the title and go onto a second line
+       rather than run off the right edge. */
+    @media (min-width: 1500px) {
+      body.weekly-page .head .actions.in-head { gap: 4px; }
+      body.weekly-page .head { gap: 8px; }
+      body.weekly-page .head .actions.in-head > :is(button, a.button) { padding: 0 6px; }
+      body.weekly-page .head .title h1 { font-size: 24px; }
+    }
+    @media (max-width: 1499px) {
+      body.weekly-page .head .actions.in-head { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+    }
   </style>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -153,20 +161,6 @@
       ['run-days', 'reset', 'publish', 'prev', 'next'].forEach(id => { document.getElementById(id).style.display = 'none'; });
       document.getElementById('week-date').disabled = true;
     }
-    // Each button's own width from its words (16px bold, 14px each side), so the answer does not depend on how the row is drawn now.
-    const measure = document.createElement('canvas').getContext('2d');
-    function fitHead() {
-      const head = document.querySelector('#screen .head'), title = head && head.querySelector('.title');
-      if (!title || !head.offsetWidth) return;
-      const btns = [...head.querySelectorAll('.actions.in-head > button, .actions.in-head > a.button')].filter(b => getComputedStyle(b).display !== 'none');
-      const own = btns.reduce((sum, b) => { measure.font = getComputedStyle(b).font; return sum + Math.ceil(measure.measureText(b.textContent).width) + 30; }, 0);
-      const cs = getComputedStyle(head), room = head.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const wrap = title.offsetWidth + 12 + own + 6 * Math.max(0, btns.length - 1) > room;
-      if (head.classList.contains('wrap-actions') !== wrap) head.classList.toggle('wrap-actions', wrap);
-    }
-    window.addEventListener('resize', fitHead);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHead);
-    if (window.ResizeObserver) new ResizeObserver(fitHead).observe(document.querySelector('#screen .head'));
     document.getElementById('go-other').textContent = liveView ? 'Weekly Dispatch Template' : 'Weekly Dispatch';
     document.getElementById('go-other').href = (liveView ? 'weekly.html?' : 'weekly.html?view=live') + (liveView ? testQuery.slice(1) : testQuery);
     let week = L.isDateKey(params.get('week')) ? L.weekStart(params.get('week')) : L.weekStart(today);
@@ -206,7 +200,6 @@
     function routeNumber(v) { const s = String(v || ''), i = s.lastIndexOf('_'); return i > 0 && /^\d+$/.test(s.slice(i + 1)) ? s.slice(0, i) : s; }
 
     function render() {
-      fitHead();
       if (popover) return; // the editor is open; the grid redraws when it closes
       if (rowDrag && rowDrag.busy()) { held = true; return; } // a route is being moved; the grid redraws when it is let go
       const kind = weekKind(), preview = kind === 'future' && loaded && !runs.length;
