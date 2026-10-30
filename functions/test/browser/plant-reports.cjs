@@ -104,13 +104,16 @@ async function seed() {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
   const { today, yesterday } = await seed();
+  // The Thursday load that is never loaded carries over into Friday's list as yesterday's unfinished load (loads carry over until
+  // done or marked not running), so on a Friday today's list holds 11.
+  const TODAY_LOADS = 10 + (L.dayName(yesterday).toUpperCase() === 'THURSDAY' ? 1 : 0);
   const browser = await chromium.launch();
   const results = [];
   try {
     // Manager Center: the Reports button opens the Reports module (Joe 10/11: every report in one place); its Plant Reports
     // card opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
     const mc = await openPage(browser, 1920, 950, '/manager.html?' + MANAGER);
-    await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10 To load/.test(document.getElementById('pv-chips').textContent));
+    await mc.waitForFunction((n) => /Plant Update/.test(document.getElementById('pv-subject').textContent) && new RegExp('of ' + n + ' To load').test(document.getElementById('pv-chips').textContent), TODAY_LOADS);
     const size = await mc.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(size.scroll <= size.inner, 'Manager Center still fits with the Reports button');
     await shots(mc, 'manager-reports-button', 1920);
