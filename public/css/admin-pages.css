@@ -8,7 +8,7 @@
 .adm-nav-head input { min-height: 40px; padding: 0 12px; border: 1px solid #cfd9e3; border-radius: 9px; font: inherit; }
 .adm-nav-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; }
 .adm-nav-group h2 { margin: 12px 8px 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; color: #5a6b7d; }
-.adm-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 5px 8px; border: 0; border-radius: 9px; background: none; color: #0b3d6b; font: inherit; font-size: 16px; font-weight: 700; text-align: left; cursor: pointer; }
+.adm-item { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 9px; background: none; color: #0b3d6b; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
 .adm-item:hover { background: #eef5fc; }
 .adm-item.on { background: #0b3d6b; color: #fff; }
 .adm-item .adm-name { flex: 1; min-width: 0; }

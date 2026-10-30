@@ -3,7 +3,7 @@
 .routeweek-page .rw-shell { display: grid !important; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; padding: 0 16px 12px; }
 .routeweek-page .rw-grid { margin: 0; min-height: 0; overflow: auto; }
 .routeweek-page table.rw th small { display: block; font-size: 16px; font-weight: 600; opacity: .8; }
-.routeweek-page .rw-day { width: 94%; min-height: 28px; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-size: 16px; font-weight: 900; white-space: nowrap; cursor: pointer; }
+.routeweek-page .rw-day { width: 94%; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-weight: 900; white-space: nowrap; cursor: pointer; }
 .routeweek-page .rw-day.off { background: #fde8e6; color: #c0392b; }
 .routeweek-page .rw-day.over { background: repeating-linear-gradient(135deg, #fff3dc 0 6px, #ffe6b3 6px 12px); color: #8a5a00; box-shadow: inset 0 0 0 2px #f2b632; }
 .routeweek-page .rw-day:disabled { cursor: default; }
@@ -27,7 +27,6 @@
 .routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
 @media (max-width: 1500px) {
   .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; }
-  .routeweek-page .rw-day { font-size: 16px; }
 }
 /* Route Week Override: Reset asks twice (the button turns orange and says Click Again). */
 .routeweek-page #reset.armed { background: #b45309; color: #fff; border-color: #b45309; }

@@ -63,7 +63,7 @@
 }
 @media (max-width: 900px) { #std-cards { grid-template-columns: 1fr 1fr; } .lb-actions { flex-wrap: wrap; } .lb-head .lb-actions button { flex: 1 1 30%; } .lb-qty { flex-wrap: wrap; white-space: normal; } .lb-qty .lb-in { width: 100%; } }
 .lb-card { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.lb-card .eyebrow { font-size: 16px; font-weight: 800; letter-spacing: .08em; color: #5b6b7c; text-transform: uppercase; }
+.lb-card .eyebrow { font-weight: 800; letter-spacing: .08em; color: #5b6b7c; text-transform: uppercase; }
 .lb-prod { font-size: 26px; font-weight: 800; color: #0b2f55; line-height: 1.15; }
 .lb-big { font-size: 46px; font-weight: 900; line-height: 1; color: #0b2f55; }
 .lb-red { color: #c62828; }
@@ -132,8 +132,7 @@
 .lb-actions { display: flex; gap: 8px; margin-left: auto; flex: 1; justify-content: flex-end; min-width: 0; }
 .lb-actions button { flex: 0 1 150px; min-width: 0; min-height: 68px; background: #fff; border: 2px solid #0b4f8a; border-radius: 12px; font: inherit; font-size: 19px; font-weight: 900; color: #0b4f8a; line-height: 1.15; padding: 4px 8px; cursor: pointer; touch-action: manipulation; }
 .lb-actions button small { display: block; font-size: 16px; font-weight: 700; color: #5b6b7c; margin-top: 2px; }
-.lb-actions button.cur { background: #0b2f55; border-color: #0b2f55; color: #fff; } .lb-actions button.cur small { color: #d5e6f5; }
-/* Joe 10/26: the Quality Check as a list; tap OK or Not OK on each line. */
+* Joe 10/26: the Quality Check as a list; tap OK or Not OK on each line. */
 .lb-qlist { background: #fff; border: 1px solid #c9d6e4; border-radius: 12px; overflow: hidden; margin-top: 10px; }
 .lb-qrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) 150px 150px; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid #e3eaf1; font-size: 21px; font-weight: 800; color: #0b2f55; min-height: 70px; }
 .lb-qrow:first-child { border-top: 0; }
@@ -306,7 +305,7 @@ body.pd-tv .pd-empty { color: #cfe3f5; padding: 0 40px; font-size: 28px; }
 .lt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
 .lt-key { background: #fff8e1; border-radius: 8px; padding: 8px 10px; }
 .lt-reader-btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-.lt-reader-btns button { min-height: 44px; padding: 0 18px; font-size: 16px; font-weight: 700; }
+.lt-reader-btns button { min-height: 44px; padding: 0 18px; font-size: 16px; }
 /* Review item 33 (Joe 10/13): Make Line Key, Start Test Feed and Test Feed on Every Line are app buttons (white with the blue
    edge and words, like Products List above them), not plain grey browser buttons; the Stop buttons are the red kind. */
 .lt-reader-btns button { border: 1px solid var(--ud-blue); border-radius: 9px; background: #fff; color: var(--ud-blue); font-family: inherit; font-weight: 800; cursor: pointer; }
@@ -617,7 +616,7 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
   #status .lb-sbtns button { flex: 1 1 0; width: auto; }
   #std-cards .lb-big { font-size: 38px; }
 }
-@media (max-width: 500px) { #status .lb-sbtns button { font-size: 16px; padding: 0 4px; } #status .lb-sbtns button.c { flex-grow: 1.6; } #status .lb-timer { font-size: 32px; } }
+@media (max-width: 500px) { #status .lb-sbtns button { font-size: 16px; } #status .lb-sbtns button.c { flex-grow: 1.6; } #status .lb-timer { font-size: 32px; } }
 /* Joe 10/26 (filler mock-up 1): the Fill weight box (countdown and one weight box) beside Up next and Each hour. */
 .lb-bottom { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr); gap: 12px; margin-top: 10px; flex: 1 1 auto; }
 .lb-bottom:has(> #fill-box[hidden]) { grid-template-columns: minmax(0, 1fr); }

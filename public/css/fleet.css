@@ -12,9 +12,9 @@
 }
 .fleet-split h2 small { color: var(--muted); font-size: 16px; font-weight: 600; margin-left: 6px; }
 .fs-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin: 0 4px 6px; }
-.fs-rules label { display: grid; gap: 3px; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.fs-rules label { display: grid; gap: 3px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
 .fs-rule { display: flex; align-items: center; gap: 6px; }
-.fs-rule input { width: 96px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; }
+.fs-rule input { width: 96px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
 .fs-addtech { display: flex; gap: 6px; margin: 8px 4px; }
 .fs-addtech input { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; }
 .fleet-page tr.clicky { cursor: pointer; }
@@ -32,9 +32,9 @@ table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
 .fs-legend em { margin-left: auto; font-style: normal; color: #5a6b7d; }
 /* Fleet Service report: the Reviewed by / Date line under the week's work (the current app's sign-off). */
 #print .print-sign { margin: 18px 0 6px; font-weight: 700; }
-.fleet-page .head .tabs { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.fleet-page .head .tabs { display: inline-grid; grid-auto-flow: column; }
 .fleet-page .head .tabs button { white-space: nowrap; height: 42px; min-height: 42px; }
-.fleet-page .head .title { flex: 1 1 300px; min-width: 260px; }
+.fleet-page .head .title { flex: 1 1 300px; }
 .fleet-page .head .title small { white-space: normal; display: block; }
 .fleet-page .head .title h1 { white-space: nowrap; }
 /* Review item 41 (Joe 10/13): Fleet Service's "N of N units need something" sits in from the right edge, and the grey helper

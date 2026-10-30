@@ -255,8 +255,8 @@
 .ds-band { text-align: center; font-weight: 800; letter-spacing: .08em; padding: 10px; }
 .ds-band.end, .ds-band.end td { background: #f4c542; color: #174a80; } .ds-band.start, .ds-band.start td { background: #174a80; color: #fff; border-bottom: 4px solid #f4c542; }
 .ds-week-title { display: flex; justify-content: space-between; padding: 8px 12px; background: #20578e; color: #fff; }
-.ds-week-table { width: 100%; border-collapse: collapse; font-size: 16px; }
-.ds-week-table th { position: sticky; top: 0; background: #eef5fa; color: #12385f; font-size: 16px; padding: 4px; } .ds-week-table th small { display: block; font-weight: 600; color: #647b8e; }
+.ds-week-table { width: 100%; border-collapse: collapse; }
+.ds-week-table th { position: sticky; top: 0; background: #eef5fa; color: #12385f; padding: 4px; } .ds-week-table th small { display: block; font-weight: 600; color: #647b8e; }
 .ds-week-table td { padding: 5px 6px; border-bottom: 1px solid #e3e9ef; text-align: center; } .ds-week-table td:first-child { text-align: left; }
 .ds-week-table tbody tr:nth-child(even) { background: #eef5fa; } .ds-week-table td.off { color: #9aa9b5; }
 .ds-welcome { margin: 0; font-size: 16px; } .ds-welcome i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2eb872; margin-right: 6px; }
@@ -299,13 +299,14 @@ body.ds-tv .ds-week-table th { font-size: 19px; padding: 6px 4px; } body.ds-tv .
 body.ds-tv .ds-week-table td { height: 64px; padding: 8px 6px; line-height: 1.2; white-space: normal; overflow-wrap: break-word; text-overflow: clip; }
 @media (max-width: 1550px) { body.ds-tv .ds-grid { grid-template-columns: 1fr 300px; } }
 @media (max-width: 1050px) { body.ds-tv .ds-grid { grid-template-columns: 1fr; } body.ds-tv .ds-weather { display: none !important; } body.ds-tv .ds-week { grid-column: 1; } }
-@media (max-width: 760px) {
-  .ds-row { grid-template-columns: 60px 1fr 1fr 70px; font-size: 16px; }
-  .ds-row > span:nth-child(5), .ds-row > span:nth-child(7), .ds-headrow span:nth-child(5), .ds-headrow span:nth-child(7) { display: none; }
-}
 
 /* Review item 46 (Joe 10/13): the Driver Station on a 1024 tablet shows more of the loadout board (shorter lines, a smaller
    heading, the weekly schedule a little lower) and every column fits, Pickup included. */
+/* Audit 10/30: on a window shorter than the TV (an office screen 790 high) the weekly schedule's fixed 424px left today's loadout
+   one line and pushed the weather box up over Desk view and Refresh; there the two share the height as on a tablet, and the
+   weather box keeps its words inside it. */
+@media (max-height: 900px) { body.ds-tv .ds-grid { grid-template-rows: minmax(0, 1.6fr) minmax(0, 1fr); } }
+body.ds-tv .ds-weather { overflow: hidden; justify-content: safe center; }
 @media (max-width: 1100px) {
   body.ds-tv .head h1 { font-size: 30px; }
   body.ds-tv .ds-grid { grid-template-rows: minmax(0, 1.6fr) minmax(0, 1fr); }
@@ -348,10 +349,10 @@ body.ds-tv .ds-week-table td { height: 64px; padding: 8px 6px; line-height: 1.2;
 .ta-page .ta-grid { background: #fff; border: 1px solid #d5dfea; border-radius: 8px; overflow: auto; max-height: calc(100dvh - 210px); }
 .ta-page .ta-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.1fr) 96px 170px 104px; align-items: center; gap: 0;
   border-bottom: 1px solid #e3e9f0; border-left: 4px solid #388650; min-height: 52px; font-size: 16px; cursor: pointer; }
-.ta-page .ta-row > span { padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; }
-.ta-page .ta-headrow { position: sticky; top: 0; z-index: 1; background: #245990; color: #fff; text-transform: uppercase; font-weight: 700; font-size: 16px; min-height: 40px; border-left-color: #245990; cursor: default; }
+.ta-page .ta-row > span { overflow: hidden; text-overflow: ellipsis; }
+.ta-page .ta-headrow { position: sticky; top: 0; z-index: 1; background: #245990; color: #fff; text-transform: uppercase; border-left-color: #245990; cursor: default; }
 .ta-page .ta-row .rt b { font-size: 18px; }
-.ta-page .ta-row small { display: block; font-size: 16px; color: #5b6b7c; }
+.ta-page .ta-row small { display: block; color: #5b6b7c; }
 .ta-page .ta-row .grey { color: #6b7a89; }
 .ta-page .ta-row .tr input { width: 100%; text-align: center; text-transform: uppercase; font-weight: 700; font-size: 16px; padding: 6px; border: 1px solid #b9c7d6; border-radius: 6px; }
 .ta-page .ta-row .tr small { text-align: center; min-height: 14px; }
@@ -360,12 +361,12 @@ body.ds-tv .ds-week-table td { height: 64px; padding: 8px 6px; line-height: 1.2;
 .ta-page .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
 .ta-page .ta-row.dup .tr small { color: #8a5a00; font-weight: 700; }
 .ta-page .ta-row.sel { background: #dcebfb; border-left: 5px solid #2f7de1; }
-.ta-page .ta-yard { background: #fff; border: 1px solid #d5dfea; border-radius: 8px; padding: 10px 12px; max-height: calc(100dvh - 210px); overflow: auto; }
-.ta-page .ta-yard h3 { margin: 12px 0 6px; font-size: 16px; text-transform: uppercase; color: #33475b; }
+.ta-page .ta-yard { background: #fff; border: 1px solid #d5dfea; border-radius: 8px; max-height: calc(100dvh - 210px); overflow: auto; }
+.ta-page .ta-yard h3 { margin: 12px 0 6px; text-transform: uppercase; color: #33475b; }
 .ta-page .ta-help { margin: 0; color: #0b4d83; font-weight: 700; }
 .ta-page .ta-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; font-size: 16px; border: 1px solid; min-height: 40px; }
-.ta-page .ta-chip small { display: block; font-weight: 400; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-page .ta-chip { border-radius: 6px; padding: 6px 4px; font-weight: 700; border: 1px solid; min-height: 40px; }
+.ta-page .ta-chip small { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-page .ta-chip.open { background: #eef8f0; border-color: #6bb07c; color: #1f5f30; cursor: pointer; }
 .ta-page .ta-chip.busy { background: #fff6df; border-color: #d4a121; color: #6e4800; }
 .ta-page .ta-chip.down { background: #fde8e8; border-color: #d98080; color: #8f1d16; }
@@ -375,8 +376,7 @@ body.ds-tv .ds-week-table td { height: 64px; padding: 8px 6px; line-height: 1.2;
   .ta-page .ta-wrap { grid-template-columns: minmax(0, 1fr); }
   .ta-page .ta-yard, .ta-page .ta-depart { display: none; }
   .ta-page .ta-row { grid-template-columns: 50px minmax(0, .9fr) minmax(0, 1fr) 52px 96px; font-size: 16px; }
-  .ta-page .ta-row > span { padding: 6px 3px; overflow-wrap: anywhere; }
-  .ta-page .ta-headrow { font-size: 16px; }
+  .ta-page .ta-row > span { overflow-wrap: anywhere; }
   .ta-page .ta-row .rt b { font-size: 16px; }
   .ta-page .ta-row .tr input { padding: 6px 2px; }
 }
@@ -404,7 +404,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .ps-page .ps-station b { display: block; font-size: 25px; color: #0b2f55; }
 .ps-page .ps-station span { display: block; margin-top: 8px; color: #4a5b6c; font-size: 17px; }
 .ps-page .ps-station:active { transform: scale(.99); background: #f2f8ff; }
-.ps-page .ps-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.ps-page .ps-tabs { display: grid; }
 .ps-page .ps-tab { display: flex; gap: 18px; align-items: center; text-decoration: none; background: var(--tone); border: 1px solid #d5dfea; border-top: 6px solid var(--accent); border-radius: 14px; padding: 24px; min-height: 160px; color: #0b2f55; }
 .ps-page .ps-tab img { width: 84px; height: 84px; object-fit: contain; }
 .ps-page .ps-tab b { display: block; font-size: 27px; }
@@ -430,7 +430,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 }
 
 /* ---------- Phone Screens (Administration > System Tools): every phone and tablet screen in one list ---------- */
-.pss h2 { margin: 14px 0 8px; font-size: 20px; color: #123f70; }
+.pss h2 { font-size: 20px; }
 .pss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .pss-card { display: grid; gap: 6px; padding: 16px; background: #fff; border: 1px solid #c9d6e4; border-top: 5px solid #0b6eaa; border-radius: 12px; text-decoration: none; color: #0b2f55; }
 .pss-card b { font-size: 19px; } .pss-card span { color: #4a5b6c; font-size: 16px; } .pss-card small { color: #6b7b8c; font-size: 16px; word-break: break-all; }
@@ -588,7 +588,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* Joe 10/28 (gz): Case Unloading's boxes about a third as wide, with Unloaded By on the same line; the name shows by the status. */
 .sw-fields.unl { grid-template-columns: repeat(2, minmax(120px, 170px)) minmax(220px, 340px); }
-.sw-who { display: inline-block; padding: 6px 10px; border-radius: 8px; background: #e8f1fb; color: #0b2f55; font-size: 18px; font-weight: 800; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-who { background: #e8f1fb; color: #0b2f55; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sw-full { display: inline-block; max-width: 330px; padding: 10px 12px; border-radius: 8px; background: #fff7e8; color: #7a3e00; font-size: 17px; font-weight: 800; }
 .sw-field { display: block; }
 .sw-field span { display: block; color: #4a5b6c; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }

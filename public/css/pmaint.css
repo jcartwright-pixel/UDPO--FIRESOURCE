@@ -16,7 +16,7 @@
 .pm-page .pm-panel > h2 small { margin-left: auto; font-size: 16px; font-weight: 600; color: var(--muted); }
 .pm-page .pm-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .pm-page table.pm-table { width: 100%; border-collapse: collapse; table-layout: auto; }
-.pm-page table.pm-table th { position: sticky; top: 0; z-index: 1; background: #e8f0f8; color: var(--ud-blue-dark); text-align: left; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pm-page table.pm-table th { position: sticky; top: 0; z-index: 1; background: #e8f0f8; color: var(--ud-blue-dark); font-size: 16px; letter-spacing: .05em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .pm-page table.pm-table td { padding: 7px 10px; border-bottom: 1px solid #e3eaf1; border-right: 0; font-size: 16px; vertical-align: middle; text-align: left; height: auto; line-height: 1.3; white-space: normal; overflow: visible; }
 .pm-page table.pm-table th { text-align: left; height: auto; }
 .pm-page .pm-pill, .pm-page table.pm-table td .pm-pill { white-space: nowrap; }

@@ -96,18 +96,21 @@
       gpsDays = []; gpsAlerts = []; runs = []; events = []; periodReady = false;
       const range = (name) => query(collection(dbRef, name), where('date', '>=', p.start), where('date', '<=', p.end));
       const from = S.scAddDays_(p.start, -2), to = S.scAddDays_(p.end, 2), fail = (what) => e => showError('Could not read ' + what + ' (' + e.message + '). The scorecard may be short; check the network and reload the page.');
-      // The period's loads and check-ins show together, once both have answered, so a half-read board never shows.
-      const got = { runs: null, events: null }, put = (k) => s => {
-        got[k] = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
-        if (!got.runs || !got.events || gpsKey !== key) return;
-        runs = got.runs; events = got.events; periodReady = true; render();
+      // The period's loads, check-ins, GPS miles and GPS alerts show together, once all four have answered, so a half-read board
+      // never shows and the board is worked out once (audit 10/30: a Year board was worked out three times as each list came in,
+      // and a press on Settings waited behind it). After that each change redraws as before.
+      const got = { runs: null, events: null, gps: null, alerts: null }, put = (k, keep) => s => {
+        got[k] = keep(s);
+        if (gpsKey !== key || Object.values(got).some(v => v === null)) return;
+        runs = got.runs; events = got.events; gpsDays = got.gps; gpsAlerts = got.alerts; periodReady = true; render();
       };
+      const all = (s) => s.docs.map(d => Object.assign({ id: d.id }, d.data())), plain = (s) => s.docs.map(d => d.data());
       gpsSub = [
-        onSnapshot(query(collection(dbRef, 'runs'), where('weekStart', '>=', L.weekStart(from)), where('weekStart', '<=', to)), put('runs'), fail('the dispatch runs')),
-        onSnapshot(query(collection(dbRef, 'plantEvents'), where('date', '>=', from), where('date', '<=', to)), put('events'), fail('the plant check-ins')),
-        onSnapshot(range('gpsDays'), s => { gpsDays = s.docs.map(d => d.data()); render(); }, e => showError('Could not read the GPS miles (' + e.message + '). Reload the page.')),
+        onSnapshot(query(collection(dbRef, 'runs'), where('weekStart', '>=', L.weekStart(from)), where('weekStart', '<=', to)), put('runs', all), fail('the dispatch runs')),
+        onSnapshot(query(collection(dbRef, 'plantEvents'), where('date', '>=', from), where('date', '<=', to)), put('events', all), fail('the plant check-ins')),
+        onSnapshot(range('gpsDays'), put('gps', plain), e => { put('gps', () => [])(); showError('Could not read the GPS miles (' + e.message + '). Reload the page.'); }),
         // No alerts yet (or none readable) is the plain "No GPS alerts received yet" line, not an error.
-        onSnapshot(range('gpsAlerts'), s => { gpsAlerts = s.docs.map(d => d.data()); render(); }, () => { gpsAlerts = []; render(); })
+        onSnapshot(range('gpsAlerts'), put('alerts', plain), () => put('alerts', () => [])())
       ];
     }
     let routeMaps = S.scRouteMaps_(L, []);

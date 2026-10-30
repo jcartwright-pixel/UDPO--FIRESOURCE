@@ -49,7 +49,11 @@ const SCREENS = [
   ['Open Safety Issues', 'safety-issues.html'], ['Fire Extinguishers', 'extinguishers.html'], ['Fire Alarm', 'safety-fire.html?sys=alarm'],
   ['Fire Suppression', 'safety-fire.html?sys=suppression'], ['Escape Plan', 'safety-fire.html?sys=escape'], ['Past Walks', 'safety-walks.html'],
   ['Checklist Setup', 'safety-setup.html'], ['Products', 'products.html'], ['Machine Setup', 'machine-setup.html'], ['Location Areas', 'location-areas.html'],
-  ['RedZone', 'redzone.html'], ['Shifts', 'shifts.html'], ['Text Log', 'texts.html'], ['Coming Soon page', 'soon.html']
+  ['RedZone', 'redzone.html'], ['Shifts', 'shifts.html'], ['Text Log', 'texts.html'], ['Coming Soon page', 'soon.html'],
+  // Audit 10/30: the screens added since this list was made.
+  ['Plant Vacations & Schedule', 'crew.html'], ['Maintenance Schedule', 'maint-crew.html'], ['Late Forecast', 'forecast.html'], ['Departments', 'group.html'],
+  ['Plant Material Trailers', 'jug-trailers.html'], ['Menu Setup', 'menu-setup.html'], ['Plant Equipment', 'plant-equipment.html'], ['Plant Production', 'production-home.html'],
+  ['Help', 'help.html']
 ];
 
 async function seed() {

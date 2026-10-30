@@ -61,7 +61,7 @@
     // Maintenance Center (Joe 10/12, mock-up A): what the plant asked for (Shift Notes' Maintenance Requests), each made into a
     // work order or marked already fixed; the breakdowns recorded today (fixed on the spot, not requested); the open work orders;
     // and the PMs overdue or due this week, each sent to the Maintenance Station as a work order.
-    const L = window.UDLogic, R = window.UDPlantMaint, U = window.UDPlant;
+    const L = window.UDLogic, R = window.UDPlantMaint;
     const params = new URLSearchParams(location.search);
     let plant = params.get('plant') || '', person = null, app = {}, data = null, db = null, stop = null;
     const doing = new Set();

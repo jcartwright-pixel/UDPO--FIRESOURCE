@@ -1,9 +1,9 @@
 /* equipment.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
-th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; font-size: 16px; text-align: center; white-space: normal; line-height: 1.1; }
+th.eq-day, td.eq-day { padding-left: 2px !important; padding-right: 2px !important; text-align: center; white-space: normal; line-height: 1.1; }
 th.eq-day { text-transform: uppercase; }
 td.eq-day.today { background: #fff8e1; }
-td.eq-day { font-size: 16px; font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
+td.eq-day { font-weight: 800; overflow: visible !important; text-overflow: clip !important; }
 td.eq-day span { display: block; white-space: nowrap; }
 .head .actions.fleet-sync #fleet-synced { font-size: 16px; color: #44515e; max-width: 260px; line-height: 1.25; }
 .head .actions.fleet-sync #fleet-synced.bad { color: #b3261e; font-weight: 600; }

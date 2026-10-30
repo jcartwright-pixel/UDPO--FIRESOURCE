@@ -19,7 +19,7 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 @media (max-height: 720px) {
   .split-side { height: calc(100vh - 138px); }
 }
-.drivers-page { --row: 40px; --font: 17px; }
+.drivers-page { --row: 40px; }
 .drivers-page .split .sheet { overflow: auto; }
 .drivers-page .sheet td.name { cursor: pointer; }
 .drivers-page .sheet td.name:hover { text-decoration: underline; }
@@ -30,7 +30,7 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 /* Relief has its own column on the Driver Roster, so the small tag beside the name is not shown. */
 .drivers-page td.name .chip { display: none; }
 @media (max-width: 1500px) {
-  .drivers-page .sheet thead th { font-size: 16px; padding: 0 4px; letter-spacing: 0; white-space: normal; line-height: 1.1; }
+  .drivers-page .sheet thead th { font-size: 16px; padding: 0 4px; letter-spacing: 0; }
   .drivers-page .sheet td.name { font-size: 16px; }
   .drivers-page .sheet td .status, .drivers-page .sheet td .pill { font-size: 16px; padding: 2px 6px; }
   .drivers-page button.edit, .drivers-page input.truck { font-size: 16px; height: 30px; }

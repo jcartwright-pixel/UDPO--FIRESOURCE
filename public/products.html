@@ -421,7 +421,6 @@
     // in the layout before 10/13 (an Area column, a line per product per area) still loads. The Excel reader is Over the Road's.
     const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
-    const COLS = TEMPLATE.filter(t => t !== 'Plant');
     const plantByName = (n) => { const t = String(n || '').trim().toUpperCase(); return ALL_PLANTS.find(p => p.name.toUpperCase() === t || p.id.toUpperCase() === t) || null; };
     const SHEET_FIELDS = [['Product', 'name'], ['SKU', 'sku'], ['UPC', 'upc'], ['Type', 'mfgType'], ['Group', 'productGroup'], ['Full Speed Per Min', 'ratePerMin'], ['Target %', 'targetPct'], ['Lowest Speed', 'minSpeed'], ['Highest Speed', 'maxSpeed'], ['Shelf Life Days', 'shelfLifeDays'], ['Target Fill Weight g', 'fillGrams']];
     const today = () => { const d = new Date(); return shortDate(d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })); };

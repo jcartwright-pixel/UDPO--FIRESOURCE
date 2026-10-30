@@ -17,7 +17,7 @@
 .sw-btn.rv-cam { min-height: 60px; white-space: nowrap; }
 .rv-hint { margin: 0; padding: 12px 16px; border-radius: 10px; background: #eef4fa; color: #33475b; font-size: 18px; font-weight: 700; }
 .rv-table { width: 100%; margin-top: 12px; border-collapse: collapse; background: #fff; border: 1px solid #c9d6e3; border-radius: 12px; overflow: hidden; font-size: 18px; }
-.rv-table th { background: #e8f0f8; text-align: left; padding: 10px 12px; font-size: 16px; color: #33475b; }
+.rv-table th { background: #e8f0f8; padding: 10px 12px; font-size: 16px; color: #33475b; }
 .rv-table td { padding: 10px 12px; border-top: 1px solid #e3eaf1; vertical-align: middle; }
 .rv-table { table-layout: auto; }
 .rv-table th, .rv-table td { text-align: left; }

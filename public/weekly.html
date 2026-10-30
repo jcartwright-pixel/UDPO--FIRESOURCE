@@ -138,9 +138,9 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { mountRowDrag } from './js/row-drag.js';
-    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError, watchCopied } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, shortTime, showError, watchCopied } from './js/app.js';
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
-    import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
+    import { lists, watchLists, canSave, canReorder, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
     import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
