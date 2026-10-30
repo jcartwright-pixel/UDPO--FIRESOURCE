@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, runDaysSettled } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
@@ -104,6 +104,9 @@ async function seed() {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
   const { today, yesterday } = await seed();
+  // Manager Center reads the loads through runDays (a trigger on each run): wait until their records are written, as
+  // plant-manager.cjs does, before opening the page.
+  await runDaysSettled(db());
   const browser = await chromium.launch();
   const results = [];
   try {
