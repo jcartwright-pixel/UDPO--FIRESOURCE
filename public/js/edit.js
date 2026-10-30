@@ -90,7 +90,6 @@ export async function watchLists(user, onChange) {
   watchPerson(db, user, p => { lists.person = p; onChange(); });
 }
 
-export function screenOpen() { return L.screenState(lists.app, screenKey).open; }
 export function canSave() { return maySave(lists.person, L.SAVE_ROLES, lists.app, screenKey); }
 export function canReorder() { return maySave(lists.person, L.REORDER_ROLES, lists.app, screenKey); }
 export function canManage() { return maySave(lists.person, L.DRIVER_ROLES, lists.app, screenKey); }

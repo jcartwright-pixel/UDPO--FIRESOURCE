@@ -12,8 +12,9 @@ const admin = require('firebase-admin');
   const deadline = Date.now() + 5 * 60 * 1000;
   let last = null;
   while (Date.now() < deadline) {
-    const app = (await db.collection('config').doc('app').get()).data() || {};
-    last = app.lastTransfer;
+    // The copy's own record (audit 10/29); config/app no longer changes every minute.
+    const status = (await db.collection('config').doc('copyStatus').get()).data() || {};
+    last = status.lastTransfer;
     if (last && last.at > since) break;
     await new Promise(r => setTimeout(r, 15000));
   }

@@ -134,20 +134,21 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   try { await SMS.loadDoneCheck(db); } catch (e) { console.error('Load Done Texts failed: ' + (e && e.message || e)); }
 });
 
+// Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
+// dataLoads/<id> marker, so it runs one time; it deletes nothing.
+// The Over the Road history is about 19,000 day counts, so a run gets 5 minutes and room for the file.
 // Joe's Over the Road history (OTR Trips 2026 + the August accounting package), filled in once (src/otr-seed.js): on the test
-// copy since 10/11; on the live app by the data load otr-history-2026-10-18 (Joe 10/18, src/data-loads.js).
-exports.otrHistorySandbox = onSchedule({ schedule: 'every 5 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+// copy since 10/11; on the live app by the data load otr-history-2026-10-18 (Joe 10/18). Audit 10/29: it used to have a job of
+// its own that woke every 5 minutes for a load done long ago; it is now one more once-only load of this job.
+async function otrHistoryOnce() {
   const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
   if (project !== 'ud-distribution-sandbox') { await require('./src/data-loads').loadOtrHistoryOnce(db, { project }); return; }
   // Joe 10/13: his OTR runs ticked in OTR Routes Setup, from his workbook against Route Master.
   await require('./src/otr-seed').seedOtrRoutesOnce(db);
   await require('./src/otr-seed').seedOtrOnce(db);
-});
-
-// Joe 10/13: data he sent, loaded once on each app (test copy and live) after a deploy (src/data-loads.js). Each load has a
-// dataLoads/<id> marker, so it runs one time; it deletes nothing.
-// The Over the Road history is about 19,000 day counts, so a run gets 5 minutes and room for the file.
+}
 exports.dataLoadsOnce = onSchedule({ schedule: 'every 10 minutes', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
+  try { await otrHistoryOnce(); } catch (e) { console.error('Over the Road history load failed: ' + (e && e.message || e)); }
   await require('./src/data-loads').runDataLoads(db);
   // Joe 10/26: once after each deploy, every person's copies in the plants' databases (a deploy may add a plant's database).
   try {

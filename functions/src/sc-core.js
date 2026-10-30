@@ -439,7 +439,6 @@ function scRound_(n) { return Math.round(n * 100) / 100; }
 /** The key a manager's Excuse is saved under: a GPS alert (date, truck, time, kind) or a Time miss (date, driver, early/late). */
 function scMissKey_(kind, date, a, b) { return [kind, date, String(a == null ? '' : a), String(b == null ? '' : b)].join('|'); }
 function scAlertKey_(date, a) { return scMissKey_('gps', date, scUnitKey_(a.tag) + '@' + (a.at || ''), a.kind); }
-function scSickFade_(date, asOf, s) { return scFade_(date, asOf, 1, [s.sickFade1, s.sickFade2, s.sickFade3]); }
 /** What an accident or complaint costs on asOf: class or severity points, faded by its age (0 once it is gone). */
 function scPdaStep_(x) { return SC_CORE.PDA_STEPS.filter(function (k) { return k[0] === x.step; })[0] || SC_CORE.PDA_STEPS[0]; }
 function scIncidentPoints_(x, s, asOf) {

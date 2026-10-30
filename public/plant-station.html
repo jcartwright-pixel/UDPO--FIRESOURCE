@@ -81,7 +81,6 @@
   <script type="module">
     import { startOffline } from './js/offline-saves.js';
     import { start, requireSignIn, watchPerson, escapeHtml, shortDate, showError, callServer, stationCodeSignIn, signOutHere, lockDevice, STATION_DEVICE } from './js/app.js';
-    import { collection, query, where, onSnapshot } from './js/firebase.js';
     import { resolveStation, askCode, remember, lockStation } from './js/station-code.js';
     import { mountStationWork } from './js/station-work.js';
     import { fullScreenOnTap } from './js/full-screen.js';
@@ -139,7 +138,7 @@
     // A link with ?station= sets up a new tablet only. Once the tablet has a station, changing it goes through Release
     // (and the manager release code, when the plant has one), as on the current app.
     const asked = new URLSearchParams(location.search).get('station') || '';
-    let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : ''), runs = [];
+    let stationId = read() || (STATIONS.some(s => s.id === asked) ? asked : '');
     if (stationId && !read()) write(stationId);
     // The station from its code (Administration > Plant Station Codes): its own name, one of the five station types.
     const CODE_KEY = 'udPlantStationCode', stationCall = (op, f) => callServer('stationRelease', Object.assign({ op }, f));
@@ -282,14 +281,11 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       signedAs = user.station || null; away = false;
-      // Read again when the day rolls at 6 AM (Saturday to Sunday is a new week), so the counts never show last week.
-      let date = '', stop = null;
       // Turned off, a new code or a removed station: every read stops first, so a read the database refuses on the way out
       // never covers the code screen's message (Off shows "turned off", not a read error).
       const turnedAway = async (message) => {
         away = true; signedAs = null; write('');
         lockStation(document.getElementById('change'), false);
-        if (stop) { stop(); stop = null; }
         if (work) work.stop();
         await signOutHere();
         showError(message);
@@ -302,17 +298,11 @@
       }
       work = mountStationWork({ db, box: document.getElementById('work'), person: () => person, onDraw: counts });
       watchPerson(db, user, p => { person = p; if (work) work.render(); });
-      const watch = () => {
-        date = L.operatingDay(new Date());
-        if (stop) stop();
-        const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-        stop = onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => { if (!away) showError('Could not read the loads: ' + e.message); });
-      };
-      watch();
+      // Audit 10/29: the station's own work (station-work.js) reads the loads; this page used to read the same two weeks again,
+      // used none of it, and drew the tablet twice on every load change.
       await decide().catch(err => showError('Could not check this tablet\'s station code: ' + (err.message || err)));
       // A new code or a removed station sends the tablet back to the code screen (checked every 5 minutes).
       setInterval(async () => {
-        if (L.operatingDay(new Date()) !== date) watch();
         if (mode === 'code' && named && Date.now() % 300000 < 60000) {
           if (signedAs) {
             // Off, New code or Remove: the tablet goes back to the code screen (the database already refuses it).

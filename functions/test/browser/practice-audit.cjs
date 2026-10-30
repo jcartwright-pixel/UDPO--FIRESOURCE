@@ -500,9 +500,107 @@ async function writes() {
   });
 }
 
+/*
+ * Click speed (Joe 10/29: "I'd also want to do a click speed test"): presses that only change what is shown (day and week
+ * arrows, tabs, a screen's view picker) and moving from one screen to the next through the menu, each timed from the press
+ * until the screen first changes ("answered") and until it stops changing ("done"). Nothing is saved.
+ */
+const CLICK_SCREENS = ['distribution.html', 'daily.html', 'weekly.html', 'routes.html', 'routeweek.html', 'loadout.html', 'loadout.html?area=BOXING', 'unloading.html',
+  'returns.html', 'washing.html', 'scheduler.html', 'checkins.html', 'scorecard.html', 'otr.html', 'fleet.html', 'quality.html', 'reports.html', 'shiftreports.html',
+  'plant-station.html', 'uploads.html', 'administration.html'];
+// From one screen to the next by the link a person presses (the left menu, or a screen's own button).
+const CLICK_PATH = ['index.html', 'distribution.html', 'daily.html', 'weekly.html', 'routes.html', 'drivers.html', 'plant.html', 'loadout.html', 'unloading.html', 'manager.html', 'yard.html', 'maint.html', 'issues.html', 'fleet.html', 'administration.html'];
+async function pressTimed(page, el, label) {
+  await page.evaluate(() => { window.__clickAt = performance.now(); });
+  const t = Date.now();
+  await el.click({ timeout: 5000 });
+  let first = -1;
+  while (Date.now() - t < 15000) {
+    await page.waitForTimeout(50);
+    const s = await page.evaluate(() => { const m = (window.__muts || []).filter(x => x >= window.__clickAt); return { first: m.length ? m[0] - window.__clickAt : -1, last: m.length ? m[m.length - 1] - window.__clickAt : -1, now: performance.now() - window.__clickAt }; }).catch(() => null);
+    if (!s) continue;
+    if (s.first >= 0 && first < 0) first = Math.round(s.first);
+    if (s.now - Math.max(0, s.last) > 600) return { label, answeredMs: first, doneMs: s.last >= 0 ? Math.round(s.last) : -1 };
+  }
+  return { label, answeredMs: first, doneMs: -1, slow: true };
+}
+async function clicks() {
+  report.clicks = [];
+  for (const url of CLICK_SCREENS) {
+    const page = await newPage();
+    const row = { url, presses: [] };
+    try {
+      await open(page, url);
+      const marks = await page.evaluate(() => {
+        const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !el.disabled; };
+        const out = [];
+        const tag = (el, label) => { if (!el || !vis(el) || out.length >= 8) return; el.dataset.clickTest = String(out.length); out.push(label); };
+        ['next', 'prev', 'week-next', 'week-prev'].forEach(id => tag(document.getElementById(id), id.replace('-', ' ') + ' arrow'));
+        document.querySelectorAll('.tabs button, .tabs a[href^="#"], #tabs button, [role="tab"]').forEach(b => { if (!b.classList.contains('on') && !b.classList.contains('active')) tag(b, 'tab "' + b.textContent.trim().slice(0, 30) + '"'); });
+        return out;
+      });
+      for (let i = 0; i < marks.length; i++) {
+        const el = await page.$('[data-click-test="' + i + '"]');
+        if (!el) continue;
+        try { row.presses.push(await pressTimed(page, el, marks[i])); } catch (e) { row.presses.push({ label: marks[i], error: String(e.message).split('\n')[0].slice(0, 120) }); }
+      }
+      // The view picker (Route Editor and others): each choice once.
+      const sel = await page.$('#view-select');
+      if (sel) {
+        for (const v of await page.$$eval('#view-select option', o => o.map(x => x.value).slice(0, 4))) {
+          await page.evaluate(() => { window.__clickAt = performance.now(); });
+          const t = Date.now();
+          await page.selectOption('#view-select', v);
+          await page.waitForTimeout(700);
+          const s = await page.evaluate(() => { const m = (window.__muts || []).filter(x => x >= window.__clickAt); return m.length ? [m[0] - window.__clickAt, m[m.length - 1] - window.__clickAt] : [-1, -1]; });
+          row.presses.push({ label: 'view "' + v + '"', answeredMs: Math.round(s[0]), doneMs: Math.round(s[1]), waitedMs: Date.now() - t });
+        }
+      }
+    } catch (e) { row.error = String(e.message).split('\n')[0].slice(0, 200); }
+    row.errors = page.w.errors.slice(0, 4);
+    report.clicks.push(row);
+    console.log('CLICK ' + url.padEnd(26) + ' ' + row.presses.map(p => p.label + ' ' + (p.error ? 'ERR' : p.answeredMs + '/' + p.doneMs + 'ms')).join(', ') + (row.error ? ' ERROR ' + row.error : ''));
+    await page.done();
+    save();
+  }
+  // Screen to screen: one browser tab, each next screen opened by pressing its link on the screen before.
+  const page = await newPage();
+  report.moves = [];
+  await open(page, CLICK_PATH[0]);
+  for (let i = 1; i < CLICK_PATH.length; i++) {
+    const to = CLICK_PATH[i];
+    const link = await page.evaluate((want) => {
+      const a = [...document.querySelectorAll('a[href]')].find(x => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0 && x.getAttribute('href').split(/[?#]/)[0].replace(/^\.?\//, '') === want; });
+      if (!a) return false;
+      a.dataset.clickMove = '1';
+      return true;
+    }, to);
+    const t0 = Date.now();
+    let how = 'menu link';
+    try {
+      if (link) await page.click('[data-click-move="1"]', { timeout: 5000 });
+      else { how = 'typed address (no link on the screen before)'; await page.goto(SITE + '/' + withWho(to), { waitUntil: 'domcontentloaded' }); }
+      await page.waitForURL(u => u.pathname.endsWith('/' + to), { timeout: 15000 });
+      let shown = -1;
+      while (Date.now() - t0 < 20000) {
+        await page.waitForTimeout(100);
+        const s = await page.evaluate(() => { const m = window.__muts || []; return { drawing: document.body.classList.contains('ud-drawing'), quiet: !m.length || performance.now() - m[m.length - 1] > 1000, origin: performance.timeOrigin, last: m.length ? m[m.length - 1] : 0 }; }).catch(() => null);
+        if (!s) continue;
+        if (!s.drawing && shown < 0) shown = Date.now() - t0;
+        if (!s.drawing && s.quiet) { report.moves.push({ from: CLICK_PATH[i - 1], to, how, shownMs: shown, doneMs: Math.round(s.origin + s.last - t0) }); break; }
+      }
+    } catch (e) { report.moves.push({ from: CLICK_PATH[i - 1], to, how, error: String(e.message).split('\n')[0].slice(0, 120) }); }
+    const m = report.moves[report.moves.length - 1] || {};
+    console.log('MOVE ' + (CLICK_PATH[i - 1] + ' -> ' + to).padEnd(40) + ' ' + (m.error ? 'ERROR ' + m.error : m.shownMs + ' shown, ' + m.doneMs + ' done') + ' (' + how + ')');
+    save();
+  }
+  await page.done();
+}
+
 (async () => {
   browser = await chromium.launch();
   try {
+    if (process.env.CLICKS_ONLY === '1') { await clicks(); return; }
     const only = (process.env.ONLY || '').split(',').filter(Boolean);
     const pick = (list) => list.filter(([, u]) => !only.length || only.includes(u));
     await captureAfter('before any write');
@@ -514,6 +612,7 @@ async function writes() {
     const again = [];
     await readPass(pick(SCREENS.filter(([, u]) => ['distribution.html', 'daily.html', 'weekly.html', 'loadout.html', 'forecast.html', 'manager.html', 'plant.html'].includes(u))), { viewport: { width: 1536, height: 790 } }, again, 'r1536b');
     report.again = again.map(r => ({ url: r.url, shownMs: r.shownMs, settledMs: r.settledMs }));
+    if (process.env.NO_CLICKS !== '1') await clicks();
     if (process.env.NO_WRITES !== '1') await writes();
   } finally {
     report.endedAt = new Date().toISOString();

@@ -11,7 +11,6 @@ const L = window.UDLogic;
 const PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
 let plant = new URLSearchParams(location.search).get('plant') || currentPlant(), sides = null, admin = false, db = null, dbOf = null, stop = null, busy = Promise.resolve();
 if (!PLANTS.some(p => p.id === plant)) plant = PLANTS[0].id;
-const nameOf = (key) => (L.MENU_SIDES.find(s => s.key === key) || {}).name || key;
 const itemsOf = (g) => ((MENU.find(([m]) => m === g) || [])[1] || []).map(i => i[0]);
 
 function draw() {

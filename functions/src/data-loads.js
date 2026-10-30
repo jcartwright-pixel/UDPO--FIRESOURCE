@@ -56,7 +56,7 @@
  * hand is kept, and a run already set in OTR Routes Setup is left as it is. On the test copy both are already there, so it only
  * leaves its marker (otrHistorySandbox loaded both there on 10/11). On the live app (Joe 10/18: "Load the Over the Road history
  * (otr-history-2026-10-18) into the live app.") loadOtrHistory runs. It is about 19,000 day counts, so it runs from the
- * otrHistorySandbox job in index.js (5 minutes, 512MiB) rather than with the loads above.
+ * otrHistoryOnce step of the dataLoadsOnce job in index.js (5 minutes, 512MiB) rather than in runDataLoads.
  */
 const crypto = require('crypto');
 const L = require('./logic');

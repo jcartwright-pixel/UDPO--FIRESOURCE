@@ -56,7 +56,18 @@ test('a copy that finds the sheets unchanged rewrites no list, week or log recor
   assert.equal(logs.length, 2, 'the first copy keeps its own record; the quiet one updates the standing record');
   const quiet = logs.find(d => d.id === 'no-changes').data();
   assert.deepEqual([quiet.at, quiet.changed], [again.at, false]);
-  assert.equal(((await db().collection('config').doc('app').get()).data().lastTransfer || {}).at, again.at, 'screens still see the copy running');
+  assert.equal(((await db().collection('config').doc('copyStatus').get()).data().lastTransfer || {}).at, again.at, 'screens still see the copy running');
+});
+
+test('a quiet copy leaves config/app alone, so open screens are not redrawn every minute (audit 10/29)', async () => {
+  const tabs = F.fakeSheets();
+  await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  const before = (await db().collection('config').doc('app').get()).updateTime;
+  const again = await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  const after = await db().collection('config').doc('app').get();
+  assert.ok(after.updateTime.isEqual(before), 'config/app was not written again');
+  assert.ok(after.data().liveWeeks && after.data().liveWeeks.current, 'the Live weeks are still on config/app');
+  assert.equal((await db().collection('config').doc('copyStatus').get()).data().lastTransfer.at, again.at);
 });
 
 test('a new copy of the Live workbook replaces every row, even one the app changed without writing it to the sheet', async () => {

@@ -55,7 +55,7 @@
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate, shortTime } from './js/app.js';
+    import { start, requireSignIn, showError, shortDate, shortTime, watchCopied } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
     import { unitKey, gpsIndex, truckState, yardSpots, workingToday } from './js/gps-state.js';
 
@@ -132,10 +132,12 @@
         const c = snap.data() || {};
         data.app = c;
         data.writeBack = !!(c.writeBack && c.writeBack.enabled === true);
-        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+        render();
+      });
+      watchCopied(db, (when) => {
+        const at = when ? new Date(when) : null;
         const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
         document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + shortTime(at) : 'Waiting for the first copy';
-        render();
       });
     });
   </script>

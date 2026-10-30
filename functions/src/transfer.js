@@ -470,6 +470,10 @@ async function keepAppOnlyDays(db, ops) {
   }
 }
 
+// The same value, whatever order its keys were stored in (the database hands a record's fields back sorted).
+const sortedKeys = (v) => Array.isArray(v) ? v.map(sortedKeys) : v && typeof v === 'object' ? Object.keys(v).sort().reduce((o, k) => { o[k] = sortedKeys(v[k]); return o; }, {}) : v;
+const sameValue = (a, b) => JSON.stringify(sortedKeys(a === undefined ? null : a)) === JSON.stringify(sortedKeys(b === undefined ? null : b));
+
 // Nothing to write for a list: no row changed and its stored fingerprints are the same (Joe 10/18: no double writes).
 function sameHashes(a, b) {
   const ka = Object.keys(a || {}), kb = Object.keys(b || {});
@@ -659,12 +663,19 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   ops.push({ ref: transferRef, data: { at: stamp, force: !!force, changed, summary, warningCount: warnings.length, warnings: warnings.slice(0, 200) } });
   await commitInBatches(db, ops);
   const lastTransfer = { at: stamp, id: transferRef.id, warningCount: warnings.length };
+  // Audit 10/29 (Joe: "make sure we're not doing any double work"): when the copy ran is kept in its own record
+  // (config/copyStatus), which only the "Copied from the sheets at" line reads. config/app is read by every open screen and by
+  // every save; it is written only when the weeks, the sheet copy or the screens' owners really change, so the minute copy no
+  // longer redraws every open screen each minute or makes a save that read config/app start over.
+  await db.collection(C.config).doc('copyStatus').set({ lastTransfer });
   // Read the switch again in a transaction: an administrator may have moved a screen while this copy was reading the sheets,
   // and writing back the owners read at the start would quietly undo that move (Joe 10/12: Daily Dispatch flipped back).
   await db.runTransaction(async (tx) => {
-    const current = ((await tx.get(configRef)).data() || {}).screenOwners || {};
+    const was = (await tx.get(configRef)).data() || {}, current = was.screenOwners || {};
     const anyNew = Object.keys(current).some(k => current[k] === 'new');
-    tx.set(configRef, { mode: anyNew ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, current), liveWeeks, lastTransfer, liveSourceId }, { merge: true });
+    const want = { mode: anyNew ? 'live' : 'test', screenOwners: Object.assign({ dailyDispatch: 'old', weeklyDispatch: 'old' }, current), liveWeeks, liveSourceId };
+    if (Object.keys(want).every(k => sameValue(was[k], want[k]))) return;
+    tx.set(configRef, want, { merge: true });
   });
   // Joe 10/19 (screen speed): the Live weeks' one-day load records (rundays.js), filled in once and again when the weeks move.
   // The trigger on each run keeps them in step after that; a failure here never stops the copy.

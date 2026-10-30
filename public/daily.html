@@ -122,7 +122,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { mountRowDrag } from './js/row-drag.js';
-    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError, watchCopied } from './js/app.js';
     import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, withUnsaved, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { bindDailyKeys, keepCursor } from './js/daily-keys.js';
     import { runArea } from './js/plant-core.js';
@@ -723,7 +723,9 @@
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
         render();
-        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+      });
+      watchCopied(db, (when) => {
+        const at = when ? new Date(when) : null;
         document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
       });
       watchLists(user, render);

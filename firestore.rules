@@ -48,6 +48,8 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/stationAccess/tv).data.get('keys', {}).get(request.auth.token.udTv, '') == request.auth.token.get('udTvVersion', 'none');
     }
     match /config/app { allow read: if activeUserOrStation() || tvStation(); }
+    // When the copy from the sheets last ran (audit 10/29): the "Copied from the sheets at" line.
+    match /config/copyStatus { allow read: if activeUserOrStation() || tvStation(); }
     match /config/fleetSync { allow read: if activeUser(); }
     match /config/fleetSyncPreview { allow read: if activeUser(); }
     match /config/fleetOwnership { allow read: if activeUser(); }
