@@ -646,7 +646,7 @@ exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (r
   }
   const run = await fleetSyncWrite();
   if (run && run.paused) throw new HttpsError('failed-precondition', 'Writing to the sheets is paused, so the fleet list was not synced. Resume it in Administration > Go-Live Switches, then press Sync fleet list again.');
-  if (!run) throw new HttpsError('failed-precondition', 'The fleet list sync is not turned on here, so nothing was written to Equipment Master');
+  if (!run) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here, so nothing was written to Equipment Master');
   return runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: user.email });
 });
 
