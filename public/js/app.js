@@ -11,6 +11,7 @@ import {
   getFunctions, httpsCallable, connectFunctionsEmulator
 } from './firebase.js';
 import { helpHref } from './help.js';
+import { keepScreenAwake } from './keep-awake.js';
 
 export const DOMAIN = 'uniteddairy.com';
 
@@ -29,6 +30,9 @@ document.querySelectorAll('.topbar').forEach(bar => {
 // Joe 10/10: Administration opens a screen inside its right-hand panel; there the screen shows without its own header and menu.
 export const EMBED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 if (EMBED) document.body.classList.add('embed');
+// Joe 10/30 (his Samsung tablet still went dark): every screen opened on a tablet keeps the tablet's screen on, not only the
+// station screens. A phone (narrower than 600 either way) and a computer with a mouse are left alone.
+if (!EMBED && navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) >= 600) keepScreenAwake();
 
 /*
  * Joe 10/27: "these are just the plant apps for the plant tablets. And they should be able to go no other places than where
