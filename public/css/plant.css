@@ -1,11 +1,11 @@
 /* Operations: the plant screens' few extra pieces, built on app.css's colours and type so every screen
    keeps one look. Area colours are the current app's (CASE blue, TOTES purple, BOXING orange, TANKER green). */
-.plant-page .eyebrow { display: block; font-size: 16px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.plant-page .eyebrow { display: block; font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
 .plant-page .dayname { align-self: center; margin: 0 auto; font-size: 26px; font-weight: 800; color: var(--ud-blue-dark); letter-spacing: .02em; }
 .plant-page .hstats { display: flex; gap: 8px; align-self: center; }
 .plant-page .hstats div { min-width: 86px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px; text-align: center; }
 .plant-page .hstats b { display: block; font-size: 24px; line-height: 1.1; color: var(--ud-blue); }
-.plant-page .hstats span { font-size: 16px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.plant-page .hstats span { font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
 .plant-page .hstats .good b { color: var(--runs-ink); }
 .plant-page .hstats .warn b { color: #b45f00; }
 
@@ -50,25 +50,25 @@
 /* Joe 10/27: the trailer on a load is green once unloaded, red while it still waits on the Unloading list. */
 .plant-page table.loadout td input.unl-ok, .plant-page table.loadout td input.unl-ok:disabled { background: #1f7a3a; border-color: #1f7a3a; color: #fff; font-weight: 700; }
 .plant-page table.loadout td input.unl-no, .plant-page table.loadout td input.unl-no:disabled { background: #b42332; border-color: #b42332; color: #fff; font-weight: 700; }
-.plant-page tr.divider td { height: 30px; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-align: left; padding-left: 14px; }
+.plant-page tr.divider td { height: 30px; font-weight: 800; letter-spacing: .04em; text-align: left; padding-left: 14px; }
 .plant-page tr.divider.prior td { background: #fff1dc !important; color: #a35400; }
 .plant-page tr.divider.today td { background: var(--band) !important; color: var(--ud-blue); }
 .plant-page tr.done > td { background: #f1faf4 !important; }
 .plant-page tr.loading > td { background: #fffaeb !important; }
-.plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.state.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page button.state.loading { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
 .plant-page button.state.paused { background: #ede7f6; color: #4a2c82; border-color: #c5b3e6; }
-.plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
 .plant-page .tick { color: var(--runs-ink); font-weight: 800; }
 .plant-page .running { color: #8a5a00; }
 .plant-page .running::after { content: ' \25CF'; color: #e5891a; }
-.plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.pu.open { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
 .plant-page button.pu.done { background: #e6f6ec; border-color: #a8dcb8; color: var(--runs-ink); }
-.plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; font-size: 16px; }
-.plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.plant-page button.pu i { font-style: normal; display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; border-radius: 9px; background: var(--pickup); color: #fff; }
+.plant-page button.edit-row { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
 /* Joe 10/11: the driver stays on one line; a long name shrinks to fit (fitDrivers in loadout.html). */
 .plant-page.loadout-page table.loadout td.lo-driver { white-space: nowrap; overflow: hidden; padding-left: 4px; padding-right: 4px; }
 .plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
@@ -144,21 +144,21 @@
 .plant-page table.unload .uw-tag.add { background: #fff3cf; color: #7a5600; }
 .plant-page tr.prior > td:first-child { box-shadow: inset 5px 0 0 #b42332; }
 .plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
-.plant-page td.rr span { display: block; font-size: 16px; color: var(--muted); }
+.plant-page td.rr span { display: block; color: var(--muted); }
 .plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }
-.plant-page small.next { display: block; margin-top: 2px; font-size: 16px; color: var(--muted); font-weight: 600; }
+.plant-page small.next { display: block; margin-top: 2px; color: var(--muted); font-weight: 600; }
 .plant-page .na { color: #9aa8b6; }
 .plant-page .chk { font-weight: 800; white-space: nowrap; }
 .plant-page .chk.ok { color: var(--runs-ink); }
 .plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
-.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-size: 16px; font-weight: 800; border: 1px solid var(--line); background: var(--pill-gray-bg); color: #516273; }
+.plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-weight: 800; border: 1px solid var(--line); background: var(--pill-gray-bg); color: #516273; }
 .plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
 /* Joe 10/28 (gz): who is unloading, under the status on Unloading. */
 .plant-page table.unload small.who { display: block; margin-top: 4px; font-size: 16px; font-weight: 800; color: #0b2f55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
 .plant-page .pill.ret, .plant-page .pill.pend { background: #fde5e3; color: #b42332; border-color: #f2b8b2; }
 .plant-page .pill.washp { background: #e0f4f9; color: #006b86; border-color: #9fd6e4; }
-.plant-page button.rta, .plant-page button.wash { min-width: 70px; height: 30px; border-radius: 8px; border: 0; color: #fff; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.rta, .plant-page button.wash { min-width: 70px; height: 30px; border-radius: 8px; border: 0; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.rta { background: #b42332; }
 .plant-page button.wash { background: #e5891a; }
 .plant-page tr.needs-return > td:first-child { box-shadow: inset 5px 0 0 #b42332; }
@@ -195,13 +195,10 @@
   body.yard-page .head .hstats { gap: 4px; }
   /* It still wrapped with wider fonts (the test runner's DejaVu Sans, 10/14): under 1500 the counts go to the line below the
      buttons, so the tabs and Refresh stay on the top line whatever the font. */
-  body.yard-page .head .hstats { order: 5; }
-  body.yard-page .head .badge-test { order: 6; }
   .unload-page .hstats { gap: 6px; }
   .unload-page .hstats div { min-width: 60px; padding: 3px 8px; }
   .unload-page .hstats b { font-size: 18px; }
   .unload-page .hstats span { font-size: 16px; }
-  .plant-page small.next { font-size: 16px; }
 }
 
 /* Plant Operations Scheduler: Day / Week / Month, Sunday first; Receiving is the same screen in green. */
@@ -594,7 +591,7 @@ body.yard-page .head .badge-test { order: 6; }
 .temp-page table.tp-table td input { width: 100%; height: 38px; border: 1px solid #b8cadb; border-radius: 8px; font: inherit; color: var(--ink); background: #fff; padding: 0 8px; box-sizing: border-box; }
 .temp-page table.tp-table td input.tp-notes { text-align: left; }
 .temp-page table.tp-table td input:disabled { background: #f1f5f8; }
-.temp-page .tp-status { display: inline-block; border-radius: 12px; padding: 3px 10px; font-size: 16px; font-weight: 800; white-space: nowrap; background: #eef2f6; color: #4c5d6e; }
+.temp-page .tp-status { display: inline-block; border-radius: 12px; padding: 3px 10px; font-weight: 800; white-space: nowrap; background: #eef2f6; color: #4c5d6e; }
 .temp-page .tp-status.ok { background: #e6f6ec; color: var(--runs-ink); }
 .temp-page .tp-status.bad { background: #fdecec; color: #c62828; }
 .temp-page .tp-status.warn { background: #fff3df; color: #b45f00; }
@@ -636,14 +633,13 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-bar em { font-style: normal; font-size: 16px; font-weight: 800; color: var(--accent); }
 .manager-page .mc-ic { width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 16px; flex: none; }
 .manager-page .mc-desc { font-size: 16px; color: var(--muted); }
-.manager-page .mc-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; flex: 1; min-height: 0; }
-.manager-page .mc-tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-decoration: none; color: var(--ink); background: #f8fbfe; min-width: 0; }
+.manager-page .mc-tiles { display: grid; flex: 1; min-height: 0; }
+.manager-page .mc-tile { flex-direction: column; justify-content: center; gap: 2px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; color: var(--ink); background: #f8fbfe; min-width: 0; }
 .manager-page .mc-tile:hover { border-color: var(--accent); }
-.manager-page .mc-tile span { font-size: 16px; font-weight: 800; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.manager-page .mc-tile b { font-size: 24px; font-weight: 900; color: var(--ud-blue-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.manager-page .mc-tile b.time { font-size: 19px; }
-.manager-page .mc-tile b small { font-size: 16px; font-weight: 700; color: var(--muted); margin-left: 4px; }
-.manager-page .mc-tile i { font-style: normal; font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-tile span { font-weight: 800; color: var(--muted); }
+.manager-page .mc-tile b { font-weight: 900; color: var(--ud-blue-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page .mc-tile b small { font-weight: 700; color: var(--muted); margin-left: 4px; }
+.manager-page .mc-tile i { font-style: normal; color: var(--muted); }
 .manager-page .mc-tile u { display: block; height: 5px; background: #e3ebf2; border-radius: 3px; overflow: hidden; }
 .manager-page .mc-tile u s { display: block; height: 100%; background: #1f9d55; }
 .manager-page .mc-tile.warn b, .manager-page .mc-tile.warn i { color: #b45f00; }
@@ -664,7 +660,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-pvlist .mc-pvh:first-child { margin-top: 0; }
 .manager-page .mc-pvlist .mc-pvh em { margin-left: auto; font-style: normal; letter-spacing: 0; text-transform: none; }
 .manager-page .mc-pvlist .mc-pvh.bad { color: #b42318; }
-.manager-page .mc-pvlist .mc-rt { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 8px; padding: 2px 0; }
+.manager-page .mc-pvlist .mc-rt { display: grid; gap: 8px; padding: 2px 0; }
 .manager-page .mc-pvlist .mc-rt em, .manager-page .mc-pvlist .mc-rt i { font-style: normal; overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-pvlist .mc-rt em { color: var(--muted); }
 .manager-page .mc-pvlist .mc-rt b { overflow: hidden; text-overflow: ellipsis; }
@@ -674,9 +670,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-pvlist .mc-pvrow.ok { color: #1f7a4d; }
 .manager-page .mc-pvlist .mc-pvnone { color: var(--muted); }
 /* Long card and tile names wrap instead of being cut off (Joe 10/10 at his window width). */
-.manager-page .mc-tile span, .manager-page .mc-tile i { white-space: normal; overflow-wrap: anywhere; }
 .manager-page .mc-acts { flex-wrap: wrap; }
-.manager-page .mc-btn { min-width: 0; }
 /* The Plant menu's section names are long: they wrap onto a second line. */
 .plant-page .sidemenu .side-sec-btn { white-space: normal; line-height: 1.2; }
 .manager-page .mc-pvnote { margin-top: auto; color: var(--muted); font-size: 16px; border-top: 1px dashed var(--line); padding-top: 8px; }
@@ -719,16 +713,15 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-routes span b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-routes span small { font-size: 16px; font-weight: 600; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
-@media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; align-content: start; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; } .manager-page .mc-tile { min-height: 92px; } }
+@media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; }}
 @media (max-width: 760px) {
   .manager-page .head .badge-test span { display: none; }
   .manager-page .mc-shell { padding: 0 8px 8px; overflow: auto; }
   .manager-page .mc-shell { align-items: flex-start; }
-  .manager-page .mc-grid { display: flex; flex-direction: column; overflow: visible; flex: 1 1 auto; min-width: 0; }
+  .manager-page .mc-grid { display: flex; overflow: visible; flex: 1 1 auto; min-width: 0; }
   .manager-page .mc-card { min-width: 0; flex: none; }
   .manager-page .mc-acts { flex-direction: column; }
   .manager-page .mc-acts .mc-btn { flex: none; }
-  .manager-page .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .manager-page .mc-btn { min-width: 0; }
   .manager-page .mc-preview { flex: none; min-height: 200px; }
   .manager-page .mc-dhead { flex-direction: column; }
@@ -755,10 +748,10 @@ body.yard-page .head .badge-test { order: 6; }
 
 /* Auto-save (Joe 10/10): no Record or Save buttons on the plant side. Each box shows when it saved ("Saved 10:42"), and an empty
    box of a new round shows the last reading small and grey under it. */
-.plant-page .as-note { display: block; margin-top: 3px; font-size: 16px; font-weight: 800; color: var(--runs-ink); min-height: 0; }
+.plant-page .as-note { display: block; margin-top: 3px; font-weight: 800; color: var(--runs-ink); min-height: 0; }
 .plant-page .as-note:empty { display: none; }
 .plant-page .as-note.bad { color: #b42332; }
-.plant-page .as-last { display: block; margin-top: 3px; font-size: 16px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plant-page .as-last { display: block; margin-top: 3px; font-weight: 600; color: #8796a2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quality-page .qc-round { margin-left: auto; font-size: 16px; font-weight: 700; color: var(--muted); }
 /* Joe 10/14 (Run Complete, A): the line is done for the shift. */
 .quality-page .qc-done-btn { font: inherit; font-size: 16px; font-weight: 800; padding: 9px 18px; border-radius: 9px; border: 0; background: #0b3d6e; color: #fff; cursor: pointer; }
@@ -808,7 +801,6 @@ body.yard-page .head .badge-test { order: 6; }
 @media (max-width: 760px) {
   .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) .sheet.scroll-list { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) .sheet.scroll-list table.loadout { min-width: 860px; }
-  .plant-page:is(.loadout-page, .unload-page, .returns-page, .washing-page) table.loadout td { font-size: 16px; }
   .quality-page #panes, .shift-page #panes { display: none; }
   .shift-page .sn-lastrep, .shift-page .sn-carry, .shift-page .sn-sec .why, .shift-page .qc-lines h2 { display: none; }
 }
@@ -1098,7 +1090,7 @@ body.yard-page .head .badge-test { order: 6; }
 .sched-page .sc-suppaste { width: 100%; min-height: 320px; box-sizing: border-box; font: inherit; font-size: 18px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
 .sched-page .sc-suplist { max-height: 60vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .sched-page .sc-suptable { width: 100%; border-collapse: collapse; font-size: 16px; }
-.sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 12px; font-size: 16px; font-weight: 800; }
+.sched-page .sc-suptable th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; padding: 8px 12px; font-size: 16px; font-weight: 800; }
 .sched-page .sc-suptable td { padding: 6px 12px; border-top: 1px solid #edf2f7; font-weight: 700; color: var(--ink); }
 .sched-page .sc-suptable td:last-child { width: 1%; text-align: right; white-space: nowrap; }
 .sched-page .sc-suptable td.empty { text-align: center; color: var(--muted); }
@@ -1211,9 +1203,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-pvlist .mc-rt { grid-template-columns: minmax(0, 1fr) auto; }
 .manager-page .mc-pvlist .mc-rt i { grid-column: 1 / -1; white-space: normal; overflow: visible; }
 @media (min-width: 1501px) {
-  .manager-page .mc-report { grid-row: 1 / span 2; }
-  .manager-page .mc-grid [data-card="dept"] { grid-column: 2 / span 2; }
-  .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+  .manager-page .mc-grid [data-card="dept"] .mc-tiles { grid-template-rows: minmax(0, 1fr); }
 }
 @media (max-width: 1500px) { .manager-page .mc-tile { min-height: 64px; } }
 
@@ -1239,7 +1229,6 @@ body.yard-page .head .badge-test { order: 6; }
 @media (max-width: 1500px) {
   /* Yard Checks on a laptop: the eyebrow takes two short lines so Refresh stays on the top line. */
   body.yard-page .head .title { flex: 0 1 300px; min-width: 0; }
-  body.yard-page .head .title .eyebrow { white-space: normal; }
 }
 /* Review item 56 follow-up: on a phone (390) with 16px words, "All Loads 12" was squeezed and cut. The Needs Unloading /
    All Loads buttons keep their full words; if both do not fit on one line, the second goes under the first. */
@@ -1262,7 +1251,7 @@ body.yard-page .head .badge-test { order: 6; }
 .products-page .pm-sheet col.c-name { width: 300px; } .products-page .pm-sheet col.c-sku { width: 96px; } .products-page .pm-sheet col.c-upc { width: 130px; }
 .products-page .pm-sheet col.c-type { width: 112px; } .products-page .pm-sheet col.c-group { width: 92px; } .products-page .pm-sheet col.c-mach { width: 80px; }
 .products-page .pm-sheet col.c-num { width: 86px; } .products-page .pm-sheet col.c-rm { width: 104px; }
-.products-page .pm-sheet thead tr.pm-band th { height: 30px; top: 0; font-size: 16px; letter-spacing: .06em; border-bottom: 1px solid rgba(255, 255, 255, .25); }
+.products-page .pm-sheet thead tr.pm-band th { height: 30px; top: 0; letter-spacing: .06em; border-bottom: 1px solid rgba(255, 255, 255, .25); }
 .products-page .pm-sheet thead tr:not(.pm-band) th { top: 30px; height: 58px; padding: 4px 3px; overflow-wrap: anywhere; }
 .products-page .pm-sheet thead th { border-right: 1px solid rgba(255, 255, 255, .18); }
 .products-page .pm-sheet thead th.pm-m { background: #0d6b45; }
@@ -1354,9 +1343,8 @@ body.yard-page .head .badge-test { order: 6; }
 
 /* Joe 10/15: Manager Center's Shift Notes card. Bigger, bolder numbers; while any note is not resolved by hand the card turns
    red, says how many need review and lists them (a line opens that note); calm again once all are resolved. */
-.manager-page .mc-card[data-card="notes"] .mc-tile b { font-size: 30px; font-weight: 900; }
+.manager-page .mc-card[data-card="notes"] .mc-tile b { font-weight: 900; }
 .manager-page .mc-card[data-card="notes"] .mc-tile.bad { background: #fdecec; border-color: #f1b5b5; }
-.manager-page .mc-card[data-card="notes"] .mc-tile.bad b { font-size: 34px; }
 .manager-page .mc-card[data-card="notes"] .mc-tile.bad span, .manager-page .mc-card[data-card="notes"] .mc-tile.bad i { color: #b42318; font-weight: 800; }
 .manager-page .mc-card.mc-alert { --accent: #c62828; background: #fff6f6; box-shadow: 0 0 0 3px #f3b4b4; }
 .manager-page .mc-pill { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 12px; background: #c62828; color: #fff; font-size: 16px; font-weight: 900; vertical-align: middle; white-space: nowrap; animation: mc-pill-pulse 1.6s ease-in-out infinite; }
@@ -1372,7 +1360,6 @@ body.yard-page .head .badge-test { order: 6; }
 .shift-page .sn-card.sn-asked { box-shadow: 0 0 0 3px #f3b4b4; }
 .manager-page .mc-card.mc-alert .mc-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* With the Shift Notes list showing, no row squeezes its cards below their content (the grid scrolls instead). */
-@media (min-width: 1501px) { .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: repeat(3, minmax(min-content, 1fr)); } }
 /* Joe 10/15: the Scheduler, Yard Checks, Cooler Temperature and Quality cards have two big tiles each (Shift Notes three): the label, the number big under it, the line under that. */
 .manager-page .mc-grid :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tiles { grid-template-rows: minmax(0, 1fr); }
 .manager-page :is([data-card="sched"], [data-card="walk"], [data-card="notes"], [data-card="dept"]) .mc-tile { grid-template-columns: minmax(0, 1fr); grid-template-areas: "label" "num" "line"; align-content: center; row-gap: 2px; padding: 6px 14px; }
@@ -1398,7 +1385,6 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page [data-card="walk"] .mc-tile.warn b { color: #b45f00; }
 /* Joe 10/22 (practice test): the big walkthrough numbers get room for the whole letter height. */
 .manager-page [data-card="walk"] .mc-tile b { line-height: 1.15; }
-@media (max-width: 760px) { .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; } }
 /* Joe 10/15 (Manager Walkthrough, look C, option 1): the phone and tablet start screen (three choices) and the walkthrough
    (Coolers, then Quality) as big tiles with big numbers; a red tile flashes while a check is past due. */
 .walk-page .wk-view { display: block; overflow: auto; padding: 4px 16px 16px; }
@@ -1439,7 +1425,7 @@ body.yard-page .head .badge-test { order: 6; }
 @media (min-width: 761px) { .plant-page .wk-bar { flex-wrap: nowrap; } .plant-page .wk-bar b { order: 0; flex: 1 1 auto; } .plant-page .wk-bar a.next { margin-left: 0; } }
 /* Joe 10/15 (later): the Manager Walkthrough card's Yard, Coolers and Quality tiles list what is in them (problems first, red),
    with the name and big number on one line so the list has the room; the bottom row takes the height its lists need. */
-.manager-page [data-card="walk"] .wk-tile { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label num" "line num" "list list"; align-content: start; row-gap: 2px; padding: 8px 12px; }
+.manager-page [data-card="walk"] .wk-tile { grid-template-columns: minmax(0, 1fr) auto; align-content: start; row-gap: 2px; padding: 8px 12px; }
 .manager-page [data-card="walk"] .wk-tile b { grid-area: num; text-align: right; align-self: center; }
 .manager-page [data-card="walk"] .wk-tile .wk-items { grid-area: list; list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .manager-page [data-card="walk"] .wk-items li { font-size: 16px; font-weight: 700; color: var(--ink); white-space: normal; overflow-wrap: normal; line-height: 1.2; }
@@ -1449,7 +1435,6 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page [data-card="walk"] .wk-items li.ok { color: #1f7a4d; }
 .manager-page [data-card="walk"] .wk-items li.more { color: var(--ud-blue); font-weight: 800; }
 /* The two top rows share what the walkthrough card leaves (the report preview scrolls inside itself). */
-@media (min-width: 1501px) { .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: minmax(250px, 1fr) minmax(250px, 1fr) auto; } }
 /* Joe 10/15 (later): each walkthrough tile on the phone lists what it holds under its name and number. */
 .walk-page .wk-choice { flex-wrap: wrap; }
 .walk-page .wk-choice .wk-items { flex: 1 1 100%; list-style: none; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
@@ -1465,8 +1450,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-grid [data-card="walk"] .mc-tile:not(.wk-tile) { align-content: start; }
 /* Joe 10/18: each walkthrough area is green (done), yellow (due at 2 hours) or red (past due at 3 hours), with who did its newest
    check. Manager Center: a state word by the area's name and the who line under its count. */
-.manager-page [data-card="walk"] .wk-tile { grid-template-areas: "label num" "line num" "who who" "list list"; }
-.manager-page [data-card="walk"] .wk-tile .wk-who { grid-area: who; margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manager-page [data-card="walk"] .wk-tile .wk-who { margin: 2px 0 0; font-size: 16px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .manager-page [data-card="walk"] .wk-tile.warn { background: #fff7e0; border-color: #f0d38a; }
 .manager-page [data-card="walk"] .wk-tile.good { background: #eef8f1; border-color: #b9e0c6; }
 .manager-page [data-card="walk"] .wk-tile.good b { color: #1f7a4d; }
@@ -1503,7 +1487,6 @@ body.yard-page .head .badge-test { order: 6; }
    tiles need (they still grow into spare room), the tiles' big numbers and padding are a little smaller, and the report preview
    is a little tighter; the walkthrough card keeps its size. */
 @media (min-width: 1501px) {
-  .manager-page .mc-grid, .manager-page .mc-grid:has(.mc-alert) { grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr) auto; }
   .manager-page .mc-grid > .mc-card:not([data-card="walk"]) { padding: 8px 14px 10px; gap: 4px; }
   .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tiles { min-height: min-content; }
   .manager-page .mc-grid :is([data-card="sched"], [data-card="notes"], [data-card="dept"]) .mc-tile { padding: 4px 12px; row-gap: 0; }
@@ -1644,20 +1627,19 @@ a.wp-more { color: var(--ud-blue); }
 .manager-page [data-card="walk"] .wp-count b { text-decoration: underline; }
 /* Wide screens: the four columns stay as they were; Last Walkthrough and Pictures share the fourth, one above the other. */
 @media (min-width: 1501px) {
-  .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto; }
+  .manager-page .mc-grid [data-card="walk"] .mc-tiles { grid-template-rows: auto auto; }
   .manager-page [data-card="walk"] .mc-tiles > .wk-tile:not(.wp-tile) { grid-row: span 2; }
   .manager-page [data-card="walk"] .mc-tiles > .mc-tile:not(.wk-tile) { padding-top: 4px; padding-bottom: 4px; }
   .manager-page .mc-grid [data-card="walk"] .wp-tile { grid-template-areas: "label num" "list list"; }
   .manager-page [data-card="walk"] .wp-tile i { display: none; }
-  .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; padding-top: 6px; }
+  .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; }
   .manager-page [data-card="walk"] .wp-tile b { font-size: 30px; }
   .manager-page [data-card="walk"] .mc-tiles > .mc-tile:not(.wk-tile) b { font-size: 34px; }
   .manager-page [data-card="walk"] .wp-tile { padding-top: 4px; padding-bottom: 4px; }
   /* Kept a little short of the 1536 x 886 screen so a slightly taller font elsewhere still fits with no scrolling. */
   .manager-page .mc-grid [data-card="walk"] .wp-tile .wp-box { margin-top: 0; padding-top: 4px; }
-  .manager-page [data-card="walk"] .wp-tile .wp-side { gap: 3px; }
   .manager-page [data-card="walk"] .wp-tile .wp-cap { min-height: 34px; padding: 4px 8px; }
-  .manager-page [data-card="walk"] .wp-tile .wp-take { height: 36px; min-height: 36px; }
+  .manager-page [data-card="walk"] .wp-tile .wp-take { height: 36px; }
   /* Four across leaves "3 · Production PAST DUE" little room beside its number: the names at 16px and a slimmer badge,
      so the whole name shows on one line even where a screen's font runs wider. */
   .manager-page [data-card="walk"] .wk-tile { padding-left: 10px; padding-right: 10px; column-gap: 6px; }
@@ -1756,7 +1738,6 @@ a.wp-more { color: var(--ud-blue); }
 .prod-home .mc-preview, .prod-home .mc-preview *, .prod-home a.mc-btn { text-decoration: none; }
 .prod-home .mc-preview { color: inherit; }
 .prod-home a.mc-btn { display: inline-flex; align-items: center; justify-content: center; }
-@media (min-width: 1501px) { .prod-home .mc-grid [data-card="walk"] .mc-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .prod-home [data-card="walk"] .wk-who { white-space: normal; }
 /* Joe 10/26: Blow Mold is off this page and Boxing and Totes are two cards, and the page fits a 1536 laptop window without
    scrolling: each machine card is shorter (the counts and the four lines each on one line, the name beside "Production

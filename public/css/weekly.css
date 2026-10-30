@@ -17,7 +17,7 @@
 .wk-scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 16px; background: #fff; border: 1px solid #d0dce5; border-radius: 14px; }
 .wk-panel h2 { margin: 0; padding: 8px 24px 10px; color: #123f70; font-size: 19px; font-weight: 500; }
 .weekly-page #routes-sheet td.day { background: #171c20 !important; box-shadow: none; outline: 0; }
-.weekly-page #routes-sheet td.day:not(.off) { position: relative; padding: 0 9px; text-align: center; color: #0e3a62; font-size: 16px; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.weekly-page #routes-sheet td.day:not(.off) { position: relative; text-align: center; color: #0e3a62; font-weight: 850; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
 .weekly-page #routes-sheet td.day:not(.off)::before { content: ""; position: absolute; inset: 3px; border: 1px solid #bfd1e0; border-radius: 7px; background: #f4f8fb; }
 .weekly-page #routes-sheet td.day:not(.off) > * { position: relative; }
 .weekly-page #routes-sheet td.day .nm { display: block; }
@@ -32,17 +32,17 @@
   .wk-panel h2 { padding: 4px 20px 6px; font-size: 17px; }
 }
 .weekly-page #routes-sheet td.day .unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.weekly-page #routes-sheet td.day.editable:not(.off)::after { content: "\25BE"; position: absolute; top: 50%; right: 11px; transform: translateY(-50%); color: #0e3a62; font-size: 16px; }
-.weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; font-size: 16px; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { content: "\25BE"; position: absolute; top: 50%; transform: translateY(-50%); color: #0e3a62; }
+.weekly-page #routes-sheet td.day:not(.off) { padding-right: 22px; }
 .weekly-page .wk-scroll { scrollbar-gutter: stable; }
-.weekly-page #routes-sheet td.day:not(.off) { padding: 0 17px 0 6px; font-size: clamp(16px, .72vw, 16px); letter-spacing: -.02em; }
-.weekly-page #routes-sheet td.day.editable:not(.off)::after { right: 7px; font-size: 16px; }
+.weekly-page #routes-sheet td.day:not(.off) { padding: 0 17px 0 6px; }
+.weekly-page #routes-sheet td.day.editable:not(.off)::after { right: 7px; }
 .weekly-page .board td.b-extra, .weekly-page .board tr.relief td.b-extra { background: #d9ebfb !important; color: #000 !important; }
-.weekly-page #routes-sheet td.day:not(.off) { font-size: 16px; letter-spacing: 0; }
+.weekly-page #routes-sheet td.day:not(.off) { letter-spacing: 0; }
 .weekly-page #routes-sheet td.day .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .weekly-page #routes-sheet td.day.c-notrun { color: #5d7286; }
 .weekly-page #routes-sheet td.day.c-notrun::before { background: #eef1f4; border: 1px dashed #9aa9b7; }
-.weekly-page #routes-sheet td.day .notrun { display: block; margin-top: 1px; font-style: normal; font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #a35b00; }
+.weekly-page #routes-sheet td.day .notrun { display: block; margin-top: 1px; font-style: normal; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #a35b00; }
 /* Route Run Days (Joe 10/10): a little wider so every route and run reads in full; day over date like the board;
    all seven days fit with no sideways scrollbar. */
 .modal.wide-modal#days-modal { width: min(960px, calc(100vw - 32px)); }

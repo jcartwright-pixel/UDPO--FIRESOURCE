@@ -44,7 +44,7 @@
 .crew-setup input.short { width: 120px; }
 .crew-setup .crew-set { font-weight: 700; color: var(--pill-green-ink); }
 .crew-setup input[type=time] { width: 130px; }
-.crew-days { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.crew-days { display: inline-flex; justify-content: center; }
 .crew-days label { display: inline-flex; align-items: center; gap: 2px; font-size: 16px; font-weight: 700; }
 .crew-limits { display: grid; gap: 14px; padding: 16px; max-width: 900px; }
 .crew-limits label { display: flex; justify-content: space-between; gap: 16px; align-items: center; font-weight: 700; }

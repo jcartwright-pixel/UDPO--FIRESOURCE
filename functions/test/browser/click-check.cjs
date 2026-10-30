@@ -44,6 +44,15 @@ function look() {
   for (const el of controls) {
     const r = el.getBoundingClientRect();
     if (r.top < 0 || r.left < 0 || r.bottom > vh || r.right > vw) continue;
+    // Scrolled out of sight inside a list box (or under its fixed header row) is not covered: only what a person can see counts.
+    let clipped = false;
+    for (let a = el.parentElement; a && a !== document.body && !clipped; a = a.parentElement) {
+      const st = getComputedStyle(a);
+      if (!/(auto|scroll|hidden|clip)/.test(st.overflowY + st.overflowX)) continue;
+      const c = a.getBoundingClientRect(), head = [...a.querySelectorAll('thead')].filter(t => getComputedStyle(t).position === 'sticky' || [...t.querySelectorAll('th')].some(th => getComputedStyle(th).position === 'sticky')).reduce((m, t) => Math.max(m, t.getBoundingClientRect().bottom), c.top);
+      if (r.top < head - 1 || r.bottom > c.bottom + 1 || r.left < c.left - 1 || r.right > c.right + 1) clipped = true;
+    }
+    if (clipped) continue;
     // A control is covered when the middle and both ends of it are under something else (not itself, its own parts or its label).
     const spots = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + Math.min(6, r.width / 3), r.top + r.height / 2], [r.right - Math.min(6, r.width / 3), r.top + r.height / 2]];
     const over = spots.map(([x, y]) => document.elementFromPoint(x, y)).filter(hit => hit && hit !== el && !el.contains(hit) && !(hit.contains(el) && hit.tagName === 'LABEL') && !(hit.tagName === 'LABEL' && hit.control === el));
@@ -128,7 +137,10 @@ async function presses(browser, url) {
     if (left && /\.html/.test(now) && brokenLinks([now]).length) problem = (problem ? problem + '; ' : '') + 'opens a missing page ' + now;
     if (problem) out.push({ press: item.tag + ' "' + item.text + '"', problem, ms: Date.now() - t0 });
     // Start fresh after a press that opened another page or left a layer up, so the next press finds the screen as it opens.
-    const layer = left ? true : await s.page.evaluate(() => [...document.querySelectorAll('body *')].some(x => { const st = getComputedStyle(x); if (st.position !== 'fixed' || st.display === 'none' || st.visibility === 'hidden' || st.pointerEvents === 'none') return false; const r = x.getBoundingClientRect(); return r.width * r.height >= innerWidth * innerHeight / 4; })).catch(() => true);
+    const layerUp = () => s.page.evaluate(() => [...document.querySelectorAll('body *')].some(x => { const st = getComputedStyle(x); if (st.position !== 'fixed' || st.display === 'none' || st.visibility === 'hidden' || st.pointerEvents === 'none') return false; const r = x.getBoundingClientRect(); return r.width * r.height >= innerWidth * innerHeight / 4; })).catch(() => true);
+    // A pop-up is closed with Esc, as a person would; only one that stays open needs the screen opened again.
+    let layer = left || await layerUp();
+    if (layer && !left) { await s.page.keyboard.press('Escape').catch(() => {}); await s.page.waitForTimeout(250); layer = await layerUp(); }
     if (layer) { await s.ctx.close(); s = await open(browser, SIZES[0], url); await mark(s.page); }
   }
   await s.ctx.close();
@@ -140,7 +152,17 @@ async function presses(browser, url) {
   const browser = await chromium.launch();
   const rows = [];
   const only = (process.env.ONLY || '').split(',').filter(Boolean);
-  for (const [name, url] of SCREENS.filter(([, u]) => !only.length || only.includes(u.split(/[?#]/)[0]))) {
+  const todo = SCREENS.filter(([, u]) => !only.length || only.includes(u.split(/[?#]/)[0]));
+  // Several screens at once (WORKERS), each in its own browser window.
+  const next = () => todo.shift();
+  await Promise.all(Array.from({ length: Number(process.env.WORKERS || 4) }, async () => { for (let job = next(); job; job = next()) await check(browser, rows, job); }));
+  rows.sort((a, b) => SCREENS.findIndex(x => x[1] === a.url) - SCREENS.findIndex(x => x[1] === b.url));
+  if (OUT) fs.writeFileSync(OUT, JSON.stringify(rows, null, 1));
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });
+
+async function check(browser, rows, [name, url]) {
+  {
     const row = { name, url, sizes: {}, errors: [], missing: [], links: [] };
     for (const size of SIZES) {
       let s;
@@ -161,5 +183,4 @@ async function presses(browser, url) {
       'presses', row.presses ? (row.presses.pressed + ' problems ' + (row.presses.problems || []).length) : '-', row.errors.length ? 'ERR ' + row.errors[0].slice(0, 70) : '', row.missing.length ? 'MISSING ' + row.missing[0] : '', row.links.length ? 'BROKEN ' + row.links[0] : '');
     if (OUT) fs.writeFileSync(OUT, JSON.stringify(rows, null, 1));
   }
-  await browser.close();
-})().catch(e => { console.error(e); process.exit(1); });
+}

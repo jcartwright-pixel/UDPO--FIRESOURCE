@@ -56,7 +56,7 @@ body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
 body.daily-look table.daily tr.mover td { cursor: grab; }
 body.daily-look table.daily tr.mover td button, body.daily-look table.daily tr.mover td input, body.daily-look table.daily tr.mover td select { cursor: pointer; }
 body.daily-look table.daily tr.row-dragging td { background: #e8f1fa !important; }
-table.daily td.offcover::before { content: attr(data-cover); font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+table.daily td.offcover::before { text-overflow: ellipsis; display: block; }
 /* Daily Dispatch, Sunday: the Sunday deliveries already loaded Saturday are shown for reference, a little quieter than
    what is loading today. */
 body.daily-look table.daily tbody tr.group.loaded.already td { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }

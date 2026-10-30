@@ -1,7 +1,7 @@
 /* maint.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
 .hub-page .head .hub-tiles { margin-left: auto; }
-.hub-tiles > a.button { gap: 6px; max-width: 150px !important; min-width: 120px !important; }
+.hub-tiles > a.button { gap: 6px; }
 .hub-tiles > a.button img { width: 34px; height: 30px; object-fit: contain; flex: none; }
 .hub-view { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; padding-bottom: 14px; }
 .hub-page .kpis b { font-size: 34px; }
@@ -51,7 +51,7 @@
 .hub-page .hub-tiles4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .hub-page .hub-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; min-height: 42px; padding: 4px 10px; text-align: left; }
 .hub-page .hub-tile b { font-size: 26px; min-width: 30px; text-align: right; flex: none; }
-.hub-page .hub-tile span { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #415264; }
+.hub-page .hub-tile span { font-size: 16px; overflow: hidden; text-overflow: ellipsis; color: #415264; }
 .hub-latest table.issues thead th { position: sticky; top: 0; z-index: 1; }
 @media (max-width: 1199.98px) {
   .hub-page .hub-latest { overflow: clip; }
@@ -69,10 +69,7 @@
   .hub-page .hub-wrench svg { width: 34px; height: 34px; }
   .hub-page .hub-big b { font-size: 36px; }
   .hub-page .hub-tiles4 { gap: 5px; }
-  .hub-page .hub-tile { min-height: 36px; padding: 2px 10px; }
-  .hub-page .hub-tile b { font-size: 22px; }
   /* A long label (Annual inspections this month) takes two lines in the same tile height when the tile is narrow. */
-  .hub-page .hub-tile span { white-space: normal; line-height: 1.1; }
 }
 /* Joe 10/23: "make these cards look a little bit bigger. You can see not all the words are going in." On his Edge the bottoms
    of letters like g and y were cut off in the small tiles (the label box was shorter than the letters). The tiles are a little
