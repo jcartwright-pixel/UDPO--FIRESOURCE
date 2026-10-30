@@ -378,6 +378,7 @@ Every truck and trailer the dispatch lists offer, with its status, where it is, 
 - `Down` on a unit opens the box to put it down: type the reason and press `Put down`. A down unit stays red on Daily and Weekly Dispatch until it is back.
 - `Back in service` puts a down unit back.
 - The fleet list is the master list and copies in every night. `Preview fleet sync` shows every change a sync would make, without changing anything. `Sync fleet list` copies it in now (managers). `Download list` saves the list.
+- While writing to the sheets is paused (Administration, Go-Live Switches), `Sync fleet list` says so and changes nothing. Press it again after Resume.
 
 !> Do not take a unit off a load by putting it down here. Change the load on Daily Dispatch; the down mark is only for units that cannot run.
 
@@ -1207,6 +1208,7 @@ screens: administration.html?item=switch
 Which screens are switched on, and the emergency stop.
 
 - **Pause writing to the sheets** holds every save: screens keep saving, the saves wait, and **Resume** writes them to the sheets in order.
+- While it is paused, nothing at all is written to the sheets: not Publish moving the weeks, and not the fleet list sync into Equipment Master (the nightly one waits, and `Sync fleet list` says it is paused).
 - One button turns on everything that is ready.
 
 > Use Pause if something is writing wrong values to the sheets. Nothing is lost while paused.

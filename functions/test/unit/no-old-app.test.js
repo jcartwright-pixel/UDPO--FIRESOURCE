@@ -47,3 +47,31 @@ test('every screen loads the shared shell that gives it Back and Home', () => {
   });
   assert.deepEqual(bad, []);
 });
+
+// Joe 10/30 ("check to see if our router ... the reads and writes transferred over to our new Firebase system"): every screen
+// reads from the Firebase database and saves through the server; no screen talks to Google Sheets or the old program itself.
+// The sheets are reached only by the server (the copy in, the write-back and the other syncs Joe turned on).
+test('no screen reads or writes Google Sheets or the old program directly', () => {
+  const bad = [];
+  files(PUB).filter(f => !f.includes(path.sep + 'vendor' + path.sep)).forEach(f => {
+    const text = fs.readFileSync(f, 'utf8');
+    [/sheets\.googleapis\.com/i, /docs\.google\.com\/spreadsheets/i, /google\.script\.run/, /macros\/s\//].forEach(re => { if (re.test(text)) bad.push(path.relative(PUB, f) + ': ' + re); });
+  });
+  assert.deepEqual(bad, []);
+});
+
+test('the database lets no screen write; every save goes through the server', () => {
+  const rules = fs.readFileSync(path.join(__dirname, '../../../firestore.rules'), 'utf8');
+  // The one write rule is the catch-all at the bottom, and it says no (if false).
+  const writes = rules.split('\n').filter(l => /allow\s+[^:;]*\b(write|create|update|delete)\b/.test(l));
+  assert.deepEqual(writes.filter(l => !/:\s*if false;/.test(l)), []);
+});
+
+// Joe 10/30: Pause writing to the sheets is the emergency stop for every sheet write, the fleet list sync's too.
+test('the fleet list sync waits while writing to the sheets is paused', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../index.js'), 'utf8');
+  const fn = src.slice(src.indexOf('async function fleetSyncWrite()'), src.indexOf('exports.fleetSyncNightly'));
+  assert.match(fn, /sheetsPaused\(/);
+  assert.match(src, /if \(!run \|\| run\.paused\) return;/);
+  assert.match(src, /run && run\.paused\) throw new HttpsError/);
+});
