@@ -1,0 +1,6 @@
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Box load Start and End times: ok Add Load 959ms, Save times 623ms, Put back 765ms, Delete Load 53ms
+WRITE Shift report shows Box loads: ok Add Load 554ms, Delete Load 61ms
+WRITE Shift report: later-day Scheduler load not BEHIND: ok Add Load 608ms, Delete Load 54ms
+WRITE Driver Room TV at 1920 (look only): ok 
+WRITE Daily Dispatch red cells (look only): FAILED page.click: Timeout 30000ms exceeded. 
