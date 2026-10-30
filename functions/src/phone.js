@@ -255,9 +255,10 @@ async function phoneCall(db, input, now) {
   if (op === 'board') {
     // The loads the plant loads on this operating day (Saturday = the Sunday and Monday deliveries), as on the Driver Room board.
     const date = L.operatingDay(new Date(stamp)), week = L.weekStart(date);
-    const runs = (await db.collection(C.runs).where('weekStart', 'in', [week, L.addDays(week, 7)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
-    const pickups = (await db.collection('pickups').where('date', 'in', [date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(d => d.data());
-    const rows = B.loadoutBoardRows(runs, pickups, date).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
+    // Joe 10/30: yesterday's loads not loaded yet stay on, first, until they are loaded (last week's runs for Saturday's).
+    const runs = (await db.collection(C.runs).where('weekStart', 'in', [L.addDays(week, -7), week, L.addDays(week, 7)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+    const pickups = (await db.collection('pickups').where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(d => d.data());
+    const rows = B.loadoutBoardRows(runs, pickups, date, { carry: true }).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
   if (op === 'schedule') return mySchedule(db, input, stamp);
