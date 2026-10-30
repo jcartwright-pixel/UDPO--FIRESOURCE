@@ -1,0 +1,83 @@
+{
+ "today": "2026-10-30",
+ "weeks": [
+  "2026-10-25",
+  "2026-11-01"
+ ],
+ "runs": 79,
+ "problems": [
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "907_1 FAIRMONT TRANSFER 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_1 8303_1 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "950_1 CHARLESTON TRANSFER 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "880 VENTURA 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "812 DSD 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "812 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "8303_2 8303_2 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_1 PRODUCT 1 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "980 PORTSMOUTH TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "909_1 MARIETTA LOAD 1 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "901_3 JUG 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "971 PAINTSVILLE TRANSFER 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "805 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "808 DSD 2026-10-31 (sat)"
+  },
+  {
+   "kind": "Running load with no driver",
+   "what": "822 DSD 2026-10-30 (fri)"
+  },
+  {
+   "kind": "Leaving time differs from Route Master",
+   "what": "822 DSD 2026-10-30 (fri): load 4:45 AM, Route Master 5:15 AM"
+  }
+ ],
+ "plantLoads": 12,
+ "counts": {
+  "Running load with no driver": 16,
+  "Leaving time differs from Route Master": 1
+ }
+}
