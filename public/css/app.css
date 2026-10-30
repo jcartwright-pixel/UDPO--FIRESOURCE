@@ -1043,9 +1043,6 @@ span.status::first-letter, .vstatus::first-letter, .temp-page .tp-status::first-
 .weekly-page #rows tr.mover td:nth-child(-n+2), body.daily-look table.daily tr.mover td:nth-child(-n+2) { touch-action: none; }
 
 
-/* Joe 10/11: a load whose regular driver is off that day (vacation, sick, unpaid...) is red until someone covers it. The
-   words come from data-cover so the cell itself stays empty for typing a driver. */
-body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #f5c6c8 !important; color: #9b1c3a; box-shadow: inset 0 0 0 2px #ee3e3e; font-weight: 800; }
 
 
 /* Joe 10/11: Under Construction modules open only for Administrators; anyone else sees the card but cannot open it. */

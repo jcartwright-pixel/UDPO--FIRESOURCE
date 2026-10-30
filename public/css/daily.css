@@ -109,9 +109,9 @@ body.daily-look #delivers { display: none; }
   body.daily-look .head:has(#print-sheet) #week-begin { width: 72px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 104px; }
 }
-/* Joe 10/20: a load whose regular driver is off reads NEEDS DRIVER in bold white on solid red, with who is off and why under it,
+/* Joe 10/11, 10/20: a load whose regular driver is off (vacation, sick, unpaid...) reads NEEDS DRIVER in bold white on solid red, with who is off and why under it,
    at 16px, until someone picks a driver (the same look as Weekly Dispatch). */
-body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #c81e1e !important; color: #fff; box-shadow: inset 0 0 0 2px #8f1010; }
+body.daily-look table.daily td.missing.offcover, table.daily td.missing.offcover { background: #c81e1e !important; color: #fff; box-shadow: inset 0 0 0 2px #8f1010; font-weight: 800; }
 table.daily td.offcover::before { content: "NEEDS DRIVER"; font-size: 16px; font-weight: 900; letter-spacing: .03em; color: #fff; white-space: nowrap; overflow: visible; }
 table.daily td.offcover::after { content: attr(data-off-who) "\A" attr(data-off-why); display: block; font-size: 16px; font-weight: 700; line-height: 1.15; color: #fff; white-space: pre-line; }
 /* Joe 10/23: a down truck or trailer says "T-532 DOWN" only; the driver cell's NEEDS DRIVER words are not put on it. */

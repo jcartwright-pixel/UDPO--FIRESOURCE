@@ -406,6 +406,10 @@ function validateStep(input) {
 }
 
 const newOrderId = () => 'WO-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+// A new work order: the blank record every one starts from (audit 10/30: it was written out by hand in five places), with what
+// the caller knows about it.
+const newOrder = (fields) => Object.assign({ facility_id: FACILITY, category: '', source_kind: '', source_id: '', service_key: '', status: 'NEW', started_at: '', techs: '',
+  parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '', version: 1, createdInApp: true }, fields);
 
 async function step(db, input, nowMs) {
   const req = validateStep(input);
@@ -434,9 +438,8 @@ async function step(db, input, nowMs) {
       const m = matchUnit(units, req.unit);
       if (m.error) throw SaveErr('BAD_REQUEST', m.error);
       const id = newOrderId();
-      order = { work_order_id: id, facility_id: FACILITY, unit: m.unit.unit, unit_type: m.unit.type, problem: req.problem ? req.category + ': ' + req.problem : req.category, category: req.category,
-        can_run: req.canRun ? 'YES' : 'NO', source: 'TECH', source_kind: '', source_id: '', service_key: '', status: 'NEW', created_at: stamp, created_by: joinNames(names), started_at: '', techs: '',
-        parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '', updated_at: stamp, updated_by: by, version: 1, createdInApp: true };
+      order = newOrder({ work_order_id: id, unit: m.unit.unit, unit_type: m.unit.type, problem: req.problem ? req.category + ': ' + req.problem : req.category, category: req.category,
+        can_run: req.canRun ? 'YES' : 'NO', source: 'TECH', created_at: stamp, created_by: joinNames(names), updated_at: stamp, updated_by: by });
       renew((r, d) => tx.update(r, d), people, nowMs);
       tx.set(db.collection(WORK_ORDERS).doc(docId(id)), order);
       result.job = jobOf(order);
@@ -598,10 +601,9 @@ async function step(db, input, nowMs) {
 // A write-up's work order: the unit, what the driver wrote and where it came from, tied to the write-up (source_kind|source_id).
 function writeUpOrder(r, kindName, stamp, by) {
   const id = newOrderId(), kind = KEY_KINDS[kindName] || 'TRUCK', problem = text(r.issue_details || r.notes, 300);
-  return { work_order_id: id, facility_id: FACILITY, unit: kind === 'FORK_TRUCK' ? text(rawUnit(r), 20).toUpperCase() : unitText(rawUnit(r), kind), unit_type: kind, problem, category: '', source_from: writeUpFrom(r),
-    can_run: canRunGuess(problem + ' ' + (r.priority || '')) ? 'YES' : 'NO', source: 'WRITE_UP', source_kind: kindName, source_id: r.record_id, service_key: '', status: 'NEW',
-    created_at: String(r.opened_at || r.service_date || stamp), created_by: text(r.driver, 60) || 'Write-up', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '',
-    signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '', updated_at: stamp, updated_by: by, version: 1, createdInApp: true };
+  return newOrder({ work_order_id: id, unit: kind === 'FORK_TRUCK' ? text(rawUnit(r), 20).toUpperCase() : unitText(rawUnit(r), kind), unit_type: kind, problem, source_from: writeUpFrom(r),
+    can_run: canRunGuess(problem + ' ' + (r.priority || '')) ? 'YES' : 'NO', source: 'WRITE_UP', source_kind: kindName, source_id: r.record_id,
+    created_at: String(r.opened_at || r.service_date || stamp), created_by: text(r.driver, 60) || 'Write-up', updated_at: stamp, updated_by: by });
 }
 
 /*
@@ -676,10 +678,9 @@ async function engineCodeOrders(db, faults, stamp) {
         return;
       }
       const id = newOrderId(), n = fresh.length;
-      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), { work_order_id: id, facility_id: FACILITY, unit: g.unit.unit, unit_type: 'TRUCK', problem: what + (n > 1 ? ' · came on ' + n + ' times' : ''),
-        category: 'Engine', can_run: 'YES', source: 'FLEET', source_from: FROM.FLEET, source_kind: 'codes', source_id: sid, service_key: '', status: 'NEW', created_at: fresh[0].at || stamp,
-        created_by: 'Verizon Fleet', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '',
-        code: g.code, code_count: n, code_last: last, code_alerts: fresh.map(f => f.alertId).slice(-CODE_ALERTS_KEPT), updated_at: stamp, updated_by: 'Verizon Fleet', version: 1, createdInApp: true });
+      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), newOrder({ work_order_id: id, unit: g.unit.unit, unit_type: 'TRUCK', problem: what + (n > 1 ? ' · came on ' + n + ' times' : ''),
+        category: 'Engine', can_run: 'YES', source: 'FLEET', source_from: FROM.FLEET, source_kind: 'codes', source_id: sid, created_at: fresh[0].at || stamp, created_by: 'Verizon Fleet',
+        code: g.code, code_count: n, code_last: last, code_alerts: fresh.map(f => f.alertId).slice(-CODE_ALERTS_KEPT), updated_at: stamp, updated_by: 'Verizon Fleet' }));
       made++;
     });
   }
@@ -714,10 +715,9 @@ async function serviceOrders(db, nowMs) {
       if (gone.docs.length || mine.docs.some(d => d.data().service_key === i.key && String(d.data().status || '').toUpperCase() !== 'DONE')) return;
       const id = newOrderId(), late = i.status === 'OVERDUE';
       const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^(\d{4})-(\d\d)-(\d\d)$/, (m, y, mo, d) => Number(mo) + '-' + Number(d) + '-' + y.slice(2));
-      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), { work_order_id: id, facility_id: FACILITY, unit: i.unit, unit_type: i.type, problem: G.SERVICES[i.key] + (late ? ' overdue' : ' due') + (when ? ' ' + when : ''),
-        category: '', can_run: 'YES', source: 'SERVICE', source_from: FROM.SERVICE, source_kind: 'service', source_id: sid, service_key: i.key, due_at: String(i.dueAt), status: 'NEW', created_at: stamp,
-        created_by: 'Fleet Service', started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '', safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '',
-        updated_at: stamp, updated_by: 'Fleet Service', version: 1, createdInApp: true });
+      tx.set(db.collection(WORK_ORDERS).doc(docId(id)), newOrder({ work_order_id: id, unit: i.unit, unit_type: i.type, problem: G.SERVICES[i.key] + (late ? ' overdue' : ' due') + (when ? ' ' + when : ''),
+        can_run: 'YES', source: 'SERVICE', source_from: FROM.SERVICE, source_kind: 'service', source_id: sid, service_key: i.key, due_at: String(i.dueAt), created_at: stamp,
+        created_by: 'Fleet Service', updated_at: stamp, updated_by: 'Fleet Service' }));
       made++;
     });
   }
@@ -798,9 +798,8 @@ async function sendToGarage(tx, db, req, email, stamp, logRef, mode) {
     .find(o => o.service_key === req.serviceKey && String(o.status || '').toUpperCase() !== 'DONE');
   if (open) return { ok: true, requestId: req.requestId, already: true, workOrderId: open.work_order_id, runs: [] };
   const id = newOrderId();
-  const order = { work_order_id: id, facility_id: FACILITY, unit: req.unit, unit_type: req.unitType, problem: G.SERVICES[req.serviceKey] + (req.note ? ': ' + req.note : ''), category: '', can_run: 'YES',
-    source: 'OFFICE', source_kind: '', source_id: '', service_key: req.serviceKey, status: 'NEW', created_at: stamp, created_by: email, started_at: '', techs: '', parts_at: '', fixed: '', fixed_note: '',
-    safe: '', signed_by: '', signature: '', completed_at: '', minutes: '', odometer: '', updated_at: stamp, updated_by: email, version: 1, createdInApp: true };
+  const order = newOrder({ work_order_id: id, unit: req.unit, unit_type: req.unitType, problem: G.SERVICES[req.serviceKey] + (req.note ? ': ' + req.note : ''), can_run: 'YES',
+    source: 'OFFICE', service_key: req.serviceKey, created_at: stamp, created_by: email, updated_at: stamp, updated_by: email });
   tx.set(db.collection(WORK_ORDERS).doc(docId(id)), order);
   const result = { ok: true, requestId: req.requestId, workOrderId: id, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, workOrderId: id, after: order, result });

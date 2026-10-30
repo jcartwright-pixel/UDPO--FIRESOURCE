@@ -49,7 +49,7 @@
 
   <script>window.UD_OFFLINE = true;</script>
   <script type="module">
-    import { offlineSave, startOffline, waiting, onWaitingChange } from './js/offline-saves.js';
+    import { offlineSave, startOffline, waiting } from './js/offline-saves.js';
     import { start, requireSignIn, escapeHtml, showError, shortDate, dateTimeText, watchPerson } from './js/app.js';
     import { doc, getDoc, collection, query, where, onSnapshot } from './js/firebase.js';
     import { today, pickPlant, plantName, canWalk, modeText, shrinkPhoto, watchOpenIssues, watchSetup, watchExtinguishers, agePill, maintText, foundLine, thisMonth } from './js/safety.js';
@@ -58,7 +58,7 @@
     // or Not good, with a note and up to three photos. A Not good also offers Send to Plant Maintenance, and becomes an open
     // issue that the next walk reviews until it is fixed (shown in the sub-area where it was found too). The month's first
     // walk carries the monthly items. Every tap and every box saves as it is left (no Save button).
-    const S = window.UDSafety, L = window.UDLogic;
+    const S = window.UDSafety;
     const params = new URLSearchParams(location.search);
     let db = null, person = null, app = {}, plant = '', walk = null, walkSeen = false, monthWalks = [], setup = null, setupSeen = false, open = [], fixedHere = [], exts = [];
     let date = today(), viewing = '', area = '', armFinish = false, stops = [];

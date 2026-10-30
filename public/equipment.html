@@ -68,7 +68,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, shortTime, showError, callServer } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('dailyDispatch');
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     // Today follows the clock (6 a.m. roll), so a screen left open overnight marks and takes units off the right day.
