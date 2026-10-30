@@ -724,8 +724,15 @@ async function writes() {
       const had = await edits();
       await p.click('#add-load');
       await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
-    // The route list fills in once the routes are read; give it the time a slow answer takes before saying it offers none.
-    await p.waitForFunction(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''), null, { timeout: 20000 }).catch(() => {});
+    // Add Load fills its Route / Run list from the routes read when it opens (it does not fill in later): opened before the
+    // screen has read them, it is empty; then Cancel and open it again, as a person would.
+    for (let i = 0; i < 6 && !(await p.evaluate(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''))); i++) {
+      rec.addLoadReopened = (rec.addLoadReopened || 0) + 1;
+      await p.click('#sched-modal [data-close]');
+      await p.waitForTimeout(3000);
+      await p.click('#add-load');
+      await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
+    }
       const pick = await p.$$eval('#s-route option', o => (o.find(x => x.value !== '') || {}).value);
       if (pick === undefined) throw new Error('Add Load offers no route / run');
       await p.selectOption('#s-route', pick);
@@ -1634,8 +1641,15 @@ async function writes() {
     const had = await p.evaluate(() => [...document.querySelectorAll('#rows tr[data-row] [data-sedit]')].map(b => b.closest('tr').dataset.row));
     await p.click('#add-load');
     await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
-    // The route list fills in once the routes are read; give it the time a slow answer takes before saying it offers none.
-    await p.waitForFunction(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''), null, { timeout: 20000 }).catch(() => {});
+    // Add Load fills its Route / Run list from the routes read when it opens (it does not fill in later): opened before the
+    // screen has read them, it is empty; then Cancel and open it again, as a person would.
+    for (let i = 0; i < 6 && !(await p.evaluate(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''))); i++) {
+      rec.addLoadReopened = (rec.addLoadReopened || 0) + 1;
+      await p.click('#sched-modal [data-close]');
+      await p.waitForTimeout(3000);
+      await p.click('#add-load');
+      await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
+    }
     const pick = await p.$$eval('#s-route option', o => { const x = o.find(v => v.value !== ''); return x ? { v: x.value, t: x.textContent } : null; });
     if (!pick) throw new Error('Add Load offers no route / run');
     await p.selectOption('#s-route', pick.v);
@@ -1722,8 +1736,15 @@ async function writes() {
     const had = await p.evaluate(() => [...document.querySelectorAll('#rows tr[data-row] [data-sedit]')].map(b => b.closest('tr').dataset.row));
     await p.click('#add-load');
     await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
-    // The route list fills in once the routes are read; give it the time a slow answer takes before saying it offers none.
-    await p.waitForFunction(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''), null, { timeout: 20000 }).catch(() => {});
+    // Add Load fills its Route / Run list from the routes read when it opens (it does not fill in later): opened before the
+    // screen has read them, it is empty; then Cancel and open it again, as a person would.
+    for (let i = 0; i < 6 && !(await p.evaluate(() => [...document.querySelectorAll('#s-route option')].some(o => o.value !== ''))); i++) {
+      rec.addLoadReopened = (rec.addLoadReopened || 0) + 1;
+      await p.click('#sched-modal [data-close]');
+      await p.waitForTimeout(3000);
+      await p.click('#add-load');
+      await p.waitForSelector('#sched-modal:not([hidden]) #s-route');
+    }
     const pick = await p.$$eval('#s-route option', o => { const x = o.find(v => v.value !== ''); return x ? { v: x.value, t: x.textContent } : null; });
     if (!pick) throw new Error('Add Load offers no route / run');
     const today = operatingDay(), d = new Date(today + 'T12:00:00Z');
@@ -2236,7 +2257,7 @@ async function writes() {
     }
     // 6.76 (#552): yesterday's loads not loaded yet stay on the TV after the 6 a.m. roll, first.
     {
-      const shownKeys = () => tvp.evaluate(() => { const rows = [...document.querySelectorAll('#ds-grid .ds-row')];
+      const shownKeys = () => tvp.evaluate(() => { const rows = [...document.querySelectorAll('#ds-grid .ds-row')].filter(r => r.querySelector('.rt'));
         return rows.map(r => { const rt = r.querySelector('.rt'); return rt && rt.classList.contains('span2') ? rt.textContent.trim() + '|' : (rt ? rt.textContent.trim() : '') + '|' + ((rt && rt.nextElementSibling) ? rt.nextElementSibling.textContent.trim() : ''); }); });
       let exp = await carryExpected(), shown = await shownKeys();
       // The list rolls with a second copy: only the first copy counts.
@@ -2379,7 +2400,18 @@ async function writes() {
     await open(p, 'daily.html');
     await p.waitForSelector('table.daily tbody tr', { timeout: 30000 });
     await p.waitForTimeout(2000);
-    rec.cells = await p.evaluate(() => [...document.querySelectorAll('table.daily td.missing.offcover')].filter(td => td.offsetParent).slice(0, 12).map(td => {
+    // A day with a driver off: today, else the next loadout days (the day arrow), up to a week.
+    rec.daysLooked = 0;
+    for (let i = 0; i < 7 && !(await p.$('table.daily td.missing.offcover:not(.unit-down)')); i++) {
+      if (!(await p.$('#next'))) break;
+      await p.click('#next');
+      await p.waitForTimeout(2500);
+      rec.daysLooked++;
+    }
+    // A down truck or trailer says "T-532 DOWN" only, no NEEDS DRIVER (Joe 10/23): looked at on its own.
+    rec.down = await p.evaluate(() => [...document.querySelectorAll('table.daily td.missing.offcover.unit-down')].filter(td => td.offsetParent).map(td => ({ text: td.textContent.trim(), bg: getComputedStyle(td).backgroundColor, before: getComputedStyle(td, '::before').content })));
+    for (const x of rec.down) if (!/DOWN|NOT USABLE|OUT OF SERVICE/i.test(x.text) || x.bg !== 'rgb(200, 30, 30)' || x.before !== 'none') bad.push('down unit cell: ' + JSON.stringify(x));
+    rec.cells = await p.evaluate(() => [...document.querySelectorAll('table.daily td.missing.offcover:not(.unit-down)')].filter(td => td.offsetParent).slice(0, 12).map(td => {
       const c = getComputedStyle(td), b = getComputedStyle(td, '::before'), a = getComputedStyle(td, '::after');
       return { bg: c.backgroundColor, color: c.color, weight: c.fontWeight, before: b.content, beforeSize: b.fontSize, beforeWeight: b.fontWeight, beforeColor: b.color, after: a.content.slice(0, 60), afterSize: a.fontSize,
         who: td.dataset.offWho || '', why: td.dataset.offWhy || '', w: Math.round(td.getBoundingClientRect().width), cut: td.scrollWidth > td.clientWidth + 1 };
