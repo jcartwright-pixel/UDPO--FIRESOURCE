@@ -372,7 +372,9 @@ const OTHERS = [
       await toOps(t, 20000);
       assert.equal(await locked(t), null, 'Administrator sign-in freed the tablet');
       assert.equal(await t.evaluate(() => localStorage.getItem('udPlantStationCode')), null, 'the tablet forgot its station');
-      await t.goto(HOSTING + '/administration.html');
+      // Operations may still be moving on to its home screen; let it finish so this open isn't cut off by it.
+      await t.waitForLoadState('networkidle').catch(() => {});
+      await t.goto(HOSTING + '/administration.html').catch(() => t.goto(HOSTING + '/administration.html'));
       await t.waitForTimeout(2000);
       assert.equal(pageOf(t.url()), 'administration.html', 'the freed tablet opens every screen');
       await t.context().close();
