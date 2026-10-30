@@ -290,7 +290,7 @@ screens: driver-station.html
 
 The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; the station code decides what opens.
 
-- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
+- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Loads left over from yesterday that are not loaded yet stay on the board (and on View Loadout) after 6 a.m., at the top, until they are loaded or marked Ended Up Not Running. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
 - **The box on the right** shows the live weather (no sound). The Driver Scorecard is off the TV for now.
 - The live picture is FOX Weather's free live stream on YouTube, then AccuWeather's when it is live. FOX Weather does not let other sites show its stream at the moment, so most of the time the box shows the **live weather radar** for the Pittsburgh radar (it covers Uniontown) instead, with a fresh picture every 5 minutes. If the radar will not load either (no internet), the box shows the local weather with one line saying why. The TV tries the live videos again every 10 minutes.
 - After an update to Operations the TV reloads the board by itself within a few minutes. Nobody has to press Refresh.
