@@ -2403,8 +2403,7 @@ async function writes() {
     // A day with a driver off: today, else the next loadout days (the day arrow), up to a week.
     rec.daysLooked = 0;
     for (let i = 0; i < 7 && !(await p.$('table.daily td.missing.offcover:not(.unit-down)')); i++) {
-      if (!(await p.$('#next'))) break;
-      await p.click('#next');
+      if (!(await p.click('#next', { timeout: 5000 }).then(() => true).catch(() => false))) break;
       await p.waitForTimeout(2500);
       rec.daysLooked++;
     }
