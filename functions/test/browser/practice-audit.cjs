@@ -2426,7 +2426,27 @@ async function writes() {
       if (!x.who) why.push('no who is off');
       if (why.length) bad.push((x.who || 'a cell') + ': ' + why.join(', '));
     }
-    if (!rec.count) note('Daily Dispatch red cells: no driver-off cell on the practice copy today to look at');
+    // No driver off on the days the arrow reaches: the same cell the screen draws for one (daily.html), put into its own table
+    // for a moment, so the look (the style rules #553 changed) is still read; nothing is saved.
+    if (!rec.count) {
+      rec.madeCell = await p.evaluate(() => { const tb = document.querySelector('table.daily tbody'); if (!tb) return null;
+        const tr = document.createElement('tr'); tr.innerHTML = '<td class="missing offcover" data-cover="TEST" data-off-who="PRACTICE, TEST" data-off-why="VACATION"></td>'; tb.prepend(tr);
+        const td = tr.firstChild, c = getComputedStyle(td), b = getComputedStyle(td, '::before'), a = getComputedStyle(td, '::after');
+        const out = { bg: c.backgroundColor, color: c.color, weight: c.fontWeight, before: b.content, beforeSize: b.fontSize, beforeWeight: b.fontWeight, beforeColor: b.color, after: a.content.slice(0, 60), afterSize: a.fontSize, who: td.dataset.offWho };
+        tr.remove(); return out; });
+      if (rec.madeCell) rec.cells.push(rec.madeCell);
+      note('Daily Dispatch red cells: no driver off on the practice copy on the days shown; the screen\'s own cell was looked at in place');
+    }
+    for (const x of rec.madeCell ? [rec.madeCell] : []) {
+      const why = [];
+      if (x.bg !== 'rgb(200, 30, 30)') why.push('background ' + x.bg);
+      if (x.color !== 'rgb(255, 255, 255)' || x.beforeColor !== 'rgb(255, 255, 255)') why.push('words ' + x.color + '/' + x.beforeColor);
+      if (x.before !== '"NEEDS DRIVER"') why.push('says ' + x.before);
+      if (!/PRACTICE, TEST/.test(x.after)) why.push('who/why line ' + x.after);
+      if (parseFloat(x.beforeSize) < 16 || parseFloat(x.afterSize) < 16) why.push('text ' + x.beforeSize + '/' + x.afterSize);
+      if (Number(x.beforeWeight) < 700) why.push('NEEDS DRIVER not bold (' + x.beforeWeight + ')');
+      if (why.length) bad.push('driver-off cell: ' + why.join(', '));
+    }
     await shot(p, 'daily-red-cells');
     rec.bad = bad;
     if (bad.length) throw new Error(bad.slice(0, 4).join('; '));
