@@ -218,7 +218,7 @@ function fakeWritableSheets(tabs) {
   let lastId = 100;
   const colIndex = (letters) => letters.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   return {
-    calls: reader.calls, writes, tabs,
+    calls: reader.calls, writes,
     batchGet: reader.batchGet,
     async batchUpdate(spreadsheetId, data) {
       writes.push({ spreadsheetId, data });

@@ -466,6 +466,8 @@ async function readerMinute(db, opts) {
   const o = Object.assign({ now: () => new Date(), project: '' }, opts || {});
   const now = o.now(), ms = now.getTime(), done = [];
   const lines = await db.collection('productionLines').where('counter', 'in', ['READER', 'CONTROLLER']).get();
+  // A plant's shifts, read once a minute for all its lines (audit 10/29: it was read again for every line).
+  const shiftsOf = {};
   for (const d of lines.docs) {
     const c = d.data(), id = c.operationId || d.id;
     const feed = c.counter === 'READER' && c.testFeed && sandboxOnly(o.project) && Date.parse(c.testFeed.until) > ms ? c.testFeed : null;
@@ -482,7 +484,8 @@ async function readerMinute(db, opts) {
     // Quiet for 3 minutes on this shift: the line stopped (from its last jug).
     const plant = await db.collection('plantSetup').doc(docId(id)).get();
     const fac = plant.exists ? text(plant.data().facilityId) || 'fac_uniontown' : 'fac_uniontown';
-    const shifts = await db.collection('plantShifts').doc(docId(fac)).get();
+    if (!shiftsOf[fac]) shiftsOf[fac] = db.collection('plantShifts').doc(docId(fac)).get();
+    const shifts = await shiftsOf[fac];
     const shift = plantShift(shifts.exists ? shifts.data().shifts : null, ms);
     const ref = db.collection('productionRuns').doc(docId(P.runId(id, shift.key)));
     await db.runTransaction(async (tx) => {

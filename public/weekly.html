@@ -138,7 +138,7 @@
   <script type="module">
     import { printSaved } from './js/print-sheet.js';
     import { mountRowDrag } from './js/row-drag.js';
-    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError } from './js/app.js';
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, shortTime, showError, watchCopied } from './js/app.js';
     const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
     import { lists, watchLists, canSave, canReorder, optionsHtml, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
@@ -305,12 +305,6 @@
       const cvg = cvgOptions().filter(o => o.text.toUpperCase() !== 'CARRIER').map(o => '<option value="' + escapeHtml(o.id) + '"' + (!d.driverId && who === o.text.toUpperCase() ? ' selected' : '') + '>' + escapeHtml(o.text) + '</option>').join('');
       return html + group('Relief Drivers — Seniority Order', relief) + group('Drivers — Seniority Order', regular) + (override ? group('Override — Unavailable / Assigned', blocked) : '') +
         (cvg ? '<optgroup label="Other CVG / Carriers">' + cvg + '</optgroup>' : '');
-    }
-
-    function busyOn(day, key, self) {
-      const busy = {};
-      rows.forEach(r => { const d = r.days[day]; if (r !== self && d.runs && d[key]) busy[d[key]] = 'on ' + r.route; });
-      return busy;
     }
 
     function saveDriver(row, day, value) {
@@ -657,7 +651,9 @@
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
         render();
-        const at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+      });
+      watchCopied(db, (when) => {
+        const at = when ? new Date(when) : null;
         document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
       });
       document.getElementById('prev').onclick = () => move(-7);

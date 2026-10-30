@@ -930,6 +930,12 @@ export async function start() {
   return services;
 }
 
+// When the copy from the sheets last ran (audit 10/29): its own record, so config/app, which every screen reads, no longer
+// changes every minute. cb gets the time it ran (an ISO time) or '' before the first copy.
+export function watchCopied(db, cb) {
+  return onSnapshot(doc(db, 'config', 'copyStatus'), s => cb(((s.data() || {}).lastTransfer || {}).at || ''), () => cb(''));
+}
+
 export function isUnitedDairy(user) {
   return !!(user && user.emailVerified && String(user.email || '').toLowerCase().endsWith('@' + DOMAIN));
 }

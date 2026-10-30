@@ -502,13 +502,6 @@
     // Product in each jug = filled - empty jug - cap, against the product's Target Fill Weight g (Product Sheet). The box saves as it is left.
     const g = (n) => (n === null || n === undefined ? '—' : fmt(n) + ' g');
     const sgn = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
-    function fillDueText(d, w) {
-      if (!d) return '';
-      w = w || { many: 'jugs' };
-      if (d.why === 'product') return 'Starts when a product is running';
-      if (d.due) return d.why === 'change' ? 'Due now: product changed' + (d.dueAt ? ' ' + clock(d.dueAt) : '') : d.why === 'start' ? 'Due now: first check of the run' : d.why === 'jugs' ? 'Due now: ' + fmt(d.every) + ' ' + w.many + ' since the last one' : 'Due now (since ' + clock(d.dueAt) + ')';
-      return d.nextAt ? 'Next due ' + clock(d.nextAt) : d.jugsLeft !== null ? 'Next due in ' + fmt(d.jugsLeft) + ' ' + w.many : 'Next due at the next product change';
-    }
     // Jugs in from the fillers that feed this line against boxes out x jugs in each box.
     function drawBoxing(v) {
       const el = document.getElementById('box-strip'), b = v.boxing;

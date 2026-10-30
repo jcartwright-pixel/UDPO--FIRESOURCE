@@ -1,7 +1,7 @@
 // Plant Distribution Departments, option A (Joe picked 10/10): the same reads and counts as before, plus what the bottom half of
 // each card shows (loads by depart hour, trailers to unload first, washes waiting longest, returns by reason).
-import { start, requireSignIn, showError, shortDate, escapeHtml } from './app.js';
-import { collection, doc, query, where, onSnapshot } from './firebase.js';
+import { start, requireSignIn, showError, shortDate, escapeHtml, watchCopied } from './app.js';
+import { collection, query, where, onSnapshot } from './firebase.js';
 import { watchWashRequests, watchLoads } from './recent-records.js';
 import * as P from './plant-core.js';
 const L = window.UDLogic;
@@ -101,8 +101,8 @@ export function run(render) {
     watchWashRequests(db, L.weekStart(date), r => { data.wash = r; go(); }, fail('the wash list'), 'plantWash');
     // Joe 10/18 (screen speed): the open wash requests and the week's finished ones, not every one ever made.
     watchWashRequests(db, L.weekStart(date), r => { data.appWash = r; go(); }, fail('the wash requests'));
-    onSnapshot(doc(db, 'config', 'app'), snap => {
-      const c = snap.data() || {}, at = c.lastTransfer && c.lastTransfer.at ? new Date(c.lastTransfer.at) : null;
+    watchCopied(db, (when) => {
+      const at = when ? new Date(when) : null;
       document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
     });
     go();

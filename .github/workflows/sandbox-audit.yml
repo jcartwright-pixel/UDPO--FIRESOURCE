@@ -7,10 +7,12 @@ name: Practice copy test (live data copy + full browser test)
 #   cannot change Google Cloud access themselves: Joe gives the live deploy key read-only database access (Cloud Datastore
 #   Viewer) and the practice copy's key database access on the practice copy, both set to end by themselves.
 # - [audit] in the commit message: the full browser test against the practice copy (functions/test/browser/practice-audit.cjs).
+# - [clicks] in the commit message (audit 10/29, Joe: "I'd also want to do a click speed test"): only the click speed pass of
+#   practice-audit.cjs (arrows, tabs, view pickers and moving screen to screen; nothing is saved).
 # Neither one deploys anything or changes the live app.
 on:
   push:
-    branches: [claude/project-thread-wsuoyf]
+    branches: [claude/project-thread-wsuoyf, claude/project-thread-ivjfyh]
 
 permissions:
   contents: write
@@ -72,7 +74,7 @@ jobs:
           if-no-files-found: ignore
 
   audit:
-    if: contains(github.event.head_commit.message, '[audit]')
+    if: contains(github.event.head_commit.message, '[audit]') || contains(github.event.head_commit.message, '[clicks]')
     runs-on: ubuntu-latest
     environment: distribution-sandbox
     timeout-minutes: 90
@@ -98,6 +100,7 @@ jobs:
         env:
           KEY: ${{ runner.temp }}/practice.json
           NO_WRITES: ${{ contains(github.event.head_commit.message, '[reads only]') && '1' || '' }}
+          CLICKS_ONLY: ${{ contains(github.event.head_commit.message, '[clicks]') && '1' || '' }}
         run: |
           out="../practice-audit/$(date -u +%Y%m%d-%H%M)"
           echo "OUT=$out" >> "$GITHUB_ENV"
