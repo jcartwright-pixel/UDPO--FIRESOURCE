@@ -97,6 +97,10 @@ async function seed() {
   await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_rp').set({ recordId: 'TEMP-rp', type: 'PLANT_TEMPERATURE_CHECK', date: yesterday, status: 'HIGH', recordedAt: nyStamp(yesterday, 16 * 60),
     recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: 44, status: 'HIGH' } });
   for (const [id, run] of Object.entries(runs)) await d.collection('runs').doc(id).set(run);
+  // On a Friday, Thursday's never-loaded 510 would carry over into today's loadout as left over (10/20 carryover rule), so
+  // the screens read 11 to load; the plant starts fresh from today here (Administration > Start Plant Fresh) so every
+  // weekday reads today's 10. The reports still read the past days.
+  await d.collection('config').doc('app').set({ plantStart: { date: today, by: 'test', at: new Date().toISOString() } }, { merge: true });
   return { today, yesterday };
 }
 
