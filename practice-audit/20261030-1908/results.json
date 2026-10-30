@@ -1,0 +1,1182 @@
+{
+ "site": "https://ud-distribution-sandbox.web.app",
+ "startedAt": "2026-10-30T19:08:04.184Z",
+ "screens": [],
+ "wide": [],
+ "phone": [],
+ "tablet": [],
+ "writes": [
+  {
+   "name": "Daily Dispatch red cells (look only)",
+   "ok": true,
+   "steps": [],
+   "daysLooked": 1,
+   "down": [
+    {
+     "text": "T-532 DOWN",
+     "bg": "rgb(200, 30, 30)",
+     "before": "none"
+    }
+   ],
+   "cells": [],
+   "count": 0,
+   "bad": [],
+   "totalMs": 12181,
+   "calls": [],
+   "errors": [],
+   "shot": "shots/write-daily-dispatch-red-cells-look-only.jpg"
+  }
+ ],
+ "after": [
+  {
+   "label": "after Loadout Start and End",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1630,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:08 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-loadout-start-and-end-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1261,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:08 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-loadout-start-and-end-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1315,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:08 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-loadout-start-and-end-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1956,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-loadout-start-and-end-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1351,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:08 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-loadout-start-and-end-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1792,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:08 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:25 AM · 39 late\nALL LOADS DONE\nest. Sun 4:20 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:00 PM ⚠\nleft over · 52 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n4:55 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:45 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n7:55 PM ⚠\nleft ove",
+     "shot": "shots/after-after-loadout-start-and-end-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 2283,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-loadout-start-and-end-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1666,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 53 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n3 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 50 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n3 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n11 min ago\n 4 h 51 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-loadout-start-and-end-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1181,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:08 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 8 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 8 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 8 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 8 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 38 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 8 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 8 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 8 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 38 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 8 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 8 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND · 12 h 8 m",
+     "shot": "shots/after-after-loadout-start-and-end-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 1981,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-loadout-start-and-end-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 1271,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-loadout-start-and-end-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "label": "after Loadout Skip",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1441,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:08 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-loadout-skip-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1323,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:08 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-loadout-skip-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1203,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:08 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-loadout-skip-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1928,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-loadout-skip-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1293,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:08 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-loadout-skip-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1067,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:08 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:25 AM · 39 late\nALL LOADS DONE\nest. Sun 4:20 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:00 PM ⚠\nleft over · 52 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n4:55 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:45 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n7:55 PM ⚠\nleft ove",
+     "shot": "shots/after-after-loadout-skip-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 1013,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-loadout-skip-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1671,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 53 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n3 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 50 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n3 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n12 min ago\n 4 h 52 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-loadout-skip-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1254,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:09 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 9 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 9 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 9 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 9 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 39 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 9 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 9 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 9 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 39 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 9 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 9 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND · 12 h 9 m",
+     "shot": "shots/after-after-loadout-skip-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 1130,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-loadout-skip-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 1612,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-loadout-skip-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "label": "after Daily depart time +5 min",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1799,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:09 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-daily-depart-time-5-min-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1308,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:09 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-daily-depart-time-5-min-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1316,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:09 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-daily-depart-time-5-min-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1740,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-daily-depart-time-5-min-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1348,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:09 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-daily-depart-time-5-min-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1220,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:09 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:30 AM · 39 late\nALL LOADS DONE\nest. Sun 4:25 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:05 PM ⚠\nleft over · 56 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n5:00 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:55 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n8:00 PM ⚠\nleft ove",
+     "shot": "shots/after-after-daily-depart-time-5-min-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 1050,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-daily-depart-time-5-min-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1374,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 54 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n4 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 51 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n4 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n12 min ago\n 4 h 52 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-daily-depart-time-5-min-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1694,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:09 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 9 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 9 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 9 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 9 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 39 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 9 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 9 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 9 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 39 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 9 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 9 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND · 12 h 9 m",
+     "shot": "shots/after-after-daily-depart-time-5-min-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 1175,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-daily-depart-time-5-min-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 2107,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-daily-depart-time-5-min-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "label": "after Weekly driver change",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1333,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:09 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-weekly-driver-change-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1352,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:09 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-weekly-driver-change-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1637,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:09 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-weekly-driver-change-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1704,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-weekly-driver-change-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1164,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:09 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-weekly-driver-change-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1121,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:09 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:30 AM · 39 late\nALL LOADS DONE\nest. Sun 4:25 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:05 PM ⚠\nleft over · 56 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n5:00 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:55 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n8:00 PM ⚠\nleft ove",
+     "shot": "shots/after-after-weekly-driver-change-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 1060,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-weekly-driver-change-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1595,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 54 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n4 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 51 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n4 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n13 min ago\n 4 h 53 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-weekly-driver-change-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1793,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:10 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 10 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 10 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 10 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 10 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 40 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 10 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 10 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 10 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 40 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 10 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 10 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND ·",
+     "shot": "shots/after-after-weekly-driver-change-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 880,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-weekly-driver-change-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 1214,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-weekly-driver-change-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "label": "after Route Editor start time +5 min",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1514,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:10 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-route-editor-start-time-5-min-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1453,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:10 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-route-editor-start-time-5-min-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1298,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:10 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-route-editor-start-time-5-min-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1921,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-route-editor-start-time-5-min-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1369,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:10 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-route-editor-start-time-5-min-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1139,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:10 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:30 AM · 39 late\nALL LOADS DONE\nest. Sun 4:25 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:05 PM ⚠\nleft over · 55 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n5:00 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:55 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n8:00 PM ⚠\nleft ove",
+     "shot": "shots/after-after-route-editor-start-time-5-min-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 1019,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-route-editor-start-time-5-min-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1548,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 55 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n5 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 52 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n5 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n13 min ago\n 4 h 53 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-route-editor-start-time-5-min-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1363,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:10 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 10 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 10 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 10 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 10 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 40 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 10 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 10 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 10 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 40 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 10 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 10 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND ·",
+     "shot": "shots/after-after-route-editor-start-time-5-min-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 1221,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-route-editor-start-time-5-min-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 2296,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-route-editor-start-time-5-min-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  },
+  {
+   "label": "after Ended Up Not Running",
+   "screens": [
+    {
+     "url": "distribution.html",
+     "settledMs": 1558,
+     "nums": {
+      "daily.loads": "18",
+      "daily.needsDriver": "5",
+      "daily.covered": "72%",
+      "weekly.open": "48",
+      "routes.active": "70",
+      "drivers.active": "24",
+      "drivers.available": "20",
+      "drivers.relief": "4",
+      "vacation.today": "1",
+      "vacation.pending": "0",
+      "issues.truck": "0",
+      "issues.trailer": "0",
+      "issues.jack": "0",
+      "fleet.inactive": "6",
+      "checkins.deliveries": "25",
+      "checkins.checkedIn": "0",
+      "checkins.issues": "0",
+      "conflicts.open": "100+",
+      "mgr.review": "0",
+      "mgr.alerts": "113",
+      "mgr.road": "3",
+      "mgr.yard": "7"
+     },
+     "tiles": [
+      "DAILY, WEEKLY AND ROUTES Dispatch Daily Dispatch → Weekly Dispatch Template → Route Editor",
+      "DRIVERS AND TIME OFF Drivers & Vacations Driver Roster → Driver Weekly Template → Vacation",
+      "TRUCKS, TRAILERS AND FORK TRUCKS Equipment Fleet & Maintenance → Equipment → Equipment Iss",
+      "OVERALL Check-ins & Overall Driver Check-ins → Sheet Conflicts → Deliveries 25 TODAY Check",
+      "MANAGER Manager Driver Scorecard → Over the Road → Trucks Today → GPS Setup → Scorecard 0 "
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nRoute Distribution\nDISTRIBUTION OPERATIONS COMMAND CENTER\nLast Sync: 3:10 PM\nFriday 10-30-26\nDAILY, WEEKLY AND ROUTES\nDispatch\nDaily Dispatch\n→\nWeekly Dispatch Template\n→\nRoute Editor\n→\nToday\n18\nLOADS\nDrivers\n5\nNEEDS DRIVER\nCovered\n72%\nHAVE A DRIVER\nThis Week\n48\nOPEN DAYS\nRoutes\n70\nACTIVE RUNS\nDRIVERS AND TIME OFF\nDrivers & Vacations\nDriver Roster\n→\nDriver Weekly Template\n→\nVacation Schedule\n→\nRoster\n24\nACTIVE\nAvailable\n20\nDRIVERS TODAY\nRelief\n4\nRELIEF\nOff Today\n1\nVACATION\nRequests\n0\nPENDING\nTRUCKS, TRAILERS AND FORK TRUCKS\nEquipment\nFleet & Maintenance\n→\nEquipment\n→\nEquipment Issues\n→\nGarage Work Orders\n→\nFleet Service\n→\nTruck\n0\nISSUES TODAY\nTrailer\n0\nISSUES TODAY\nFork Truck\n0\nISSUES TODAY\nDown / Out\n6\nUNITS\nOVERALL\nCheck-ins & Overall\nDriver Check-ins\n→\nSheet Conflicts\n→\nDeliveries\n25\nTODAY\nChecked In\n0\nDONE\nIssues\n0\nWITH ISSUES\nConflicts\n100+\nOPEN\nMANAGER\nManager\nDriver Scorecard\n→\nOver the Road\n→\nTrucks Today\n→\nGPS Setup\n→\nScorecard\n0\nUNDER REVIEW\nGPS alerts\n113\nTODAY\nOn the road\n3\nTRUCKS\nIn yard\n7\nTRUCKS",
+     "shot": "shots/after-after-ended-up-not-running-distribution-html.jpg"
+    },
+    {
+     "url": "daily.html",
+     "settledMs": 1371,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 19
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDaily Dispatch\nWeekly Dispatch\nPrint Dispatch Sheet\nDown Trucks / Trailers\n72%\nDRIVERS COVERED\nDriver Call-Off\n+ Add Route / Run\nWEEK BEGINNING\n◀\n▶\nLOADOUT DAY\nDELIVERS SATURDAY\n◀\nSaturday\nSunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\n▶\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:10 PM\nDown or not usable but still on loads: T-537 on Route 824 (Fri 10-30-26), T-532 on Route 815 (Sat 10-31-26).\nTake them off these loads\nROUTE RUN RUNS? DRIVER / CVG OVR TRUCK TRAILER DEPART TIME JACK DRIVER NOTES ACTION\nSATURDAY DELIVERIES, 10-31-26\n852 JERSEY LOAD 2 RUNS CARPENTER, GREGG 124953 T-954 1:00 PM Edit\n852 JERSEY LOAD 1 RUNS BEVARD, ROBERT 123886 T-956 1:00 PM Edit\n901 MF JUG RUNS YODER, SCOTT 123891 11:00 AM Edit\n950 CHARLESTON TRANSFER RUNS BRANCH N/A 10:00 PM Edit\n827 UT WALMART RUNS PRASTER, JEREMY 223876 T-825 1:00 AM 326 Edit\n6304 UT WALMART RUNS ALESANTRINO, DAVID 223875 T-10309 1:00 AM 318 Edit\n815 DSD RUNS ALSTON, BRANDON 224981 T-532 DOWN 3:30 AM 325 Edit\n6302 UT WALMART RUNS GREGORY, MICHAEL 223873 T-993 3:00 AM 320",
+     "shot": "shots/after-after-ended-up-not-running-daily-html.jpg"
+    },
+    {
+     "url": "weekly.html",
+     "settledMs": 1417,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 46,
+      "board-rows#1": 26
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nSheet conflicts\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nWeekly Dispatch Template\nNot published yet this week\nDaily Dispatch\nWeekly Dispatch\nRoute Run Days\nReset Week\nPrint Weekly Dispatch\nPublish to Daily Dispatch\nLIVE: SAVES GO TO THE SHEET\nCopied from the sheets at 3:10 PM\nWEEK STARTING\n◀\n10-25-26\n▶\nRelief Driver\nNeeds Driver\nDriver Off — Needs Driver\nPlant Load\nConflict\nDoes Not Run\nChanged This Week\nAdded to Driver's Week\nBackup Driver\nDay Note — No Route\nOverride\nRoute / Run Assignments\nROUTE RUN / DESTINATION SUN\n10-25-26\n MON\n10-26-26\n TUE\n10-27-26\n WED\n10-28-26\n THU\n10-29-26\n FRI\n10-30-26\n SAT\n10-31-26\n855 SAVE-A-LOT 1 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \n856 SAVE-A-LOT 2 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nRUGG, DONALD\n123888\n \nYODER, SCOTT\n123891\n \n857 SAVE-A-LOT 3 \n— NEEDS DRIVER —\n \nRUGG, DONALD\n123888\n \n852 JERSEY LOAD 1 \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-985\n \nBEVARD, ROBERT\n123886 / T-956\n \nPLETCHER, KEVIN\n123890 / T-9",
+     "shot": "shots/after-after-ended-up-not-running-weekly-html.jpg"
+    },
+    {
+     "url": "loadout.html",
+     "settledMs": 1687,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows": 45
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nDaily Case Loadout\nLOADOUT DAY\n◀\n10-30-26\n▶\nFRIDAY · 10-30-26\n43\nRUNS\n0\nLOADED\n0\nLOADING\nLIVE\nSaves stay in the Operations test copy\n0/43\nCases\n0 loaded · 43 to load\n0/1\nTotes\n0 loaded · 1 to load\n0/0\nBoxes\n0 loaded · 0 to load\n0/0\nTanker\n0 loaded · 0 to load\n0 of 43\nloaded\nLeft over\n26\nLoading\n0\nCases Out\n0\nPickups\n0 left of 0\nBehind\n28\nROUTE RUN DRIVER / CVG TRUCK TRAILER CASES OUT DEPART STATUS START / END TOTAL TIME P/U \nPRIOR DAY LOADS · 10-29-26 — still open, finish these first\n855 SAVE-A-LOT 1 RUGG, DONALD 8:00 AM Waiting \nStart\n P/U Edit\n856 SAVE-A-LOT 2 YODER, SCOTT 10:00 AM Waiting \nStart\n P/U Edit\n857 SAVE-A-LOT 3 RUGG, DONALD 2:30 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 1 PLETCHER, KEVIN 1:00 PM Waiting \nStart\n P/U Edit\n852 JERSEY LOAD 2 COOK, JASON 1:00 PM Waiting \nStart\n P/U Edit\n854 CREAMOLAND YODER, SCOTT 2:00 AM Waiting \nStart\n P/U Edit\n845 I/W BALTIMORE PEFFER, JACOB 9:00 PM Waiting \nStart\n P/U Edit\n980 PORTSMOUTH TRANSFER 7:00 AM Waiting \nStart\n P/U Edit\n971 PAINTSVILLE TRANSFER 8:00 AM Waiting \nStart\n P/U ",
+     "shot": "shots/after-after-ended-up-not-running-loadout-html.jpg"
+    },
+    {
+     "url": "plant.html",
+     "settledMs": 1393,
+     "nums": {
+      "load.total": "17",
+      "load.waiting": "17",
+      "load.loading": "0",
+      "load.done": "0",
+      "unload.total": "24",
+      "unload.waiting": "24",
+      "unload.unloading": "0",
+      "unload.done": "0",
+      "wash.open": "59",
+      "wash.done": "0",
+      "ret.total": "0",
+      "ret.pending": "0"
+     },
+     "tiles": [
+      "Open Loadout Center → LOADOUT CENTER Loading Case Loadout 0 / 43 → Tote Loadout 0 / 1 → Bo",
+      "Behind schedule 29 30+ min late",
+      "Pickups open 0 none",
+      "Avg time per load - start to end",
+      "Open Unloading & Washing → TRAILERS BACK FROM THE ROUTES Unloading Case Unloading 0 / 23 →",
+      "Back, not started 0 checked in, waiting",
+      "Longest wait - since check-in",
+      "Avg time to unload - start to end",
+      "Open Truck Washing → TRAILER WASHING Washing T-995 · Trailer cleaning requested → 761-763 ",
+      "Oldest open T-995 waiting 18 days 1 h",
+      "After unloading 0 trailers back, need a wash",
+      "Open Product Returns → PRODUCT RETURNS (RTA) Returns Product Returns 0 pending → RETURNS B",
+      "Cases back 0 all returns today",
+      "Not in the cooler yet 0 pending RTA"
+     ],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPlant Distribution Departments\nMANAGER-LAUNCHED PLANT WORKSPACES\nLast Sync: 3:10 PM\nFriday 10-30-26\nOpen Loadout Center →\nLOADOUT CENTER\nLoading\nCase Loadout\n0 / 43\n→\nTote Loadout\n0 / 1\n→\nBox Loadout\n0 / 0\n→\nTanker Loadout\n0 / 0\n→\nLOADS BY DEPART TIME\ndone / scheduled\n0/1\n10\nPM\n0/2\n1\nAM\n0/5\n3\nAM\n0/1\n4\nAM\n0/4\n5\nAM\n0/1\n7\nAM\n0/1\n9\nAM\n0/2\n1\nPM\nDone\nLoading\nBehind\nWaiting\nPickup open\nBehind schedule\n29\n30+ min late\nPickups open\n0\nnone\nAvg time per load\n-\nstart to end\nToday\n17\nLoads Today\nWaiting\n17\nWaiting\nLoading\n0\nLoading\nDone\n0\nComplete\n0 of 17 loads complete · + 27 from yesterday · 0 done by now, yesterday 0 at this time\nOpen Unloading & Washing →\nTRAILERS BACK FROM THE ROUTES\nUnloading\nCase Unloading\n0 / 23\n→\nTote Unloading\n0 / 1\n→\nBox Unloading\n0 / 0\n→\nTanker Unloading\n0 / 0\n→\nUNLOAD FIRST\nback longest · next load needs it\nT-10309 · 8301 needed for 6304 1:00 AM\nOn the road\nT-993 · 6302 needed for 6302 3:00 AM\nOn the road\nT-978 · 8302_1 needed for 8302_1 4:00 AM\nOn the road\nBack, not started\n0\nchecked in, waiting\nLongest wait\n-\nsince check-in\nAvg t",
+     "shot": "shots/after-after-ended-up-not-running-plant-html.jpg"
+    },
+    {
+     "url": "forecast.html",
+     "settledMs": 1039,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 30
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nPLANT DISTRIBUTION\nLate Forecast\nFRIDAY · 10-30-26\nDue by\n2:00 AM\n3:00 AM\n4:00 AM\n4:30 AM\n5:00 AM\n5:30 AM\n6:00 AM\nFORECAST AT 3:10 PM\n⚠ 42 loads late\n855, 856, 857, 852 Jersey L1, 852 Jersey L2, 854, 845, 980, 971, 825, 6303, 824, 813, 6302 Walmart, 803, 8301, 8302 Walmart, 808 DSD, 822, 812 DSD, 6301 Walmart, 8302 Walmart, 6301 Walmart, 901 Product 1, 909, 907, 852 Jersey L2, 852 Jersey L1, 827, 6304, 815, 6302 Walmart, 811, 8302 Walmart, 8303 Walmart, 808 DSD, 805, 812 DSD, 6301 Walmart, 8302 Walmart, 8303 Walmart, 901 Product 1 · misses dispatch\nDUE BY 5:00 AM\n39 loads\n0 cases · est. done Sun 3:30 AM · 39 late\nALL LOADS DONE\nest. Sun 4:25 AM\n43 loads · 0 cases left\nLoads still to load (43) · in loading order\nROUTE\nRUN\nCASES\nDEPART\nEST. DONE\n12 AM\n12 PM\n12 AM\n855\nSave-A-Lot 1\n–\nThu 8:00 AM\n4:05 PM ⚠\nleft over · 55 min\n856\nSave-A-Lot 2\n–\nThu 10:00 AM\n5:00 PM ⚠\nleft over · 55 min\n857\nSave-A-Lot 3\n–\nThu 2:30 PM\n5:55 PM ⚠\nleft over · 55 min\n852\nJersey Load 1\n–\nThu 1:00 PM\n6:50 PM ⚠\nleft over · 55 min\n852\nJersey Load 2\n–\nThu 1:00 PM\n8:00 PM ⚠\nleft ove",
+     "shot": "shots/after-after-ended-up-not-running-forecast-html.jpg"
+    },
+    {
+     "url": "yard.html",
+     "settledMs": 977,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "rows#1": 1,
+      "all-rows#2": 1,
+      "history#3": 9
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nLIVE TRAILER MONITORING · TIMESTAMPED CHECKS\nYard Checks\nActive Yard Queue\n24-Hour History\nAll Trailers in Yard\nFRIDAY\n10-30-26\n0\nACTIVE\n0\nDUE\n0\nCHECKED\n2:41 PM\nLATEST\nLIVE\nSaves stay in the Operations test copy\n↻ Refresh\nActive Yard Queue\nTrailers loaded and awaiting or due for yard check. Checked trailers leave this list for 2 hours.\n2-hour recheck cycle · Trailers past dispatch time will not reappear.\nTRAILER # ACTUAL TEMP (°F) TEMP SET POINT (°F) FUEL LEVEL GPS TEMP (°F) NOTES LAST CHECK NEXT RECHECK ACTION\nNo loaded trailers are currently due for a yard check.\n0 trailers due, 0 checked in the last 2 hours. Each box saves as you leave it, with the time and who entered it, and the trailer is locked for 2 hours; Left Yard takes it off the list.",
+     "shot": "shots/after-after-ended-up-not-running-yard-html.jpg"
+    },
+    {
+     "url": "trucks.html",
+     "settledMs": 1478,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 16
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · ROUTE DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nTrucks Today\nFrom Verizon Connect Fleet · 10-30-26 · read 3:07 PM\nToday's Routes\nAll Fleet Units\n16\nDISPATCHED TODAY\n3\nDRIVING\n4\nSTOPPED OR PARKED\n7\nIN YARD\n2\nNO SIGNAL\n0\nNOT IN FLEET\n0\nNO TRUCK\nDRIVER TRUCK STATUS WHERE NOW MILES TODAY FIRST MOVE DISPATCH LAST REPORT TIME OUT ALERTS\nBEVARD, ROBERT 123886 Parked Alton Hill Dr, Eighty Four, PA 15330 0 1:00 PM 11:15 AM\n3 h 55 min ago\n \nnot out yet\n 0 ▾\nCARPENTER, GREGG 124953 In yard Uniontown Branch\nDavid Dr, Uniontown, PA 15401\n 0.6 11:17 AM 1:00 PM 3:05 PM\n5 min ago\n \nnot out yet\n 3 ▾\nKODRIC JR, THOMAS 223878 No signal I-70 W, Zanesville, OH 43701 0 1:00 AM 3:52 AM\n108 days ago\n \nnot out yet\n 0 ▾\nKEMP, JOHN 223882 In yard Uniontown Branch\nKing St, Uniontown, PA 15401\n 276.5 2:07 AM 1:00 AM 12:18 PM\n2 h 52 min ago\n 7 h 10 m\nback 11:42 AM\n 1 ▾\nCOONEY, WILLIAM 224001 In yard Loading Dock\nKing St, Uniontown, PA 15401\n 179 12:32 AM 1:30 AM 3:05 PM\n5 min ago\n \nnot out yet\n 2 ▾\nYODER, SCOTT 123891 Parked Ramp 56, Flintstone, MD 21530 326.8 12:07 AM 2:00 AM 2:57 PM\n14 min ago\n 4 h 54 m\nstill out\n 12 ▾\nGRE",
+     "shot": "shots/after-after-ended-up-not-running-trucks-html.jpg"
+    },
+    {
+     "url": "manager.html",
+     "settledMs": 1776,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · PLANT DISTRIBUTION\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nDAILY REVIEW · REPORTS\nPlant Distribution\nFRIDAY · 10-30-26\nReports\nLIVE\nSaves stay in the Operations test copy\nSend Current Report\nEmails the plant report to the Plant Managers group. Tap the preview to open the full report, edit it or add a note.\nPlant Update 10/30 3:11 PM: 29 routes behind\n29 Behind\n44 of 44 To load\n0 Pickups\n71 Breakdowns\n0 Lines down\n1 Temps out\nROUTES\n0 of 44 loaded\nROUTES BEHIND\n29\n855 SAVE-A-LOT 1\ndepart 8:00 AM\nBEHIND · 31 h 11 min late\n856 SAVE-A-LOT 2\ndepart 10:00 AM\nBEHIND · 29 h 11 min late\n852 JERSEY LOAD 1\ndepart 1:00 PM\nBEHIND · 26 h 11 min late\n852 JERSEY LOAD 2\ndepart 1:00 PM\nBEHIND · 26 h 11 min late\n857 SAVE-A-LOT 3\ndepart 2:30 PM\nBEHIND · 24 h 41 min late\n845 I/W BALTIMORE\ndepart 9:00 PM\nBEHIND · 18 h 11 min late\n824 DSD\ndepart 1:00 AM\nBEHIND · 14 h 11 min late\n6303 UT WALMART\ndepart 1:00 AM\nBEHIND · 14 h 11 min late\n813 DSD\ndepart 1:30 AM\nBEHIND · 13 h 41 min late\n854 CREAMOLAND\ndepart 2:00 AM\nBEHIND · 13 h 11 min late\n880 VENTURA\ndepart 2:00 AM\nBEHIND · 13 h 11 min late\n6302 UT WALMART\ndepart 3:00 AM\nBEHIND ·",
+     "shot": "shots/after-after-ended-up-not-running-manager-html.jpg"
+    },
+    {
+     "url": "driver-station.html",
+     "settledMs": 816,
+     "nums": {},
+     "tiles": [],
+     "rows": {},
+     "bad": [],
+     "text": "Operations\nTest copy\n‹ Back\nHome\nVersion 6.76\nUpdated 10-30-26 2:14 PM\nPT\nSign out\nSet up this screen\nDriver Station\n61°F · Clear\nHigh 62° · Low 44° · Rain 11% · Wind 11 mph\nEnter this station's code\nType this screen's code from Administration > Driver Station Codes. It remembers it after this.\nStation code\nOpen station\nAdministrator sign-in",
+     "shot": "shots/after-after-ended-up-not-running-driver-station-html.jpg"
+    },
+    {
+     "url": "reports.html?view=rundown",
+     "settledMs": 1755,
+     "nums": {},
+     "tiles": [],
+     "rows": {
+      "tbody": 4,
+      "tbody#1": 27
+     },
+     "bad": [],
+     "text": "Operations\nUNIONTOWN · REPORTS\nBack\nHome\nTest copy\nVersion 6.76\nUpdated 10-30-26 2:14 PM\n?\nHelp\nAdministration\nPT\nSign out\n☰\nREPORTS · PLANT REPORTS\nLoading Rundown\n \nPrint\n \nTV display\nREPORT\nWeekly Scorecard\nShift Comparison\nDay-of-Week Trends\nLoading Rundown\nLOADOUT\nAll loadouts\nCases\nTotes\nBoxing\nTanker\nDAY\n◀\n10-29-26\n▶\nThursday 10-29-26 6:00 AM to Friday 6:00 AM\nLOADS\n0\nstarted this day\nFIRST START\n—\nfirst load started\nLAST END\n—\nlast load finished\nAVG LOAD\n—\nStart to End\nDOWNTIME\n0\nbetween loads\nLONGEST GAP\n—\none loadout idle\nENTERED LATER\n0\nsaved over 5 min from the time\nCHANGED\n0\ntimes changed after\nRecap by shift\na load counts for the shift it started in; downtime goes to the shift it happened in\nSHIFT LOADS STARTED LOADS FINISHED AVG LOAD DOWNTIME BETWEEN LOADS LONGEST GAP ON TIME TIMES FROM TABLET TIMES FROM DESK NO SOURCE ENTERED LATER CHANGED LATER\nFirst Shift 6:00 AM–2:30 PM 0 0 — 0 — — 0 0 0 0 0\nSecond Shift 1:00 PM–9:30 PM 0 0 — 0 — — 0 0 0 0 0\nThird Shift 8:00 PM–4:30 AM 0 0 — 0 — — 0 0 0 0 0\nWhole day 0 0 — 0 — — 0 0 0 0 0\nEvery load, first started to last\n0 loads\nNo load was started this day.\nLoads for this day with no Start or End\n27\nROUTE / RUN LOADOUT DEPART W",
+     "shot": "shots/after-after-ended-up-not-running-reports-html-view-rundown.jpg"
+    }
+   ],
+   "errors": []
+  }
+ ],
+ "notes": [
+  "Daily Dispatch red cells: no driver-off cell on the practice copy today to look at"
+ ],
+ "endedAt": "2026-10-30T19:11:19.730Z"
+}
