@@ -602,6 +602,8 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 
 > Typing a trailer or a count never starts a load. Only the status button does.
 
+> If Route / Run in `+ Add Load` says **Loading the routes…**, wait a moment: the routes fill in by themselves. No need to close the box.
+
 !> Do not press Skip over and over to send a load to the bottom. Each press moves it one place, 2 at most. If it really has to wait longer, a manager can drag it.
 
 !> Do not press Done before the trailer is really loaded. Done stops the clock and the load drops off the plant's list.

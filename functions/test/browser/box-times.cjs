@@ -168,6 +168,30 @@ async function journal(id, ok) {
     await st.waitForFunction(() => { const c = document.querySelector('#work .sw-card[data-sw="sch:SCHED-a2"]'); return !c || /done|loaded|complete/i.test(c.className + ' ' + c.textContent); }, null, { timeout: 10000 });
     assert.deepEqual(st.errors, []);
     results.push('Plant Station Boxing shows the typed End the same as a pressed End');
+
+    // 6.76 practice test: + Add Load pressed before the screen has read the routes left Route/Run empty until Cancel and open
+    // again. Now it says it is loading the routes, and fills by itself once they arrive, keeping what was picked.
+    const routeSnap = await db().collection('routes').get(), runSnap = await db().collection('runs').get();
+    await Promise.all(routeSnap.docs.concat(runSnap.docs).map(d => d.ref.delete()));
+    const early = await openPage(browser, 1536, 790, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
+    await early.waitForSelector('#add-load', { state: 'visible', timeout: 15000 });
+    await early.click('#add-load');
+    await early.waitForSelector('#sched-modal:not([hidden])');
+    assert.deepEqual(await early.$$eval('#s-route option', os => os.map(o => o.textContent)), ['Loading the routes…'], 'no routes yet: it says so');
+    await Promise.all(routeSnap.docs.map(d => d.ref.set(d.data())));
+    await early.waitForFunction(() => [...document.querySelectorAll('#s-route option')].some(o => o.textContent === '905 · ALDI - CHARLESTON · Aldi Charleston'), null, { timeout: 10000 });
+    assert.equal(await early.$eval('#s-route option', o => o.textContent), 'Pick one…', 'the box still starts blank');
+    assert.equal(await early.isVisible('#sched-modal'), true, 'the Add Load box stayed open');
+    await early.selectOption('#s-route', { label: '905 · ALDI - CHARLESTON · Aldi Charleston' });
+    assert.equal(await early.inputValue('#s-kind'), 'BOXING', 'Load Type from Route Master');
+    const one = routeSnap.docs.find(d => d.data().displayPlant === true);
+    await db().collection('routes').doc('run_box_times_new').set(Object.assign({}, one.data(), { routeCode: '999', route: '999', run: 'NEW RUN', routeName: 'New' }));
+    await early.waitForFunction(() => [...document.querySelectorAll('#s-route option')].some(o => o.textContent === '999 · NEW RUN · New'), null, { timeout: 10000 });
+    assert.equal(await early.$eval('#s-route', s => s.options[s.selectedIndex].textContent), '905 · ALDI - CHARLESTON · Aldi Charleston', 'a route arriving later keeps the pick');
+    await early.click('#sched-modal [data-close]');
+    assert.deepEqual(early.errors, []);
+    await early.close();
+    results.push('+ Add Load pressed before the routes are read: Route/Run says Loading the routes…, then fills by itself and keeps the pick');
   } finally {
     await browser.close();
   }
