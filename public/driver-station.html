@@ -116,7 +116,7 @@
     const overflows = (id) => { const el = document.getElementById(id); return el.scrollHeight > el.clientHeight + 2; };
     function render() {
       date = L.operatingDay(new Date());
-      const rows = B.loadoutBoardRows(runs, pickups, date), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
+      const rows = B.loadoutBoardRows(runs, pickups, date, { carry: true }), dayName = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(date))];
       document.getElementById('weekday').textContent = dayName.charAt(0) + dayName.slice(1).toLowerCase();
       if (tv) {
         const h = new Date().getHours(), w = document.getElementById('welcome');
@@ -464,8 +464,9 @@
         try { const r = await stationCall('check', { kind: 'KIOSK', key: kiosk.key, version: kiosk.version }); if (!r.ok) { remember(CODE_KEY, null); gate(r.message).catch(() => {}); } } catch (e) { /* offline: keep the kiosk */ }
       }, 300000);
       const week = L.weekStart(date), err = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
-      // The board updates the moment Dispatch or the plant saves (no 10-minute wait).
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = lastLive(s); render(); }, err('the loads'));
+      // The board updates the moment Dispatch or the plant saves (no 10-minute wait). Last week's runs too: a load left over
+      // from Saturday (delivered Saturday) still shows on Sunday morning until it is loaded (Joe 10/30).
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', [L.addDays(week, -7), week, L.addDays(week, 7)])), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); updated = lastLive(s); render(); }, err('the loads'));
       // Review item 73 (Joe 10/13): only pickups from yesterday on (the board is today's loads), not every pickup ever made.
       onSnapshot(query(collection(db, 'pickups'), where('date', '>=', L.addDays(date, -1))), s => { pickups = s.docs.map(d => d.data()); render(); }, err('the pickups'));
       onSnapshot(collection(db, 'drivers'), s => { drivers = s.docs.map(d => d.data()); render(); }, err('the drivers'));

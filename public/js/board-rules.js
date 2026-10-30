@@ -53,16 +53,22 @@
   // Joe 10/10: the Driver Room board and the phone's View Loadout show what the plant loads on this operating day (the same
   // loads as the Loadout Center): Saturday's board is Saturday's loadout (Sunday and Monday deliveries), not Saturday's deliveries.
   // runs = run documents of the delivery weeks (this week and next), each with its id.
-  function loadoutBoardRows(runs, pickups, loadDate) {
-    var rows = [];
+  // Joe 10/30 ("if there is leftover routes from the previous day at 6 a.m., it doesn't display them... until they're cleared
+  // off"): with opts.carry (the Driver Room board, its TV and View Loadout) yesterday's loads that are not loaded yet stay on, first, as the
+  // Loadout Center keeps them, until they are loaded or Ended Up Not Running. The runs must then hold last week's too.
+  function loadoutBoardRows(runs, pickups, loadDate, opts) {
+    var rows = [], yesterday = L.addDays(loadDate, -1);
     (runs || []).forEach(function (run) {
       if (!L.liveFlagShown(run, 'displayMobileRoute', 'mobile')) return;
       L.loadBlocksFor(run, loadDate).forEach(function (b) {
-        boardRows([run], pickups, b.deliveryDate).forEach(function (r) { r.deliveryDate = b.deliveryDate; rows.push(r); });
+        boardRows([run], pickups, b.deliveryDate).forEach(function (r) { r.deliveryDate = b.deliveryDate; r.prior = false; rows.push(r); });
+      });
+      if (opts && opts.carry) L.loadBlocksFor(run, yesterday).forEach(function (b) {
+        boardRows([run], pickups, b.deliveryDate).forEach(function (r) { if (r.state === 'LOADED') return; r.deliveryDate = b.deliveryDate; r.prior = true; rows.push(r); });
       });
     });
     return rows.sort(function (a, b) {
-      return (Number(a.sequence == null || a.sequence === '' ? 999999 : a.sequence) - Number(b.sequence == null || b.sequence === '' ? 999999 : b.sequence)) ||
+      return (Number(b.prior) - Number(a.prior)) || (Number(a.sequence == null || a.sequence === '' ? 999999 : a.sequence) - Number(b.sequence == null || b.sequence === '' ? 999999 : b.sequence)) ||
         a.deliveryDate.localeCompare(b.deliveryDate) || a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run, undefined, { numeric: true });
     });
   }

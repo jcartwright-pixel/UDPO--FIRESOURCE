@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear } = require('../emulator/helpers');
+const { db, clear, runDaysSettled } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
 const F = require('../fixtures/fake-sheets');
 const PD = require('../fixtures/plant-demo');
@@ -97,6 +97,10 @@ async function seed() {
   await d.collection('plantJournal').doc('PLANT_TEMPERATURE_CHECK_app_rp').set({ recordId: 'TEMP-rp', type: 'PLANT_TEMPERATURE_CHECK', date: yesterday, status: 'HIGH', recordedAt: nyStamp(yesterday, 16 * 60),
     recordedBy: 'supervisor.test@uniteddairy.com', createdInApp: true, payload: { locationId: 'ut_temp_cooler_north', location: 'Cooler North', manualTemperature: 44, status: 'HIGH' } });
   for (const [id, run] of Object.entries(runs)) await d.collection('runs').doc(id).set(run);
+  // On a Friday, Thursday's never-loaded 510 would carry over into today's loadout as left over (10/20 carryover rule), so
+  // the screens read 11 to load; the plant starts fresh from today here (Administration > Start Plant Fresh) so every
+  // weekday reads today's 10. The reports still read the past days.
+  await d.collection('config').doc('app').set({ plantStart: { date: today, by: 'test', at: new Date().toISOString() } }, { merge: true });
   return { today, yesterday };
 }
 
@@ -104,16 +108,16 @@ async function seed() {
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
   const { today, yesterday } = await seed();
-  // The Thursday load that is never loaded carries over into Friday's list as yesterday's unfinished load (loads carry over until
-  // done or marked not running), so on a Friday today's list holds 11.
-  const TODAY_LOADS = 10 + (L.dayName(yesterday).toUpperCase() === 'THURSDAY' ? 1 : 0);
+  // Manager Center reads the loads through runDays (a trigger on each run): wait until their records are written, as
+  // plant-manager.cjs does, before opening the page.
+  await runDaysSettled(db());
   const browser = await chromium.launch();
   const results = [];
   try {
     // Manager Center: the Reports button opens the Reports module (Joe 10/11: every report in one place); its Plant Reports
     // card opens the Plant Scorecard (look B): seven day cards and the week, yesterday picked.
     const mc = await openPage(browser, 1920, 950, '/manager.html?' + MANAGER);
-    await mc.waitForFunction((n) => /Plant Update/.test(document.getElementById('pv-subject').textContent) && new RegExp('of ' + n + ' To load').test(document.getElementById('pv-chips').textContent), TODAY_LOADS);
+    await mc.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 10 To load/.test(document.getElementById('pv-chips').textContent));
     const size = await mc.evaluate(() => ({ scroll: document.scrollingElement.scrollHeight, inner: window.innerHeight }));
     assert.ok(size.scroll <= size.inner, 'Manager Center still fits with the Reports button');
     await shots(mc, 'manager-reports-button', 1920);

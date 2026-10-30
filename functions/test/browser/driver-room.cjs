@@ -199,6 +199,12 @@ async function touchPage(browser, width, height, url, mobile) {
       const deliver = L.addDays(L.operatingDay(new Date()), 1), p = L.dayPrefix(deliver), id = L.weekStart(deliver) + '__run_live805';
       await db().collection('runs').doc(id).set({ weekStart: L.weekStart(deliver), route: '805', run: 'LIVE TEST', routeId: 'rte_t805', runId: 'run_live805', rev: 0,
         days: { [p]: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE', truck: '900002', trailer: 'T-905' } } });
+      // Joe 10/30: loads from yesterday's loadout (today's deliveries) still open after the 6 a.m. roll stay on; a loaded one goes.
+      const today = L.operatingDay(new Date()), tp = L.dayPrefix(today), tw = L.weekStart(today);
+      await db().collection('runs').doc(tw + '__run_left806').set({ weekStart: tw, route: '806', run: 'LEFT OVER', routeId: 'rte_t806', runId: 'run_left806', rev: 0,
+        days: { [tp]: { runs: true, driver: 'LEFT, OVER', trailer: 'T-906' } } });
+      await db().collection('runs').doc(tw + '__run_done807').set({ weekStart: tw, route: '807', run: 'DONE LAST NIGHT', routeId: 'rte_t807', runId: 'run_done807', rev: 0,
+        days: { [tp]: { runs: true, driver: 'DONE, LAST', trailer: 'T-907', completeTime: new Date(Date.now() - 3600000).toISOString() } } });
       const lv = await openPage(browser, 1024, 768, '/driver-station.html' + SIGNED);
       await lv.waitForSelector('#code-box form.st-code');
       await lv.fill('#code-box input', kiosk);
@@ -206,12 +212,14 @@ async function touchPage(browser, width, height, url, mobile) {
       await lv.waitForURL(/route\.html\?room=1$/);
       await lv.click('#m-board');
       await lv.waitForSelector('#board-track :text("T-905")');
+      await lv.waitForSelector('#board-track :text("T-906")');
+      assert.equal(await lv.locator('#board-track :text("T-907")').count(), 0, 'a load finished last night is not on View Loadout');
       await lv.waitForTimeout(1500);
       await db().collection('runs').doc(id).update({ ['days.' + p + '.trailer']: 'T-977' });
       await lv.waitForSelector('#board-track :text("T-977")', { timeout: 10000 });
       assert.deepEqual(lv.errors, []);
       await lv.close();
-      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback)');
+      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback), and keeps yesterday\'s unfinished loads');
     }
 
     // Joe 10/12 "it does not let you scroll the list": the Check-In and DVIR screens scroll by finger on a phone and on
