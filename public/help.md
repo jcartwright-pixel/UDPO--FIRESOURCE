@@ -1387,13 +1387,14 @@ An Administrator is never locked to a station. A computer or tablet signed in wi
 ## Keeping a tablet screen on
 id: screen-on
 
-The station tablets, the line tablets, the Driver Room tablet and the TVs keep their screen on by themselves while their screen is open. Nothing needs pressing. If a tablet's screen still goes dark, the tablet's own settings are turning it off. Check these on the tablet, one at a time:
+The station tablets, the line tablets, the Driver Room tablet and the TVs keep their screen on by themselves while their screen is open. So does any tablet with any Operations screen open (a phone is left alone, to save its battery). Nothing needs pressing. If a tablet's screen still goes dark, the tablet's own settings are turning it off. Check these on the tablet, one at a time:
 
 1. Plug the tablet in. A tablet left on its battery saves power by turning the screen off.
 2. Open the tablet's **Settings**, then **Battery** (on some tablets **Battery and device care**). Turn **Power saving** off.
 3. In **Settings**, open **Display**, then **Screen timeout**, and pick the longest time.
 4. In **Settings**, open **Apps**, then **Chrome** (or the browser the station runs in), then **Battery**, and pick **Unrestricted**.
 5. Open the station again and tap the screen once.
+6. Still going dark? In **Settings**, open **Battery**, then **Background usage limits**, and turn off **Put unused apps to sleep**. If Chrome is in the **Sleeping apps** or **Deep sleeping apps** list there, take it out.
 
 > The Garage tablet is set up by IT. If its screen still goes dark, ask IT to let the screen stay on in the tablet's lock-down setup and to turn power saving off.
 

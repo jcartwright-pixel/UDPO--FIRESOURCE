@@ -32,7 +32,10 @@ const FAKE_LOCK = `(() => {
 
 async function open(browser, url, opts) {
   opts = opts || {};
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+  // A touch tablet or phone (opts.touch = its width x height), else a computer with a mouse.
+  const t = opts.touch;
+  const ctx = await browser.newContext(t ? { viewport: { width: t[0], height: t[1] }, screen: { width: t[0], height: t[1] }, hasTouch: true, isMobile: true, serviceWorkers: 'block' }
+    : { viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
   if (opts.noLock) await ctx.addInitScript('window.udNoWakeLock = true;');
   if (opts.init) await ctx.addInitScript(opts.init);
   await ctx.addInitScript(FAKE_LOCK);
@@ -88,8 +91,11 @@ async function open(browser, url, opts) {
       const { ctx, page } = await open(browser, 'garage-station.html', { noLock: true });
       await page.waitForFunction(() => document.documentElement.dataset.awake === 'video');
       await page.waitForFunction(() => { const v = document.getElementById('keep-awake'); return v && !v.paused && v.muted && v.loop && v.currentTime > 0.2; }, null, { timeout: 15000 });
-      const box = await page.$eval('#keep-awake', v => { const r = v.getBoundingClientRect(); return { w: r.width, h: r.height, events: getComputedStyle(v).pointerEvents }; });
-      assert.ok(box.w <= 4 && box.h <= 4 && box.events === 'none', 'the video is tiny and never in the way: ' + JSON.stringify(box));
+      // Big enough that Android keeps the screen on for it (Joe 10/30: a tiny one did not), but unseen and never in the way.
+      const box = await page.$eval('#keep-awake', v => { const r = v.getBoundingClientRect(), c = getComputedStyle(v); return { w: r.width, h: r.height, events: c.pointerEvents, opacity: Number(c.opacity), z: c.zIndex }; });
+      assert.ok(box.w >= 1280 && box.h >= 800 && box.events === 'none' && box.opacity <= 0.02 && box.z === '-1', 'the video fills the screen behind everything, unseen: ' + JSON.stringify(box));
+      // A tap still reaches the screen's own buttons.
+      assert.notEqual(await page.evaluate(() => document.elementFromPoint(640, 400).id), 'keep-awake');
       results.push('no keep-the-screen-on in the browser: a silent video plays instead');
       await ctx.close();
     }
@@ -108,6 +114,20 @@ async function open(browser, url, opts) {
       await page.waitForTimeout(1500);
       assert.equal(await page.evaluate(() => [window.udLockAsks, document.documentElement.dataset.awake || '']).then(x => x.join()), '0,', url + ' is left alone');
       results.push(url + ' leaves the screen alone');
+      await ctx.close();
+    }
+    // Joe 10/30 (his Samsung tablet still went dark): any screen on a tablet keeps the screen on; a phone's screens do not.
+    for (const url of ['index.html', 'daily.html', 'loadout.html']) {
+      const { ctx, page } = await open(browser, url, { touch: [1280, 800] });
+      await page.waitForFunction(() => document.documentElement.dataset.awake === 'lock' && window.udLockAsks === 1, null, { timeout: 15000 });
+      results.push(url + ' on a tablet keeps the screen on');
+      await ctx.close();
+    }
+    for (const url of ['daily.html', 'route.html']) {
+      const { ctx, page } = await open(browser, url, { touch: [390, 844] });
+      await page.waitForTimeout(1500);
+      assert.equal(await page.evaluate(() => [window.udLockAsks, document.documentElement.dataset.awake || '']).then(x => x.join()), '0,', url + ' on a phone is left alone');
+      results.push(url + ' on a phone leaves the screen alone');
       await ctx.close();
     }
     console.log('keep-awake check passed:\n - ' + results.join('\n - '));

@@ -17,8 +17,10 @@ export function keepScreenAwake() {
       video.id = 'keep-awake';
       Object.assign(video, { muted: true, loop: true, autoplay: true, playsInline: true });
       video.setAttribute('muted', ''); video.setAttribute('playsinline', ''); video.setAttribute('aria-hidden', 'true');
-      // Small but on the screen: a browser stops a silent video it cannot see.
-      Object.assign(video.style, { position: 'fixed', left: '0', bottom: '0', width: '2px', height: '2px', opacity: '0.01', pointerEvents: 'none', zIndex: '-1' });
+      // Joe 10/30 (the Garage tablet still went dark): Android keeps the screen on for a playing video only when it is big enough
+      // to watch, so a tiny one did nothing. It fills the screen behind everything, almost see-through, and never takes a tap
+      // (the Driver Room TV's video works the same way).
+      Object.assign(video.style, { position: 'fixed', inset: '0', width: '100vw', height: '100vh', objectFit: 'cover', opacity: '0.01', pointerEvents: 'none', zIndex: '-1' });
       video.innerHTML = '<source src="img/keep-awake.mp4" type="video/mp4"><source src="img/keep-awake.webm" type="video/webm">';
       document.body.appendChild(video);
       video.addEventListener('pause', () => setTimeout(() => { if (root.dataset.awake === 'video') video.play().catch(() => {}); }, 1000));
