@@ -268,6 +268,7 @@
     function render() {
       // Joe 10/15: while a load is being dragged the list is not drawn again (another screen's save, the minute tick), so the
       // lifted line stays under the pointer; it is drawn when the line is let go.
+      refreshSchedRoutes();
       if (rowDrag && rowDrag.busy()) { heldDraw = true; return; }
       const live = rowsNow(), all = withSched(live), byArea = {};
       P.AREAS.forEach(a => { byArea[a] = all.filter(r => r.area === a); });
@@ -660,7 +661,7 @@
       const list = R.scheduleCustomers(slotRoutes());
       schedOptions = (x && !list.some(c => c.runId === x.runId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '' }] : []).concat(list);
       const pick = x ? schedOptions.findIndex(c => c.runId === x.runId || (c.slots || []).some(s => s.runId === x.runId)) : -1;
-      document.getElementById('s-route').innerHTML = (pick < 0 ? '<option value="">Pick one…</option>' : '') + schedOptions.map((c, i) => '<option value="' + i + '"' + (i === pick ? ' selected' : '') + '>' + escapeHtml([c.route, c.run, c.name].filter(Boolean).join(' · ')) + '</option>').join('');
+      drawSchedRoutes(pick);
       document.getElementById('sched-title').textContent = (x ? 'Edit Load · ' + R.loadNumberName(x.run || x.route, x.loadNo) : 'Add Load · Daily Box Loadout ' + shortDate(date));
       const put = (id, v) => { document.getElementById(id).value = v || ''; };
       // Joe 10/14: Load Type starts as the run's Route Master type and can be changed; each loadout shows its own type.
@@ -683,6 +684,25 @@
       openModal('sched-modal');
       document.getElementById(x ? 's-time' : 's-route').focus();
     }
+    // The Route/Run drop-down. Before the screen has read the routes it says so, and it fills by itself once they arrive
+    // (6.76 practice test: + Add Load pressed early left it empty until Cancel and open again).
+    let schedRoutesKey = '';
+    function drawSchedRoutes(pick) {
+      const words = schedOptions.map(c => [c.route, c.run, c.name].filter(Boolean).join(' · '));
+      schedRoutesKey = JSON.stringify(words);
+      document.getElementById('s-route').innerHTML = (pick < 0 ? '<option value="">' + (schedOptions.length ? 'Pick one…' : 'Loading the routes…') + '</option>' : '') +
+        words.map((w, i) => '<option value="' + i + '"' + (i === pick ? ' selected' : '') + '>' + escapeHtml(w) + '</option>').join('');
+    }
+    function refreshSchedRoutes() {
+      if (schedEditing || document.getElementById('sched-modal').hidden) return;
+      const box = document.getElementById('s-route'), was = schedOptions[Number(box.value)], list = R.scheduleCustomers(slotRoutes());
+      const key = JSON.stringify(list.map(c => [c.route, c.run, c.name].filter(Boolean).join(' · ')));
+      if (key === schedRoutesKey) return;
+      const picked = box.value !== '' && was ? was.runId : '';
+      schedOptions = list;
+      drawSchedRoutes(picked ? list.findIndex(c => c.runId === picked) : -1);
+    }
+
     // Joe 10/20: a new load's time starts as the run's time for the delivery day (the dispatch sheet's, else Route Master's),
     // and follows a change of run or day until a time is typed.
     // A typed Start or End time as the saved time: a box left as it was keeps the saved time; a time before 6 AM is the night
