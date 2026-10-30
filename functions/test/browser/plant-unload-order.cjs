@@ -213,7 +213,12 @@ async function openPage(browser, width, height, url, touch) {
     await cu.waitForSelector('#work .sw-quick .sw-full');
     const waiting = await cu.$$eval('#work .sw-card:not(.run):not(.done):not(.road)', cs => cs.map(c => ({ start: !!c.querySelector('.sw-quick [data-act="ustart"]'), full: (c.querySelector('.sw-full') || {}).textContent || '' })).filter(c => c.start || c.full));
     assert.ok(waiting.length >= 1 && waiting.every(c => !c.start && c.full === '2 unloading now. Finish one first.'), 'two unloading: no Start Unloading on the others ' + JSON.stringify(waiting));
-    const savedNow = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-08').get()).docs.map(x => x.data()), '2026-10-08');
+    // The name shows before the save lands; on a slow test machine the save can take several seconds, so wait for it.
+    let savedNow = {};
+    for (let t = Date.now(); Date.now() - t < 20000; await new Promise(r => setTimeout(r, 500))) {
+      savedNow = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-08').get()).docs.map(x => x.data()), '2026-10-08');
+      if (Object.values(savedNow).some(u => u.unloadedBy === 'Riley Moss' && u.status === 'UNLOADING')) break;
+    }
     assert.ok(Object.values(savedNow).some(u => u.unloadedBy === 'Riley Moss' && u.status === 'UNLOADING'), 'Unloaded By saved');
     if (SHOTS) await cu.screenshot({ path: path.join(SHOTS, 'after-two-unloading-1536.png') });
     assert.deepEqual(cu.errors, []);
