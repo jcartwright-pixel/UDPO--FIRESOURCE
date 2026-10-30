@@ -42,6 +42,8 @@
 'use strict';
 
 const admin = require('firebase-admin');
+// Joe 10/30: every read and save the server makes is checked against the one list index (src/lists.js).
+require('./src/list-guard');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
