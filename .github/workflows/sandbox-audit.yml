@@ -24,7 +24,7 @@ concurrency:
 jobs:
   copy-live:
     if: contains(github.event.head_commit.message, '[copy live]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: distribution-production
     defaults:
       run:
@@ -75,7 +75,7 @@ jobs:
 
   audit:
     if: contains(github.event.head_commit.message, '[audit]') || contains(github.event.head_commit.message, '[clicks]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 90
     defaults:
