@@ -10,7 +10,8 @@ const EMP = require('../../src/employees');
 const F = require('../fixtures/fake-sheets');
 
 const UDMS_DB = 'udms-test';
-const udms = () => { db(); return require('firebase-admin/firestore').getFirestore(UDMS_DB); };
+// UDMS's own database (made up here): its lists are not this app's, so the list guard leaves it alone.
+const udms = () => { db(); return require('../../src/list-guard').outsideDb(require('firebase-admin/firestore').getFirestore(UDMS_DB)); };
 let n = 0;
 const rid = () => 'emp-request-' + (++n) + '-' + Date.now();
 const MANAGER = { email: 'manager.test@uniteddairy.com' };

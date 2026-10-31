@@ -14,6 +14,7 @@
 
 const L = require('./logic');
 const SMS = require('./sms');
+const { outsideDb } = require('./list-guard');
 
 // The only fields read from a UDMS employee record. Never add a private field (dob, address, ssn, masterRow, emergency...).
 const UDMS_FIELDS = Object.freeze(['firstName', 'lastName', 'preferredName', 'suffix', 'phone',
@@ -57,9 +58,12 @@ function plantOfBranch(branch) {
   return p ? p.id : '';
 }
 
+// UDMS's employee list. It lives in UDMS's own database, not this app's, so it is not in src/lists.js.
+const UDMS_LIST = 'people';
+
 // Reads UDMS (safe fields only). udmsDb is a Firestore for the UDMS project (tests pass their own).
 async function readUdms(udmsDb) {
-  const snap = await udmsDb.collection('people').select(...UDMS_FIELDS).get();
+  const snap = await outsideDb(udmsDb).collection(UDMS_LIST).select(...UDMS_FIELDS).get();
   return snap.docs.map(d => pick(d.data())).filter(Boolean);
 }
 

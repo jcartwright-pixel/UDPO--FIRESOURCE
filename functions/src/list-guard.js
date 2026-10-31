@@ -22,11 +22,15 @@ function check(path, fromList) {
   if (!noted.has(text)) { noted.add(text); console.error(text); }
 }
 
+// Another app's database (UDMS, read by src/employees.js) has its own lists; outsideDb marks it so its names are not checked.
+const outside = (x) => !!(x && (x.__udOutside || (x.firestore && x.firestore.__udOutside)));
+function outsideDb(db) { if (!db.__udOutside) Object.defineProperty(db, '__udOutside', { value: true }); return db; }
+
 function install() {
   if (Firestore.prototype.__udListGuard) return;
   const wrap = (proto, name, fromList) => {
     const original = proto[name];
-    proto[name] = function (path) { if (typeof path === 'string') check(path, fromList); return original.apply(this, arguments); };
+    proto[name] = function (path) { if (typeof path === 'string' && !outside(this)) check(path, fromList); return original.apply(this, arguments); };
   };
   wrap(Firestore.prototype, 'collection', false);
   wrap(Firestore.prototype, 'doc', false);
@@ -40,4 +44,4 @@ function install() {
 
 install();
 
-module.exports = { install, check };
+module.exports = { install, check, outsideDb };

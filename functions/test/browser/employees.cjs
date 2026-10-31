@@ -56,7 +56,7 @@ const PEOPLE = [
   await clear();
   await runTransfer({ db: db(), reader: F.fakeReader(F.fakeSheets()), sources: F.SOURCES, now: () => new Date('2026-10-09T12:00:00Z') });
   await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/demo-ud-distribution/databases/' + UDMS_DB + '/documents', { method: 'DELETE' });
-  const udms = require('firebase-admin/firestore').getFirestore(UDMS_DB);
+  const udms = require('../../src/list-guard').outsideDb(require('firebase-admin/firestore').getFirestore(UDMS_DB));
   for (const [id, first, last, job, hired, phone, left] of PEOPLE) {
     await udms.collection('people').doc('p' + id).set({ firstName: first, lastName: last, phone: phone === undefined ? '330555' + id.slice(1) : phone, dob: '1980-01-01', ssn: '123-45-6789', address: { line1: '1 Made Up Lane' },
       current: { employeeId: id, jobTitle: job, hireDate: hired, location: 'Uniontown PA Branch', workStatus: left ? 'Terminated' : 'Active', active: !left, termDate: left || null } });
