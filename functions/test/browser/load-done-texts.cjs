@@ -41,6 +41,8 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
     body: 'United Dairy: your load is done. Route 905 UT DSD MILK, trailer T-901, 1,200 cases. Pickups: 2 crates chocolate milk.' });
   await db().collection('driverPhones').doc('drv_test_adams').set({ driverId: 'drv_test_adams', phone: '+13305550101', loadText: false, stoppedAt: '2026-10-18T14:06:00.000Z' });
   await db().collection('textLog').doc('doneReply_SM2').set({ direction: 'in', kind: 'SIGN_UP', driverId: 'drv_test_adams', name: 'ADAMS, PAT', from: '+13305550101', at: '2026-10-18T14:06:00.000Z', status: 'RECEIVED', body: 'STOP' });
+  // Joe 10/31: a driver's reply that was texted on to the phone under Driver replies.
+  await db().collection('textLog').doc('doneReply_SM5').set({ direction: 'in', kind: 'REPLY', driverId: 'drv_test_casey', name: 'CASEY, LEE', from: '+13305551234', at: '2026-10-18T15:10:00.000Z', status: 'RECEIVED', body: 'Running about 20 minutes late', forwardTo: '+13305557777', forwardStatus: 'SENT' });
   const browser = await chromium.launch();
   try {
     // The Driver Roster: Texts, a Schedule and a Load tick (Joe 10/26), saved at once; a driver who replied STOP says so in red.
@@ -95,12 +97,24 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
         assert.equal((await db().collection('private').doc('sms').get()).data().doneOn, true);
         assert.equal((await db().collection('private').doc('sms').get()).data().on, undefined, 'Schedule texts untouched');
         await p.fill('#test-phone', '330-555-9999');
+        // Joe 10/31: driver replies sent on to a phone; it saves by itself, a bad number is refused, blank turns it off.
+        assert.equal(await p.textContent('#fwd-state'), 'Off');
+        assert.match(await p.textContent('#fwd-sample'), /^United Dairy: reply from .+: Running about 20 minutes late$/);
+        await p.fill('#fwd-phone', '555-77');
+        await p.press('#fwd-phone', 'Enter');
+        await p.waitForFunction(() => /10 digits/.test(document.getElementById('error').textContent));
+        await p.fill('#fwd-phone', '330-555-7777');
+        await p.press('#fwd-phone', 'Enter');
+        await p.waitForFunction(() => document.getElementById('fwd-state').textContent === 'On' && /330-555-7777/.test(document.getElementById('fwd-text').textContent));
+        assert.equal((await db().collection('private').doc('sms').get()).data().forwardTo, '+13305557777');
+        assert.match(await p.textContent('#log'), /Reply.*Running about 20 minutes late.*Sent to your cell/);
       }
       assert.ok(await fits(p) <= 0, 'no side scroll on Texts at ' + w);
       assert.deepEqual(await small(p), [], 'Texts: no text under 16px at ' + w);
       if (SHOTS) { await p.$eval('h1', e => e.scrollIntoView()); await p.waitForTimeout(1000); await p.screenshot({ path: path.join(SHOTS, 'after-texts-top-' + w + '.png') }); }
       if (SHOTS && w !== 390) {
         await p.$eval('#done-turn', e => e.closest('section').previousElementSibling.scrollIntoView()); await p.waitForTimeout(500); await p.screenshot({ path: path.join(SHOTS, 'after-texts-kinds-' + w + '.png') });
+        await p.$eval('#fwd-phone', e => e.closest('section').scrollIntoView()); await p.waitForTimeout(500); await p.screenshot({ path: path.join(SHOTS, 'after-texts-replies-' + w + '.png') });
         await p.$eval('#log', e => e.closest('section').scrollIntoView()); await p.waitForTimeout(500); await p.screenshot({ path: path.join(SHOTS, 'after-texts-log-' + w + '.png') });
       }
       assert.deepEqual(p.errors, []);

@@ -1306,9 +1306,12 @@ Texts to drivers from the company's Twilio number. Each kind of text has its own
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
 4. Press `Turn On` in each part you want. **Who gets them** lists the ticked drivers.
-5. **Texts and replies** shows each text and reply with its status.
+5. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
+6. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
 
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
+
+> Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 
