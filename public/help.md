@@ -108,6 +108,20 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 
+### Send schedule texts
+
+Administrators see a strip above the loads: **Schedule texts for the posted week**, with that week's dates, and whether its texts were sent.
+
+1. Check the week on the button: `Send Schedule Texts: Week of ...`.
+2. Press it once. It turns red and says how many drivers it will text.
+3. Press it again within 5 seconds to send. The strip turns green and says when it was sent and to how many drivers.
+
+- It always sends the posted week, even when you are looking at another week or day here.
+- `Send Again` sends the same week a second time (press it twice too).
+- Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
+
+!> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
+
 ### OVR
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
@@ -137,7 +151,7 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 1. Click a driver box on a route's day. The driver list opens right there. Pick a driver and it saves.
 2. On the Driver Assignment Board, click a driver's day to set their availability: Available, Backup, Day Note, Vacation, Sick, Personal, Bereavement, Unpaid or Off. Type a **Note** if needed, then `Save availability`.
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
-4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm.
+4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
@@ -171,8 +185,11 @@ It always shows the live week. After next week is published, it moves on to that
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
+
+> The Weekly Dispatch Template has no Send button on purpose: after a Publish it moves on to next week. Send from here or from Daily Dispatch.
 
 !> Do not change a day here and on Daily Dispatch at the same time. They are the same load, so the last change wins.
 
@@ -1313,7 +1330,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
 5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).

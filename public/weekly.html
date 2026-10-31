@@ -93,6 +93,7 @@
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
     <div class="notice error" id="error" hidden></div>
+    <div id="send-texts" hidden></div>
     <div class="wk-note" id="wk-note" hidden></div>
     <div class="wk-scroll" id="wk-scroll">
       <section class="wk-panel" id="routes-panel">
@@ -144,6 +145,7 @@
     forScreen('weeklyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
     import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
+    import { sendTextsStrip } from './js/send-texts-strip.js';
     // A run whose regular driver is off that day: the reason and who it is for, as "SICK DAY: ALSTON, BRANDON".
     const coverText = (c) => c ? String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '') : '\u2014 NEEDS DRIVER \u2014';
 
@@ -641,6 +643,8 @@
     requireSignIn(async (user) => {
       const { db } = await start();
       watchLists(user, render);
+      // Joe 10/31 (hx): Send Schedule Texts on the live Weekly Dispatch only, never the template.
+      if (liveView) sendTextsStrip(db, document.getElementById('send-texts'));
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};
         writeBack = !!(c.writeBack && c.writeBack.enabled === true);
