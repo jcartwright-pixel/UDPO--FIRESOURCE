@@ -1212,3 +1212,12 @@ body.ud-drawing .side-main, body.ud-drawing #screen > :not(.topbar):not(.side-wr
   .topbar .hdr-version b, .topbar .hdr-version small { display: inline; }
   .topbar .hdr-version small::before { content: '· '; }
 }
+/* Joe 10/31: the phone and tablet apps, and any screen on a phone, show only "Last refreshed 10-31-26 9:26 AM", never the
+   version or the date the app was updated. Other screens keep the version as above. */
+.hdr-version .hv-fresh { display: none; }
+body.ud-phone-app .hdr-version .hv-ver { display: none; }
+body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
+@media (max-width: 700px) {
+  .hdr-version .hv-ver { display: none; }
+  .hdr-version .hv-fresh { display: inline; }
+}

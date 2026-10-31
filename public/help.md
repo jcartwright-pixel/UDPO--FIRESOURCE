@@ -24,6 +24,7 @@ id: start
 Operations is United Dairy's app for dispatch, the plant floor, fleet and maintenance. Every screen has the same three parts:
 
 - **The blue bar across the top.** The United Dairy logo with the plant you are in written in yellow (Uniontown, Charleston or Martins Ferry), then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
+- **On a phone, and on the phone and tablet apps** (the driver phone, Plant Managers, the Plant, Garage, Maintenance and Driver Stations and the Line Tablet), the top bar shows **Last refreshed** with the date and time instead of the version, like "Last refreshed 10-8-26 9:26 AM". It is the last time the screen got fresh information. If it stays old, the phone or tablet has no signal: pull down or reopen the app to refresh it.
 - **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in.
 - **The screen.** Filters and the date sit on the right. Lists have headings that stay put when you scroll.
 
@@ -297,6 +298,7 @@ The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; t
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
 - A screen opened with a code has no Back, Home or Sign out. `Release` at the bottom (with the manager release code) is the only way out.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the screen has no signal.
 - `Release` goes back to the code screen, never into the app. Once a code has opened it, the TV or tablet opens only the Driver Room screens: any other screen typed in goes straight back.
 
 > On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
@@ -442,6 +444,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
   - and the work order scrolled all the way down.
 - Tapped early, `Complete` says what is left and shows it in red. The **Needs work** lines are kept on the work order.
 - Left with no taps for 20 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - With no signal the station keeps working and sends everything when the signal is back.
 - A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app. An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account).
 
@@ -814,6 +817,7 @@ The plant manager's phone walkthrough. The Plant Managers app opens on three cho
 - The Plant Managers app shows only these screens: the walkthrough (Yard, Coolers, Production), Loading and Unloading (with its Returns and Washing). There is no menu on the left, no `Home` and no `Administration`. The `Plant Managers` button at the top (and the logo) goes back to the three choices.
 - Any other screen opened in the Plant Managers app goes back to its three choices. Send Report and Trailer Assignments are in the full Operations app: open it from its own link, not from the Plant Managers app.
 - On a phone, swipe up to see the rest of the screen.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
 - For managers only.
 
 > Opened from its normal link (not the Plant Managers app) on a computer, `Open the full Operations app` is still at the bottom.
@@ -967,6 +971,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 8. For a product change, tap `CHANGEOVER` on the bar: pick the product it changes to and tap `START CHANGEOVER`. The bar turns blue with its clock and the standard minutes. Tap `RUNNING` when the new product runs; the changeover's minutes are kept.
 9. `CIP / Sanitation` starts and finishes a wash (Boxing has no CIP).
 
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
 - Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE) and what was made. **Running now** says since when the product has run and how long the last changeover took.
 - **Down this shift** adds up the minutes down and in changeover, and lists each one with its minutes, newest first; the one going on now says "now".
@@ -1079,6 +1084,7 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - `+ Report a Problem`: pick the machine, say what is wrong and whether it is down (`Yes, it's down` or `No, it runs`), then `Send`.
 - `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up, then `Record`.
 - The station has no Back or Home. `Release` (with the manager release code) is the only way out.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
 
 - An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
@@ -1345,6 +1351,7 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
 - **View Loadout** shows the route list and each load's status, updating by itself.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
 
 On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out, and it goes back to the code screen, never into the app. The tablet opens no other screen.
 
@@ -1361,6 +1368,7 @@ The plant floor tablets. Each one is opened once with its **Station code** (`OPE
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
 - A station has no Home, Sign out or menu. Nothing on it opens any other screen of the app, and an address typed into the tablet comes straight back to the station.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 
 ### Case Unloading tablet
 
