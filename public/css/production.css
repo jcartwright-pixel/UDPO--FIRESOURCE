@@ -652,3 +652,24 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
   #status .lb-sbtns button { min-width: 0; flex: 1 1 auto; padding: 0 12px; }
   .lt-tablet :is(.lb-tog, .lb-pick) button { min-width: 0; padding: 4px 6px; font-size: 16px; overflow-wrap: anywhere; }
 }
+/* Joe 10/31 (Labeling Room, mock-up 3): the filler's Labeling Room box, first in the bottom row. */
+#label-box[hidden] { display: none; }
+#label-box > .lb-box { height: 100%; box-sizing: border-box; }
+.lb-bottom.lb-has-label { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(0, 1.7fr); }
+.lb-bottom.lb-has-label:has(> #fill-box[hidden]) { grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); }
+.lb-bottom.lb-has-label:has(> #fill-box[hidden]):has(> #strip[hidden]) { display: grid; grid-template-columns: minmax(0, 1fr); }
+.lr-t { display: flex; flex-direction: column; gap: 6px; border: 2px solid #0b4f8a; }
+.lr-t h3 { background: #0b4f8a; color: #fff; margin: -12px -16px 4px; padding: 6px 8px 6px 16px; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lr-t small { display: block; font-size: 16px; font-weight: 800; color: #5b6b7c; letter-spacing: .04em; text-transform: uppercase; }
+.lr-t { gap: 2px; }
+.lr-t-sec { padding: 2px 0; } .lr-t-n { border-top: 1px solid #e3eaf1; padding-top: 4px; }
+.lr-t-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lr-t-row small { flex: 1 1 auto; min-width: 0; }
+.lr-t-row b { font-size: 34px; font-weight: 900; color: #0b2f55; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lr-t-row.lr-t-name b { font-size: 20px; white-space: normal; text-align: right; }
+.lr-t-row.lr-t-due b { color: #c62828; }
+.lr-t-hold { border-color: #c62828; } .lr-t-hold h3 { background: #c62828; }
+.lr-t-say { font-size: 20px; font-weight: 900; color: #c62828; }
+.lr-t h3 .lb-btn { margin: 0; min-height: 44px; padding: 4px 12px; font-size: 17px; font-weight: 900; color: #fff; border: 2px solid #fff; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.lr-t .lr-t-stop { background: #c62828; } .lr-t .lr-t-go { background: #1d7a3e; }
+@media (max-width: 900px) { .lb-bottom.lb-has-label, .lb-bottom.lb-has-label:has(> #fill-box[hidden]) { grid-template-columns: minmax(0, 1fr); } }

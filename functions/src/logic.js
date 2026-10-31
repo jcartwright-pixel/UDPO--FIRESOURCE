@@ -1483,7 +1483,7 @@
     { key: 'shipping', name: 'Shipping & Receiving', home: 'scheduler.html', screens: [
       ['scheduler', 'Shipping and Receiving Schedule', ['scheduler.html']], ['receiving', 'Inventory (Receiving Log)', ['inventory.html']]] },
     // Joe 10/28: Debag / Labeling Room, its own department: the plant material trailers parked in the lot.
-    { key: 'debag', name: 'Debag / Labeling Room', home: 'jug-trailers.html', screens: [['jugTrailers', 'Plant Material Trailers', ['jug-trailers.html']]] },
+    { key: 'debag', name: 'Debag / Labeling Room', home: 'jug-trailers.html', screens: [['jugTrailers', 'Plant Material Trailers', ['jug-trailers.html']], ['labelRoom', 'Labeling Room', ['labeling.html']]] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],

@@ -186,7 +186,7 @@ export const MENU = [
   // the PM schedule and the mechanics' tablet.
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
-  ['Debag / Labeling Room', [['Plant Material Trailers', 'jug-trailers.html', 'truck']]],
+  ['Debag / Labeling Room', [['Plant Material Trailers', 'jug-trailers.html', 'truck'], ['Labeling Room', 'labeling.html', 'production.webp']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
   ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],

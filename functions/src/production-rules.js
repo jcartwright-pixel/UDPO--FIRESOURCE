@@ -706,11 +706,53 @@
     return { list: out, changed: changed };
   }
 
+  // ---------- Labeling Room (Joe 10/31, mock-up 3: "United Dairy End Zone") ----------
+  // The half gallon, quart and pint bottles come out of their bags in Debag, get their labels in the Labeling Room and ride the belt
+  // to a filler. The Labeling Room screen and each filler's tablet tell each other what is labeled now, how many are left and what is
+  // next. Joe 10/31: three fillers get their bottles from the Labeling Room: the Old and New Half Gallon fillers (the old one also runs
+  // quarts and pints) and the Gallon Filler. Line Targets ticks or unticks any filler (labelRoom true / false); a filler never
+  // ticked or unticked is in when its name is a half gallon or the Gallon Filler.
+  // lineDoc = the line's productionLines record: beltMin (minutes from the Labeling Room to the filler), beltHolds (bottles the belt
+  // holds), labeling { product, at, by } (the label the Labeling Room put on last; empty = what the filler runs), labelHold { at, by }.
+  function labelDefault(name) { var k = text(name).toUpperCase().replace(/[^A-Z0-9]/g, ''); return /HALFGALLON|12GALLON/.test(k) || k === 'GALLONFILLER'; }
+  function labelLines(lines, lineInfo) {
+    var info = lineInfo || {};
+    return (lines || []).filter(function (l) {
+      if (lineKind(l.name) !== 'FILLER' || isBagFiller(l.name)) return false;
+      var on = (info[l.operationId] || {}).labelRoom;
+      return on === true || (on !== false && labelDefault(l.name));
+    });
+  }
+  function sameItem(a, b) { return text(a).toUpperCase() === text(b).toUpperCase(); }
+  // v = the line's lineMore() (product, runLeft, next, speed, target, state). What both rooms see for one filler:
+  //   labeling   the label going on now (the Labeling Room's pick, else what the filler runs);
+  //   switched   the Labeling Room already went on to another label: the filler's bottles left are all on the belt;
+  //   onBelt     bottles labeled and on their way (the belt's bottles, or every one left once switched);
+  //   toLabel    labels still to put on of what the filler runs (left to run - the belt), 0 = switch now;
+  //   switchMin  about how many minutes until the switch, at the filler's speed (else its target speed);
+  //   arriveAt   when the first bottle with the new label reaches the filler (the switch + the belt minutes).
+  function labelView(v, lineDoc, nowMs) {
+    var d = lineDoc || {}, x = v || {}, running = text(x.product), rl = x.runLeft || null, next = x.next || null;
+    var beltMin = num(d.beltMin), holds = num(d.beltHolds) || 0;
+    var lab = d.labeling && typeof d.labeling === 'object' && text(d.labeling.product) ? d.labeling : null;
+    var switched = !!(lab && running && !sameItem(lab.product, running));
+    var left = rl ? rl.left : null;
+    var toLabel = switched || left === null ? null : Math.max(0, left - holds);
+    var onBelt = left === null ? (holds || null) : switched ? left : Math.min(left, holds);
+    var perMin = num(x.speed) || (x.target && x.target.perHour ? x.target.perHour / 60 : null);
+    var switchMin = toLabel !== null && perMin ? Math.ceil(toLabel / perMin) : null;
+    var arriveAt = switched && beltMin !== null && when(lab.at) ? when(lab.at) + beltMin * 60000 : null;
+    var hold = d.labelHold && typeof d.labelHold === 'object' && text(d.labelHold.at) ? { at: text(d.labelHold.at), by: text(d.labelHold.by) } : null;
+    return { running: running, labeling: lab ? text(lab.product) : running, labelingAt: lab ? text(lab.at) : '', switched: switched, next: next, left: left,
+      toLabel: toLabel, onBelt: onBelt, beltMin: beltMin, beltHolds: holds || null, switchMin: switchMin, switchNow: toLabel === 0 && !!next,
+      arriveAt: arriveAt, arriveIn: arriveAt === null ? null : Math.max(0, Math.ceil((arriveAt - nowMs) / 1000)), hold: hold, down: x.state === 'STOPPED' };
+  }
+
   return { COUNTERS: COUNTERS, machineRange: machineRange, DEFAULT_RANGES: DEFAULT_RANGES, RZ_MATCH: RZ_MATCH, rzGuess: rzGuess, rzLocationFor: rzLocationFor, rzProblemsFor: rzProblemsFor, rzStopReasons: rzStopReasons, rzRunsFor: rzRunsFor, rzFill: rzFill, rzEfficiency: rzEfficiency, COUNTER_LABEL: COUNTER_LABEL, REASONS: REASONS, START_SHIFTS: START_SHIFTS, targetPerHour: targetPerHour, productionShifts: productionShifts,
     shiftNow: shiftNow, shiftHours: shiftHours, runId: runId, TARGET_FIELDS: TARGET_FIELDS, targetsFor: targetsFor, stopMinutes: stopMinutes, speedOf: speedOf, speedFlag: speedFlag, codeDate: codeDate, lineNow: lineNow,
     lineKind: lineKind, packSide: packSide, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, blowHours: blowHours, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MAX: FILL_MAX, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
     usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasCip: hasCip, runLeft: runLeft, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
-    countAt: countAt, checkDue: checkDue, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
+    countAt: countAt, checkDue: checkDue, labelLines: labelLines, labelDefault: labelDefault, labelView: labelView, sameItem: sameItem, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });
