@@ -38,7 +38,7 @@ concurrency:
 jobs:
   deploy:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy sandbox]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: distribution-${{ inputs.target || 'sandbox' }}
     defaults:
       run:
