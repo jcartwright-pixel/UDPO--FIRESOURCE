@@ -80,3 +80,30 @@ test('the Loadout Center and the other plant screens use the Late Forecast\'s le
     if (users.test(html)) assert.match(html, /<script src="js\/plant-rules\.js"><\/script>/, f + ' loads plant-rules.js');
   });
 });
+
+// Joe 10/31 ("this is Saturday loadout for Monday deliveries, and what is showing is not leaving until Sunday"; "it's delivery
+// day minus the offset ... none of these routes should be showing late even if they weren't loaded until tomorrow morning,
+// except for the ones that are delivered Sunday"): a Load Day route loaded early (Monday's loads on Saturday, 2 days before)
+// leaves the day before its delivery at its time, so the Saturday shift's Late Forecast and email only count Sunday's loads late.
+test('Saturday loadout for Monday: Load Day routes leave Sunday, so they are not late on Saturday', () => {
+  const mon = (route, time, leavesOn, extra) => load(route, time, Object.assign({ loadDate: '2026-10-31', deliveryDate: '2026-11-02', departureDate: '2026-11-02', leavesOn }, extra));
+  assert.equal(R.departWall(mon('852', 780, 'Load Day')), day('2026-11-01') + 780, 'Jersey, Load Day 2 days before: Sunday 1:00 PM, not Saturday');
+  assert.equal(R.departWall(mon('849', 960, 'Load Day')), day('2026-11-01') + 960, 'Sun Valley 4:00 PM: Sunday 4:00 PM');
+  assert.equal(R.departWall(mon('845', 1260, 'Load Day')), day('2026-11-01') + 1260, 'I/W Baltimore 9:00 PM: Sunday 9:00 PM');
+  assert.equal(R.departWall(mon('849', 240, 'Load Day')), day('2026-11-02') + 240, 'a Load Day time before 6 a.m.: Monday morning');
+  assert.equal(R.departWall(mon('825', 330, 'Delivery Day')), day('2026-11-02') + 330, 'Delivery Day: Monday 5:30 AM, as before');
+  // Load Day one day before is unchanged: Tuesday's Jersey loaded Monday still leaves Monday.
+  assert.equal(R.departWall(load('852', 780, { loadDate: '2026-11-02', deliveryDate: '2026-11-03', leavesOn: 'Load Day' })), day('2026-11-02') + 780);
+
+  // Saturday 10-31 at 2:30 PM, 1,000 cases an hour: Jersey L1/L2 and Sun Valley finish after their 1:00 / 4:00 PM times today,
+  // but they leave Sunday, so nothing is late; a Sunday-delivery load (827, 2:00 AM Sunday) can still be late.
+  const sat = { case: (route, run, time, leavesOn, cases, deliveryDate) => Object.assign(mon(route, time, leavesOn, { run, area: 'CASE', quantity: cases, deliveryDate: deliveryDate || '2026-11-02', departureDate: deliveryDate || '2026-11-02' }), { id: route + run }) };
+  const loads = [sat.case('852', 'L1', '1:00 PM', 'Load Day', 1000), sat.case('852', 'L2', '1:00 PM', 'Load Day', 1000), sat.case('849', 'SV', '4:00 PM', 'Load Day', 1000)];
+  const f = R.loadForecast({ date: '2026-10-31', loads }, at('2026-10-31T18:30:00Z'));
+  assert.equal(f.late, 0, 'no Monday load is late on Saturday');
+  f.loads.forEach(x => assert.equal(x.late, false, x.route + ' ' + x.run + ' not late'));
+  const withSunday = loads.concat([sat.case('827', 'W', '2:00 AM', 'Delivery Day', 20000, '2026-11-01')]);
+  const g = R.loadForecast({ date: '2026-10-31', loads: withSunday }, at('2026-10-31T18:30:00Z'));
+  assert.deepEqual(g.loads.filter(x => x.late).map(x => x.route), ['827'], 'only the Sunday delivery can be late today');
+  assert.equal(R.plantReport({ loads: loads.map(x => Object.assign({}, x, { dispatchTime: x.dispatchTime })) }, at('2026-10-31T21:30:00Z')).behind.length, 0, '5:30 PM Saturday: none behind');
+});

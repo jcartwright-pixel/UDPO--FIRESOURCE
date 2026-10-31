@@ -80,6 +80,11 @@
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
     let drivers = [], rows = [], editingId = null, panelOpen = false, typing = null, loaded = false;
+    // Joe 10/31 (mock-ups 2 and 3): + Add Driver picks from the plant's Employees list (UDMS); the name, employee ID and hire date
+    // come from it (gray, they follow UDMS) and the mobile phone fills in. With no Employees list yet, the name is typed as before.
+    let employees = [], picked = null;
+    const idKey = (v) => String(v == null ? '' : v).trim().replace(/^0+(?=.)/, '').toUpperCase();
+    const employeeOf = (d) => d && d.employeeId ? employees.find(e => e.idKey === idKey(d.employeeId)) || null : null;
     // Joe 10/13: accidents / incidents and complaints (driverIncidents), entered here under Edit; the Driver Scorecard grades them.
     const S = window.UDScore, CORE = S.SC_CORE;
     let incidents = [], scoreSaved = {}, incForm = '';
@@ -178,10 +183,19 @@
       panelOpen = true;
       editingId = r ? r.id : null;
       const v = r || { name: '', hireDate: '', seniorityDate: '', defaultTruckId: '', reliefDriver: false };
+      picked = null;
+      const emp = r ? employeeOf(drivers.find(x => x.id === r.id)) : null, pick = !r && employees.some(e => e.active);
+      const gray = (on) => on ? ' readonly class="from-udms" tabindex="-1"' : '';
       document.getElementById('panel').innerHTML =
         '<div class="panel-head"><h2>' + (r ? 'Edit Driver' : 'Add Driver') + '</h2>' + (r ? '<span>Seniority #' + r.position + '</span>' : '') + '</div>' +
-        '<label>Driver name<input id="d-name" type="text" maxlength="120" value="' + escapeHtml(v.name) + '"></label>' +
-        '<div class="panel-row"><label>Hire date<input id="d-hire" type="date" value="' + escapeHtml(v.hireDate || '') + '"></label>' +
+        (pick ? '<label>Pick an employee<input id="d-pick" type="text" maxlength="60" autocomplete="off" placeholder="Type part of a name or employee ID"></label><div class="emp-picks" id="d-picks" hidden></div>' +
+            '<label hidden id="d-name-box">Employee<input id="d-name" type="text" maxlength="120"' + gray(true) + '></label>' +
+            '<div class="panel-row"><label>Employee ID<input id="d-emp" type="text"' + gray(true) + '></label><label>Mobile phone<input id="d-phone" type="tel" inputmode="tel" maxlength="20" placeholder="330-555-1234"></label></div>' +
+            '<p class="hint" id="d-udms-note">Gray boxes come from UDMS and follow it by themselves.</p>'
+          : '<label>' + (emp ? 'Employee' : 'Driver name') + '<input id="d-name" type="text" maxlength="120" value="' + escapeHtml(v.name) + '"' + gray(emp) + '></label>' +
+            (emp ? '<div class="panel-row"><label>Employee ID<input id="d-emp" type="text" value="' + escapeHtml(emp.employeeId) + '"' + gray(true) + '></label><label>Position<input type="text" value="' + escapeHtml(emp.position || '') + '"' + gray(true) + '></label></div>' +
+              '<p class="hint">Gray boxes come from UDMS and follow it by themselves.</p>' : '')) +
+        '<div class="panel-row"><label>Hire date<input id="d-hire" type="date" value="' + escapeHtml(v.hireDate || '') + '"' + gray(pick || emp) + '></label>' +
         '<label>Seniority date<input id="d-seniority" type="date" value="' + escapeHtml(v.seniorityDate || '') + '"></label></div>' +
         '<label>Assigned truck<input id="d-truck" type="text" list="truck-list" maxlength="40" autocomplete="off" value="' + escapeHtml(truckUnit(v.defaultTruckId)) + '" placeholder="No truck"></label>' +
         (r ? '<div class="panel-facts"><span>Seniority: <b>' + years(r.seniorityDate) + '</b></span><span>Vacation: <b>' + r.vacationWeeks + ' wks</b></span></div>' : '') +
@@ -192,7 +206,8 @@
       incForm = '';
       render();
       if (r) { paintIncidents(r); document.getElementById('d-add-accident').onclick = () => incidentForm(r, 'accident'); document.getElementById('d-add-complaint').onclick = () => incidentForm(r, 'complaint'); document.getElementById('d-add-pda').onclick = () => incidentForm(r, 'pda'); }
-      document.getElementById('d-name').focus();
+      document.getElementById(pick ? 'd-pick' : 'd-name').focus();
+      if (pick) bindPick();
       document.getElementById('d-cancel').onclick = closePanel;
       // Joe 10/17: Remove moved here from the list (the select boxes are gone). Press twice; the driver stays on the list as Inactive.
       const rm = document.getElementById('d-remove');
@@ -213,11 +228,17 @@
           relief: document.getElementById('d-relief').checked
         };
         const truck = findTruck(fields.truck);
+        if (pick) {
+          if (!picked) { showError('Pick an employee from the list.'); document.getElementById('d-pick').focus(); return; }
+          const phone = document.getElementById('d-phone').value.trim(), digits = phone.replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, '');
+          if (phone && digits.length !== 10) { showError('Type the mobile phone as 10 digits, like 330-555-1234.'); document.getElementById('d-phone').focus(); return; }
+          Object.assign(fields, { employeeId: picked.employeeId, name: picked.name, hireDate: picked.hireDate || '', phone });
+        }
         // Nothing typed is lost: the panel stays open with a reason when the name is missing or the truck is not on Equipment Master.
         if (!fields.name) { showError('Type the driver\'s name.'); document.getElementById('d-name').focus(); return; }
         if (fields.truck && !truck) { showError(fields.truck + ' is not a truck in Equipment Master. Pick one from the list or leave it blank.'); document.getElementById('d-truck').focus(); return; }
         showError('');
-        return { fields, values: { name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief } };
+        return { fields, values: Object.assign({ name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief }, fields.employeeId ? { employeeId: fields.employeeId } : {}) };
       };
       if (r) {
         document.getElementById('panel').onchange = (ev) => {
@@ -245,6 +266,38 @@
         saveOptimistic('saveDriver', fields, () => drivers.push(temp), () => { drivers = drivers.filter(x => x !== temp); }, render)
           .then(() => { drivers = drivers.filter(x => x !== temp); render(); });
       };
+    }
+    // The Employees list drop-down: active employees not on the roster yet, by name or employee ID; picking one fills the boxes.
+    function bindPick() {
+      const box = document.getElementById('d-pick'), list = document.getElementById('d-picks');
+      const taken = new Set(drivers.map(d => idKey(d.employeeId)).filter(Boolean));
+      const draw = () => {
+        const q = box.value.trim().toUpperCase();
+        const found = employees.filter(e => e.active && !taken.has(e.idKey) && (!q || e.name.indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);
+        list.innerHTML = found.map(e => '<button type="button" data-emp="' + escapeHtml(e.idKey) + '"><b>' + escapeHtml(e.name) + '</b> \u00b7 ' + escapeHtml(e.employeeId) +
+          '<small>' + escapeHtml(e.position || 'No position') + (e.hireDate ? ' \u00b7 Hired ' + shortDate(e.hireDate) : '') + '</small></button>').join('') +
+          '<p>' + (found.length ? 'Only employees who are not drivers yet' : 'No employee matches. Everyone on the Employees list who is not a driver yet shows here.') + '</p>';
+        list.hidden = false;
+      };
+      box.oninput = () => { picked = null; draw(); };
+      box.onfocus = draw;
+      box.onkeydown = (e) => { if (e.key === 'Enter') { const first = list.querySelector('[data-emp]'); if (first) { e.preventDefault(); first.click(); } } if (e.key === 'Escape') list.hidden = true; };
+      list.onclick = (e) => {
+        const b = e.target.closest('[data-emp]');
+        if (!b) return;
+        picked = employees.find(x => x.idKey === b.dataset.emp);
+        list.hidden = true;
+        box.closest('label').hidden = true;
+        document.getElementById('d-name-box').hidden = false;
+        document.getElementById('d-name').value = picked.name;
+        document.getElementById('d-emp').value = picked.employeeId;
+        document.getElementById('d-phone').value = picked.phone || '';
+        document.getElementById('d-hire').value = picked.hireDate || '';
+        if (!document.getElementById('d-seniority').value) document.getElementById('d-seniority').value = picked.hireDate || '';
+        showError('');
+        document.getElementById('d-truck').focus();
+      };
+      document.getElementById('panel').addEventListener('mousedown', (e) => { if (!e.target.closest('#d-picks, #d-pick')) list.hidden = true; });
     }
     // The driver's accidents and complaints, newest first; a manager picks Reviewed - counts or Reviewed - not counted.
     function paintIncidents(r) {
@@ -369,6 +422,7 @@
       onSnapshot(collection(db, 'driverIncidents'), snap => { incidents = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); const r = rows.find(x => x.id === editingId); if (panelOpen && r) paintIncidents(r); }, e => showError('Could not read the accidents and complaints: ' + friendlyError(e)));
       onSnapshot(doc(db, 'scorecard', 'settings'), snap => { scoreSaved = snap.exists() ? snap.data() : {}; render(); }, () => {});
       onSnapshot(collection(db, 'driverPhones'), snap => { phones = {}; ticks = {}; stopped = {}; snap.docs.forEach(d => { const k = d.data().driverId || d.id; phones[k] = d.data().phone || ''; ticks[k] = { scheduleText: d.data().scheduleText === true, loadText: d.data().loadText === true }; stopped[k] = !!d.data().stoppedAt; }); render(); }, () => {});
+      onSnapshot(collection(db, 'employees'), snap => { employees = snap.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name))); }, () => {});
       onSnapshot(collection(db, 'drivers'), snap => { drivers = snap.docs.map(d => d.data()); loaded = true; render(); }, e => showError('Could not read the driver list: ' + friendlyError(e)));
       window.addEventListener('resize', render);
     });

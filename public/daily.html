@@ -59,6 +59,7 @@
       <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
       <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
+    <div id="send-texts" hidden></div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning down-loads" id="down-loads" hidden><span id="down-loads-text"></span> <button type="button" id="down-loads-clear">Take them off these loads</button></div>
     <div class="sheet">
@@ -129,6 +130,7 @@
     forScreen('dailyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { sendTextsStrip } from './js/send-texts-strip.js';
 
     const L = window.UDLogic, R = window.UDPlant;
     // Joe 10/12: a run reads as Route, Route Name and Run Name ("6301" then "Walmart Load 1"), never 6301_1.
@@ -713,6 +715,8 @@
 
     requireSignIn(async (user) => {
       const { db } = await start();
+      // Joe 10/31 (hx): Send Schedule Texts for the posted week (whatever week or day is showing).
+      sendTextsStrip(db, document.getElementById('send-texts'));
       onSnapshot(collection(db, 'routes'), snap => {
         routeHours = {};
         snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; });

@@ -346,12 +346,13 @@ export async function renderPlantFresh(box) {
     '<p class="ap-note">Loads from before today stop showing as prior-day work on the Loadout Center, the plant departments, Plant Station and the Manager Center. Nothing is deleted; carry-over works normally from today on.</p></div>';
   const $ = (s) => box.querySelector(s);
   const show = (p) => { $('#pfr-now').textContent = p ? 'Started fresh from ' + p.date + ' by ' + p.by : 'Never started fresh'; };
-  try { show((await call('plantFresh')).plantStart); } catch (err) { say(box, errText(err), 'bad'); }
+  // The button works as soon as it shows, before the last start date has been read (a click then did nothing).
   box.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b || b.id !== 'pfr-go') return;
     twice(b, 'Click Again to Confirm', () => busy(box, b, async () => { const out = await call('plantFreshSet'); show(out.plantStart); say(box, out.message, 'good'); }));
   });
+  try { show((await call('plantFresh')).plantStart); } catch (err) { say(box, errText(err), 'bad'); }
 }
 
 /* ---------- Date Inventory ---------- */
