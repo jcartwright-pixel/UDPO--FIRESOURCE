@@ -99,6 +99,39 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     await disp.waitForTimeout(2500);
     assert.equal(await disp.isHidden('#send-texts'), true, 'only administrators');
     await disp.context().close();
+    // Joe 10/31 (im): Texts part 3, "Sample for": a driver's week in the new text, texted only to the part 5 cell.
+    for (const [w, h] of [[1536, 790], [390, 844]]) {
+      await db().collection('private').doc('sms').set({ forwardTo: w === 1536 ? '' : '+13305557777' }, { merge: true });
+      const tx = await openPage(browser, w, h, '/texts.html?' + ADMIN);
+      await tx.waitForFunction(() => document.querySelectorAll('#sample-for option').length > 1, null, { timeout: 15000 });
+      assert.equal(await tx.inputValue('#sample-for'), '', 'the drop-down starts blank');
+      assert.equal(await tx.isHidden('#sample-text'), true);
+      await tx.selectOption('#sample-for', 'drv_test_casey');
+      await tx.waitForFunction(() => !document.getElementById('sample-text').hidden);
+      const text = await tx.textContent('#sample-text');
+      assert.match(text, /^United Dairy: your schedule, week of 10-11-26\nSun 10-11: /);
+      assert.match(text, /Wed 10-14: Rt 905 UT DSD MILK/);
+      assert.match(await tx.textContent('#preview-text'), /is posted\. Open UD Routes > My Schedule/, 'drivers still get the short text');
+      if (w === 1536) {
+        assert.equal(await tx.isDisabled('#sample-send'), true, 'needs the part 5 cell');
+        assert.match(await tx.textContent('#sample-hint'), /Type your cell in part 5 first/);
+        if (SHOTS) await tx.locator('#sample-for').locator('xpath=ancestor::section').screenshot({ path: path.join(SHOTS, 'sample-no-cell-1536.png') });
+      } else {
+        await tx.waitForFunction(() => !document.getElementById('sample-send').disabled);
+        assert.match(await tx.textContent('#sample-hint'), /Goes only to 330-555-7777 \(part 5\)\. No driver gets it\./);
+        await tx.click('#sample-send');
+        assert.equal(await tx.textContent('#sample-send'), 'Tap again to text 330-555-7777');
+        await tx.click('#sample-send');
+        await tx.waitForFunction(() => /Test copy: written to the list/.test(document.getElementById('sample-hint').textContent), null, { timeout: 15000 });
+        await tx.waitForFunction(() => /Sample to you/.test(document.getElementById('log').textContent), null, { timeout: 15000 });
+        const logged = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'SAMPLE');
+        assert.deepEqual(logged.map(x => [x.to, x.status, x.body === text]), [['+13305557777', 'NOT SENT', true]]);
+      }
+      assert.ok(await fits(tx) <= 0, 'no side scroll on Texts at ' + w);
+      if (SHOTS) await tx.locator('#sample-for').locator('xpath=ancestor::section').screenshot({ path: path.join(SHOTS, 'sample-' + w + '.png') });
+      assert.deepEqual(tx.errors, []);
+      await tx.context().close();
+    }
     console.log('send-texts-live: ok');
   } finally { await browser.close(); }
   process.exit(0);

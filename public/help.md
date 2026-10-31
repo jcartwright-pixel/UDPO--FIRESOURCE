@@ -1335,6 +1335,8 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
 
+> To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
+
 > To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.

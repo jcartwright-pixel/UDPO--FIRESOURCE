@@ -1229,3 +1229,6 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip .send-button.armed { background: #c0392b; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
+.texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
+.texts-page .texts-test select { font-size: 16px; min-width: 240px; padding: 6px 8px; }
+.texts-page .texts-week { white-space: pre-line; }
