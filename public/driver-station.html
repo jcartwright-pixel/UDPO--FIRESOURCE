@@ -122,11 +122,18 @@
         const h = new Date().getHours(), w = document.getElementById('welcome');
         w.hidden = false; w.innerHTML = '<i></i><b>Good ' + (h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening') + ', Uniontown drivers.</b> ' + shortDate(date) + ' · Work safely and have a strong day.';
       }
-      const one = rows.map(r => '<div class="ds-row ' + r.state.toLowerCase() + '">' + (r.streamId ? '<span class="rt span2">' + escapeHtml(r.streamId) + '</span>' : '<span class="rt">' + escapeHtml(r.route) + '</span><span>' + escapeHtml(r.run) + '</span>') +
+      // Joe 10/31 ("a dedicated separation line between yesterday's loads and today's loads... people are getting confused"):
+      // when loads are left over from yesterday, a labeled line goes above them and another above today's loads.
+      const hasPrior = rows.some(r => r.prior), yday = L.addDays(date, -1);
+      const dayText = (d) => { const n = L.DAY_NAMES[L.DAYS.indexOf(L.dayPrefix(d))]; return n.charAt(0) + n.slice(1).toLowerCase() + ' ' + shortDate(d); };
+      const split = (r, i) => !hasPrior || (i && rows[i - 1].prior === r.prior) ? '' : r.prior
+        ? '<div class="ds-split prior"><b>Yesterday\'s loads</b> <span>' + escapeHtml(dayText(yday)) + ' · not loaded yet</span></div>'
+        : '<div class="ds-split today"><b>Today\'s loads</b> <span>' + escapeHtml(dayText(date)) + '</span></div>';
+      const one = rows.map((r, i) => split(r, i) + '<div class="ds-row ' + r.state.toLowerCase() + '">' + (r.streamId ? '<span class="rt span2">' + escapeHtml(r.streamId) + '</span>' : '<span class="rt">' + escapeHtml(r.route) + '</span><span>' + escapeHtml(r.run) + '</span>') +
         '<span>' + escapeHtml(r.driver || '—') + '</span><span class="strong">' + escapeHtml(r.trailer || '—') + '</span><span>' + escapeHtml(r.cases === '' ? '—' : String(r.cases)) + '</span><span class="st">' + r.state + '</span>' +
         '<span class="' + (r.pickup ? 'pu-yes' : '') + '">' + (r.pickup ? 'YES' : '—') + '</span>' +
         (r.pickup ? '<span class="ds-strip pu"><b>PICKUP</b> ' + escapeHtml(r.pickupText) + '</span>' : '') + (tv && r.notes ? '<span class="ds-strip note"><b>NOTE</b> ' + escapeHtml(r.notes) + '</span>' : '') + '</div>').join('');
-      const s = JSON.stringify(rows.map(r => [r.route, r.run, r.driver, r.trailer, r.cases, r.state, r.pickupText, tv ? r.notes : '']));
+      const s = JSON.stringify(rows.map(r => [r.route, r.run, r.driver, r.trailer, r.cases, r.state, r.pickupText, tv ? r.notes : '', r.prior]));
       if (s !== sig) {
         sig = s;
         const box = document.getElementById('board');

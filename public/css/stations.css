@@ -254,6 +254,14 @@
 .ds-strip.pu { background: #fde5e3; color: #8f1d16; } .ds-strip.note { background: #e3effb; color: #134c85; }
 .ds-band { text-align: center; font-weight: 800; letter-spacing: .08em; padding: 10px; }
 .ds-band.end, .ds-band.end td { background: #f4c542; color: #174a80; } .ds-band.start, .ds-band.start td { background: #174a80; color: #fff; border-bottom: 4px solid #f4c542; }
+/* Joe 10/31: a labeled line between yesterday's loads (still not loaded) and today's, on the board, the TV and View Loadout. */
+.ds-split, .drv-split { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 18px; font-weight: 800; }
+.ds-split { padding: 8px 12px; border-top: 5px solid; border-bottom: 1px solid #e3e9ef; }
+.ds-split span, .drv-split span { font-size: 16px; font-weight: 700; }
+.ds-split.prior, .drv-split.prior { background: #fff1dc; color: #8a4500; border-color: #c26a00; }
+.ds-split.today, .drv-split.today { background: #e3effb; color: #134c85; border-color: #174a80; }
+body.ds-tv .ds-split { font-size: 26px; padding: 10px 14px; border-top-width: 6px; } body.ds-tv .ds-split span { font-size: 21px; }
+.drv-split { margin: 12px 6px 6px; padding: 8px 14px; border-radius: 10px; border-top: 5px solid; }
 .ds-week-title { display: flex; justify-content: space-between; padding: 8px 12px; background: #20578e; color: #fff; }
 .ds-week-table { width: 100%; border-collapse: collapse; }
 .ds-week-table th { position: sticky; top: 0; background: #eef5fa; color: #12385f; padding: 4px; } .ds-week-table th small { display: block; font-weight: 600; color: #647b8e; }

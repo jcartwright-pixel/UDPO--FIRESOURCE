@@ -291,7 +291,7 @@ screens: driver-station.html
 
 The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; the station code decides what opens.
 
-- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Loads left over from yesterday that are not loaded yet stay on the board (and on View Loadout) after 6 a.m., at the top, until they are loaded or marked Ended Up Not Running. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
+- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Loads left over from yesterday that are not loaded yet stay on the board (and on View Loadout) after 6 a.m., at the top, until they are loaded or marked Ended Up Not Running. When there are any, a light orange **Yesterday's loads** line sits above them and a light blue **Today's loads** line above today's, so nobody mixes them up. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
 - **The box on the right** shows the live weather (no sound). The Driver Scorecard is off the TV for now.
 - The live picture is FOX Weather's free live stream on YouTube, then AccuWeather's when it is live. FOX Weather does not let other sites show its stream at the moment, so most of the time the box shows the **live weather radar** for the Pittsburgh radar (it covers Uniontown) instead, with a fresh picture every 5 minutes. If the radar will not load either (no internet), the box shows the local weather with one line saying why. The TV tries the live videos again every 10 minutes.
 - After an update to Operations the TV reloads the board by itself within a few minutes. Nobody has to press Refresh.
@@ -1349,13 +1349,15 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **Check-In** (after the route): truck, trailer and pallet jack, cases delivered and returned, over or short, refused or returned product, truck, trailer and pallet jack problems, whether the trailer needs cleaning, and notes. Then `Check In`.
 - **DVIR** (truck inspection): pick Pre-trip or Post-trip. Every item starts as no defect; tick only what is wrong and write it up. The odometer starts at the truck's GPS reading. `+ Add trailer inspection` for a second trailer. Sign, then `Submit` (or `Review inspection` first).
 - **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
-- **View Loadout** shows the route list and each load's status, updating by itself.
+- **View Loadout** shows the route list and each load's status, updating by itself. Loads left over from yesterday that are not loaded yet are at the top under a light orange **Yesterday's loads** line; today's loads follow under a light blue **Today's loads** line.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
 - **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
 
 On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out, and it goes back to the code screen, never into the app. The tablet opens no other screen.
 
 > The Driver Room tablet (not a driver's own phone) keeps its screen on by itself. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
+!> Do not mistake a load under **Yesterday's loads** for today's run of the same route. Check which line it sits under.
 
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
 

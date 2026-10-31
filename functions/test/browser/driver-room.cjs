@@ -214,12 +214,35 @@ async function touchPage(browser, width, height, url, mobile) {
       await lv.waitForSelector('#board-track :text("T-905")');
       await lv.waitForSelector('#board-track :text("T-906")');
       assert.equal(await lv.locator('#board-track :text("T-907")').count(), 0, 'a load finished last night is not on View Loadout');
+      // Joe 10/31: a labeled line above yesterday's loads and another above today's, in that order.
+      const order = (sel) => lv.evaluate((q) => [...document.querySelector(q).children].map(e => e.classList.contains('drv-split') ? e.querySelector('b').textContent : (e.querySelector('.rt i') || {}).textContent).filter(Boolean), sel);
+      assert.deepEqual(await order('#board-track > div:first-child'), ["Yesterday's loads", 'T-906', "Today's loads", 'T-905']);
+      assert.ok(Number((await lv.evaluate(() => getComputedStyle(document.querySelector('.drv-split span')).fontSize)).replace('px', '')) >= 16, 'the line\'s words are 16 px or more');
+      await shot(lv, 'driver-room-yesterday-today-1024.png');
       await lv.waitForTimeout(1500);
       await db().collection('runs').doc(id).update({ ['days.' + p + '.trailer']: 'T-977' });
       await lv.waitForSelector('#board-track :text("T-977")', { timeout: 10000 });
       assert.deepEqual(lv.errors, []);
       await lv.close();
-      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback), and keeps yesterday\'s unfinished loads');
+      results.push('Driver Room: View Loadout updates by itself the moment a load changes (no Refresh, well before the 2-minute fallback), and keeps yesterday\'s unfinished loads under a Yesterday\'s loads line, above a Today\'s loads line');
+
+      // The TV board: the same two lines, at the TV (1920), Joe's window (1536) and phone width (390).
+      for (const [w, h] of [[1920, 1080], [1536, 790], [390, 844]]) {
+        const t = await openPage(browser, w, h, '/driver-station.html?tv=1');
+        await t.waitForSelector('#tvacct:not([hidden])');
+        await t.fill('#tvacct-code', tv);
+        await t.click('#tvacct button');
+        await t.waitForSelector('#screen:not([hidden])');
+        await t.waitForSelector('#board .ds-split.prior', { timeout: 20000 });
+        const rows = await t.evaluate(() => { const out = []; for (const e of document.getElementById('board').children) { if (e.classList.contains('ds-band')) break; out.push(e.classList.contains('ds-split') ? e.querySelector('b').textContent : e.querySelector('.strong') && e.querySelector('.strong').textContent); } return out.filter(Boolean); });
+        assert.deepEqual(rows.filter(x => /loads$|^T-90[56]$|^T-977$/.test(x)), ["Yesterday's loads", 'T-906', "Today's loads", 'T-977']);
+        const fit = await t.evaluate(() => { const b = document.querySelector('#board .ds-split'); return { px: parseFloat(getComputedStyle(b.querySelector('span')).fontSize), wide: document.documentElement.scrollWidth <= innerWidth + 1 }; });
+        assert.ok(fit.px >= 16 && fit.wide, 'TV board line ' + w + ': ' + JSON.stringify(fit));
+        await shot(t, 'driver-station-yesterday-today-' + w + '.png');
+        assert.deepEqual(t.errors, []);
+        await t.close();
+      }
+      results.push('Driver Room TV board (1920, 1536 and 390): a Yesterday\'s loads line above the loads left over from yesterday and a Today\'s loads line above today\'s');
     }
 
     // Joe 10/12 "it does not let you scroll the list": the Check-In and DVIR screens scroll by finger on a phone and on

@@ -258,7 +258,8 @@ async function phoneCall(db, input, now) {
     // Joe 10/30: yesterday's loads not loaded yet stay on, first, until they are loaded (last week's runs for Saturday's).
     const runs = (await db.collection(C.runs).where('weekStart', 'in', [L.addDays(week, -7), week, L.addDays(week, 7)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
     const pickups = (await db.collection('pickups').where('date', 'in', [L.addDays(date, -1), date, L.addDays(date, 1), L.addDays(date, 2), L.addDays(date, 3)]).get()).docs.map(d => d.data());
-    const rows = B.loadoutBoardRows(runs, pickups, date, { carry: true }).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText }));
+    const rows = B.loadoutBoardRows(runs, pickups, date, { carry: true }).map(r => ({ route: r.streamId || r.route, run: r.streamId ? '' : r.run, driver: r.driver, cases: r.cases, trailer: r.trailer, state: r.state, status: r.status, pickup: r.pickup, pickupText: r.pickupText, prior: !!r.prior }));
+    // Joe 10/31: prior = left over from yesterday; View Loadout draws a line between yesterday's loads and today's.
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
   if (op === 'schedule') return mySchedule(db, input, stamp);
