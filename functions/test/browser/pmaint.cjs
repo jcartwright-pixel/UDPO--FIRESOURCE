@@ -89,7 +89,8 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
   const request = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Water leak under the pasteurizer', Type: 'Maintenance Request', Equipment: 'GALLON FILLER', Urgency: 'This week' }, followUpStatus: 'OPEN' });
   const boiler = await act(MANAGER, 'saveMachine', { facilityId: 'fac_uniontown', fields: { name: 'Boiler', kind: 'Utility', area: 'Utilities', make: 'Cleaver-Brooks' } });
   await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease filler bowl bearings', every: 2, unit: 'WEEKS', lastDone: '2026-09-01' } });
-  await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: boiler.machineId, task: 'Blow down and check the water', every: 1, unit: 'MONTHS', lastDone: new Date().toISOString().slice(0, 10) } });
+  // Done today and due in 2 months, so it is always under Later: 1 month from 10-31 is 11-30, only 30 days, which is Next 30 days.
+  await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: boiler.machineId, task: 'Blow down and check the water', every: 2, unit: 'MONTHS', lastDone: new Date().toISOString().slice(0, 10) } });
 
   const browser = await chromium.launch();
   const results = [];
