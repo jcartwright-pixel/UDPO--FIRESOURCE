@@ -66,3 +66,11 @@
 .crew-board th.left { position: sticky; left: 0; z-index: 3; }
 .crew-board tr.open-row td.left { background: #fff6f5; }
 .crew-page table { table-layout: auto; }
+/* Joe 10/31 (mock-up 4): + Add Person picks from the Employees list; boxes that come from UDMS are gray. */
+.crew-page input.from-udms { background: #eef2f7; color: #3d4656; }
+.crew-picker { align-self: flex-end; width: min(460px, 100%); background: #fff; border: 1px solid var(--ud-blue); border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+.crew-picker input { display: block; width: calc(100% - 20px); margin: 10px; font: inherit; font-size: 16px; min-height: 38px; border: 2px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; }
+.crew-picker > button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid #e4e9f0; background: #fff; padding: 9px 12px; font: inherit; font-size: 16px; cursor: pointer; }
+.crew-picker > button:hover, .crew-picker > button:focus { background: #e8f1fb; }
+.crew-picker > button span { color: var(--muted); }
+.crew-picker p { margin: 0; padding: 8px 12px; border-top: 1px solid #e4e9f0; color: var(--muted); font-size: 16px; }

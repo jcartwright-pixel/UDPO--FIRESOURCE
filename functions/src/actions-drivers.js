@@ -9,6 +9,7 @@ const M = require('./model');
 const { queueMaster } = require('./masterwrite');
 const { SaveError, queueSheetCells } = require('./actions-common');
 const { liveRead, driverToLive } = require('./actions-live');
+const EMP = require('./employees');
 
 const C = M.COLLECTIONS;
 
@@ -106,14 +107,27 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
     existing = snap.data();
   }
+  // Joe 10/31 (mock-ups 2 and 3): a driver with an employee ID from the Employees list (UDMS) takes the name and hire date
+  // from that list; the screen shows them gray. A new driver picked from the list keeps the employee ID; the seniority date
+  // starts at the hire date when it is left blank.
+  const empId = req.employeeId || (existing && existing.employeeId) || '';
+  const emp = empId ? await EMP.employeeFor(tx, db, empId) : null;
+  if (req.employeeId && !emp) throw new SaveError('NOT_FOUND', 'Employee ' + req.employeeId + ' is not on the Employees list');
+  if (req.employeeId && !existing) {
+    const twin = (await tx.get(db.collection(C.drivers).where('employeeId', '==', emp.employeeId).limit(1))).docs[0];
+    if (twin) throw new SaveError('NOT_ALLOWED', emp.name + ' is already on the Driver Roster');
+  }
+  const phoneRef = !existing && req.phone ? db.collection('driverPhones') : null;
   const truckId = await truckByUnit(tx, db, req.truck);
   // D6: an existing driver's name and own truck reach the Current and Next Live weeks (driverToLive).
   const live = existing ? await liveRead(tx, db, '') : null;
-  const after = { name: req.name, hireDate: req.hireDate, seniorityDate: req.seniorityDate, defaultTruckId: truckId, reliefDriver: req.relief };
+  const name = emp ? emp.name : req.name, hireDate = emp ? emp.hireDate : req.hireDate;
+  const after = { name, hireDate, seniorityDate: req.seniorityDate || (emp && !existing ? emp.hireDate : req.seniorityDate), defaultTruckId: truckId, reliefDriver: req.relief };
+  if (emp && !existing) after.employeeId = emp.employeeId;
   const result = { ok: true, requestId: req.requestId, runs: [] };
   if (existing) {
     result.liveWeeks = { updated: 0, added: 0, warnings: [] };
-    driverToLive(tx, db, mode, req, stamp, email, { id: existing.id, name: req.name }, truckId, live, result);
+    driverToLive(tx, db, mode, req, stamp, email, { id: existing.id, name }, truckId, live, result);
     const before = {};
     Object.keys(after).forEach(k => { before[k] = existing[k] === undefined ? null : existing[k]; });
     tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
@@ -122,10 +136,11 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
     tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: existing.id, before, after, result });
     return result;
   }
-  const id = 'drv_' + req.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) + '_' + req.requestId.slice(-6).toLowerCase();
+  const id = 'drv_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) + '_' + req.requestId.slice(-6).toLowerCase();
   ref = db.collection(C.drivers).doc(M.safeIdPart(id));
   const created = Object.assign({ id, status: 'ACTIVE', employmentStatus: 'ACTIVE', unavailableReason: '', createdInApp: true, testEdited: true, createdAt: stamp, createdBy: email }, after);
   tx.set(ref, created);
+  if (phoneRef) tx.set(phoneRef.doc(M.safeIdPart(id)), { driverId: id, phone: req.phone, updatedAt: stamp, updatedBy: email }, { merge: true });
   queueMaster(tx, db, mode, req.requestId, '', ref, id, Object.assign({ status: 'ACTIVE', employmentStatus: 'ACTIVE' }, after), true, stamp, email);
   result.driverId = id;
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: id, before: null, after: created, result });

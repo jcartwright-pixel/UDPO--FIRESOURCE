@@ -28,7 +28,9 @@ const COLLECTIONS = Object.freeze({
   outbox: 'outbox', conflicts: 'conflicts', exceptions: 'exceptions', vacations: 'vacations',
   plantLoads: 'plantLoads', masterOutbox: 'masterOutbox', maintenance: 'maintenance',
   // Joe 10/16: drivers marked Backup for a day on the Weekly board (app only; never written to the sheets).
-  backups: 'driverBackups'
+  backups: 'driverBackups',
+  // Joe 10/31: each plant's Employees list, brought over from UDMS (src/employees.js).
+  employees: 'employees'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });

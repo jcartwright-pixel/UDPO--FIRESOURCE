@@ -63,3 +63,10 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .drivers-page .panel-actions { flex-wrap: wrap; }
 .drivers-page .panel-actions button { white-space: nowrap; }
 .drivers-page .panel-actions #d-remove { margin-right: auto; color: #b42318; border-color: #f1b4ae; }
+/* Joe 10/31 (mock-ups 2 and 3): + Add Driver picks from the Employees list; boxes that come from UDMS are gray. */
+.drivers-page .panel input.from-udms { background: #eef2f7; color: #3d4656; }
+.emp-picks { border: 1px solid var(--ud-blue); border-radius: 8px; background: #fff; box-shadow: 0 6px 18px rgba(0, 0, 0, .14); max-height: 360px; overflow: auto; }
+.emp-picks button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #e4e9f0; background: #fff; padding: 8px 12px; font: inherit; font-size: 16px; color: var(--ink); cursor: pointer; }
+.emp-picks button:hover, .emp-picks button:focus { background: #e8f1fb; }
+.emp-picks button small { display: block; color: var(--muted); font-size: 16px; }
+.emp-picks p { margin: 0; padding: 8px 12px; color: var(--muted); font-size: 16px; }

@@ -1,0 +1,22 @@
+/* employees.html (Joe 10/31, mock-up 1): the plant's Employees list from UDMS, read only. */
+.emp-view { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 10px; min-height: 0; flex: 1; }
+.employees-page .head .title small { display: block; font-size: 16px; font-weight: 700; }
+.employees-page .head .title small.good { color: #1a7f3c; }
+.employees-page .head .title small.bad { color: #b3261e; }
+.employees-page .actions input[type=search] { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 240px; }
+.employees-page .actions select { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; }
+.employees-page .sheet.scroll-list { flex: 1; min-height: 0; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.employees-page table { width: 100%; border-collapse: collapse; }
+.employees-page thead th { position: sticky; top: 0; z-index: 2; }
+.employees-page td { border-bottom: 1px solid #e3eaf1; padding: 8px; text-align: center; font-size: 16px; }
+.employees-page td.left, .employees-page th.left { text-align: left; }
+.employees-page td.empty { color: var(--muted); padding: 16px; text-align: left; }
+.employees-page .none { color: var(--muted); }
+.employees-page tr.left-row td { background: #fdecec; }
+.employees-page .st-on { color: #1a7f3c; font-weight: 800; }
+.employees-page .st-left { color: #b3261e; font-weight: 800; }
+.employees-page .foot { color: var(--muted); font-size: 16px; }
+@media (max-width: 760px) {
+  .employees-page .actions input[type=search] { width: 100%; }
+  .employees-page .sheet.scroll-list { overflow-x: auto; }
+}
