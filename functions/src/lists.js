@@ -9,7 +9,8 @@
  *   - functions/test/unit/lists.test.js fails if any screen or server file spells a list that is not here, or if a screen
  *     reads a list the database rules do not allow.
  *
- * A new list: add its name here (in order) and run npm run sync-logic.
+ * A new list: add its name here (in order) and run npm run sync-logic. employees (Joe 10/30): the Employees list the
+ * server fills from UDMS in each plant's own database.
  */
 (function (root, factory) {
   const api = factory();
@@ -20,20 +21,21 @@
   const NAMES = Object.freeze([
     'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
     'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dataLoads', 'dateBackups', 'driverBackups',
-    'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'equipment', 'exceptions', 'extinguishers',
-    'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions', 'garageSignatures',
-    'garageTechs', 'gpsAlerts', 'gpsDays', 'gpsReefer', 'gpsReeferReadings', 'gpsTemps', 'gpsTrucks',
-    'jugTrailers', 'locationAreas', 'mailCopies', 'mailSeen', 'maintenance', 'masterOutbox', 'menuSetup',
-    'meta', 'odometers', 'opsAssignments', 'otrColumns', 'otrComments', 'otrDaily', 'otrMonthRuns',
-    'otrMonthly', 'otrRoutes', 'otrSeed', 'outbox', 'personAccess', 'personRights', 'pickups',
-    'plantAccess', 'plantEvents', 'plantJournal', 'plantLineStatus', 'plantLoads', 'plantMachines', 'plantMaintClocks',
-    'plantMaintCounters', 'plantMaintLocks', 'plantMaintLogins', 'plantPmTasks', 'plantProducts', 'plantReports', 'plantReturns',
-    'plantSetup', 'plantShifts', 'plantUploadLog', 'plantUploads', 'plantWash', 'plantWorkOrders', 'private',
-    'productSetup', 'productSheet', 'productionLines', 'productionRuns', 'receivingItems', 'receivingScans', 'redzoneChecks',
-    'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routes', 'runDays', 'runs',
-    'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'scorecard', 'scorecardExcuses', 'scorecardRatings',
-    'sensors', 'sentEmails', 'stationAccess', 'tempLocations', 'textLog', 'transfers', 'users',
-    'vacations', 'walkPhotoData', 'walkPhotos', 'weeks', 'windowTests', 'workOrders', 'workOrdersDeleted'
+    'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
+    'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',
+    'garageSignatures', 'garageTechs', 'gpsAlerts', 'gpsDays', 'gpsReefer', 'gpsReeferReadings', 'gpsTemps',
+    'gpsTrucks', 'jugTrailers', 'locationAreas', 'mailCopies', 'mailSeen', 'maintenance', 'masterOutbox',
+    'menuSetup', 'meta', 'odometers', 'opsAssignments', 'otrColumns', 'otrComments', 'otrDaily',
+    'otrMonthRuns', 'otrMonthly', 'otrRoutes', 'otrSeed', 'outbox', 'personAccess', 'personRights',
+    'pickups', 'plantAccess', 'plantEvents', 'plantJournal', 'plantLineStatus', 'plantLoads', 'plantMachines',
+    'plantMaintClocks', 'plantMaintCounters', 'plantMaintLocks', 'plantMaintLogins', 'plantPmTasks', 'plantProducts', 'plantReports',
+    'plantReturns', 'plantSetup', 'plantShifts', 'plantUploadLog', 'plantUploads', 'plantWash', 'plantWorkOrders',
+    'private', 'productSetup', 'productSheet', 'productionLines', 'productionRuns', 'receivingItems', 'receivingScans',
+    'redzoneChecks', 'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routes', 'runDays',
+    'runs', 'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'scorecard', 'scorecardExcuses',
+    'scorecardRatings', 'sensors', 'sentEmails', 'stationAccess', 'tempLocations', 'textLog', 'transfers',
+    'users', 'vacations', 'walkPhotoData', 'walkPhotos', 'weeks', 'windowTests', 'workOrders',
+    'workOrdersDeleted'
   ]);
   const KNOWN = new Set(NAMES);
   const known = (name) => KNOWN.has(String(name));
