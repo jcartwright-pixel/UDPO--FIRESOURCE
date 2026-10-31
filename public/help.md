@@ -247,8 +247,10 @@ screens: drivers.html
 Every driver: employee ID, relief or regular, seniority, assigned truck, mobile phone, texts, vacation weeks and status. Accidents, complaints and PDAs (Progressive Discipline Actions) are entered here too and count on the Driver Scorecard.
 
 - Use the **Status** and **Relief** filters on the right to narrow the list.
-- `+ Add Driver` adds a driver. `Edit` on a line opens the driver beside the list.
-- In the driver's box: change the name, hire date, seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
+- `+ Add Driver` adds a driver: type part of a name or employee ID in **Pick an employee** and pick the person from the [Employees](#employees) list. Their name, employee ID and hire date fill in gray, and their mobile phone fills in. Pick the truck and relief, then press `Add Driver`.
+- Gray boxes come from UDMS and follow it by themselves. Change those in UDMS, not here.
+- `Edit` on a line opens the driver beside the list.
+- In the driver's box: change the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
 - Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
@@ -1136,6 +1138,15 @@ screens: crew.html?view=setup, maint-crew.html?view=setup
 
 The areas with their own shift times, the jobs and how many people each needs, the people (name, employee ID, phone, usual job, shift, days off) and the vacation limits. Every box saves when you leave it.
 
+To add a person to the schedule:
+
+1. On the `People` tab, press `+ Add Person`.
+2. Type part of a name or employee ID and pick the person from the [Employees](#employees) list. Their name, employee ID, phone and hire date fill in gray.
+3. Set their area, shift, usual job and days off.
+
+- Gray boxes come from UDMS and follow it by themselves. Change those in UDMS.
+- Someone not in UDMS yet: press `Type a name instead` and type the line as before.
+
 On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
 
 1. Add the mechanic on `People` (`+ Add Person`) and type their name.
@@ -1168,6 +1179,23 @@ Everything administrators set up, grouped down the left: People & Access, Links 
 - Administration is for administrators only; the button in the top bar shows only to them.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
+
+## Employees
+id: employees
+screens: employees.html, administration.html?item=employees
+
+Everyone who works at the plant, brought over from UDMS by itself every 15 minutes: name, employee ID, position, hire date and phone. **Used On** says where each person is in Operations (Driver Roster, Plant Schedule, Maintenance Schedule). Nothing private comes over from UDMS.
+
+1. Add or change the person in UDMS (a new hire, a new position or phone, someone who left).
+2. Within 15 minutes the change shows here, and on the Driver Roster and the schedules for anyone already on them.
+3. To put the person to work in Operations, pick them on the Driver Roster (`+ Add Driver`) or on Plant Schedule Setup (`+ Add Person`).
+
+- The line under the title says when UDMS was last checked. A red line means the last check did not work, and it tries again by itself.
+- Use **Search** for a name or employee ID, and the **Status** drop-down for Active, Left or All. Someone who left shows in red with the day they left.
+
+> Gray boxes on the Driver Roster and the schedules come from this list. They change by themselves when UDMS changes.
+
+!> Do not type a person's name, ID or hire date into Operations to fix it. Fix it in UDMS and it follows here.
 
 ## People & Roles
 id: admin-people

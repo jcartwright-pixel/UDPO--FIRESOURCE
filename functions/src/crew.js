@@ -12,6 +12,7 @@
 
 const R = require('./crew-rules');
 const L = require('./logic');
+const EMP = require('./employees');
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
@@ -92,7 +93,7 @@ function validateSetup(input, SaveError) {
     if (f.holidayMaxOff !== undefined) o.holidayMaxOff = count(f.holidayMaxOff, SaveError, 'How many may be off in a holiday week');
   }
   out.fields = o;
-  if ((out.op === 'area' || out.op === 'job' || out.op === 'person') && !out.id && !o.name) throw new SaveError('BAD_REQUEST', 'Type the name first.');
+  if ((out.op === 'area' || out.op === 'job' || out.op === 'person') && !out.id && !o.name && !(out.op === 'person' && o.employeeId)) throw new SaveError('BAD_REQUEST', 'Type the name first.');
   if (out.id && o.name !== undefined && !o.name) throw new SaveError('BAD_REQUEST', 'A name cannot be blank.');
   if (out.op === 'job' && !out.id && !o.areaId) throw new SaveError('BAD_REQUEST', 'Pick the area first.');
   if (out.op !== 'starter' && !Object.keys(o).length && !out.status) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
@@ -140,6 +141,17 @@ async function saveSetup(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const coll = COLL[req.op], all = await mineOf(tx, db, coll, req);
   let id = req.id, was = id ? all.find(x => x.id === id) : null;
   if (id && !was) throw new SaveError('NOT_FOUND', 'That line is no longer on the list.');
+  if (req.op === 'person') {
+    // Joe 10/31 (mock-up 4): a person picked from the Employees list (UDMS) takes the name, employee ID, phone and hire date
+    // from it, and they keep following UDMS (employees.js); the screen shows those boxes gray.
+    const empId = req.fields.employeeId !== undefined ? req.fields.employeeId : was ? was.employeeId : '';
+    const emp = empId ? await EMP.employeeFor(tx, db, empId, req.facilityId) : null;
+    if (emp) {
+      const twin = all.find(x => x.id !== id && R.active(x) && EMP.idKey(x.employeeId) === EMP.idKey(emp.employeeId));
+      if (twin) throw new SaveError('BAD_REQUEST', emp.name + ' is already on this list.');
+      Object.assign(req.fields, { name: emp.name, employeeId: emp.employeeId, phone: emp.phone, hireDate: emp.hireDate });
+    } else if (!id && !req.fields.name) throw new SaveError('NOT_FOUND', 'Employee ' + empId + ' is not on the Employees list.');
+  }
   const name = req.fields.name !== undefined ? req.fields.name : was ? was.name : '';
   const twin = req.op !== 'person' && all.find(x => x.id !== id && R.active(x) && text(x.name).toUpperCase() === name.toUpperCase() &&
     (req.op === 'area' || (req.fields.areaId || (was && was.areaId)) === x.areaId));
