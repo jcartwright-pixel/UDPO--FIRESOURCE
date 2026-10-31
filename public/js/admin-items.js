@@ -4,6 +4,8 @@
 export const ADMIN_GROUPS = [
   ['People & Access', 'Who signs in, their role, which plants they see and their rights', [
     ['people', 'People & Roles', 'Add a person; set their role, account status, allowed plants (All plants or each plant) and each right (use role, allow, deny).', '', 'people'],
+    // Joe 10/31 (mock-up 1): every employee at the plant, from UDMS; Add Driver and the schedules' + Add Person pick from it.
+    ['employees', 'Employees', 'Everyone who works at the plant, brought over from UDMS by itself every 15 minutes: name, employee ID, position, hire date and phone, and where each person is used. Change a person in UDMS.', 'employees.html', 'people'],
     ['role-templates', 'Role Templates', 'Pick a role and tick the rights it gets. The Administrator role is protected and has every right.', '', 'check'],
     ['access-codes', 'Access & QR Codes', 'A revocable phone link and QR code for each employee: Generate, Regenerate (press twice) and Text the link (texting is off).', '', 'pin']
   ]],

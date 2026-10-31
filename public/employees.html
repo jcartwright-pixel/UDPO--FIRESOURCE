@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Employees · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/employees.css">
+  <script src="js/logic.js"></script>
+</head>
+<!-- Joe 10/31 (mock-up 1): each plant's employees, brought over from UDMS every 15 minutes by the server (functions/src/employees.js).
+     Read only: name, employee ID, position, hire date and phone; where each person is used in Operations; who has left. -->
+<body class="fill employees-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Employees</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">Administration · People &amp; Access · <span id="plant-name"></span></span><h1>Employees</h1></div>
+      <div class="actions in-head">
+        <span id="sync"></span>
+        <input type="search" id="search" placeholder="Search name or ID..." aria-label="Search name or employee ID" autocomplete="off">
+        <select id="status" aria-label="Status"><option value="ACTIVE">Status: Active</option><option value="LEFT">Status: Left</option><option value="ALL">Status: All</option></select>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view emp-view">
+      <div class="sheet scroll-list">
+        <table>
+          <thead><tr><th class="left">Name</th><th>Employee ID</th><th>Position</th><th>Hire Date</th><th>Phone</th><th>Used On</th><th>Status</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="7" class="empty">Reading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="foot" id="foot">Brought over from UDMS by itself every 15 minutes: new hires, position and phone changes, and people who leave. Change a person in UDMS, not here. Nothing private comes across.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { collection, doc, onSnapshot } from './js/firebase.js';
+
+    const L = window.UDLogic;
+    const PLANTS = L.PLANTS && L.PLANTS.length ? L.PLANTS : [{ id: 'fac_uniontown', name: 'Uniontown' }];
+    const plant = (() => {
+      let came = new URLSearchParams(location.search).get('plant') || '';
+      if (!PLANTS.some(p => p.id === came)) try { came = sessionStorage.getItem('udPlant') || ''; } catch (e) { /* no storage */ }
+      return (PLANTS.find(p => p.id === came) || PLANTS[0]).id;
+    })();
+    document.getElementById('plant-name').textContent = (PLANTS.find(p => p.id === plant) || { name: plant }).name;
+    const idKey = (v) => String(v == null ? '' : v).trim().replace(/^0+(?=.)/, '').toUpperCase();
+    let employees = null, drivers = [], crew = [], sync = null;
+
+    // Where each employee is used: the Driver Roster, the plant schedule, the Maintenance Schedule.
+    function usedOn(e) {
+      const out = [];
+      if (drivers.some(d => idKey(d.employeeId) === e.idKey && String(d.status || '').toUpperCase() !== 'INACTIVE')) out.push('Driver Roster');
+      const on = crew.filter(p => idKey(p.employeeId) === e.idKey && String(p.status || '').toUpperCase() !== 'RETIRED');
+      if (on.some(p => p.team !== 'maint')) out.push('Plant Schedule');
+      if (on.some(p => p.team === 'maint')) out.push('Maintenance Schedule');
+      return out;
+    }
+    function render() {
+      const s = sync;
+      const line = document.getElementById('sync');
+      line.className = s && s.ok === false ? 'bad' : 'good';
+      line.textContent = !s ? 'Waiting for the first copy from UDMS' : s.ok === false ? s.problem + ' Last tried ' + dateTimeText(s.checkedAt) + '.' : 'Up to date with UDMS · last checked ' + dateTimeText(s.checkedAt);
+      if (!employees) return;
+      const q = document.getElementById('search').value.trim().toUpperCase(), st = document.getElementById('status').value;
+      const shown = employees.filter(e => e.facilityId === plant && (st === 'ALL' || (st === 'ACTIVE') === !!e.active) &&
+        (!q || String(e.name).indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0));
+      document.getElementById('rows').innerHTML = shown.map(e => {
+        const used = usedOn(e);
+        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + escapeHtml(e.employeeId) + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td>' +
+          '<td>' + (e.hireDate ? shortDate(e.hireDate) : '<span class="none">None</span>') + '</td><td>' + (escapeHtml(e.phone) || '<span class="none">No phone in UDMS</span>') + '</td>' +
+          '<td>' + (used.length ? used.map(escapeHtml).join('<br>') : '<span class="none">Not used yet</span>') + '</td>' +
+          '<td>' + (e.active ? '<span class="st-on">Active</span>' : '<span class="st-left">' + (e.status === 'GONE' ? 'Not in UDMS' : 'Left' + (e.leftDate ? ' ' + shortDate(e.leftDate) : '')) + '</span>') + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="empty">' + (employees.some(e => e.facilityId === plant) ? 'No employee matches.' : 'No employees yet. They come over from UDMS by themselves once UDMS lets Operations read them.') + '</td></tr>';
+    }
+    ['search', 'status'].forEach(id => { document.getElementById(id).oninput = render; });
+    requireSignIn(async () => {
+      const { db } = await start();
+      const fail = (what) => (e) => showError('Could not read the ' + what + ' (' + e.message + '). Check the network and reload the page.');
+      onSnapshot(collection(db, 'employees'), s => { employees = s.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name))); render(); }, fail('Employees list'));
+      onSnapshot(doc(db, 'config', 'employees'), s => { sync = s.exists() ? s.data() : null; render(); }, () => {});
+      onSnapshot(collection(db, 'drivers'), s => { drivers = s.docs.map(d => d.data()); render(); }, () => {});
+      onSnapshot(collection(db, 'crewPeople'), s => { crew = s.docs.map(d => d.data()).filter(p => p.facilityId === plant); render(); }, () => {});
+    });
+  </script>
+</body>
+</html>
