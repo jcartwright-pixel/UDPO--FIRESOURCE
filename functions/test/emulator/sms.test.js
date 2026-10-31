@@ -285,3 +285,42 @@ test('Texts: driver replies are texted on to the phone saved under Driver replie
   assert.deepEqual([r.forwardTo, r.forwardSince], ['', '']);
   assert.equal(await SMS.replyCheck(db(), live('2026-10-18T14:15:00Z')), null);
 });
+
+test('Joe 10/31 (im): a sample of the new text, the driver\'s own week, goes only to the cell in part 5; drivers keep the old text', async () => {
+  const sent = [], fetch = async (url, init) => { sent.push(String(init.body)); return { ok: true, status: 201, json: async () => ({}) }; };
+  const live = { env: { LIVE_TEXTS: '1' }, fetch, now: () => new Date('2026-10-17T23:00:00Z') };
+  await post();
+  await db().collection('exceptions').doc('ex_casey_thu').set({ driverId: 'drv_test_casey', startDate: L.addDays(WEEK, 4), endDate: L.addDays(WEEK, 4), type: 'VACATION', status: 'APPROVED' });
+  // The list to pick from, then one driver's week: Sunday to Saturday, his run with its leaving time, Off on the other days.
+  let r = await SMS.smsCall(db(), ADMIN, { op: 'sample' });
+  assert.ok(r.sampleDrivers.some(x => x.driverId === 'drv_test_casey' && x.name === 'CASEY, LEE'));
+  assert.equal(r.sample, undefined);
+  r = await SMS.smsCall(db(), ADMIN, { op: 'sample', driverId: 'drv_test_casey' });
+  const lines = r.sample.text.split('\n');
+  // Joe 10/31 (ip): like a table, no date on each line.
+  assert.deepEqual(lines.slice(0, 4), ['United Dairy schedule', 'Week of 10-18-26 to 10-24-26', '', 'DAY | ROUTE | RUN | DEPART']);
+  assert.equal(lines[4], 'SUN | OFF');
+  assert.ok(lines.some(x => /^MON \| 905 \| UT DSD MILK( \| \d+(:\d\d)?[AP])?$/.test(x)), r.sample.text);
+  assert.ok(lines.includes('THU | OFF (Vacation)'), r.sample.text);
+  assert.ok(lines.slice(4).every(x => /^(SUN|MON|TUE|WED|THU|FRI|SAT) \| /.test(x)));
+  assert.equal(r.sample.text, await SMS.weekText(db(), 'drv_test_casey', WEEK));
+  // Needs the account and the part 5 cell; only administrators.
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_test_casey' }, live), /Save the Twilio account/);
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_test_casey' }, live), /part 5/);
+  await SMS.smsCall(db(), ADMIN, { op: 'setForward', phone: '330-555-7777' });
+  await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'sendSample', driverId: 'drv_test_casey' }, live), /Only an administrator/);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_nobody' }, live), /not on the Driver Roster/);
+  r = await SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_test_casey', phone: '330-555-1234' }, live);
+  assert.deepEqual([r.sampleSend.to, r.sampleSend.status, sent.length], ['330-555-7777', 'SENT', 1]);
+  const body = new URLSearchParams(sent[0]);
+  assert.deepEqual([body.get('To'), body.get('Body')], ['+13305557777', r.sample.text], 'only the part 5 cell, never a typed or driver number');
+  // The drivers' Send schedule texts still send the short text, and nothing was sent to a driver.
+  assert.equal((await db().collection('private').doc('sms').get()).data().lastSend, undefined);
+  assert.match((await SMS.smsCall(db(), ADMIN, { op: 'preview' })).message, /is posted\. Open UD Routes > My Schedule/);
+  // The test copy only writes it to the list.
+  r = await SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_test_casey' }, { env: {}, fetch });
+  assert.deepEqual([r.sampleSend.status, sent.length], ['NOT SENT', 1]);
+  const logs = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'SAMPLE');
+  assert.deepEqual(logs.map(x => x.name + ' ' + x.status).sort(), ['Sample: CASEY, LEE NOT SENT', 'Sample: CASEY, LEE SENT']);
+});
