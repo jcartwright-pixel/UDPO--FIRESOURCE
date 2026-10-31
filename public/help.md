@@ -194,7 +194,7 @@ The list at the top picks the view: Start Times, Mileage, Hours and Return, Load
 - **Change many boxes at once:** click the first box, Shift+click (or drag to) the last one, type, then press Enter. Every marked box gets the same value.
 - **Start times:** type a time any way (5, 530, 5:30p or 1730). The up / down clicker moves it 15 minutes a click.
 - **Load Day** and **Run By** are picked from a list, never typed. Load Day reads in words (Same day, Day before...) counted back from the delivery day.
-- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time.
+- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time. A Load Day route loaded 2 days early (Monday's loads on Saturday) still leaves the day before delivery, on Sunday.
 - **Daily Order** and **Weekly Order:** grab a line and drag it up or down.
 - `+ Add Route` adds a new route; `+ Add Run / Destination` adds a run under a route.
 - `Edit Route` opens the full form for one run.
@@ -625,6 +625,8 @@ Will the plant be late? Every case load still to load, in the order it will be l
 - Last night's left-over loads come first, marked at the left edge.
 
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
+
+> Saturday's loads for Monday leave on Sunday, so on Saturday they are red only if they will not be ready by their Sunday time. Only Sunday's loads can be late on Saturday.
 
 ## Unloading (Case, Tote, Box and Tanker)
 id: unloading
