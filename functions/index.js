@@ -579,6 +579,15 @@ exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes'
   await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));
 });
 
+// Joe 10/31: the route status email for the salespeople (src/salesmail.js), 6:00 AM Monday through Saturday. It sends nothing
+// until Administration switches it on with at least one address (private/salesRouteEmail).
+exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
+  await eachPlant('salesRouteEmail', async (pdb) => {
+    const r = await require('./src/salesmail').sendMorning(pdb);
+    if (r && r.status !== 'SENT') console.log('salesRouteEmail', r.status, r.reason || '');
+  });
+});
+
 // How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.
 exports.cleanupNightly = onSchedule({ schedule: '30 3 * * *', timeZone: 'America/New_York', timeoutSeconds: 540, maxInstances: 1 }, async () => {
   await eachPlant('cleanup', (pdb) => runCleanup({ db: pdb }));
