@@ -61,6 +61,8 @@ function messageFor(week) {
 // the cell in part 5; the drivers' Send schedule texts keep messageFor until Joe says to switch.
 // Joe 10/31 (ip, "have the headers, like the day, route, run, and depart"): a table, one header row and no date on each line:
 // "DAY | ROUTE | RUN | DEPART", then "MON | 8301 | UT WALMART | 3:00 AM", "SUN | OFF".
+// Joe 10/31 (is): short times so a row fits one line on a phone: "3:00 AM" -> "3A", "3:30 PM" -> "3:30P".
+const short = (t) => String(t || '').replace(/:00 ([AP])M$/, '$1').replace(/ ([AP])M$/, '$1');
 const DAY_SHORT = { sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT' };
 async function weekText(db, driverId, week) {
   const P = require('./phone');
@@ -74,7 +76,7 @@ async function weekText(db, driverId, week) {
   days.forEach(d => {
     const day = DAY_SHORT[d.day];
     if (!d.runs.length) { lines.push(day + ' | ' + said(d.status)); return; }
-    d.runs.forEach(x => lines.push([day, x.route, x.run, x.leaves].filter(Boolean).join(' | ') + (d.status ? ' (' + d.status + ')' : '')));
+    d.runs.forEach(x => lines.push([day, x.route, x.run, short(x.leaves)].filter(Boolean).join(' | ') + (d.status ? ' (' + d.status + ')' : '')));
   });
   return ['United Dairy schedule', 'Week of ' + dateText(week) + ' to ' + dateText(L.addDays(week, 6)), '', 'DAY | ROUTE | RUN | DEPART'].concat(lines).join('\n').slice(0, 1500);
 }
