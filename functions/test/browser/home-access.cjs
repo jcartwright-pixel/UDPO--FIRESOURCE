@@ -178,7 +178,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/22: Case Counters added under Connections & Keys (the palletizer and case returns counter boxes).
     // Joe 10/26: Machine Connections added under Connections & Keys; Case Counters moved into it (Find a setting still finds it).
     // Joe 10/25: Menu Setup, Plant Schedule Setup, Maintenance Schedule Setup and Maintenance Equipment added under Plant Setup.
-    assert.equal(all, 39, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    // Joe 10/31: Sales Route Email added under Email & Schedules.
+    assert.equal(all, 40, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
     assert.deepEqual(await adm.$$eval('.adm-nav-group:has(h2:text-is("Dispatch")) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
