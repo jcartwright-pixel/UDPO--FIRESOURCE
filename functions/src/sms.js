@@ -1,10 +1,9 @@
 /*
- * Schedule Texts (Joe 10/15: "build it, have everything ready but not implemented just yet ... put something in
- * administration to keep it off"): when a new week is posted (Weekly Publish makes it the Live Current week, here or in
- * the current app), every driver on that week who has a mobile phone number gets one text saying his schedule is posted.
+ * Schedule Texts (Joe 10/15): each driver on the posted week (the Live Current week) who is ticked Schedule on the Driver
+ * Roster gets one text saying his schedule is posted.
  *
- * - Off until an administrator turns it On in Administration > Schedule Texts. Turning it On never texts the week that is
- *   already posted; only the next one.
+ * - Joe 10/31: publishing never sends them. An administrator presses Send schedule texts on Administration > Texts when
+ *   ready; the same week again needs Send again.
  * - The texting service is Twilio. The Account SID, Auth Token and From number are typed into that screen only; they are
  *   kept in private/sms, which no screen can read (firestore.rules), and never shown again.
  * - Mobile phone numbers are typed on the Driver Roster and kept in driverPhones/{driverId} (the Live sheet copy rewrites
@@ -90,12 +89,12 @@ async function activeDrivers(db) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const status = (d, env, project) => ({ replyAddress: project ? replyAddress(project) : '', on: !!d.on, hasSid: !!d.accountSid, hasToken: !!d.authToken, from: d.fromNumber ? phoneText(d.fromNumber) : '', live: liveTexts(env),
+const status = (d, env, project) => ({ replyAddress: project ? replyAddress(project) : '', hasSid: !!d.accountSid, hasToken: !!d.authToken, from: d.fromNumber ? phoneText(d.fromNumber) : '', live: liveTexts(env),
   savedAt: d.savedAt || '', savedBy: d.savedBy || '', switchedAt: d.switchedAt || '', switchedBy: d.switchedBy || '', lastWeek: d.lastWeek || '', lastSend: d.lastSend || null,
   doneOn: !!d.doneOn, doneAskedAt: d.doneAskedAt || '', ask: ASK, doneSwitchedAt: d.doneSwitchedAt || '', doneSwitchedBy: d.doneSwitchedBy || '',
   forwardTo: d.forwardTo ? phoneText(d.forwardTo) : '', forwardSince: d.forwardSince || '', forwardSample: forwardMessage('Lee Casey', '+13305551234', 'Running about 20 minutes late') });
 
-/* input.op: status | save {accountSid, authToken, fromNumber} | clear | setOn {on} | preview
+/* input.op: status | save {accountSid, authToken, fromNumber} | clear | preview | sendSchedule {again}
  *           | doneList | setDoneOn {on} | test {phone} | doneAsk   (Load Done Texts, below; the drivers are ticked on the Driver Roster)
  *           | setForward {phone}   (driver replies sent on to that phone; blank turns it off) */
 async function smsCall(db, user, input, options) {
@@ -118,24 +117,51 @@ async function smsCall(db, user, input, options) {
     return status(next, o.env, o.project);
   }
   if (op === 'clear') {
-    const next = { on: false, lastWeek: d.lastWeek || '', doneOn: false, savedAt: stamp, savedBy: email, switchedAt: stamp, switchedBy: email };
+    const next = { lastSend: d.lastSend || null, doneOn: false, savedAt: stamp, savedBy: email, switchedAt: stamp, switchedBy: email };
     await ref.set(next);
     return status(next, o.env, o.project);
   }
-  if (op === 'setOn') {
-    const on = input.on === true;
-    if (on && !(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio Account SID, Auth Token and phone number first.');
-    // Turning it On never texts the week already posted: that week counts as done.
-    const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
-    const next = Object.assign({}, d, { on, switchedAt: stamp, switchedBy: email }, on ? { lastWeek: live.current || d.lastWeek || '' } : {});
-    await ref.set(next);
-    return status(next, o.env, o.project);
-  }
+  // Joe 10/31 ("instead of throwing the publish and then sending the text out, I would ... like to have control over that"):
+  // publishing never texts. The posted week's schedule texts go when an administrator presses Send schedule texts.
   if (op === 'preview') {
-    const live = ((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {};
-    const week = live.next || live.current || '';
-    const list = (await activeDrivers(db)).filter(x => x.scheduleText);
-    return Object.assign(status(d, o.env, o.project), { week, message: messageFor(week || L.weekStart(L.operatingDay(o.now()))), drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+    const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
+    const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
+    return Object.assign(status(d, o.env, o.project), { week, ticked, message: messageFor(week || L.weekStart(L.operatingDay(o.now()))), drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+  }
+  if (op === 'sendSchedule') {
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
+    const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
+    if (!week) throw new SmsError('NOT_ALLOWED', 'No week is posted yet.');
+    // Claim it first, so two presses never text the same week twice; a second send of a week needs Send again.
+    const claimed = await db.runTransaction(async tx => {
+      const x = (await tx.get(ref)).data() || {};
+      if (x.lastSend && x.lastSend.week === week && input.again !== true) return 'SENT';
+      if (x.sendingAt && Date.parse(stamp) - Date.parse(x.sendingAt) < 120000) return 'BUSY';
+      tx.set(ref, { sendingAt: stamp }, { merge: true });
+      return '';
+    });
+    if (claimed === 'SENT') throw new SmsError('NOT_ALLOWED', 'This week was already sent. Press Send again to send it a second time.');
+    if (claimed === 'BUSY') throw new SmsError('NOT_ALLOWED', 'The schedule texts are being sent now.');
+    const live = liveTexts(o.env), body = messageFor(week), list = await weekDrivers(db, week);
+    let sent = 0, failed = 0, noPhone = 0;
+    for (const x of list) {
+      const log = { direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp, by: email };
+      if (!x.phone) { noPhone++; Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
+      else if (!live) { Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' }); }
+      else {
+        let r;
+        try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+        if (r.ok) sent++; else failed++;
+        Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+        // A driver who replied STOP is unticked on the Driver Roster (Joe 10/26).
+        if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
+      }
+      await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '')).set(log);
+    }
+    const lastSend = { week, at: stamp, by: email, drivers: list.length, sent, failed, noPhone, live };
+    const next = Object.assign({}, d, { lastSend, sendingAt: '' });
+    await ref.set(next);
+    return status(next, o.env, o.project);
   }
   if (op === 'doneList') {
     const list = await activeDrivers(db);
@@ -216,44 +242,6 @@ async function sendOne(d, to, body, fetchFn) {
   return { ok: false, reason: 'Twilio refused (' + res.status + ')' + (why ? ': ' + String(why).slice(0, 200) : '') };
 }
 
-/*
- * The minute job (index.js transferEveryMinute): when the Live Current week is a week not texted yet and the switch is On,
- * text it once. Returns what it did, or null when there was nothing to do.
- */
-async function postedCheck(db, options) {
-  const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a) }, options || {});
-  const ref = PRIVATE(db), d = (await ref.get()).data() || {};
-  if (!d.on) return null;
-  const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
-  if (!week || week <= String(d.lastWeek || '')) return null;
-  // Claim the week first, so two minute runs never text the same week twice.
-  const claimed = await db.runTransaction(async tx => {
-    const s = (await tx.get(ref)).data() || {};
-    if (!s.on || week <= String(s.lastWeek || '')) return false;
-    tx.set(ref, { lastWeek: week }, { merge: true });
-    return true;
-  });
-  if (!claimed) return null;
-  const stamp = o.now().toISOString(), live = liveTexts(o.env), body = messageFor(week), list = await weekDrivers(db, week);
-  let sent = 0, failed = 0, noPhone = 0;
-  for (const x of list) {
-    const log = { direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp };
-    if (!x.phone) { noPhone++; Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
-    else if (!live) { Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' }); }
-    else {
-      let r;
-      try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
-      if (r.ok) sent++; else failed++;
-      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
-      // A driver who replied STOP is unticked on the Driver Roster (Joe 10/26).
-      if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
-    }
-    await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId)).set(log);
-  }
-  const lastSend = { week, at: stamp, drivers: list.length, sent, failed, noPhone, live };
-  await ref.set({ lastSend }, { merge: true });
-  return lastSend;
-}
 
 /*
  * A text a driver sent to the Twilio number (Twilio's "A message comes in" webhook, a form POST). Only a request signed with
@@ -409,4 +397,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { TEST_TEXT, forwardMessage, smsCall, postedCheck, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };
+module.exports = { TEST_TEXT, forwardMessage, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };

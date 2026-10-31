@@ -68,8 +68,8 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
     for (const [w, h] of [[1536, 790], [1920, 1080], [390, 844]]) {
       const p = await openPage(browser, w, h, '/texts.html?testEmail=admin.test@uniteddairy.com');
       await p.waitForFunction((on) => document.getElementById('done-state').textContent === on, w === 1536 ? 'Off' : 'On');
-      assert.equal(await p.textContent('#state'), 'Off', 'Schedule texts stay Off');
-      await p.waitForFunction(() => document.getElementById('count').textContent === '1 ticked' && document.getElementById('preview-count').textContent === '1 ticked');
+      assert.equal(await p.textContent('#state'), 'Not sent', 'Schedule texts are only sent by the button');
+      await p.waitForFunction(() => document.getElementById('count').textContent === '1 ticked' && document.getElementById('preview-count').textContent === '1 driver');
       assert.equal(await p.$eval('#drivers tr td', td => td.textContent), 'CASEY, LEE');
       assert.equal(await p.$eval('#preview tr td', td => td.textContent), 'CASEY, LEE');
       assert.match(await p.textContent('#sample'), /^United Dairy: your load is done\. Route 801 .*Pickups: 2 crates chocolate milk\.$/);

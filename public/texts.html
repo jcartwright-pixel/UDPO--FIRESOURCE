@@ -28,7 +28,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Texts</h1><small>Texts to drivers from the company's Twilio number. Each kind has its own On / Off here. Who gets each kind is ticked on the <a href="drivers.html">Driver Roster</a>, under Texts.</small></div>
+      <div class="title"><h1>Texts</h1><small>Texts to drivers from the company's Twilio number. Schedule texts go only when you press Send; load done texts have their own On / Off. Who gets each kind is ticked on the <a href="drivers.html">Driver Roster</a>, under Texts.</small></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <p class="hint texts-mode" id="mode"></p>
@@ -61,11 +61,12 @@
         <p class="hint">Their <b>YES</b> and <b>STOP</b> replies are picked up here by themselves. Do not change the reply setting in Twilio; the other United Dairy app uses it.</p>
       </section>
       <section class="gps-card wide texts-kind">
+        <!-- Joe 10/31 ("I would probably like to have control over that"): publishing never texts; this button sends them. -->
         <h2>3. Schedule texts <span class="pill" id="state">-</span></h2>
         <div class="texts-kind-grid">
           <div>
             <p class="hint" id="state-text"></p>
-            <div class="gps-buttons"><button type="button" class="primary big" id="turn"></button></div>
+            <div class="gps-buttons"><button type="button" class="primary big" id="send"></button></div>
             <p class="hint" id="last"></p>
             <p class="hint">The text:</p>
             <p class="texts-sample" id="preview-text"></p>
@@ -74,7 +75,7 @@
             <h3>Who gets them <span class="pill" id="preview-count">-</span></h3>
             <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
               <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
-            <p class="hint">Drivers ticked <b>Schedule</b> on the Driver Roster. Only the ones on the posted week get a text.</p>
+            <p class="hint" id="preview-note"></p>
           </div>
         </div>
       </section>
@@ -125,9 +126,10 @@
     import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText, serverText } from './js/app.js';
     import { collection, query, orderBy, limit, onSnapshot } from './js/firebase.js';
 
-    let s = null, armed = null, askArmed = null;
+    let s = null, armed = null, askArmed = null, sendArmed = null;
     const $ = (id) => document.getElementById(id);
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
+    const addDays = (k, n) => { const [y, m, d] = String(k).split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); };
     const day = (k) => { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
     const list = (rows) => rows.map(d => '<tr><td>' + escapeHtml(d.name) + '</td><td>' + (d.phone ? escapeHtml(d.phone) : '<span class="texts-none">No number</span>') + '</td></tr>').join('') ||
       '<tr><td colspan="2" class="hint">Nobody ticked yet.</td></tr>';
@@ -144,15 +146,16 @@
       $('saved').textContent = s.savedAt ? 'Last changed ' + stamp(s.savedAt) + (s.savedBy ? ' by ' + s.savedBy : '') : '';
       $('test-send').disabled = !keys; $('ask').disabled = !keys;
       $('ask-text').textContent = 'Texts every driver with a mobile phone who is not ticked yet: "' + (s.ask || '') + '" A YES reply ticks Schedule and Load on the Driver Roster; STOP unticks them.' + (s.doneAskedAt ? ' Last asked ' + stamp(s.doneAskedAt) + '.' : '');
-      // Schedule texts
-      pill($('state'), s.on);
-      $('state-text').textContent = s.on ? 'On: when Dispatch posts a new week, each ticked driver on it gets one text.' : 'Off: no schedule texts are sent.' + need;
-      $('turn').textContent = s.on ? 'Turn Off' : 'Turn On'; $('turn').disabled = !s.on && !keys;
-      const l = s.lastSend;
-      $('last').textContent = l ? 'Last posted week ' + day(l.week) + ', ' + stamp(l.at) + ': ' + (l.live ? l.sent + ' sent, ' + l.failed + ' failed' : l.drivers + ' written to the list') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'No schedule texts yet.';
+      // Schedule texts: sent only when this button is pressed (two taps), never by Publish.
+      const l = s.lastSend, done = !!(l && s.week && l.week === s.week), sched = s.drivers || [];
+      $('state').textContent = !s.week ? 'No week' : done ? 'Sent' : 'Not sent'; $('state').className = 'pill ' + (done ? 'yes' : 'no');
+      $('state-text').textContent = s.week ? 'Posted week ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + '. Publishing never sends texts; press the button when you are ready.' + need : 'No week is posted yet.';
+      if (!sendArmed) $('send').textContent = done ? 'Send again' : 'Send schedule texts';
+      $('send').disabled = !keys || !s.week || !sched.length;
+      $('last').textContent = l ? 'Last sent ' + stamp(l.at) + ' for the week of ' + day(l.week) + ': ' + (l.live ? l.sent + ' sent' + (l.failed ? ', ' + l.failed + ' not sent' : '') : l.drivers + ' written to the list (test copy)') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'Not sent yet.';
       $('preview-text').textContent = s.message || '';
-      const sched = s.drivers || [];
-      $('preview-count').textContent = sched.length + ' ticked'; $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
+      $('preview-count').textContent = sched.length + (sched.length === 1 ? ' driver' : ' drivers'); $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
+      $('preview-note').innerHTML = 'Drivers ticked <b>Schedule</b> on the Driver Roster who are on the posted week' + (s.ticked != null ? ' (' + s.ticked + ' ticked in all)' : '') + '.';
       $('preview').innerHTML = list(sched);
       // Load done texts
       pill($('done-state'), s.doneOn);
@@ -181,7 +184,13 @@
       const d = await call({ op: 'doneList' });
       if (d) { s.loadDrivers = d.drivers; s.drivers = p ? p.drivers : []; render(); }
     }
-    $('turn').onclick = () => call({ op: 'setOn', on: !s.on }, $('turn'));
+    // No pop-up: the first tap arms the button, a second tap within 5 seconds sends the texts.
+    $('send').onclick = async () => {
+      const b = $('send'), again = !!(s.lastSend && s.lastSend.week === s.week), n = (s.drivers || []).length;
+      if (!sendArmed) { b.textContent = 'Tap again to text ' + n + (n === 1 ? ' driver' : ' drivers'); b.classList.add('armed'); sendArmed = setTimeout(() => { sendArmed = null; b.classList.remove('armed'); render(); }, 5000); return; }
+      clearTimeout(sendArmed); sendArmed = null; b.classList.remove('armed');
+      await call({ op: 'sendSchedule', again }, b);
+    };
     $('done-turn').onclick = () => call({ op: 'setDoneOn', on: !s.doneOn }, $('done-turn'));
     $('save').onclick = async () => {
       const r = await call({ op: 'save', accountSid: $('f-sid').value, authToken: $('f-token').value, fromNumber: $('f-from').value }, $('save'));
