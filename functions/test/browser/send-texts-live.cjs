@@ -109,8 +109,9 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await tx.selectOption('#sample-for', 'drv_test_casey');
       await tx.waitForFunction(() => !document.getElementById('sample-text').hidden);
       const text = await tx.textContent('#sample-text');
-      assert.match(text, /^United Dairy: your schedule, week of 10-11-26\nSun 10-11: /);
-      assert.match(text, /Wed 10-14: Rt 905 UT DSD MILK/);
+      assert.match(text, /^United Dairy schedule\nWeek of 10-11-26 to 10-17-26\n\nDAY \| ROUTE \| RUN \| DEPART\nSUN \| /);
+      assert.match(text, /\nWED \| 905 \| UT DSD MILK/);
+      assert.match(text, /\nMON \| 802 \| UT DSD MILK \| 4:00 AM/);
       assert.match(await tx.textContent('#preview-text'), /is posted\. Open UD Routes > My Schedule/, 'drivers still get the short text');
       if (w === 1536) {
         assert.equal(await tx.isDisabled('#sample-send'), true, 'needs the part 5 cell');

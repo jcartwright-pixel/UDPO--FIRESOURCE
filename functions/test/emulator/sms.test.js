@@ -297,12 +297,12 @@ test('Joe 10/31 (im): a sample of the new text, the driver\'s own week, goes onl
   assert.equal(r.sample, undefined);
   r = await SMS.smsCall(db(), ADMIN, { op: 'sample', driverId: 'drv_test_casey' });
   const lines = r.sample.text.split('\n');
-  assert.equal(lines[0], 'United Dairy: your schedule, week of 10-18-26');
-  assert.equal(lines.length, 9);
-  assert.match(lines[2], /^Mon 10-19: Rt 905 UT DSD MILK/);
-  assert.equal(lines[1], 'Sun 10-18: Off');
-  assert.equal(lines[5], 'Thu 10-22: Off (Vacation)');
-  assert.equal(lines[8], 'Changes show in UD Routes > My Schedule.');
+  // Joe 10/31 (ip): like a table, no date on each line.
+  assert.deepEqual(lines.slice(0, 4), ['United Dairy schedule', 'Week of 10-18-26 to 10-24-26', '', 'DAY | ROUTE | RUN | DEPART']);
+  assert.equal(lines[4], 'SUN | OFF');
+  assert.ok(lines.some(x => /^MON \| 905 \| UT DSD MILK( \| \d+:\d\d [AP]M)?$/.test(x)), r.sample.text);
+  assert.ok(lines.includes('THU | OFF (Vacation)'), r.sample.text);
+  assert.ok(lines.slice(4).every(x => /^(SUN|MON|TUE|WED|THU|FRI|SAT) \| /.test(x)));
   assert.equal(r.sample.text, await SMS.weekText(db(), 'drv_test_casey', WEEK));
   // Needs the account and the part 5 cell; only administrators.
   await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSample', driverId: 'drv_test_casey' }, live), /Save the Twilio account/);

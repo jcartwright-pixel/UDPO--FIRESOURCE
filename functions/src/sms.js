@@ -59,7 +59,9 @@ function messageFor(week) {
 // Joe 10/31 (im, "I want to see how the sample comes through before I authorize anything"): the driver's own week in the text,
 // one line a day, Sunday to Saturday, from the same days as the driver's My Schedule. For now it is only a sample texted to
 // the cell in part 5; the drivers' Send schedule texts keep messageFor until Joe says to switch.
-const DAY_SHORT = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+// Joe 10/31 (ip, "have the headers, like the day, route, run, and depart"): a table, one header row and no date on each line:
+// "DAY | ROUTE | RUN | DEPART", then "MON | 8301 | UT WALMART | 3:00 AM", "SUN | OFF".
+const DAY_SHORT = { sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT' };
 async function weekText(db, driverId, week) {
   const P = require('./phone');
   const snap = await db.collection(C.drivers).doc(driverId).get();
@@ -67,12 +69,14 @@ async function weekText(db, driverId, week) {
   const driver = Object.assign({ id: snap.id }, snap.data());
   const [runs, exceptions, backups] = await Promise.all([db.collection(C.runs).where('weekStart', '==', week).get(), db.collection(C.exceptions).where('driverId', '==', driverId).get(), db.collection(C.backups).where('driverId', '==', driverId).get()]);
   const days = P.scheduleDays(driver, L.weeklyRows(runs.docs.map(d => Object.assign({}, d.data(), { id: d.id })), week), exceptions.docs.map(d => d.data()), week, backups.docs.map(d => d.data()));
-  const md = (k) => { const [, m, d] = String(k).split('-'); return Number(m) + '-' + Number(d); };
-  const said = (t) => t === 'Not scheduled' || !t ? 'Off' : /^Off: /.test(t) ? 'Off (' + t.slice(5) + ')' : t;
-  const lines = days.map(d => DAY_SHORT[d.day] + ' ' + md(d.date) + ': ' + (d.runs.length
-    ? d.runs.map(x => 'Rt ' + x.route + (x.run ? ' ' + x.run : '') + (x.leaves ? ', leaves ' + x.leaves : '')).join('; ') + (d.status ? ' (' + d.status + ')' : '')
-    : said(d.status)));
-  return ['United Dairy: your schedule, week of ' + dateText(week)].concat(lines, ['Changes show in UD Routes > My Schedule.']).join('\n').slice(0, 1500);
+  const said = (t) => t === 'Not scheduled' || t === 'Off' || !t ? 'OFF' : /^Off: /.test(t) ? 'OFF (' + t.slice(5) + ')' : t;
+  const lines = [];
+  days.forEach(d => {
+    const day = DAY_SHORT[d.day];
+    if (!d.runs.length) { lines.push(day + ' | ' + said(d.status)); return; }
+    d.runs.forEach(x => lines.push([day, x.route, x.run, x.leaves].filter(Boolean).join(' | ') + (d.status ? ' (' + d.status + ')' : '')));
+  });
+  return ['United Dairy schedule', 'Week of ' + dateText(week) + ' to ' + dateText(L.addDays(week, 6)), '', 'DAY | ROUTE | RUN | DEPART'].concat(lines).join('\n').slice(0, 1500);
 }
 
 async function adminOnly(db, user) {
