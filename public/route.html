@@ -515,9 +515,16 @@
       const btn = document.getElementById('board-refresh'); btn.disabled = true;
       try {
         const r = await call('board'); boardAt = Date.now(); showError('');
-        const day = new Date(r.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + shortDate(r.date), m = r.rows.length;
+        const dayOf = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + shortDate(d);
+        const day = dayOf(r.date), m = r.rows.length;
+        // Joe 10/31 ("a dedicated separation line between yesterday's loads and today's loads... people are getting confused"):
+        // when loads are left over from yesterday, a labeled line goes above them and another above today's loads.
+        const yday = new Date(Date.parse(r.date + 'T12:00:00Z') - 86400000).toISOString().slice(0, 10), hasPrior = r.rows.some(x => x.prior);
+        const split = (x, i) => !hasPrior || (i && !!r.rows[i - 1].prior === !!x.prior) ? '' : x.prior
+          ? '<div class="drv-split prior"><b>Yesterday\'s loads</b> <span>' + escapeHtml(dayOf(yday)) + ' · not loaded yet</span></div>'
+          : '<div class="drv-split today"><b>Today\'s loads</b> <span>' + escapeHtml(day) + '</span></div>';
         const list = '<div class="drv-band start"><span>&#9660; Start of loadout</span><span>' + escapeHtml(day) + '</span><div><b>' + r.remaining + ' remaining</b> of ' + m + ' load' + (m === 1 ? '' : 's') + '</div></div>' +
-          r.rows.map(x => '<div class="drv-row"><span class="rt"><b>' + escapeHtml(x.route) + (x.run ? ' · ' + escapeHtml(x.run) : '') + '</b> <i>' + escapeHtml(x.trailer || '—') + '</i></span><span class="pill ' + PILL[x.state] + '">' + escapeHtml(x.status) + '</span>' +
+          r.rows.map((x, i) => split(x, i) + '<div class="drv-row"><span class="rt"><b>' + escapeHtml(x.route) + (x.run ? ' · ' + escapeHtml(x.run) : '') + '</b> <i>' + escapeHtml(x.trailer || '—') + '</i></span><span class="pill ' + PILL[x.state] + '">' + escapeHtml(x.status) + '</span>' +
             (x.pickup ? '<span class="pu"><b>PICKUP</b>' + (x.pickupText ? ' · ' + escapeHtml(x.pickupText) : '') + '</span>' : '') + '</div>').join('') +
           '<div class="drv-band end">&#9632; End of loadout <small>· starts over at the top</small></div>';
         const track = document.getElementById('board-track');
@@ -538,7 +545,8 @@
     // and with no signal the last list is shown.
     // Joe 10/18: it listens to just what phone.js op board reads: the operating day's loads (New York, the day turns at 6 a.m.;
     // that week and the next) and its pickups (that day to 3 days on), again when the day turns. A change to anything else
-    // (last week's loads, later pickups) never changed the board, so it is not read.
+    // (later pickups) never changed the board, so it is not read. Joe 10/30: last week's loads and yesterday's pickups too,
+    // for yesterday's loads that stay on until they are loaded.
     let boardWatch = null, boardSoon = null, boardDay = '';
     const opDay = () => {
       const p = {};
@@ -553,7 +561,7 @@
       boardDay = key(0); boardWatch = [];
       const { db } = await start();
       const { collection, query, where, onSnapshot } = await import('./js/firebase.js');
-      const weeks = [0, 7].map(n => key(n - day.getUTCDay()));
+      const weeks = [-7, 0, 7].map(n => key(n - day.getUTCDay()));
       let first = 2;
       const changed = () => {
         if (first > 0) { first--; return; }
@@ -561,7 +569,7 @@
         boardSoon = setTimeout(() => { if (!document.getElementById('step-board').hidden) readBoard(); else boardAt = 0; }, 800);
       };
       // Review item 73 (Joe 10/13): only the board's pickups, not every pickup ever made.
-      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [0, 1, 2, 3].map(key))), changed, () => {})];
+      boardWatch = [onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), changed, () => {}), onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [-1, 0, 1, 2, 3].map(key))), changed, () => {})];
     }
     function openBoard() {
       step('step-board'); readBoard(); watchBoard().catch(() => {}); clearInterval(boardTimer);
