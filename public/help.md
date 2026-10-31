@@ -1175,7 +1175,7 @@ A phone link and QR code for each employee. `Generate` makes one; `Regenerate` (
 
 ## Links & Codes
 id: admin-links
-screens: administration.html?item=app-links, administration.html?item=station-codes, administration.html?item=garage-codes, administration.html?item=driver-codes, administration.html?item=manager-app-codes
+screens: administration.html?item=app-links, administration.html?item=station-codes, administration.html?item=garage-codes, administration.html?item=driver-codes, administration.html?item=manager-app-codes, administration.html?item=sales-app
 
 Every link and code people use to reach the app:
 
@@ -1186,6 +1186,7 @@ Every link and code people use to reach the app:
 - An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
+- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1387,6 +1388,28 @@ On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows
 !> Do not mistake a load under **Yesterday's loads** for today's run of the same route. Check which line it sits under.
 
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
+
+## Sales app: where every route is
+id: sales
+screens: sales.html
+
+The salespeople's phone app (**UD Sales** on the home screen). It shows every route of a division: who is driving it, its status and where it is now, with a map on top. It only shows; nothing can be changed from it. Anyone with a United Dairy account can use it.
+
+1. Open the Sales App link (Administration, **Sales App**) and sign in with your United Dairy Google account.
+2. Add it to the home screen. It is called **UD Sales**.
+3. Pick the **Division** at the top right (Uniontown, Charleston or Martins Ferry). The phone remembers it.
+4. Scroll the routes. Tap a route and the map at the top moves to that truck. The map stays on top while you keep scrolling; tap another route to move it again.
+
+- **Route, Driver, Status, Where now.** The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
+- **Status** is the same as the 6:00 AM sales email: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1 hr 12 min late** (red), **Not departed, 35 min behind** (loaded, past its dispatch time, still here), **Not loaded, 20 min behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road near** or **Stopped at**). In the yard it says **At the plant**, or **Back at the plant** once it has been out.
+- The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
+- **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
+- `?` opens this Help. `Sign out` is at the bottom.
+
+> To see a route on a bigger map, tap the map and open it in Google Maps.
+
+!> Do not read **No GPS** as lost. It means neither the trailer nor the truck on that load has a GPS unit the app knows about; ask Dispatch.
 
 ## Plant Station tablet
 id: plant-station

@@ -852,7 +852,8 @@ async function noScroll(page) {
     const LOCKED = ['maint-station.html', 'plant-kiosk.html'];
     // Joe 10/27: the Plant Station has no Back or Home at all, not even while picking a station (tablet-lock.cjs checks it).
     // Joe 10/28: the Garage Station is the same: only Release (tablet-lock.cjs and garage-flow.cjs check it).
-    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html' && f !== 'plant-station.html' && f !== 'garage-station.html' && LOCKED.indexOf(f) < 0);
+    // Joe 10/31: the Sales app is the salespeople's own phone app, with no way into the rest of Operations (sales-app.cjs checks it).
+    const pages = fsMod.readdirSync(pathMod.join(__dirname, '../../../public')).filter(f => f.endsWith('.html') && f !== 'route.html' && f !== 'driver-room.html' && f !== 'plant-station.html' && f !== 'garage-station.html' && f !== 'sales.html' && LOCKED.indexOf(f) < 0);
     const bh = await openPage(browser, 1366, 768, '/index.html?testEmail=manager.test@uniteddairy.com');
     const missing = [];
     for (const pg of pages) {
