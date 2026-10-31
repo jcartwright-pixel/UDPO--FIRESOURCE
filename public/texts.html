@@ -78,6 +78,21 @@
             <p class="hint" id="preview-note"></p>
           </div>
         </div>
+        <!-- Joe 10/31 (im): see the new text, each driver's own week, on your own phone before the drivers get it. -->
+        <h3 class="texts-new">New text: each driver's own week <span class="pill warn">Sample only</span></h3>
+        <div class="texts-kind-grid">
+          <div>
+            <p class="hint">Drivers still get the text above. Pick a driver to see their posted week in the new text, then text it to your own phone to see how it comes through.</p>
+            <form class="texts-test" autocomplete="off" onsubmit="return false">
+              <label>Sample for<select id="sample-for"><option value=""></option></select></label>
+            </form>
+            <div class="gps-buttons"><button type="button" class="primary" id="sample-send" disabled>Text this sample to my phone</button></div>
+            <p class="hint" id="sample-hint"></p>
+          </div>
+          <div>
+            <p class="texts-sample texts-week" id="sample-text" hidden></p>
+          </div>
+        </div>
       </section>
       <section class="gps-card wide texts-kind">
         <h2>4. Load done texts <span class="pill" id="done-state">-</span></h2>
@@ -170,6 +185,7 @@
       if (document.activeElement !== $('fwd-phone')) $('fwd-phone').value = s.forwardTo || '';
       $('fwd-text').textContent = s.forwardTo ? 'On: every reply since ' + stamp(s.forwardSince) + ' is texted to ' + s.forwardTo + '.' + (keys ? '' : ' Save the Twilio account first.') : 'Off: replies are only listed below.';
       $('fwd-sample').textContent = s.forwardSample || '';
+      renderSample();
     }
     async function call(fields, button) {
       showError('');
@@ -219,13 +235,41 @@
       const r = await call({ op: 'doneAsk' }, b);
       if (r && r.asked) $('ask-text').textContent = r.asked.live ? r.asked.sent + ' drivers asked' + (r.asked.failed ? ', ' + r.asked.failed + ' not sent' : '') + '. Their replies tick them on the Driver Roster.' : r.asked.drivers + ' drivers: test copy, written to the list at the bottom only.';
     };
+    // Joe 10/31 (im): a driver's posted week in the new text, and "Text this sample to my phone" (only the part 5 cell gets it).
+    let sampleArmed = null, sample = null, sampleSent = '';
+    const SAMPLE = { SENT: 'Sent to your phone.', FAILED: 'Not sent.', STOPPED: 'Not sent.', 'NOT SENT': 'Test copy: written to the list at the bottom only.' };
+    function renderSample() {
+      const b = $('sample-send'), keys = s && s.hasSid && s.hasToken && s.from, to = s && s.forwardTo;
+      $('sample-text').hidden = !sample; $('sample-text').textContent = sample ? sample.text : '';
+      if (!sampleArmed) b.textContent = 'Text this sample to my phone';
+      b.disabled = !sample || !keys || !to;
+      $('sample-hint').textContent = sampleSent || (!to ? 'Type your cell in part 5 first; the sample goes only there.' : 'Goes only to ' + to + ' (part 5). No driver gets it.');
+    }
+    async function loadSample(driverId) {
+      showError('');
+      try {
+        const r = await callServer('sms', { op: 'sample', driverId });
+        if (!driverId) { const keep = $('sample-for').value; $('sample-for').innerHTML = '<option value=""></option>' + (r.sampleDrivers || []).map(x => '<option value="' + escapeHtml(x.driverId) + '">' + escapeHtml(x.name) + '</option>').join(''); $('sample-for').value = keep; }
+        sample = r.sample || null;
+      } catch (e) { sample = null; showError(serverText(e, 'Texts')); }
+      renderSample();
+    }
+    $('sample-for').onchange = () => { sampleSent = ''; sample = null; renderSample(); if ($('sample-for').value) loadSample($('sample-for').value); };
+    $('sample-send').onclick = async () => {
+      const b = $('sample-send');
+      if (!sampleArmed) { b.textContent = 'Tap again to text ' + (s.forwardTo || 'your phone'); b.classList.add('armed'); sampleArmed = setTimeout(() => { sampleArmed = null; b.classList.remove('armed'); renderSample(); }, 5000); return; }
+      clearTimeout(sampleArmed); sampleArmed = null; b.classList.remove('armed');
+      const r = await call({ op: 'sendSample', driverId: $('sample-for').value }, b);
+      if (r && r.sampleSend) sampleSent = r.sampleSend.to + ': ' + (SAMPLE[r.sampleSend.status] || r.sampleSend.status) + (r.sampleSend.reason && r.sampleSend.status !== 'NOT SENT' ? ' ' + r.sampleSend.reason : '');
+      renderSample();
+    };
     // The phone for driver replies saves by itself when you leave the box or press Enter.
     const saveForward = () => { const v = $('fwd-phone').value.trim(); if (v !== (s && s.forwardTo || '')) call({ op: 'setForward', phone: v }); };
     $('fwd-phone').addEventListener('change', saveForward);
     $('fwd-phone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('fwd-phone').blur(); } });
     // The texts and replies (textLog), newest first; the list follows new ones as they come.
     const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received', SENDING: 'Sending', STOPPED: 'Replied STOP' };
-    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply' };
+    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply', SAMPLE: 'Sample to you' };
     const FWD = { SENT: 'Sent to your cell', FAILED: 'Not sent to your cell' };
     const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
     function watchLog(db) {
@@ -236,7 +280,7 @@
           '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
       }, e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
     }
-    requireSignIn(async () => { const { db } = await start(); watchLog(db); await refresh(); });
+    requireSignIn(async () => { const { db } = await start(); watchLog(db); await refresh(); await loadSample(''); });
   </script>
 </body>
 </html>

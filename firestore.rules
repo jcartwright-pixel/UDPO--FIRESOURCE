@@ -54,6 +54,8 @@ service cloud.firestore {
     match /config/fleetSyncPreview { allow read: if activeUser(); }
     match /config/fleetOwnership { allow read: if activeUser(); }
     match /config/mocreo { allow read: if activeUser(); }
+    // Joe 10/31: when the Employees list last checked UDMS, and any problem.
+    match /config/employees { allow read: if activeUser(); }
     // Whether RedZone's Test Connection passed (the sign-in itself stays in private/redzone).
     match /config/redzone { allow read: if activeUser(); }
     // What RedZone has (its lines, products, runs, problem types and check sheets), read in by Administration > RedZone.
@@ -164,6 +166,8 @@ service cloud.firestore {
     match /menuSetup/{id} { allow read: if activeUser(); }
     match /crewWeeks/{id} { allow read: if activeUser(); }
     match /crewVacations/{id} { allow read: if activeUser(); }
+    // Joe 10/31: the Employees list from UDMS (name, employee ID, position, hire date, phone); written only by the server.
+    match /employees/{id} { allow read: if activeUser(); }
     match /crewRules/{id} { allow read: if activeUser(); }
     match /plantWorkOrders/{id} { allow read: if activeUser(); }
     match /plantPmTasks/{id} { allow read: if activeUser(); }

@@ -56,6 +56,31 @@ function messageFor(week) {
   return 'United Dairy: your schedule for the week of ' + dateText(week) + ' to ' + dateText(L.addDays(week, 6)) + ' is posted. Open UD Routes > My Schedule to see it.';
 }
 
+// Joe 10/31 (im, "I want to see how the sample comes through before I authorize anything"): the driver's own week in the text,
+// one line a day, Sunday to Saturday, from the same days as the driver's My Schedule. For now it is only a sample texted to
+// the cell in part 5; the drivers' Send schedule texts keep messageFor until Joe says to switch.
+// Joe 10/31 (ip, "have the headers, like the day, route, run, and depart"): a table, one header row and no date on each line:
+// "DAY | ROUTE | RUN | DEPART", then "MON | 8301 | UT WALMART | 3:00 AM", "SUN | OFF".
+// Joe 10/31 (is): short times so a row fits one line on a phone: "3:00 AM" -> "3A", "3:30 PM" -> "3:30P".
+const short = (t) => String(t || '').replace(/:00 ([AP])M$/, '$1').replace(/ ([AP])M$/, '$1');
+const DAY_SHORT = { sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT' };
+async function weekText(db, driverId, week) {
+  const P = require('./phone');
+  const snap = await db.collection(C.drivers).doc(driverId).get();
+  if (!snap.exists) throw new SmsError('BAD_REQUEST', 'That driver is not on the Driver Roster.');
+  const driver = Object.assign({ id: snap.id }, snap.data());
+  const [runs, exceptions, backups] = await Promise.all([db.collection(C.runs).where('weekStart', '==', week).get(), db.collection(C.exceptions).where('driverId', '==', driverId).get(), db.collection(C.backups).where('driverId', '==', driverId).get()]);
+  const days = P.scheduleDays(driver, L.weeklyRows(runs.docs.map(d => Object.assign({}, d.data(), { id: d.id })), week), exceptions.docs.map(d => d.data()), week, backups.docs.map(d => d.data()));
+  const said = (t) => t === 'Not scheduled' || t === 'Off' || !t ? 'OFF' : /^Off: /.test(t) ? 'OFF (' + t.slice(5) + ')' : t;
+  const lines = [];
+  days.forEach(d => {
+    const day = DAY_SHORT[d.day];
+    if (!d.runs.length) { lines.push(day + ' | ' + said(d.status)); return; }
+    d.runs.forEach(x => lines.push([day, x.route, x.run, short(x.leaves)].filter(Boolean).join(' | ') + (d.status ? ' (' + d.status + ')' : '')));
+  });
+  return ['United Dairy schedule', 'Week of ' + dateText(week) + ' to ' + dateText(L.addDays(week, 6)), '', 'DAY | ROUTE | RUN | DEPART'].concat(lines).join('\n').slice(0, 1500);
+}
+
 async function adminOnly(db, user) {
   const email = String(user && user.email || '').toLowerCase();
   // The one Users list (Uniontown's database), whichever plant this is for.
@@ -178,6 +203,32 @@ async function smsCall(db, user, input, options) {
   }
   // Joe 10/26 ("I want to do just sample"): a test text to one number typed on the screen, nobody else. Works with every
   // switch Off; the test copy only writes it to the log.
+  // Joe 10/31 (im): Texts part 3, "Sample for": a driver's week in the new text, and "Text this sample to my phone", which
+  // goes only to the cell saved in part 5 (never to a driver).
+  if (op === 'sample' || op === 'sendSample') {
+    const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
+    const list = (await activeDrivers(db)).map(x => ({ driverId: x.driverId, name: x.name }));
+    const out = Object.assign(status(d, o.env, o.project), { week, sampleDrivers: list });
+    const driverId = String(input.driverId || '');
+    if (!driverId) return out;
+    if (!week) throw new SmsError('BAD_REQUEST', 'No week is posted yet.');
+    const pick = list.find(x => x.driverId === driverId);
+    if (!pick) throw new SmsError('BAD_REQUEST', 'That driver is not on the Driver Roster.');
+    out.sample = { driverId, name: pick.name, text: await weekText(db, driverId, week) };
+    if (op === 'sample') return out;
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
+    if (!d.forwardTo) throw new SmsError('NOT_ALLOWED', 'Type your cell in part 5, Driver replies to your cell, first.');
+    const to = d.forwardTo, log = { direction: 'out', kind: 'SAMPLE', name: 'Sample: ' + pick.name, driverId: '', to, body: out.sample.text, at: stamp, by: email };
+    if (!liveTexts(o.env)) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+    else {
+      let r;
+      try { r = await sendOne(d, to, out.sample.text, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+    }
+    await db.collection('textLog').doc('sample_' + stamp.replace(/[^0-9]/g, '')).set(log);
+    out.sampleSend = { to: phoneText(to), status: log.status, reason: log.reason || '' };
+    return out;
+  }
   if (op === 'test') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account on Schedule Texts first.');
     const to = phoneE164(input.phone);
@@ -397,4 +448,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { TEST_TEXT, forwardMessage, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };
+module.exports = { TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, messageFor, SmsError, liveTexts };

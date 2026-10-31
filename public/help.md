@@ -108,6 +108,20 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 
+### Send schedule texts
+
+Administrators see a strip above the loads: **Schedule texts for the posted week**, with that week's dates, and whether its texts were sent.
+
+1. Check the week on the button: `Send Schedule Texts: Week of ...`.
+2. Press it once. It turns red and says how many drivers it will text.
+3. Press it again within 5 seconds to send. The strip turns green and says when it was sent and to how many drivers.
+
+- It always sends the posted week, even when you are looking at another week or day here.
+- `Send Again` sends the same week a second time (press it twice too).
+- Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
+
+!> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
+
 ### OVR
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
@@ -137,7 +151,7 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 1. Click a driver box on a route's day. The driver list opens right there. Pick a driver and it saves.
 2. On the Driver Assignment Board, click a driver's day to set their availability: Available, Backup, Day Note, Vacation, Sick, Personal, Bereavement, Unpaid or Off. Type a **Note** if needed, then `Save availability`.
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
-4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm.
+4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
@@ -171,8 +185,11 @@ It always shows the live week. After next week is published, it moves on to that
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
+
+> The Weekly Dispatch Template has no Send button on purpose: after a Publish it moves on to next week. Send from here or from Daily Dispatch.
 
 !> Do not change a day here and on Daily Dispatch at the same time. They are the same load, so the last change wins.
 
@@ -194,7 +211,7 @@ The list at the top picks the view: Start Times, Mileage, Hours and Return, Load
 - **Change many boxes at once:** click the first box, Shift+click (or drag to) the last one, type, then press Enter. Every marked box gets the same value.
 - **Start times:** type a time any way (5, 530, 5:30p or 1730). The up / down clicker moves it 15 minutes a click.
 - **Load Day** and **Run By** are picked from a list, never typed. Load Day reads in words (Same day, Day before...) counted back from the delivery day.
-- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time.
+- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time. A Load Day route loaded 2 days early (Monday's loads on Saturday) still leaves the day before delivery, on Sunday.
 - **Daily Order** and **Weekly Order:** grab a line and drag it up or down.
 - `+ Add Route` adds a new route; `+ Add Run / Destination` adds a run under a route.
 - `Edit Route` opens the full form for one run.
@@ -230,8 +247,10 @@ screens: drivers.html
 Every driver: employee ID, relief or regular, seniority, assigned truck, mobile phone, texts, vacation weeks and status. Accidents, complaints and PDAs (Progressive Discipline Actions) are entered here too and count on the Driver Scorecard.
 
 - Use the **Status** and **Relief** filters on the right to narrow the list.
-- `+ Add Driver` adds a driver. `Edit` on a line opens the driver beside the list.
-- In the driver's box: change the name, hire date, seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
+- `+ Add Driver` adds a driver: type part of a name or employee ID in **Pick an employee** and pick the person from the [Employees](#employees) list. Their name, employee ID and hire date fill in gray, and their mobile phone fills in. Pick the truck and relief, then press `Add Driver`.
+- Gray boxes come from UDMS and follow it by themselves. Change those in UDMS, not here.
+- `Edit` on a line opens the driver beside the list.
+- In the driver's box: change the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
 - Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
@@ -625,6 +644,8 @@ Will the plant be late? Every case load still to load, in the order it will be l
 - Last night's left-over loads come first, marked at the left edge.
 
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
+
+> Saturday's loads for Monday leave on Sunday, so on Saturday they are red only if they will not be ready by their Sunday time. Only Sunday's loads can be late on Saturday.
 
 ## Unloading (Case, Tote, Box and Tanker)
 id: unloading
@@ -1117,6 +1138,15 @@ screens: crew.html?view=setup, maint-crew.html?view=setup
 
 The areas with their own shift times, the jobs and how many people each needs, the people (name, employee ID, phone, usual job, shift, days off) and the vacation limits. Every box saves when you leave it.
 
+To add a person to the schedule:
+
+1. On the `People` tab, press `+ Add Person`.
+2. Type part of a name or employee ID and pick the person from the [Employees](#employees) list. Their name, employee ID, phone and hire date fill in gray.
+3. Set their area, shift, usual job and days off.
+
+- Gray boxes come from UDMS and follow it by themselves. Change those in UDMS.
+- Someone not in UDMS yet: press `Type a name instead` and type the line as before.
+
 On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
 
 1. Add the mechanic on `People` (`+ Add Person`) and type their name.
@@ -1149,6 +1179,23 @@ Everything administrators set up, grouped down the left: People & Access, Links 
 - Administration is for administrators only; the button in the top bar shows only to them.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
+
+## Employees
+id: employees
+screens: employees.html, administration.html?item=employees
+
+Everyone who works at the plant, brought over from UDMS by itself every 15 minutes: name, employee ID, position, hire date and phone. **Used On** says where each person is in Operations (Driver Roster, Plant Schedule, Maintenance Schedule). Nothing private comes over from UDMS.
+
+1. Add or change the person in UDMS (a new hire, a new position or phone, someone who left).
+2. Within 15 minutes the change shows here, and on the Driver Roster and the schedules for anyone already on them.
+3. To put the person to work in Operations, pick them on the Driver Roster (`+ Add Driver`) or on Plant Schedule Setup (`+ Add Person`).
+
+- The line under the title says when UDMS was last checked. A red line means the last check did not work, and it tries again by itself.
+- Use **Search** for a name or employee ID, and the **Status** drop-down for Active, Left or All. Someone who left shows in red with the day they left.
+
+> Gray boxes on the Driver Roster and the schedules come from this list. They change by themselves when UDMS changes.
+
+!> Do not type a person's name, ID or hire date into Operations to fix it. Fix it in UDMS and it follows here.
 
 ## People & Roles
 id: admin-people
@@ -1340,10 +1387,12 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
 5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
+
+> To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
 
 > To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 

@@ -1221,3 +1221,14 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
   .hdr-version .hv-ver { display: none; }
   .hdr-version .hv-fresh { display: inline; }
 }
+/* Joe 10/31 (hx): Send Schedule Texts strip on Weekly Dispatch and Daily Dispatch (the posted week only). */
+.send-strip { margin: 0 16px 8px; padding: 8px 14px; border-radius: 10px; font-size: 16px; font-weight: 600; background: #fff4d6; color: #6b4b00; border: 1px solid #f0d58a; display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.send-strip[hidden] { display: none; }
+.send-strip.sent { background: #e3f4e8; color: #1d5b2f; border-color: #a9d8b6; }
+.send-strip .send-button { background: var(--ud-blue); color: #fff; border: 0; padding: 6px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.send-strip .send-button.armed { background: #c0392b; }
+.send-strip .send-button:disabled { opacity: .5; cursor: default; }
+.send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
+.texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
+.texts-page .texts-test select { font-size: 16px; min-width: 240px; padding: 6px 8px; }
+.texts-page .texts-week { white-space: pre-line; }
