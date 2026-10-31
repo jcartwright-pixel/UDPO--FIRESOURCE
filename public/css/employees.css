@@ -1,8 +1,9 @@
 /* employees.html (Joe 10/31, mock-up 1): the plant's Employees list from UDMS, read only. */
 .emp-view { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 10px; min-height: 0; flex: 1; }
-.employees-page .head .title small { display: block; font-size: 16px; font-weight: 700; }
-.employees-page .head .title small.good { color: #1a7f3c; }
-.employees-page .head .title small.bad { color: #b3261e; }
+.employees-page #sync { font-size: 16px; font-weight: 700; margin-right: auto; }
+.employees-page #sync.good { color: #1a7f3c; }
+.employees-page #sync.bad { color: #b3261e; }
+.employees-page .actions.in-head { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
 .employees-page .actions input[type=search] { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 240px; }
 .employees-page .actions select { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; }
 .employees-page .sheet.scroll-list { flex: 1; min-height: 0; overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
@@ -17,6 +18,8 @@
 .employees-page .st-left { color: #b3261e; font-weight: 800; }
 .employees-page .foot { color: var(--muted); font-size: 16px; }
 @media (max-width: 760px) {
-  .employees-page .actions input[type=search] { width: 100%; }
-  .employees-page .sheet.scroll-list { overflow-x: auto; }
+  .employees-page .head { flex-wrap: wrap; }
+  .employees-page .actions.in-head { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .employees-page .actions input[type=search] { flex: 1 1 180px; width: auto; }
+  .employees-page table { min-width: 760px; }
 }

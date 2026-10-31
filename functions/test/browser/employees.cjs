@@ -35,7 +35,13 @@ async function openPage(browser, width, height, url) {
   page.errors = errors;
   return page;
 }
-const shot = (p, name) => SHOTS ? p.screenshot({ path: path.join(SHOTS, name) }) : null;
+// A screen shows once its first data is drawn (js/app.js holdUntilDrawn); a picture waits for that.
+async function shot(p, name, frame) {
+  if (!SHOTS) return;
+  const on = frame ? p.frame({ url: /employees\.html/ }) : p;
+  await on.waitForFunction(() => !document.body.classList.contains('ud-drawing'));
+  await p.screenshot({ path: path.join(SHOTS, name) });
+}
 const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth);
 
 // Made-up people only. Each UDMS record also carries private fields, which must never show.
@@ -88,7 +94,7 @@ const PEOPLE = [
     const a = await openPage(browser, 1536, 790, '/administration.html?item=employees&' + MANAGER.replace('manager', 'admin'));
     await a.waitForSelector('#frame');
     await a.frameLocator('#frame').locator('#rows tr').first().waitFor();
-    await shot(a, '1-employees-in-administration-1536.png');
+    await shot(a, '1-employees-in-administration-1536.png', true);
     await a.close();
     results.push('Administration > Employees opens the list');
 
@@ -110,7 +116,9 @@ const PEOPLE = [
     await shot(d, '3-add-driver-filled-1536.png');
     await d.click('#d-save');
     await d.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(r => /KEMP, RILEY/.test(r.textContent) && /10877/.test(r.textContent)), null, { timeout: 15000 });
-    const kemp = (await db().collection('drivers').where('employeeId', '==', '10877').get()).docs[0].data();
+    let kemp = null;
+    for (let i = 0; i < 75 && !kemp; i++) { const q = await db().collection('drivers').where('employeeId', '==', '10877').get(); kemp = q.empty ? null : q.docs[0].data(); if (!kemp) await new Promise(r => setTimeout(r, 200)); }
+    assert.ok(kemp, 'Kemp is saved on the Driver Roster with his employee ID');
     assert.equal(kemp.hireDate, '2026-10-20');
     await d.click('#add');
     await d.fill('#d-pick', 'ke');
