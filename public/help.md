@@ -1201,6 +1201,33 @@ Where email goes and who it comes from:
 - **Sent Email Log:** every email the app sent, newest first.
 - **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`. Pick the plant with `Location`; each plant keeps its own mailbox settings and its own check-ins.
 
+## Sales Route Email
+id: admin-sales-email
+screens: administration.html?item=sales-email
+
+The email the salespeople get at 6:00 AM, Monday through Saturday (never Sunday). It has one line for each route: the route number, the run, and where that load stands. It lists the loads of the shift that just ended. Monday's email also has Saturday's loads. Loads marked Ended Up Not Running are left off.
+
+What the status says:
+
+- **On time, left 4:05 AM:** the load left by its dispatch time.
+- **Left 5:42 AM, 1 hr 12 min late:** it left after its dispatch time, and by how much.
+- **Not departed, 35 min behind:** it is loaded, its dispatch time has passed, and it has not left.
+- **Not loaded, 20 min behind:** its dispatch time has passed and it is not loaded yet.
+- **Loaded** or **Not loaded:** its dispatch time has not come yet.
+
+The time a load left comes from its trailer's GPS. When the trailer has no GPS, the truck's GPS is used.
+
+1. Type the salespeople's addresses in **Addresses**, separated by commas. They save when you leave the box.
+2. Press `Send a test to me` to see this morning's email in your own inbox.
+3. Press `Turn on`, then press it again. From then on it goes out at 6:00 AM.
+
+- `Turn off` stops it. Nothing goes out while it is off.
+- Email sending in **Sent Email Log** must also be on.
+
+> Every email it sends is listed in Sent Email Log.
+
+!> Do not turn it on before the addresses are in. With no one on it, nothing goes out.
+
 ## Refresh Rates
 id: admin-refresh
 screens: administration.html?item=refresh-rates

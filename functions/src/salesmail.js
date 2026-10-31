@@ -205,4 +205,41 @@ async function sendMorning(db, deps) {
     fromName: 'United Dairy Operations' }, d.env ? { env: d.env } : undefined);
 }
 
-module.exports = { salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, LATE_GRACE, SETTINGS_DOC };
+/* ---------- Administration > Sales Route Email (Joe 10/31: who gets it, On / Off; Off with no one on it to start) ---------- */
+
+const EMAIL = /^[^\s@<>(),;:"\[\]\\]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+class SalesMailError extends Error { constructor(code, message) { super(message); this.code = code; } }
+
+async function adminView(db) {
+  const d = (await db.collection('private').doc(SETTINGS_DOC).get()).data() || {};
+  const s = await settings(db), mail = await require('./adminmail').emailSettings(db);
+  return { on: s.on, to: s.to, sending: mail.sending, changedAt: text(d.changedAt), changedBy: text(d.changedBy) };
+}
+// input: { on: true|false } or { to: 'a@x.com, b@x.com' }.
+async function adminSave(db, email, input, stamp) {
+  const { addresses } = require('./mail');
+  const ref = db.collection('private').doc(SETTINGS_DOC), patch = { changedAt: stamp, changedBy: email };
+  if (input.on !== undefined) patch.on = input.on === true;
+  if (input.to !== undefined) {
+    const raw = String(input.to || '').split(/[;,\s]+/).map(x => x.trim()).filter(Boolean), bad = raw.filter(a => !EMAIL.test(a));
+    if (bad.length) throw new SalesMailError('BAD_REQUEST', 'Not an email address: ' + bad.slice(0, 3).join(', '));
+    patch.to = addresses(raw);
+  }
+  await ref.set(patch, { merge: true });
+  const view = await adminView(db);
+  return Object.assign(view, { ok: true, message: patch.on === true && !view.to.length ? 'Turned on. Add at least one address so it has someone to go to.' : '' });
+}
+// Send a test to me: today's email as it would go out at 6:00 AM, only to the person who pressed it.
+async function adminTest(db, email, input, stamp, deps) {
+  const nowMs = Date.parse(stamp);
+  let at = nowMs;
+  // On a Sunday (no email) the test shows Monday's: the loads of the weekend.
+  if (!coveredDates(at).length) at += 86400000;
+  const mail = salesEmail(salesRows(await readInput(db, at), at));
+  const appMail = (deps && deps.appMail) || require('./adminmail').appMail;
+  const out = await appMail(db, { kind: 'Sales route status', label: 'Test', detail: 'Send a test to me', by: email, to: [email], subject: 'TEST: ' + mail.subject, text: mail.text, html: mail.html,
+    fromName: 'United Dairy Operations' }, deps && deps.env ? { env: deps.env } : undefined);
+  return { ok: out.status === 'SENT', message: out.status === 'SENT' ? 'Sent to ' + email + '.' : (out.reason || 'The test did not go out.') };
+}
+
+module.exports = { adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, LATE_GRACE, SETTINGS_DOC };

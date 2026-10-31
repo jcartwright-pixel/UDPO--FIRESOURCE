@@ -88,3 +88,20 @@ test('nothing goes out until it is switched on with an address', async () => {
   assert.equal(sent, 0);
   assert.equal((await S.sendMorning(db, { now: () => Date.parse('2026-11-01T11:00:00Z'), appMail: deps.appMail })).status, 'SKIPPED', 'Sunday');
 });
+
+test('Administration: Off with no one on it to start; addresses checked; On saved', async () => {
+  const store = {};
+  const ref = (c, id) => ({ get: async () => ({ data: () => store[c + '/' + id], exists: !!store[c + '/' + id] }), set: async (v, o) => { store[c + '/' + id] = Object.assign({}, o && o.merge ? store[c + '/' + id] : {}, v); } });
+  const db = { collection: (c) => ({ doc: (id) => ref(c, id) }) };
+  let v = await S.adminView(db);
+  assert.equal(v.on, false);
+  assert.deepEqual(v.to, []);
+  await assert.rejects(S.adminSave(db, 'boss@uniteddairy.com', { to: 'pat@example.com, not-an-address' }, '2026-10-31T18:00:00Z'), /Not an email address: not-an-address/);
+  v = await S.adminSave(db, 'boss@uniteddairy.com', { on: true }, '2026-10-31T18:00:00Z');
+  assert.equal(v.on, true);
+  assert.match(v.message, /Add at least one address/);
+  v = await S.adminSave(db, 'boss@uniteddairy.com', { to: 'Pat@Example.com; lee@example.com' }, '2026-10-31T18:01:00Z');
+  assert.deepEqual(v.to, ['pat@example.com', 'lee@example.com']);
+  assert.equal(v.on, true);
+  assert.equal(v.changedBy, 'boss@uniteddairy.com');
+});
