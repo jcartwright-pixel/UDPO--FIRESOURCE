@@ -880,16 +880,21 @@ export function lastRefreshed() { return Math.max(refreshedAt, (window.UDReads &
     if (right) right.before(box); else bar.append(box);
     return box;
   });
+  // Written only when the words change (at most once a minute), so a busy screen's many reads never touch the page.
+  let shown = '', queued = 0;
   const showFresh = () => {
-    const at = lastRefreshed();
+    queued = 0;
+    const at = lastRefreshed(), text = at ? 'Last refreshed ' + dateTimeText(at) : 'Not refreshed yet';
+    if (text === shown) return;
+    shown = text;
     boxes.forEach(box => {
       const el = box.querySelector('.hv-fresh');
-      el.textContent = at ? 'Last refreshed ' + dateTimeText(at) : 'Not refreshed yet';
+      el.textContent = text;
       el.title = 'The last time this screen got fresh information';
     });
   };
   showFresh();
-  window.addEventListener('ud-refreshed', showFresh);
+  window.addEventListener('ud-refreshed', () => { if (!queued) queued = setTimeout(showFresh, 250); });
   appVersion().then(v => {
     if (!v || !(v.banner || v.label)) return;
     const parts = (v.banner || v.label).split(' · ');

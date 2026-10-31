@@ -120,8 +120,7 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
         assert.match(look.text, /^Last refreshed \d{1,2}-\d{1,2}-\d\d \d{1,2}:\d\d [AP]M$/, name + ': a phone shows only when the screen last refreshed (' + look.text + ')');
         // A fresh answer from the server moves the time on.
         await p.evaluate(() => { window.UDReads.freshAt = Date.now() + 3 * 60000; window.dispatchEvent(new CustomEvent('ud-refreshed')); });
-        const later = await p.evaluate(() => [...document.querySelectorAll('.hdr-version .hv-fresh')].find(e => e.offsetWidth).textContent);
-        assert.notEqual(later, look.text, name + ': the time moves when the screen refreshes');
+        await p.waitForFunction((was) => [...document.querySelectorAll('.hdr-version .hv-fresh')].find(e => e.offsetWidth).textContent !== was, look.text, { timeout: 5000 });
       } else assert.equal(look.text, 'Version 6.48 Updated 10-22-26 1:30 PM', name + ': the header names the version and when it was updated');
       assert.ok(look.fonts.every(f => f >= 16), name + ': 16px words ' + look.fonts);
       assert.equal(look.color, 'rgb(255, 255, 255)', name + ': white on the blue header');
