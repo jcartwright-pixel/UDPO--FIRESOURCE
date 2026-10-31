@@ -16,6 +16,7 @@ const SHARED_FILES = [
   'upload-rules.js',     // Upload Center (Joe 10/18)
   'crew-rules.js',       // Plant Schedule & Vacations (Joe 10/25)
   'scan-rules.js',       // barcode scans (audit 10/29: it was copied by hand)
+  'lists.js',           // the one index of every database list (Joe 10/30)
 ];
 const SRC = path.join(__dirname, '..', 'functions', 'src');
 const DEST = path.join(__dirname, '..', 'public', 'js');

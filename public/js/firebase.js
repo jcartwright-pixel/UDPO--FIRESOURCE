@@ -19,7 +19,20 @@ export const FIREBASE_FILES = ['app', 'auth', 'firestore', 'functions']
 // Joe 10/21 ("the older screens are loading and then it's refreshing on the new ones"): every read a screen starts is
 // counted until its first answer arrives, so app.js shows the screen once, when its first data is drawn, instead of the
 // empty boxes and dashes first and the numbers after. The reads themselves are Firebase's own, unchanged.
-import { onSnapshot as fsOnSnapshot, getDoc as fsGetDoc, getDocs as fsGetDocs } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+import { onSnapshot as fsOnSnapshot, getDoc as fsGetDoc, getDocs as fsGetDocs, collection as fsCollection, doc as fsDoc, collectionGroup as fsCollectionGroup } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+// Joe 10/30 ("everything goes to the same place at all times"): this file is the one door to the database, and every list a
+// screen reads is checked against the one index (js/lists.js, the server's src/lists.js). A name not in it is refused here,
+// with its name, instead of reading somewhere by accident.
+import './lists.js';
+function checked(parent, parts, fromList) {
+  const path = parts.filter(p => typeof p === 'string').join('/');
+  const bad = window.UDLists.unlisted(path, fromList);
+  if (bad.length) throw new Error('Not in the list index (js/lists.js): ' + bad.join(', '));
+}
+const startsAtList = (parent) => !!(parent && parent.type === 'collection');
+export function collection(parent, ...parts) { checked(parent, parts, startsAtList(parent)); return fsCollection(parent, ...parts); }
+export function doc(parent, ...parts) { checked(parent, parts, startsAtList(parent)); return fsDoc(parent, ...parts); }
+export function collectionGroup(db, id) { if (!window.UDLists.known(id)) throw new Error('Not in the list index (js/lists.js): ' + id); return fsCollectionGroup(db, id); }
 const reads = window.UDReads = window.UDReads || { waiting: 0, started: 0, last: 0, listeners: new Set(), log: [] };
 // What was read and how long its first answer took (the first 100 reads of a screen), for the timing checks.
 const nameOf = (ref) => { try { return ref.path || (ref._query && ref._query.path && ref._query.path.segments.join('/')) || ref.type || '?'; } catch (e) { return '?'; } };

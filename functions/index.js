@@ -42,6 +42,8 @@
 'use strict';
 
 const admin = require('firebase-admin');
+// Joe 10/30: every read and save the server makes is checked against the one list index (src/lists.js).
+require('./src/list-guard');
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
@@ -541,8 +543,10 @@ const realEquipment = () => (realLive() ? require('./src/sources').UNIONTOWN.mas
 async function realFleetSyncOn() {
   return ((((await db.collection('config').doc('app').get()).data() || {}).fleetSyncReal) || {}).enabled === true;
 }
-// { target, allowReal } for a sync that writes, or null where none may run.
+// { target, allowReal } for a sync that writes, or null where none may run. {paused: true} while Administration >
+// Go-Live Switches > Pause writing to the sheets is on: the emergency stop holds the fleet list's write too.
 async function fleetSyncWrite() {
+  if (sheetsPaused((await db.collection('config').doc('app').get()).data() || {})) return { paused: true };
   const target = fleetSyncTarget();
   if (target) return { target, allowReal: false };
   const real = realEquipment();
@@ -551,7 +555,7 @@ async function fleetSyncWrite() {
 
 exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   const run = await fleetSyncWrite();
-  if (!run) return;
+  if (!run || run.paused) return;
   const sheets = makeSheetsWriter();
   await runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: 'nightly' });
 });
@@ -643,7 +647,8 @@ exports.fleetSyncNow = onCall({ timeoutSeconds: 120, maxInstances: 1 }, async (r
     return runFleetSync({ db, reader: sheets, sheets, target, by: user.email, dryRun: true });
   }
   const run = await fleetSyncWrite();
-  if (!run) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here; the current app syncs it every week');
+  if (run && run.paused) throw new HttpsError('failed-precondition', 'Writing to the sheets is paused, so the fleet list was not synced. Resume it in Administration > Go-Live Switches, then press Sync fleet list again.');
+  if (!run) throw new HttpsError('failed-precondition', 'The fleet list sync is not set up here, so nothing was written to Equipment Master');
   return runFleetSync({ db, reader: sheets, sheets, target: run.target, allowReal: run.allowReal, by: user.email });
 });
 
