@@ -89,7 +89,8 @@ const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: pa
   const request = await act(PLANT, 'saveShiftNote', { values: { Entry: 'Water leak under the pasteurizer', Type: 'Maintenance Request', Equipment: 'GALLON FILLER', Urgency: 'This week' }, followUpStatus: 'OPEN' });
   const boiler = await act(MANAGER, 'saveMachine', { facilityId: 'fac_uniontown', fields: { name: 'Boiler', kind: 'Utility', area: 'Utilities', make: 'Cleaver-Brooks' } });
   await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: 'ut_prod_gallon_filler', task: 'Grease filler bowl bearings', every: 2, unit: 'WEEKS', lastDone: '2026-09-01' } });
-  await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: boiler.machineId, task: 'Blow down and check the water', every: 1, unit: 'MONTHS', lastDone: new Date().toISOString().slice(0, 10) } });
+  // Every 2 months (not 1): one month on from the 31st is only 30 days, which is "Next 30 days", not "Later".
+  await act(MANAGER, 'savePmTask', { facilityId: 'fac_uniontown', fields: { machineId: boiler.machineId, task: 'Blow down and check the water', every: 2, unit: 'MONTHS', lastDone: new Date().toISOString().slice(0, 10) } });
 
   const browser = await chromium.launch();
   const results = [];

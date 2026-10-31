@@ -14,7 +14,7 @@ jobs:
   # its script) also changes public/help.md, or says in its description why the help stays the same, on a line starting
   # "Help unchanged:" (a fix nobody sees, for example). The rule is in CLAUDE.md.
   help-updated:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
