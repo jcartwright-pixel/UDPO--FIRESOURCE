@@ -33,11 +33,13 @@
     const L = window.UDLogic;
     // Joe 10/11: Plant Production and Plant Maintenance carry an UNDER CONSTRUCTION banner across their picture.
     const art = (s) => s.pic ? '<img src="img/library/' + s.pic + '" alt="' + (s.bannerInPic ? 'Under Construction' : '') + '">' : '<svg class="launch-icon" viewBox="0 0 24 24" aria-hidden="true">' + ICON[s.icon] + '</svg>';
-    // Joe 10/26 (1E): four cards: Plant Operations and Route Distribution (each opens its own page of department cards) and Reports
+    // Joe 10/26 (1E): four cards (Joe 10/31: five, see the cards list below): Plant Operations and Route Distribution (each opens its own page of department cards) and Reports
     // and Safety Walkthrough. Under each card's Open button, straight down: each department in dark blue with its main screens under
     // it in light blue (Reports: its four report groups; Safety Walkthrough: its main screens). Administration is the header button.
     const bld = (s) => s.building ? ' building' : '';
-    const sub = (s, [label, href]) => '<a class="hq-sub' + bld(s) + (s.buildingSections && /inventory\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
+    // Joe 10/31: a quick line marked 'main' is a dark blue line inside the card (Inventory on Shipping & Receiving); a screen still being
+    // built (Inventory's Receiving Log, or one that opens the being-built page) is marked so only administrators open it.
+    const sub = (s, [label, href, kind]) => '<a class="' + (kind === 'main' ? 'hq-main' : 'hq-sub') + bld(s) + (s.buildingSections && /inventory\.html|soon\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
     const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
       (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
     // Joe 10/28: departments with no screens of their own under them sit two to a row, so the card still fits.
@@ -50,13 +52,22 @@
       return html;
     };
     const groupCard = (g) => '<div class="launch-card hq-card" data-group="' + g.key + '"><a class="launch-art" href="' + g.home + '" tabindex="-1">' + art(g) + '</a><strong>' + escapeHtml(g.name) + '</strong>' +
-      '<a class="open-text" href="' + g.home + '">Open ' + escapeHtml(g.name) + ' &rarr;</a><div class="hq-list">' + pairUp(groupSides(g.key).filter(s => !s.menuOnly)) + '</div></div>';
+      '<a class="open-text" href="' + g.home + '">Open ' + escapeHtml(g.name) + ' &rarr;</a><div class="hq-list">' + pairUp(groupSides(g.key).filter(s => !s.menuOnly && !s.homeCard)) + '</div></div>';
     const sideCard = (s) => '<div class="launch-card hq-card' + bld(s) + (s.bannerInPic ? ' banner-pic' : '') + '" data-card-side="' + s.key + '"><a class="launch-art" data-side="' + s.key + '" href="' + s.home + '" tabindex="-1">' + art(s) + (s.building && !s.bannerInPic ? '<span class="uc-banner">Under Construction</span>' : '') + '</a>' +
       '<strong>' + escapeHtml(s.name) + '</strong><a class="open-text" data-side="' + s.key + '" href="' + s.home + '">Open ' + escapeHtml(s.short || s.name) + ' &rarr;</a>' +
       (s.building ? '<b class="uc-admin-only">Administrators only while it is being built</b>' : '') + '<div class="hq-list">' + (s.quick || []).map(q => sub(s, q)).join('') + '</div></div>';
-    const cards = GROUPS.map(groupCard).concat(SIDES.filter(s => !s.group && !s.menuOnly).map(sideCard));
+    // Joe 10/31: Reports and Safety Walkthrough share one card, Reports & Safety: each as a dark blue line with its main screens
+    // under it in light blue. Each keeps its own pages and menu.
+    const side = (k) => SIDES.find(s => s.key === k);
+    const joinedCard = (r, f) => '<div class="launch-card hq-card" data-card-side="' + r.key + '" data-joined="' + f.key + '"><a class="launch-art" data-side="' + r.key + '" href="' + r.home + '" tabindex="-1">' + art(r) + '</a>' +
+      '<strong>Reports &amp; Safety</strong><a class="open-text" data-side="' + r.key + '" href="' + r.home + '">Open Reports &amp; Safety &rarr;</a>' +
+      '<div class="hq-list">' + dept(r) + dept(f) + '</div></div>';
+    // Joe 10/31: Plant Operations, then Plant Maintenance and Shipping & Receiving (each its own card here; Shipping & Receiving stays
+    // in Plant Operations everywhere else), Route Distribution, then Reports & Safety.
+    const solos = SIDES.filter(s => (!s.group || s.homeCard) && !s.menuOnly && s.key !== 'reports' && s.key !== 'safety');
+    const cards = [groupCard(GROUPS[0])].concat(solos.map(sideCard), GROUPS.slice(1).map(groupCard), [joinedCard(side('reports'), side('safety'))]);
     document.getElementById('sides').innerHTML = cards.join('');
-    document.getElementById('sides').classList.add('seven', 'hq-grid');
+    document.getElementById('sides').classList.add('seven', 'hq-grid', 'five');
     // The side picked here is the side its screens' menu shows.
     // Joe 10/11: an Under Construction card opens only for an Administrator; anyone else stays on this page.
     document.getElementById('sides').addEventListener('click', e => {

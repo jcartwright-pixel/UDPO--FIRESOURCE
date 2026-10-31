@@ -164,14 +164,17 @@ async function wasp(page, parts) {
 
     // The plant home: Inventory (Under Construction: administrators only while it is built).
     // Joe 10/26 (ej): Inventory sits inside Shipping & Receiving: a light blue button under it on the home's Plant Operations card,
-    // and an item in the Shipping & Receiving menu; no sideways scroll.
+    // and an item in the Shipping & Receiving menu; no sideways scroll. Joe 10/31: Shipping & Receiving is its own Home card, with
+    // Inventory as a dark blue line with its places under it: Receiving Log, Plant Material Trailers (open to everyone, it is in use),
+    // and Off-site Inventory and Inventory Room (being built).
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       const home = await openPage(browser, w, h, '/index.html' + ADMIN);
       await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
       await home.goto(HOSTING + '/index.html' + ADMIN);
       await home.waitForSelector('.hq-sub[data-side="shipping"][href="inventory.html"].building');
       await home.waitForTimeout(400);
-      assert.deepEqual(await home.$$eval('.hq-sub[data-side="shipping"]', a => a.map(x => x.textContent)), ['Shipping', 'Receiving', 'Inventory']);
+      assert.deepEqual(await home.$$eval('.hq-sub[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.classList.contains('building'))), ['Shipping:false', 'Receiving:false', 'Receiving Log:true', 'Plant Material Trailers:false', 'Off-site Inventory:true', 'Inventory Room:true']);
+      assert.deepEqual(await home.$$eval('.hq-main[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.getAttribute('href') + ':' + x.classList.contains('building'))), ['Inventory:inventory.html:true']);
       assert.ok(await fits(home), 'home fits at ' + w);
       await shot(home, '0-home-inventory-card-' + w + '.png');
       await home.close();

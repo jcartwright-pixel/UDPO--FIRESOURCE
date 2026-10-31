@@ -2,7 +2,7 @@ import { start, requireSignIn, save, escapeHtml, dateTimeText, showError, goLive
 import { doc, onSnapshot, collection, query, where } from './firebase.js';
 import { plantFor } from './pmaint.js';
 
-// Plant Material Trailers (Joe 10/28, mock-up 2; first called Jug Trailers): the dry box trailers parked in the plant's lot, on Debag / Labeling Room. The list on the left
+// Plant Material Trailers (Joe 10/28, mock-up 2; first called Jug Trailers): the dry box trailers parked in the plant's lot, in Inventory under Shipping & Receiving (Joe 10/31; it was on Debag / Labeling Room). The list on the left
 // says how full each one is and what is on it; the trailer picked opens on the right: Empty / Half Full / Loaded, a line for
 // each item with its pallets, notes, Left the Lot and its history. + Add Trailer picks one of United Dairy's trailers from the
 // main trailer list (Equipment Master) or takes a typed number for any other trailer; either way it is kept on this plant's

@@ -1304,17 +1304,20 @@ async function noScroll(page) {
     // Joe 10/26 (1E): four cards: Plant Operations and Route Distribution (their departments as dark blue buttons with their main
     // screens under them in light blue), Reports and Safety Walkthrough. The menu lists the two groups (each pops out its
     // departments, Plant Vacations & Schedule included), a line, then Reports and Safety Walkthrough.
-    const FOUR = ['Plant Operations', 'Route Distribution', 'Reports', 'Safety Walkthrough'];
+    // Joe 10/31: five cards: Plant Operations, Plant Maintenance and Shipping & Receiving (each its own card on the Home screen only),
+    // Route Distribution, and Reports & Safety (one card). The menu lists the two groups, a line, then Plant Maintenance, Reports and
+    // Safety Walkthrough; Debag / Labeling Room is back in Plant Operations.
+    const FOUR = ['Plant Operations', 'Plant Maintenance', 'Shipping & Receiving', 'Route Distribution', 'Reports & Safety'];
     const lp = await openPage(browser, 1920, 950, '/index.html?testEmail=manager.test@uniteddairy.com');
     await lp.waitForSelector('.hq-card');
     assert.deepEqual(await lp.$$eval('.hq-card > strong', s => s.map(x => x.textContent)), FOUR);
-    assert.deepEqual(await lp.$$eval('.hq-main', s => s.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Maintenance', 'Shipping & Receiving', 'Debag / Labeling Room', 'Route Distribution', 'Fleet & Maintenance', 'Garage']);
-    await lp.waitForFunction(() => [...document.querySelectorAll('.hq-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 2, null, { timeout: 10000 });
+    assert.deepEqual(await lp.$$eval('.hq-main', s => s.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Debag / Labeling Room', 'Inventory', 'Route Distribution', 'Fleet & Maintenance', 'Garage', 'Reports', 'Safety Walkthrough']);
+    await lp.waitForFunction(() => [...document.querySelectorAll('.hq-card img')].filter(i => i.complete && i.naturalWidth > 0).length === 3, null, { timeout: 10000 });
     assert.equal(await lp.$$eval('.hq-card[data-card-side="reports"] svg.launch-icon', s => s.length), 1, 'Reports shows its icon');
     assert.deepEqual(await lp.$$eval('.sidemenu .side-sec-btn', b => b.map(x => x.getAttribute('title'))), ['Plant Operations', 'Route Distribution'], 'Home lists the two groups, not every screen');
-    assert.deepEqual(await lp.$$eval('.sidemenu > a[data-side]', a => a.map(x => x.textContent.trim())), ['Reports', 'Safety Walkthrough']);
+    assert.deepEqual(await lp.$$eval('.sidemenu > a[data-side]', a => a.map(x => x.textContent.trim())), ['Plant Maintenance', 'Reports', 'Safety Walkthrough']);
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout', f => f.map(x => [...x.querySelectorAll('a[data-side]')].map(a => a.textContent.trim()).join(', '))),
-      ['Plant Distribution, Plant Production, Plant Vacations & Schedule, Plant Maintenance, Shipping & Receiving, Debag / Labeling Room', 'Route Distribution, Fleet & Maintenance, Garage']);
+      ['Plant Distribution, Plant Production, Plant Vacations & Schedule, Shipping & Receiving, Debag / Labeling Room', 'Route Distribution, Fleet & Maintenance, Garage']);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
     // Joe 10/10: the Plant Distribution picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.
