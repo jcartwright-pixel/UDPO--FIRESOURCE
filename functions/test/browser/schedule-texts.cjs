@@ -75,14 +75,16 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       assert.deepEqual(ro.errors, []);
       await ro.context().close();
 
-      // Administration > Schedule Texts: Off, the account boxes empty, who would get the next text.
+      // Administration > Texts: not sent yet, the account boxes empty, who would get the next text.
       const tx = await openPage(browser, w, w === 1536 ? 730 : 950, '/texts.html?testEmail=admin.test@uniteddairy.com');
-      await tx.waitForFunction(() => document.getElementById('state').textContent === 'Off');
-      assert.equal(await tx.isDisabled('#turn'), true, 'On needs the Twilio account first');
+      await tx.waitForFunction(() => document.getElementById('state').textContent === 'Not sent');
+      assert.match(await tx.textContent('#state-text'), /Posted week 10-11-26 to 10-17-26\. Publishing never sends texts/);
+      assert.equal(await tx.textContent('#send'), 'Send schedule texts');
+      assert.equal(await tx.isDisabled('#send'), true, 'Send needs the Twilio account first');
       assert.deepEqual(await tx.$$eval('#form input', i => i.map(x => x.value + '|' + x.placeholder)), ['|', '|', '|'], 'empty boxes, no placeholder that looks saved');
       await tx.waitForSelector('#preview tr td');
       // Joe 10/26: only the drivers ticked Schedule on the Driver Roster (none here).
-      await tx.waitForFunction(() => document.getElementById('preview-count').textContent === '0 ticked');
+      await tx.waitForFunction(() => document.getElementById('preview-count').textContent === '0 drivers');
       assert.match(await tx.textContent('#preview'), /Nobody ticked yet/);
       assert.match(await tx.textContent('#mode'), /Test copy: texts are written to the list at the bottom only/);
       await tx.waitForSelector('#log tr.texts-in');
@@ -100,12 +102,21 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
         await tx.click('#save');
         await tx.waitForFunction(() => document.getElementById('keys').textContent === 'Saved');
         assert.deepEqual(await tx.$$eval('#form input', i => i.map(x => x.value)), ['', '', ''], 'the boxes empty after saving');
-        await tx.click('#turn');
-        await tx.waitForFunction(() => document.getElementById('state').textContent === 'On');
-        // Turning On counts the week already posted as done.
-        assert.equal((await db().collection('private').doc('sms').get()).data().lastWeek, '2026-10-11');
-        await tx.click('#turn');
-        await tx.waitForFunction(() => document.getElementById('state').textContent === 'Off');
+        // Joe 10/31: publishing never texts; Send schedule texts, tapped twice, texts the posted week.
+        assert.equal((await db().collection('private').doc('sms').get()).data().lastSend, undefined, 'nothing sent by saving or publishing');
+        await db().collection('runs').doc('2026-10-11__run_t905').set({ weekStart: '2026-10-11', route: '905', run: 'UT DSD MILK', runId: 'run_t905', rev: 0, days: { wed: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE' } } });
+        await db().collection('driverPhones').doc('drv_test_casey').set({ scheduleText: true }, { merge: true });
+        await tx.reload();
+        await tx.waitForFunction(() => document.getElementById('preview-count').textContent === '1 driver' && !document.getElementById('send').disabled);
+        await tx.click('#send');
+        assert.equal(await tx.textContent('#send'), 'Tap again to text 1 driver', 'the first tap only arms it');
+        assert.equal((await db().collection('private').doc('sms').get()).data().lastSend, undefined);
+        await tx.click('#send');
+        await tx.waitForFunction(() => document.getElementById('state').textContent === 'Sent' && document.getElementById('send').textContent === 'Send again');
+        const last = (await db().collection('private').doc('sms').get()).data().lastSend;
+        assert.deepEqual([last.week, last.drivers, last.live, last.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
+        assert.match(await tx.textContent('#last'), /Last sent .* for the week of 10-11-26: 1 written to the list \(test copy\)/);
+        if (SHOTS) await tx.screenshot({ path: path.join(SHOTS, 'after-texts-sent-' + w + '.png') });
       }
       assert.deepEqual(tx.errors, []);
       await tx.context().close();

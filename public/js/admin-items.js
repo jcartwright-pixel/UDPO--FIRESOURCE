@@ -60,7 +60,7 @@ export const ADMIN_GROUPS = [
     // Joe 10/15: built ready and kept Off; the drivers' mobile phones are typed on the Driver Roster.
     // Joe 10/26: one Texts screen, a part per kind of text (Schedule, Load done) each with its own On / Off; who gets them is
     // ticked on the Driver Roster.
-    ['schedule-texts', 'Texts', 'Texts to drivers: schedule texts when a week is posted, and load done texts with any pickups. Each kind has its own On / Off; who gets them is ticked on the Driver Roster. The Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
+    ['schedule-texts', 'Texts', 'Texts to drivers: schedule texts for the posted week (sent when you press Send), and load done texts with any pickups. Who gets them is ticked on the Driver Roster; driver replies can be sent on to your cell. The Twilio texting account is typed here and never shown again.', 'texts.html', 'gear'],
     // Joe 10/11: RedZone's API sign-in (token, or client ID and secret), Test Connection; Products then gets Get from RedZone.
     // Joe 10/22 (the case counter hookup guide): the palletizer's counter box, and the case returns one, read-only by the plant PC.
     // Joe 10/26: the counter boxes are machines in Machine Connections now; Find a setting and ?item= still open this one.

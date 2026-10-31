@@ -233,7 +233,7 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 - In the driver's box: change the name, hire date, seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
-- Under **Texts**, tick **Schedule** to text that driver their schedule when a week is posted, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns each kind on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
+- Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
 
 > The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used.
 
@@ -1302,15 +1302,21 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. Each kind of text has its own part and its own On / Off: **Schedule texts** (when a new week is posted) and **Load done texts** (when the plant finishes a driver's load, with any open pickups). Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** tell drivers the posted week is up; they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Press `Turn On` in each part you want. **Who gets them** lists the ticked drivers.
-5. **Texts and replies** shows each text and reply with its status.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice.
+5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
+6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
+7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
+
+> To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
+
+> Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 

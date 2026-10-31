@@ -7,7 +7,7 @@
  *   garage                the Garage Station tablet (technician name + login ID, no United Dairy account)
  *   newRouteCode          a manager makes a new Route Distribution code for the phones
  *   gps                   a manager or administrator saves, removes or tests the Verizon Connect GPS login (Fleet, or Reveal)
- *   sms                   Administration > Schedule Texts: the Twilio login, the On / Off switch, who would get a text (src/sms.js)
+ *   sms                   Administration > Texts: the Twilio login, Send schedule texts, the Load done switch, who gets them (src/sms.js)
  *   smsReply              Twilio posts a driver's reply to a schedule text here; kept in textLog when Twilio's signature checks out
  *   fleetGpsEvery5Minutes reads where each truck is now from Verizon Connect Fleet, and today's miles every 15 minutes
  *   setSwitch             an administrator moves a screen between the current app and the new one, or turns the write-back on / off
@@ -128,10 +128,9 @@ exports.transferEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeZone
   }
   // Joe 10/28: "I do not want the date to change unless I change it". The weeks move only when someone presses Publish, so the
   // calendar reaching the Next week no longer publishes it (weekroll.autoPublish is not run).
-  // Joe 10/15: Schedule Texts, once a new week is the Live Current week (Off until an administrator turns it On).
-  try { await SMS.postedCheck(db); } catch (e) { console.error('Schedule Texts failed: ' + (e && e.message || e)); }
+  // Joe 10/31: Schedule Texts are no longer sent here; an administrator presses Send schedule texts on Administration > Texts.
   // Joe 10/26: Load Done Texts, a picked driver's load finished at the plant (Off until an administrator turns it On).
-  // Their YES / STOP replies tick or untick Load Text on the Driver Roster (read back from Twilio).
+  // Drivers' replies are read back from Twilio: YES / STOP tick or untick them, and each is sent on to the phone saved on Texts.
   try { await SMS.replyCheck(db); } catch (e) { console.error('Load Done Texts replies failed: ' + (e && e.message || e)); }
   try { await SMS.loadDoneCheck(db); } catch (e) { console.error('Load Done Texts failed: ' + (e && e.message || e)); }
 });
@@ -241,7 +240,7 @@ exports.people = onCall(async (request) => {
   return { people: snap.docs.map(d => { const p = d.data(); return { email: d.id, name: p.name || '', status: p.status || '', roles: p.roles || [], facilities: p.facilities || [] }; }) };
 });
 
-// Administration > Schedule Texts (src/sms.js): an administrator saves the Twilio login, turns the texts On or Off, sees who would get one.
+// Administration > Texts (src/sms.js): an administrator saves the Twilio login, sends the schedule texts, turns load done texts On or Off.
 exports.sms = onCall({ timeoutSeconds: 60 }, async (request) => {
   const user = signedIn(request);
   try { return await SMS.smsCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
