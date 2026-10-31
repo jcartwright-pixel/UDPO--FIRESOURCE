@@ -696,16 +696,14 @@
     function refreshSchedRoutes() {
       if (schedEditing || document.getElementById('sched-modal').hidden) return;
       const box = document.getElementById('s-route'), was = schedOptions[Number(box.value)], list = R.scheduleCustomers(slotRoutes());
-      const words = (c) => [c.route, c.run, c.name].filter(Boolean).join(' · ');
-      const key = JSON.stringify(list.map(words));
+      const key = JSON.stringify(list.map(c => [c.route, c.run, c.name].filter(Boolean).join(' · ')));
       if (key === schedRoutesKey) return;
-      // The pick is kept by what it reads (route, run, name), then by run: an as-needed customer (Aldi - Charleston LOAD 1 to 4)
-      // takes its first slot's run, which changes while its slots are still arriving.
-      const picked = box.value !== '' && was ? was : null;
-      let at = picked ? list.findIndex(c => words(c) === words(picked)) : -1;
-      if (at < 0 && picked && picked.runId) at = list.findIndex(c => c.runId === picked.runId);
+      // An as-needed customer (Aldi - Charleston LOAD 1, LOAD 2 ...) is named by its first slot, so it can be renamed when
+      // its other slots arrive: the pick follows any of its runs.
+      const runsOf = (c) => [c.runId].concat((c.slots || []).map(s => s.runId)).filter(Boolean);
+      const picked = box.value !== '' && was ? runsOf(was) : [];
       schedOptions = list;
-      drawSchedRoutes(at);
+      drawSchedRoutes(picked.length ? list.findIndex(c => runsOf(c).some(id => picked.indexOf(id) >= 0)) : -1);
     }
 
     // Joe 10/20: a new load's time starts as the run's time for the delivery day (the dispatch sheet's, else Route Master's),
