@@ -21,7 +21,12 @@ let view = VIEWS[params.get('view')] ? params.get('view') : 'board';
 let tab = ['areas', 'jobs', 'people', 'limits'].indexOf(params.get('tab')) >= 0 ? params.get('tab') : 'areas';
 let plant = params.get('plant') || '', person = null, app = {}, db = null, stops = [];
 let week = R.weekStart(todayKey()), shift = 1, area = '', vacShow = 'UPCOMING', editing = null, editCell = '';
-const data = { areas: [], jobs: [], people: [], weeks: {}, vacations: [], rules: null, read: {} };
+const data = { areas: [], jobs: [], people: [], weeks: {}, vacations: [], rules: null, read: {}, employees: [] };
+// Joe 10/31 (mock-up 4): + Add Person picks from the plant's Employees list (UDMS). A picked person's name, employee ID, phone and
+// hire date come from it and follow UDMS (gray boxes); with no Employees list yet, + Add Person gives a blank line as before.
+const idKey = (v) => String(v == null ? '' : v).trim().replace(/^0+(?=.)/, '').toUpperCase();
+const linked = (p) => !!(p.employeeId && data.employees.some(e => e.idKey === idKey(p.employeeId)));
+let pickQ = '';
 let busy = Promise.resolve();
 const esc = escapeHtml, opt = (v, cur, label) => optionTag(v, cur, label);
 const day = (k) => (R.isDay(k) ? shortDate(k) : '');
@@ -158,20 +163,30 @@ function setupHtml() {
     const login = (p) => !maint ? '' : '<td class="nowrap">' + (p.id ? '<input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="short" data-login="1" aria-label="Station login ID" placeholder="' +
       (p.loginSet ? 'Change' : '5 or 6 digits') + '"' + dis() + '>' + (p.loginSet ? ' <span class="crew-set">Set</span>' : '') : '') + '</td>';
     html = '<table><thead><tr><th class="left">Name</th><th>Employee ID</th><th>Phone</th><th>Area</th><th>Shift</th><th>Usual job</th><th>Days off</th><th>Hire date</th>' + (maint ? '<th>Station login ID</th>' : '') + '<th>In use</th></tr></thead><tbody>' +
-      (rows.map(p => '<tr data-op="person" data-id="' + esc(p.id) + '"><td class="left"><input data-k="name" maxlength="60" value="' + esc(p.name) + '" placeholder="LAST, FIRST"' + dis() + '></td>' +
-        '<td><input data-k="employeeId" maxlength="20" class="short" value="' + esc(p.employeeId || '') + '"' + dis() + '></td><td><input data-k="phone" maxlength="20" class="short" value="' + esc(p.phone || '') + '"' + dis() + '></td>' +
+      (rows.map(p => { const u = linked(p) ? ' readonly tabindex="-1" class="from-udms' : ' class="'; return '<tr data-op="person" data-id="' + esc(p.id) + '"><td class="left"><input data-k="name" maxlength="60"' + u + '" value="' + esc(p.name) + '" placeholder="LAST, FIRST"' + dis() + '></td>' +
+        '<td><input data-k="employeeId" maxlength="20"' + u + ' short" value="' + esc(p.employeeId || '') + '"' + dis() + '></td><td><input data-k="phone" maxlength="20"' + u + ' short" value="' + esc(p.phone || '') + '"' + dis() + '></td>' +
         '<td><select data-k="areaId"' + dis() + '>' + opt('', p.areaId || '', '') + areas().map(a => opt(a.id, p.areaId, a.name)).join('') + '</select></td>' +
         '<td><select data-k="shift"' + dis() + '>' + R.SHIFTS.map(s => opt(String(s), String(p.shift || 1), R.SHIFT_NAMES[s])).join('') + '</select></td>' +
         '<td><select data-k="jobId"' + dis() + '>' + opt('', p.jobId || '', '') + jobsOf(p.areaId).map(j => opt(j.id, p.jobId, j.name)).join('') + '</select></td>' +
-        '<td>' + daysBoxes(p.daysOff, 'daysOff') + '</td><td><input type="date" data-k="hireDate" value="' + esc(p.hireDate || '') + '"' + dis() + '></td>' + login(p) + '<td>' + (p.id ? inUse(p) : '') + '</td></tr>').join('') || empty(maint ? 10 : 9)) + '</tbody></table>';
+        '<td>' + daysBoxes(p.daysOff, 'daysOff') + '</td><td><input type="date" data-k="hireDate"' + u + '" value="' + esc(p.hireDate || '') + '"' + dis() + '></td>' + login(p) + '<td>' + (p.id ? inUse(p) : '') + '</td></tr>'; }).join('') || empty(maint ? 10 : 9)) + '</tbody></table>';
   } else {
     const r = rules();
     html = '<div class="crew-limits"><label>Most people off a day, per area and shift<input type="number" min="0" max="50" data-rule="maxOff" value="' + esc(r.maxOff) + '"' + dis() + '></label>' +
       '<label>In a holiday week (New Year\'s, Memorial Day, 4th of July, Labor Day, Thanksgiving, Deer Season, Christmas)<input type="number" min="0" max="50" data-rule="holidayMaxOff" value="' + esc(r.holidayMaxOff) + '"' + dis() + '></label></div>';
   }
+  const picker = editing === 'pick' && tab === 'people' ? pickerHtml() : '';
   const starter = testCopy && canSetup() && data.read.people && !data.people.length ? '<div class="crew-starter">Test copy: <button type="button" id="starter">Fill in a made-up starting list</button> (made-up people, so the screens can be tried before the real list is loaded)</div>' : '';
-  return starter + '<div class="sheet scroll-list crew-setup">' + html + '</div><div class="foot">' + (canSetup() ? 'Every box saves when you leave it. ' : 'View only: a manager or administrator changes the setup. ') +
+  return starter + picker + '<div class="sheet scroll-list crew-setup">' + html + '</div><div class="foot">' + (canSetup() ? 'Every box saves when you leave it. ' : 'View only: a manager or administrator changes the setup. ') +
     'Only name, employee ID, phone, area, shift, usual job, days off and hire date are kept' + (team === 'maint' ? ', and a hidden copy of each station login ID' : '') + '.</div>';
+}
+
+// The Employees list drop-down: active employees not on this schedule yet, by name or employee ID.
+function pickerHtml() {
+  const on = new Set(data.people.filter(R.active).map(p => idKey(p.employeeId)).filter(Boolean)), q = pickQ.trim().toUpperCase();
+  const found = data.employees.filter(e => e.active && e.facilityId === plant && !on.has(e.idKey) && (!q || String(e.name).indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);
+  return '<div class="crew-picker"><input id="emp-q" value="' + esc(pickQ) + '" placeholder="Pick an employee: type a name or ID" aria-label="Pick an employee" autocomplete="off">' +
+    found.map(e => '<button type="button" data-emp="' + esc(e.idKey) + '"><b>' + esc(e.name) + '</b> · ' + esc(e.employeeId) + ' · <span>' + (esc(e.position) || 'No position') + '</span></button>').join('') +
+    '<p>' + (found.length ? 'Employees not on this schedule yet' : 'No employee matches.') + ' <button type="button" class="link" id="emp-type">Type a name instead</button> <button type="button" class="link" id="emp-close">Close</button></p></div>';
 }
 
 function render(force) {
@@ -196,6 +211,7 @@ top.addEventListener('click', e => {
   else if (b.dataset.tab) { tab = b.dataset.tab; editing = null; setUrl(); render(true); }
   else if (b.id === 'prev' || b.id === 'next') { week = R.addDays(week, b.id === 'prev' ? -7 : 7); editCell = ''; follow(); }
   else if (b.id === 'add-vac') { editing = 'new'; render(true); }
+  else if (b.id === 'add-row' && tab === 'people' && data.employees.some(e => e.active && e.facilityId === plant)) { editing = 'pick'; pickQ = ''; render(true); const q = body.querySelector('#emp-q'); if (q) q.focus(); }
   else if (b.id === 'add-row') { editing = 'new-' + tab; render(true); const n = body.querySelector('tr[data-id=""] [data-k="name"]'); if (n) n.focus(); }
   else if (b.id === 'print') window.print();
 });
@@ -208,6 +224,14 @@ body.addEventListener('click', e => {
   const t = e.target;
   if (t.id === 'starter') { t.disabled = true; send('saveCrewSetup', { op: 'starter' }, 'The starting list').catch(() => {}); return; }
   if (t.id === 'vac-cancel') { editing = null; render(true); return; }
+  const empBtn = t.closest('[data-emp]');
+  if (empBtn) {
+    editing = null; render(true);
+    send('saveCrewSetup', { op: 'person', fields: Object.assign({ employeeId: empBtn.dataset.emp }, area ? { areaId: area } : {}) }, 'That person').catch(() => {});
+    return;
+  }
+  if (t.id === 'emp-type') { editing = 'new-people'; render(true); const n = body.querySelector('tr[data-id=""] [data-k="name"]'); if (n) n.focus(); return; }
+  if (t.id === 'emp-close') { editing = null; render(true); return; }
   if (t.dataset.vac) { editing = t.dataset.vac; render(true); return; }
   const cell = t.closest('td.pick[data-key]');
   if (cell && canEdit()) { editCell = cell.dataset.key; render(true); }
@@ -263,10 +287,20 @@ body.addEventListener('change', e => {
   }
   send('saveCrewSetup', { op, id, fields }, 'That line').then(() => { if (!id) editing = null; render(true); }, () => {});
 });
+body.addEventListener('input', e => {
+  if (e.target.id !== 'emp-q') return;
+  pickQ = e.target.value;
+  const at = e.target.selectionStart;
+  render(true);
+  const q = body.querySelector('#emp-q');
+  if (q) { q.focus(); q.setSelectionRange(at, at); }
+});
 body.addEventListener('focusout', e => { if (e.target.dataset && e.target.dataset.cell) setTimeout(() => { if (editCell && !body.contains(document.activeElement)) { editCell = ''; render(true); } }, 150); });
 body.addEventListener('keydown', e => {
   if (e.key === 'Escape' && editCell) { editCell = ''; render(true); }
   if (e.key === 'Enter' && e.target.matches('tr[data-op] input')) e.target.blur();
+  if (e.key === 'Enter' && e.target.id === 'emp-q') { const first = body.querySelector('[data-emp]'); if (first) first.click(); }
+  if (e.key === 'Escape' && editing === 'pick') { editing = null; render(true); }
 });
 window.udBack = () => { if (editing || editCell) { editing = null; editCell = ''; render(true); return true; } return false; };
 
@@ -282,6 +316,7 @@ function follow() {
     render();
   }, fail(name));
   stops.push(mine('crewAreas', 'areas'), mine('crewJobs', 'jobs'), mine('crewPeople', 'people'), mine('crewVacations', 'vacations'));
+  stops.push(onSnapshot(collection(db, 'employees'), s => { data.employees = s.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name))); render(); }, () => {}));
   stops.push(onSnapshot(query(collection(db, 'crewWeeks'), where('weekStart', '==', week)), s => {
     data.weeks = {};
     s.docs.forEach(d => { const w = d.data(); if (w.facilityId === plant && w.team === team) data.weeks[R.weekId(w.personId, w.weekStart)] = w; });

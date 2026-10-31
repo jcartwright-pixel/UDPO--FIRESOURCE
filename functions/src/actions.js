@@ -218,12 +218,17 @@ function validate(input) {
   }
   if (action === 'saveDriver') {
     out.driverId = text(input.driverId);
+    // Joe 10/31 (mock-ups 2 and 3): a new driver is picked from the Employees list; the server fills the name and hire date.
+    out.employeeId = text(input.employeeId, 20);
     out.name = text(input.name, 120).toUpperCase();
-    if (!out.name) throw new SaveError('BAD_REQUEST', 'Enter the driver name');
+    if (!out.name && !out.employeeId) throw new SaveError('BAD_REQUEST', 'Enter the driver name, or pick an employee');
     out.hireDate = dateOrBlank(input.hireDate, 'Hire date');
     out.seniorityDate = dateOrBlank(input.seniorityDate, 'Seniority date');
     out.truck = text(input.truck, 40).toUpperCase();
     out.relief = input.relief === true;
+    out.phone = text(input.phone, 30);
+    if (out.phone && !SMS.phoneE164(out.phone)) throw new SaveError('BAD_REQUEST', 'Type the mobile phone like 330-555-1234');
+    out.phone = out.phone ? SMS.phoneText(out.phone) : '';
     return out;
   }
   if (action === 'saveDriverException') {

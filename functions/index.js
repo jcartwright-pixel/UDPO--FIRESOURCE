@@ -33,6 +33,8 @@
  *   deviceReads           the one door for every reading device: a line's label reader (its line PC) now, a receiving scanner later (src/reader.js)
  *   lineReader            Line Targets, administrators: make a line's reader key; start or stop the sandbox test feed
  *   productionEveryMinute the sandbox test feed's pretend jugs, and a stop when a label reader line goes quiet
+ *   employeesEvery15Minutes  Joe 10/31: each plant's Employees list from UDMS (name, employee ID, position, hire date, phone only;
+ *                         src/employees.js); the schedules' people and drivers with the same employee ID follow it
  *   usersToPlants         Joe 10/26 (the plants are completely separate): each plant's database gets a copy of only the people
  *                         given that plant (src/plants.js), so no one else can read it
  *
@@ -577,6 +579,19 @@ exports.garageServicesEvery30Minutes = onSchedule({ schedule: 'every 30 minutes'
 // Joe 10/27: the Driver Room TV's Driver Scorecard turn (src/scorecard-kiosk.js): the month's overall scores, every 15 minutes.
 exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
   await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));
+});
+
+// Joe 10/31 (mock-ups 1 to 4): the Employees list from UDMS, every 15 minutes (src/employees.js). UDMS is its own Firebase
+// project; this reads only the safe fields of its employee records. Until UDMS lets this project read, each plant's
+// Employees screen says it is waiting for permission.
+exports.employeesEvery15Minutes = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
+  const EMP = require('./src/employees');
+  const project = process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId;
+  const udmsApp = admin.apps.find(a => a && a.name === 'udms') || admin.initializeApp({ projectId: EMP.UDMS_PROJECT }, 'udms');
+  const { getFirestore } = require('firebase-admin/firestore');
+  const plantDbs = Object.fromEntries(PLANTS.activePlants().filter(plantReady).map(p => [p.id, PLANTS.dbFor(p.id, db)]));
+  const out = await EMP.runEmployeeSync({ udmsDb: getFirestore(udmsApp, EMP.udmsDatabase(project)), plantDbs });
+  if (!out.ok) console.error('employees', out.detail);
 });
 
 // How long data is kept (src/cleanup.js, Joe 10/18): behind-the-scenes logs 90 days, Shift Notes 6 months, once a night.

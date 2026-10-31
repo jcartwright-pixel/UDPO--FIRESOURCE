@@ -270,6 +270,13 @@ jobs:
         run: |
           node test/browser/phone-speed.cjs "https://$PROJECT.web.app" "$PROJECT" | tee speed.txt
           { echo "### Phone speed"; sed 's/^/- /' speed.txt; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Show the Employees list's line (read from UDMS)
+        if: steps.settings.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          PROJECT: ${{ steps.settings.outputs.project }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: node test/browser/employees-status.cjs "$PROJECT"
       - name: Show what the sandbox copy read from the sheets
         if: steps.settings.outputs.ready == 'true'
         continue-on-error: true
