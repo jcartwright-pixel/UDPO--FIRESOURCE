@@ -482,7 +482,11 @@
     t = Number(t);
     // Joe 10/21 (Sun Valley 849, Load Day at 4:00 AM): a Load Day time before the 6 a.m. roll is the end of that load day's
     // shift, the next morning (it cannot leave before the shift that loads it has started).
-    if (on === 'LOAD DAY') return ((load === null ? departDay : load) + (t < 360 ? 1 : 0)) * 1440 + t;
+    // Joe 10/31 ("this is Saturday loadout for Monday deliveries ... not leaving until Sunday"; "it's delivery day minus the
+    // offset"): a load built early (Monday's loads on Saturday, Load Day 2 days before) still leaves the day before its delivery
+    // at its time, never on the early load day, so a Monday Jersey loaded Saturday is not late until Sunday at 1:00 PM.
+    var delivery = dayNum(x.deliveryDate), leaveDay = load === null ? departDay : delivery !== null && load < delivery - 1 ? delivery - 1 : load;
+    if (on === 'LOAD DAY') return (leaveDay + (t < 360 ? 1 : 0)) * 1440 + t;
     if (on === 'DELIVERY DAY') return departDay * 1440 + t;
     return (load !== null && load < departDay && t >= 360 ? departDay - 1 : departDay) * 1440 + t;
   }

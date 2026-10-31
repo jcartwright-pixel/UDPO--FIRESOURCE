@@ -24,6 +24,7 @@ id: start
 Operations is United Dairy's app for dispatch, the plant floor, fleet and maintenance. Every screen has the same three parts:
 
 - **The blue bar across the top.** The United Dairy logo with the plant you are in written in yellow (Uniontown, Charleston or Martins Ferry), then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
+- **On a phone, and on the phone and tablet apps** (the driver phone, Plant Managers, the Plant, Garage, Maintenance and Driver Stations and the Line Tablet), the top bar shows **Last refreshed** with the date and time instead of the version, like "Last refreshed 10-8-26 9:26 AM". It is the last time the screen got fresh information. If it stays old, the phone or tablet has no signal: pull down or reopen the app to refresh it.
 - **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in.
 - **The screen.** Filters and the date sit on the right. Lists have headings that stay put when you scroll.
 
@@ -193,7 +194,7 @@ The list at the top picks the view: Start Times, Mileage, Hours and Return, Load
 - **Change many boxes at once:** click the first box, Shift+click (or drag to) the last one, type, then press Enter. Every marked box gets the same value.
 - **Start times:** type a time any way (5, 530, 5:30p or 1730). The up / down clicker moves it 15 minutes a click.
 - **Load Day** and **Run By** are picked from a list, never typed. Load Day reads in words (Same day, Day before...) counted back from the delivery day.
-- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time.
+- **Departure Day:** Load Day leaves on the load date; Delivery Day leaves on the delivery date. Both leave at the Start Time. A Load Day route loaded 2 days early (Monday's loads on Saturday) still leaves the day before delivery, on Sunday.
 - **Daily Order** and **Weekly Order:** grab a line and drag it up or down.
 - `+ Add Route` adds a new route; `+ Add Run / Destination` adds a run under a route.
 - `Edit Route` opens the full form for one run.
@@ -235,7 +236,7 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 - In the driver's box: change the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
-- Under **Texts**, tick **Schedule** to text that driver their schedule when a week is posted, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns each kind on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
+- Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
 
 > The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used.
 
@@ -292,13 +293,14 @@ screens: driver-station.html
 
 The Driver Room screens: the TV board and the drivers' kiosk tablet. One link; the station code decides what opens.
 
-- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Loads left over from yesterday that are not loaded yet stay on the board (and on View Loadout) after 6 a.m., at the top, until they are loaded or marked Ended Up Not Running. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
+- **The TV board** shows today's loads (route, run, driver, trailer, cases, load status), pickups and the drivers' weekly schedule. Loads left over from yesterday that are not loaded yet stay on the board (and on View Loadout) after 6 a.m., at the top, until they are loaded or marked Ended Up Not Running. When there are any, a light orange **Yesterday's loads** line sits above them and a light blue **Today's loads** line above today's, so nobody mixes them up. Both lists roll by themselves. The weekly schedule's words are the same size as the loads above it; a long name or route goes onto a second line, or gets a little smaller, so nothing is cut off. The local weather is in the top bar.
 - **The box on the right** shows the live weather (no sound). The Driver Scorecard is off the TV for now.
 - The live picture is FOX Weather's free live stream on YouTube, then AccuWeather's when it is live. FOX Weather does not let other sites show its stream at the moment, so most of the time the box shows the **live weather radar** for the Pittsburgh radar (it covers Uniontown) instead, with a fresh picture every 5 minutes. If the radar will not load either (no internet), the box shows the local weather with one line saying why. The TV tries the live videos again every 10 minutes.
 - After an update to Operations the TV reloads the board by itself within a few minutes. Nobody has to press Refresh.
 - **The kiosk** is where drivers check in at the plant.
 - To set up a screen: open the Driver Station link, type the station code and press `OPEN THE BOARD`.
 - A screen opened with a code has no Back, Home or Sign out. `Release` at the bottom (with the manager release code) is the only way out.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the screen has no signal.
 - `Release` goes back to the code screen, never into the app. Once a code has opened it, the TV or tablet opens only the Driver Room screens: any other screen typed in goes straight back.
 
 > On a Raspberry Pi TV box, run the setup line once (it is in the Pi steps). After that, a power cut needs nothing: the Pi turns the TV on and opens the board by itself. To restart the board, unplug the Pi, not the TV.
@@ -380,6 +382,7 @@ Every truck and trailer the dispatch lists offer, with its status, where it is, 
 - `Down` on a unit opens the box to put it down: type the reason and press `Put down`. A down unit stays red on Daily and Weekly Dispatch until it is back.
 - `Back in service` puts a down unit back.
 - The fleet list is the master list and copies in every night. `Preview fleet sync` shows every change a sync would make, without changing anything. `Sync fleet list` copies it in now (managers). `Download list` saves the list.
+- While writing to the sheets is paused (Administration, Go-Live Switches), `Sync fleet list` says so and changes nothing. Press it again after Resume.
 
 !> Do not take a unit off a load by putting it down here. Change the load on Daily Dispatch; the down mark is only for units that cannot run.
 
@@ -443,6 +446,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
   - and the work order scrolled all the way down.
 - Tapped early, `Complete` says what is left and shows it in red. The **Needs work** lines are kept on the work order.
 - Left with no taps for 20 minutes, the tablet goes back to the cards. Notes typed and boxes ticked stay on the tablet.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - With no signal the station keeps working and sends everything when the signal is back.
 - A tablet opened with a station code has no Back or Home in its header. `Release` (bottom right, with the manager release code) is the only way out, and it goes back to the code screen, never into the app. An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account).
 
@@ -623,6 +627,8 @@ Will the plant be late? Every case load still to load, in the order it will be l
 - Last night's left-over loads come first, marked at the left edge.
 
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
+
+> Saturday's loads for Monday leave on Sunday, so on Saturday they are red only if they will not be ready by their Sunday time. Only Sunday's loads can be late on Saturday.
 
 ## Unloading (Case, Tote, Box and Tanker)
 id: unloading
@@ -815,6 +821,7 @@ The plant manager's phone walkthrough. The Plant Managers app opens on three cho
 - The Plant Managers app shows only these screens: the walkthrough (Yard, Coolers, Production), Loading and Unloading (with its Returns and Washing). There is no menu on the left, no `Home` and no `Administration`. The `Plant Managers` button at the top (and the logo) goes back to the three choices.
 - Any other screen opened in the Plant Managers app goes back to its three choices. Send Report and Trailer Assignments are in the full Operations app: open it from its own link, not from the Plant Managers app.
 - On a phone, swipe up to see the rest of the screen.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
 - For managers only.
 
 > Opened from its normal link (not the Plant Managers app) on a computer, `Open the full Operations app` is still at the bottom.
@@ -968,6 +975,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 8. For a product change, tap `CHANGEOVER` on the bar: pick the product it changes to and tap `START CHANGEOVER`. The bar turns blue with its clock and the standard minutes. Tap `RUNNING` when the new product runs; the changeover's minutes are kept.
 9. `CIP / Sanitation` starts and finishes a wash (Boxing has no CIP).
 
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
 - Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE) and what was made. **Running now** says since when the product has run and how long the last changeover took.
 - **Down this shift** adds up the minutes down and in changeover, and lists each one with its minutes, newest first; the one going on now says "now".
@@ -1080,6 +1088,7 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - `+ Report a Problem`: pick the machine, say what is wrong and whether it is down (`Yes, it's down` or `No, it runs`), then `Send`.
 - `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up, then `Record`.
 - The station has no Back or Home. `Release` (with the manager release code) is the only way out.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
 
 - An Administrator frees the tablet with `Administrator sign-in` on the code screen (their own account). It forgets the station and opens Operations.
@@ -1235,6 +1244,7 @@ screens: administration.html?item=switch
 Which screens are switched on, and the emergency stop.
 
 - **Pause writing to the sheets** holds every save: screens keep saving, the saves wait, and **Resume** writes them to the sheets in order.
+- While it is paused, nothing at all is written to the sheets: not Publish moving the weeks, and not the fleet list sync into Equipment Master (the nightly one waits, and `Sync fleet list` says it is paused).
 - One button turns on everything that is ready.
 
 > Use Pause if something is writing wrong values to the sheets. Nothing is lost while paused.
@@ -1328,15 +1338,21 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. Each kind of text has its own part and its own On / Off: **Schedule texts** (when a new week is posted) and **Load done texts** (when the plant finishes a driver's load, with any open pickups). Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** tell drivers the posted week is up; they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Press `Turn On` in each part you want. **Who gets them** lists the ticked drivers.
-5. **Texts and replies** shows each text and reply with its status.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice.
+5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
+6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
+7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
+
+> To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
+
+> Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 
@@ -1363,12 +1379,15 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **Check-In** (after the route): truck, trailer and pallet jack, cases delivered and returned, over or short, refused or returned product, truck, trailer and pallet jack problems, whether the trailer needs cleaning, and notes. Then `Check In`.
 - **DVIR** (truck inspection): pick Pre-trip or Post-trip. Every item starts as no defect; tick only what is wrong and write it up. The odometer starts at the truck's GPS reading. `+ Add trailer inspection` for a second trailer. Sign, then `Submit` (or `Review inspection` first).
 - **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
-- **View Loadout** shows the route list and each load's status, updating by itself.
+- **View Loadout** shows the route list and each load's status, updating by itself. Loads left over from yesterday that are not loaded yet are at the top under a light orange **Yesterday's loads** line; today's loads follow under a light blue **Today's loads** line.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
 
 On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows the rolling View Loadout. `Release` at the very bottom (manager release code) is the only way out, and it goes back to the code screen, never into the app. The tablet opens no other screen.
 
 > The Driver Room tablet (not a driver's own phone) keeps its screen on by itself. If it still goes dark, see [Keeping a tablet screen on](#screen-on).
+
+!> Do not mistake a load under **Yesterday's loads** for today's run of the same route. Check which line it sits under.
 
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
 
@@ -1381,6 +1400,7 @@ The plant floor tablets. Each one is opened once with its **Station code** (`OPE
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
 - A station has no Home, Sign out or menu. Nothing on it opens any other screen of the app, and an address typed into the tablet comes straight back to the station.
+- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 
 ### Case Unloading tablet
 

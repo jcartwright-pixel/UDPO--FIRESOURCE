@@ -44,63 +44,62 @@ test('the Driver Roster keeps the mobile phone apart from the driver record; a b
   assert.equal((await db().collection('driverPhones').doc('drv_test_casey').get()).data().phone, '+13305551234');
 });
 
-test('Schedule Texts: administrators only, Off by default, keys never sent back, On needs the account', async () => {
+test('Schedule Texts: administrators only, nothing sent by default, keys never sent back, Send needs the account', async () => {
   await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'status' }), /Only an administrator/);
   let s = await SMS.smsCall(db(), ADMIN, { op: 'status' }, { env: {} });
-  assert.equal(s.on, false);
+  assert.equal(s.lastSend, null);
   assert.equal(s.live, false);
-  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'setOn', on: true }), /Save the Twilio/);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }), /Save the Twilio/);
   await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: 'nope' }), /starts with AC/);
   s = await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'secret-token', fromNumber: '330-555-0000' }, { env: {} });
   assert.deepEqual([s.hasSid, s.hasToken, s.from], [true, true, '330-555-0000']);
   assert.ok(!JSON.stringify(s).includes('secret-token') && !JSON.stringify(s).includes(SID), 'the account is never sent back');
-  // Only the drivers ticked Schedule under Texts on the Driver Roster (Joe 10/26: the roster controls who gets them).
+  // The posted week's drivers ticked Schedule under Texts on the Driver Roster (Joe 10/26: the roster controls who gets them).
+  await post();
   let p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
-  assert.equal(p.week, WEEK);
-  assert.deepEqual(p.drivers, []);
+  assert.deepEqual([p.week, p.drivers, p.ticked], [WEEK, [], 0]);
   await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-sched-0001', driverId: 'drv_test_casey', kind: 'SCHEDULE', on: true });
+  await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-sched-0002', driverId: 'drv_test_adams', kind: 'SCHEDULE', on: true });
   p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
-  assert.deepEqual(p.drivers.map(d => d.name), ['CASEY, LEE']);
+  assert.deepEqual([p.drivers.map(d => d.name), p.ticked], [['CASEY, LEE'], 2], 'ticked and on the posted week');
   await assert.rejects(applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-bad-0001', driverId: 'drv_test_casey', kind: 'OTHER', on: true }), /SCHEDULE or LOAD/);
 });
 
-test('Off: a posted week sends nothing; On: the week already posted is not texted, the next one is, once', async () => {
+test('Joe 10/31: publishing never texts; Send schedule texts texts the posted week once, Send again a second time', async () => {
   await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
   await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-good-0002', driverId: 'drv_test_casey', phone: '3305551234' });
   for (const id of ['drv_test_casey', 'drv_test_brook']) await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-' + id, driverId: id, kind: 'SCHEDULE', on: true });
   const calls = [], fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 201, json: async () => ({}) }; };
-  const live = { env: { LIVE_TEXTS: '1' }, fetch };
+  const live = (t) => ({ env: { LIVE_TEXTS: '1' }, fetch, now: () => new Date(t) });
   await post();
-  assert.equal(await SMS.postedCheck(db(), live), null, 'Off: nothing');
-  await SMS.smsCall(db(), ADMIN, { op: 'setOn', on: true });
-  assert.equal(await SMS.postedCheck(db(), live), null, 'the week already posted when it was turned On is not texted');
-  // The next week is posted.
-  const next = L.addDays(WEEK, 7);
-  await db().collection('runs').doc(next + '__run_t905').set({ weekStart: next, route: '905', run: 'UT DSD MILK', runId: 'run_t905', rev: 0, days: { mon: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE' }, wed: { runs: true, driverId: 'drv_test_brook', driver: 'BROOK' } } });
-  await db().collection('config').doc('app').set({ liveWeeks: { previous: WEEK, current: next, next: L.addDays(next, 7) } }, { merge: true });
-  const r = await SMS.postedCheck(db(), live);
-  assert.deepEqual([r.week, r.drivers, r.sent, r.noPhone], [next, 2, 1, 1]);
+  assert.equal(SMS.postedCheck, undefined, 'nothing sends by itself when a week is posted');
+  let r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:00:00Z'));
+  assert.deepEqual([r.lastSend.week, r.lastSend.drivers, r.lastSend.sent, r.lastSend.noPhone, r.lastSend.by], [WEEK, 2, 1, 1, ADMIN.email]);
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, new RegExp('/Accounts/' + SID + '/Messages\\.json$'));
   assert.equal(calls[0].init.headers.Authorization, 'Basic ' + Buffer.from(SID + ':tok').toString('base64'));
   assert.match(calls[0].init.body, /To=%2B13305551234&From=%2B13305550000&Body=United\+Dairy/);
-  assert.equal((await db().collection('textLog').doc(next + '_drv_test_casey').get()).data().status, 'SENT');
-  assert.equal((await db().collection('textLog').doc(next + '_drv_test_brook').get()).data().status, 'NO PHONE');
-  assert.equal(await SMS.postedCheck(db(), live), null, 'never twice');
-  assert.equal(calls.length, 1);
+  const logs = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.week === WEEK);
+  assert.deepEqual(logs.map(x => x.name + ' ' + x.status).sort(), ['BROOK, SAM NO PHONE', 'CASEY, LEE SENT']);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:05:00Z')), /already sent\. Press Send again/);
+  assert.equal(calls.length, 1, 'never twice by accident');
+  await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'sendSchedule', again: true }, live('2026-10-17T23:06:00Z')), /Only an administrator/);
+  r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule', again: true }, live('2026-10-17T23:10:00Z'));
+  assert.deepEqual([r.lastSend.sent, calls.length], [1, 2], 'Send again sends it a second time');
+  assert.equal((await db().collection('textLog').get()).docs.filter(x => x.data().week === WEEK).length, 4, 'each send is kept in the list');
 });
 
 test('the test copy (no LIVE_TEXTS) never sends: the texts go to the log as not sent', async () => {
   await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
   await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-good-0003', driverId: 'drv_test_casey', phone: '3305551234' });
   await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-sched-0003', driverId: 'drv_test_casey', kind: 'SCHEDULE', on: true });
-  await SMS.smsCall(db(), ADMIN, { op: 'setOn', on: true });
   await post();
   const calls = [];
-  const r = await SMS.postedCheck(db(), { env: {}, fetch: async () => { calls.push(1); return { ok: true }; } });
-  assert.deepEqual([r.week, r.live, r.sent], [WEEK, false, 0]);
+  const r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, { env: {}, fetch: async () => { calls.push(1); return { ok: true }; } });
+  assert.deepEqual([r.lastSend.week, r.lastSend.live, r.lastSend.sent], [WEEK, false, 0]);
   assert.equal(calls.length, 0);
-  assert.match((await db().collection('textLog').doc(WEEK + '_drv_test_casey').get()).data().reason, /Test copy: not sent/);
+  const log = (await db().collection('textLog').get()).docs.map(x => x.data()).find(x => x.week === WEEK);
+  assert.match(log.reason, /Test copy: not sent/);
 });
 
 test('replies: kept in the log with the driver only when Twilio signed them with the saved Auth Token', async () => {
@@ -241,11 +240,48 @@ test('Texts: Ask drivers texts the ones not ticked; a YES reply ticks Schedule a
     { sid: 'SM2', direction: 'inbound', from: '+13305552222', body: 'STOP', date_created: 'Sun, 18 Oct 2026 14:06:00 +0000' },
     { sid: 'SM0', direction: 'inbound', from: '+13305551234', body: 'STOP', date_created: 'Sun, 18 Oct 2026 13:00:00 +0000' },
     { sid: 'SM3', direction: 'inbound', from: '+17245559999', body: 'YES', date_created: 'Sun, 18 Oct 2026 14:07:00 +0000' }];
-  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:10:00Z')), { yes: 1, stop: 1 });
+  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:10:00Z')), { yes: 1, stop: 1, forwarded: 0 });
   const casey = (await db().collection('driverPhones').doc('drv_test_casey').get()).data(), adams = (await db().collection('driverPhones').doc('drv_test_adams').get()).data();
   assert.deepEqual([casey.scheduleText, casey.loadText, casey.loadTextAt, casey.phone], [true, true, '2026-10-18T14:05:00.000Z', '+13305551234']);
   assert.deepEqual([adams.scheduleText, adams.loadText, adams.stoppedAt], [false, false, '2026-10-18T14:06:00.000Z']);
-  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:11:00Z')), { yes: 0, stop: 0 }, 'each reply counts once');
+  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:11:00Z')), { yes: 0, stop: 0, forwarded: 0 }, 'each reply counts once');
   // The test copy never reads Twilio.
   assert.equal(await SMS.replyCheck(db(), { env: {}, fetch: fakeFetch }), null);
+});
+
+test('Texts: driver replies are texted on to the phone saved under Driver replies, once each, drivers only', async () => {
+  const sent = [];
+  let inbox = [];
+  const fakeFetch = async (url, init) => {
+    if (init && init.method === 'POST') { const p = new URLSearchParams(String(init.body)); sent.push([p.get('To'), p.get('Body')]); return { ok: true, json: async () => ({}) }; }
+    return { ok: true, json: async () => ({ messages: inbox }) };
+  };
+  const live = (t) => ({ env: { LIVE_TEXTS: '1' }, fetch: fakeFetch, now: () => new Date(t) });
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'secret-token', fromNumber: '330-555-0000' }, { env: {} });
+  await db().collection('driverPhones').doc('drv_test_casey').set({ driverId: 'drv_test_casey', phone: '+13305551234', scheduleText: true });
+  assert.equal(await SMS.replyCheck(db(), live('2026-10-18T14:00:00Z')), null, 'nothing to read before a phone is saved');
+  await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'setForward', phone: '330-555-7777' }), /Only an administrator/);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'setForward', phone: '555-7777' }), /10 digits/);
+  let r = await SMS.smsCall(db(), ADMIN, { op: 'setForward', phone: '330-555-7777' }, live('2026-10-18T14:00:00Z'));
+  assert.deepEqual([r.forwardTo, r.forwardSince], ['330-555-7777', '2026-10-18T14:00:00.000Z']);
+  inbox = [
+    { sid: 'SM0', direction: 'inbound', from: '+13305551234', body: 'Before it was saved', date_created: 'Sun, 18 Oct 2026 13:59:00 +0000' },
+    { sid: 'SM1', direction: 'inbound', from: '+13305551234', body: 'No problem, see you Monday', date_created: 'Sun, 18 Oct 2026 14:05:00 +0000' },
+    { sid: 'SM2', direction: 'inbound', from: '+17245559999', body: 'Is the job still open?', date_created: 'Sun, 18 Oct 2026 14:06:00 +0000' },
+    { sid: 'SM3', direction: 'outbound-api', from: '+13305550000', body: 'United Dairy: your schedule', date_created: 'Sun, 18 Oct 2026 14:06:30 +0000' }];
+  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:10:00Z')), { yes: 0, stop: 0, forwarded: 1 });
+  assert.deepEqual(sent, [['+13305557777', 'United Dairy: reply from Lee Casey (330-555-1234): No problem, see you Monday']], 'only the driver\'s reply after the phone was saved; not the other app\'s texts');
+  const casey = (await db().collection('driverPhones').doc('drv_test_casey').get()).data();
+  assert.deepEqual([casey.scheduleText, casey.stoppedAt], [true, undefined], '"No problem" does not untick him');
+  const log = (await db().collection('textLog').doc('doneReply_SM1').get()).data();
+  assert.deepEqual([log.kind, log.direction, log.status, log.forwardStatus, log.forwardTo], ['REPLY', 'in', 'RECEIVED', 'SENT', '+13305557777']);
+  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:11:00Z')), { yes: 0, stop: 0, forwarded: 0 }, 'each reply is sent on once');
+  // A STOP still unticks, and is sent on too.
+  inbox.push({ sid: 'SM4', direction: 'inbound', from: '+13305551234', body: 'STOP', date_created: 'Sun, 18 Oct 2026 14:12:00 +0000' });
+  assert.deepEqual(await SMS.replyCheck(db(), live('2026-10-18T14:13:00Z')), { yes: 0, stop: 1, forwarded: 1 });
+  assert.equal((await db().collection('driverPhones').doc('drv_test_casey').get()).data().scheduleText, false);
+  // Blank turns it off.
+  r = await SMS.smsCall(db(), ADMIN, { op: 'setForward', phone: '' }, live('2026-10-18T14:14:00Z'));
+  assert.deepEqual([r.forwardTo, r.forwardSince], ['', '']);
+  assert.equal(await SMS.replyCheck(db(), live('2026-10-18T14:15:00Z')), null);
 });

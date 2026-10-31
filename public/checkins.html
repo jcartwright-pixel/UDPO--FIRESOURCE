@@ -67,10 +67,10 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError } from './js/app.js';
+    import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError, callServer } from './js/app.js';
     import { watchLists, canSave, canReorder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     forScreen('checkIns');
-    import { httpsCallable, collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
     const params = new URLSearchParams(location.search);
@@ -85,8 +85,8 @@
       if (!codeArmed) { codeArmed = true; b.textContent = 'Click again'; setTimeout(() => { codeArmed = false; b.textContent = 'New phone code'; }, 7000); return; }
       codeArmed = false; b.textContent = 'New phone code'; b.disabled = true;
       try {
-        const { functions } = await start();
-        const r = (await httpsCallable(functions, 'newRouteCode')({})).data;
+        // Through the app's one server path, so the new code is made for the plant this screen is open at.
+        const r = await callServer('newRouteCode', {});
         document.getElementById('foot-note').innerHTML = 'Route Distribution code for the phones: <b id="phone-code">' + escapeHtml(r.code) + '</b> (the old code stops working)';
       } catch (err) { showError('Could not make a new phone code (' + (err.message || err) + '). The old code still works; press New phone code again.'); } finally { b.disabled = false; }
     });

@@ -855,6 +855,19 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
 // Joe 10/22: "in the upper banner is where I want the version and the last time it was updated." Every screen's header
 // shows "Version 6.48 · Updated 10-22-26 1:30 PM" (stamped by the deploy), just before Administration, the initials and
 // Sign out. The line at the bottom of the menu stays as it is.
+// Joe 10/31: "Do not put the date that the app was updated, because it's confusing to people. All I need to know is the
+// last time it refreshed ... Phone apps." The phone and tablet apps (the driver phone, Plant Managers, Plant, Garage,
+// Maintenance and Driver Stations, the line tablet) and any screen on a phone (700 wide or less) show only
+// "Last refreshed 10-31-26 9:26 AM": when the screen opened, then each time it last heard from the server (js/firebase.js).
+const PHONE_APPS = ['route.html', 'plant-station.html', 'garage-station.html', 'maint-station.html', 'driver-station.html', 'line.html'];
+function phoneApp() {
+  if (PHONE_APPS.indexOf(HERE_PAGE) >= 0 || document.body.classList.contains('phone')) return true;
+  if (HERE_PAGE !== 'walkthrough.html') return false;
+  try { return new URLSearchParams(location.search).get('app') === '1' || sessionStorage.getItem('udPlantManagers') === '1'; } catch (e) { return false; }
+}
+if (phoneApp()) document.body.classList.add('ud-phone-app');
+let refreshedAt = navigator.onLine === false ? 0 : Date.now();
+export function lastRefreshed() { return Math.max(refreshedAt, (window.UDReads && window.UDReads.freshAt) || 0); }
 (function headerVersion() {
   if (EMBED) return;
   const bars = [...document.querySelectorAll('.topbar, .phone-top')].filter(bar => !bar.querySelector('.hdr-version'));
@@ -862,17 +875,33 @@ try { if (sessionStorage.getItem('udAdmin') === '1') document.body.classList.add
   const boxes = bars.map(bar => {
     const box = document.createElement('div');
     box.className = 'hdr-version';
-    box.title = 'The version of the app on this screen and when it was last updated';
+    box.innerHTML = '<span class="hv-ver"></span><span class="hv-fresh"></span>';
     const right = [...bar.children].find(el => el.matches('.hdr-help, .hdr-admin, .who, #who, #signout, #change'));
     if (right) right.before(box); else bar.append(box);
     return box;
   });
+  // Written only when the words change (at most once a minute), so a busy screen's many reads never touch the page.
+  let shown = '', queued = 0;
+  const showFresh = () => {
+    queued = 0;
+    const at = lastRefreshed(), text = at ? 'Last refreshed ' + dateTimeText(at) : 'Not refreshed yet';
+    if (text === shown) return;
+    shown = text;
+    boxes.forEach(box => {
+      const el = box.querySelector('.hv-fresh');
+      el.textContent = text;
+      el.title = 'The last time this screen got fresh information';
+    });
+  };
+  showFresh();
+  window.addEventListener('ud-refreshed', () => { if (!queued) queued = setTimeout(showFresh, 250); });
   appVersion().then(v => {
     if (!v || !(v.banner || v.label)) return;
     const parts = (v.banner || v.label).split(' · ');
     boxes.forEach(box => {
-      box.innerHTML = '<b>' + escapeHtml(parts[0]) + '</b>' + (parts.length > 1 ? ' <small>' + escapeHtml(parts.slice(1).join(' · ')) + '</small>' : '');
-      if (v.commit) box.title = (v.banner || v.label) + ' (' + v.commit + ')';
+      const el = box.querySelector('.hv-ver');
+      el.innerHTML = '<b>' + escapeHtml(parts[0]) + '</b>' + (parts.length > 1 ? ' <small>' + escapeHtml(parts.slice(1).join(' · ')) + '</small>' : '');
+      el.title = 'The version of the app on this screen and when it was last updated' + (v.commit ? ' (' + v.commit + ')' : '');
     });
   });
 })();
