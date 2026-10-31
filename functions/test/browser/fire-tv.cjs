@@ -163,6 +163,16 @@ const TV = 'fac_uniontown_kiosk_tv', ROOM = 'fac_uniontown_kiosk_driver';
       batch.set(db().collection('runs').doc(wk + '__run_tv' + rt), { weekStart: wk, route: rt, run: 'UT DSD ' + rt, routeId: 'rte_tv' + rt, runId: 'run_tv' + rt, rev: 0,
         days: { [L.dayPrefix(today)]: { runs: true, loadSequence: 20 + i, driverId: 'drv_tv' + rt, driver: 'DRIVER ' + rt, truck: '9' + rt, trailer: 'T-' + rt } } });
     }
+    // The weekly list shows the operating day's week; on a Saturday "today" above is already next week, so the
+    // weekly list gets its own 40 runs in the board's week too.
+    const opDay = L.operatingDay(new Date()), opWk = L.weekStart(opDay);
+    if (opWk !== wk) {
+      for (let i = 0; i < 40; i++) {
+        const rt = String(810 + i);
+        batch.set(db().collection('runs').doc(opWk + '__run_tv' + rt), { weekStart: opWk, route: rt, run: 'UT DSD ' + rt, routeId: 'rte_tv' + rt, runId: 'run_tv' + rt, rev: 0,
+          days: { [L.dayPrefix(opDay)]: { runs: true, loadSequence: 20 + i, driverId: 'drv_tv' + rt, driver: 'DRIVER ' + rt, truck: '9' + rt, trailer: 'T-' + rt } } });
+      }
+    }
     await batch.commit();
     await rolls('board-scroll', 'the loadout list (grown past the screen)');
     await rolls('week-scroll', 'the weekly schedule');
