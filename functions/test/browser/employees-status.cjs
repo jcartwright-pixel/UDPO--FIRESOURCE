@@ -14,4 +14,8 @@ const admin = require('firebase-admin');
   if (!s) { console.log('Employees: not read from UDMS yet'); return; }
   const list = await db.collection('employees').where('active', '==', true).count().get();
   console.log('Employees: ' + (s.ok === false ? 'RED ' + s.problem : 'GREEN up to date with UDMS') + ', last checked ' + s.checkedAt + ', ' + list.data().count + ' active on the list');
-})().catch(e => { console.error(e.message); process.exit(1); });
+})().catch(e => {
+  // The live deploy key may not read the live database (the server's own account reads UDMS, not this key).
+  if (/PERMISSION_DENIED|permission/i.test(e.message)) { console.log('Employees: this deploy key cannot read the database here; open Administration > Employees to see the line.'); return; }
+  console.error(e.message); process.exit(1);
+});
