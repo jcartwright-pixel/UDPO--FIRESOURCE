@@ -224,7 +224,8 @@ async function shots(page, name, w) {
     const supNames = () => desk.$$eval('.sc-suppick button strong', b => b.map(x => x.textContent));
     await desk.waitForFunction(() => document.querySelectorAll('.sc-suppick button').length === 2 && !/Saving/.test(document.querySelector('.sc-suppick').textContent));
     assert.deepEqual(await supNames(), ['Mountain Sugar', 'Ohio Fruit']);
-    assert.ok(await desk.$eval('.sc-suppick strong', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list text is at least 16px');
+    // Read in one step: the live list can redraw between finding the name and reading its size.
+    assert.ok(await desk.evaluate(() => [...document.querySelectorAll('.sc-suppick strong')].every(e => parseFloat(getComputedStyle(e).fontSize) >= 16)), 'the list text is at least 16px');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-list-1536.png'), scale: 'css' });
     for (const w of [390, 800]) {
       await desk.setViewportSize({ width: w, height: 844 });
