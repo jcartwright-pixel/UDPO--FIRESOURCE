@@ -657,7 +657,10 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 - **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A late one is red.
 - **Loads due by each time** totals the loads and cases due by each hour.
-- Last night's left-over loads come first, marked at the left edge.
+- **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
+- Last night's left-over loads are marked at the left edge.
+
+> Example: Save-A-Lot 1 leaves 8:00 AM and Save-A-Lot 2 leaves 9:30 AM, so when the plant is behind Save-A-Lot 2 is loaded right after Save-A-Lot 1, then Jersey (1:00 PM).
 
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
 

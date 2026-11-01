@@ -119,7 +119,8 @@
           '<em class="now" style="left:' + x(today) + '"></em></span></div>';
       }).join('');
       const doneLine = doneCase.length ? '<div class="fc-done">&#10003; ' + doneCase.length + ' load' + (doneCase.length === 1 ? '' : 's') + ' done today · ' + n(doneCase.reduce((a, r) => a + (Number(r.quantity) || 0), 0)) + ' cases</div>' : '';
-      document.getElementById('loads-title').textContent = 'Loads still to load (' + f.loads.length + ') · in loading order';
+      // Joe 11/1: when the plant is behind, the truck that leaves first loads first; the heading says which order it is.
+      document.getElementById('loads-title').textContent = 'Loads still to load (' + f.loads.length + ') · ' + (f.order === 'first to leave' ? 'behind: first truck to leave loads first' : 'in loading order');
       document.getElementById('loads').innerHTML = f.loads.length ? head + rows + doneLine : '<p class="fc-empty">Every case load for today is done.</p>' + doneLine;
       // A late reason with no room beside its bar keeps only how late it is (the whole reason is on hover).
       document.querySelectorAll('#loads .fc-why').forEach(b => { if (b.scrollWidth > b.clientWidth + 1) b.textContent = b.dataset.short; });

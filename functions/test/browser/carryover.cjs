@@ -104,9 +104,12 @@ async function openPage(browser, url, w, h, opts) {
     const rep = JSON.parse(reports[0].reportJson), f = rep.forecast;
     assert.deepEqual(rep.behind.map(x => x.route).sort(), ['901_1', '907_1', '909_1', '971'], 'Routes Behind lists every left-over load');
     assert.ok(rep.behind.filter(x => x.route !== '971').every(x => /left over from Mon 10-19-26/.test(x.late)), 'a left-over load not yet past its dispatch says it is left over');
-    // The forecast takes last night's loads first (901, paused, waits its turn like the rest), then today's in order.
-    assert.deepEqual(f.loads.map(x => x.route), ['971', '901_1', '909_1', '907_1', '855', '856', '852', '849', '813']);
-    assert.ok(f.loads[1].est > f.loads[0].est, 'the paused load is not counted as nearly done');
+    // The forecast takes last night's loads first (901, paused, waits its turn like the rest), then today's.
+    // Joe 11/1: behind, the truck that leaves first loads first (by dispatch time), so 909 (6:00 AM) goes before 901,
+    // and Jersey 852 (1:00 PM) before Save-A-Lot 2 (3:00 PM).
+    assert.equal(f.order, 'first to leave');
+    assert.deepEqual(f.loads.map(x => x.route), ['971', '909_1', '901_1', '907_1', '855', '852', '856', '813', '849']);
+    assert.ok(f.loads[2].est > f.loads[1].est, 'the paused load is not counted as nearly done');
     const lastPrior = f.loads[3].est, first = f.loads[4];
     assert.ok(first.start >= lastPrior, 'today starts after last night\'s leftovers');
     assert.equal(first.late, true, 'Save-A-Lot 855 (8:00 AM) cannot leave on time behind four left-over loads');
@@ -123,7 +126,7 @@ async function openPage(browser, url, w, h, opts) {
     await fc.waitForFunction(() => document.querySelectorAll('.fc-row:not(.fc-head)').length === 9, null, { timeout: 20000 });
     await shot(fc, 'carryover-forecast-1536');
     const order = await fc.$$eval('.fc-row:not(.fc-head)', rows => rows.map(r => r.querySelector('b').textContent));
-    assert.deepEqual(order, ['971', '901', '909', '907', '855', '856', '852', '849', '813']);
+    assert.deepEqual(order, ['971', '909', '901', '907', '855', '852', '856', '813', '849']);
     assert.deepEqual(await fc.$$eval('.fc-why', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent)), [], 'every late reason shows whole');
     assert.deepEqual(await fc.$$eval('.fc-row:not(.fc-head) .fc-est', els => els.map(e => e.textContent).filter(t => !/:\d[05] [AP]M/.test(t))), [], 'every Est. Done is on a 5-minute mark');
     assert.match(await fc.$eval('.fc-row:nth-of-type(6)', r => r.className + ' ' + r.textContent).catch(() => ''), /.*/);

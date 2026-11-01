@@ -1196,7 +1196,7 @@
     var share = past ? historyShare(date) : 0, ownPace = routePaces(input.history);
     var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history);
     var usualCases = sizes.all || (counted.length ? Math.round(counted.reduce(function (a, b) { return a + b; }, 0) / counted.length) : 600);
-    var open = loads.filter(function (r) { return r.state !== 'DONE'; }), out = [], cursor = now;
+    var open = loads.filter(function (r) { return r.state !== 'DONE'; }), out = [], cursor = now, order = 'load order';
     var item = function (r) {
       var cases = casesOf(r), size = cases || sizes.of(r) || usualCases, minutes = forecastMinutes(size, rate);
       // The run's own past speed (the plant's when it has none), for this week's share.
@@ -1214,28 +1214,44 @@
     // Joe 10/20: every Est. Done is rounded up to the next 5 minutes.
     var up5 = function (m) { return Math.ceil(m / 5) * 5; };
     open = open.filter(loadingNow).concat(open.filter(function (r) { return !loadingNow(r) && r.prior; }), open.filter(function (r) { return !loadingNow(r) && !r.prior; }));
-    open.filter(loadingNow).forEach(function (r) {
-      var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
-      x.start = s ? s.start + pausedMinutes(r, nowMs) : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
-    });
-    open.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
-    out.forEach(function (x) {
-      // Joe 10/22 ("Route 8302 being late, but the dispatch time is 9 a.m., so that's not late"): a load is late only when it is
-      // done after its own dispatch time; the 6:00 AM shift end counts only for a load with no dispatch time.
-      var deadline = x.leaves === null ? x.shiftEnd : x.leaves;
-      x.estText = minutesText12(((x.est % 1440) + 1440) % 1440); x.estDay = dayShort(x.est);
-      x.late = deadline !== null && x.est > deadline;
-      x.reason = !x.late ? '' : x.leaves !== null ? 'misses dispatch' : 'past the 6:00 AM shift end';
-      // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
-      // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
-      x.lateBy = !x.late ? 0 : x.priorDay ? Math.min(x.est - deadline, x.est - Math.max(x.start, now)) : x.est - deadline;
-      // Joe 10/31 ("one route is late, but that doesn't necessarily make us 9 hours behind… if that route takes 1 hour to load,
-      // we need to make sure that's included in our time"): in "About … behind", a load whose dispatch time has already gone
-      // by counts only the time from now until it is loaded, not every hour since it should have left (its own line still
-      // says how late it is).
-      x.behindBy = !x.late ? 0 : deadline <= now ? Math.min(x.est - deadline, x.est - now) : x.lateBy;
-      x.spare = !x.late && deadline !== null ? deadline - x.est : null;
-    });
+    // Places the loads in the given order: the ones loading now first, then the rest one after another, and marks each late
+    // or not (below).
+    var place = function (list) {
+      out = []; cursor = now;
+      list.filter(loadingNow).forEach(function (r) {
+        var x = item(r), s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() });
+        x.start = s ? s.start + pausedMinutes(r, nowMs) : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
+      });
+      list.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
+      out.forEach(function (x) {
+        // Joe 10/22 ("Route 8302 being late, but the dispatch time is 9 a.m., so that's not late"): a load is late only when it is
+        // done after its own dispatch time; the 6:00 AM shift end counts only for a load with no dispatch time.
+        var deadline = x.leaves === null ? x.shiftEnd : x.leaves;
+        x.estText = minutesText12(((x.est % 1440) + 1440) % 1440); x.estDay = dayShort(x.est);
+        x.late = deadline !== null && x.est > deadline;
+        x.reason = !x.late ? '' : x.leaves !== null ? 'misses dispatch' : 'past the 6:00 AM shift end';
+        // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
+        // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
+        x.lateBy = !x.late ? 0 : x.priorDay ? Math.min(x.est - deadline, x.est - Math.max(x.start, now)) : x.est - deadline;
+        // Joe 10/31 ("one route is late, but that doesn't necessarily make us 9 hours behind… if that route takes 1 hour to load,
+        // we need to make sure that's included in our time"): in "About … behind", a load whose dispatch time has already gone
+        // by counts only the time from now until it is loaded, not every hour since it should have left (its own line still
+        // says how late it is).
+        x.behindBy = !x.late ? 0 : deadline <= now ? Math.min(x.est - deadline, x.est - now) : x.lateBy;
+        x.spare = !x.late && deadline !== null ? deadline - x.est : null;
+      });
+    };
+    place(open);
+    // Joe 11/1 ("whenever we get behind, we go by what gets delivered first … by dispatch time … Save-A-Lot load 2 should be
+    // right after Save-A-Lot load 1, and then it will go to Jersey"): when the loading order makes a truck that has not left yet
+    // late (a truck already past its time does not change the order by itself), the plant
+    // loads the truck that leaves first, first (the load order breaks a tie; a load with no dispatch time goes last). That
+    // takes the place of last night's left-over loads going first.
+    if (out.some(function (x) { return x.late && x.leaves !== null && x.leaves > now; })) {
+      var waiting = open.filter(function (r) { return !loadingNow(r); }).map(function (r, i) { var l = item(r).leaves; return { r: r, i: i, l: l === null ? Infinity : l }; });
+      var rest = waiting.sort(function (p, q) { return p.l - q.l || p.i - q.i; }).map(function (w) { return w.r; });
+      place(open.filter(loadingNow).concat(rest)); order = 'first to leave';
+    }
     var opDay = dayNum(date) === null ? Math.floor((now - FORECAST.shiftEnd) / 1440) : dayNum(date), dueAt = (opDay + 1) * 1440 + dueBy;
     var sum = function (list) { return list.reduce(function (a, x) { return a + x.cases; }, 0); }, last = function (list) { return list.length ? Math.max.apply(null, list.map(function (x) { return x.est; })) : null; };
     var due = out.filter(function (x) { return x.leaves !== null && x.leaves <= dueAt; }), late = out.filter(function (x) { return x.late; });
@@ -1248,7 +1264,7 @@
     var dayTime = function (m) { return m === null ? '' : dayShort(m) + ' ' + timed(m); };
     var prior = out.filter(function (x) { return x.priorDay; }), priorDone = last(prior), todays = out.filter(function (x) { return !x.priorDay; });
     var priorDate = prior.length ? prior[0].loadDate : '';
-    return { asOf: zoned(nowMs, { hour: 'numeric', minute: '2-digit' }), now: now, date: date, rate: rate, from: from, share: share,
+    return { asOf: zoned(nowMs, { hour: 'numeric', minute: '2-digit' }), now: now, date: date, rate: rate, from: from, share: share, order: order,
       today: today, nights: nights, loads: out, late: late.length, behind: forecastBehind({ loads: out }),
       dueBy: dueBy, dueByText: minutesText12(dueBy), dueByWhen: dayShort(dueAt) + ' ' + minutesText12(dueBy), dueAt: dueAt,
       due: { loads: due.length, cases: sum(due), late: due.filter(function (x) { return x.late; }).length, done: dueDone, doneText: timed(dueDone), doneDay: dueDone === null ? '' : dayShort(dueDone), doneWhen: dayTime(dueDone) },
