@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/pmaint.css">
   <link rel="stylesheet" href="css/jug-trailers.css">
   <script src="js/logic.js"></script>
+  <script src="js/jug-rules.js"></script>
 </head>
 <body class="fill pm-page mach-page jt-page">
   <div class="signin" id="signin" hidden>
@@ -30,6 +31,7 @@
       <div class="title"><span class="eyebrow">Shipping &amp; Receiving · Inventory · <span id="plant-name"></span></span><h1>Plant Material Trailers</h1></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the test copy</span></div>
       <div class="actions in-head">
+        <button type="button" class="pm-btn" id="edit-lists">Edit Lists</button>
         <button type="button" class="pm-btn pri" id="add">+ Add Trailer</button>
         <select id="show" class="pm-pick" aria-label="Show">
           <option value="">All trailers</option><option value="LOADED">Loaded</option><option value="HALF">Half Full</option><option value="EMPTY">Empty</option>
@@ -38,13 +40,14 @@
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <!-- Joe 10/28 (mock-up 2): how many trailers are in the lot and how full; the list on the left, the trailer picked on the right. -->
+      <!-- Joe 10/28 (mock-up 2): how many trailers are in the lot and how full; the list on the left, the trailer picked on the right.
+           Joe 11/1 (mock-up 2): Trailer Company and Unit first; Location; Edit Lists. -->
       <div class="jt-sum" id="sum"></div>
       <div class="mach-split">
         <section class="pm-panel" aria-label="Trailers in the lot">
           <div class="pm-scroll">
             <table class="pm-table">
-              <thead><tr><th>Trailer</th><th>Status</th><th>What Is on It</th></tr></thead>
+              <thead><tr><th>Trailer Company</th><th>Unit</th><th>Status</th><th>What Is on It</th><th>Location</th></tr></thead>
               <tbody id="rows"></tbody>
             </table>
           </div>
