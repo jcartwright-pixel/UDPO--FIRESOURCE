@@ -50,10 +50,22 @@ Operations saves by itself the moment you change something. There is no Save but
 id: home
 screens: index.html, company.html, group.html
 
-The first screen after you sign in. Big cards open each part of Operations: **Plant Operations** and **Route Distribution** (each opens its own page of department cards), **Reports** and **Safety Walkthrough**. Under a card, its main screens have their own buttons and a few numbers (open truck issues, open garage work orders).
+The first screen after you sign in. Five big cards, left to right, open each part of Operations:
 
-- A card marked **Under Construction** opens only for administrators while it is being built.
-- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving and **Debag / Labeling Room** (the trailers in the lot).
+1. **Plant Operations** opens its own page of department cards: Plant Distribution, Plant Production, Shipping & Receiving and Debag / Labeling Room.
+2. **Plant Maintenance**: work orders and the PM schedule for the plant's machinery. It has its own menu too.
+3. **Shipping & Receiving**: Shipping and Receiving, then **Inventory** (dark blue) with every place the plant keeps stock under it: **Receiving Log**, **Plant Material Trailers** (the trailers in the lot), **Off-site Inventory** and **Inventory Room** (the last two are being built). On the menu and on the Plant Operations page it is still one of the Plant Operations departments.
+4. **Route Distribution** opens its own page of department cards: Route Distribution, Fleet & Maintenance and Garage.
+5. **Reports & Safety**: **Reports** (Walkthrough, Driver, Plant and Garage reports) and the **Safety Walkthrough** (Weekly Walk, Open Issues, Past Walks) in one card.
+
+Under a card, its main screens have their own buttons (a department in dark blue, its screens in light blue) and a few numbers (open truck issues, open garage work orders).
+
+- A card or button marked **Under Construction** opens only for administrators while it is being built (Plant Production, Plant Maintenance, Debag / Labeling Room, Inventory's Receiving Log, Off-site Inventory and Inventory Room, and the Safety Walkthrough for now).
+
+> Each card's `Open` button opens that card's own page. On Reports & Safety it opens Reports; press **Safety Walkthrough** on the card for the walk.
+
+!> Do not look for Plant Maintenance inside Plant Operations, or for the trailers in the lot under Debag / Labeling Room. Plant Maintenance has its own card, and the trailers are under Shipping & Receiving.
+
 - Someone who sees more than one plant starts on the **Operations Overview**: one tile per plant with today's numbers and recent activity. Click a plant to open its Home.
 - An administrator can give a person their own Home screen (People & Roles); they then start there, and `Home` still comes here.
 
@@ -745,13 +757,11 @@ Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made 
 - Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
 - `Print` prints the list.
 
-# Debag / Labeling Room
-
 ## Plant Material Trailers
 id: jug-trailers
 screens: jug-trailers.html
 
-The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+Part of **Inventory**, under Shipping & Receiving (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
 1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
 2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
@@ -767,6 +777,18 @@ The dry box trailers parked in the plant's lot with plant material on them (jugs
 > A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
 
 !> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
+
+# Debag / Labeling Room
+
+## Debag / Labeling Room
+id: debag
+screens: soon.html?what=debag-labeling-room
+
+Where the half-gallon, quart and pint bottles come out of their bags and go onto the conveyor, through the labelers, to the fillers. It is a department of **Plant Operations** (its button is on the Plant Operations card). It is **Under Construction**: its screens are being built, so only administrators can open it, and it shows a "being built" page for now.
+
+- The button on that page opens **Plant Material Trailers**, which is under Shipping & Receiving, in Inventory.
+
+!> Do not look here for the trailers in the lot. They are in **Inventory** under Shipping & Receiving.
 
 # Plant Checks
 

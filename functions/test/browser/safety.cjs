@@ -113,24 +113,25 @@ async function cameraShot(page, color) {
     await mg.close();
     results.push('Safety Walkthrough is administrators only while it is being built (a manager is refused every screen)');
 
-    // The plant home: Safety Walkthrough next to Reports, under construction (Joe 10/26, 1E: the fourth of four cards, with its
-    // main screens under its Open button), on one row at 1536 and 1920.
+    // The plant home: Joe 10/31, Reports & Safety is one card (the last of five): Reports and then Safety Walkthrough (being built)
+    // as dark blue lines, each with its main screens under it, on one row at 1536 and 1920.
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       const home = await openPage(browser, w, h, '/index.html?' + ADMIN);
       await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
       await home.goto(HOSTING + '/index.html?' + ADMIN);
-      await home.waitForSelector('.hq-card[data-card-side="safety"]');
+      await home.waitForSelector('.hq-card[data-joined="safety"]');
       await home.waitForTimeout(400);
-      assert.deepEqual(await home.$$eval('.hq-card > strong', c => c.map(x => x.textContent)), ['Plant Operations', 'Route Distribution', 'Reports', 'Safety Walkthrough']);
-      assert.equal(await home.$eval('.hq-card[data-card-side="safety"]', c => c.classList.contains('building') && !!c.querySelector('.uc-banner') && !!c.querySelector('svg.launch-icon')), true, 'the card has its icon and the Under Construction banner');
+      assert.deepEqual(await home.$$eval('.hq-card > strong', c => c.map(x => x.textContent)), ['Plant Operations', 'Plant Maintenance', 'Shipping & Receiving', 'Route Distribution', 'Reports & Safety']);
+      assert.deepEqual(await home.$$eval('.hq-card[data-joined="safety"] .hq-main', a => a.map(x => x.textContent + ':' + x.classList.contains('building'))), ['Reports:false', 'Safety Walkthrough:true']);
+      assert.equal(await home.$$eval('.hq-card[data-joined="safety"] svg.launch-icon', s => s.length), 1, 'the card has the Reports icon');
       assert.deepEqual(await home.$$eval('.hq-sub[data-side="safety"]', a => a.map(x => x.getAttribute('href'))), ['safety.html', 'safety-issues.html', 'safety-walks.html']);
       const tops = await home.evaluate(() => new Set([...document.querySelectorAll('.hq-card')].map(c => Math.round(c.getBoundingClientRect().top))).size);
-      assert.equal(tops, 1, 'one row of four');
+      assert.equal(tops, 1, 'one row of five');
       await shot(home, 'safety-home-' + w);
       assert.deepEqual(home.errors, []);
       await home.close();
     }
-    results.push('The plant home shows Safety Walkthrough as the fourth card next to Reports, under construction, with its main screens under it, one row at 1536 and 1920');
+    results.push('The plant home shows Reports & Safety as one card, the last of five: Reports, then Safety Walkthrough (being built) with its main screens under it, one row at 1536 and 1920');
 
     // The walk.
     const wk = await openPage(browser, 1920, 1080, '/safety.html?' + ADMIN);

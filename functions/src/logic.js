@@ -1480,10 +1480,13 @@
       ['crewBoard', 'Schedule Board', ['crew.html']], ['crewVacations', 'Plant Vacations', ['crew.html']], ['crewSetup', 'Plant Schedule Setup', ['crew.html']]] },
     // Joe 10/26 (ej): Shipping & Receiving, its own department: the scheduler (was on Plant Distribution) and Inventory (was its own
     // card). Same screen keys, so saved ticks still hold.
+    // Joe 10/31: Plant Material Trailers moved here, into Inventory, from Debag / Labeling Room (same screen key, so saved ticks
+    // still hold). Debag / Labeling Room has no screens of its own yet.
     { key: 'shipping', name: 'Shipping & Receiving', home: 'scheduler.html', screens: [
-      ['scheduler', 'Shipping and Receiving Schedule', ['scheduler.html']], ['receiving', 'Inventory (Receiving Log)', ['inventory.html']]] },
-    // Joe 10/28: Debag / Labeling Room, its own department: the plant material trailers parked in the lot.
-    { key: 'debag', name: 'Debag / Labeling Room', home: 'jug-trailers.html', screens: [['jugTrailers', 'Plant Material Trailers', ['jug-trailers.html']]] },
+      ['scheduler', 'Shipping and Receiving Schedule', ['scheduler.html']], ['receiving', 'Inventory (Receiving Log)', ['inventory.html']],
+      ['jugTrailers', 'Inventory (Plant Material Trailers)', ['jug-trailers.html']]] },
+    // Joe 10/31: Debag / Labeling Room, its own Home card, with no screens yet (Under Construction, administrators only).
+    { key: 'debag', name: 'Debag / Labeling Room', home: '', screens: [] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],
@@ -1575,9 +1578,8 @@
     { key: 'crew', name: 'Plant Vacations & Schedule', first: 'Plant Vacations & Schedule', sections: ['Plant Vacations & Schedule'] },
     { key: 'pmaint', name: 'Plant Maintenance', first: 'Plant Maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'] },
     // Joe 10/26 (ej): Shipping & Receiving.
-    { key: 'shipping', name: 'Shipping & Receiving', first: '', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'] },
-    // Joe 10/28: Debag / Labeling Room (Plant Material Trailers).
-    { key: 'debag', name: 'Debag / Labeling Room', first: 'Debag / Labeling Room', sections: ['Debag / Labeling Room'] }
+    // Joe 10/31: Plant Material Trailers is in Inventory now; Debag / Labeling Room has no menu sections until its screens are built.
+    { key: 'shipping', name: 'Shipping & Receiving', first: '', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'] }
   ];
   var MENU_POOL = MENU_SIDES.reduce(function (all, s) { s.sections.forEach(function (g) { if (all.indexOf(g) < 0) all.push(g); }); return all; }, []);
   // The plant's menu: { sideKey: [sections] } from what Menu Setup saved (or the app's own order when nothing is saved).
