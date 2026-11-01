@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/plant.css">
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
+  <script src="js/scan-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page sched-page">
   <div class="signin" id="signin" hidden>
@@ -30,8 +31,8 @@
       <!-- Joe 10/10: Shipping / Receiving right beside the dates, a little apart, the one in use lit. Review item 37 (Joe 10/13): no date
            box; This week (or Today, This month) and the arrows on the right move the dates. -->
       <div class="title"><span class="eyebrow">Shipping &amp; Receiving · <b id="lane-name">Shipping</b></span>
-        <div class="sc-titleline"><h1 id="range">Shipping &amp; Receiving</h1>
-          <div class="tabs lane seg sc-lane" role="group" aria-label="Shipping or Receiving"><button type="button" data-lane="SHIPPING">Shipping</button><button type="button" data-lane="RECEIVING">Receiving</button></div></div></div>
+        <!-- Joe 11/1: Shipping and Receiving are separate screens (the left menu has each), so there is no Shipping | Receiving switch. -->
+        <div class="sc-titleline"><h1 id="range">Shipping &amp; Receiving</h1></div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
     </div>
     <div class="notice error" id="error" hidden></div>
@@ -50,8 +51,9 @@
       <!-- Joe 10/10: the counts and the holiday colour key sit in a slim strip under the top line, so the month title and the
            buttons keep their room. -->
       <div class="sc-strip"><div class="hstats" id="hstats"></div>
-        <!-- Joe 10/13 ("Where do I edit my receivers"): Receiving's supplier list, to add, edit or remove a supplier (in this strip, so the top line keeps its room). -->
-        <button type="button" class="sc-btn small sc-supbtn" id="suppliers" hidden>Suppliers</button><span class="sc-grow"></span><span class="sc-legend" id="legend" aria-label="Who delivers the load"><span class="sc-by ut"><i></i>Uniontown truck</span><span class="sc-by branch"><i></i>Branch</span><span class="sc-by carrier"><i></i>Carrier</span></span><span class="sc-key"><i></i>Holiday</span></div>
+        <!-- Joe 11/1 (mock-up 2): Receiving's Calendar and Suppliers & Products, where the plant adds, edits and removes its suppliers and
+             the products each one sends (in this strip, so the top line keeps its room). -->
+        <div class="tabs seg sc-rtabs" id="rtabs" role="tablist" aria-label="Receiving" hidden><button type="button" data-rtab="calendar">Calendar</button><button type="button" data-rtab="products" id="suppliers">Suppliers &amp; Products</button></div><span class="sc-grow"></span><span class="sc-legend" id="legend" aria-label="Who delivers the load"><span class="sc-by ut"><i></i>Uniontown truck</span><span class="sc-by branch"><i></i>Branch</span><span class="sc-by carrier"><i></i>Carrier</span></span><span class="sc-key"><i></i>Holiday</span></div>
       <div class="sc-body" id="body"></div>
     </div>
   </div>
@@ -64,16 +66,20 @@
     import { collection, doc, query, where, onSnapshot, getDocs } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { watchLoads as watchRunDays } from './js/recent-records.js';
+    import { listenForScans, beep } from './js/scan-input.js';
 
-    const L = window.UDLogic, R = window.UDPlant;
+    const L = window.UDLogic, R = window.UDPlant, S = window.UDScan;
     const params = new URLSearchParams(location.search);
     const today = () => L.operatingDay(new Date());
     const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month', 'history'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
+    let lane = R.lane(params.get('lane')), view = ['day', 'week', 'month', 'history', 'products'].indexOf(params.get('view')) >= 0 ? params.get('view') : (window.matchMedia('(max-width: 760px)').matches ? 'day' : 'month'); // a phone opens on the day: a month of boxes is too small to read
     let date = L.isDateKey(params.get('date')) ? params.get('date') : today();
     let loads = { SHIPPING: [], RECEIVING: [] }, seen = { SHIPPING: false, RECEIVING: false }, supplierDocs = [], routeDocs = [], person = null, app = {}, db = null, search = '';
     const pending = {};           // load id -> the load as saved (or {deleted: true}) while its save is on its way
     const pendingSuppliers = [];  // suppliers added while their save is on its way
+    // Joe 11/1 (mock-up 2): Receiving's products (receivingItems), the supplier picked on Suppliers & Products, the product line being
+    // edited there ('' none, 'new' a new one), and the calendar view to go back to.
+    let items = [], pickSup = '', editProd = '', calView = view === 'products' ? 'month' : view;
     const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const who = () => lane === 'RECEIVING' ? 'Supplier' : 'Customer';
 
@@ -83,12 +89,13 @@
     function monthEnd(key) { const d = at(monthStart(key)); d.setMonth(d.getMonth() + 1, 0); return key.slice(0, 8) + String(d.getDate()).padStart(2, '0'); }
     function range() {
       if (view === 'history') return { start: '0000-01-01', end: L.addDays(today(), -1) }; // every Receiving load before today
+      if (view === 'products') return { start: monthStart(date), end: monthEnd(date) };
       if (view === 'day') return { start: date, end: date };
       if (view === 'week') { const s = L.weekStart(date); return { start: s, end: L.addDays(s, 6) }; }
       return { start: monthStart(date), end: monthEnd(date) };
     }
     function step(dir) {
-      if (view === 'history') return date;
+      if (view === 'history' || view === 'products') return date;
       if (view === 'day') return L.addDays(date, dir);
       if (view === 'week') return L.addDays(L.weekStart(date), 7 * dir);
       const d = at(monthStart(date)); d.setMonth(d.getMonth() + dir, 1);
@@ -98,6 +105,7 @@
     function rangeTitle() {
       const r = range();
       if (view === 'history') return 'Receiving History';
+      if (view === 'products') return 'Suppliers & Products';
       // Review item 60 (Joe 10/13): the month reads Oct 26 (its 3-letter name and 2-digit year).
       if (view === 'month') return at(date).toLocaleDateString('en-US', { month: 'short' }) + ' ' + String(at(date).getFullYear()).slice(-2);
       if (view === 'week') return shortDate(r.start) + ' – ' + shortDate(r.end);
@@ -118,7 +126,7 @@
       return lane === 'RECEIVING' ? out : R.withDispatchTimes(out, liveRuns);
     }
     function catalog() {
-      if (lane === 'RECEIVING') return R.scheduleSuppliers(supplierDocs).concat(pendingSuppliers);
+      if (lane === 'RECEIVING') { const real = R.scheduleSuppliers(supplierDocs); return real.concat(pendingSuppliers.filter(p => !real.some(r => r.routeId === p.routeId))); }
       return R.scheduleCustomers(routeDocs);
     }
     function routeFor(x) {
@@ -151,14 +159,16 @@
 
     /* ---------- drawing ---------- */
     function render() {
-      if (view === 'history' && lane !== 'RECEIVING') view = 'month';
+      if ((view === 'history' || view === 'products') && lane !== 'RECEIVING') view = 'month';
       document.getElementById('v-history').hidden = lane !== 'RECEIVING';
+      document.getElementById('rtabs').hidden = lane !== 'RECEIVING';
+      document.querySelectorAll('[data-rtab]').forEach(b => b.setAttribute('aria-selected', String((b.dataset.rtab === 'products') === (view === 'products'))));
+      document.body.classList.toggle('sc-prod', view === 'products');
       document.querySelector('.sc-ctrl .stepper').hidden = view === 'history';
       watchLoads(); watchRuns();
       const ck = canSave(), r = range(), list = entries(), inRange = list.filter(x => x.date >= r.start && x.date <= r.end);
       document.body.classList.toggle('sc-recv', lane === 'RECEIVING');
       document.getElementById('lane-name').textContent = lane === 'RECEIVING' ? 'Receiving' : 'Shipping';
-      document.querySelectorAll('[data-lane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.lane === lane)));
       document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
       document.getElementById('range').lastChild.textContent = rangeTitle();
       document.getElementById('today').textContent = view === 'month' ? 'This month' : view === 'week' ? 'This week' : 'Today';
@@ -167,7 +177,6 @@
       [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
       document.getElementById('print').textContent = 'Print ' + (view === 'history' ? 'History' : view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
       document.getElementById('add').hidden = !ck;
-      document.getElementById('suppliers').hidden = lane !== 'RECEIVING';
       let tiles;
       if (view === 'history') { const sup = new Set(inRange.map(x => x.runId || x.run)).size, wks = new Set(inRange.map(x => L.weekStart(x.date))).size; tiles = [[inRange.length, inRange.length === 1 ? 'Past load' : 'Past loads'], [sup, sup === 1 ? 'Supplier' : 'Suppliers'], [wks, wks === 1 ? 'Week' : 'Weeks']]; }
       else if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
@@ -175,7 +184,11 @@
       document.getElementById('hstats').innerHTML = tiles.map(([n, l]) => '<div><b>' + n + '</b><span>' + l + '</span></div>').join('');
       const body = document.getElementById('body');
       body.className = 'sc-body sc-v-' + view;
-      body.innerHTML = view === 'history' ? historyHtml(inRange) : view === 'month' ? monthHtml(list) : view === 'week' ? weekHtml(list, ck) : dayHtml(list, ck);
+      // A product line being typed keeps what was typed when a save elsewhere redraws the screen.
+      const typed = {};
+      body.querySelectorAll('#pedit input, #pedit select').forEach(el => { typed[el.id] = el.value; });
+      body.innerHTML = view === 'products' ? productsHtml(ck) : view === 'history' ? historyHtml(inRange) : view === 'month' ? monthHtml(list) : view === 'week' ? weekHtml(list, ck) : dayHtml(list, ck);
+      Object.keys(typed).forEach(id => { const el = document.getElementById(id); if (el) el.value = typed[id]; });
       const s = body.querySelector('#who-search');
       if (s) { s.value = search; s.oninput = () => { search = s.value; filterWho(); }; filterWho(); }
       const hs = body.querySelector('#hist-search');
@@ -252,11 +265,98 @@
         (ck ? '<div class="sc-dayadd"><button type="button" class="sc-btn primary" data-new="' + date + '">＋ Add ' + (lane === 'RECEIVING' ? 'Load' : 'Route') + '</button></div>' : '');
     }
 
+    /* ---------- Suppliers & Products (Joe 11/1, mock-up 2) ---------- */
+    // Pick a supplier on the left; its products are on the right, each with Edit. ＋ Add Product opens a new line at the top of
+    // the list (no pop-up). A product the Boxing tablet named from a barcode, with no supplier yet, is under "No supplier yet".
+    const NO_SUP = '__none';
+    const supName = (r) => r ? r.name || r.run || r.route || '' : '';
+    const productsOf = (supId) => supId === NO_SUP ? items.filter(i => !catalog().some(s => s.routeId === i.supplierId)).sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base', numeric: true })) : R.supplierProducts(items, supId);
+    const num = (n) => n === null || n === undefined || n === '' ? '' : Number(n).toLocaleString('en-US');
+    const opts = (list, cur, blank) => (blank ? '<option value="">' + blank + '</option>' : '') + list.map(v => '<option' + (v === cur ? ' selected' : '') + '>' + escapeHtml(v) + '</option>').join('');
+    function productsHtml(ck) {
+      const sups = catalog(), loose = productsOf(NO_SUP);
+      if (pickSup !== NO_SUP && !sups.some(r => r.routeId === pickSup)) pickSup = sups.length ? sups[0].routeId : NO_SUP;
+      if (pickSup === NO_SUP && !loose.length && sups.length) pickSup = sups[0].routeId;
+      const n = (k) => k + ' product' + (k === 1 ? '' : 's');
+      const left = '<aside class="sc-sups"><h3>Suppliers' + (ck ? '<span><button type="button" class="sc-btn small" id="supplier-list">Add a List</button><button type="button" class="sc-btn small primary" id="supplier-add">＋ Supplier</button></span>' : '') + '</h3>' +
+        (listNote ? '<p class="sc-supnote">' + escapeHtml(listNote) + '</p>' : '') + '<div class="sc-suppick">' +
+        sups.map(r => '<button type="button" data-pick="' + escapeHtml(r.routeId) + '" aria-selected="' + (r.routeId === pickSup) + '"><strong>' + escapeHtml(supName(r)) + '</strong><small>' + (r.temp ? 'Saving&hellip;' : n(R.supplierProducts(items, r.routeId).length)) + '</small></button>').join('') +
+        (loose.length ? '<button type="button" data-pick="' + NO_SUP + '" aria-selected="' + (pickSup === NO_SUP) + '"><strong>No supplier yet</strong><small>' + n(loose.length) + '</small></button>' : '') +
+        (sups.length || loose.length ? '' : '<p class="sc-none">No suppliers on the list.</p>') + '</div></aside>';
+      const sup = sups.find(r => r.routeId === pickSup) || null, list = productsOf(pickSup), title = sup ? supName(sup) : pickSup === NO_SUP ? 'No supplier yet' : '';
+      const row = (i) => editProd === i.id && ck ? editRow(i) : '<tr class="' + (R.inventoryLow(i) ? 'low' : '') + '"><td class="strong">' + escapeHtml(i.name) + '</td><td>' + escapeHtml(i.kind || '—') + '</td><td>' + escapeHtml(i.unit || '—') + '</td>' +
+        '<td class="num">' + (num(i.low) || '—') + '</td><td class="num strong">' + num(R.shouldHave(i)) + '</td><td class="num">' + ((i.barcodes || []).length || '—') + '</td>' +
+        '<td>' + (ck ? '<button type="button" class="sc-btn small" data-prod="' + escapeHtml(i.id) + '">Edit</button>' : '') + '</td></tr>';
+      const right = '<section class="sc-prods">' + (title ? '<h3><span>' + escapeHtml(title) + '</span>' + (ck && sup && !sup.temp ? '<button type="button" class="sc-btn small" data-supplier="' + escapeHtml(sup.routeId) + '">Edit supplier</button>' : '') +
+          '<span class="sc-grow"></span>' + (ck && sup && !sup.temp ? '<button type="button" class="sc-btn primary" id="prod-add">＋ Add Product for ' + escapeHtml(title) + '</button>' : '') + '</h3>' : '') +
+        '<div class="notice error sc-err" id="p-error" hidden></div>' +
+        '<div class="sheet scroll-list"><table class="sc-table sc-prodtable"><colgroup><col style="width:30%"><col style="width:13%"><col style="width:13%"><col style="width:10%"><col style="width:11%"><col style="width:8%"><col style="width:15%"></colgroup>' +
+        '<thead><tr><th>Product</th><th>Kind</th><th>Counted in</th><th class="num">Low mark</th><th class="num">Should have</th><th class="num">Barcodes</th><th></th></tr></thead><tbody>' +
+        (editProd === 'new' && ck && sup ? editRow(null) : '') + list.map(row).join('') +
+        (list.length || editProd === 'new' ? '' : '<tr><td colspan="7" class="empty">' + (title ? 'No products for ' + escapeHtml(title) + ' yet.' + (ck && sup ? ' Press ＋ Add Product.' : '') : 'Add a supplier first.') + '</td></tr>') +
+        '</tbody></table></div><p class="sc-prodnote">Should have = the last count on Inventory, plus what came in since. Red: below its low mark.</p></section>';
+      return '<div class="sc-prodsplit">' + left + right + '</div>';
+    }
+    // The line being added or edited: drop-downs start blank on a new product.
+    function editRow(i) {
+      const v = (k) => i ? i[k] : '';
+      const supPick = i ? '<label class="sc-movesup">Supplier <select id="p-sup">' + catalog().filter(r => !r.temp).map(r => '<option value="' + escapeHtml(r.routeId) + '"' + (r.routeId === (i.supplierId || '') ? ' selected' : '') + '>' + escapeHtml(supName(r)) + '</option>').join('') +
+        (catalog().some(r => r.routeId === i.supplierId) ? '' : '<option value="" selected>No supplier yet</option>') + '</select></label>' : '';
+      return '<tr class="edit" id="pedit"><td><input id="p-name" maxlength="120" placeholder="Product name" aria-label="Product name" value="' + escapeHtml(v('name') || '') + '">' + supPick + '</td>' +
+        '<td><select id="p-kind" aria-label="Kind">' + opts(R.INVENTORY_KINDS, v('kind'), 'Pick one') + '</select></td>' +
+        '<td><select id="p-unit" aria-label="Counted in">' + opts(R.INVENTORY_UNITS, v('unit'), 'Pick one') + '</select></td>' +
+        '<td class="num"><input id="p-low" inputmode="numeric" maxlength="7" placeholder="Optional" aria-label="Low mark" value="' + escapeHtml(v('low') === null || v('low') === undefined ? '' : String(v('low'))) + '"></td>' +
+        '<td class="num">' + (i ? num(R.shouldHave(i)) : '0') + '</td>' +
+        '<td class="num">' + ((i && (i.barcodes || []).length) || '—') + '</td>' +
+        '<td><div class="acts"><button type="button" class="sc-btn small primary" id="p-save">Save</button><button type="button" class="sc-btn small" id="p-cancel">Cancel</button>' +
+        (i ? '<button type="button" class="sc-btn small danger" id="p-remove">Remove</button>' : '') + '</div></td></tr>';
+    }
+    function prodError(t) { const b = document.getElementById('p-error'); if (b) { b.textContent = t; b.hidden = !t; } }
+    async function saveProduct() {
+      const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+      const name = val('p-name').replace(/\s+/g, ' '), low = val('p-low').replace(/,/g, '');
+      if (!name) return prodError('Type the product name.');
+      if (low && !/^[0-9]{1,7}$/.test(low)) return prodError('The low mark must be a whole number.');
+      const others = items.filter(i => i.id !== editProd);
+      if (others.some(i => String(i.name).toUpperCase() === name.toUpperCase())) return prodError(name + ' is already on the list.');
+      const req = { lane: 'RECEIVING', op: editProd === 'new' ? 'addProduct' : 'editProduct', itemId: editProd === 'new' ? '' : editProd, name,
+        supplierId: editProd === 'new' ? pickSup : val('p-sup'), kind: val('p-kind'), unit: val('p-unit'), low };
+      document.querySelectorAll('#pedit button, #pedit input, #pedit select').forEach(b => { b.disabled = true; });
+      document.getElementById('p-save').textContent = 'Saving…';
+      try {
+        await save('savePlantSchedule', req);
+        showError('');
+        if (req.supplierId && editProd !== 'new') pickSup = req.supplierId;
+        editProd = ''; render();
+      } catch (e) {
+        document.querySelectorAll('#pedit button, #pedit input, #pedit select').forEach(b => { b.disabled = false; });
+        document.getElementById('p-save').textContent = 'Save';
+        prodError('Not saved (' + (e.message || e) + ').');
+      }
+    }
+    async function removeProduct(btn) {
+      if (btn.dataset.armed !== '1') { btn.dataset.armed = '1'; btn.textContent = 'Press again to remove'; return; }
+      btn.disabled = true;
+      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'removeProduct', itemId: editProd }); showError(''); editProd = ''; render(); }
+      catch (e) { btn.disabled = false; prodError('Not removed (' + (e.message || e) + ').'); }
+    }
+
     /* ---------- dialogs ---------- */
     const modal = document.getElementById('modal'), back = document.getElementById('modal-back');
     let openDay = null;
-    function openModal(html) { modal.innerHTML = html; modal.hidden = false; back.hidden = false; }
-    function closeModal() { modal.hidden = true; back.hidden = true; modal.innerHTML = ''; openDay = null; }
+    // Joe 11/1 (no overlays): on Receiving every box opens in the page, in place of the calendar; Cancel, Close or Back returns.
+    document.querySelector('#screen .view').appendChild(modal);
+    function openModal(html) {
+      stopScan();
+      const paged = lane === 'RECEIVING';
+      modal.innerHTML = html; modal.hidden = false; back.hidden = paged;
+      modal.classList.toggle('sc-pagebox', paged);
+      document.body.classList.toggle('sc-paged', paged);
+      if (paged) { modal.removeAttribute('aria-modal'); const sc = document.querySelector('.content-shell') || document.scrollingElement; if (sc) sc.scrollTop = 0; }
+    }
+    function closeModal() { stopScan(); modal.hidden = true; back.hidden = true; modal.innerHTML = ''; openDay = null; document.body.classList.remove('sc-paged'); }
+    let scanStop = null;
+    function stopScan() { if (scanStop) { scanStop(); scanStop = null; } }
     back.onclick = closeModal;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 
@@ -292,11 +392,13 @@
         '<label>Pickup Time<input id="f-time" type="time" value="' + escapeHtml(x ? x.pickupTime : '') + '"' + dis + '><small id="f-time-note">' + (x && x.fromDispatch ? 'From the dispatch sheet' : '') + '</small></label></div>' +
         '<label>Trailer<input id="f-trailer" list="f-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer" value="' + escapeHtml(x ? x.trailer : '') + '"' + dis + '><datalist id="f-trailers"></datalist><small id="f-trailer-note">Pick from the list or type one</small></label>' +
         '<label>PO Number<input id="f-po" maxlength="40" placeholder="Needed for a carrier load" value="' + escapeHtml(x ? x.poNumber : '') + '"' + dis + '></label>' +
-        '<label>Cases<input id="f-cases" inputmode="numeric" maxlength="6" placeholder="Optional" value="' + escapeHtml(x ? x.cases : '') + '"' + dis + '></label>' +
-        '<label>Product<input id="f-product" maxlength="80" placeholder="Optional" value="' + escapeHtml(x ? x.product : '') + '"' + dis + '></label>' +
-        '<label class="wide">Notes<textarea id="f-notes"' + dis + '>' + escapeHtml(x ? x.notes : '') + '</textarea></label></div>' +
+        (ship ? '<label>Cases<input id="f-cases" inputmode="numeric" maxlength="6" placeholder="Optional" value="' + escapeHtml(x ? x.cases : '') + '"' + dis + '></label>' +
+        '<label>Product<input id="f-product" maxlength="80" placeholder="Optional" value="' + escapeHtml(x ? x.product : '') + '"' + dis + '></label>' : '') +
+        (ship ? '' : linesBox(x, ck)) + '<label class="wide">Notes<textarea id="f-notes"' + dis + '>' + escapeHtml(x ? x.notes : '') + '</textarea></label></div>' +
         '<div class="notice error sc-err" id="f-error" hidden></div>' +
-        '<div class="modal-actions">' + (x && ck ? '<button type="button" class="danger sc-left" id="f-delete">Delete Load</button>' : '') + '<button type="button" data-close>' + (ck ? 'Cancel' : 'Close') + '</button>' + (ck ? '<button type="button" class="primary" id="f-save">Save Load</button>' : '') + '</div>');
+        '<div class="modal-actions">' + (x && ck ? '<button type="button" class="danger sc-left" id="f-delete">Delete Load</button>' : '') + '<button type="button" data-close>' + (ck ? 'Cancel' : 'Close') + '</button>' + (ck ? '<button type="button" class="primary" id="f-save">Save Load</button>' : '') +
+        (!ship && x && ck && !x.received ? '<button type="button" class="primary sc-receive" id="f-receive">Mark Received</button>' : '') + '</div>');
+      if (!ship) startLines(x, ck, options);
       const loadIn = document.getElementById('f-load'), dateIn = document.getElementById('f-date'), kindIn = document.getElementById('f-kind');
       if (kindIn) document.getElementById('f-route').addEventListener('change', ev => {
         const r = options[Number(ev.target.value)];
@@ -323,11 +425,167 @@
       trailers(loadIn.value || key);
       if (!ck) return;
       document.getElementById('f-save').onclick = () => saveLoad(x, options);
+      const rcv = document.getElementById('f-receive');
+      if (rcv) rcv.onclick = () => markReceived(x, options);
       // The cursor starts in the first box of a new load; Enter in any box but Notes saves.
       if (!x) document.getElementById('f-route').focus();
       modal.querySelector('.sc-form').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA' && ev.target.tagName !== 'BUTTON') { ev.preventDefault(); document.getElementById('f-save').click(); } });
       const del = document.getElementById('f-delete');
       if (del) del.onclick = () => confirmDelete(x);
+    }
+
+    /* ---------- a Receiving load's products, and checking it in (Joe 11/1) ---------- */
+    // "one trailer could have multiple items on it ... a quantity of this many caps, a quantity of that many caps"; "when I'm receiving,
+    // I'm going to check in ... the supplier and then everything that's supposed to be on that trailer ... hook it up to a scanner".
+    // Each line: the product (the picked supplier's products first), what was ordered and, once the load is here, what came in.
+    // A scan adds to its product's Received (a pallet label its whole count); a barcode the app does not know asks which product
+    // it is once. Mark Received puts the received counts into Inventory.
+    let formLines = [], formLoad = null, formOptions = [], unknownScan = '';
+    const boxValue = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const itemById = (id) => items.find(i => i.id === id) || null;
+    function linesBox(x, ck) {
+      const old = x && !(x.lines || []).length && (x.product || x.cases) ? '<p class="sc-oldprod">Booked before products were listed: ' + escapeHtml([x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ')) + '</p>' : '';
+      const got = x && x.received ? '<p class="sc-gotnote">Received ' + escapeHtml(shortDate(L.operatingDay(new Date(x.received.at)))) + ' ' + escapeHtml(new Date(x.received.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + ' by ' + escapeHtml(String(x.received.by || '').split('@')[0]) + '. Its products are in Inventory.</p>' : '';
+      const scan = x && ck && !x.received ? '<div class="sc-scanbar"><label>Check in: scan each label<input id="f-scan" placeholder="Scan a label (or type the barcode and press Enter)" aria-label="Scan a label"></label><span id="f-scan-note" class="sc-scannote" aria-live="polite"></span></div>' +
+        '<div class="sc-unknown" id="f-unknown" hidden><b>New barcode.</b> Which product is it?<select id="f-unknown-pick" aria-label="Which product is it"></select><button type="button" class="sc-btn small primary" id="f-unknown-save">Save</button><button type="button" class="sc-btn small" id="f-unknown-skip">Skip</button></div>' : '';
+      return '<div class="wide sc-lines">' + got + old + scan + '<table class="sc-linetable"><thead><tr><th>Products on this load</th><th>Counted in</th><th class="num">Ordered</th>' + (x ? '<th class="num">Received</th>' : '') + '<th></th></tr></thead><tbody id="f-lines"></tbody></table>' +
+        '<div class="sc-linefoot">' + (ck && !(x && x.received) ? '<button type="button" class="sc-btn small" id="f-addline">＋ Add a product</button>' : '') + '<span id="f-linetot"></span></div></div>';
+    }
+    function startLines(x, ck, options) {
+      formLoad = x; formOptions = options; unknownScan = '';
+      formLines = x && (x.lines || []).length ? x.lines.map(l => Object.assign({}, l)) : [];
+      if (!formLines.length && ck && !(x && x.received)) formLines.push({ itemId: '', ordered: null, received: null });
+      drawLines();
+      const add = document.getElementById('f-addline');
+      if (add) add.onclick = () => { formLines.push({ itemId: '', ordered: null, received: null }); drawLines(); const sel = document.querySelectorAll('#f-lines select'); if (sel.length) sel[sel.length - 1].focus(); };
+      const route = document.getElementById('f-route');
+      if (route) route.addEventListener('change', drawLines);
+      const box = document.getElementById('f-scan');
+      if (box) {
+        scanStop = listenForScans({ box, onScan });
+        document.getElementById('f-unknown-save').onclick = linkUnknown;
+        document.getElementById('f-unknown-skip').onclick = () => { unknownScan = ''; document.getElementById('f-unknown').hidden = true; scanNote(''); box.focus(); };
+      }
+    }
+    const pickedSupplier = () => { const sel = document.getElementById('f-route'); return (sel && formOptions[Number(sel.value)]) || null; };
+    // The product drop-down: the supplier's products, then every other product.
+    function productOptions(cur) {
+      const sup = pickedSupplier(), mine = sup ? R.supplierProducts(items, sup.routeId) : [], rest = items.filter(i => mine.indexOf(i) < 0).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      const o = (i) => '<option value="' + escapeHtml(i.id) + '"' + (i.id === cur ? ' selected' : '') + '>' + escapeHtml(i.name) + '</option>';
+      const gone = cur && !itemById(cur) ? '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml((formLines.find(l => l.itemId === cur) || {}).name || 'Product no longer on the list') + '</option>' : '';
+      return '<option value="">Pick a product</option>' + gone + (mine.length ? '<optgroup label="' + escapeHtml(supName(sup) || 'This supplier') + '">' + mine.map(o).join('') + '</optgroup>' : '') +
+        (rest.length ? '<optgroup label="Other products">' + rest.map(o).join('') + '</optgroup>' : '');
+    }
+    function drawLines() {
+      const body = document.getElementById('f-lines');
+      if (!body) return;
+      const x = formLoad, ck = canSave(), locked = !ck || !!(x && x.received), dis = locked ? ' disabled' : '';
+      body.innerHTML = formLines.map((l, n) => {
+        const it = itemById(l.itemId), unit = (it && it.unit) || l.unit || '';
+        return '<tr data-line="' + n + '"><td><select data-f="itemId" aria-label="Product"' + dis + '>' + productOptions(l.itemId) + '</select></td><td>' + escapeHtml(unit || '—') + '</td>' +
+          '<td class="num"><input data-f="ordered" inputmode="numeric" maxlength="7" aria-label="Ordered" value="' + (l.ordered === null || l.ordered === undefined ? '' : l.ordered) + '"' + dis + '></td>' +
+          (x ? '<td class="num"><input data-f="received" inputmode="numeric" maxlength="7" aria-label="Received" class="' + (l.received !== null && l.ordered !== null && l.received !== undefined && l.received !== l.ordered ? 'off' : '') + '" value="' + (l.received === null || l.received === undefined ? '' : l.received) + '"' + dis + '></td>' : '') +
+          '<td>' + (locked ? '' : '<button type="button" class="sc-btn small danger" data-dropline="' + n + '">Remove</button>') + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="empty">No products on this load.</td></tr>';
+      body.oninput = body.onchange = (e) => {
+        const tr = e.target.closest('[data-line]'), k = e.target.dataset.f;
+        if (!tr || !k) return;
+        const l = formLines[Number(tr.dataset.line)];
+        if (k === 'itemId') { l.itemId = e.target.value; const it = itemById(l.itemId); l.name = it ? it.name : ''; l.unit = it ? it.unit || '' : ''; if (e.type === 'change') drawLines(); return; }
+        const t = e.target.value.replace(/,/g, '').trim();
+        l[k] = t === '' ? null : /^[0-9]{1,7}$/.test(t) ? Number(t) : t;
+        const got = tr.querySelector('[data-f="received"]');
+        if (got) got.classList.toggle('off', typeof l.received === 'number' && typeof l.ordered === 'number' && l.received !== l.ordered);
+        lineTotals();
+      };
+      body.onclick = (e) => { const b = e.target.closest('[data-dropline]'); if (!b) return; formLines.splice(Number(b.dataset.dropline), 1); drawLines(); };
+      lineTotals();
+    }
+    function lineTotals() {
+      const el = document.getElementById('f-linetot');
+      if (!el) return;
+      const real = formLines.filter(l => l.itemId), sum = (k) => real.reduce((n, l) => n + (typeof l[k] === 'number' ? l[k] : 0), 0);
+      const short = real.filter(l => typeof l.received === 'number' && typeof l.ordered === 'number' && l.received !== l.ordered);
+      el.innerHTML = real.length ? escapeHtml(real.length + ' product' + (real.length === 1 ? '' : 's') + ' · ' + sum('ordered').toLocaleString('en-US') + ' ordered' + (formLoad ? ' · ' + sum('received').toLocaleString('en-US') + ' received' : '')) +
+        (short.length ? ' · <b class="sc-off">' + escapeHtml(short.map(l => (l.received < l.ordered ? 'short ' + (l.ordered - l.received) : 'over ' + (l.received - l.ordered)) + ' on ' + ((itemById(l.itemId) || l).name || 'a product')).join(', ')) + '</b>' : '') : '';
+    }
+    // What is wrong with the lines, in words (receiving: every product needs its received count).
+    function lineProblem(receiving) {
+      const real = formLines.filter(l => l.itemId), ids = real.map(l => l.itemId);
+      if (formLines.some(l => !l.itemId && (l.ordered !== null || l.received !== null))) return 'Pick the product on each line, or remove the line.';
+      if (ids.some((id, i) => ids.indexOf(id) !== i)) return 'A product is on the load twice. Put its count on one line.';
+      if (real.some(l => l.ordered !== null && typeof l.ordered !== 'number')) return 'Ordered must be a whole number.';
+      if (real.some(l => l.received !== null && l.received !== undefined && typeof l.received !== 'number')) return 'Received must be a whole number.';
+      if (receiving) {
+        if (!real.length) return 'Put the products on the load before marking it received.';
+        const blank = real.filter(l => typeof l.received !== 'number');
+        if (blank.length) return 'Type what came in for ' + blank.map(l => (itemById(l.itemId) || l).name || 'each product').join(', ') + ' (0 if none came).';
+      }
+      return '';
+    }
+    function scanNote(t, bad) { const n = document.getElementById('f-scan-note'); if (n) { n.textContent = t; n.classList.toggle('bad', !!bad); } }
+    function onScan(raw) {
+      const p = S.parseScan(raw, new Date()), key = S.barcodeKey(p), qty = S.scanQuantity(p);
+      const it = key && items.find(i => (i.barcodes || []).indexOf(key) >= 0);
+      if (!it) {
+        beep(false);
+        unknownScan = raw;
+        const pick = document.getElementById('f-unknown-pick');
+        const onLoad = formLines.filter(l => l.itemId).map(l => l.itemId);
+        pick.innerHTML = '<option value="">Pick one</option>' + items.filter(i => onLoad.indexOf(i.id) >= 0).concat(items.filter(i => onLoad.indexOf(i.id) < 0)).map(i => '<option value="' + escapeHtml(i.id) + '">' + escapeHtml(i.name) + '</option>').join('');
+        document.getElementById('f-unknown').hidden = false;
+        scanNote('Not known yet: ' + (S.shownCode(p) || raw), true);
+        return;
+      }
+      countScan(it, qty, p);
+    }
+    function countScan(it, qty, p) {
+      let l = formLines.find(x => x.itemId === it.id);
+      if (!l) { const blank = formLines.find(x => !x.itemId); l = blank || { itemId: '', ordered: null, received: null }; if (!blank) formLines.push(l); Object.assign(l, { itemId: it.id, name: it.name, unit: it.unit || '' }); }
+      l.received = (typeof l.received === 'number' ? l.received : 0) + qty;
+      beep(true);
+      drawLines();
+      scanNote('+' + qty + ' ' + it.name + (p && p.lot ? ' (lot ' + p.lot + ')' : '') + ' · now ' + l.received + (typeof l.ordered === 'number' ? ' of ' + l.ordered : ''));
+    }
+    async function linkUnknown() {
+      const id = document.getElementById('f-unknown-pick').value, it = itemById(id), raw = unknownScan;
+      if (!it) return scanNote('Pick which product it is.', true);
+      const btn = document.getElementById('f-unknown-save');
+      btn.disabled = true;
+      try {
+        await save('savePlantSchedule', { lane: 'RECEIVING', op: 'linkBarcode', itemId: id, raw });
+        unknownScan = '';
+        document.getElementById('f-unknown').hidden = true;
+        const p = S.parseScan(raw, new Date());
+        countScan(it, S.scanQuantity(p), p);
+      } catch (e) { scanNote('Not saved (' + (e.message || e) + ').', true); }
+      btn.disabled = false;
+      const box = document.getElementById('f-scan'); if (box) box.focus();
+    }
+    // Mark Received: saves the load as it is typed, then puts each product's received count into Inventory.
+    async function markReceived(x, options) {
+      const bad = lineProblem(true);
+      if (bad) return formError(bad);
+      const r = options[Number(document.getElementById('f-route').value)], key = document.getElementById('f-date').value;
+      const f = { routeId: r ? r.routeId : '', runId: r ? r.runId : '', route: r ? r.route : '', run: r ? r.run : '', scheduleType: document.getElementById('f-type').value,
+        loadDate: document.getElementById('f-load').value, pickupTime: document.getElementById('f-time').value, trailer: document.getElementById('f-trailer').value.trim().toUpperCase(),
+        poNumber: document.getElementById('f-po').value.trim(), notes: document.getElementById('f-notes').value, lines: formLines.filter(l => l.itemId).map(l => ({ itemId: l.itemId, ordered: l.ordered })) };
+      if (!r) return formError('Pick the supplier.');
+      if (!R.time24(f.pickupTime)) return formError('Enter the pickup time.');
+      if (f.scheduleType === 'CARRIER' && !f.poNumber) return formError('A carrier load needs its PO number.');
+      const btn = document.getElementById('f-receive');
+      modal.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      btn.textContent = 'Saving…';
+      try {
+        await save('savePlantSchedule', { lane, op: 'save', id: x.id, date: key, fields: f });
+        await save('savePlantSchedule', { lane, op: 'receive', id: x.id, date: key, lines: formLines.filter(l => l.itemId).map(l => ({ itemId: l.itemId, received: l.received })) });
+        showError('');
+        closeModal(); render();
+      } catch (e) {
+        modal.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        btn.textContent = 'Mark Received';
+        formError('Not received (' + (e.message || e) + '). Check the entries and press Mark Received again.');
+      }
     }
 
     // The trailer list: every active trailer, the ones not on a load that day marked available (read when the box opens).
@@ -354,8 +612,15 @@
       const r = options[Number(document.getElementById('f-route').value)];
       const f = { routeId: r ? r.routeId : '', runId: r ? r.runId : '', route: r ? r.route : '', run: r ? r.run : '', scheduleType: document.getElementById('f-type').value,
         loadDate: document.getElementById('f-load').value, pickupTime: document.getElementById('f-time').value, trailer: document.getElementById('f-trailer').value.trim().toUpperCase(),
-        poNumber: document.getElementById('f-po').value.trim(), cases: document.getElementById('f-cases').value.trim(), product: document.getElementById('f-product').value.trim(), notes: document.getElementById('f-notes').value };
+        poNumber: document.getElementById('f-po').value.trim(), cases: boxValue('f-cases'), product: boxValue('f-product'), notes: document.getElementById('f-notes').value };
       if (document.getElementById('f-kind')) f.loadType = document.getElementById('f-kind').value;
+      if (lane === 'RECEIVING') {
+        const bad = lineProblem(false);
+        if (bad) return formError(bad);
+        f.lines = formLines.filter(l => l.itemId).map(l => ({ itemId: l.itemId, ordered: l.ordered }));
+        // A load booked before products were listed keeps its Product and Cases words until products are put on it.
+        if (!f.lines.length && x) { f.product = x.product; f.cases = x.cases; }
+      }
       const key = document.getElementById('f-date').value;
       // The same checks as the server, so a mistake is fixed in the box.
       if (!r) return formError(lane === 'RECEIVING' ? 'Pick the supplier.' : 'Pick the route / run.');
@@ -373,6 +638,7 @@
       openLoad(key, x ? x.id : '', r ? { routeId: r.routeId, runId: r.runId } : null);
       const put = (id, v) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = v; };
       put('f-type', f.scheduleType); if (f.loadType) put('f-kind', f.loadType); put('f-date', key); put('f-load', f.loadDate); put('f-time', f.pickupTime); put('f-trailer', f.trailer); put('f-po', f.poNumber); put('f-cases', f.cases); put('f-product', f.product); put('f-notes', f.notes);
+      if (f.lines && document.getElementById('f-lines')) { const was = formLines; formLines = f.lines.map(l => Object.assign({ received: (was.find(w => w.itemId === l.itemId) || {}).received ?? null }, l)); drawLines(); }
     }
     function confirmLoad(x, r, f, key) {
       const c = R.scheduleCheck({ lane, runId: r.runId, run: r.run, date: key, loadDate: f.loadDate }, routeDocs, today());
@@ -434,7 +700,7 @@
         '<div class="modal-actions"><button type="button" id="s-cancel">Cancel</button><button type="button" class="primary" id="s-addall">Add Suppliers</button></div>');
       const box = document.getElementById('s-list');
       box.focus();
-      document.getElementById('s-cancel').onclick = openSuppliers;
+      document.getElementById('s-cancel').onclick = view === 'products' ? closeModal : openSuppliers;
       document.getElementById('s-addall').onclick = async () => {
         const seen = new Set(catalog().map(s => s.run.toUpperCase())), add = [], skipped = [];
         box.value.split(/\r?\n/).map(x => x.trim().replace(/\s+/g, ' ')).filter(Boolean).forEach(label => {
@@ -460,7 +726,7 @@
         }
         const msg = 'Added ' + add.length + ' supplier' + (add.length === 1 ? '' : 's') + '.' + (skipped.length ? ' Already on the list: ' + skipped.join(', ') + '.' : '');
         listNote = msg;
-        openSuppliers();
+        if (view === 'products') { closeModal(); render(); } else openSuppliers();
       };
     }
     // New Supplier, or Edit Supplier (with Remove) when sup is given.
@@ -484,9 +750,12 @@
         if (sup) return changeSupplier({ op: 'editSupplier', id: sup.routeId, name, label, code }, 'Edit Supplier', done);
         const temp = { routeId: 'new-' + Date.now(), runId: '', route: code || '…', run: name, name: label || name, temp: true };
         pendingSuppliers.push(temp);
+        // Suppliers & Products shows the new supplier, ready for its products.
+        if (view === 'products') { pickSup = temp.routeId; editProd = ''; }
         done(); render();
         try {
           const res = await save('savePlantSchedule', { lane: 'RECEIVING', op: 'addSupplier', name, label, code });
+          if (pickSup === temp.routeId && res.supplier) pickSup = res.supplier.routeId;
           Object.assign(temp, res.supplier || {});
           showError('');
           setTimeout(() => { pendingSuppliers.splice(pendingSuppliers.indexOf(temp), 1); render(); if (!modal.hidden && modal.querySelector('.sc-suptable')) openSuppliers(); }, 1500);
@@ -527,13 +796,19 @@
         if (t.dataset.runId !== undefined) return openLoad(t.dataset.new, '', { routeId: t.dataset.routeId, runId: t.dataset.runId });
         return openLoad(t.dataset.new, '');
       }
+      if (t.dataset.rtab) { listNote = ''; return setView(t.dataset.rtab === 'products' ? 'products' : calView || 'month'); }
+      if (t.dataset.pick) { pickSup = t.dataset.pick; editProd = ''; return render(); }
+      if (t.id === 'prod-add') { editProd = 'new'; render(); const n = document.getElementById('p-name'); if (n) n.focus(); return; }
+      if (t.dataset.prod) { editProd = t.dataset.prod; render(); const n = document.getElementById('p-name'); if (n) n.focus(); return; }
+      if (t.id === 'p-save') return saveProduct();
+      if (t.id === 'p-cancel') { editProd = ''; return render(); }
+      if (t.id === 'p-remove') return removeProduct(t);
       if (t.id === 'supplier-add') return openSupplier();
       if (t.id === 'suppliers') { listNote = ''; return openSuppliers(); }
       if (t.id === 'supplier-new') return openSupplier(null, true);
       if (t.id === 'supplier-list') { listNote = ''; return openSupplierList(); }
       if (t.dataset.supplier) { const sup = catalog().find(r => r.routeId === t.dataset.supplier); if (sup) openSupplier(sup, !!t.closest('#modal')); return; }
       if (t.dataset.view) { setView(t.dataset.view); return; }
-      if (t.dataset.lane) { lane = t.dataset.lane; search = ''; if (view === 'history' && lane !== 'RECEIVING') view = 'month'; push(); render(); }
     });
     function push() { history.replaceState(null, '', '?' + new URLSearchParams(Object.assign({ view, date }, lane === 'RECEIVING' ? { lane: 'receiving' } : {})).toString()); }
     function setView(v) {
@@ -541,8 +816,18 @@
       const t = today();
       if (view === 'month' && v !== 'month' && date.slice(0, 7) === t.slice(0, 7)) date = t;
       if (view === 'week' && v !== 'week' && t >= L.weekStart(date) && t <= L.addDays(L.weekStart(date), 6)) date = t;
+      if (v !== 'products') calView = v;
+      editProd = '';
       view = v; push(); render();
     }
+    // Back: a box open on Receiving closes first; Suppliers & Products goes back to the calendar.
+    window.udBack = () => { if (!modal.hidden) { closeModal(); render(); return true; } if (view === 'products') { setView(calView || 'month'); return true; } return false; };
+    // Enter in a product line saves it; Escape cancels it.
+    document.getElementById('body').addEventListener('keydown', e => {
+      if (!e.target.closest('#pedit')) return;
+      if (e.key === 'Enter') { e.preventDefault(); saveProduct(); }
+      if (e.key === 'Escape') { editProd = ''; render(); }
+    });
     function setDate(d) { if (!L.isDateKey(d)) return; date = d; push(); render(); }
     document.getElementById('prev').onclick = () => setDate(step(-1));
     document.getElementById('next').onclick = () => setDate(step(1));
@@ -617,6 +902,8 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       watchLoads();
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); if (!modal.hidden && modal.querySelector('.sc-suptable')) openSuppliers(); }, fail('the suppliers'));
+      // Joe 11/1: Receiving's products (the same list the Boxing tablet names barcodes into), with what Inventory says each should have.
+      onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { items = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); if (document.getElementById('f-lines')) drawLines(); }, fail('the products'));
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, fail('Route Master'));
       render();
     });

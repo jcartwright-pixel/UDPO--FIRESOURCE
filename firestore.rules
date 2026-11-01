@@ -135,6 +135,8 @@ service cloud.firestore {
     // Receiving scan-in: each scan on a delivery, and what the plant receives (saved only through save).
     match /receivingScans/{id} { allow read: if activeUserOrStation(); }
     match /receivingItems/{id} { allow read: if activeUserOrStation(); }
+    // Joe 11/1: Inventory's history, every stock change (received, counted), saved only through save (inventory.js).
+    match /inventoryMoves/{id} { allow read: if activeUser(); }
     // Joe 10/28: Debag's Jug Trailers, the trailers parked in the lot (saved only through save, jugtrailers.js).
     match /jugTrailers/{id} { allow read: if activeUser(); }
     // Joe 11/1: each plant's Plant Material Trailers lists (trailer companies and units, items, locations; saved only through save).

@@ -738,32 +738,93 @@ Which trailer goes on which load: route, run, driver, truck, trailer and depart 
 
 # Shipping & Receiving
 
-## Shipping and Receiving Schedule
+## Shipping Schedule
 id: scheduler
-screens: scheduler.html, scheduler.html?lane=receiving
+screens: scheduler.html
 
-The calendar of loads going out (**Shipping**) and coming in (**Receiving**). Switch between them with the two buttons at the top.
+The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**).
 
-- Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now. **History** lists every past load, newest first.
+- Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
 - Each load is colored by who delivers it: Uniontown truck, Branch or Carrier. Holidays are marked.
 - Click a day's `+` (or `+ Add Load`) to add a load: schedule type, load type, load date, delivery date, pickup time, trailer, PO, cases, product and notes. Press `Confirm`; nothing saves until then.
 - Click a load to open it, change it, or `Delete Load` (it asks first).
 - A Shipping load takes the dispatch sheet's time for its run once the Live week has it.
-- **Suppliers** (Receiving) lists the suppliers. `+ New Supplier` adds one; `Add a List` pastes many at once, one per line.
 - `Print Monthly` prints the month.
 
 > A load put on here shows on the Loading screens and on Daily Dispatch on its day.
 
 !> Do not delete a load that ran. Mark it on the Loading screen instead.
 
-## Receiving Log
+## Receiving Schedule
+id: receiving
+screens: scheduler.html?lane=receiving
+
+The calendar of loads coming in, and where you check a load in when its trailer arrives. Two tabs at the top: **Calendar** and **Suppliers & Products**. Everything opens in the screen itself; `Cancel`, `Close` or `Back` brings you back to the calendar.
+
+### Book a load
+
+1. Click a day's `+` (or `+ Add Load`).
+2. Pick the **supplier**, the schedule type, the dates and the pickup time. A carrier load needs its **PO number**.
+3. Under **Products on this load**, pick each product and type how many were **ordered**. `+ Add a product` adds another line; one trailer can carry many products (for example two kinds of caps).
+4. Press `Save Load`, then `Confirm`.
+
+### Check a load in
+
+1. Open the load (click it on the calendar).
+2. Scan each label with the scanner. The scanner types into the **Check in** box by itself; each scan adds to that product's **Received** count (a pallet label adds its whole count).
+3. A barcode the app has never seen asks **Which product is it?** Pick it and press `Save`. From then on that barcode is known.
+4. You can also type the received counts by hand. A count that does not match what was ordered turns red, and the line under the products says how many short or over.
+5. Press `Mark Received`. Each product's received count goes into **Inventory**, and the load shows who received it and when.
+
+- **History** lists every past load, newest first.
+- `Print Monthly` prints the month.
+
+> Type 0 for a product that did not come. `Mark Received` needs a count for every product on the load.
+
+!> Do not press `Mark Received` until everything is counted. It puts the counts into Inventory once; to fix a count afterwards, use `Count` on Inventory.
+
+## Suppliers & Products
+id: receiving-products
+screens: scheduler.html?lane=receiving&view=products
+
+The plant's own list of suppliers and everything they send: ingredients, packaging, chemicals and the rest. Pick a supplier on the left; its products are on the right.
+
+1. `+ Supplier` adds a supplier (`Add a List` pastes many at once, one per line). `Edit supplier` changes or removes the one picked.
+2. `+ Add Product for (supplier)` opens a new line at the top of the list. Type the name, pick its **Kind** and what it is **Counted in** (cases, each, pounds and so on), and a **Low mark** if you want a warning. Press `Save` (or Enter).
+3. `Edit` on a product changes it, or moves it to another supplier. `Remove` takes it off the list (press it twice).
+
+- **Should have** is what Inventory says the plant should have now. A product below its low mark is red.
+- **No supplier yet** holds products named from a barcode on the Boxing tablet. Edit one to give it its supplier.
+
+> A product removed here stays on the loads that already carried it.
+
+!> Do not add the same product twice under two suppliers. Edit the one you have and move it.
+
+## Inventory
 id: inventory
 screens: inventory.html
 
-Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made and best-by dates, cases, temperature and who received it. Pallets are scanned on the Boxing station's Receiving tab.
+What the plant should have of every product it receives. Every change goes through here: a load marked received on Receiving adds to it, and a count typed here sets it.
 
-- Pick a supplier on the right to narrow the list.
-- Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
+- **On Hand** lists each product: its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, and **Should have** (last count + received since − used since).
+- `Count` is for when you count the shelf: type what is really there and press `Save count` (or Enter). That becomes the new starting point.
+- `History` shows every change to that product: each load received (with its supplier and PO) and each count, with who did it.
+- Pick a **kind** or a **supplier** on the right to narrow the list; type in **Find a product** to search.
+- `Edit products` opens Receiving's Suppliers & Products. `Print` prints the list.
+- A product below its low mark is red.
+
+> **Used since** is ready for later, when using a product (for example 500 dispenser bags) takes it off Inventory by itself.
+
+!> Do not type a count you did not take. A count replaces what the plant should have.
+
+## Receiving Log
+id: receiving-log
+screens: inventory.html?tab=log
+
+Every pallet scanned in on the Boxing station's Receiving tab: date, time, supplier, PO, item, lot, made and best-by dates, cases, temperature and who received it. It is the **Receiving Log** tab on Inventory.
+
+- Pick 7 days, 30 days, 90 days or a year.
+- Pick a supplier on the right to narrow the list, or search for an item, lot or PO.
 - `Print` prints the list.
 
 ## Plant Material Trailers

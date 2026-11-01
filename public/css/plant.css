@@ -1797,3 +1797,56 @@ a.wp-more { color: var(--ud-blue); }
   body.sched-page .head .title { flex: 1 1 100%; min-width: 0; }
   body.sched-page .sc-titleline { flex-wrap: wrap; row-gap: 8px; }
 }
+
+/* Joe 11/1 (mock-up 2): Receiving's Calendar | Suppliers & Products tabs, the in-page boxes (no overlays), a load's products,
+   checking a load in with the scanner. */
+.sched-page .sc-rtabs { display: inline-flex; }
+.sched-page .sc-rtabs button { min-height: 36px; padding: 0 18px; font-size: 16px; font-weight: 800; }
+.sched-page.sc-recv .sc-rtabs button[aria-selected="true"] { background: var(--runs-ink); border-color: var(--runs-ink); color: #fff; }
+.sched-page.sc-prod .sc-ctrl, .sched-page.sc-paged .sc-ctrl { visibility: hidden; }
+.sched-page.sc-prod .sc-strip .hstats, .sched-page.sc-prod .sc-strip .sc-legend, .sched-page.sc-prod .sc-strip .sc-key { display: none; }
+.sched-page.sc-paged .view > :not(#modal) { display: none !important; }
+.sched-page #modal.sc-pagebox { position: static; transform: none; z-index: auto; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0 16px 16px; box-shadow: none; border: 1px solid var(--line); border-top: 6px solid var(--runs-ink); }
+.sched-page #modal.sc-pagebox .modal-actions { position: sticky; bottom: 0; background: #fff; padding: 10px 0 2px; }
+.sched-page .modal-actions button.sc-receive { background: var(--runs-ink); color: #fff; border: 0; }
+.sched-page .sc-prodsplit { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 14px; flex: 1 1 auto; min-height: 0; }
+.sched-page .sc-sups, .sched-page .sc-prods { display: flex; flex-direction: column; min-height: 0; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.sched-page .sc-sups h3, .sched-page .sc-prods h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; font-size: 20px; font-weight: 900; color: var(--ud-blue-dark); }
+.sched-page .sc-sups h3 { justify-content: space-between; }
+.sched-page .sc-sups h3 span { display: inline-flex; gap: 6px; }
+.sched-page .sc-suppick { overflow: auto; display: flex; flex-direction: column; }
+.sched-page .sc-suppick button { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; text-align: left; border: 0; border-bottom: 1px solid #e3eaf1; background: #fff; padding: 10px 10px; font: inherit; font-size: 16px; color: var(--ink); cursor: pointer; }
+.sched-page .sc-suppick button strong { font-weight: 800; }
+.sched-page .sc-suppick button small { font-size: 16px; color: var(--muted); white-space: nowrap; }
+.sched-page .sc-suppick button[aria-selected="true"] { background: var(--runs-ink); color: #fff; }
+.sched-page .sc-suppick button[aria-selected="true"] small { color: #e7f6ec; }
+.sched-page .sc-prods .sheet { flex: 1 1 auto; min-height: 0; }
+.sched-page .sc-prodtable td.num, .sched-page .sc-prodtable th.num, .sched-page .sc-linetable .num { text-align: right; }
+.sched-page .sc-prodtable .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.sched-page .sc-prodtable td, .sched-page .sc-prodtable th { text-align: left; }
+.sched-page .sc-prodtable tr.low td { background: #fdecec; }
+.sched-page .sc-prodtable tr.low td:first-child { box-shadow: inset 6px 0 0 #c62828; }
+.sched-page .sc-prodtable tr.edit td { background: #fffbe8; vertical-align: top; }
+.sched-page .sc-prodtable input, .sched-page .sc-prodtable select, .sched-page .sc-linetable input, .sched-page .sc-linetable select { height: 36px; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; color: var(--ink); background: #fff; }
+.sched-page .sc-prodtable td.num input, .sched-page .sc-linetable td.num input { text-align: right; max-width: 120px; }
+.sched-page .sc-movesup { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 16px; font-weight: 700; color: var(--muted); }
+.sched-page .sc-btn.danger { color: #b42318; }
+.sched-page .sc-prodnote, .sched-page .sc-oldprod, .sched-page .sc-gotnote { margin: 8px 0 0; font-size: 16px; font-weight: 600; color: var(--muted); }
+.sched-page .sc-gotnote { color: var(--runs-ink); font-weight: 800; }
+.sched-page .sc-lines { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0; }
+.sched-page .sc-linetable { width: 100%; border-collapse: collapse; font-size: 16px; }
+.sched-page .sc-linetable th { background: var(--runs-ink); color: #fff; text-align: left; padding: 8px 10px; font-size: 16px; letter-spacing: .04em; text-transform: uppercase; }
+.sched-page .sc-linetable td { padding: 6px 10px; border-bottom: 1px solid #e3eaf1; color: var(--ink); }
+.sched-page .sc-linetable td:first-child { width: 46%; }
+.sched-page .sc-linetable input.off { border-color: #c62828; color: #b42318; font-weight: 800; }
+.sched-page .sc-linefoot { display: flex; align-items: center; gap: 14px; font-size: 16px; font-weight: 700; color: var(--ink); }
+.sched-page .sc-off { color: #b42318; }
+.sched-page .sc-scanbar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.sched-page .sc-scanbar label { flex: 1 1 380px; }
+.sched-page .sc-scanbar input { height: 44px; font-size: 18px; border: 2px solid var(--runs-ink); }
+.sched-page .sc-scannote { font-size: 16px; font-weight: 800; color: var(--runs-ink); padding-bottom: 10px; }
+.sched-page .sc-scannote.bad { color: #b42318; }
+.sched-page .sc-unknown { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff3c4; border: 2px solid #c99a00; border-radius: 10px; padding: 8px 12px; font-size: 16px; color: #5a4300; }
+.sched-page .sc-unknown[hidden] { display: none; }
+.sched-page .sc-unknown select { min-width: 260px; height: 36px; }
+@media (max-width: 760px) { .sched-page .sc-prodsplit { grid-template-columns: 1fr; } .sched-page .sc-suppick { max-height: 200px; } }
