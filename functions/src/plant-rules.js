@@ -1228,6 +1228,11 @@
       // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
       // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
       x.lateBy = !x.late ? 0 : x.priorDay ? Math.min(x.est - deadline, x.est - Math.max(x.start, now)) : x.est - deadline;
+      // Joe 10/31 ("one route is late, but that doesn't necessarily make us 9 hours behind… if that route takes 1 hour to load,
+      // we need to make sure that's included in our time"): in "About … behind", a load whose dispatch time has already gone
+      // by counts only the time from now until it is loaded, not every hour since it should have left (its own line still
+      // says how late it is).
+      x.behindBy = !x.late ? 0 : deadline <= now ? Math.min(x.est - deadline, x.est - now) : x.lateBy;
       x.spare = !x.late && deadline !== null ? deadline - x.est : null;
     });
     var opDay = dayNum(date) === null ? Math.floor((now - FORECAST.shiftEnd) / 1440) : dayNum(date), dueAt = (opDay + 1) * 1440 + dueBy;
@@ -1257,10 +1262,11 @@
     return base + (f.share ? ' + ' + Math.round(f.share * 100) + '% past nights (' + (f.nights || []).map(function (n) { return n.label; }).join(', ') + ')' : '');
   }
   // Joe 10/20: how far behind the forecast is: the most any load runs past when it is needed, rounded up to 5 minutes.
+  // Joe 10/31: a load already past its dispatch counts only the time until it is loaded (behindBy).
   function forecastBehind(f) {
     if (!f) return 0;
     if (typeof f.behind === 'number') return f.behind;
-    var m = (f.loads || []).reduce(function (a, x) { return x.late && x.lateBy > a ? x.lateBy : a; }, 0);
+    var m = (f.loads || []).reduce(function (a, x) { var b = typeof x.behindBy === 'number' ? x.behindBy : x.lateBy; return x.late && b > a ? b : a; }, 0);
     return Math.ceil(m / 5) * 5;
   }
   function spanText(m) { var h = Math.floor(m / 60), r = m % 60; return h ? h + ' hr' + (r ? ' ' + r + ' min' : '') : r + ' min'; }

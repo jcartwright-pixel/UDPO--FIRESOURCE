@@ -296,6 +296,40 @@ test('a load left over from last night is behind only by the loading it still ha
   assert.equal(f.behind, Math.ceil(p.lateBy / 5) * 5);
 });
 
+// Joe 10/31 (8:10 PM email "About 9 hr 15 min behind, Lost 4 hr 10 min since the 3:53 PM report" with one route really
+// late): "one route is late, but that doesn't necessarily make us 9 hours behind… if that route takes 1 hour to load, we
+// need to make sure that's included in our time". A load whose dispatch time has already gone by counts the time until it is loaded.
+test('a load already past its dispatch counts only the time until it is loaded in "About … behind"', () => {
+  const now = Date.UTC(2026, 10, 1, 0, 10); // Sat 10-31-26 8:10 PM
+  const loads = [
+    { id: 'j', area: 'CASE', route: '852', run: 'JERSEY L2', quantity: '900', state: 'NOT_STARTED', loadDate: '2026-10-31', deliveryDate: '2026-11-01', dispatchTime: '1:00 PM', leavesOn: 'Load Day' }];
+  const f = R.loadForecast({ date: '2026-10-31', loads }, now);
+  const j = f.loads[0];
+  assert.equal(j.late, true, 'it left at 1:00 PM and is not loaded');
+  assert.equal(j.lateBy, j.est - j.leaves, 'its own line still says how late it is (7 hours and more)');
+  assert.ok(j.lateBy > 7 * 60);
+  assert.equal(j.behindBy, j.est - f.now, 'but it puts the plant behind only by the time until it is loaded');
+  assert.ok(f.behind <= 60, 'about 1 hour behind, not 8');
+  assert.equal(R.forecastSummary(f).behindText, 'About ' + (f.behind >= 60 ? '1 hr' + (f.behind % 60 ? ' ' + f.behind % 60 + ' min' : '') : f.behind + ' min') + ' behind');
+  // An hour later with nothing loaded, the number does not grow by the hour that went by.
+  const later = R.loadForecast({ date: '2026-10-31', loads }, now + 60 * 60000);
+  assert.equal(later.behind, f.behind, 'nothing lost just because the clock moved');
+  assert.equal(R.forecastSummary(Object.assign({}, later, { before: { asOf: '8:10 PM', behind: f.behind } })).changeText, 'No change since the 8:10 PM report');
+});
+
+test('10-31-26 8:10 PM: one left-over route late is about its own loading time behind, not 9 hours', () => {
+  const now = Date.UTC(2026, 10, 1, 0, 10);
+  const loads = [
+    { id: 'p', area: 'CASE', route: '845', run: 'I/W BALTIMORE', quantity: '', state: 'NOT_STARTED', loadDate: '2026-10-30', deliveryDate: '2026-10-31', dispatchTime: '4:00 AM', leavesOn: 'Load Day', prior: true },
+    { id: 'j', area: 'CASE', route: '852', run: 'JERSEY L2', quantity: '', state: 'NOT_STARTED', loadDate: '2026-10-31', deliveryDate: '2026-11-02', dispatchTime: '1:00 PM', leavesOn: 'Load Day' },
+    { id: 's', area: 'CASE', route: '849', run: 'SUN VALLEY', quantity: '', state: 'NOT_STARTED', loadDate: '2026-10-31', deliveryDate: '2026-11-02', dispatchTime: '4:00 PM', leavesOn: 'Load Day' }];
+  const f = R.loadForecast({ date: '2026-10-31', loads }, now);
+  assert.equal(f.late, 1, 'only 845 is late; Monday\'s Jersey and Sun Valley leave Sunday');
+  const p = f.loads.find(x => x.id === 'p');
+  assert.ok(f.behind <= Math.ceil(p.minutes / 5) * 5, 'behind by no more than 845\'s own loading time');
+  assert.ok(f.behind < 120);
+});
+
 // Joe 10/22 (7:36 AM, 0 of 29 loaded, "About 8 hr 20 min behind"; option az): a fresh start at 6 AM. Last night's left-over
 // loads go first with their own times on their own line; today's loads go at 1,000 cases an hour, so a morning with nothing
 // loaded yet is not hours behind. Past nights timed End to End (waits counted as loading) no longer slow it down.

@@ -599,6 +599,7 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - The loads are the ones loaded today, by type (Case, Box, Tote, Tanker). Inside each type, each delivery day once: the loaded loads (green), then the ones not loaded yet.
 - The banner at the top is red when a route is behind, yellow with "Potentially late" when no route is behind yet but the forecast says one or more loads will be late, and green only when everything is on time.
 - A load says BEHIND when it is not loaded 45 minutes after it leaves. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not behind before then.
+- The forecast box says **About … behind** and how much was lost or made up since the last report. A load that has already missed its time counts only the time from now until it is loaded, so one late route does not make the plant read hours behind, and the number does not grow just because the clock moved.
 
 !> Do not send the report twice for one shift. Use Send Test to Me to check it first.
 
@@ -658,6 +659,8 @@ Will the plant be late? Every case load still to load, in the order it will be l
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
 
 > Saturday's loads for Monday leave on Sunday, so on Saturday they are red only if they will not be ready by their Sunday time. Only Sunday's loads can be late on Saturday.
+
+> **About … behind** counts the work still to do. A load that has already missed its time (left over from last night, or past its dispatch) counts only the time from now until it is loaded, not every hour since it should have left. Its own line still shows how late it is.
 
 ## Unloading (Case, Tote, Box and Tanker)
 id: unloading
