@@ -10,7 +10,7 @@
  */
 import { start, isUnitedDairy, callServer, escapeHtml } from './app.js';
 import { onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider } from './firebase.js';
-import { helpHref } from './help.js';
+import { loadHelp, sectionForPage, renderBody } from './help.js';
 
 const REFRESH_MS = 2 * 60 * 1000;
 const DIVISION_KEY = 'udSalesDivision';
@@ -19,10 +19,12 @@ const $ = (id) => document.getElementById(id);
 
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const VIEWS = ['home', 'routes', 'customers'];
-const TITLES = { home: 'UD Sales', routes: 'Route Status', customers: 'Customers' };
+const VIEWS = ['home', 'routes', 'customers', 'help'];
+const TITLES = { home: 'UD Sales', routes: 'Route Status', customers: 'Customers', help: 'Help' };
 
 let view = 'home';
+let helpFrom = 'home';  // Joe 11/1: the screen the ? was pressed on (Back from Help comes back to it)
+let helpPart = '';
 let picked = '';     // the route on the map (its id)
 let rows = {};       // id -> row
 let timer = null;
@@ -221,20 +223,50 @@ function drawByGroup(rows) {
       '<span class="cu-chip">' + escapeHtml(dayName(r.day).slice(0, 3)) + ', no route</span>').join('') + '</div></div>').join('');
 }
 
-/* ---------- The three views ---------- */
+/* ---------- Help, inside the app ---------- */
+
+// Joe 11/1: "The sales is not supposed to have any other options than just strictly to this app." The ? used to open the
+// Operations Help page, which left the Sales app and showed the rest of Operations. Now Help is a screen of this app: only
+// the Sales app's own parts of help.md (the parts whose screens are all sales.html), and Back comes back to the screen.
+// Nothing on it links anywhere else.
+const partName = (t) => { const n = t.replace(/^Sales app:\s*/i, ''); return n.charAt(0).toUpperCase() + n.slice(1); };
+const salesParts = (help) => help.sections.filter(x => x.screens.length && x.screens.every(p => p.split('?')[0] === 'sales.html'));
+async function drawHelp() {
+  let help;
+  try { help = await loadHelp(); } catch (e) { $('sa-help-read').innerHTML = '<p>' + escapeHtml(e.message) + '</p>'; return; }
+  const parts = salesParts(help);
+  const s = parts.find(x => x.id === helpPart) || sectionForPage(help, 'sales.html', helpFrom === 'home' ? '' : 'view=' + helpFrom) || parts[0];
+  if (!s) return;
+  helpPart = s.id;
+  $('sa-help-read').innerHTML = '<h2>' + escapeHtml(partName(s.title)) + '</h2>' + renderBody(s.body);
+  // A link to a part that is not the Sales app's own stays plain words (it would lead out of the app).
+  $('sa-help-read').querySelectorAll('a').forEach(a => {
+    if (parts.some(x => x.id === a.dataset.helpLink)) { a.removeAttribute('href'); a.setAttribute('role', 'button'); a.tabIndex = 0; return; }
+    a.replaceWith(document.createTextNode(a.textContent));
+  });
+  const others = parts.filter(x => x.id !== s.id);
+  $('sa-help-more').innerHTML = others.length ? '<p class="sa-lbl">More help</p>' + others.map(x => '<button type="button" class="sa-helpgo" data-help-link="' + escapeHtml(x.id) + '">' + escapeHtml(partName(x.title)) + '</button>').join('') : '';
+}
+function helpAddress() { return 'sales.html?view=help' + (helpFrom !== 'home' ? '&for=' + helpFrom : '') + keepTest('&'); }
+
+/* ---------- The views ---------- */
 
 function showView(v, push) {
   view = VIEWS.includes(v) ? v : 'home';
-  if (push) history.pushState({ view }, '', view === 'home' ? 'sales.html' + keepTest() : 'sales.html?view=' + view + keepTest('&'));
+  if (view === 'help') { const f = new URLSearchParams(location.search).get('for'); if (!push && VIEWS.includes(f) && f !== 'help') helpFrom = f; }
+  if (push) history.pushState({ view }, '', view === 'home' ? 'sales.html' + keepTest() : view === 'help' ? helpAddress() : 'sales.html?view=' + view + keepTest('&'));
   $('v-home').hidden = view !== 'home';
   $('v-routes').hidden = view !== 'routes';
   $('v-customers').hidden = view !== 'customers';
+  $('v-help').hidden = view !== 'help';
+  $('sa-top').hidden = view === 'help';
   $('sa-maparea').hidden = view !== 'routes';
   $('sa-ref-line').hidden = view !== 'routes';
   $('sa-back').hidden = view === 'home';
+  $('sa-help').hidden = view === 'help' || !signedIn;
   $('sa-title').textContent = TITLES[view];
-  $('sa-help').href = helpHref();
   window.scrollTo(0, 0);
+  if (view === 'help') { drawHelp(); return; }
   if (!signedIn) return;
   if (view === 'routes') load();
   if (view === 'customers') loadCustomers();
@@ -247,7 +279,6 @@ function keepTest(join) { const t = new URLSearchParams(location.search).get('te
 const fitTop = () => document.documentElement.style.setProperty('--sa-hdr-h', document.querySelector('.sa-hdr').offsetHeight + 'px');
 window.addEventListener('resize', fitTop);
 fitTop();
-window.udHelpFor = () => 'sales.html' + (view === 'home' ? '' : '?view=' + view);
 
 function startRefreshing() {
   clearInterval(timer);
@@ -268,7 +299,21 @@ $('sa-division').addEventListener('change', () => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('screen').hidden) load(); });
 $('v-home').addEventListener('click', (ev) => { const b = ev.target.closest('[data-go]'); if (b) showView(b.dataset.go, true); });
-$('sa-back').addEventListener('click', () => { if (history.state && history.state.view) history.back(); else { history.replaceState(null, '', 'sales.html' + keepTest()); showView('home', false); } });
+// Back: a group open on Customers closes first (back to the group list); otherwise one screen back, and from Help to the
+// screen the ? was pressed on. It never leaves the Sales app.
+$('sa-back').addEventListener('click', () => {
+  if (view === 'customers' && tab === 'group' && cuGroup) { cuGroup = ''; drawCustomers(); window.scrollTo(0, 0); return; }
+  if (history.state && history.state.view) { history.back(); return; }
+  const to = view === 'help' ? helpFrom : 'home';
+  history.replaceState(null, '', to === 'home' ? 'sales.html' + keepTest() : 'sales.html?view=' + to + keepTest('&'));
+  showView(to, false);
+});
+$('sa-help').addEventListener('click', () => { if (view === 'help') return; helpFrom = view; helpPart = ''; showView('help', true); });
+$('v-help').addEventListener('click', (ev) => {
+  const a = ev.target.closest('[data-help-link]');
+  if (a) { ev.preventDefault(); helpPart = a.dataset.helpLink; drawHelp(); window.scrollTo(0, 0); }
+});
+$('v-help').addEventListener('keydown', (ev) => { const a = ev.target.closest('a[data-help-link]'); if (a && ev.key === 'Enter') { ev.preventDefault(); a.click(); } });
 window.addEventListener('popstate', () => showView(new URLSearchParams(location.search).get('view') || 'home', false));
 $('v-customers').addEventListener('click', (ev) => {
   const t = ev.target.closest('[data-tab]');
@@ -302,7 +347,7 @@ onAuthStateChanged(auth, async (user) => {
   $('signin').hidden = !!user;
   $('screen').hidden = !user;
   signedIn = !!user;
-  if (!user) { clearInterval(timer); return; }
+  if (!user) { clearInterval(timer); $('sa-help').hidden = true; return; }
   showError('');
   $('who').textContent = user.email || '';
   startRefreshing();
