@@ -6,7 +6,7 @@
  *     with its lot, best-by date and count; a barcode never seen asks "Which item is it?" (a blank drop-down, or type a new one);
  *     − and + fix a count; the tablet camera (Use camera) reads a barcode too. Every scan saves itself.
  *   - Inventory > Receiving Log: every scan, newest first, with the supplier, lot, dates, cases and who received it; a lot search
- *     finds one line; Received Items renames an item when its box is left.
+ *     finds one line; an item renamed on Receiving > Suppliers & Products is renamed in the log.
  * Text 16px and up, no sideways scroll at 800 and 1024 (tablet) and 1536 and 1920 (office). Pictures go to SHOTS.
  */
 const assert = require('node:assert/strict');
@@ -171,7 +171,7 @@ async function wasp(page, parts) {
       const home = await openPage(browser, w, h, '/index.html' + ADMIN);
       await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
       await home.goto(HOSTING + '/index.html' + ADMIN);
-      await home.waitForSelector('.hq-sub[data-side="shipping"][href="inventory.html"].building');
+      await home.waitForSelector('.hq-sub[data-side="shipping"][href="inventory.html?tab=log"].building');
       await home.waitForTimeout(400);
       assert.deepEqual(await home.$$eval('.hq-sub[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.classList.contains('building'))), ['Shipping:false', 'Receiving:false', 'Receiving Log:true', 'Plant Material Trailers:false', 'Off-site Inventory:true', 'Inventory Room:true']);
       assert.deepEqual(await home.$$eval('.hq-main[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.getAttribute('href') + ':' + x.classList.contains('building'))), ['Inventory:inventory.html:true']);
@@ -181,7 +181,8 @@ async function wasp(page, parts) {
     }
     // The office: Inventory > Receiving Log.
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
-      const log = await openPage(browser, w, h, '/inventory.html' + ADMIN);
+      // Joe 11/1: the Receiving Log is a tab on Inventory.
+      const log = await openPage(browser, w, h, '/inventory.html' + ADMIN.replace('?', '?tab=log&'));
       await log.waitForSelector('#rows tr td.strong');
       assert.equal(await log.$$eval('#rows tr', r => r.length), 4);
       const rows = await log.$$eval('#rows tr', r => r.map(x => [...x.cells].map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
@@ -194,21 +195,25 @@ async function wasp(page, parts) {
       await log.waitForFunction(() => document.querySelectorAll('#rows tr').length === 1);
       if (w === 1920) {
         await log.fill('#search', '');
-        await log.click('#items-open');
-        await log.waitForSelector('#items:not([hidden]) [data-item]');
-        await shot(log, '5-office-received-items-1920.png');
-        const box = '#items [data-item="' + capId + '"]';
-        await log.fill(box, 'Gallon caps, white 38 mm');
-        await log.press(box, 'Enter');
+        // Joe 11/1: an item named on the tablet is a product on Receiving > Suppliers & Products ("No supplier yet"); renaming it
+        // there renames it in the log.
+        const sp = await openPage(browser, 1920, 1080, '/scheduler.html' + MANAGER.replace('?', '?lane=receiving&view=products&'));
+        await sp.waitForSelector('[data-pick="__none"]');
+        await sp.click('[data-pick="__none"]');
+        await sp.click('[data-prod="' + capId + '"]');
+        await shot(sp, '5-office-received-items-1920.png');
+        await sp.fill('#p-name', 'Gallon caps, white 38 mm');
+        await sp.press('#p-name', 'Enter');
         for (let i = 0; i < 100 && (await db().collection('receivingItems').doc(capId).get()).data().name !== 'Gallon caps, white 38 mm'; i++) await new Promise(r => setTimeout(r, 100));
         assert.equal((await db().collection('receivingItems').doc(capId).get()).data().name, 'Gallon caps, white 38 mm');
-        await log.click('#items [data-close]');
+        assert.deepEqual(sp.errors, []);
+        await sp.close();
         await log.waitForFunction(() => [...document.querySelectorAll('#rows td.strong')].filter(t => /Gallon caps, white 38 mm/.test(t.textContent)).length === 2);
       }
       assert.deepEqual(log.errors, []);
       await log.close();
     }
-    results.push('Receiving Log at 1536 and 1920: every scan with supplier, lot, dates, cases and who; a lot search finds its line; Received Items renames an item when its box is left');
+    results.push('Receiving Log at 1536 and 1920: every scan with supplier, lot, dates, cases and who; a lot search finds its line; an item renamed on Suppliers & Products is renamed in the log');
   } finally { await browser.close(); }
   console.log(results.join('\n'));
 })().catch(e => { console.error(e); process.exit(1); });

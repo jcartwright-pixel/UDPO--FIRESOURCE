@@ -170,7 +170,8 @@ export const MENU = [
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
   // Joe 10/26 (ej): the Plant Distribution Scheduler is its own department, Shipping & Receiving, with Inventory beside it.
   ['Shipping', [['Shipping Schedule', 'scheduler.html', 'week']]],
-  ['Receiving', [['Receiving Schedule', 'scheduler.html?lane=receiving', 'day']]],
+  // Joe 11/1 (mock-up 2): the plant's own suppliers and the products each one sends.
+  ['Receiving', [['Receiving Schedule', 'scheduler.html?lane=receiving', 'day'], ['Suppliers & Products', 'scheduler.html?lane=receiving&view=products', 'materials']]],
   ['Shift Notes', [['Shift Notes', 'shiftnotes.html', 'alert']]],
   ['Quality Checks', [['Quality Checks', 'quality.html', 'production.webp']]],
   ['Cooler Temperature', [['Cooler Temperature', 'temps.html', 'temperatures.webp']]],
@@ -190,7 +191,8 @@ export const MENU = [
   // the PM schedule and the mechanics' tablet.
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
-  ['Inventory', [['Receiving Log', 'inventory.html', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
+  // Joe 11/1 ("a nice little module for the inventory"): On Hand, what the plant should have of each product, first.
+  ['Inventory', [['On Hand', 'inventory.html', 'day'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
   // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
   ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
@@ -221,7 +223,7 @@ export const SIDES = [
     openPages: ['jug-trailers.html'],
     // Joe 10/31 (Inventory picture 2): on its Home card, Inventory is a dark blue line ('main') with the places stock is kept under it:
     // the Receiving Log, the trailers in the lot, and room for the off-site inventory and the inventory room (being built).
-    quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html', 'main'], ['Receiving Log', 'inventory.html'],
+    quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html', 'main'], ['Receiving Log', 'inventory.html?tab=log'],
       ['Plant Material Trailers', 'jug-trailers.html'], ['Off-site Inventory', 'soon.html?what=offsite-inventory'], ['Inventory Room', 'soon.html?what=inventory-room']] },
   // Joe 10/28: one more plant area, Debag / Labeling Room (where the jugs come out of their bags, and the labeling room), with
   // Plant Material Trailers (Joe 10/28: they carry jugs, cardboard, empty crates and more), the trailers parked in the lot.

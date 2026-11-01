@@ -54,7 +54,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     const h = await openPage(browser, 1536, 790, '/index.html?testEmail=' + ADMIN);
     await h.waitForSelector('#sides .hq-card[data-card-side="shipping"] .hq-sub');
     assert.deepEqual(await h.$$eval('#sides .hq-card[data-card-side="shipping"] .hq-sub', a => a.map(x => x.textContent + ':' + x.getAttribute('href'))),
-      ['Shipping:scheduler.html', 'Receiving:scheduler.html?lane=receiving', 'Receiving Log:inventory.html', 'Plant Material Trailers:jug-trailers.html', 'Off-site Inventory:soon.html?what=offsite-inventory', 'Inventory Room:soon.html?what=inventory-room']);
+      ['Shipping:scheduler.html', 'Receiving:scheduler.html?lane=receiving', 'Receiving Log:inventory.html?tab=log', 'Plant Material Trailers:jug-trailers.html', 'Off-site Inventory:soon.html?what=offsite-inventory', 'Inventory Room:soon.html?what=inventory-room']);
     assert.equal(await h.$eval('#sides .hq-card[data-group="plantops"] .hq-main[data-side="debag"]', a => a.getAttribute('href')), 'labeling.html');
     await h.waitForTimeout(1200);
     await shot(h, '1-home-1536.png');

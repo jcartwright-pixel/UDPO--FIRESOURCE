@@ -99,8 +99,9 @@ async function shots(page, name, w) {
       assert.deepEqual(await page.$$eval('table.sc-table tbody tr', t => t.map(x => x.className)), ['by-ut', 'by-ut', 'by-carrier'], 'the day colors each load by who delivers it');
       await fits(page, 'Scheduler day ' + w + 'x' + h);
       await shots(page, 'sched-day', w);
-      // Receiving: the same screen with the suppliers.
-      await page.click('[data-lane="RECEIVING"]');
+      // Receiving: the same screen with the suppliers (Joe 11/1: its own screen, opened from the menu; no switch).
+      assert.equal(await page.$('[data-lane]'), null, 'no Shipping | Receiving switch');
+      await page.goto(HOSTING + '/scheduler.html?lane=receiving&view=day&date=' + DATE + MANAGER);
       // Joe 10/13: no sample suppliers; a load booked with one still shows its name.
       await page.waitForFunction(() => /Valley Farms Milk Co-op/.test(document.getElementById('body').textContent));
       await page.click('[data-view="week"]');
@@ -207,48 +208,52 @@ async function shots(page, name, w) {
     await watcher.waitForFunction(() => /No loads/.test(document.querySelector('.sc-weekgrid > .sc-col:nth-child(10)').textContent), null, { timeout: 8000 });
     results.push('Delete Load (Walmart, Tuesday) after "Delete this load?": gone from the other screen');
     // Receiving: New Supplier.
-    await desk.click('[data-lane="RECEIVING"]');
-    await watcher.click('[data-lane="RECEIVING"]');
+    const receiving = (p, v) => p.goto(HOSTING + '/scheduler.html?lane=receiving&view=' + v + '&date=' + DATE + MANAGER);
+    await receiving(desk, 'week'); await receiving(watcher, 'week');
+    await desk.waitForSelector('.sc-wholist'); await watcher.waitForSelector('.sc-wholist');
     await desk.click('#supplier-add');
     await desk.fill('#s-name', 'Ohio Valley Fruit');
     await desk.fill('#s-label', 'Ohio Fruit');
     await desk.click('#s-save');
     await watcher.waitForFunction(() => /Ohio Fruit[\s\S]*S02 · OHIO VALLEY FRUIT/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
     results.push('New Supplier (Ohio Valley Fruit): on the other screen as S02');
-    // Joe 10/13: the Suppliers button lists them; Edit renames one, Remove takes one off (after "Remove this supplier?").
+    // Joe 10/13: the suppliers are listed (Joe 11/1: on Suppliers & Products, in the page); Edit renames one, Remove takes one off
+    // (after "Remove this supplier?").
     await desk.setViewportSize({ width: 1536, height: 864 });
     await desk.click('#suppliers');
-    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 2 && !/Saving/.test(document.querySelector('.sc-suptable').textContent));
-    assert.deepEqual(await desk.$$eval('.sc-suptable tbody tr', r => r.map(x => x.cells[1].textContent)), ['MOUNTAIN STATE SUGAR', 'OHIO VALLEY FRUIT']);
-    assert.ok(await desk.$eval('.sc-suptable td', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list text is at least 16px');
+    const supNames = () => desk.$$eval('.sc-suppick button strong', b => b.map(x => x.textContent));
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suppick button').length === 2 && !/Saving/.test(document.querySelector('.sc-suppick').textContent));
+    assert.deepEqual(await supNames(), ['Mountain Sugar', 'Ohio Fruit']);
+    assert.ok(await desk.$eval('.sc-suppick strong', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list text is at least 16px');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-list-1536.png'), scale: 'css' });
     for (const w of [390, 800]) {
       await desk.setViewportSize({ width: w, height: 844 });
-      assert.ok(await desk.$eval('#modal', m => m.getBoundingClientRect().right <= innerWidth + 1), 'the Suppliers box fits at ' + w);
+      assert.ok(await desk.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth + 1), 'Suppliers & Products fits at ' + w);
       if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-list-' + w + '.png'), scale: 'css' });
     }
     await desk.setViewportSize({ width: 1536, height: 864 });
-    await desk.click('.sc-suptable tbody tr:nth-child(1) [data-supplier]');
+    await desk.click('.sc-suppick button:nth-child(1)');
+    await desk.click('.sc-prods [data-supplier]');
     assert.equal(await desk.inputValue('#s-name'), 'MOUNTAIN STATE SUGAR');
+    assert.equal(await desk.isVisible('#modal-back'), false, 'the box opens in the page, not over it');
     await desk.fill('#s-name', 'Dean Foods Milk');
     await desk.fill('#s-label', 'Dean');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-edit-1536.png'), scale: 'css' });
     await desk.click('#s-save');
-    await desk.waitForFunction(() => /DEAN FOODS MILK/.test((document.querySelector('.sc-suptable') || {}).textContent || ''), null, { timeout: 8000 });
+    await desk.waitForFunction(() => /Dean/.test((document.querySelector('.sc-suppick') || {}).textContent || ''), null, { timeout: 8000 });
     await watcher.waitForFunction(() => /Dean[\s\S]*S06 · DEAN FOODS MILK/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
     results.push('Edit Supplier (Mountain State Sugar to Dean Foods Milk): on the other screen');
-    await desk.click('.sc-suptable tbody tr:nth-child(2) [data-supplier]');
+    await desk.click('.sc-suppick button:nth-child(2)');
+    await desk.click('.sc-prods [data-supplier]');
     await desk.click('#s-remove');
     assert.match(await desk.textContent('#modal'), /Remove this supplier\?[\s\S]*OHIO VALLEY FRUIT/);
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-remove-1536.png'), scale: 'css' });
     await desk.click('#s-go');
-    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 1, null, { timeout: 8000 });
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suppick button').length === 1, null, { timeout: 8000 });
     await watcher.waitForFunction(() => !/OHIO VALLEY FRUIT/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
     results.push('Remove Supplier (Ohio Valley Fruit) after "Remove this supplier?": gone from the other screen');
-    await desk.click('#modal [data-close]');
     // Month view of the day: the day box lists the loads.
-    await desk.click('[data-lane="SHIPPING"]');
-    await desk.click('[data-view="month"]');
+    await desk.goto(HOSTING + '/scheduler.html?view=month&date=' + DATE + MANAGER);
     await desk.click('[data-day="2026-10-08"]');
     await desk.waitForSelector('.sc-dayrow');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-daybox-1920.png'), scale: 'css' });
@@ -296,18 +301,17 @@ async function shots(page, name, w) {
     }
     await desk.setViewportSize({ width: 1536, height: 864 });
     results.push('Week on a tablet (1024x768) and a phone: each day at least 130px, the top buttons wrap on screen, no load card cut');
-    await desk.click('[data-lane="RECEIVING"]');
-    await desk.click('#suppliers');
+    await receiving(desk, 'products');
+    await desk.waitForSelector('#supplier-list');
     await desk.click('#supplier-list');
     await desk.fill('#s-list', JOE.concat(['  dean foods milk ', '', 'Sig']).join('\n'));
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-add-list-1536.png'), scale: 'css' });
     assert.ok(await desk.$eval('#s-list', e => parseFloat(getComputedStyle(e).fontSize) >= 16), 'the list box text is at least 16px');
     await desk.click('#s-addall');
     await desk.waitForFunction(() => /Added 20 suppliers\. Already on the list: dean foods milk, Sig\./.test((document.querySelector('.sc-supnote') || {}).textContent || ''), null, { timeout: 30000 });
-    await desk.waitForFunction(() => document.querySelectorAll('.sc-suptable tbody tr').length === 21, null, { timeout: 15000 });
-    const shortNames = await desk.$$eval('.sc-suptable tbody tr', r => r.map(x => x.cells[2].textContent));
-    assert.deepEqual(shortNames, ['Dean'].concat(JOE), 'his spelling, in his order');
-    assert.ok(await desk.$eval('#modal', m => m.getBoundingClientRect().right <= innerWidth + 1), 'the Suppliers box fits');
+    await desk.waitForFunction(() => document.querySelectorAll('.sc-suppick button').length === 21 && !/Saving/.test(document.querySelector('.sc-suppick').textContent), null, { timeout: 15000 });
+    assert.deepEqual(await supNames(), ['Dean'].concat(JOE), 'his spelling, in his order');
+    assert.ok(await desk.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth + 1), 'Suppliers & Products fits');
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'suppliers-after-list-1536.png'), scale: 'css' });
     await desk.click('#supplier-list');
     await desk.fill('#s-list', JOE.join('\n'));
@@ -320,8 +324,7 @@ async function shots(page, name, w) {
     await db().collection('plantJournal').doc('PLANT_SCHEDULE_app_old1').set({ recordId: 'SCHED-old1', type: 'PLANT_SCHEDULE', date: '2026-05-12', status: 'SCHEDULED', routeId: 'rte_c892', runId: 'run_c892',
       route: '892', run: 'GARBER', createdInApp: true, recordedAt: '2026-05-01T12:00:00Z', payload: { pickupTime: '07:00', scheduleType: 'ROUTE', product: 'Old May load' } });
     await desk.keyboard.press('Escape');
-    await desk.click('[data-lane="SHIPPING"]');
-    await desk.click('[data-view="month"]');
+    await desk.goto(HOSTING + '/scheduler.html?view=month&date=' + DATE + MANAGER);
     await desk.waitForFunction(() => /Oct 26/.test(document.getElementById('range').textContent));
     assert.ok(!(await desk.textContent('#body')).includes('Old May load'), 'the May load is not in October');
     for (let i = 0; i < 5; i++) { const before = await desk.textContent('#range'); await desk.click('#prev'); await desk.waitForFunction((b) => document.getElementById('range').textContent !== b, before); }

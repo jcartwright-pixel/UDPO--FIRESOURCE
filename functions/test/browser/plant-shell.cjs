@@ -36,7 +36,7 @@ const SCREENS = [
   ['unloading.html', '.head', ['[data-mode="check"]', '[data-mode="view"]', '#tabs']],
   ['returns.html', '.head', ['[data-mode="check"]', '[data-mode="view"]']],
   ['washing.html', null],
-  // Joe 10/10 (typed): Shipping and Receiving sit beside the date on the title line; the buttons stay on the button line.
+  // Joe 10/10 (typed): the buttons stay on the button line. Joe 11/1: no Shipping | Receiving switch (the left menu has both).
   ['scheduler.html', '.head', ['#add', '[data-view="week"]']],
   ['yard.html', '.head', ['[data-pane="current"]', '#refresh']],
   ['quality.html', null],
@@ -89,15 +89,16 @@ const SCREENS = [
     // Joe 10/26: each loading and unloading is its own menu item (loadout.html?area=TOTES is Tote Loading itself, not a remembered view).
     assert.deepEqual(menuHrefs.filter(h => /\?/.test(h) && !/^(loadout|unloading)\.html\?area=(CASE|TOTES|BOXING|TANKER)$/.test(h)), ['manager.html?report=1'], 'no plant menu link opens a remembered or side view');
     await side.close();
-    const sch = await openPage(browser, 1920, 950, '/scheduler.html' + MANAGER);
+    // Joe 11/1: Shipping and Receiving are separate screens (no switch on the screen); the menu opens each.
+    const sch = await openPage(browser, 1920, 950, '/scheduler.html' + MANAGER.replace('?', '?lane=receiving&'));
     await sch.waitForSelector('.sc-day');
-    await sch.click('[data-lane="RECEIVING"]');
+    assert.equal(await sch.textContent('#lane-name'), 'Receiving');
     await sch.click('[data-view="week"]');
     await sch.click('#next');
     await sch.waitForURL(/lane=receiving/);
     await Promise.all([sch.waitForURL(u => /scheduler\.html$/.test(u.pathname) && !/lane=/.test(u.search)), sch.click('.sidemenu a[href="scheduler.html"]')]);
     await sch.waitForSelector('.sc-day');
-    assert.equal(await sch.getAttribute('[data-lane="SHIPPING"]', 'aria-selected'), 'true', 'the Scheduler menu link opens Shipping');
+    assert.equal(await sch.$('[data-lane]'), null, 'Joe 11/1: no Shipping | Receiving switch');
     assert.equal(await sch.getAttribute('[data-view="month"]', 'aria-selected'), 'true', 'the Scheduler menu link opens the month');
     assert.equal(await sch.textContent('#lane-name'), 'Shipping');
     await sch.close();
@@ -124,9 +125,9 @@ const SCREENS = [
           assert.ok(Math.max(...mids) - Math.min(...mids) <= 6, page + ' ' + w + ': the buttons and filters are on one line ' + JSON.stringify(boxes));
         }
         if (page === 'scheduler.html') {
-          const t = await p.evaluate(() => { const r = (s) => document.querySelector('.sc-titleline ' + s).getBoundingClientRect(); const d = r('#range'), sh = r('[data-lane="SHIPPING"]'), rc = r('[data-lane="RECEIVING"]');
-            return { mids: [d, sh, rc].map(x => Math.round(x.top + x.height / 2)), gap: Math.round(rc.left - sh.right), beside: Math.round(sh.left - d.right) }; });
-          assert.ok(Math.max(...t.mids) - Math.min(...t.mids) <= 6 && t.beside >= 0 && t.beside < 60 && t.gap > 0, 'scheduler.html ' + w + ': Shipping and Receiving sit beside the dates with a little space between them (review item 37: no date box) ' + JSON.stringify(t));
+          // Joe 11/1: the dates stand alone on the title line (Shipping and Receiving are separate screens, no switch).
+          assert.equal(await p.$('.sc-titleline [data-lane]'), null, 'scheduler.html ' + w + ': no Shipping | Receiving switch beside the dates');
+          assert.ok(await p.isVisible('.sc-titleline #range'), 'scheduler.html ' + w + ': the dates on the title line');
         }
         // The shared top line (data-top): the action buttons are one even row and none is left down in the screen.
         const tiles = await p.evaluate(() => {
@@ -142,7 +143,7 @@ const SCREENS = [
         assert.deepEqual(p.errors, [], page + ' has no page errors');
         await p.close();
       }
-      results.push(w + ' wide: every plant screen has Back and Home; Unloading, Returns, Scheduler, Yard Checks and Temperatures keep their buttons and filters on one line; the Scheduler\'s Shipping and Receiving sit beside the date');
+      results.push(w + ' wide: every plant screen has Back and Home; Unloading, Returns, Scheduler, Yard Checks and Temperatures keep their buttons and filters on one line; the Scheduler has no Shipping | Receiving switch');
     }
     console.log(results.map(r => 'SHELL ' + r).join('\n'));
   } finally {

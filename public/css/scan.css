@@ -55,6 +55,25 @@
 .inv-page table.inv-log th, .inv-page table.inv-log td { text-align: left; }
 .inv-page table.inv-log .num { text-align: right; }
 .inv-page .foot { font-size: 16px; }
+/* Joe 11/1: Inventory's On Hand, Receiving Log and History tabs; Count typed in the row (no pop-up). */
+.inv-page .inv-tabs { display: inline-flex; align-self: flex-start; width: auto; margin: 0 0 10px; }
+.inv-page table.inv-onhand th { white-space: normal; }
+.inv-page .inv-tabs button { min-height: 40px; padding: 0 18px; font-size: 16px; font-weight: 800; }
+.inv-page .inv-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-tab[hidden] { display: none !important; }
+.inv-page .inv-tab { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1 1 auto; }
+.inv-page table.inv-onhand td.big { font-size: 18px; }
+.inv-page table.inv-onhand tr.low td { background: #fdecec; }
+.inv-page table.inv-onhand tr.low td:first-child { box-shadow: inset 6px 0 0 #c62828; }
+.inv-page table.inv-onhand tr.low td small { color: #b42318; }
+.inv-page table.inv-onhand tr.counting td { background: #fffbe8; }
+.inv-page .inv-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.inv-page .inv-acts button { min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.inv-page .inv-acts button.primary { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-acts input { width: 120px; min-height: 36px; border: 2px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; text-align: right; }
+.inv-page table.inv-history tr.mv-count td:nth-child(4) { color: var(--ud-blue); font-weight: 800; }
+.inv-page table.inv-history tr.mv-received td:nth-child(5) { color: var(--runs-ink); }
+.inv-page .inv-err[hidden] { display: none; }
 .inv-items .inv-help { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
 .inv-items table { width: 100%; font-size: 16px; }
 .inv-items td { padding: 8px; vertical-align: middle; }
@@ -63,6 +82,6 @@
 .inv-items .inv-item-acts button { min-height: 44px; font-size: 16px; }
 .inv-items .inv-item-acts button.armed { background: #b42318; color: #fff; border-color: #b42318; }
 @media print {
-  .inv-page .inv-filters, .inv-page .head .actions, .inv-page .topbar { display: none !important; }
+  .inv-page .inv-filters, .inv-page .head .actions, .inv-page .topbar, .inv-page .inv-tabs, .inv-page .inv-acts { display: none !important; }
   .inv-page table.inv-log th, .inv-page table.inv-log td { font-size: 11px; padding: 3px 5px; }
 }

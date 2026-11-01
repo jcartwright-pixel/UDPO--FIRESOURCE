@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Receiving Log · Operations</title>
+  <title>Inventory · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/scan.css">
   <script src="js/logic.js"></script>
@@ -16,7 +16,7 @@
 </head>
 <body class="fill issues-page inv-page">
   <div class="signin" id="signin" hidden>
-    <h1>Receiving Log</h1>
+    <h1>Inventory</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -28,58 +28,96 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Inventory · <span id="plant-name"></span></span><h1>Receiving Log</h1></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Scanned in on the Boxing station's Receiving tab</span></div>
+      <!-- Joe 11/1 ("a nice little module for the inventory"): the one place every stock change goes through. Receiving's Mark
+           Received puts stock in; Count is the manual override; Used (for example 500 dispenser bags) comes later. -->
+      <div class="title"><span class="eyebrow">Inventory · <span id="plant-name"></span></span><h1 id="page-title">Inventory</h1></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Received on Receiving, counted here</span></div>
       <div class="actions in-head">
-        <button type="button" id="items-open">Received Items</button>
+        <a class="button" id="products-open" href="scheduler.html?lane=receiving&amp;view=products">Edit products</a>
         <button type="button" id="print">Print</button>
       </div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">
-      <div class="actions inv-filters">
-        <div class="chips" id="periods"></div>
-        <span class="spacer"></span>
-        <input type="search" id="search" placeholder="Find an item, lot or PO" aria-label="Find an item, lot or PO">
-        <select id="supplier" aria-label="Supplier"></select>
-      </div>
-      <div class="sheet scroll-list">
-        <table class="issues inv-log">
-          <colgroup><col style="width:7%"><col style="width:7%"><col style="width:15%"><col style="width:6%"><col style="width:20%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:10%"></colgroup>
-          <thead><tr><th>Date</th><th>Time</th><th>Supplier</th><th>PO</th><th>Item</th><th>Lot</th><th>Made</th><th>Best by</th><th class="num">Cases</th><th>Temp</th><th>Received by</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
-      <div class="foot" id="foot"></div>
+      <div class="tabs seg inv-tabs" id="tabs" role="tablist" aria-label="Inventory"><button type="button" data-tab="onhand">On Hand</button><button type="button" data-tab="log">Receiving Log</button><button type="button" data-tab="history">History</button></div>
+
+      <section id="tab-onhand" class="inv-tab" hidden>
+        <div class="actions inv-filters">
+          <input type="search" id="oh-search" placeholder="Find a product" aria-label="Find a product">
+          <span class="spacer"></span>
+          <select id="oh-kind" aria-label="Kind"></select>
+          <select id="oh-supplier" aria-label="Supplier"></select>
+        </div>
+        <div class="notice error inv-err" id="oh-error" hidden></div>
+        <div class="sheet scroll-list">
+          <table class="issues inv-log inv-onhand">
+            <colgroup><col style="width:18%"><col style="width:14%"><col style="width:9%"><col style="width:11%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:20%"></colgroup>
+            <thead><tr><th>Product</th><th>Supplier</th><th>Counted in</th><th class="num">Last count</th><th class="num">Received since</th><th class="num">Used since</th><th class="num">Should have</th><th></th></tr></thead>
+            <tbody id="oh-rows"></tbody>
+          </table>
+        </div>
+        <div class="foot" id="oh-foot"></div>
+      </section>
+
+      <section id="tab-log" class="inv-tab" hidden>
+        <div class="actions inv-filters">
+          <div class="chips" id="periods"></div>
+          <span class="spacer"></span>
+          <input type="search" id="search" placeholder="Find an item, lot or PO" aria-label="Find an item, lot or PO">
+          <select id="supplier" aria-label="Supplier"></select>
+        </div>
+        <div class="sheet scroll-list">
+          <table class="issues inv-log">
+            <colgroup><col style="width:7%"><col style="width:7%"><col style="width:15%"><col style="width:6%"><col style="width:20%"><col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:10%"></colgroup>
+            <thead><tr><th>Date</th><th>Time</th><th>Supplier</th><th>PO</th><th>Item</th><th>Lot</th><th>Made</th><th>Best by</th><th class="num">Cases</th><th>Temp</th><th>Received by</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="foot" id="foot"></div>
+      </section>
+
+      <section id="tab-history" class="inv-tab" hidden>
+        <div class="actions inv-filters">
+          <select id="h-product" aria-label="Product"></select>
+          <span class="spacer"></span>
+        </div>
+        <div class="sheet scroll-list">
+          <table class="issues inv-log inv-history">
+            <colgroup><col style="width:9%"><col style="width:8%"><col style="width:20%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:20%"><col style="width:14%"></colgroup>
+            <thead><tr><th>Date</th><th>Time</th><th>Product</th><th>What</th><th class="num">Change</th><th class="num">Should have</th><th>Load</th><th>By</th></tr></thead>
+            <tbody id="h-rows"></tbody>
+          </table>
+        </div>
+        <div class="foot" id="h-foot"></div>
+      </section>
     </div>
   </div>
 
-  <div class="modal-back" id="items-back" hidden></div>
-  <section class="modal wide-modal inv-items" id="items" role="dialog" aria-modal="true" aria-labelledby="items-title" hidden>
-    <h2 id="items-title">Received Items</h2>
-    <p class="inv-help">What the plant receives. A barcode scanned for the first time is named on the tablet and added here. Change a name and it saves when you leave the box.</p>
-    <div id="item-list"></div>
-    <div class="modal-actions"><button type="button" data-close>Close</button></div>
-  </section>
-
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote, save } from './js/app.js';
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote, save, maySave } from './js/app.js';
+    import { collection, doc, query, where, orderBy, limit, onSnapshot } from './js/firebase.js';
     import { plantFor } from './js/pmaint.js';
 
-    // Receiving Log (Joe 10/13, mock-up E): every scan of every delivery, newest first, searchable by item, lot or PO, so a
-    // recall can be answered: who brought lot X in, when, and how much. The scans are made on the Boxing station's Receiving
-    // tab (receivingScans); the delivery's temperature is the one typed on its card (the Scheduler's Receiving load).
+    // Inventory (Joe 11/1, mock-up 2): On Hand shows each product's last count, what came in since (Receiving's Mark Received)
+    // and what it should have now; Count types what is really on the shelf (the new starting point). History lists every
+    // change. The Receiving Log (Joe 10/13, mock-up E) is every scan of every delivery, searchable by item, lot or PO.
     const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
     const params = new URLSearchParams(location.search);
     const PERIODS = [['7', '7 days'], ['30', '30 days'], ['90', '90 days'], ['365', 'Year']];
+    const TABS = ['onhand', 'log', 'history'];
+    let tab = TABS.indexOf(params.get('tab')) >= 0 ? params.get('tab') : 'onhand';
     let plant = params.get('plant') || '', period = '30', search = '', supplier = '', person = null, app = {}, db = null;
-    let scans = null, items = [], deliveries = {}, stops = [];
+    let ohSearch = '', ohKind = '', ohSupplier = '', counting = '', hProduct = params.get('product') || '';
+    let scans = null, items = null, moves = null, deliveries = {}, supplierDocs = [], stops = [];
     const today = () => L.operatingDay(new Date());
     const timeOf = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : ''; };
-    const itemName = (l) => { const it = l.itemId && items.find(i => i.id === l.itemId); return it ? it.name : l.itemName || ''; };
+    const dayOf = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? shortDate(L.operatingDay(new Date(t))) : ''; };
+    const itemName = (l) => { const it = l.itemId && (items || []).find(i => i.id === l.itemId); return it ? it.name : l.itemName || ''; };
     const who = (l) => l.station || String(l.by || '').replace(/^station:/, '').split('@')[0];
-    const canEdit = () => L.hasRole(person, L.REORDER_ROLES);
+    const canCount = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
+    const num = (n) => n === null || n === undefined || n === '' ? '' : Number(n).toLocaleString('en-US');
+    const suppliers = () => U.scheduleSuppliers(supplierDocs);
+    const supplierName = (id) => { const s = suppliers().find(r => r.routeId === id); return s ? s.name || s.run : ''; };
 
     function render() {
       const pl = plantFor(person, plant);
@@ -88,6 +126,64 @@
       const st = L.screenState(app, 'plant');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? 'LIVE' : 'TEST COPY';
+      document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+      TABS.forEach(t => { document.getElementById('tab-' + t).hidden = t !== tab; });
+      document.getElementById('products-open').hidden = !canCount();
+      if (tab === 'onhand') renderOnHand(); else if (tab === 'history') renderHistory(); else renderLog();
+    }
+
+    /* ---------- On Hand ---------- */
+    function renderOnHand() {
+      // Not while a count is being typed (a save elsewhere would redraw the box away).
+      const a = document.activeElement;
+      if (a && a.id === 'count-qty' && counting) return;
+      const sups = suppliers(), kinds = U.INVENTORY_KINDS;
+      document.getElementById('oh-kind').innerHTML = '<option value="">All kinds</option>' + kinds.map(k => '<option' + (k === ohKind ? ' selected' : '') + '>' + k + '</option>').join('');
+      document.getElementById('oh-supplier').innerHTML = '<option value="">All suppliers</option>' + sups.map(r => '<option value="' + escapeHtml(r.routeId) + '"' + (r.routeId === ohSupplier ? ' selected' : '') + '>' + escapeHtml(r.name || r.run) + '</option>').join('');
+      const q = ohSearch.toUpperCase(), ck = canCount();
+      const list = (items || []).filter(i => (!ohKind || i.kind === ohKind) && (!ohSupplier || i.supplierId === ohSupplier) && (!q || [i.name, supplierName(i.supplierId)].join(' ').toUpperCase().indexOf(q) >= 0))
+        .sort((a, b) => supplierName(a.supplierId).localeCompare(supplierName(b.supplierId)) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+      document.getElementById('oh-rows').innerHTML = list.map(i => {
+        const counted = i.countQty !== null && i.countQty !== undefined && i.countQty !== '', low = U.inventoryLow(i);
+        const acts = counting === i.id ? '<input id="count-qty" inputmode="numeric" maxlength="8" aria-label="What is on the shelf now" placeholder="On the shelf"><button type="button" class="primary" id="count-save">Save count</button><button type="button" id="count-cancel">Cancel</button>'
+          : (ck ? '<button type="button" data-count="' + escapeHtml(i.id) + '">Count</button>' : '') + '<button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
+        return '<tr class="' + (low ? 'low' : '') + (counting === i.id ? ' counting' : '') + '"><td class="strong">' + escapeHtml(i.name) + (low ? '<small>Below its low mark (' + num(i.low) + ')</small>' : '') + '</td><td>' + escapeHtml(supplierName(i.supplierId) || '—') + '</td>' +
+          '<td>' + escapeHtml(i.unit || '—') + '</td><td class="num">' + (counted ? num(i.countQty) + ' <small>on ' + escapeHtml(dayOf(i.countAt)) + '</small>' : 'Not counted yet') + '</td>' +
+          '<td class="num">' + (Number(i.receivedSince) ? '+' + num(i.receivedSince) : '0') + '</td><td class="num">' + (Number(i.usedSince) ? '−' + num(i.usedSince) : '0') + '</td>' +
+          '<td class="num strong big">' + num(U.shouldHave(i)) + '</td><td><div class="inv-acts">' + acts + '</div></td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">' + (!items ? 'Loading Inventory&hellip;' : items.length ? 'No products match.' : 'No products yet. Add them on Receiving > Suppliers &amp; Products.') + '</td></tr>';
+      const lows = list.filter(U.inventoryLow).length;
+      document.getElementById('oh-foot').textContent = list.length + ' product' + (list.length === 1 ? '' : 's') + (lows ? ' · ' + lows + ' below the low mark (red)' : '') + '. Should have = last count + received since − used since.';
+      const box = document.getElementById('count-qty');
+      if (box && !box.dataset.focused) { box.dataset.focused = '1'; box.focus(); }
+    }
+    function ohError(t) { const b = document.getElementById('oh-error'); b.textContent = t; b.hidden = !t; }
+    async function saveCount() {
+      const box = document.getElementById('count-qty'), t = box.value.replace(/,/g, '').trim();
+      if (!/^[0-9]{1,7}$/.test(t)) return ohError('Type what is on the shelf now, as a whole number.');
+      const btn = document.getElementById('count-save');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'count', itemId: counting, qty: t }); ohError(''); counting = ''; render(); }
+      catch (e) { btn.disabled = false; btn.textContent = 'Save count'; ohError('Not saved (' + (e.message || e) + ').'); }
+    }
+
+    /* ---------- History ---------- */
+    const WHAT = { RECEIVED: 'Received', COUNT: 'Counted', USED: 'Used' };
+    function renderHistory() {
+      const pick = document.getElementById('h-product');
+      pick.innerHTML = '<option value="">All products</option>' + (items || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).map(i => '<option value="' + escapeHtml(i.id) + '"' + (i.id === hProduct ? ' selected' : '') + '>' + escapeHtml(i.name) + '</option>').join('');
+      const list = (moves || []).filter(m => !hProduct || m.itemId === hProduct);
+      document.getElementById('h-rows').innerHTML = list.map(m => {
+        const change = m.kind === 'COUNT' ? (m.change ? (m.change > 0 ? '+' : '−') + num(Math.abs(m.change)) : '0') : (m.kind === 'USED' ? '−' : '+') + num(m.qty);
+        return '<tr class="mv-' + escapeHtml(String(m.kind).toLowerCase()) + '"><td>' + escapeHtml(dayOf(m.at)) + '</td><td>' + escapeHtml(timeOf(m.at)) + '</td><td class="strong">' + escapeHtml(itemName(m)) + '</td>' +
+          '<td>' + escapeHtml(WHAT[m.kind] || m.kind) + (m.kind === 'COUNT' ? '<small>' + num(m.qty) + ' on the shelf</small>' : '') + '</td><td class="num strong">' + change + '</td><td class="num">' + num(m.after) + '</td>' +
+          '<td>' + escapeHtml([m.supplier, m.poNumber ? (/^PO\b/i.test(m.poNumber) ? m.poNumber : 'PO ' + m.poNumber) : ''].filter(Boolean).join(' · ') || '—') + '</td><td>' + escapeHtml(who(m)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">' + (!moves ? 'Loading the history&hellip;' : 'Nothing yet. A load marked received on Receiving, or a Count here, shows up here.') + '</td></tr>';
+      document.getElementById('h-foot').textContent = list.length + ' change' + (list.length === 1 ? '' : 's') + (moves && moves.length >= 500 ? ' (the newest 500)' : '') + '.';
+    }
+
+    /* ---------- Receiving Log ---------- */
+    function renderLog() {
       document.getElementById('periods').innerHTML = PERIODS.map(([k, label]) => '<button type="button" data-period="' + k + '" class="' + (period === k ? 'on' : '') + '">' + label + '</button>').join('');
       const mine = (scans || []).filter(l => l.status !== 'REMOVED' && (l.facilityId || 'fac_uniontown') === plant);
       const sups = [...new Set(mine.map(l => l.supplier).filter(Boolean))].sort();
@@ -106,46 +202,36 @@
       }).join('') || '<tr><td colspan="11" class="empty">' + (!scans ? 'Loading the Receiving Log&hellip;' : mine.length ? 'No scans match.' : 'Nothing scanned in yet. On the Boxing station\'s Receiving tab, start a delivery and scan its labels.') + '</td></tr>';
       const cases = list.reduce((n, l) => n + (Number(l.count) || 0), 0);
       document.getElementById('foot').textContent = list.length + ' scan' + (list.length === 1 ? '' : 's') + ' · ' + cases + ' case' + (cases === 1 ? '' : 's') + '. Shaded rows: a barcode not named yet.';
-      document.getElementById('items-open').hidden = !canEdit();
-      renderItems();
     }
 
-    function renderItems() {
-      const box = document.getElementById('item-list');
-      if (document.getElementById('items').hidden) return;
-      // Not while a name is being typed (a save elsewhere would redraw the box away).
-      const a = document.activeElement;
-      if (a && a.matches && a.matches('#item-list [data-item]')) return;
-      const mine = items.filter(i => (i.facilityId || 'fac_uniontown') === plant).sort((a, b) => a.name.localeCompare(b.name));
-      box.innerHTML = mine.length ? '<table class="issues inv-item-table"><thead><tr><th>Item</th><th>Barcodes</th><th></th></tr></thead><tbody>' + mine.map(i =>
-        '<tr><td><input class="inv-name" data-item="' + escapeHtml(i.id) + '" value="' + escapeHtml(i.name) + '" aria-label="Name of ' + escapeHtml(i.name) + '"></td><td>' + (i.barcodes || []).map(b => escapeHtml(b.indexOf('TEXT:') === 0 ? b.slice(5) : S.shownCode({ gtin: b }))).join('<br>') + '</td>' +
-        '<td class="inv-item-acts"><button type="button" data-remove="' + escapeHtml(i.id) + '">Remove</button></td></tr>').join('') + '</tbody></table>'
-        : '<p class="inv-help">No items yet.</p>';
-    }
-
+    function setTab(t) { tab = t; counting = ''; const u = new URL(location.href); u.searchParams.set('tab', t); if (t === 'history' && hProduct) u.searchParams.set('product', hProduct); else u.searchParams.delete('product'); history.replaceState(null, '', u); render(); }
+    document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
     document.getElementById('periods').addEventListener('click', e => { const b = e.target.closest('[data-period]'); if (b && b.dataset.period !== period) { period = b.dataset.period; follow(); } });
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
     document.getElementById('supplier').addEventListener('change', e => { supplier = e.target.value; render(); });
+    document.getElementById('oh-search').addEventListener('input', e => { ohSearch = e.target.value.trim(); render(); });
+    document.getElementById('oh-kind').addEventListener('change', e => { ohKind = e.target.value; render(); });
+    document.getElementById('oh-supplier').addEventListener('change', e => { ohSupplier = e.target.value; render(); });
+    document.getElementById('h-product').addEventListener('change', e => { hProduct = e.target.value; setTab('history'); });
     document.getElementById('print').addEventListener('click', () => window.print());
-    const items$ = document.getElementById('items'), back$ = document.getElementById('items-back');
-    const closeItems = () => { items$.hidden = true; back$.hidden = true; };
-    document.getElementById('items-open').addEventListener('click', () => { items$.hidden = false; back$.hidden = false; renderItems(); });
-    back$.addEventListener('click', closeItems);
-    // A name saves when its box is left (Joe: no Save buttons); Remove needs a second press.
-    items$.addEventListener('change', async e => {
-      const box = e.target.closest('[data-item]'), it = box && items.find(i => i.id === box.dataset.item), name = box ? box.value.trim() : '';
-      if (!it || !name || name === it.name) return;
-      try { await save('saveReceivingItem', { op: 'edit', itemId: it.id, name }); showError(''); } catch (err) { box.value = it.name; showError(err.message || String(err)); }
+    document.getElementById('oh-rows').addEventListener('click', e => {
+      const c = e.target.closest('[data-count]'), h = e.target.closest('[data-history]');
+      if (c) { counting = c.dataset.count; ohError(''); render(); return; }
+      if (h) { hProduct = h.dataset.history; setTab('history'); return; }
+      if (e.target.id === 'count-save') return saveCount();
+      if (e.target.id === 'count-cancel') { counting = ''; ohError(''); render(); }
     });
-    items$.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-item]')) e.target.blur(); });
-    items$.addEventListener('click', async e => {
-      if (e.target.closest('[data-close]')) { closeItems(); return; }
-      const rem = e.target.closest('[data-remove]'), it = rem && items.find(i => i.id === rem.dataset.remove);
-      if (!it) return;
-      if (rem.dataset.armed !== '1') { rem.dataset.armed = '1'; rem.textContent = 'Press again to remove'; rem.classList.add('armed'); return; }
-      try { await save('saveReceivingItem', { op: 'remove', itemId: it.id }); showError(''); } catch (err) { showError(err.message || String(err)); }
+    document.getElementById('oh-rows').addEventListener('keydown', e => {
+      if (e.target.id !== 'count-qty') return;
+      if (e.key === 'Enter') { e.preventDefault(); saveCount(); }
+      if (e.key === 'Escape') { counting = ''; ohError(''); render(); }
     });
-    window.udBack = () => { if (!items$.hidden) { closeItems(); return true; } if (search || supplier) { search = ''; supplier = ''; document.getElementById('search').value = ''; render(); return true; } return false; };
+    window.udBack = () => {
+      if (counting) { counting = ''; render(); return true; }
+      if (tab === 'history' && hProduct) { hProduct = ''; setTab('onhand'); return true; }
+      if (search || supplier || ohSearch || ohKind || ohSupplier) { search = supplier = ohSearch = ohKind = ohSupplier = ''; ['search', 'oh-search'].forEach(id => { document.getElementById(id).value = ''; }); render(); return true; }
+      return false;
+    };
 
     function follow() {
       stops.forEach(u => u());
@@ -159,15 +245,18 @@
           deliveries = {};
           U.scheduleEntries(s.docs.map(d => d.data()), 'RECEIVING').forEach(x => { deliveries[x.id] = x; });
           render();
-        }, () => {}),
-        onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { items = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the item list'))
+        }, () => {})
       ];
     }
     requireSignIn(async (user) => {
       ({ db } = await start());
       let first = true;
+      const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(doc(db, 'users', String(user.email).toLowerCase()), s => { person = s.exists() ? Object.assign({ email: user.email }, s.data()) : null; if (first) { first = false; follow(); } else render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
+      onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { items = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the products'));
+      onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); }, fail('the suppliers'));
+      onSnapshot(query(collection(db, 'inventoryMoves'), orderBy('at', 'desc'), limit(500)), s => { moves = s.docs.map(d => d.data()); render(); }, fail('the Inventory history'));
     });
   </script>
 </body>
