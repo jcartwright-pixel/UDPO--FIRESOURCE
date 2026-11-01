@@ -69,7 +69,7 @@ const pick = (page, name) => page.click('#mx-list .mx-m:has(b:text-is("' + name 
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
       const page = await openPage(browser, w, h, '/administration.html?item=machine-connections&' + ADMIN);
       await page.waitForSelector('#mx-list .mx-m');
-      assert.deepEqual(await page.$$eval('.adm-nav-group:has(h2:text-is("Connections & Keys")) .adm-name', s => s.map(x => x.textContent)), ['Machine Connections', 'MOCREO Key', 'Texts', 'RedZone Sign-In']);
+      assert.deepEqual(await page.$$eval('.adm-nav-group:has(.adm-gh[data-group="Products & Machines"]) .adm-name', s => s.map(x => x.textContent)), ['Product Sheet', 'Machine Setup', 'Machine Connections', 'MOCREO Key', 'RedZone Sign-In']);
       assert.deepEqual(await page.$$eval('#mx-plants button', b => b.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
       await page.waitForSelector('#mx-list .mx-m:has(b:text-is("Palletizer"))');
       await page.waitForSelector('#mx-list .mx-m:has(b:text-is("BLOW MOLD"))');

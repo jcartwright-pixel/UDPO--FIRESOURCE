@@ -278,7 +278,16 @@ const OTHERS = [
 
     // Joe 10/29 "I need something that my account never gets locked out of": an Administrator is never locked to a station.
     {
-      const locked = (p) => p.evaluate(() => localStorage.getItem('udStationDevice'));
+      // Operations may move on from Home to the plant choice while a read is in flight; read again once the new page has loaded.
+      const settled = async (p, fn) => {
+        for (let i = 0; ; i++) {
+          try { return await p.evaluate(fn); } catch (e) {
+            if (i >= 4 || !/Execution context was destroyed|navigat/i.test(e.message)) throw e;
+            await p.waitForLoadState('load').catch(() => {});
+          }
+        }
+      };
+      const locked = (p) => settled(p, () => localStorage.getItem('udStationDevice'));
       // Operations' first screen: Home, or the plant choice for an Administrator of more than one plant.
       const opsHome = (u) => ['index.html', 'company.html'].indexOf(pageOf(String(u))) >= 0;
       // Waits until the page has settled on Operations' first screen (it may move on from Home to the plant choice on the way).
@@ -371,7 +380,7 @@ const OTHERS = [
       await t.click('#code-box .st-admin');
       await toOps(t, 20000);
       assert.equal(await locked(t), null, 'Administrator sign-in freed the tablet');
-      assert.equal(await t.evaluate(() => localStorage.getItem('udPlantStationCode')), null, 'the tablet forgot its station');
+      assert.equal(await settled(t, () => localStorage.getItem('udPlantStationCode')), null, 'the tablet forgot its station');
       // Operations may still be moving on to its home screen; let it finish so this open isn't cut off by it.
       await t.waitForLoadState('networkidle').catch(() => {});
       await t.goto(HOSTING + '/administration.html').catch(() => t.goto(HOSTING + '/administration.html'));

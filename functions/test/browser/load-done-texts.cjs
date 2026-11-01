@@ -120,11 +120,12 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       assert.deepEqual(p.errors, []);
       await p.context().close();
     }
-    // Administration lists Texts under Connections & Keys (it was Schedule Texts).
+    // Administration lists Texts under Email & Texts (it was Schedule Texts).
     const a = await openPage(browser, 1536, 790, '/administration.html?testEmail=admin.test@uniteddairy.com');
     await a.waitForSelector('.adm-item[data-key="people"]');
     await a.fill('#find', 'texts');
-    await a.waitForFunction(() => [...document.querySelectorAll('.adm-item')].map(x => x.dataset.key).join() === 'schedule-texts');
+    // Joe 11/1: Find a setting also matches the group's name, so "texts" lists the whole Email & Texts group, Texts with it.
+    await a.waitForFunction(() => [...document.querySelectorAll('.adm-item')].map(x => x.dataset.key).join() === 'repair-email,sales-email,checkin-email,report-recipients,email-senders,sent-log,schedule-texts');
     await a.waitForSelector('.adm-item[data-key="schedule-texts"]', { state: 'visible' });
     if (SHOTS) { await a.waitForTimeout(1000); await a.screenshot({ path: path.join(SHOTS, 'after-administration-1536.png') }); }
     await a.context().close();

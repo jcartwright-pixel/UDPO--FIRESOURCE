@@ -69,12 +69,15 @@ async function openPage(browser, url, when) {
       // leave before Sunday's shift ends, so all four are behind on Sunday at 6:40 PM and still at 12:46 AM Monday.
       const sunday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-11T22:40:00Z');
       await sunday.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent));
-      await sunday.waitForFunction(() => /4 routes behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      // Joe 11/1: late = the truck should have left. At 6:40 PM Sunday only 844 (6:00 PM) has; the other three are behind.
+      await sunday.waitForFunction(() => /1 route late/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
       assert.match(await sunday.textContent('body'), /left over from Sat 10-10-26/);
       await sunday.close();
       const later = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-12T04:46:10Z');
-      await later.waitForFunction(() => /4 routes behind/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
-      assert.match(await later.textContent('body'), /971[\s\S]*BEHIND/);
+      // 12:46 AM Monday: 844, 950 (11:00 PM) and 971 (12:00 AM) should have left; 880 (2:00 AM) is behind.
+      await later.waitForFunction(() => /3 routes late/.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      assert.match(await later.textContent('body'), /971[\s\S]*LATE/);
+      assert.match(await later.textContent('body'), /880[\s\S]*BEHIND/);
       results.push('Sunday 6:40 PM and Monday 12:46 AM: the four Saturday loads still open are left over and leave before Sunday\'s shift ends, so all are behind');
       // Joe 10/19 ("look into the route setup"): the Route Editor's Departure Day decides. Tuesday 10/20's loads made Monday:
       // Jersey (Load Day, 1:00 PM) leaves Monday; 901 (7:00 AM), 907 (9:00 AM) and 827 (1:00 AM) are Delivery Day, Tuesday.
@@ -86,8 +89,8 @@ async function openPage(browser, url, when) {
           days: { tue: { runs: true, loadDayOffset: -1, loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: '2026-10-20', dispatchTime: time, loadSequence: i + 1 } } });
       }
       const monday = await openPage(browser, '/manager.html?' + MANAGER, '2026-10-19T18:57:00Z');
-      await monday.waitForFunction(() => /1 route behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
-      assert.match(await monday.textContent('body'), /852[\s\S]*BEHIND/);
+      await monday.waitForFunction(() => /1 route late/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 8000 });
+      assert.match(await monday.textContent('body'), /852[\s\S]*LATE/);
       const lo2 = await openPage(browser, '/loadout.html?' + MANAGER, '2026-10-19T18:57:00Z');
       await lo2.waitForSelector('#rows tr[data-row]');
       await lo2.waitForFunction(() => /Behind 1\b/.test(document.getElementById('strip').textContent), null, { timeout: 8000 });
