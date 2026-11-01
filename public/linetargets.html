@@ -352,7 +352,8 @@
         // Joe 10/14: the Blow Mold weighs a jug from each of its six heads; the tablet flags a head outside this range.
         (R.lineKind(line.name) === 'BLOWMOLD' ? [['jugWeightTarget', 'Jug weight target, g'], ['jugWeightLow', 'Lightest, g'], ['jugWeightHigh', 'Heaviest, g']].map(([k, l]) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" inputmode="decimal" maxlength="6" value="' + escapeHtml(val(k)) + '"' + (ck ? '' : ' disabled') + '></label>').join('') : '') +
         '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>' +
-        (R.hasFill(line.name) ? fillSetup(line, info, val, ck) : '') + (R.lineKind(line.name) === 'PACK' ? fedSetup(line, info, val, ck) : '');
+        (R.hasFill(line.name) ? fillSetup(line, info, val, ck) : '') + (R.lineKind(line.name) === 'PACK' ? fedSetup(line, info, val, ck) : '') +
+        (R.lineKind(line.name) === 'FILLER' && !R.isBagFiller(line.name) ? labelSetup(line, info, val, ck) : '');
     }
     // Joe 10/14: a filler's fill weight check: how often it is due, and the numbers for the product in each jug (filled - empty jug - cap,
     // against each product's Target fill weight on the Product Sheet).
@@ -378,8 +379,25 @@
         '<label>Jugs in each box <input id="setup-perBox" data-setup="perBox" data-max="1000" inputmode="numeric" maxlength="4" value="' + escapeHtml(val('perBox')) + '"' + dis + '></label>' +
         '<span>Jugs boxed = boxes counted on this line × jugs in each box. Jugs in minus jugs boxed is what is still on the conveyor, rejected or spilled. Leave every line unticked for none.</span></div>';
     }
+    // Joe 10/31 (Labeling Room, mock-up 3): the filler gets its bottles from the Labeling Room, how long the belt takes and how many
+    // bottles are on it; the Labeling Room screen and this filler's tablet count down with these.
+    function labelSetup(line, info, val, ck) {
+      const dis = ck ? '' : ' disabled', on = R.labelLines([line], data.lineInfo).length === 1;
+      return '<div class="lt-fill"><h3>Labeling Room <small>the bottles come from the Labeling Room on the belt</small></h3>' +
+        '<div class="lt-fillrow"><label class="lt-check"><input type="checkbox" id="setup-labelRoom" data-labelroom="1"' + (on ? ' checked' : '') + dis + '> Gets its bottles from the Labeling Room</label></div>' +
+        (on ? '<div class="lt-fillrow"><label>Belt time from the Labeling Room, minutes <input id="setup-beltMin" data-setup="beltMin" data-max="120" inputmode="decimal" maxlength="5" value="' + escapeHtml(val('beltMin')) + '"' + dis + '></label>' +
+          '<label>Bottles on the belt <input id="setup-beltHolds" data-setup="beltHolds" data-max="100000" inputmode="numeric" maxlength="6" value="' + escapeHtml(val('beltHolds')) + '"' + dis + '></label></div>' +
+          '<span>Labels still to put on = left to run on this filler − bottles on the belt. After the Labeling Room switches labels, the first new bottle reaches this filler after the belt time.</span>' : '') + '</div>';
+    }
     document.getElementById('setup').addEventListener('change', async e => {
       const line = current();
+      if (e.target.dataset.labelroom !== undefined && line && canSave()) {
+        note = ''; render('keep');
+        try { await save('saveLineSetup', { operationId: line.operationId, labelRoom: e.target.checked }); note = ''; showError(''); }
+        catch (err) { note = 'Not saved.'; showError(line.name + ' not saved (' + (err.message || err) + ').'); }
+        render(true);
+        return;
+      }
       if (e.target.dataset.fedby !== undefined && line && canSave()) {
         const fedBy = [...document.querySelectorAll('#setup [data-fedby]')].filter(x => x.checked).map(x => x.dataset.fedby);
         note = ''; render('keep');
@@ -392,7 +410,7 @@
       if (!box || !line || !canSave()) return;
       const k = box.dataset.setup, v = box.value.trim(), max = box.dataset.max ? Number(box.dataset.max) : k === 'cipHours' ? 72 : /^jugWeight/.test(k) ? 500 : 600, n = Number(v);
       const names = { cipHours: 'CIP wash every', changeoverMin: 'Changeover standard', jugWeightTarget: 'Jug weight target', jugWeightLow: 'Lightest jug weight', jugWeightHigh: 'Heaviest jug weight',
-        fillEveryN: 'How often', tareGrams: 'Empty jug weight', capGrams: 'Cap weight', fillUnder: 'Light when under target by', fillOver: 'Heavy when over target by', perBox: 'Jugs in each box' };
+        fillEveryN: 'How often', tareGrams: 'Empty jug weight', capGrams: 'Cap weight', fillUnder: 'Light when under target by', fillOver: 'Heavy when over target by', perBox: 'Jugs in each box', beltMin: 'Belt time', beltHolds: 'Bottles on the belt' };
       if (k !== 'fillEvery' && v !== '' && (!isFinite(n) || n < 0 || n > max)) { refuse(names[k] + ' must be a number from 0 to ' + max + '. It was not changed.'); box.blur(); render(true); return; }
       if (k === 'fillEvery') box.blur();
       note = ''; render('keep');

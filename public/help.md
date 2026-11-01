@@ -783,15 +783,31 @@ Part of **Inventory**, under Shipping & Receiving (on the Home screen it is unde
 
 # Debag / Labeling Room
 
-## Debag / Labeling Room
-id: debag
-screens: soon.html?what=debag-labeling-room
-
-Where the half-gallon, quart and pint bottles come out of their bags and go onto the conveyor, through the labelers, to the fillers. It is a department of **Plant Operations** (its button is on the Plant Operations card). It is **Under Construction**: its screens are being built, so only administrators can open it, and it shows a "being built" page for now.
-
-- The button on that page opens **Plant Material Trailers**, which is under Shipping & Receiving, in Inventory.
+Where the half-gallon, quart and pint bottles come out of their bags and go onto the conveyor, through the labelers, to the fillers. It is a department of **Plant Operations** (its button is on the Plant Operations card). It is **Under Construction**, so only administrators can open it for now. Its button opens the **Labeling Room**.
 
 !> Do not look here for the trailers in the lot. They are in **Inventory** under Shipping & Receiving.
+
+## Labeling Room
+id: labeling
+screens: labeling.html
+
+The Labeling Room and the fillers talk to each other here. The bottles come out of their bags in Debag, get their labels in the Labeling Room and ride the belt to a filler. There is one panel for each filler (for example the Old Half Gallon Filler, the New Half Gallon Filler and the Gallon Filler). Each panel shows the label going on now, how many labels are still to put on, the bottles already on the belt and what that filler runs next.
+
+1. Check **Labeling now** on each panel. It is what the filler runs, with its **code date** in big letters. If you are putting on a different label, pick it in the drop-down.
+2. Watch **Labels still to put on**. It counts down as the filler fills: it is what the filler still has to run, less the bottles already on the belt.
+3. **Up next at this filler** shows what the filler runs next, how many and its code date. You can change it with the drop-down; the filler's tablet shows the change.
+4. When the panel says **SWITCH LABELS NOW** in red, put on the next labels and press `I switched to ... labels`. The filler's tablet then counts down to the first bottle with the new label.
+5. When a filler presses **Hold labels** on its tablet, its panel turns red and says **Filler says: HOLD LABELS**. Stop labeling for that filler until it says it is running again.
+
+- **On the belt to the filler** is how many bottles are labeled and on their way, and about how long they take to get there. After you switch, it shows the last bottles of the old label still on the belt and the countdown to the first new one.
+- **Switch labels in ... bottles** says about how many minutes are left, at the speed the filler is running.
+- What each filler runs, how many it has left and what is next come from the filler's line tablet. The belt time and the bottles on the belt are set for each filler on [Line Targets](#linetargets), where a filler that does not get its bottles from the Labeling Room is unticked.
+- A panel with a red **DOWN** means the filler is stopped on its tablet.
+
+> Pick the next filler's labels ahead of time and stack them by the island, so the switch takes seconds.
+
+!> Do not press `I switched` before the new labels are really going on. The filler's countdown starts the moment you press it.
+!> Do not keep labeling for a filler that says HOLD LABELS. The bottles back up on the belt.
 
 # Plant Checks
 
@@ -1024,6 +1040,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 - **Fill weight** (the fillers, and the Raypak and bag fillers with bags), beside Up next: it counts down to the next weight and says NOW, flashing, when one is due. Weigh one filled jug, type its weight in grams in the box and press Enter. The box empties and the countdown starts again; under it is the last weight and whether it was over or under target. How often is set on Line Targets. Boxing has no fill weight check: its product was weighed before it gets there.
 - On the Blow Mold, scan each resin lot; each new lot or color starts a new run.
 - `Set Next` sets what runs next on this line and how many.
+- **Labeling Room** (a filler that gets its bottles from the Labeling Room), first in the bottom row: how many of the label it runs are still coming (on the belt and still to label), the next label and about when its first bottle gets here. Once the Labeling Room presses I switched, it counts down to the first new bottle. Press `Hold Labels (Filler Down)` when the filler goes down, so the Labeling Room stops; press `Filler Running Again` when it runs.
 
 **A line tablet on the floor:** open the Line Tablet link (Administration, Plant Station Codes) on the tablet. Once the plant has a Line Tablet code, the tablet types it once and picks its line. After that it has no Back, Home, Sign out or `Change Line`, and it opens no other screen. To move it to another line, a manager taps `Release` in the bottom-right corner and types the manager release code; the tablet goes back to the code screen. An Administrator frees the tablet for good with `Administrator sign-in` on the code screen (their own account). A computer opening Line Tablet from the menus works as before.
 
@@ -1036,6 +1053,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 !> Do not type a weight from memory or from the last jug. Weigh a jug each time the box says NOW.
 !> Do not tap `DOWN` for a product change. Tap `CHANGEOVER`, so the time counts as a changeover, not as down.
 !> Do not type the Line Tablet code on your own computer. It then opens only the Line Tablet.
+!> Do not forget `Filler Running Again` after a hold. The Labeling Room stays stopped for this filler until you press it.
 
 ## Line Targets
 id: linetargets
@@ -1046,6 +1064,7 @@ Each line's setup: its products' speeds and targets (full speed, target %, lowes
 - `Fill Empty Speeds from RedZone` and `Refresh from RedZone` copy speeds from RedZone.
 - `Start Test Feed (1 hour)` sends made-up counts to a line to test the screens; `Stop Test Feed` stops it.
 - `Test read` reads a sensor once to check it.
+- **Labeling Room** (fillers): tick **Gets its bottles from the Labeling Room**, then type the **Belt time from the Labeling Room** in minutes and the **Bottles on the belt**. The [Labeling Room](#labeling) screen and the filler's tablet count down with them. Untick it for a filler that does not get its bottles from the Labeling Room.
 
 > How a line is counted, its controller and its RedZone line are also on the line's page in [Machine Connections](#machine-connections). Both save the same way.
 

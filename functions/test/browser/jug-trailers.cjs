@@ -50,26 +50,26 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
   const results = [];
   try {
     // Joe 10/31: Plant Material Trailers is in Inventory, under Shipping & Receiving (its own card on the Home screen); Debag /
-    // Labeling Room stays a Plant Operations department with no screens yet (Under Construction).
+    // Labeling Room stays a Plant Operations department (Under Construction) whose button opens the Labeling Room.
     const h = await openPage(browser, 1536, 790, '/index.html?testEmail=' + ADMIN);
     await h.waitForSelector('#sides .hq-card[data-card-side="shipping"] .hq-sub');
     assert.deepEqual(await h.$$eval('#sides .hq-card[data-card-side="shipping"] .hq-sub', a => a.map(x => x.textContent + ':' + x.getAttribute('href'))),
       ['Shipping:scheduler.html', 'Receiving:scheduler.html?lane=receiving', 'Receiving Log:inventory.html', 'Plant Material Trailers:jug-trailers.html', 'Off-site Inventory:soon.html?what=offsite-inventory', 'Inventory Room:soon.html?what=inventory-room']);
-    assert.equal(await h.$eval('#sides .hq-card[data-group="plantops"] .hq-main[data-side="debag"]', a => a.getAttribute('href')), 'soon.html?what=debag-labeling-room');
+    assert.equal(await h.$eval('#sides .hq-card[data-group="plantops"] .hq-main[data-side="debag"]', a => a.getAttribute('href')), 'labeling.html');
     await h.waitForTimeout(1200);
     await shot(h, '1-home-1536.png');
     assert.deepEqual(h.errors, []);
     await h.close();
     const g = await openPage(browser, 1536, 790, '/group.html?g=plantops&testEmail=' + ADMIN);
     await g.waitForSelector('#sides a[data-side="debag"]');
-    assert.equal(await g.$eval('#sides a[data-side="debag"]', a => a.getAttribute('href')), 'soon.html?what=debag-labeling-room');
+    assert.equal(await g.$eval('#sides a[data-side="debag"]', a => a.getAttribute('href')), 'labeling.html');
     assert.equal(await g.$eval('#sides a[data-side="debag"] strong', a => a.textContent), 'Debag / Labeling Room');
-    await Promise.all([g.waitForURL(/soon\.html\?what=debag-labeling-room/), g.click('#sides a[data-side="debag"]')]);
-    await g.waitForFunction(() => /Debag \/ Labeling Room is being built/.test(document.getElementById('what').textContent));
-    assert.equal(await g.getAttribute('#go', 'href'), 'jug-trailers.html');
+    await Promise.all([g.waitForURL(/labeling\.html/), g.click('#sides a[data-side="debag"]')]);
+    await g.waitForSelector('#lanes', { state: 'attached' });
+    assert.equal(await g.$eval('main h1, h1', e => e.textContent), 'Labeling Room');
     assert.deepEqual(g.errors, []);
     await g.close();
-    results.push('Plant Material Trailers is under Inventory on the Home screen\'s Shipping & Receiving card; Debag / Labeling Room is a Plant Operations department being built');
+    results.push('Plant Material Trailers is under Inventory on the Home screen\'s Shipping & Receiving card; Debag / Labeling Room is a Plant Operations department being built that opens the Labeling Room');
 
     // Sam, on the plant floor, adds the trailers and fills them in.
     const p = await openPage(browser, 1536, 790, '/jug-trailers.html?testEmail=' + SAM);

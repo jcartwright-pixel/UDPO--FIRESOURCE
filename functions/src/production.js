@@ -22,7 +22,7 @@
  *               empty jug, cap and product target of that moment: production-rules fillOf works out the product in each jug).
  * The Blow Mold's heads (check) and a filler's fill weights are also the Quality screen's check, in the same save (weightjoin.js).
  * saveLineCounter: how a line is counted (TABLET, SENSOR or READER), Line Targets (productionLines/{operationId}).
- * saveLineSetup: the line's changeover standard minutes and hours between CIP washes, the Blow Mold's jug weight target and
+ * saveLineSetup (also Joe 10/31: a filler's Labeling Room tick, belt minutes and bottles on the belt): the line's changeover standard minutes and hours between CIP washes, the Blow Mold's jug weight target and
  *   range in grams, and a filler's fill weight check setup (how often, empty jug, cap, light and heavy allowances) (Line Targets).
  * The products, their speeds, targets, UPCs and shelf lives are the plant's Products list (plantProducts), not kept here.
  */
@@ -389,11 +389,13 @@ async function saveLineCounter(tx, db, req, email, stamp, logRef, mode, SaveErro
 // Joe 10/14: and each filler's fill weight check: how often (fillEvery MINUTES / JUGS / CHANGE, fillEveryN), the empty jug and cap
 // in grams, and how far under or over the product's target fill weight is flagged.
 // Joe 10/14: and a packing line's feeders (fedBy, the lines whose jugs it boxes) and how many jugs go in each box (perBox).
-const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh', 'fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver', 'fedBy', 'perBox', 'redzoneLocation'];
+const SETUP_KEYS = ['changeoverMin', 'cipHours', 'jugWeightTarget', 'jugWeightLow', 'jugWeightHigh', 'fillEvery', 'fillEveryN', 'tareGrams', 'capGrams', 'fillUnder', 'fillOver', 'fedBy', 'perBox', 'redzoneLocation', 'labelRoom', 'beltMin', 'beltHolds'];
 function validateLineSetup(input, SaveError) {
   const out = { operationId: lineId(input.operationId, SaveError) };
   [['changeoverMin', 'Changeover standard minutes', 600], ['cipHours', 'Hours between CIP washes', 72], ['jugWeightTarget', 'Jug weight target grams', 500], ['jugWeightLow', 'Lowest jug weight grams', 500], ['jugWeightHigh', 'Highest jug weight grams', 500],
-    ['fillEveryN', 'How often', 100000], ['tareGrams', 'Empty jug weight grams', 2000], ['capGrams', 'Cap weight grams', 200], ['fillUnder', 'Light below target by grams', 1000], ['fillOver', 'Heavy above target by grams', 1000], ['perBox', 'Jugs in each box', 1000]].forEach(([k, label, max]) => {
+    ['fillEveryN', 'How often', 100000], ['tareGrams', 'Empty jug weight grams', 2000], ['capGrams', 'Cap weight grams', 200], ['fillUnder', 'Light below target by grams', 1000], ['fillOver', 'Heavy above target by grams', 1000], ['perBox', 'Jugs in each box', 1000],
+    // Joe 10/31: the Labeling Room: minutes on the belt from the Labeling Room to this filler, and how many bottles the belt holds.
+    ['beltMin', 'Belt time minutes', 120], ['beltHolds', 'Bottles on the belt', 100000]].forEach(([k, label, max]) => {
     if (!(k in input)) return;
     const v = text(input[k]), n = Number(v);
     if (v !== '' && (!isFinite(n) || n < 0 || n > max)) throw new SaveError('BAD_REQUEST', label + ' must be a number from 0 to ' + max + '.');
@@ -415,6 +417,11 @@ function validateLineSetup(input, SaveError) {
     const v = text(input.redzoneLocation);
     if (v && v !== 'NONE' && !/^[A-Za-z0-9-]{1,60}$/.test(v)) throw new SaveError('BAD_REQUEST', 'Pick a RedZone line.');
     out.redzoneLocation = v || null;
+  }
+  // Joe 10/31: whether this filler gets its bottles from the Labeling Room (ticked on Line Targets).
+  if ('labelRoom' in input) {
+    if (typeof input.labelRoom !== 'boolean') throw new SaveError('BAD_REQUEST', 'Tick or untick the Labeling Room box.');
+    out.labelRoom = input.labelRoom;
   }
   if (Object.keys(out).length < 2) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
   return out;

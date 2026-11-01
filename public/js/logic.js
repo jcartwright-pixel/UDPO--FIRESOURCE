@@ -1485,8 +1485,8 @@
     { key: 'shipping', name: 'Shipping & Receiving', home: 'scheduler.html', screens: [
       ['scheduler', 'Shipping and Receiving Schedule', ['scheduler.html']], ['receiving', 'Inventory (Receiving Log)', ['inventory.html']],
       ['jugTrailers', 'Inventory (Plant Material Trailers)', ['jug-trailers.html']]] },
-    // Joe 10/31: Debag / Labeling Room, its own Home card, with no screens yet (Under Construction, administrators only).
-    { key: 'debag', name: 'Debag / Labeling Room', home: '', screens: [] },
+    // Joe 10/31: Debag / Labeling Room, its own Home card (Under Construction, administrators only): the Labeling Room.
+    { key: 'debag', name: 'Debag / Labeling Room', home: 'labeling.html', screens: [['labelRoom', 'Labeling Room', ['labeling.html']]] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],

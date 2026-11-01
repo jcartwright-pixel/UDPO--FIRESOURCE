@@ -118,7 +118,7 @@ const ACTION_RIGHT = Object.freeze({
   saveTemperatureCheck: 'plant.write', sendPlantReport: 'plant.report.send', saveWalkPhoto: 'plant.report.send', removeWalkPhoto: 'plant.report.send', captionWalkPhoto: 'plant.report.send', saveMachineProducts: 'plant.settings.write', saveProductSetup: 'plant.settings.write', saveProductUpload: 'plant.settings.write', saveProductSheet: 'plant.settings.write', savePlantShifts: 'plant.settings.write', sendToGarage: 'issues.write', deleteGarageJob: 'issues.write',
   saveSafetyWalk: 'plant.write', saveSafetyIssue: 'plant.write', saveExtinguisherCheck: 'plant.write', saveExtinguisher: 'plant.settings.write', saveFireSystemCheck: 'plant.write', saveFireSystem: 'plant.settings.write', saveSafetyChecklist: 'plant.settings.write', saveLocationAreas: 'plant.settings.write', saveMenuSetup: 'plant.settings.write',
   saveReceivingScan: 'operations.write', saveReceivingItem: 'plant.settings.write',
-  saveJugTrailer: 'plant.write',
+  saveJugTrailer: 'plant.write', saveLabelRoom: 'plant.write',
   saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write'
 });
 
@@ -182,7 +182,7 @@ const ACTION_SCREENS = Object.freeze({
   saveSafetyWalk: ['safetyWalk'], saveSafetyIssue: ['safetyIssues'], saveExtinguisherCheck: ['extinguishers'], saveExtinguisher: ['extinguishers'],
   saveFireSystemCheck: ['fire'], saveFireSystem: ['fire'], saveSafetyChecklist: ['safetySetup'],
   saveMachine: ['machinery', 'pmEquipment'], makeWorkOrder: ['pmCenter'], savePmTask: ['pmSchedule'], sendPmToMaintenance: ['pmCenter', 'pmSchedule'], saveReceivingItem: ['receiving'],
-  saveJugTrailer: ['jugTrailers'],
+  saveJugTrailer: ['jugTrailers'], saveLabelRoom: ['labelRoom', 'lineTablet'],
   sendToGarage: ['fleetService', 'rFleetService'], deleteGarageJob: ['fleetService', 'rFleetService'], saveFleetRules: ['fleetService'], saveFleetUnit: ['fleetService'],
   saveGarageTech: ['fleetService'],
   saveCrewDay: ['crewBoard', 'pmCrew'], saveCrewVacation: ['crewVacations', 'pmCrew'], saveCrewSetup: ['crewSetup', 'pmCrew'],

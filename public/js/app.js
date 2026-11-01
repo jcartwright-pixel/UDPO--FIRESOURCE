@@ -191,6 +191,8 @@ export const MENU = [
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
   ['Inventory', [['Receiving Log', 'inventory.html', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
+  // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
+  ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
   ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
@@ -226,7 +228,7 @@ export const SIDES = [
   // Joe 10/31: Debag / Labeling Room (where the half-gallon, quart and pint bottles come out of their bags and are labeled on their
   // way to the fillers) stays in Plant Operations. Plant Material Trailers moved to Inventory, so it has no screens yet: Under
   // Construction, administrators only.
-  { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'soon.html?what=debag-labeling-room', pic: 'box-v1.webp', note: 'Taking the bottles out of their bags and labeling them for the fillers', sections: [], building: true },
+  { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'labeling.html', pic: 'box-v1.webp', note: 'Taking the bottles out of their bags and labeling them for the fillers', sections: ['Debag / Labeling Room'], building: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch Template', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },

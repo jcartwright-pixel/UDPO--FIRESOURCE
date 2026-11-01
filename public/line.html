@@ -86,7 +86,8 @@
         <div class="lb-strip" id="check-inline" hidden></div>
         <!-- Joe 10/14: a filler's fill weight check (filled jugs in grams) and the product in each jug against the product's target. -->
         <!-- Joe 10/26 (filler mock-up 1): the Fill weight box beside Up next and Each hour. -->
-        <div class="lb-bottom"><div class="lb-fillbox" id="fill-box" hidden></div><div class="lb-strip" id="strip" hidden></div></div>
+        <!-- Joe 10/31 (Labeling Room, mock-up 3): what the Labeling Room is sending this filler, the countdown to the next label, Hold labels. -->
+        <div class="lb-bottom"><div class="lb-fillbox" id="label-box" hidden></div><div class="lb-fillbox" id="fill-box" hidden></div><div class="lb-strip" id="strip" hidden></div></div>
       </section>
       <!-- Change Product: the line's products (the plant's Products list). -->
       <section class="lb-pane" id="product-pane" hidden>
@@ -171,6 +172,8 @@
 
     // The banner's clock (Joe 10/26): h:mm:ss since the state began, every second.
     function tick() {
+      const lt = document.getElementById('lr-time');
+      if (lt && lt.dataset.at) { const s = Math.max(0, Math.ceil((Number(lt.dataset.at) - now()) / 1000)); lt.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
       const ft = document.getElementById('fw-time'), due = ft ? Number(ft.dataset.next || 0) : 0;
       if (due) { const left = Math.max(0, Math.ceil((due - now()) / 1000)); ft.textContent = left ? (left >= 3600 ? Math.floor(left / 3600) + ':' + String(Math.floor(left / 60) % 60).padStart(2, '0') : Math.floor(left / 60)) + ':' + String(left % 60).padStart(2, '0') : 'NOW'; }
       const tm = document.getElementById('timer'), from = Number(tm.dataset.since || 0);
@@ -464,6 +467,7 @@
       }
       drawMachine(v);
       drawLotRuns(v);
+      drawLabel(v);
       drawFill(v);
       drawBoxing(v);
       // The CIP clock (mock-up G): hours since the last CIP wash that passed, against the line's hours between washes.
@@ -492,6 +496,46 @@
           '<div class="lb-box"><h3>Each hour</h3>' + (hrs.length ? '<div class="lb-hbars">' + hrs.map(x => '<div' + (x.now ? ' class="now"' : '') + ' title="' + fmt(x.made) + ' made' + (x.target ? ' of ' + fmt(x.target) : '') + '"><i class="' + (!x.past ? 'e' : x.pct === null ? (x.made ? '' : 'e') : x.pct >= 100 ? '' : x.pct >= 90 ? 'a' : 'r') + '" style="height:' + (x.past && (x.made || x.target) ? Math.max(6, Math.round(Math.max(x.made, 1) / top * 56)) : 6) + 'px"></i><span>' + hourName(x.from) + '</span></div>').join('') + '</div>' : '<div class="lb-mut">Starts with the shift\'s first product.</div>') + '</div>';
       }
     }
+    // ---------- Labeling Room (Joe 10/31, mock-up 3: "United Dairy End Zone") ----------
+    // A filler that gets its bottles from the Labeling Room: how many of what it runs are still coming (on the belt and still to
+    // label), the next label and when its first bottle gets here (counting down once the Labeling Room taps I switched), and Hold
+    // labels / Filler running again, which shows on the Labeling Room screen at once.
+    function drawLabel(v) {
+      const box = document.getElementById('label-box'), line = v.line;
+      const on = !!line && R.labelLines([line], data.lineInfo).length === 1;
+      box.hidden = !on;
+      document.getElementById('board').querySelector('.lb-bottom').classList.toggle('lb-has-label', on);
+      if (!on) return;
+      const x = R.labelView(v, (data.lineInfo || {})[line.operationId] || {}, now()), dis = busy ? ' disabled' : '';
+      const mmss = (sec) => Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+      // Joe 10/31: short rows, a word on the left and the number on the right, so the box fits beside Fill weight and Up next.
+      const row = (words, value, cls) => '<div class="lr-t-row' + (cls ? ' ' + cls : '') + '"><small>' + words + '</small><b>' + value + '</b></div>';
+      let top, bottom;
+      if (x.switched) {
+        top = row(escapeHtml(x.running) + ' left, all on the belt', x.left === null ? '—' : fmt(x.left));
+        bottom = row('Next label', escapeHtml(x.labeling), 'lr-t-name') + (x.arriveAt !== null ? row('First one reaches you in', '<span id="lr-time" data-at="' + x.arriveAt + '">' + mmss(x.arriveIn) + '</span>', 'lr-t-due') + '<div class="lb-mut">Labeling Room switched at ' + escapeHtml(clock(x.labelingAt)) + '</div>' :
+          '<div class="lb-mut">Switched at ' + escapeHtml(clock(x.labelingAt)) + '. Set the belt time on Line Targets for the countdown.</div>');
+      } else {
+        top = !x.running ? '<div class="lb-mut">Pick the product running first.</div>' : row(escapeHtml(x.running) + ' still coming', x.left === null ? '—' : fmt(x.left)) +
+          '<div class="lb-mut">' + (x.left === null ? 'Type how many to run for the countdown.' : fmt(x.onBelt || 0) + ' on the belt + ' + fmt(x.toLabel) + ' still to label') + '</div>';
+        bottom = x.next ? row('Next label', escapeHtml(x.next.product), 'lr-t-name') + (x.switchMin !== null && x.beltMin !== null ? row('First one reaches you in about', fmt(x.switchMin + x.beltMin) + ' min') : '') : '<div class="lb-mut">Nothing up next yet.</div>';
+      }
+      // The button sits in the box's title bar, so the bottom of the screen never hides it.
+      const btn = x.hold ? '<button type="button" class="lb-btn lr-t-go" data-lr="resume"' + dis + '>Filler Running Again</button>' : '<button type="button" class="lb-btn lr-t-stop" data-lr="hold"' + dis + '>Hold Labels (Filler Down)</button>';
+      draw('label-box', '<div class="lb-box lr-t' + (x.hold ? ' lr-t-hold' : '') + '"><h3><span>Labeling Room</span>' + btn + '</h3>' +
+        (x.hold ? '<div class="lr-t-say">HOLD LABELS sent at ' + escapeHtml(clock(x.hold.at)) + '</div>' : '') +
+        '<div class="lr-t-sec">' + top + '</div><div class="lr-t-sec lr-t-n">' + bottom + '</div></div>');
+      const tm = document.getElementById('lr-time');
+      if (tm) tm.textContent = mmss(Math.max(0, Math.ceil((Number(tm.dataset.at) - now()) / 1000)));
+    }
+    document.getElementById('label-box').addEventListener('click', async e => {
+      const b = e.target.closest('[data-lr]');
+      if (!b || b.disabled || busy) return;
+      b.disabled = true;
+      try { await save('saveLabelRoom', { operationId: lineId, op: b.dataset.lr }); showError(''); }
+      catch (err) { showError('The Labeling Room was not told (' + (err.message || err) + ').'); }
+      render();
+    });
     // The tabs in the head (Joe 10/26, mock-up 1): Line (the board), then the line's buttons. Boxing has no CIP (Joe 10/26).
     function drawTabs(v) {
       const open = MORE[pane] ? pane : pane ? '' : 'board';
