@@ -125,10 +125,10 @@ async function uploadMenu(browser) {
   // Today's loads (delivered tomorrow) and yesterday's (delivered today), each with a trailer, a truck and a made-up driver.
   const today = L.operatingDay(new Date()), now = new Date().toISOString();
   const b = db().batch();
-  const add = (id, route, loadDate, day) => {
+  const add = (id, route, loadDate, day, extra) => {
     const delivery = L.addDays(loadDate, 1), prefix = L.dayPrefix(delivery), week = L.weekStart(delivery);
-    b.set(db().collection('runs').doc(week + '__' + id), { weekStart: week, route, run: 'Run ' + route, routeId: 'rte_' + id, runId: id, rev: 0, routeStatus: 'ACTIVE', masterShow: { daily: true, leavesOn: 'Delivery Day' },
-      days: { [prefix]: Object.assign({ runs: true, deliveryDate: delivery, loadDate }, day) } });
+    b.set(db().collection('runs').doc(week + '__' + id), Object.assign({ weekStart: week, route, run: 'Run ' + route, routeId: 'rte_' + id, runId: id, rev: 0, routeStatus: 'ACTIVE', masterShow: { daily: true, leavesOn: 'Delivery Day' },
+      days: { [prefix]: Object.assign({ runs: true, deliveryDate: delivery, loadDate }, day) } }, extra || {}));
   };
   add('sa802', '802', L.addDays(today, -1), { dispatchTime: 210, driver: 'Sam Porter', trailer: 'T-801', truck: '701', completeTime: L.addDays(today, -1) + 'T23:00:00-04:00' });
   add('sa811', '811', L.addDays(today, -1), { dispatchTime: 270, driver: 'Dana Whitfield', trailer: 'T-802', truck: '702', completeTime: L.addDays(today, -1) + 'T23:30:00-04:00' });
@@ -137,14 +137,22 @@ async function uploadMenu(browser) {
   add('sa813', '813', L.addDays(today, -1), { dispatchTime: 330, driver: 'Ortiz, Samuel', trailer: 'T-804', truck: '704', completeTime: L.addDays(today, -1) + 'T23:50:00-04:00' });
   add('sa815', '815', today, { dispatchTime: 1400, driver: 'Tina Moss', trailer: 'T-805', truck: '705' });
   add('sa820', '820', today, { runs: false, dispatchTime: 1300, driver: 'Nobody Running' });
+  // Joe 11/1: a Save-A-Lot drop and hook. Its trailer was dropped at the Save-A-Lot; the driver's truck is back at the plant.
+  add('sa855', '855', L.addDays(today, -1), { dispatchTime: 360, driver: 'Reyes, Marco', trailer: 'T-806', truck: '706', completeTime: L.addDays(today, -1) + 'T23:55:00-04:00' },
+    { routeName: 'Save-A-Lot 1', streamId: 'SAVE-A-LOT 1' });
+  b.set(db().collection('routes').doc('sa855'), { route: '855', routeName: 'Save-A-Lot 1', streamId: 'SAVE-A-LOT 1', dropAndHook: true });
   b.set(db().collection('gpsTrucks').doc('T-801'), { tag: 'T-801', unitId: 'U801', lat: 40.69, lon: -80.1, address: 'I-79 N, Cranberry, PA', place: '', speedMph: 61, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('702'), { tag: '702', unitId: 'U702', lat: 39.63, lon: -79.95, address: '100 Mall Rd, Morgantown, WV', place: 'Walmart 2291', speedMph: 0, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('T-803'), { tag: 'T-803', unitId: 'U803', lat: 39.7, lon: -78.9, address: 'US|21795|Mary Rd [MD-63]', place: '', speedMph: 0, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('T-804'), { tag: 'T-804', unitId: 'U804', lat: 39.65, lon: -78.76, address: 'I-68 E near Cumberland, Allegany County, Maryland 21502', place: '', speedMph: 58, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('705'), { tag: '705', unitId: 'U705', lat: 39.9, lon: -79.72, address: '', place: 'Uniontown Plant', speedMph: 0, lastReport: now });
+  b.set(db().collection('gpsTrucks').doc('T-806'), { tag: 'T-806', unitId: 'U806', lat: 41.24, lon: -77.0, address: '', place: 'SAL Williamsport', speedMph: 0, lastReport: now });
+  b.set(db().collection('gpsTrucks').doc('706'), { tag: '706', unitId: 'U706', lat: 39.9, lon: -79.72, address: '', place: 'Uniontown Plant', speedMph: 0, lastReport: now });
+  const dropped = new Date(Date.now() - 90 * 60000).toISOString();
   // When they left: 802's trailer trip (its GPS saw it leave), 811's truck (its trailer has no GPS unit).
   const left = (h, m) => new Date(Date.parse(today + 'T0' + h + ':' + m + ':00-04:00')).toISOString();
   b.set(db().collection('gpsReefer').doc('T-801'), { id: L.weekStart(today) + '__sa802|' + L.dayPrefix(today), unitId: 'U801', out: left(3, 20) });
+  b.set(db().collection('gpsReefer').doc('T-806'), { id: L.weekStart(today) + '__sa855|' + L.dayPrefix(today), unitId: 'U806', out: left(6, 10), place: 'SAL Williamsport', placeSince: dropped, where: 'SAL Williamsport' });
   b.set(db().collection('gpsDays').doc(today + '_702'), { tag: '702', date: today, yardOut: left(5, 42) });
   await b.commit();
 
@@ -176,7 +184,10 @@ async function uploadMenu(browser) {
       assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Today', 'Loaded']);
       const rows = await pg.$$eval('.sa-row', x => x.map(r => ['.sa-route', '.sa-driver', '.sa-where'].map(c => r.querySelector(c).textContent.trim())));
       assert.deepEqual(rows, [['815', 'Tina Moss', 'At the plant'], ['802', 'Sam Porter', 'On the road: I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291'],
-        ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502']], '820 (Ended Up Not Running) left off');
+        ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502'],
+        ['855', 'Reyes, Marco', 'Back at the plant']], '820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
+      // Joe 11/1: the dropped Save-A-Lot trailer's status says when it was dropped, and still says how it left.
+      assert.match(await pg.textContent('.sa-row[data-id*="sa855"] .sa-pill'), /^Dropped \d{1,2}:\d{2} [AP]M( \w+day)?, left (on time|(\d+h )?\d+m late)$/);
       assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^Left \d{1,2}:\d{2} [AP]M, (\d+h )?\d+m late$/, 'the status short: 1h 12m, not 1 hr 12 min');
       // Joe 11/1 (mock-up 3): every route is exactly two lines: route and status, then driver · where now, never wrapped.
       const lines = await pg.$$eval('.sa-row', x => x.map(r => {
@@ -203,6 +214,11 @@ async function uploadMenu(browser) {
       if (w === 390) assert.ok(await pg.$eval('.sa-row[data-id*="sa813"] .sa-l2', e => e.scrollWidth > e.clientWidth && getComputedStyle(e).textOverflow === 'ellipsis'), 'the long place is cut with …');
       await pg.click('text=Ortiz, Samuel');
       assert.equal(await pg.textContent('#sa-map-where'), 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502');
+      // Tapped, the words under the map say where and when the trailer was dropped and where the truck is; the map goes to the truck.
+      await pg.click('text=Reyes, Marco');
+      assert.match(await pg.textContent('#sa-map-where'), /^Trailer dropped at SAL Williamsport at \d{1,2}:\d{2} [AP]M( \w+day)?\. Truck: Back at the plant\.$/);
+      assert.match(await pg.getAttribute('#sa-map', 'src'), /q=39\.9,-79\.72/);
+      if (SHOTS) { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.screenshot({ path: path.join(SHOTS, 'sales-' + w + '-tapped-855-dropped.png') }); }
       // Text at least 16px; nothing wider than the phone.
       const small = await pg.$$eval('.sa-row *, .sa-cols *, .sa-sub *, .sa-map *', x => x.filter(e => e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent.trim()));
       assert.deepEqual(small, []);

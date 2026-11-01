@@ -1581,11 +1581,14 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 - **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
 - **Status** is the same as the 6:00 AM sales email, written shorter so it fits on one line: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1h 12m late** (red; h is hours, m is minutes), **Not departed, 35m behind** (loaded, past its dispatch time, still here), **Not loaded, 20m behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
 - **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out.
+- **Save-A-Lot drop and hook.** A Save-A-Lot route ticked **Drop and Hook** in the Route Editor leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the Save-A-Lot (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2h 12m late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
 - **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
 - `?` opens this Help. `Sign out` is at the bottom.
 
 > To see a route on a bigger map, tap the map and open it in Google Maps.
+
+!> Do not read **Where now** on a dropped Save-A-Lot load as the trailer. It is the driver's truck; the trailer is still at the store.
 
 !> Do not read **No GPS** as lost. It means neither the trailer nor the truck on that load has a GPS unit the app knows about; ask Dispatch.
 

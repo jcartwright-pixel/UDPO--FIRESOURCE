@@ -68,3 +68,61 @@ test('the call: picks the division asked for, else the first; nothing written', 
   const other = await A.salesCall(divisions, () => fakeDb, { division: 'nope' }, { now: () => NOW });
   assert.equal(other.division, 'fac_uniontown');
 });
+
+// Joe 11/1: a Save-A-Lot drop and hook. Once its trailer is at the Save-A-Lot place in Fleet, the status says when it was dropped
+// and Where now follows the driver's truck (home, or on its next trip), not the trailer left at the store.
+test('Save-A-Lot drop and hook: dropped time, then the truck', () => {
+  const runs = [
+    run('s1', '855', { prefix: 'tue', fields: { dispatchTime: 480, driver: 'Pat Doyle', trailer: 'T-201', truck: '601', completeTime: iso('2026-11-03T06:00:00') } },
+      { runId: 'run_s1', routeName: 'Save-A-Lot 1', streamId: 'SAVE-A-LOT 1' }),
+    run('s2', '856', { prefix: 'tue', fields: { dispatchTime: 540, driver: 'Lee Shaw', trailer: 'T-202', truck: '602', completeTime: iso('2026-11-03T06:30:00') } },
+      { runId: 'run_s2', routeName: 'Save-A-Lot 2', streamId: 'SAVE-A-LOT 2' }),
+    run('c1', '870', { prefix: 'tue', fields: { dispatchTime: 300, driver: 'Kim Rhodes', trailer: 'T-203', truck: '603', completeTime: iso('2026-11-03T04:00:00') } },
+      { runId: 'run_c1', routeName: 'COSTCO - NEW JERSEY', streamId: 'COSTCO NJ' })
+  ];
+  const routes = [{ id: 'run_s1', dropAndHook: true }, { id: 'run_s2', dropAndHook: true }, { id: 'run_c1', dropAndHook: true }];
+  const reefer = {
+    'T-201': { id: 's1|tue', unitId: 'U21', out: iso('2026-11-03T10:12:00'), place: 'SAL Williamsport', placeSince: iso('2026-11-03T15:05:00'), where: 'SAL Williamsport' },
+    // 856's trailer is still on the road with the truck: nothing changes.
+    'T-202': { id: 's2|tue', unitId: 'U22', out: iso('2026-11-03T09:10:00'), place: '', where: 'I-80 E' },
+    'T-203': { id: 'c1|tue', unitId: 'U23', out: iso('2026-11-03T05:00:00'), place: 'SAL Williamsport', placeSince: iso('2026-11-03T09:00:00') }
+  };
+  const units = {
+    'T-201': { tag: 'T-201', unitId: 'U21', lat: 41.2, lon: -77.0, place: 'SAL Williamsport', speedMph: 0, lastReport: iso('2026-11-03T17:00:00') },
+    'T-202': { tag: 'T-202', unitId: 'U22', lat: 41.0, lon: -78.0, place: '', address: 'I-80 E', speedMph: 60, lastReport: iso('2026-11-03T17:00:00') },
+    'T-203': { tag: 'T-203', unitId: 'U23', lat: 41.2, lon: -77.0, place: 'SAL Williamsport', speedMph: 0, lastReport: iso('2026-11-03T17:00:00') },
+    601: { tag: '601', unitId: 'U61', lat: 39.9, lon: -79.7, place: 'Uniontown Plant', speedMph: 0, lastReport: iso('2026-11-03T20:00:00') },
+    602: { tag: '602', unitId: 'U62', lat: 41.0, lon: -78.0, place: '', address: 'I-80 E', speedMph: 60, lastReport: iso('2026-11-03T17:00:00') }
+  };
+  const late = Date.parse('2026-11-04T01:30:00Z'); // 8:30 PM Tuesday
+  const out = A.salesScreen({ runs, reefer, gpsDays: [], routes, units }, late);
+  const by = {}; out.groups[0].rows.forEach(r => { by[r.route] = r; });
+  assert.equal(by['855'].status, 'Dropped 3:05 PM, left 2h 12m late');
+  assert.equal(by['855'].where, 'Back at the plant');
+  assert.equal(by['855'].by, 'TRUCK');
+  assert.equal(by['855'].lat, 39.9);
+  assert.equal(by['855'].note, 'Trailer dropped at SAL Williamsport at 3:05 PM. Truck: Back at the plant.');
+  assert.equal(by['856'].status, 'Left 9:10 AM, 10m late');
+  assert.equal(by['856'].where, 'On the road: I-80 E');
+  assert.equal(by['856'].by, 'TRAILER');
+  // Only Save-A-Lot: another drop-and-hook route at the same place reads as before.
+  assert.equal(by['870'].where, 'At SAL Williamsport');
+  assert.equal(by['870'].note, '');
+  // Without the Drop and Hook tick, a Save-A-Lot route reads as before too.
+  const plain = A.salesScreen({ runs, reefer, gpsDays: [], routes: [], units }, late).groups[0].rows.find(r => r.route === '855');
+  assert.equal(plain.where, 'At SAL Williamsport');
+});
+
+test('Save-A-Lot drop and hook: the truck\'s next route', () => {
+  const runs = [
+    run('s1', '855', { prefix: 'tue', fields: { dispatchTime: 480, driver: 'Pat Doyle', trailer: 'T-201', truck: '601', completeTime: iso('2026-11-03T06:00:00') } },
+      { runId: 'run_s1', routeName: 'Save-A-Lot 1', dropAndHook: true }),
+    run('d1', '812', { prefix: 'tue', fields: { dispatchTime: 1200, driver: 'Pat Doyle', trailer: 'T-300', truck: '601' } })
+  ];
+  const reefer = { 'T-201': { id: 's1|tue', unitId: 'U21', out: iso('2026-11-03T08:05:00'), place: 'SAL Williamsport', placeSince: iso('2026-11-03T13:05:00') } };
+  const units = { 601: { tag: '601', unitId: 'U61', lat: 40.5, lon: -79.0, place: '', address: 'US-22 W', speedMph: 55, lastReport: iso('2026-11-03T17:00:00') } };
+  const r = A.salesScreen({ runs, reefer, gpsDays: [], units }, Date.parse('2026-11-03T22:30:00Z')).groups[0].rows.find(x => x.route === '855');
+  assert.equal(r.status, 'Dropped 1:05 PM, left on time');
+  assert.equal(r.where, 'On the road: US-22 W');
+  assert.equal(r.note, 'Trailer dropped at SAL Williamsport at 1:05 PM. Truck: On the road: US-22 W. Next route for this truck: 812.');
+});
