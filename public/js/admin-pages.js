@@ -746,6 +746,46 @@ export async function renderReportRecipients(box) {
   await load();
 }
 
+/* ---------- Sales Route Email (Joe 10/31) ---------- */
+
+// The 6:00 AM route status email for the salespeople: who gets it (saves when the box is left), On / Off, and a test to oneself.
+export async function renderSalesEmail(box) {
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="se-reload">Refresh</button><span id="se-switch" style="display:flex;gap:8px;align-items:center"></span>' +
+    '<div class="ap-right"><button type="button" class="ap-btn" id="se-test">Send a test to me</button></div></div><div class="ap-msg" hidden></div>' +
+    '<p class="ap-note">At 6:00 AM Monday through Saturday (never Sunday) the salespeople get one line per route: Route, Run and Status. ' +
+    'It lists the loads of the shift that just ended (Monday\'s also has Saturday\'s). The time a load left comes from its trailer\'s GPS, or the truck\'s when the trailer has none.</p>' +
+    '<div id="se-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-section"><h3>Who gets it</h3>' +
+    '<label class="ap-field">Addresses<small>Separated by commas. Saves when you leave the box.</small><input id="se-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label>' +
+    '<small id="se-changed"></small></div></div></div>';
+  const $ = (s) => box.querySelector(s);
+  let saving = Promise.resolve();
+  function render(d) {
+    $('#se-switch').innerHTML = (d.on ? '<button type="button" class="ap-btn warn" id="se-off">Turn off</button>' : '<button type="button" class="ap-btn main" id="se-on">Turn on</button>') +
+      '<span class="ap-chip ' + (d.on ? 'good' : 'bad') + '">' + (d.on ? 'The sales email is ON' : 'The sales email is OFF') + '</span>';
+    $('#se-sending').innerHTML = d.sending ? '' : '<div class="ap-msg bad">Email sending is OFF, so nothing will go out. Turn it on in Sent Email Log.</div>';
+    const input = $('#se-to');
+    if (document.activeElement !== input) { input.value = d.to.join(', '); input.dataset.was = input.value; }
+    $('#se-changed').textContent = d.changedBy ? 'Changed ' + when(d.changedAt) + ' by ' + d.changedBy : '';
+  }
+  async function load() { await saving; try { const d = await call('salesEmail'); if (box.isConnected) render(d); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => {
+    const i = ev.target;
+    if (i.id !== 'se-to' || i.value.trim() === i.dataset.was) return;
+    saving = saving.then(async () => {
+      try { const d = await call('saveSalesEmail', { to: i.value }); i.dataset.was = i.value.trim(); render(d); say(box, d.message || '', d.message ? 'warn' : ''); } catch (err) { say(box, errText(err), 'bad'); }
+    });
+  });
+  box.addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.id === 'se-reload') load();
+    if (b.id === 'se-off') busy(box, b, async () => { await saving; const d = await call('saveSalesEmail', { on: false }); render(d); say(box, ''); });
+    if (b.id === 'se-on') twice(b, 'Press again to turn on', () => busy(box, b, async () => { await saving; const d = await call('saveSalesEmail', { on: true }); render(d); say(box, d.message || '', d.message ? 'warn' : ''); }));
+    if (b.id === 'se-test') busy(box, b, async () => { await saving; const out = await call('salesEmailTest'); say(box, out.message, out.ok ? 'good' : 'bad'); });
+  });
+  await load();
+}
+
 /* ---------- Sent Email Log and the Sending switch ---------- */
 
 const STATUS = { SENT: ['Sent', 'good'], BLOCKED: ['Stopped (off)', 'bad'], FAILED: ['Failed', 'bad'], HELD: ['Held', 'warn'] };
@@ -912,6 +952,7 @@ export const PAGES = {
   'driver-codes': renderDriverCodes,
   'manager-app-codes': renderManagerAppCodes,
   'report-recipients': renderReportRecipients,
+  'sales-email': renderSalesEmail,
   'sent-log': renderSentLog,
   'email-senders': renderEmailSenders,
   'repair-items': renderRepairItems

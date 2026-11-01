@@ -581,6 +581,15 @@ exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes'
   await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));
 });
 
+// Joe 10/31: the route status email for the salespeople (src/salesmail.js), 6:00 AM Monday through Saturday. It sends nothing
+// until Administration switches it on with at least one address (private/salesRouteEmail).
+exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
+  await eachPlant('salesRouteEmail', async (pdb) => {
+    const r = await require('./src/salesmail').sendMorning(pdb);
+    if (r && r.status !== 'SENT') console.log('salesRouteEmail', r.status, r.reason || '');
+  });
+});
+
 // Joe 10/31 (mock-ups 1 to 4): the Employees list from UDMS, every 15 minutes (src/employees.js). UDMS is its own Firebase
 // project; this reads only the safe fields of its employee records. Until UDMS lets this project read, each plant's
 // Employees screen says it is waiting for permission.

@@ -13,6 +13,7 @@
  *   Sent Email Log        sentLog, setSending, setForecastEmail                        sentEmails, private/emailSettings
  *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, fromWho)
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
+ *   Sales Route Email     salesEmail, saveSalesEmail, salesEmailTest                   private/salesRouteEmail (salesmail.js)
  * The email, schedule and diagnostics items are in admintools.js.
  */
 'use strict';
@@ -456,6 +457,10 @@ const OPS = {
   sentLog: (db) => sentLog(db), setSending, setForecastEmail,
   emailSenders: (db, email, input, stamp, d) => emailSenders(db, d), saveEmailSenders,
   repairItems: (db) => repairItems(db), saveRepairItem, completeRepairItem,
+  // Joe 10/31: the 6:00 AM route status email for the salespeople (salesmail.js).
+  salesEmail: (db) => require('./salesmail').adminView(db),
+  saveSalesEmail: async (db, email, input, stamp) => { try { return await require('./salesmail').adminSave(db, email, input, stamp); } catch (e) { if (e.code === 'BAD_REQUEST') fail('BAD_REQUEST', e.message); throw e; } },
+  salesEmailTest: (db, email, input, stamp, d) => require('./salesmail').adminTest(db, email, input, stamp, d.mailDeps),
   // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
   stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove, noAccountSet: STATIONS.noAccountSet
 };

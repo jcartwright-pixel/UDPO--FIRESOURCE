@@ -21,6 +21,8 @@ export const ADMIN_GROUPS = [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
     ['email-senders', 'Email Senders', 'Who email comes from: the person who presses Send (their own United Dairy email), and each plant\'s address for automatic email.', '', 'swap'],
     ['report-recipients', 'Manager Report Recipients', 'Who gets the plant report at each location: add and remove people (press twice to remove).', '', 'star'],
+    // Joe 10/31: the 6:00 AM route status email for the salespeople, Monday through Saturday.
+    ['sales-email', 'Sales Route Email', 'The 6:00 AM route status email for sales, Monday through Saturday (Route, Run, Status): who gets it, On or Off, and Send a test to me.', '', 'truck'],
     ['sent-log', 'Sent Email Log', 'Every email the app sent, newest first.', '', 'day'],
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
     ['refresh-rates', 'Refresh Rates', 'How often each background job runs (each saves when it is picked), and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']
