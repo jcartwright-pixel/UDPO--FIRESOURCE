@@ -12,6 +12,10 @@
 'use strict';
 
 const P = require('./production-rules');
+// The starting Products list, the same file as public/data/plant-products.json (a unit test keeps them the same). A line with no
+// saved list uses its starting list, as the screens do (public/js/products.js watchProducts), so the "Labeling now" drop-down and
+// this check agree.
+const START = require('./plant-products.json');
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const docId = (id) => String(id).replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 200);
@@ -30,6 +34,13 @@ function validateLabelRoom(input, SaveError) {
   return out;
 }
 
+// A line's products: its saved Products list, else its starting list.
+function productsOf(saved, operationId) {
+  if (saved && Array.isArray(saved.products)) return saved.products;
+  const line = (START.lines || []).find(l => l.operationId === operationId);
+  return line ? line.products || [] : [];
+}
+
 async function saveLabelRoom(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const setup = await tx.get(db.collection('plantSetup').doc(docId(req.operationId))), sd = setup.exists ? setup.data() : null;
   if (!sd || sd.type !== 'PRODUCTION_AREA' || sd.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'That filler is not set up for this plant.');
@@ -38,7 +49,7 @@ async function saveLabelRoom(tx, db, req, email, stamp, logRef, mode, SaveError)
   if (req.op === 'labeling') {
     // Only one of the filler's own products (the plant's Products list for this line).
     const prods = await tx.get(db.collection('plantProducts').doc(docId(req.operationId)));
-    const targets = P.targetsFor(prods.exists ? prods.data().products : []);
+    const targets = P.targetsFor(productsOf(prods.exists ? prods.data() : null, req.operationId));
     const hit = targets.find(t => P.sameItem(t.name, req.product));
     if (!hit) throw new SaveError('BAD_REQUEST', req.product + ' is not one of ' + name + '\'s products.');
     req.product = hit.name;
@@ -56,4 +67,4 @@ async function saveLabelRoom(tx, db, req, email, stamp, logRef, mode, SaveError)
   return result;
 }
 
-module.exports = { validateLabelRoom, saveLabelRoom, OPS };
+module.exports = { validateLabelRoom, saveLabelRoom, productsOf, OPS };

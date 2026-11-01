@@ -53,3 +53,23 @@ test('Line Targets keeps each filler\'s Labeling Room tick, belt minutes and bot
   assert.throws(() => PROD.validateLineSetup({ operationId: 'ut_prod_new', beltMin: '500' }, SaveError), /Belt time minutes/);
   assert.throws(() => PROD.validateLineSetup({ operationId: 'ut_prod_new', labelRoom: 'yes' }, SaveError), /Labeling Room/);
 });
+
+// 6.78 practice test: NEW 1/2 GALLON had no saved Products list, so the "Labeling now" drop-down showed its starting list but the
+// server refused every pick ("38% Cream is not one of NEW 1/2 GALLON's products."). The server now uses the same starting list.
+test('a filler with no saved Products list takes a label from its starting list, as the drop-down shows', () => {
+  const fs = require('fs'), path = require('path');
+  const start = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../public/data/plant-products.json'), 'utf8'));
+  const half = start.lines.find(l => l.operationId === 'ut_prod_new_half_gallon');
+  assert.ok(half.products.length > 0);
+  assert.deepEqual(LABEL.productsOf(null, 'ut_prod_new_half_gallon').map(p => p.name), half.products.map(p => p.name));
+  // A saved list still wins, even an empty one.
+  assert.deepEqual(LABEL.productsOf({ products: [{ name: '1% Pint' }] }, 'ut_prod_new_half_gallon'), [{ name: '1% Pint' }]);
+  assert.deepEqual(LABEL.productsOf({ products: [] }, 'ut_prod_new_half_gallon'), []);
+  assert.deepEqual(LABEL.productsOf(null, 'no_such_line'), []);
+});
+
+test('functions/src/plant-products.json is the same as public/data/plant-products.json (copy it after changing the starting list)', () => {
+  const fs = require('fs'), path = require('path');
+  assert.equal(fs.readFileSync(path.join(__dirname, '../../src/plant-products.json'), 'utf8'),
+    fs.readFileSync(path.join(__dirname, '../../../public/data/plant-products.json'), 'utf8'));
+});
