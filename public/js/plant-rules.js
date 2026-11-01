@@ -144,6 +144,34 @@
       startedAt: text(w.startedAt), startedBy: text(w.startedBy), completedAt: text(w.completedAt), completedBy: text(w.completedBy), pauseMark: w.pauseMark || null };
   }
 
+  /* ---------- Receiving products and Inventory (Joe 11/1, mock-up 2) ---------- */
+  // A Receiving load carries several products, each with what was ordered and what came in. A product is a receivingItems
+  // record (the same list the Boxing tablet names barcodes into), and belongs to one supplier. Inventory keeps, on each product,
+  // its last count and what was received (and later used) since then, so "Should have" = last count + received - used.
+  var INVENTORY_KINDS = ['Ingredient', 'Packaging', 'Chemical', 'Other'];
+  var INVENTORY_UNITS = ['Cases', 'Each', 'Pallets', 'Pounds', 'Gallons', 'Bags', 'Boxes', 'Bundles', 'Rolls', 'Drums', 'Pails', 'Totes'];
+  var MAX_LOAD_LINES = 40;
+  function wholeOrNull(v) { var t = text(v); if (!t) return null; var n = Number(t); return Number.isInteger(n) && n >= 0 ? n : null; }
+  function loadLines(p) {
+    var list = Array.isArray(p && p.lines) ? p.lines : [];
+    return list.filter(function (l) { return l && text(l.itemId); }).map(function (l) {
+      return { itemId: text(l.itemId), name: text(l.name), unit: text(l.unit), ordered: wholeOrNull(l.ordered), received: wholeOrNull(l.received) };
+    });
+  }
+  function shouldHave(item) {
+    item = item || {};
+    return (Number(item.countQty) || 0) + (Number(item.receivedSince) || 0) - (Number(item.usedSince) || 0);
+  }
+  function inventoryLow(item) {
+    var low = wholeOrNull(item && item.low);
+    return low !== null && shouldHave(item) < low;
+  }
+  // The products a supplier sends (its own first), for a load's drop-downs and the Suppliers & Products screen.
+  function supplierProducts(items, supplierId) {
+    return (items || []).filter(function (i) { return text(i.status || 'ACTIVE').toUpperCase() !== 'REMOVED' && text(i.supplierId) === text(supplierId); })
+      .sort(function (a, b) { return text(a.name).localeCompare(text(b.name), undefined, { sensitivity: 'base', numeric: true }); });
+  }
+
   function scheduleEntries(docs, laneName) {
     var all = newestRecords(docs, [LOAD_TYPE[lane(laneName)]]), out = [];
     Object.keys(all).forEach(function (id) {
@@ -152,7 +180,7 @@
       out.push({ id: id, date: d.date, routeId: d.routeId || '', runId: d.runId || '', route: d.route || '', run: d.run || '', pickupTime: time24(p.pickupTime) || text(p.pickupTime),
         scheduleType: text(p.scheduleType).toUpperCase() === 'CARRIER' || p.carrier === true ? 'CARRIER' : 'ROUTE', loadDate: text(p.loadDate), trailer: text(p.trailer),
         poNumber: text(p.poNumber), cases: text(p.cases), product: text(p.product), notes: text(p.notes || d.notes), status: text(d.status).toUpperCase() || 'SCHEDULED',
-        loadType: loadArea(p.loadType), inApp: !!d.createdInApp, work: workOf(p.work) });
+        loadType: loadArea(p.loadType), inApp: !!d.createdInApp, work: workOf(p.work), lines: loadLines(p), received: p.received && p.received.at ? { at: text(p.received.at), by: text(p.received.by) } : null });
     });
     return out.sort(function (a, b) { return a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'); });
   }
@@ -1577,6 +1605,7 @@
 
   return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
+    INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
     scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,

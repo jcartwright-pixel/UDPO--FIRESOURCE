@@ -20,6 +20,7 @@ const { queueMaster } = require('./masterwrite');
 const M = require('./model');
 const B = require('./board-rules');
 const WJ = require('./weightjoin');
+const INV = require('./inventory');
 
 // Everyone who may save on Daily Dispatch, plus the plant floor.
 const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
@@ -691,7 +692,9 @@ const appScheduleId = (type, id) => docId(type + '_app_' + id);
 function validateSchedule(input, SaveError) {
   const out = { lane: R.lane(input.lane), op: text(input.op) || 'save' };
   const SUPPLIER_OPS = ['addSupplier', 'editSupplier', 'removeSupplier'];
-  if (['save', 'remove', 'progress'].concat(SUPPLIER_OPS).indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove, progress, addSupplier, editSupplier or removeSupplier');
+  if (['save', 'remove', 'progress'].concat(SUPPLIER_OPS, INV.OPS).indexOf(out.op) < 0) throw new SaveError('BAD_REQUEST', 'op must be save, remove, progress, addSupplier, editSupplier, removeSupplier, ' + INV.OPS.join(', '));
+  // Joe 11/1: Receiving's products, Mark Received and Inventory's Count (inventory.js).
+  if (INV.OPS.indexOf(out.op) >= 0) return INV.validate(input, out, SaveError);
   if (SUPPLIER_OPS.indexOf(out.op) >= 0) {
     if (out.lane !== 'RECEIVING') throw new SaveError('BAD_REQUEST', 'Suppliers are on Receiving');
     // Joe 10/13 ("Where do I edit my receivers"): a supplier can be edited or removed, as well as added.
@@ -760,6 +763,8 @@ function validateSchedule(input, SaveError) {
   if (out.loadDate && out.loadDate > out.date) throw new SaveError('BAD_REQUEST', 'The load date cannot be after the delivery date.');
   out.trailer = text(f.trailer).toUpperCase();
   if (out.trailer.length > 24 || /[^A-Z0-9 _\-/.#]/.test(out.trailer)) throw new SaveError('BAD_REQUEST', 'Check the trailer number.');
+  // Joe 11/1: a Receiving load carries several products, each with what was ordered (inventory.js).
+  out.lines = out.lane === 'RECEIVING' ? INV.validateLines(f.lines, SaveError) : null;
   return out;
 }
 
@@ -846,6 +851,7 @@ async function changeSupplier(tx, journal, req, email, stamp, logRef, mode, Save
 async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const type = R.LOAD_TYPE[req.lane], journal = db.collection('plantJournal');
   if (req.op === 'editSupplier' || req.op === 'removeSupplier') return changeSupplier(tx, journal, req, email, stamp, logRef, mode, SaveError);
+  if (INV.PRODUCT_OPS.indexOf(req.op) >= 0) return INV.saveProduct(tx, db, req, email, stamp, logRef, mode, SaveError);
   if (req.op === 'addSupplier') {
     const docs = (await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data());
     const list = R.scheduleSuppliers(docs);
@@ -868,11 +874,13 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
   // bring it back with Save Load or Start; deleting it again is fine.
   if (had && String(had.status || '').toUpperCase() === 'DELETED' && req.op !== 'remove') throw new SaveError('CONFLICT', 'That load was deleted from the Scheduler. The screen was refreshed.');
   if (req.op === 'progress') return progressSchedule(tx, db, req, had, type, email, stamp, logRef, mode, SaveError);
-  let choices = [], equipment = [];
+  if (req.op === 'receive') return INV.receive(tx, db, req, had, type, email, stamp, logRef, mode, SaveError, appScheduleId);
+  let choices = [], equipment = [], lines = null;
   if (req.op === 'save') {
     if (req.lane === 'RECEIVING') choices = R.scheduleSuppliers((await tx.get(journal.where('type', '==', R.SUPPLIER_TYPE))).docs.map(d => d.data()));
     else choices = R.scheduleCustomers((await tx.get(db.collection('routes'))).docs.map(d => Object.assign({ runId: d.id }, d.data())));
     if (req.trailer) equipment = (await tx.get(db.collection('equipment'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if (req.lane === 'RECEIVING') lines = await INV.linesForSave(tx, db, req, had, SaveError);
   }
   // All reads are done.
   const id = req.id || ('SCHED-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24));
@@ -893,6 +901,10 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     // Save Load keeps what the station did on the load (its Start, End, count): changing the load's boxes does not start it over.
     if (had && had.payload && had.payload.work) payload.work = had.payload.work;
     if (req.lane === 'SHIPPING' && req.loadType) payload.loadType = req.loadType;
+    // A load with product lines also reads as its products and their total in the older Product and Cases boxes.
+    if (lines && lines.length) Object.assign(payload, { lines, product: INV.linesText(lines), cases: had && had.payload && had.payload.received ? had.payload.cases : INV.linesTotal(lines) });
+    else if (lines) payload.lines = [];
+    if (had && had.payload && had.payload.received) payload.received = had.payload.received;
     rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
       area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
   }
