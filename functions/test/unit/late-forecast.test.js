@@ -441,3 +441,26 @@ test('behind: the truck that leaves first loads first; on time: the load order s
   assert.deepEqual(easy.loads.map(x => x.id), ['j2', 'w1', 'w2', 's1', 's2']);
   assert.ok(easy.loads.every(x => !x.late));
 });
+
+// Joe 11/1 (10:32 AM email "All loads on time"): "sal 1 was a little late think we should show". A load finished after its own
+// dispatch time is loaded late: the subject, a yellow banner (when nothing is late or behind now), the forecast box, the text
+// and its Done time all say so.
+test('a load loaded after its dispatch time shows as loaded late', () => {
+  const SUN = '2026-11-01', at = Date.parse('2026-11-01T15:32:00Z'); // Sunday 10:32 AM
+  const row = (id, route, run, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', quantity: 900, dispatchTime: dispatch, prior: false, loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day' }, extra);
+  const loads = [row('s1', '855', 'SAVE-A-LOT 1', H(8), { state: 'DONE', startedAt: '2026-11-01T12:00:00Z', completedAt: '2026-11-01T13:20:00Z' }),
+    row('s2', '856', 'SAVE-A-LOT 2', H(9, 30), { state: 'DONE', startedAt: '2026-11-01T13:20:00Z', completedAt: '2026-11-01T14:15:00Z' }),
+    row('j2', '852', 'UT JERSEY LOAD 2', H(13), { state: 'WAITING', quantity: 300 })];
+  const r = R.plantReport({ loads, forecast: R.loadForecast({ date: SUN, loads }, at) }, at);
+  assert.deepEqual(r.loaded.map(x => [x.route, x.loadedLate || 0]).sort(), [['855', 20], ['856', 0]], 'Save-A-Lot 1 was loaded 20 minutes after its 8:00 AM dispatch');
+  assert.match(r.subject, /: 1 route loaded late$/);
+  const t = R.truckCheck(r);
+  assert.deepEqual(t.loadedLate.map(x => [x.name, x.sub, x.value]), [['855 Save-A-Lot 1', 'Dispatch Sun 8:00 AM · loaded 8:20 AM', '20 min late']]);
+  assert.match(R.truckCheckSummary(t), /1 already loaded late/);
+  const html = R.reportHtml(r, ''), plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(html, /padding:16px 14px;background:#f5c518[^>]*><div[^>]*>&#9888; 1 ROUTE LOADED LATE/);
+  assert.match(plain, /Already loaded, but late 855 Save-A-Lot 1 Dispatch Sun 8:00 AM · loaded 8:20 AM 20 min late/);
+  assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
+  assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
+  assert.match(r.text, /LOADED LATE \(1\)\n {2}855 Save-A-Lot 1, Dispatch Sun 8:00 AM · loaded 8:20 AM, 20 min late/);
+});

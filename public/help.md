@@ -576,7 +576,7 @@ screens: manager.html
 
 The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Box Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
 
-- A route tile is green when it is loaded and red when it is not. Only LATE (its truck should already have left) and BEHIND (left over from the last shift, truck not gone yet) have a word.
+- A route tile is green when it is loaded and red when it is not. Only LATE (its truck should already have left, or on a green tile: it was loaded after its dispatch time) and BEHIND (left over from the last shift, truck not gone yet) have a word.
 - Click a card to open its screen; click a line on a card to open that exact item.
 - **Manager Walkthrough:** each stop (Yard, Coolers, Production, Pictures) is green when done, yellow when due (2 hours) and red when past due (3 hours). `Check now` does the check; `View` shows the last one.
 - **Send Current Report:** see [Send Current Report](#send-report).
@@ -597,10 +597,10 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - `Copy` copies the report; `Print` prints it.
 - Only what was checked since the last report went out is in it; the rest says "Not checked".
 - The loads are the ones loaded today, by type (Case, Box, Tote, Tanker). Inside each type, each delivery day once: the loaded loads (green), then the ones not loaded yet.
-- **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet.
-- The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Will miss their trucks** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, and green only when everything is on time.
+- **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet. **Loaded late** means the load is loaded, but it finished after its dispatch time; its Done time says "late" in red.
+- The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Will miss their trucks** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 45 minutes after it leaves. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
-- The forecast box answers one question: at this pace, will every truck be loaded before it leaves? It lists the loads **late now** (with when each should be loaded), the loads that **will miss their truck** (and by how much), and says every other truck is **On time**, with when the last one should be loaded. It never shows cases.
+- The forecast box answers one question: at this pace, will every truck be loaded before it leaves? It lists the loads **late now** (with when each should be loaded), the loads that **will miss their truck** (and by how much), and says every other truck is **On time**, with when the last one should be loaded. Below that, **Already loaded, but late** names each load finished after its dispatch time and by how much. It never shows cases.
 
 > One late route does not make the whole plant late: the box names the trucks that will leave late and says the rest are on time.
 

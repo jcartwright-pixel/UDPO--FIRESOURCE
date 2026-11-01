@@ -1056,7 +1056,9 @@
       var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
-      if (r.state === 'DONE') { out.loaded.push(item); return; }
+      // Joe 11/1 ("sal 1 was a little late think we should show"): a load finished after its own dispatch time was loaded late,
+      // by the minutes between the two.
+      if (r.state === 'DONE') { var doneWall = wallMinutes(r.completedAt); if (leaves !== null && doneWall !== null && doneWall - leaves >= 1) item.loadedLate = Math.round(doneWall - leaves); out.loaded.push(item); return; }
       areas[r.area].left++; out.leftToLoad++;
       // Joe 10/20: a load left over from last night that leaves before this shift ends missed its shift, so it is behind even
       // before its dispatch time (a Saturday loadout for Monday still waits for Monday, Joe 10/11).
@@ -1093,8 +1095,8 @@
       areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, fixed: shift.fixed, handoff: shift.handoff, others: shift.others, pickups: pickups, lines: lines, temperatures: temps,
       output: lineOutput(input.output), outputShift: text(input.outputShift), forecast: input.forecast || null };
     r.counts = { behind: r.behind.length, leftToLoad: r.leftToLoad, pickups: pickups.length, down: down.length, linesDown: lines.filter(function (l) { return l.flag; }).length, tempsOut: temps.filter(function (t) { return t.flag; }).length };
-    var tcr = truckCheck(r), lateNow = tcr.lateNow.length, leftOver = tcr.leftOver;
-    r.subject = 'Plant Update ' + r.timeLabel + ': ' + (lateNow ? lateNow + ' route' + (lateNow === 1 ? '' : 's') + ' late' : leftOver ? leftOver + ' route' + (leftOver === 1 ? '' : 's') + ' behind' : 'All routes on time');
+    var tcr = truckCheck(r), lateNow = tcr.lateNow.length, leftOver = tcr.leftOver, doneLate = tcr.loadedLate.length;
+    r.subject = 'Plant Update ' + r.timeLabel + ': ' + (lateNow ? lateNow + ' route' + (lateNow === 1 ? '' : 's') + ' late' : leftOver ? leftOver + ' route' + (leftOver === 1 ? '' : 's') + ' behind' : doneLate ? doneLate + ' route' + (doneLate === 1 ? '' : 's') + ' loaded late' : 'All routes on time');
     r.smooth = !r.counts.behind && !r.counts.down && !r.counts.linesDown && !r.counts.tempsOut;
     r.text = reportText(r);
     return r;
@@ -1331,11 +1333,16 @@
       else ok.push(x);
     });
     var last = ok.length ? Math.max.apply(null, ok.map(function (x) { return x.est; })) : null;
-    return { lateNow: lateNow, miss: miss, leftOver: leftOver, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
+    // Joe 11/1: a load already loaded, but after its truck's dispatch time, shows as loaded late.
+    var loadedLate = (r.loaded || []).filter(function (x) { return x.loadedLate > 0; }).sort(function (a, b) { return (a.doneMs || 0) - (b.doneMs || 0); }).map(function (x) {
+      return { id: x.id, name: name(x), area: x.area, value: spanText(x.loadedLate) + ' late', sub: 'Dispatch ' + [x.departDay, x.depart].filter(Boolean).join(' ') + ' · loaded ' + x.doneAt };
+    });
+    return { lateNow: lateNow, miss: miss, loadedLate: loadedLate, leftOver: leftOver, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
   }
   function truckCheckSummary(t) {
     return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
-      t.ok ? (t.lateNow.length || t.miss.length ? 'the other ' + t.ok + ' make it' : 'all ' + t.ok + ' make it') : ''].filter(Boolean).join(' · ');
+      t.ok ? (t.lateNow.length || t.miss.length ? 'the other ' + t.ok + ' make it' : 'all ' + t.ok + ' make it') : '',
+      (t.loadedLate || []).length ? t.loadedLate.length + ' already loaded late' : ''].filter(Boolean).join(' · ');
   }
 
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
@@ -1370,6 +1377,8 @@
       if (t.ok) L.push('  Every other truck: ' + t.ok + ' load' + (t.ok === 1 ? '' : 's') + ' on time, last one est. loaded ' + t.okLast);
       L.push('');
     }
+    var lateDone = truckCheck(r).loadedLate;
+    if (lateDone.length) { L.push('LOADED LATE (' + lateDone.length + ')'); lateDone.forEach(function (x) { L.push('  ' + x.name + ', ' + x.sub + ', ' + x.value); }); L.push(''); }
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
     r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status + (d.carried ? '  (carried over)' : '') + (d.review ? '  review ' + d.reviewAt + ': ' + d.review : '')); });
     if ((r.fixed || []).length) { L.push(''); L.push('FIXED SINCE LAST REPORT (' + r.fixed.length + ')'); r.fixed.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + '  RESOLVED' + (d.reviewAt ? ' ' + d.reviewAt : '') + (d.review ? ': ' + d.review : '')); }); }
@@ -1430,7 +1439,7 @@
         var sep = '';
         var key = x.prior ? 'prior' : splitDays ? x.day : 'today';
         if ((splitDays || hasPrior) && key !== last) { last = key; sep = '<tr><td colspan="4" style="' + F + 'padding:8px 8px 4px;font-size:14px;font-weight:800;color:' + (key === 'prior' ? '#9a5b00' : INK) + ';border-bottom:2px solid ' + (key === 'prior' ? '#e8a317' : INK) + '">' + e(x.prior ? 'Left over from ' + leftFrom(x.loadDate) : splitDays ? deliversLabel(x.day) : 'Today ' + todayLabel) + '</td></tr>'; }
-        return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : x.est ? (x.est.late ? '<span style="display:inline-block;padding:1px 6px;border-radius:5px;background:' + RED + ';color:#ffffff;font-weight:800" title="' + e(x.est.reason) + '">' + (mixed ? 'est. ' : '') + e(x.est.estText) + ' &#9888;</span>' : '<span style="color:' + GREEN + ';font-weight:800">' + (mixed ? 'est. ' : '') + e(x.est.estText) + '</span>') : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
+        return sep + '<tr>' + td(x, e(x.route), 0, 1) + td(x, e(brief(x.name)) || '&nbsp;') + td(x, x.word ? '<b style="font-size:12px">' + e(x.word) + '</b>' : x.est ? (x.est.late ? '<span style="display:inline-block;padding:1px 6px;border-radius:5px;background:' + RED + ';color:#ffffff;font-weight:800" title="' + e(x.est.reason) + '">' + (mixed ? 'est. ' : '') + e(x.est.estText) + ' &#9888;</span>' : '<span style="color:' + GREEN + ';font-weight:800">' + (mixed ? 'est. ' : '') + e(x.est.estText) + '</span>') : x.doneLate ? '<span style="color:' + RED + ';font-weight:800">' + e(x.done) + ' late</span>' : e(x.done || '–'), 1) + td(x, e(x.depart || '–'), 1) + '</tr>';
       }).join('') + '</table></td></tr>';
     }
     // Short words so a name or heading fits one row on a phone: "HALF GALLON FILLER 1" -> "HALF GAL FILLER 1",
@@ -1451,8 +1460,9 @@
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:4px">' +
         (t.lateNow.length ? lab('Late now: truck should have left', RED) + t.lateNow.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         (t.miss.length ? lab('Will miss its truck', RED) + t.miss.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
-        (t.ok ? lab(bad ? 'Every other truck' : 'Every truck', GREEN) + line(t.ok + ' load' + (t.ok === 1 ? '' : 's'), 'Last one est. loaded ' + t.okLast, '&#10003; On time', false) : '') +
+        (t.ok ? lab(bad ? 'Every other truck' : 'Every truck still to load', GREEN) + line(t.ok + ' load' + (t.ok === 1 ? '' : 's'), 'Last one est. loaded ' + t.okLast, '&#10003; On time', false) : '') +
         (!t.lateNow.length && !t.miss.length && !t.ok ? line('Nothing left to load', '', '&ndash;', false) : '') +
+        (t.loadedLate.length ? lab('Already loaded, but late', RED) + t.loadedLate.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
@@ -1465,7 +1475,7 @@
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
     var untilOf = function (x) { return x.minutesUntil === null || x.minutesUntil === undefined ? 1e9 : x.minutesUntil; };
     var loaded = (r.loaded || []).slice().sort(function (a, b) { return byGroup(a, b) || byDay(a, b) || (a.doneMs || 9e15) - (b.doneMs || 9e15) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN }; });
+      .map(function (x) { return { area: x.area, day: x.deliveryDate, route: routeNumber(x.route), name: shortRun(x), done: x.doneAt, depart: x.depart, word: '', bg: '#e2f4ea', fg: GREEN, doneLate: x.loadedLate > 0 }; });
     // Joe 10/19 (Late Forecast): with a forecast, a load not loaded shows its Est. Done (green, or red with a warning sign when late).
     var fc = r.forecast, fcBy = {}; (fc ? fc.loads : []).forEach(function (x) { fcBy[x.id] = x; });
     // Joe 10/20 (3:09 PM report): not loaded routes follow the plant's load order (Daily Case Loadout, where a load is dragged up
@@ -1491,7 +1501,9 @@
     var tc = truckCheck(r), leftBehind = 0; behind = tc.lateNow.length;
     var late = !behind && tc.miss.length ? tc.miss.length : 0;
     if (!behind && !late) leftBehind = tc.leftOver;
-    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind || leftBehind ? RED : late ? YELLOW : GREEN) + ';color:' + (late ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL MISS ITS TRUCK' : 'S WILL MISS THEIR TRUCKS') : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
+    // Joe 11/1: with nothing late or behind now, a load that was loaded late still keeps the banner from saying all on time.
+    var doneLate = !behind && !late && !leftBehind ? tc.loadedLate.length : 0;
+    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind || leftBehind ? RED : late || doneLate ? YELLOW : GREEN) + ';color:' + (late || doneLate ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL MISS ITS TRUCK' : 'S WILL MISS THEIR TRUCKS') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     if (fc) H.push(forecastBox(tc));
     H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
