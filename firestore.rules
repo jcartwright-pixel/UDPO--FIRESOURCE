@@ -139,6 +139,8 @@ service cloud.firestore {
     match /inventoryMoves/{id} { allow read: if activeUser(); }
     // Joe 10/28: Debag's Jug Trailers, the trailers parked in the lot (saved only through save, jugtrailers.js).
     match /jugTrailers/{id} { allow read: if activeUser(); }
+    // Joe 11/1: each plant's Plant Material Trailers lists (trailer companies and units, items, locations; saved only through save).
+    match /jugTrailerLists/{id} { allow read: if activeUser(); }
     // Each plant's own product areas and groups (Administration > Products).
     match /productSetup/{id} { allow read: if activeUserOrStation(); }
     // Joe 10/13: the plant's products that run on no machine yet (the Product Sheet's lines with no check).
