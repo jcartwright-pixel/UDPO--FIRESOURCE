@@ -194,6 +194,21 @@ async function until(check, what) {
     await until(async () => { const g = await db().collection('reportGroups').where('name', '==', 'Plant Management').get(); return !g.empty && g.docs[0].data().recipients.length === 3; }, 'Report group saved');
     await shot(p, 'report-recipients-1920.png');
 
+    // Joe 10/31: the sales route email starts Off with no one on it; addresses save when the box is left; On is pressed twice.
+    await open('sales-email', '#se-off, #se-on');
+    assert.equal(await p.inputValue('#se-to'), '', 'no addresses to start');
+    assert.ok(await p.$('#se-on'), 'Off to start');
+    await p.fill('#se-to', 'sales.one@uniteddairy.com, sales.two@uniteddairy.com');
+    await p.press('#se-to', 'Tab');
+    await until(async () => ((await db().collection('private').doc('salesRouteEmail').get()).data() || {}).to?.length === 2, 'Sales addresses saved');
+    await p.click('#se-on');
+    assert.equal((((await db().collection('private').doc('salesRouteEmail').get()).data() || {}).on), undefined, 'one press does not turn it on');
+    await p.click('#se-on');
+    await p.waitForSelector('#se-off');
+    assert.equal(((await db().collection('private').doc('salesRouteEmail').get()).data() || {}).on, true);
+    assert.ok(await oneLine(p), 'Sales Route Email buttons on one line');
+    await shot(p, 'sales-email-1920.png');
+
     await open('sent-log', '#sl-rows tr');
     await p.click('#sl-off');
     await p.waitForSelector('#sl-on');

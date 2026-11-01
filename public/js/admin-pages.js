@@ -498,6 +498,8 @@ const APP_LINKS = [
   { key: 'line', title: 'Line Tablet', label: 'Line tablet link', path: 'line.html?tablet=1', who: 'ud', short: 'A tablet at a production line with a UD account, then the Line Tablet code once', opens: 'The tablet at a production line. Once the plant has a Line Tablet code (Line Tablets, below), the tablet types it once and picks its line; after that it opens nothing else, with no Back, Home, Sign out or Change Line. Release in the bottom-right corner takes the manager release code (Manager Links) and goes back to the code screen. A computer opening Line Tablet from the menus works as before.', shut: 'New code or Remove on the Line Tablet, below.' },
   // Joe 10/18: the Plant Managers app ("send them the link and have a code").
   { key: 'managers', title: 'Plant Managers App', label: 'Plant Managers link', path: 'walkthrough.html?view=home&app=1', who: 'ud', short: 'The plant managers\' own app on their phone or tablet: UD account (Manager or Administrator role), then the Plant Managers code once (Plant Managers App page)', opens: 'The plant managers\' app on their phone, iPad or tablet: the Manager Walkthrough (Yard, Coolers, Production), Loading and Unloading. Send them the link; they sign in with their United Dairy account, type the Plant Managers code once (below) and add it to the home screen, where it is called Plant Managers. It is their own phone, so Sign out stays and there is no Release.', shut: 'New code (below) makes every phone ask for the new code; change their role in People & Roles.' },
+  // Joe 10/31: the Sales app, a phone app for the salespeople: any United Dairy account, nothing else.
+  { key: 'sales', title: 'Sales App', label: 'Sales App link', path: 'sales.html', who: 'ud', short: 'Salespeople on their phones: anyone with a United Dairy account, no code', opens: 'The salespeople\'s phone app: every route of the division they pick (Uniontown, Charleston, Martins Ferry), its driver, its status and where it is now, with the map on top. Tap a route and the map moves to that truck. Send them the link; they sign in with their United Dairy account and add it to the home screen, where it is called UD Sales. It only shows; nothing can be changed from it.', shut: 'It is open to every United Dairy account. Turning off their United Dairy account stops it.' },
   { key: 'distribution', title: 'Distribution Manager', label: 'Distribution Manager link', path: 'distribution.html', who: 'ud', short: 'The distribution manager (routes, trucks and drivers): UD account; opens Route Distribution in the full app', opens: 'Route Distribution, the distribution side of the full Operations app: dispatch, routes, trucks and drivers. Their role decides what they can change.', shut: 'Change their role in People & Roles.' },
   { key: 'personal', title: 'Personal phone links', label: '', path: '', who: 'ud', short: 'One person, with their own link and UD sign-in', opens: 'One person\'s phone screens.', shut: 'Revoke in Access & QR Codes.', goto: 'access-codes' }
 ];
@@ -512,6 +514,7 @@ const GARAGE_LINKS = ['garage', 'maint'];
 const DRIVER_LINKS = ['driver'];
 const DRIVER_MORE = ['route'];
 const MANAGER_APP_LINKS = ['managers'];
+const SALES_LINKS = ['sales'];
 
 // The link cards for the given keys; tail is more of the page under the cards (Manager Links' release codes, the stations).
 export async function renderAppLinks(box, ctx, keys = MANAGER_LINKS, tail = '', more = []) {
@@ -689,6 +692,8 @@ export async function renderStationCodes(box, ctx) {
 export async function renderGarageCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, GARAGE_LINKS, stationSection('GARAGE') + stationSection('MAINT')), bindStations(box, 'GARAGE'), bindStations(box, 'MAINT')]); }
 // Joe 10/18: the Plant Managers app: its link, then each plant's Plant Managers code.
 export async function renderManagerAppCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, MANAGER_APP_LINKS, stationSection('MANAGER')), bindStations(box, 'MANAGER')]); }
+// Joe 10/31: the Sales app's link (copy, print a QR, Launch).
+export async function renderSalesApp(box, ctx) { await renderAppLinks(box, ctx, SALES_LINKS); }
 export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK'), DRIVER_MORE), bindStations(box, 'KIOSK')]); }
 
 /* ---------- Manager Report Recipients ---------- */
@@ -742,6 +747,46 @@ export async function renderReportRecipients(box) {
         await load();
       });
     }
+  });
+  await load();
+}
+
+/* ---------- Sales Route Email (Joe 10/31) ---------- */
+
+// The 6:00 AM route status email for the salespeople: who gets it (saves when the box is left), On / Off, and a test to oneself.
+export async function renderSalesEmail(box) {
+  box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="se-reload">Refresh</button><span id="se-switch" style="display:flex;gap:8px;align-items:center"></span>' +
+    '<div class="ap-right"><button type="button" class="ap-btn" id="se-test">Send a test to me</button></div></div><div class="ap-msg" hidden></div>' +
+    '<p class="ap-note">At 6:00 AM Monday through Saturday (never Sunday) the salespeople get one line per route: Route, Run and Status. ' +
+    'It lists the loads of the shift that just ended (Monday\'s also has Saturday\'s). The time a load left comes from its trailer\'s GPS, or the truck\'s when the trailer has none.</p>' +
+    '<div id="se-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-section"><h3>Who gets it</h3>' +
+    '<label class="ap-field">Addresses<small>Separated by commas. Saves when you leave the box.</small><input id="se-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label>' +
+    '<small id="se-changed"></small></div></div></div>';
+  const $ = (s) => box.querySelector(s);
+  let saving = Promise.resolve();
+  function render(d) {
+    $('#se-switch').innerHTML = (d.on ? '<button type="button" class="ap-btn warn" id="se-off">Turn off</button>' : '<button type="button" class="ap-btn main" id="se-on">Turn on</button>') +
+      '<span class="ap-chip ' + (d.on ? 'good' : 'bad') + '">' + (d.on ? 'The sales email is ON' : 'The sales email is OFF') + '</span>';
+    $('#se-sending').innerHTML = d.sending ? '' : '<div class="ap-msg bad">Email sending is OFF, so nothing will go out. Turn it on in Sent Email Log.</div>';
+    const input = $('#se-to');
+    if (document.activeElement !== input) { input.value = d.to.join(', '); input.dataset.was = input.value; }
+    $('#se-changed').textContent = d.changedBy ? 'Changed ' + when(d.changedAt) + ' by ' + d.changedBy : '';
+  }
+  async function load() { await saving; try { const d = await call('salesEmail'); if (box.isConnected) render(d); } catch (err) { say(box, errText(err), 'bad'); } }
+  box.addEventListener('change', ev => {
+    const i = ev.target;
+    if (i.id !== 'se-to' || i.value.trim() === i.dataset.was) return;
+    saving = saving.then(async () => {
+      try { const d = await call('saveSalesEmail', { to: i.value }); i.dataset.was = i.value.trim(); render(d); say(box, d.message || '', d.message ? 'warn' : ''); } catch (err) { say(box, errText(err), 'bad'); }
+    });
+  });
+  box.addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.id === 'se-reload') load();
+    if (b.id === 'se-off') busy(box, b, async () => { await saving; const d = await call('saveSalesEmail', { on: false }); render(d); say(box, ''); });
+    if (b.id === 'se-on') twice(b, 'Press again to turn on', () => busy(box, b, async () => { await saving; const d = await call('saveSalesEmail', { on: true }); render(d); say(box, d.message || '', d.message ? 'warn' : ''); }));
+    if (b.id === 'se-test') busy(box, b, async () => { await saving; const out = await call('salesEmailTest'); say(box, out.message, out.ok ? 'good' : 'bad'); });
   });
   await load();
 }
@@ -911,7 +956,9 @@ export const PAGES = {
   'garage-codes': renderGarageCodes,
   'driver-codes': renderDriverCodes,
   'manager-app-codes': renderManagerAppCodes,
+  'sales-app': renderSalesApp,
   'report-recipients': renderReportRecipients,
+  'sales-email': renderSalesEmail,
   'sent-log': renderSentLog,
   'email-senders': renderEmailSenders,
   'repair-items': renderRepairItems

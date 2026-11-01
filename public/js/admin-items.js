@@ -15,12 +15,16 @@ export const ADMIN_GROUPS = [
     ['garage-codes', 'Garage Station Codes', 'The Garage Station and Maintenance Station links (copy, print a QR, Launch in a new window), then the garage stations and the Maintenance Station: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
     ['driver-codes', 'Driver Station Codes', 'The Driver Station link, for the Driver\'s Kiosk Station (the TV) and the Driver Room Check-In Station (the drivers\' tablet, its code opens the drivers\' Check-In, like their phones): copy, print a QR, open; then the stations: + Add Station, each tablet, TV or kiosk\'s code (typed on it once), New code, Remove; and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people'],
     // Joe 10/18: "send them the link and have a code".
-    ['manager-app-codes', 'Plant Managers App', 'The Plant Managers link for the managers\' phones, iPads and tablets (copy, print a QR, Launch): they sign in with their United Dairy account and type the Plant Managers code once; then each plant\'s Plant Managers code: Create code, New code.', '', 'people']
+    ['manager-app-codes', 'Plant Managers App', 'The Plant Managers link for the managers\' phones, iPads and tablets (copy, print a QR, Launch): they sign in with their United Dairy account and type the Plant Managers code once; then each plant\'s Plant Managers code: Create code, New code.', '', 'people'],
+    // Joe 10/31: the Sales app link: any United Dairy account, no code.
+    ['sales-app', 'Sales App', 'The Sales app link for the salespeople\'s phones (copy, print a QR, Launch): every route of their division, its driver, status and where it is now on the map. Any United Dairy account opens it.', '', 'truck']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],
     ['email-senders', 'Email Senders', 'Who email comes from: the person who presses Send (their own United Dairy email), and each plant\'s address for automatic email.', '', 'swap'],
     ['report-recipients', 'Manager Report Recipients', 'Who gets the plant report at each location: add and remove people (press twice to remove).', '', 'star'],
+    // Joe 10/31: the 6:00 AM route status email for the salespeople, Monday through Saturday.
+    ['sales-email', 'Sales Route Email', 'The 6:00 AM route status email for sales, Monday through Saturday (Route, Run, Status): who gets it, On or Off, and Send a test to me.', '', 'truck'],
     ['sent-log', 'Sent Email Log', 'Every email the app sent, newest first.', '', 'day'],
     ['checkin-email', 'Driver Check-In Email', 'The mailbox check for driver check-in email: on or off, sender, recipient, subject, Check now, and Use the standard addresses.', '', 'people'],
     ['refresh-rates', 'Refresh Rates', 'How often each background job runs (each saves when it is picked), and Archive now for completed work. Two retired jobs stay read-only.', '', 'week']

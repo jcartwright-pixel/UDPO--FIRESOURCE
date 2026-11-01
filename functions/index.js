@@ -221,6 +221,14 @@ exports.garage = onCall({ maxInstances: 3 }, async (request) => {
   } catch (error) { throw asHttps(error); }
 });
 
+// Joe 10/31: the Sales app (src/salesapp.js). Any United Dairy account may use it ("No other access information is needed"):
+// it is not checked against the Users list. Read only. Divisions = the plants that are running.
+exports.sales = onCall({ maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
+  if (!unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with your United Dairy account.');
+  const divisions = PLANTS.activePlants().filter(plantReady).map(p => ({ id: p.id, name: p.name }));
+  try { return await require('./src/salesapp').salesCall(divisions, (id) => PLANTS.dbFor(id, db), request.data || {}); } catch (error) { throw asHttps(error); }
+});
+
 exports.newRouteCode = onCall(async (request) => {
   const user = signedIn(request);
   try { return await newRouteCode(await plantDb(request, user), user); } catch (error) { throw asHttps(error); }
@@ -579,6 +587,15 @@ exports.garageServicesEvery30Minutes = onSchedule({ schedule: 'every 30 minutes'
 // Joe 10/27: the Driver Room TV's Driver Scorecard turn (src/scorecard-kiosk.js): the month's overall scores, every 15 minutes.
 exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 240, maxInstances: 1, memory: '512MiB' }, async () => {
   await eachPlant('scorecardKiosk', (pdb) => writeKioskScores({ db: pdb }));
+});
+
+// Joe 10/31: the route status email for the salespeople (src/salesmail.js), 6:00 AM Monday through Saturday. It sends nothing
+// until Administration switches it on with at least one address (private/salesRouteEmail).
+exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
+  await eachPlant('salesRouteEmail', async (pdb) => {
+    const r = await require('./src/salesmail').sendMorning(pdb);
+    if (r && r.status !== 'SENT') console.log('salesRouteEmail', r.status, r.reason || '');
+  });
 });
 
 // Joe 10/31 (mock-ups 1 to 4): the Employees list from UDMS, every 15 minutes (src/employees.js). UDMS is its own Firebase

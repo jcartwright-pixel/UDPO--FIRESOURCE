@@ -115,6 +115,10 @@ export const ICON = {
   people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5"/>',
   vacation: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l3 3 5-6"/>',
   truck: '<path d="M2 6h11v10H2zM13 9h5l3 4v3h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  // Joe 10/31: Shipping & Receiving's own picture instead of the forklift: the plant's dock door with a pallet going out and one coming in.
+  dock: '<path d="M2 21V9.5L12 4l10 5.5V21"/><path d="M6 21v-8.5h12V21"/><path d="M6 15.5h12M6 18.5h12"/><path d="M9 9.5h4.5l-1.3-1.3M15 11h-4.5l1.3 1.3"/>',
+  // Joe 10/31: Plant Material Trailers' own icon: what comes in on them (cardboard boxes, bags of powder, bottles) on a pallet.
+  materials: '<path d="M2 21h20M3 21v-2h18v2"/><rect x="3.5" y="12" width="7" height="7"/><path d="M7 12v2.5"/><rect x="10.5" y="14.5" width="4.5" height="4.5"/><path d="M4.5 12c0-3.2 1.2-4.5 2.5-4.5s2.5 1.3 2.5 4.5"/><path d="M6 7.5h2"/><path d="M16.5 19v-5.5l1-1.5V9.5h1.5V12l1 1.5V19"/>',
   pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   wrench: '<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
@@ -185,8 +189,10 @@ export const MENU = [
   // Joe 10/12: Plant Maintenance, like the garage work orders but for the plant's machinery: requests from the plant, work orders,
   // the PM schedule and the mechanics' tablet.
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
-  ['Inventory', [['Receiving Log', 'inventory.html', 'day']]],
-  ['Debag / Labeling Room', [['Plant Material Trailers', 'jug-trailers.html', 'truck'], ['Labeling Room', 'labeling.html', 'production.webp']]],
+  // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
+  ['Inventory', [['Receiving Log', 'inventory.html', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
+  // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
+  ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
   ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
@@ -205,14 +211,24 @@ export const SIDES = [
   { key: 'production', group: 'plantops', quick: [['Production Lines', 'production.html'], ['Quality Checks', 'quality.html']], name: 'Plant Production', home: 'production-home.html', pic: 'plant-production-construction-560.webp', note: 'Production lines, runs and output', sections: ['Production Lines', 'Quality Checks', 'Cooler Temperature', 'Shift Notes'], openSections: ['Quality Checks', 'Cooler Temperature', 'Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/25 (mock-up 1): Plant Vacations & Schedule sits in the menu under the plant's own sides, with no card on the plant home (menuOnly).
   { key: 'crew', group: 'plantops', menuOnly: true, short: 'Plant Vacations & Schedule', name: 'Plant Vacations & Schedule', home: 'crew.html', note: 'Who works which job each shift, vacations and setup', sections: ['Plant Vacations & Schedule'], flatFirst: true },
-  { key: 'pmaint', group: 'plantops', quick: [['Work Orders', 'pmworkorders.html'], ['PM Schedule', 'pmschedule.html']], name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
+  // Joe 10/31: Plant Maintenance is its own card on the Home screen (out of Plant Operations), with its own menu.
+  { key: 'pmaint', quick: [['Work Orders', 'pmworkorders.html'], ['PM Schedule', 'pmschedule.html']], name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/26 (ej): Shipping & Receiving, its own department: outgoing product loads, receiving and inventory (the old Plant
   // Distribution Scheduler and the Inventory card). Inventory is still being built, so it opens only for administrators (buildingSections).
-  { key: 'shipping', group: 'plantops', name: 'Shipping & Receiving', home: 'scheduler.html', pic: 'forklift-truck-v1-560.webp', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'], buildingSections: ['Inventory'],
-    quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html']] },
+  // Joe 10/31: on the Home screen only, Shipping & Receiving is its own card (homeCard); everywhere else it stays in Plant Operations.
+  { key: 'shipping', group: 'plantops', homeCard: true, name: 'Shipping & Receiving', home: 'scheduler.html', icon: 'dock', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'], buildingSections: ['Inventory'],
+    // Joe 10/31: Plant Material Trailers sits in Inventory but is already in use, so it stays open to everyone (openPages).
+    openPages: ['jug-trailers.html'],
+    // Joe 10/31 (Inventory picture 2): on its Home card, Inventory is a dark blue line ('main') with the places stock is kept under it:
+    // the Receiving Log, the trailers in the lot, and room for the off-site inventory and the inventory room (being built).
+    quick: [['Shipping', 'scheduler.html'], ['Receiving', 'scheduler.html?lane=receiving'], ['Inventory', 'inventory.html', 'main'], ['Receiving Log', 'inventory.html'],
+      ['Plant Material Trailers', 'jug-trailers.html'], ['Off-site Inventory', 'soon.html?what=offsite-inventory'], ['Inventory Room', 'soon.html?what=inventory-room']] },
   // Joe 10/28: one more plant area, Debag / Labeling Room (where the jugs come out of their bags, and the labeling room), with
   // Plant Material Trailers (Joe 10/28: they carry jugs, cardboard, empty crates and more), the trailers parked in the lot.
-  { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'jug-trailers.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Plant material trailers in the lot: how full each one is and what is on it', sections: ['Debag / Labeling Room'], flatFirst: true },
+  // Joe 10/31: Debag / Labeling Room (where the half-gallon, quart and pint bottles come out of their bags and are labeled on their
+  // way to the fillers) stays in Plant Operations. Plant Material Trailers moved to Inventory, so it has no screens yet: Under
+  // Construction, administrators only.
+  { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'labeling.html', pic: 'box-v1.webp', note: 'Taking the bottles out of their bags and labeling them for the fillers', sections: ['Debag / Labeling Room'], building: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch Template', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
@@ -259,7 +275,7 @@ const sideHas = (side, page) => isHome(side, page) || (SIDE_PAGES[side.key] || [
 // too) stay open to everyone while those sides are being built (openSections).
 const builtHas = (side, page) => sideHas(Object.assign({}, side, { sections: side.baseSections.filter(g => (side.openSections || []).indexOf(g) < 0) }), page);
 // Joe 10/26: a side can hold one section still being built (Inventory inside Shipping & Receiving): only its screens are refused.
-const inBuildingSection = (side, page) => (side.buildingSections || []).some(g => MENU.some(([m, items]) => m === g && items.some(([, href]) => pageOf(href) === page)));
+const inBuildingSection = (side, page) => (side.openPages || []).indexOf(page) < 0 && (side.buildingSections || []).some(g => MENU.some(([m, items]) => m === g && items.some(([, href]) => pageOf(href) === page)));
 export const buildingSideFor = (page) => SIDES.find(s => s.building && builtHas(s, page)) || SIDES.find(s => inBuildingSection(s, page)) || null;
 export const mayOpenBuilding = (person) => !!(person && window.UDLogic && window.UDLogic.isAdmin(person));
 function refuseBuilding(side) {
@@ -672,6 +688,8 @@ const PAGE_ICON = {
   'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'redzone.html': 'production.webp', 'machine-setup.html': 'production.webp', 'production.html': 'production.webp', 'production-home.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star', 'forecast.html': 'week',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-fire.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
+  // Joe 10/31: Plant Material Trailers' own icon (boxes, a bag and a bottle on a pallet).
+  'jug-trailers.html': 'materials',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {

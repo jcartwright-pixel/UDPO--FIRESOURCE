@@ -50,10 +50,22 @@ Operations saves by itself the moment you change something. There is no Save but
 id: home
 screens: index.html, company.html, group.html
 
-The first screen after you sign in. Big cards open each part of Operations: **Plant Operations** and **Route Distribution** (each opens its own page of department cards), **Reports** and **Safety Walkthrough**. Under a card, its main screens have their own buttons and a few numbers (open truck issues, open garage work orders).
+The first screen after you sign in. Five big cards, left to right, open each part of Operations:
 
-- A card marked **Under Construction** opens only for administrators while it is being built.
-- **Plant Operations** has a card for each area of the plant: Plant Distribution, Plant Production, Plant Maintenance, Shipping & Receiving and **Debag / Labeling Room** (the trailers in the lot).
+1. **Plant Operations** opens its own page of department cards: Plant Distribution, Plant Production, Shipping & Receiving and Debag / Labeling Room.
+2. **Plant Maintenance**: work orders and the PM schedule for the plant's machinery. It has its own menu too.
+3. **Shipping & Receiving**: Shipping and Receiving, then **Inventory** (dark blue) with every place the plant keeps stock under it: **Receiving Log**, **Plant Material Trailers** (the trailers in the lot), **Off-site Inventory** and **Inventory Room** (the last two are being built). On the menu and on the Plant Operations page it is still one of the Plant Operations departments.
+4. **Route Distribution** opens its own page of department cards: Route Distribution, Fleet & Maintenance and Garage.
+5. **Reports & Safety**: **Reports** (Walkthrough, Driver, Plant and Garage reports) and the **Safety Walkthrough** (Weekly Walk, Open Issues, Past Walks) in one card.
+
+Under a card, its main screens have their own buttons (a department in dark blue, its screens in light blue) and a few numbers (open truck issues, open garage work orders).
+
+- A card or button marked **Under Construction** opens only for administrators while it is being built (Plant Production, Plant Maintenance, Debag / Labeling Room, Inventory's Receiving Log, Off-site Inventory and Inventory Room, and the Safety Walkthrough for now).
+
+> Each card's `Open` button opens that card's own page. On Reports & Safety it opens Reports; press **Safety Walkthrough** on the card for the walk.
+
+!> Do not look for Plant Maintenance inside Plant Operations, or for the trailers in the lot under Debag / Labeling Room. Plant Maintenance has its own card, and the trailers are under Shipping & Receiving.
+
 - Someone who sees more than one plant starts on the **Operations Overview**: one tile per plant with today's numbers and recent activity. Click a plant to open its Home.
 - An administrator can give a person their own Home screen (People & Roles); they then start there, and `Home` still comes here.
 
@@ -745,13 +757,11 @@ Every pallet scanned in at Receiving: date, time, supplier, PO, item, lot, made 
 - Click a line to see its barcodes. `Remove` takes off a pallet scanned by mistake.
 - `Print` prints the list.
 
-# Debag / Labeling Room
-
 ## Plant Material Trailers
 id: jug-trailers
 screens: jug-trailers.html
 
-The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+Part of **Inventory**, under Shipping & Receiving (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
 1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
 2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
@@ -767,6 +777,12 @@ The dry box trailers parked in the plant's lot with plant material on them (jugs
 > A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
 
 !> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
+
+# Debag / Labeling Room
+
+Where the half-gallon, quart and pint bottles come out of their bags and go onto the conveyor, through the labelers, to the fillers. It is a department of **Plant Operations** (its button is on the Plant Operations card). It is **Under Construction**, so only administrators can open it for now. Its button opens the **Labeling Room**.
+
+!> Do not look here for the trailers in the lot. They are in **Inventory** under Shipping & Receiving.
 
 ## Labeling Room
 id: labeling
@@ -1247,7 +1263,7 @@ A phone link and QR code for each employee. `Generate` makes one; `Regenerate` (
 
 ## Links & Codes
 id: admin-links
-screens: administration.html?item=app-links, administration.html?item=station-codes, administration.html?item=garage-codes, administration.html?item=driver-codes, administration.html?item=manager-app-codes
+screens: administration.html?item=app-links, administration.html?item=station-codes, administration.html?item=garage-codes, administration.html?item=driver-codes, administration.html?item=manager-app-codes, administration.html?item=sales-app
 
 Every link and code people use to reach the app:
 
@@ -1258,6 +1274,7 @@ Every link and code people use to reach the app:
 - An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
+- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1272,6 +1289,33 @@ Where email goes and who it comes from:
 - **Manager Report Recipients:** who gets the plant report at each plant. Remove is pressed twice.
 - **Sent Email Log:** every email the app sent, newest first.
 - **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`. Pick the plant with `Location`; each plant keeps its own mailbox settings and its own check-ins.
+
+## Sales Route Email
+id: admin-sales-email
+screens: administration.html?item=sales-email
+
+The email the salespeople get at 6:00 AM, Monday through Saturday (never Sunday). It has one line for each route: the route number, the run, and where that load stands. It lists the loads of the shift that just ended. Monday's email also has Saturday's loads. Loads marked Ended Up Not Running are left off.
+
+What the status says:
+
+- **On time, left 4:05 AM:** the load left by its dispatch time.
+- **Left 5:42 AM, 1 hr 12 min late:** it left after its dispatch time, and by how much.
+- **Not departed, 35 min behind:** it is loaded, its dispatch time has passed, and it has not left.
+- **Not loaded, 20 min behind:** its dispatch time has passed and it is not loaded yet.
+- **Loaded** or **Not loaded:** its dispatch time has not come yet.
+
+The time a load left comes from its trailer's GPS. When the trailer has no GPS, the truck's GPS is used.
+
+1. Type the salespeople's addresses in **Addresses**, separated by commas. They save when you leave the box.
+2. Press `Send a test to me` to see this morning's email in your own inbox.
+3. Press `Turn on`, then press it again. From then on it goes out at 6:00 AM.
+
+- `Turn off` stops it. Nothing goes out while it is off.
+- Email sending in **Sent Email Log** must also be on.
+
+> Every email it sends is listed in Sent Email Log.
+
+!> Do not turn it on before the addresses are in. With no one on it, nothing goes out.
 
 ## Refresh Rates
 id: admin-refresh
@@ -1434,6 +1478,28 @@ On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows
 !> Do not mistake a load under **Yesterday's loads** for today's run of the same route. Check which line it sits under.
 
 !> Do not check in for another driver. Pick `Not you?` and let them sign in.
+
+## Sales app: where every route is
+id: sales
+screens: sales.html
+
+The salespeople's phone app (**UD Sales** on the home screen). It shows every route of a division: who is driving it, its status and where it is now, with a map on top. It only shows; nothing can be changed from it. Anyone with a United Dairy account can use it.
+
+1. Open the Sales App link (Administration, **Sales App**) and sign in with your United Dairy Google account.
+2. Add it to the home screen. It is called **UD Sales**.
+3. Pick the **Division** at the top right (Uniontown, Charleston or Martins Ferry). The phone remembers it.
+4. Scroll the routes. Tap a route and the map at the top moves to that truck. The map stays on top while you keep scrolling; tap another route to move it again.
+
+- **Route, Driver, Status, Where now.** The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
+- **Status** is the same as the 6:00 AM sales email: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1 hr 12 min late** (red), **Not departed, 35 min behind** (loaded, past its dispatch time, still here), **Not loaded, 20 min behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road near** or **Stopped at**). In the yard it says **At the plant**, or **Back at the plant** once it has been out.
+- The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
+- **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
+- `?` opens this Help. `Sign out` is at the bottom.
+
+> To see a route on a bigger map, tap the map and open it in Google Maps.
+
+!> Do not read **No GPS** as lost. It means neither the trailer nor the truck on that load has a GPS unit the app knows about; ask Dispatch.
 
 ## Plant Station tablet
 id: plant-station
