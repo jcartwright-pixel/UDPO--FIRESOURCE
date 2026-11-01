@@ -29,12 +29,44 @@ const MENU = [
   ['FRI', 803, 0, 231705, 'FIFTH STREET MARKET']
 ];
 
+// Joe 11/1: "The sales is not supposed to have any other options than just strictly to this app." The ? opens the Sales app's
+// own Help inside the app (never help.html, which is the Operations Help with Home and the menu); only the Sales parts, no link
+// that leaves the page; Back (and the phone's back) comes back to the screen it was pressed on.
+async function insideHelp(pg, title, from) {
+  const before = pg.url();
+  assert.equal(await pg.$('#sa-help[href], a#sa-help'), null, 'the ? is a button, not a link out');
+  await pg.click('#sa-help');
+  await pg.waitForSelector('#v-help:not([hidden]) .sa-helpread h2');
+  assert.equal(await pg.textContent('#sa-help-read h2'), title);
+  assert.match(pg.url(), /\/sales\.html\?view=help/, 'still the Sales app');
+  assert.equal(await pg.textContent('#sa-title'), 'Help');
+  assert.ok(await pg.isVisible('#sa-back'), 'Back shows on Help');
+  assert.ok(await pg.isHidden('#sa-help'));
+  // Nothing on the whole page leads anywhere but this page (the map's frame is Google's own).
+  const out = await pg.$$eval('a[href], form[action]', x => x.map(e => e.getAttribute('href') || e.getAttribute('action')).filter(h => !/^#/.test(h)));
+  assert.deepEqual(out, [], 'no link out of the Sales app');
+  assert.deepEqual(await pg.$$eval('.sa-helpgo', b => b.map(x => x.textContent)), [title === 'Customers' ? 'Where every route is' : 'Customers']);
+  const small = await pg.$$eval('#v-help *', x => x.filter(e => e.children.length === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent.trim()));
+  assert.deepEqual(small, []);
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll on Help');
+  if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-' + pg.viewportSize().width + '-help-' + from + '.png'), fullPage: true });
+  // The other Sales part opens in place.
+  await pg.click('.sa-helpgo');
+  assert.notEqual(await pg.textContent('#sa-help-read h2'), title);
+  assert.match(pg.url(), /\/sales\.html\?view=help/);
+  await pg.click('#sa-back');
+  await pg.waitForSelector('#v-help', { state: 'hidden' });
+  assert.equal(pg.url(), before, 'Back comes back to the screen the ? was pressed on');
+  assert.ok(await pg.isHidden('#v-' + from) === false);
+}
+
 // Joe 11/1 (mock-ups 2-5): Customers by route, on a phone, after the list was loaded on Administration (below).
 async function customers(pg) {
   await pg.click('[data-go="customers"]');
   await pg.waitForSelector('#cu-route option[value="803"]', { state: 'attached' });
   assert.equal(await pg.textContent('#sa-title'), 'Customers');
-  assert.match(await pg.getAttribute('#sa-help', 'href'), /^help\.html\?for=sales\.html%3Fview%3Dcustomers(&|$)/);
+  // Help is inside the app, on the customers part, and Back comes back here.
+  await insideHelp(pg, 'Customers', 'customers');
   // By route: the routes (the line with no route is not one), a blank pick first.
   assert.deepEqual(await pg.$$eval('#cu-route option', o => o.map(x => x.value)), ['', '803', '805', '808', '812']);
   await pg.selectOption('#cu-route', '803');
@@ -65,6 +97,11 @@ async function customers(pg) {
   assert.deepEqual((await pg.$$eval('.cu-cust', c => c.map(x => x.querySelector('b').textContent + ' | ' + [...x.querySelectorAll('.cu-go')].map(b => b.textContent).join(', ')))).sort(),
     ['...DQ RIVERSIDE | Tue 803', 'DQ BETHEL KNOLL | Thu 805, Sat 805', 'DQ HILLVIEW | Tue 803'].sort());
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-390-customers-dairy-queen.png'), fullPage: true });
+  // Back (top left) closes the group first, back to the groups; it stays on Customers.
+  await pg.click('#sa-back');
+  await pg.waitForSelector('.cu-grp');
+  assert.ok(await pg.isVisible('#v-customers'));
+  await pg.click('.cu-grp[data-group="Dairy Queen"]');
   await pg.click('#cu-all-groups');
   await pg.waitForSelector('.cu-grp');
   const small = await pg.$$eval('#v-customers *', x => x.filter(e => e.offsetWidth && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent.trim()));
@@ -175,7 +212,7 @@ async function uploadMenu(browser) {
       assert.deepEqual(await pg.$$eval('.sa-card b', b => b.map(x => x.textContent)), ['Where the routes are', 'Customers by route']);
       assert.ok(await pg.isHidden('#sa-back'), 'no Back on the cards');
       await pg.waitForFunction(() => document.querySelector('#sa-division').options.length > 0);
-      assert.match(await pg.getAttribute('#sa-help', 'href'), /^help\.html\?for=sales\.html(&|$)/);
+      if (w === 390) await insideHelp(pg, 'Where every route is', 'home');
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-' + w + '-cards.png') });
       await pg.click('[data-go="routes"]');
       await pg.waitForSelector('.sa-row');
@@ -223,8 +260,8 @@ async function uploadMenu(browser) {
       const small = await pg.$$eval('.sa-row *, .sa-cols *, .sa-sub *, .sa-map *', x => x.filter(e => e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent.trim()));
       assert.deepEqual(small, []);
       assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll at ' + w);
-      // Help opens the Sales part (the routes screen).
-      assert.match(await pg.getAttribute('#sa-help', 'href'), /^help\.html\?for=sales\.html%3Fview%3Droutes(&|$)/);
+      // Help opens the Sales part (the routes screen), inside the app.
+      await insideHelp(pg, 'Where every route is', 'routes');
       if (SHOTS) {
         await pg.evaluate(() => window.scrollTo(0, 0));
         await pg.click('text=Dana Whitfield');

@@ -23,7 +23,8 @@
   <header class="sa-hdr">
     <button type="button" class="sa-back" id="sa-back" hidden>&#8592; Back</button>
     <h1 id="sa-title">UD Sales</h1>
-    <a class="sa-help" id="sa-help" href="help.html?for=sales.html" title="Help for this screen" aria-label="Help for this screen">?</a>
+    <!-- Joe 11/1: Help opens inside the Sales app (only the Sales app's help); nothing here leads into the rest of Operations. -->
+    <button type="button" class="sa-help" id="sa-help" title="Help for this screen" aria-label="Help for this screen" hidden>?</button>
   </header>
 
   <section class="sa-signin" id="signin" hidden>
@@ -33,7 +34,7 @@
   <p class="sa-error" id="error" role="alert" hidden></p>
 
   <main id="screen" hidden>
-    <div class="sa-top">
+    <div class="sa-top" id="sa-top">
       <div class="sa-sub">
         <span class="sa-when"><span id="sa-day"></span><span id="sa-ref-line" hidden><br>Last refreshed <span id="sa-refreshed">-</span></span></span>
         <label class="sa-div"><span>Division</span><select id="sa-division" aria-label="Division"></select></label>
@@ -82,6 +83,12 @@
       <div id="cu-by-group" class="sa-box" hidden><p class="sa-lbl" id="cu-group-say">Tap a group to see its customers.</p><button type="button" class="sa-all" id="cu-all-groups" hidden>&#8592; All groups</button></div>
       <div id="cu-list" class="sa-list"></div>
       <p class="sa-foot" id="cu-foot"></p>
+    </section>
+
+    <!-- Joe 11/1: the Sales app's own Help, inside the app. Back (top left) comes back to the screen the ? was pressed on. -->
+    <section id="v-help" class="sa-helpview" hidden>
+      <article class="sa-helpread" id="sa-help-read"><p>Loading the help…</p></article>
+      <div class="sa-helpmore" id="sa-help-more"></div>
     </section>
 
     <p class="sa-foot"><button type="button" id="signout">Sign out</button> <span id="who"></span></p>

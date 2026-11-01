@@ -5,7 +5,7 @@ html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Robo
 .sales-page { max-width: 1024px; margin: 0 auto; }
 .sa-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #0e138d; color: #fff; }
 .sa-hdr h1 { margin: 0; font-size: 22px; }
-.sa-help { width: 36px; height: 36px; border: 2px solid #fff; border-radius: 50%; color: #fff; text-decoration: none; font-weight: 800; font-size: 20px; display: inline-flex; align-items: center; justify-content: center; }
+.sa-help { width: 40px; height: 40px; padding: 0; background: transparent; cursor: pointer; font-family: Arial, sans-serif; border: 2px solid #fff; border-radius: 50%; color: #fff; text-decoration: none; flex: none; font-weight: 800; font-size: 20px; display: inline-flex; align-items: center; justify-content: center; }
 .sa-signin { padding: 24px 16px; font-size: 18px; }
 .sa-signin button, .sa-foot button { font: 700 18px Arial, sans-serif; padding: 12px 20px; border: 0; border-radius: 8px; background: #0e138d; color: #fff; cursor: pointer; }
 .sa-foot button { font-size: 16px; padding: 8px 14px; background: #4b5563; }
@@ -53,7 +53,8 @@ html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Robo
 @media (min-width: 700px) { .sa-map-box { height: 300px; } }
 
 /* Joe 11/1 (mock-up 1): the header's Back, and the two cards the app opens on. */
-.sa-back { font: 700 16px Arial, sans-serif; background: #fff; color: #0e138d; border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+/* Joe 11/1: Back is big and plain to see, top left on every screen but the first. */
+.sa-back { font: 700 18px Arial, sans-serif; background: #fff; color: #0e138d; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer; flex: none; }
 .sa-hdr h1 { flex: 1; }
 .sa-cards { display: grid; gap: 14px; padding: 16px; }
 @media (min-width: 700px) { .sa-cards { grid-template-columns: 1fr 1fr; } }
@@ -94,3 +95,16 @@ p.sa-lbl { margin-top: 10px; }
 .cu-top { display: flex; justify-content: space-between; gap: 8px; font-size: 17px; }
 .cu-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .cu-chip { background: #f1f3f6; color: #4b5563; border-radius: 8px; padding: 4px 9px; font-size: 16px; }
+
+/* Joe 11/1: the Sales app's own Help, inside the app (never the Operations Help page). */
+.sa-helpview { padding: 8px 16px 16px; font-size: 17px; line-height: 1.5; color: #26323f; }
+.sa-helpread h2 { font-size: 22px; margin: 8px 0 10px; color: #0e138d; }
+.sa-helpread h3 { font-size: 19px; margin: 16px 0 6px; }
+.sa-helpread ol, .sa-helpread ul { padding-left: 22px; }
+.sa-helpread li { margin: 6px 0; }
+.sa-helpread a { color: #0e138d; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.sa-helpread .help-key { display: inline-block; padding: 0 6px; border: 1px solid #8892a0; border-radius: 5px; background: #fff; font-weight: 700; }
+.sa-helpread .help-tip { background: #e6f4ea; border-left: 6px solid #1e7d3a; padding: 8px 12px; border-radius: 6px; }
+.sa-helpread .help-dont { background: #fde7e5; border-left: 6px solid #b42318; padding: 8px 12px; border-radius: 6px; }
+.sa-helpmore { margin-top: 16px; }
+.sa-helpgo { display: block; width: 100%; text-align: left; margin: 8px 0; padding: 14px 16px; font: 700 18px Arial, sans-serif; color: #0e138d; background: #fff; border: 0; border-left: 8px solid #0e138d; border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, .15); cursor: pointer; }
