@@ -17,6 +17,8 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 
+// Joe 11/1 (mock-up 1): Administration's groups fold shut; press the item's red group bar first when its group is closed.
+const showItem = (pg, key) => pg.waitForSelector('.adm-item[data-key="' + key + '"]', { state: 'attached' }).then(() => pg.$eval('.adm-item[data-key="' + key + '"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); }));
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height } });
   await localCalls(page);
@@ -163,7 +165,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
-    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Schedules', 'Dispatch', 'Plant Setup', 'Connections & Keys', 'Fleet & GPS Setup', 'System Tools', 'Diagnostics']);
+    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Texts', 'Dispatch & Fleet', 'Plant Setup', 'Products & Machines', 'Plant Maintenance Setup', 'Checks & Repairs']);
     const all = await adm.$$eval('.adm-item', t => t.length);
     // Joe 10/12: Garage Station Codes added; Driver Station, Plant Station and Phone Screens moved from System Tools to Links & Codes.
     // Joe 10/12: Location Areas added under Plant Setup.
@@ -181,8 +183,9 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/31: Sales Route Email added under Email & Schedules.
     // Joe 10/31 (mock-up 1): Employees added under People & Access (everyone at the plant, brought over from UDMS).
     // Joe 10/31: Sales App added under Links & Codes (the salespeople's phone app link).
+    // Joe 11/1 (mock-up 1): regrouped into eight groups, nothing removed; the same 42 items.
     assert.equal(all, 42, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
-    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(h2:text-is("Dispatch")) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration']);
+    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Dispatch & Fleet"]) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration', 'Fleet Service Setup', 'GPS Setup']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -203,18 +206,19 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForTimeout(800);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-print-1920.png') });
     // Joe 10/10: every Administration item is built; none says Being built. Repair Email opens right there.
+    await showItem(adm, 'repair-email');
     await adm.click('.adm-item[data-key="repair-email"]');
     await adm.waitForSelector('#re-where input');
     assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
-    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes', 'Plant Managers App', 'Sales App']);
+    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Managers App', 'Sales App', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes']);
     await adm.fill('#find', '');
     await adm.fill('#find', 'Print Layouts');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in seven groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in eight groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');

@@ -1217,10 +1217,18 @@ Each plant's areas and sub-areas (pick the plant at the top right): whether each
 id: administration
 screens: administration.html
 
-Everything administrators set up, grouped down the left: People & Access, Links & Codes, Email & Schedules, Dispatch, Plant Setup, Keys & Connections, Tools and Repairs. Click an item to open it on the right. Type in **Find a setting** to find any item, including the ones that moved onto Dispatch Administration.
+Everything administrators set up, in a menu down the left. Each **red bar** is a group: People & Access, Links & Codes, Email & Texts, Dispatch & Fleet, Plant Setup, Products & Machines, Plant Maintenance Setup, and Checks & Repairs. The **blue** words under a bar are its items; the one that is open is solid blue. The number on a bar says how many items it holds.
 
+1. Press a red bar to open its group. The group that was open closes, so the menu fits on one screen.
+2. Press a blue item to open it on the right.
+3. Press the open red bar again to close it.
+4. Need more room? Press `« Hide menu`. The menu folds to a thin red strip and the item gets the whole width. Press `Show menu »` to bring it back. This computer remembers which way you left it.
+
+- Type in **Find a setting** to find any item. Every group with a match opens, including items that moved onto Dispatch Administration.
 - `Open full screen` opens the item on its own page.
 - Administration is for administrators only; the button in the top bar shows only to them.
+
+> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup and GPS Setup are under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
 

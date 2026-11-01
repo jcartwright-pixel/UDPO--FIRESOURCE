@@ -19,6 +19,8 @@ const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 
+// Joe 11/1 (mock-up 1): Administration's groups fold shut; press the item's red group bar first when its group is closed.
+const showItem = (pg, key) => pg.waitForSelector('.adm-item[data-key="' + key + '"]', { state: 'attached' }).then(() => pg.$eval('.adm-item[data-key="' + key + '"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); }));
 async function openPage(browser, width, height, url) {
   // The stations keep their screen on the tablet with a service worker (Joe 10/13); its fetches skip page.route, so the
   // Firebase code it asks gstatic.com for never arrives here. Blocked as in the other checks (station-offline.cjs tests it).
@@ -115,7 +117,7 @@ async function until(check, what) {
     await p.waitForFunction(() => /Yard lead added/.test(document.querySelector('#view .ap-msg').textContent));
     results.push('+ Add Person adds Pat Plant; + Add Role adds Yard Lead with its rights');
 
-    const open = async (key, ready) => { await p.click('.adm-item[data-key="' + key + '"]'); await p.waitForSelector(ready); await p.waitForTimeout(300); };
+    const open = async (key, ready) => { await showItem(p, key); await p.click('.adm-item[data-key="' + key + '"]'); await p.waitForSelector(ready); await p.waitForTimeout(300); };
     await open('role-templates', '#rt-body table');
     assert.ok((await p.$$eval('#rt-role option', o => o.map(x => x.value))).indexOf('YARD_LEAD') >= 0);
     assert.ok(await oneLine(p));
@@ -369,7 +371,7 @@ async function until(check, what) {
       await hi.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
       await hi.goto(HOSTING + '/administration.html' + ADMIN);
       for (const [key, ready, name] of [['repair-email', '#re-where input', 'repair-email'], ['refresh-rates', '#rr2-rows tr', 'refresh-rates'], ['checkin-email', '#ce-from', 'checkin-email']]) {
-        await hi.waitForSelector('.adm-item[data-key="' + key + '"]');
+        await showItem(hi, key);
         await hi.click('.adm-item[data-key="' + key + '"]');
         await hi.waitForSelector(ready);
         await hi.waitForTimeout(400);
