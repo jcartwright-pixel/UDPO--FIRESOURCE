@@ -82,6 +82,9 @@ async function uploadMenu(browser) {
   const errors = [];
   p.on('pageerror', e => errors.push(e.message));
   await p.goto(HOSTING + '/administration.html?testEmail=sales.admin@uniteddairy.com');
+  // The Administration menu's groups fold (#577): open the item's group first.
+  await p.waitForSelector('.adm-item[data-key="sales-app"]', { state: 'attached' });
+  await p.$eval('.adm-item[data-key="sales-app"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); });
   await p.click('.adm-item[data-key="sales-app"]');
   await p.waitForSelector('#sc-list tr');
   assert.match(await p.textContent('#sc-list'), /UniontownNot loaded/);
