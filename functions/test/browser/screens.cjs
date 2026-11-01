@@ -1318,7 +1318,7 @@ async function noScroll(page) {
     assert.deepEqual(await lp.$$eval('.sidemenu .side-sec-btn', b => b.map(x => x.getAttribute('title'))), ['Plant Operations', 'Route Distribution'], 'Home lists the two groups, not every screen');
     assert.deepEqual(await lp.$$eval('.sidemenu > a[data-side]', a => a.map(x => x.textContent.trim())), ['Plant Maintenance', 'Reports', 'Safety Walkthrough']);
     assert.deepEqual(await lp.$$eval('.side-flyouts .flyout', f => f.map(x => [...x.querySelectorAll('a[data-side]')].map(a => a.textContent.trim()).join(', '))),
-      ['Plant Distribution, Plant Production, Plant Vacations & Schedule, Shipping & Receiving, Debag / Labeling Room', 'Route Distribution, Fleet & Maintenance, Garage']);
+      ['Plant Distribution, Plant Production, Plant Vacations & Schedule, Shipping & Receiving, Debag / Labeling Room', 'Route Distribution, Customer List, Fleet & Maintenance, Garage']);
     if (SHOTS) await lp.screenshot({ path: path.join(SHOTS, 'home-launcher-1920.png') });
     // Joe 10/10: the Plant Distribution picture opens Manager Center; the Plant side shows its sections (Manager Center's cards)
     // with fly-outs, and Back from a plant screen goes up to Manager Center.
