@@ -713,6 +713,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-routes span b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-routes span small { font-size: 16px; font-weight: 600; }
 .manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
+.manager-page .mc-routes .ok i { color: #b42318; }
 @media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; }}
 @media (max-width: 760px) {
   .manager-page .head .badge-test span { display: none; }
