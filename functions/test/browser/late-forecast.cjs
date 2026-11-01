@@ -100,7 +100,8 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(sent.late, 1, 'the report counts the same one late load as the tile');
     assert.equal(sent.allDoneWhen, tileDone, 'the report has the tile\'s all-done time');
     assert.deepEqual(sent.loads.filter(x => x.late).map(x => String(x.route).split('_')[0]), ['6301']);
-    assert.match(await mc.textContent('#rp-body'), new RegExp('All loads done\\s*est\\. ' + tileDone));
+    // Joe 11/1: the window names the load that will miss its truck; here it is the last one, so its time is the tile's all-done time.
+    assert.match(await mc.textContent('#rp-body'), new RegExp('Will miss its truck: 6301[\\s\\S]*?est\\. loaded ' + tileDone));
     assert.deepEqual(mc.errors, []);
 
     await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.dp-line[href="forecast.html"]')]);
