@@ -16,7 +16,7 @@
   <script src="js/logic.js"></script>
 </head>
 <!-- Joe 10/31 (mock-up 2d): a phone app just for sales. It opens on two cards (Joe 11/1). Where the routes are: the map stays
-     on top; under it every route of the division (Route, Driver, Status, Where now) scrolls. Tap a route and the map moves to
+     on top; under it every route of the division scrolls, two lines each (Joe 11/1, mock-up 3): Route and Status, then Driver · Where now. Tap a route and the map moves to
      that truck. Customers by route: the customers on a route for a day, or every day a customer gets a delivery. Any United Dairy account may use it; it
      only reads. The division drop-down picks Uniontown, Charleston or Martins Ferry (the plants that are running). -->
 <body class="sales-page">
@@ -48,7 +48,7 @@
           </div>
           <p class="sa-map-where" id="sa-map-where"></p>
         </div>
-        <div class="sa-cols" aria-hidden="true"><span>Route</span><span>Driver</span><span>Status</span><span>Where now</span></div>
+        <div class="sa-cols" aria-hidden="true"><div class="sa-l1"><span class="sa-route">Route</span><span>Status</span></div><div class="sa-l2">Driver &middot; Where now</div></div>
       </div>
     </div>
 

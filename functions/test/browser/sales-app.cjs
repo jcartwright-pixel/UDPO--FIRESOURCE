@@ -2,7 +2,7 @@
 /*
  * Joe 10/31 (mock-up 2d): the Sales app (sales.html). Any United Dairy account opens it, even one not on the Users list. The map
  * stays on top; the routes scroll under it (Route, Driver, Status, Where now); a tap moves the map to that truck. A place marked
- * in Fleet shows by its name. Pictures at 390, 768 and 1024 go to SHOTS_DIR.
+ * in Fleet shows by its name. Pictures at 390, 768, 1024 and 1536 go to SHOTS_DIR.
  * Joe 11/1 (mock-ups 1-5): the app opens on two cards; Customers by route lists a route's customers for a day, every day and
  * route of a customer, and a group's customers (Dairy Queen). The list is loaded on Administration > Sales App from the Route
  * Menu workbook (its Customer By Route tab); a group can be renamed there. Made-up customers only.
@@ -82,6 +82,9 @@ async function uploadMenu(browser) {
   const errors = [];
   p.on('pageerror', e => errors.push(e.message));
   await p.goto(HOSTING + '/administration.html?testEmail=sales.admin@uniteddairy.com');
+  // The Administration menu's groups fold (#577): open the item's group first.
+  await p.waitForSelector('.adm-item[data-key="sales-app"]', { state: 'attached' });
+  await p.$eval('.adm-item[data-key="sales-app"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); });
   await p.click('.adm-item[data-key="sales-app"]');
   await p.waitForSelector('#sc-list tr');
   assert.match(await p.textContent('#sc-list'), /UniontownNot loaded/);
@@ -129,10 +132,15 @@ async function uploadMenu(browser) {
   };
   add('sa802', '802', L.addDays(today, -1), { dispatchTime: 210, driver: 'Sam Porter', trailer: 'T-801', truck: '701', completeTime: L.addDays(today, -1) + 'T23:00:00-04:00' });
   add('sa811', '811', L.addDays(today, -1), { dispatchTime: 270, driver: 'Dana Whitfield', trailer: 'T-802', truck: '702', completeTime: L.addDays(today, -1) + 'T23:30:00-04:00' });
+  // Joe 11/1 (mock-up 3): a name typed in capitals, the GPS's "US|zip|road [route]" address, and a place too long for one line.
+  add('sa812', '812', L.addDays(today, -1), { dispatchTime: 300, driver: 'PRATT JR, MICHAEL', trailer: 'T-803', truck: '703', completeTime: L.addDays(today, -1) + 'T23:40:00-04:00' });
+  add('sa813', '813', L.addDays(today, -1), { dispatchTime: 330, driver: 'Ortiz, Samuel', trailer: 'T-804', truck: '704', completeTime: L.addDays(today, -1) + 'T23:50:00-04:00' });
   add('sa815', '815', today, { dispatchTime: 1400, driver: 'Tina Moss', trailer: 'T-805', truck: '705' });
   add('sa820', '820', today, { runs: false, dispatchTime: 1300, driver: 'Nobody Running' });
   b.set(db().collection('gpsTrucks').doc('T-801'), { tag: 'T-801', unitId: 'U801', lat: 40.69, lon: -80.1, address: 'I-79 N, Cranberry, PA', place: '', speedMph: 61, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('702'), { tag: '702', unitId: 'U702', lat: 39.63, lon: -79.95, address: '100 Mall Rd, Morgantown, WV', place: 'Walmart 2291', speedMph: 0, lastReport: now });
+  b.set(db().collection('gpsTrucks').doc('T-803'), { tag: 'T-803', unitId: 'U803', lat: 39.7, lon: -78.9, address: 'US|21795|Mary Rd [MD-63]', place: '', speedMph: 0, lastReport: now });
+  b.set(db().collection('gpsTrucks').doc('T-804'), { tag: 'T-804', unitId: 'U804', lat: 39.65, lon: -78.76, address: 'I-68 E near Cumberland, Allegany County, Maryland 21502', place: '', speedMph: 58, lastReport: now });
   b.set(db().collection('gpsTrucks').doc('705'), { tag: '705', unitId: 'U705', lat: 39.9, lon: -79.72, address: '', place: 'Uniontown Plant', speedMph: 0, lastReport: now });
   // When they left: 802's trailer trip (its GPS saw it leave), 811's truck (its trailer has no GPS unit).
   const left = (h, m) => new Date(Date.parse(today + 'T0' + h + ':' + m + ':00-04:00')).toISOString();
@@ -143,7 +151,7 @@ async function uploadMenu(browser) {
   const browser = await chromium.launch();
   try {
     await uploadMenu(browser);
-    for (const w of [390, 768, 1024]) {
+    for (const w of [390, 768, 1024, 1536]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, isMobile: w < 700, hasTouch: true, serviceWorkers: 'block' });
       await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));
       // No outside network in the test: the map is a plain stand-in page.
@@ -166,8 +174,17 @@ async function uploadMenu(browser) {
       assert.equal(await pg.textContent('#sa-title'), 'Route Status');
       assert.match(pg.url(), /sales\.html\?view=routes/);
       assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Today', 'Loaded']);
-      const rows = await pg.$$eval('.sa-row', x => x.map(r => [...r.children].map(c => c.textContent.trim())));
-      assert.deepEqual(rows.map(r => [r[0], r[1], r[3]]), [['815', 'Tina Moss', 'At the plant'], ['802', 'Sam Porter', 'On the road near I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291']], '820 (Ended Up Not Running) left off');
+      const rows = await pg.$$eval('.sa-row', x => x.map(r => ['.sa-route', '.sa-driver', '.sa-where'].map(c => r.querySelector(c).textContent.trim())));
+      assert.deepEqual(rows, [['815', 'Tina Moss', 'At the plant'], ['802', 'Sam Porter', 'On the road: I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291'],
+        ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502']], '820 (Ended Up Not Running) left off');
+      assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^Left \d{1,2}:\d{2} [AP]M, (\d+h )?\d+m late$/, 'the status short: 1h 12m, not 1 hr 12 min');
+      // Joe 11/1 (mock-up 3): every route is exactly two lines: route and status, then driver · where now, never wrapped.
+      const lines = await pg.$$eval('.sa-row', x => x.map(r => {
+        const one = r.querySelector('.sa-l1'), two = r.querySelector('.sa-l2'), lh = (e) => parseFloat(getComputedStyle(e).fontSize) * 1.6;
+        return { one: one.getBoundingClientRect().height <= lh(one) + 8, two: two.getBoundingClientRect().height <= lh(two), under: Math.abs(two.getBoundingClientRect().left - r.querySelector('.sa-route').getBoundingClientRect().left) < 2 };
+      }));
+      assert.ok(lines.every(l => l.one && l.two && l.under), 'two lines a route, the driver under the route number: ' + JSON.stringify(lines));
+      assert.equal(await pg.textContent('.sa-cols'), 'RouteStatusDriver · Where now');
       assert.equal(await pg.$eval('#sa-division', s => s.options[s.selectedIndex].text), 'Uniontown');
       assert.match(await pg.textContent('#sa-refreshed'), /^\d{1,2}:\d{2} [AP]M$/);
       assert.ok(await pg.isHidden('#sa-map'), 'no map until a route is tapped');
@@ -182,6 +199,10 @@ async function uploadMenu(browser) {
       assert.ok(top >= 0 && top < 200, 'the map stays on top: ' + top);
       await pg.click('text=Sam Porter');
       assert.match(await pg.getAttribute('#sa-map', 'src'), /q=40\.69,-80\.1/);
+      // A place too long for its line ends in "…" on the phone; tapped, the whole place is under the map.
+      if (w === 390) assert.ok(await pg.$eval('.sa-row[data-id*="sa813"] .sa-l2', e => e.scrollWidth > e.clientWidth && getComputedStyle(e).textOverflow === 'ellipsis'), 'the long place is cut with …');
+      await pg.click('text=Ortiz, Samuel');
+      assert.equal(await pg.textContent('#sa-map-where'), 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502');
       // Text at least 16px; nothing wider than the phone.
       const small = await pg.$$eval('.sa-row *, .sa-cols *, .sa-sub *, .sa-map *', x => x.filter(e => e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.textContent.trim()));
       assert.deepEqual(small, []);
@@ -195,6 +216,10 @@ async function uploadMenu(browser) {
         await pg.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await pg.click('text=Sam Porter');
         await pg.screenshot({ path: path.join(SHOTS, 'sales-' + w + '-scrolled-tapped-802.png') });
+        // Joe 11/1 (mock-up 3): a place cut off with "…" shows whole under the map once the route is tapped.
+        await pg.click('text=Pratt Jr, Michael');
+        await pg.evaluate(() => window.scrollTo(0, 0));
+        await pg.screenshot({ path: path.join(SHOTS, 'sales-' + w + '-tapped-812.png') });
       }
       // Back comes to the cards.
       await pg.click('#sa-back');
