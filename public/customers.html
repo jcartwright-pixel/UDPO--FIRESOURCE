@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Customer List · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/udcl.css">
+  <script src="js/logic.js"></script>
+  <script src="js/udcl-rules.js"></script>
+</head>
+<!-- Joe 11/1: the United Dairy Customer List (UDCL), the one customer list every app reads. See it by customer, by route or by
+     day, sort and filter it, change a customer, and print any of it from the Print menu. -->
+<body class="fill udcl-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Customer List</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">United Dairy Customer List · <span id="plant-name"></span></span><h1>Customers</h1></div>
+      <div class="tabs" role="tablist" id="views">
+        <button type="button" role="tab" data-view="customer" aria-selected="true">By Customer</button>
+        <button type="button" role="tab" data-view="route" aria-selected="false">By Route</button>
+        <button type="button" role="tab" data-view="day" aria-selected="false">By Day</button>
+      </div>
+      <div class="actions in-head">
+        <button type="button" id="add" hidden>+ Add Customer</button>
+        <button type="button" id="import" hidden>Import Route Menu</button>
+        <span id="udcl-print-menu"></span>
+      </div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="udcl-bar">
+        <div class="field"><label for="q">Find</label><input type="search" id="q" placeholder="Name, account, city, chain"></div>
+        <div class="field"><label for="route">Route</label><select id="route"><option value="">All routes</option></select></div>
+        <div class="field"><label for="day">Day</label><select id="day"><option value="">All days</option></select></div>
+        <div class="field"><label for="chain">Chain</label><select id="chain"><option value="">All chains</option></select></div>
+        <div class="field"><label for="sort">Sort by</label><select id="sort">
+          <option value="">This view's order</option><option value="customer">Customer name</option><option value="route">Route, day, stop</option>
+          <option value="day">Day, route, stop</option><option value="account">Account</option><option value="city">City</option><option value="chain">Chain</option>
+        </select></div>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="scroll-list">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="rows"><tr><td class="empty">Reading the customer list&hellip;</td></tr></tbody>
+        </table>
+      </div>
+      <div class="footer"><span id="imported"></span></div>
+    </div>
+  </div>
+
+  <script type="module">import './js/app.js'; import './js/udcl-customers.js';</script>
+</body>
+</html>

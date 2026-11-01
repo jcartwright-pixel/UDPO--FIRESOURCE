@@ -263,6 +263,9 @@ async function phoneCall(db, input, now) {
     return { date, rows, remaining: rows.filter(r => r.state !== 'LOADED').length, at: stamp };
   }
   if (op === 'schedule') return mySchedule(db, input, stamp);
+  // Joe 11/1: the route book on the phone: one route day's stops in run order and its instructions, from the United Dairy
+  // Customer List (udcl.js, kept in the company's database), so the driver knows the order to run and what to do at each stop.
+  if (op === 'routeBook') { const P = require('./plants'); return require('./udcl').routeBook(P.companyDb(db), P.plantOf(input), input.route, input.day); }
   const who = await whoFor(db, input.driverId);
   const dates = allowedDates(stamp);
   if (op === 'loads') {

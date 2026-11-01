@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Route Sequence · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/udcl.css">
+  <script src="js/logic.js"></script>
+  <script src="js/udcl-rules.js"></script>
+</head>
+<!-- Joe 11/1: "be able to sequence the routes whenever I want to change it ... change it and then print it so the office can have
+     it." One route on one day: drag the stops into the order the driver runs them, set each stop's load sequence, the start time
+     and the instructions, then print it from the Print menu. -->
+<body class="fill udcl-page">
+  <div class="signin" id="signin" hidden>
+    <h1>Route Sequence</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">United Dairy Customer List · <span id="plant-name"></span></span><h1>Route Sequence</h1></div>
+      <div class="field"><label for="route">Route</label><select id="route"></select></div>
+      <div class="field"><label>Day</label><div class="seq-days" id="days"></div></div>
+      <div class="actions in-head"><span id="udcl-print-menu"></span></div>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="seq-wrap">
+        <div class="scroll-list">
+          <table>
+            <thead><tr><th style="width:7%">Stop</th><th style="width:9%">Load</th><th style="width:10%">Account</th><th class="l" style="width:30%">Customer</th><th class="l">Stop note</th><th style="width:15%"></th></tr></thead>
+            <tbody id="rows"><tr><td colspan="6" class="empty">Reading the customer list&hellip;</td></tr></tbody>
+          </table>
+        </div>
+        <div class="seq-side">
+          <div class="box"><h3>Start time</h3><input id="start" placeholder="4:00 AM"></div>
+          <div class="box"><h3>Instructions for this route day</h3><textarea id="notes" placeholder="What the driver needs to know: who to call, where to drop, empties and credits"></textarea></div>
+          <div class="box" id="add-box" hidden><h3>Add a stop</h3><select id="add-pick"></select></div>
+          <div class="box"><h3>Truck load map</h3><div id="map"></div><p><a id="map-link" href="load-map.html">Change the load map &rarr;</a></p></div>
+          <div class="box"><small id="changed"></small></div>
+        </div>
+      </div>
+      <div class="footer"><span id="hint"></span></div>
+    </div>
+  </div>
+
+  <script type="module">import './js/app.js'; import './js/udcl-sequence.js';</script>
+</body>
+</html>

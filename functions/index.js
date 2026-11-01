@@ -35,6 +35,9 @@
  *   productionEveryMinute the sandbox test feed's pretend jugs, and a stop when a label reader line goes quiet
  *   employeesEvery15Minutes  Joe 10/31: each plant's Employees list from UDMS (name, employee ID, position, hire date, phone only;
  *                         src/employees.js); the schedules' people and drivers with the same employee ID follow it
+ *   customers             Joe 11/1: the United Dairy Customer List (UDCL; src/udcl.js): customers, route days in run order, load
+ *                         maps; read by anyone who may work at the plant, changed by an Administrator or Manager, imported by an
+ *                         Administrator. Kept in the company's database for every plant.
  *   usersToPlants         Joe 10/26 (the plants are completely separate): each plant's database gets a copy of only the people
  *                         given that plant (src/plants.js), so no one else can read it
  *
@@ -165,7 +168,7 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   exports.usersToPlants = onDocumentWritten({ document: 'users/{email}', timeoutSeconds: 60 }, (event) => mirrorOne(event.params.email));
 }
 
-const asHttps = (error) => (error instanceof PLANTS.PlantError || error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof SMS.SmsError || error instanceof MocreoError || error instanceof RedzoneError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
+const asHttps = (error) => (error instanceof PLANTS.PlantError || error instanceof SaveError || error instanceof SwitchError || error instanceof GpsError || error instanceof SMS.SmsError || error instanceof MocreoError || error instanceof RedzoneError || error instanceof AdminError || error instanceof StationError || error instanceof READER.ReaderError || error instanceof require('./src/udcl').UdclError ? new HttpsError(CODE[error.code] || 'failed-precondition', error.message, error.details || undefined) : error);
 
 // The plant's own database for a call from a screen (src/plants.js): refused unless the caller may work at that plant.
 async function plantDb(request, who) {
@@ -227,6 +230,16 @@ exports.sales = onCall({ maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' }
   if (!unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with your United Dairy account.');
   const divisions = PLANTS.activePlants().filter(plantReady).map(p => ({ id: p.id, name: p.name }));
   try { return await require('./src/salesapp').salesCall(divisions, (id) => PLANTS.dbFor(id, db), request.data || {}, { rootDb: db }); } catch (error) { throw asHttps(error); }
+});
+
+// Joe 11/1: the United Dairy Customer List (src/udcl.js). The list is kept in the company's database (this one) for every plant;
+// the call names its plant (udPlant) and is refused unless the caller may work there.
+exports.customers = onCall({ maxInstances: 5, timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+  const user = signedIn(request);
+  try {
+    const plant = await PLANTS.callPlant(db, request.data || {}, user);
+    return await require('./src/udcl').udclCall(db, user, plant, request.data || {});
+  } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {

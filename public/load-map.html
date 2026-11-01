@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <title>Truck Load Map · Operations</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/udcl.css">
+  <script src="js/logic.js"></script>
+  <script src="js/udcl-rules.js"></script>
+  <script>if (new URLSearchParams(location.search).get('kiosk') === '1') document.documentElement.classList.add('kiosk-mode');</script>
+</head>
+<!-- Joe 11/1: "I want to have route maps. Basically a map of how I want the truck loaded" and "This also needs a module to go to the
+     plant kiosk station ... a diagram of how to load the truck. On one side, and then the other side will be a list of the
+     customers." The truck seen from above on the left (front at the top), the route day's customers on the right.
+     ?kiosk=1 is the plant's kiosk: big route buttons for the day, nothing to type, and it refreshes by itself. -->
+<body class="fill udcl-page">
+  <script>if (document.documentElement.classList.contains('kiosk-mode')) document.body.classList.add('udcl-kiosk');</script>
+  <div class="signin" id="signin" hidden>
+    <h1>Truck Load Map</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="head">
+      <div class="title"><span class="eyebrow">United Dairy Customer List · <span id="plant-name"></span></span><h1 id="title">Truck Load Map</h1></div>
+      <div class="field" id="route-field"><label for="route">Route</label><select id="route"></select></div>
+      <div class="field"><label>Day</label><div class="seq-days" id="days"></div></div>
+      <div class="actions in-head"><button type="button" id="full" hidden>Full screen</button><span id="udcl-print-menu"></span></div>
+    </div>
+    <div class="kiosk-routes" id="kiosk-routes" hidden></div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="view">
+      <div class="lm-wrap">
+        <div class="lm-left">
+          <div id="truck"></div>
+          <div id="editor" hidden>
+            <div class="lm-brush" id="brush" aria-label="Load sequence to paint"></div>
+            <div class="lm-tools">
+              <button type="button" id="row-add">+ Row</button><button type="button" id="row-cut">&minus; Row</button>
+              <select id="door" aria-label="Side door"></select>
+              <button type="button" id="rebuild">Rebuild from load sequence</button>
+            </div>
+          </div>
+        </div>
+        <div class="lm-right scroll-list">
+          <table>
+            <thead><tr><th style="width:12%">Stop</th><th style="width:12%">Load</th><th class="l">Customer</th><th class="l" style="width:34%">Note</th></tr></thead>
+            <tbody id="rows"><tr><td colspan="4" class="empty">Reading the customer list&hellip;</td></tr></tbody>
+          </table>
+          <div class="notes-box" id="notes"></div>
+        </div>
+      </div>
+      <div class="footer"><span id="hint"></span></div>
+    </div>
+  </div>
+
+  <script type="module">import './js/app.js'; import './js/udcl-loadmap.js';</script>
+</body>
+</html>

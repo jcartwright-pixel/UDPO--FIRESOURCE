@@ -1498,6 +1498,9 @@
       ['conflicts', 'Sheet Conflicts', ['conflicts.html']], ['scorecard', 'Driver Scorecard', ['scorecard.html']], ['otr', 'Over the Road', ['otr.html']],
       ['trucksToday', 'Trucks Today', ['trucks.html']], ['gpsSetup', 'GPS Setup', ['gps.html']], ['dispatchAdmin', 'Dispatch Administration', ['admin.html']],
       ['ops', 'Operational Assignments', ['ops.html']], ['printLayouts', 'Print Layouts', ['print.html']], ['dispatchSettings', 'Dispatch Settings', ['settings.html']]] },
+    // Joe 11/1: the United Dairy Customer List (UDCL), its own card under Route Distribution.
+    { key: 'customers', name: 'Customer List', home: 'customers.html', screens: [
+      ['udclCustomers', 'Customers', ['customers.html']], ['udclSequence', 'Route Sequence', ['route-sequence.html']], ['udclLoadMap', 'Truck Load Map and Load Map Kiosk', ['load-map.html']]] },
     { key: 'fleet', name: 'Fleet & Maintenance', home: 'maint.html', screens: [
       ['equipment', 'Equipment', ['equipment.html']], ['issues', 'Truck, Trailer and Fork Truck Issues', ['issues.html']], ['fleetService', 'Fleet Service', ['fleet.html']]] },
     // Joe 10/26 (1E): the Garage is its own department under Route Distribution (same screen keys as when it sat on Fleet & Maintenance).

@@ -135,7 +135,11 @@ async function adminRename(db, plants, email, input, stamp) {
 
 /** For the Sales app: the division's lines, sorted by name, then day of the week, each with its group's name. */
 async function forSales(db, plant) {
-  const l = await readList(db, plant);
+  // Joe 11/1: the United Dairy Customer List is the one customer list. Once a plant has one there, the Sales app reads its lines
+  // from it (udcl.js); the list uploaded here stays only for a plant with none, and its group names are kept either way.
+  const udcl = await require('./udcl').salesRows(db, plant);
+  const l0 = await readList(db, plant);
+  const l = udcl ? { rows: udcl.rows, savedAt: udcl.savedAt, groupNames: (l0 && l0.groupNames) || {} } : l0;
   if (!l) return { rows: [], savedAt: '' };
   const names = {};
   groupsOf(l.rows, l.groupNames).forEach(g => { names[g.key] = g.name; });
