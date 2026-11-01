@@ -350,11 +350,18 @@
     return out;
   }
 
-  var CUSTOMER_FIELDS = ['name', 'chain', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
+  // Joe 11/1: every place has a distribution center code (DC). A customer belongs to one; a plant's own customers start with its code.
+  var DCS = [{ code: '1', name: 'Martins Ferry' }, { code: '6', name: 'Lancaster' }, { code: '7', name: 'Fairmont' }, { code: '9', name: 'Marietta' }, { code: '30', name: 'Uniontown' }, { code: '50', name: 'Charleston' }];
+  var PLANT_DC = { fac_martins_ferry: '1', fac_uniontown: '30', fac_charleston: '50' };
+  /** The DC code when it is one of ours ('030' and 30 are '30'), else ''. */
+  function dcOf(v) { var t = numText(v, 4).replace(/^0+(?=\d)/, ''); return DCS.some(function (d) { return d.code === t; }) ? t : ''; }
+  /** "30 Uniontown" for a DC code, '' when it has none. */
+  function dcName(v) { var t = dcOf(v), d = DCS.filter(function (x) { return x.code === t; })[0]; return d ? d.code + ' ' + d.name : ''; }
+  var CUSTOMER_FIELDS = ['name', 'chain', 'dc', 'address', 'address2', 'city', 'state', 'zip', 'phone', 'contact', 'keys', 'notes'];
   function cleanCustomer(c) {
     var out = {};
     CUSTOMER_FIELDS.forEach(function (k) {
-      if (c && c[k] !== undefined) out[k] = k === 'notes' ? String(c[k] || '').trim().slice(0, LIMITS.notes) : (k === 'chain' || k === 'zip' ? numText(c[k], LIMITS[k]) : text(c[k], LIMITS[k === 'address2' ? 'address' : k]));
+      if (c && c[k] !== undefined) out[k] = k === 'notes' ? String(c[k] || '').trim().slice(0, LIMITS.notes) : k === 'dc' ? dcOf(c[k]) : (k === 'chain' || k === 'zip' ? numText(c[k], LIMITS[k]) : text(c[k], LIMITS[k === 'address2' ? 'address' : k]));
     });
     if (out.state) out.state = out.state.toUpperCase();
     if (c && c.lat !== undefined) { var la = Number(c.lat); out.lat = isFinite(la) && la ? la : null; }
@@ -371,7 +378,7 @@
   }
 
   return { DAYS: DAYS, DAY_NAMES: DAY_NAMES, SPOTS: SPOTS, MAP_ROWS: MAP_ROWS, MAX_ROWS: MAX_ROWS, MAX_STOPS: MAX_STOPS, MAX_LINES: MAX_LINES, LIMITS: LIMITS,
-    CUSTOMER_FIELDS: CUSTOMER_FIELDS, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
+    CUSTOMER_FIELDS: CUSTOMER_FIELDS, DCS: DCS, PLANT_DC: PLANT_DC, dcOf: dcOf, dcName: dcName, text: text, numText: numText, dayOf: dayOf, dayFromName: dayFromName, seqOf: seqOf, custKey: custKey, nameKey: nameKey,
     routeDayId: routeDayId, customerId: customerId, byRoute: byRoute, dayIndex: dayIndex,
     menuStops: menuStops, addressList: addressList, gpsAddresses: gpsAddresses, bookSheet: bookSheet, routeBook: routeBook,
     runOrder: runOrder, seqsOf: seqsOf, autoMap: autoMap, bookMap: bookMap, cleanMap: cleanMap, packMap: packMap, mapCounts: mapCounts,

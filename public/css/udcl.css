@@ -27,12 +27,12 @@
 .udcl-panel header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: var(--ud-blue); color: #fff; }
 .udcl-panel header h2 { margin: 0; font-size: 20px; flex: 1; }
 .udcl-panel header button { background: #fff; color: var(--ud-blue); border: 0; border-radius: 6px; padding: 6px 12px; font: inherit; font-weight: 700; cursor: pointer; }
-.udcl-panel .body { padding: 14px 16px; overflow: auto; flex: 1; display: grid; gap: 10px; align-content: start; }
-.udcl-panel label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
-.udcl-panel input, .udcl-panel textarea, .udcl-panel select { font: inherit; font-weight: 600; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.udcl-panel .body { padding: 14px 16px; overflow: auto; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
+.udcl-panel label { display: grid; gap: 4px; min-width: 0; font-size: 14px; color: var(--muted); }
+.udcl-panel input, .udcl-panel textarea, .udcl-panel select { font: inherit; font-weight: 600; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; box-sizing: border-box; }
 .udcl-panel textarea { min-height: 90px; resize: vertical; }
-.udcl-panel .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.udcl-panel .three { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+.udcl-panel .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.udcl-panel .three { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .udcl-panel .msg { padding: 8px 10px; border-radius: 8px; background: var(--band); }
 .udcl-panel .msg.bad { background: var(--error-bg); color: var(--error-ink); }
 .udcl-panel .msg.good { background: var(--runs-bg); color: var(--runs-ink); }

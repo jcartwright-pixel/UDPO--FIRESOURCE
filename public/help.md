@@ -1468,8 +1468,8 @@ screens: customers.html
 The **United Dairy Customer List** (UDCL): the one list of every customer, the routes and days they get a delivery, and in what order. The Sales app and the drivers' route book read it from here. Each plant keeps its own list (Uniontown first).
 
 1. Pick a tab: `By Customer` (one line per customer, with its days and every route and stop), `By Route` (each route and day with its stops in order) or `By Day` (each day with its routes).
-2. Narrow it with **Find** (part of a name, account number, city or chain), **Route**, **Day** and **Chain**. **Sort by** changes the order.
-3. Tap a line to open the customer's card: address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
+2. Narrow it with **Find** (part of a name, account number, city, chain or distribution center), **Route**, **Day** and **Chain**. **Sort by** changes the order.
+3. Tap a line to open the customer's card: **Distribution center**, address, phone, contact, **Keys or door code** and **Notes for the driver**. An Administrator or Manager can change them; each box saves when you leave it.
 4. In `By Route` and `By Day`, `Open in Route Sequence` on a route's heading opens that route day to change its order.
 
 ### Buttons
@@ -1479,6 +1479,8 @@ The **United Dairy Customer List** (UDCL): the one list of every customer, the r
 - `Print` opens the print menu: this list as shown, the route sequence sheets for the office, the drivers' route book pages, the list by route or by day, or the customers' addresses and phones.
 
 > An import keeps what was typed here: run order, start times, instructions, load maps, addresses, phones, keys and notes. Run it again whenever the Route Menu changes.
+
+> The **DC** column is the customer's distribution center code: 1 Martins Ferry, 6 Lancaster, 7 Fairmont, 9 Marietta, 30 Uniontown, 50 Charleston. A plant's own customers start with its code; change it on the card when a customer belongs to another center.
 
 > **No address yet** in red means the Route Menu had no address for that account. Type it on the customer's card.
 

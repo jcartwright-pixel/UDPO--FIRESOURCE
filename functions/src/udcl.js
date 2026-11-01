@@ -120,7 +120,7 @@ async function saveCustomer(db, plant, email, input, stamp) {
     if (input.add && before) fail('BAD_REQUEST', 'Account ' + key + ' is already on the list (' + before.name + ').');
     if (!input.add && !before) fail('NOT_FOUND', 'That customer is not on the list any more. Reload the page.');
     if (fields.name === '') fail('BAD_REQUEST', 'A customer needs a name.');
-    const after = Object.assign({ plant, key, account: '', name: '', chain: '', address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true },
+    const after = Object.assign({ plant, key, account: '', name: '', chain: '', dc: U.PLANT_DC[plant] || '', address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null, active: true },
       before || {}, fields, { updatedAt: stamp, updatedBy: email });
     tx.set(ref, after);
     logEntry(db, tx, 'customer', plant, ref, before, after, email, stamp);
@@ -158,6 +158,7 @@ async function importMenu(db, plant, email, input, stamp) {
     const a = (x.account && addresses[x.account]) || {}, g = gps[U.nameKey(x.name)] || {};
     const after = Object.assign({ plant, key, account: x.account, name: x.name, chain: x.chain, address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null }, before || {});
     after.name = x.name; after.chain = x.chain; after.account = x.account; after.active = true;
+    if (!after.dc) after.dc = U.PLANT_DC[plant] || '';
     const fill = (k, v) => { if (v !== undefined && v !== null && v !== '' && (after[k] === '' || after[k] === null || after[k] === undefined)) { after[k] = v; return 1; } return 0; };
     const got = U.cleanCustomer({ address: a.address || g.address, address2: a.address2, city: a.city || g.city, state: a.state || g.state, zip: a.zip, keys: keysFrom[key], lat: g.lat, lon: g.lon });
     let n = 0;

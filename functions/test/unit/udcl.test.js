@@ -154,6 +154,17 @@ test('an import makes the customers and route days; the Route Book fills only wh
   assert.equal(tue.map.rows, 12);
   assert.ok([...db.docs.values()].every(d => !d.map || d.map.cells.every(r => typeof r === 'string')), 'no list inside a list is saved');
   assert.equal(v.imported.fileName, 'menu.xlsb');
+  assert.equal(v.customers['5001'].dc, U.PLANT_DC[PLANT], 'a plant\'s customers start with its distribution center code');
+});
+
+test('distribution center codes: only ours are kept, written the one way', () => {
+  assert.equal(U.dcOf('030'), '30');
+  assert.equal(U.dcOf(50), '50');
+  assert.equal(U.dcOf('8'), '');
+  assert.equal(U.dcName('1'), '1 Martins Ferry');
+  assert.equal(U.dcName(''), '');
+  assert.deepEqual(U.cleanCustomer({ dc: '7', name: 'X' }), { name: 'X', dc: '7' });
+  assert.equal(U.PLANT_DC.fac_uniontown, '30');
 });
 
 test('only an Administrator or Manager changes the order, the rev stops two people saving over each other, and the import keeps it', async () => {
