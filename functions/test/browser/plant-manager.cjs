@@ -105,7 +105,8 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       const page = await openPage(browser, w, h, '/manager.html' + MANAGER);
       await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
       const behind = seed.behind;
-      assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
+      // Joe 11/1: 502 is past its depart time and not loaded, so its truck should have left: the subject says late.
+      assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? late$'));
       // Joe 10/26: four department cards, two by two (Today, Waiting, Loading, Done), each opening its own screen.
       assert.deepEqual(await page.$$eval('[data-card="dept"] .dp-card', d => d.map(x => x.querySelector('strong').textContent + ' ' + x.dataset.href)),
         ['Case Loading loadout.html?area=CASE', 'Tote Loading loadout.html?area=TOTES', 'Box Loading loadout.html?area=BOXING', 'Case Unloading unloading.html']);
