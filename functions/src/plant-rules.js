@@ -1053,7 +1053,7 @@
     (input.loads || []).forEach(function (r) {
       if (!areas[r.area]) return;
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
-      var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
+      var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
       areas[r.area].total++; out.total++;
       if (r.state === 'DONE') { out.loaded.push(item); return; }
@@ -1093,7 +1093,8 @@
       areas: REPORT_AREAS.map(function (a) { return areas[a]; }).filter(function (a) { return a.total > 0; }), down: down, fixed: shift.fixed, handoff: shift.handoff, others: shift.others, pickups: pickups, lines: lines, temperatures: temps,
       output: lineOutput(input.output), outputShift: text(input.outputShift), forecast: input.forecast || null };
     r.counts = { behind: r.behind.length, leftToLoad: r.leftToLoad, pickups: pickups.length, down: down.length, linesDown: lines.filter(function (l) { return l.flag; }).length, tempsOut: temps.filter(function (t) { return t.flag; }).length };
-    r.subject = 'Plant Update ' + r.timeLabel + ': ' + (r.behind.length ? r.behind.length + ' route' + (r.behind.length === 1 ? '' : 's') + ' behind' : 'All routes on time');
+    var tcr = truckCheck(r), lateNow = tcr.lateNow.length, leftOver = tcr.leftOver;
+    r.subject = 'Plant Update ' + r.timeLabel + ': ' + (lateNow ? lateNow + ' route' + (lateNow === 1 ? '' : 's') + ' late' : leftOver ? leftOver + ' route' + (leftOver === 1 ? '' : 's') + ' behind' : 'All routes on time');
     r.smooth = !r.counts.behind && !r.counts.down && !r.counts.linesDown && !r.counts.tempsOut;
     r.text = reportText(r);
     return r;
@@ -1287,6 +1288,40 @@
     return (f.loads || []).filter(function (x) { return x.late; }).map(function (x) { return routeNumber(x.route) + (shortRun(x) ? ' ' + shortRun(x) : '') + ' est. ' + x.estText + (x.reason === 'misses dispatch' ? ', leaves ' + x.depart : ', past the 6:00 AM shift end'); });
   }
 
+  // Joe 11/1 ("the whole plant is not 11 hours behind… will all the trucks be loaded … whenever they leave? That's the
+  // estimate"): the email's forecast answers one question. Late now = not loaded and its truck should already have left (the
+  // report's late routes, and any forecast load whose leaving time has gone by); will miss its truck = at this pace it is
+  // loaded after it leaves; every other truck is on time. No cases (Joe 11/1: "I don't want to see the cases").
+  function truckCheck(r) {
+    var f = r.forecast || null, ids = {}, lateNow = [], miss = [], ok = [];
+    var name = function (x) { var n = shortRun(x); return routeNumber(x.route) + (n ? ' ' + n : ''); };
+    var est = {}; (f ? f.loads : []).forEach(function (x) { est[x.id] = x; });
+    var leftOver = 0;
+    (r.behind || []).forEach(function (x) {
+      var gone = x.minutesUntil === undefined || (x.minutesUntil !== null && x.minutesUntil < 0);
+      // A load left over from the last shift whose truck has not left yet is behind, not late: the forecast says whether it
+      // will make its truck (below); with no forecast it is only counted.
+      if (!gone) { leftOver++; return; }
+      ids[x.id] = 1; var e = x.id && est[x.id];
+      lateNow.push({ id: x.id, name: name(x), area: x.area, value: e ? 'est. ' + e.estDay + ' ' + e.estText : 'Not loaded',
+        sub: 'Should have left ' + [x.departDay, x.depart].filter(Boolean).join(' ') + (x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '') });
+    });
+    (f ? f.loads : []).forEach(function (x) {
+      if (ids[x.id]) return;
+      var deadline = x.leaves === null ? x.shiftEnd : x.leaves, when = function (m) { return dayShort(m) + ' ' + minutesText12(((m % 1440) + 1440) % 1440); };
+      var over = x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '';
+      if (x.leaves !== null && x.leaves <= f.now) lateNow.push({ id: x.id, name: name(x), area: 'CASE', value: 'est. ' + x.estDay + ' ' + x.estText, sub: 'Should have left ' + when(x.leaves) + over });
+      else if (x.late) miss.push({ id: x.id, name: name(x), value: spanText(x.est - deadline) + ' late', sub: (x.leaves === null ? 'Past the 6:00 AM shift end' : 'Leaves ' + when(x.leaves)) + ' · est. loaded ' + x.estDay + ' ' + x.estText + over });
+      else ok.push(x);
+    });
+    var last = ok.length ? Math.max.apply(null, ok.map(function (x) { return x.est; })) : null;
+    return { lateNow: lateNow, miss: miss, leftOver: leftOver, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
+  }
+  function truckCheckSummary(t) {
+    return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
+      t.ok ? (t.lateNow.length || t.miss.length ? 'the other ' + t.ok + ' make it' : 'all ' + t.ok + ' make it') : ''].filter(Boolean).join(' · ');
+  }
+
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
   // Joe 10/14: the report's route tiles show the route number and a short run name ("845 DSD", "906 Lancaster", "6304 Walmart"),
   // not LOADED / NOT LOADED (green is loaded, red is not). The plant's two-letter code (UT) and the word MILK are left off, words
@@ -1306,21 +1341,17 @@
   }
   function reportText(r) {
     var L = [], f = r.forecast;
-    L.push('ROUTES BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
+    L.push('ROUTES LATE OR BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
     r.behind.forEach(function (x) { L.push('  ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.startedAt ? ' since ' + x.startedAt : '') + '  ' + x.late + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '')); });
     L.push('');
-    // Joe 10/19 (Late Forecast): the forecast follows Routes Behind, as the box under the email's banner.
+    // Joe 11/1: the forecast answers "will every truck be loaded before it leaves?", as the box under the email's banner.
     if (f) {
-      var sm = forecastSummary(f);
-      L.push('LATE FORECAST (ESTIMATED) AT ' + f.asOf + ': ' + (f.late ? f.late + ' load' + (f.late === 1 ? '' : 's') + ' potentially late' : 'all loads on time'));
-      if (sm.behindText) L.push('  ' + sm.behindText);
-      if (sm.changeText) L.push('  ' + sm.changeText);
-      if (f.prior && f.prior.loads) {
-        L.push('  Left over from ' + f.prior.from + ': ' + f.prior.loads + ' load' + (f.prior.loads === 1 ? '' : 's') + ', ' + f.prior.cases.toLocaleString('en-US') + ' cases, est. done ' + f.prior.doneWhen);
-        L.push('  Today\'s loads: ' + (f.todayLate ? f.todayLate + ' late' : 'on time'));
-      }
-      L.push('  Due by ' + (f.dueByWhen || f.dueByText) + ': ' + f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases' + (f.due.loads ? ', est. done ' + (f.due.doneWhen || f.due.doneText) : ''));
-      if (f.loads.length) L.push('  All loads done: est. ' + (f.allDoneWhen || f.allDoneText) + ' · ' + f.casesLeft.toLocaleString('en-US') + ' cases left');
+      var t = truckCheck(r), bad = t.lateNow.length || t.miss.length;
+      L.push('FORECAST (ESTIMATED) AT ' + f.asOf + ': ' + (bad ? 'not every truck will be loaded before it leaves' : 'every truck will be loaded before it leaves'));
+      if (truckCheckSummary(t)) L.push('  ' + truckCheckSummary(t));
+      t.lateNow.forEach(function (x) { L.push('  Late now: ' + x.name + ', ' + x.sub + ', ' + x.value); });
+      t.miss.forEach(function (x) { L.push('  Will miss its truck: ' + x.name + ', ' + x.sub + ', ' + x.value); });
+      if (t.ok) L.push('  Every other truck: ' + t.ok + ' load' + (t.ok === 1 ? '' : 's') + ' on time, last one est. loaded ' + t.okLast);
       L.push('');
     }
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
@@ -1390,23 +1421,22 @@
     // "Second Shift 2:00 PM to 10:30 PM" -> "2nd Shift 2 PM-10:30 PM".
     function shortName(v) { v = text(v); return v.length > 16 ? v.replace(/\bGALLON\b/g, 'GAL').replace(/\bGallon\b/g, 'Gal') : v; }
     function shortShift(v) { return text(v).replace(/^First\b/i, '1st').replace(/^Second\b/i, '2nd').replace(/^Third\b/i, '3rd').replace(/:00\b/g, '').replace(/ to /g, '-'); }
-    // Joe 10/19 (Late Forecast): a box under the banner: how many loads will be late and why, the loads due by 5:00 AM with
-    // when they will be done, when every load will be done and the cases left (estimated, so it says so). Joe 10/20: no pace,
-    // cases an hour or which nights it came from: the group does not see how the forecast is worked out.
-    function forecastBox(f) {
-      var bad = f.late > 0, line = function (a, b, k, c) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + (c || INK) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + a + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + (bad ? '#f3c7c2' : '#cfe8da') + '">' + b + '</td></tr>'; };
-      var sm = forecastSummary(f), dueWord = f.due.loads + ' load' + (f.due.loads === 1 ? '' : 's') + ', ' + f.due.cases.toLocaleString('en-US') + ' cases';
+    // Joe 11/1: the box under the banner answers "will every truck be loaded before it leaves?" (truckCheck): the loads late
+    // now, the loads that will miss their truck and by how much, and every other truck on time. Estimated, so it says so.
+    // Joe 10/20: no pace, cases an hour or which nights it came from. Joe 11/1: no cases.
+    function forecastBox(t) {
+      var bad = t.lateNow.length + t.miss.length > 0, edge = bad ? '#f3c7c2' : '#cfe8da';
+      var lab = function (x, c) { return '<tr><td colspan="2" style="' + F + 'padding:10px 0 2px;font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:' + c + '">' + x + '</td></tr>'; };
+      var line = function (a, sub, b, k) { return '<tr><td style="' + F + 'padding:6px 0;font-size:15px;color:' + INK + ';border-bottom:1px solid ' + edge + '">' + e(a) + (sub ? '<div style="font-size:13px;color:' + GREY + '">' + e(sub) + '</div>' : '') + '</td><td align="right" style="' + F + 'padding:6px 0 6px 8px;font-size:16px;font-weight:800;white-space:nowrap;color:' + (k ? RED : GREEN) + ';border-bottom:1px solid ' + edge + '">' + b + '</td></tr>'; };
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + (bad ? '#fde8e6' : '#e2f4ea') + ';border-left:5px solid ' + (bad ? RED : GREEN) + ';padding:10px 12px">' +
-        '<div style="font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (bad ? RED : GREEN) + '">Forecast at ' + e(f.asOf) + ' (estimated)</div>' +
-        '<div style="font-size:20px;font-weight:800;margin-top:2px;color:' + (bad ? RED : GREEN) + '">' + (bad ? '&#9888; ' + f.late + ' load' + (f.late === 1 ? '' : 's') + ' potentially late' : '&#10003; All loads on time') + '</div>' +
-        (sm.behindText ? '<div style="font-size:17px;font-weight:800;margin-top:4px;color:' + RED + '">' + e(sm.behindText) + '</div>' : '') +
-        (sm.changeText ? '<div style="font-size:16px;font-weight:800;margin-top:4px;color:' + (sm.change > 0 ? GREEN : sm.change < 0 ? RED : GREY) + '">' + (sm.change > 0 ? '&#9650; ' : sm.change < 0 ? '&#9660; ' : '') + e(sm.changeText) + '</div>' : '') +
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:6px">' +
-        // Joe 10/22 (option az): last night's left-over loads on their own line, then how today's loads stand; every time has its day.
-        (f.prior && f.prior.loads ? line('Left over from ' + e(f.prior.from) + ': ' + f.prior.loads + ' load' + (f.prior.loads === 1 ? '' : 's') + ', ' + f.prior.cases.toLocaleString('en-US') + ' cases', 'est. ' + e(f.prior.doneWhen), f.prior.late > 0, '#9a5b00') +
-          line('Today\'s loads', f.todayLate ? f.todayLate + ' late' : 'On time', f.todayLate > 0) : '') +
-        line('Due by ' + e(f.dueByWhen || f.dueByText) + ': ' + e(dueWord), f.due.loads ? 'est. ' + e(f.due.doneWhen || f.due.doneText) : '&ndash;', f.due.late > 0) +
-        (f.loads.length ? line('All loads done', 'est. ' + e(f.allDoneWhen || f.allDoneText), bad) + line('Cases left', e(f.casesLeft.toLocaleString('en-US')), false) : line('All loads done', 'nothing left', false)) +
+        '<div style="font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + (bad ? RED : GREEN) + '">Forecast at ' + e(t.asOf) + ' (estimated)</div>' +
+        '<div style="font-size:20px;font-weight:800;margin-top:2px;color:' + (bad ? RED : GREEN) + '">' + (bad ? '&#9888; Not every truck will be loaded before it leaves' : '&#10003; Every truck will be loaded before it leaves') + '</div>' +
+        (truckCheckSummary(t) ? '<div style="font-size:16px;font-weight:700;margin-top:3px;color:' + INK + '">' + e(truckCheckSummary(t)) + '</div>' : '') +
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:4px">' +
+        (t.lateNow.length ? lab('Late now: truck should have left', RED) + t.lateNow.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
+        (t.miss.length ? lab('Will miss its truck', RED) + t.miss.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
+        (t.ok ? lab(bad ? 'Every other truck' : 'Every truck', GREEN) + line(t.ok + ' load' + (t.ok === 1 ? '' : 's'), 'Last one est. loaded ' + t.okLast, '&#10003; On time', false) : '') +
+        (!t.lateNow.length && !t.miss.length && !t.ok ? line('Nothing left to load', '', '&ndash;', false) : '') +
         '</table></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
@@ -1432,17 +1462,22 @@
     var todayLabel = todayKey ? leftFrom(todayKey) : '';
     var loadOrder = function (a, b) { var x = fcAt[a.id], y = fcAt[b.id]; return (x === undefined ? 1e9 : x) - (y === undefined ? 1e9 : y) || a.loadSequence - b.loadSequence || untilOf(a) - untilOf(b); };
     var notLoaded = (r.behind || []).map(function (x) { return Object.assign({ late: true }, x); }).concat(r.nextUp || []).sort(function (a, b) { return byGroup(a, b) || (hasPrior ? Number(b.priorDay) - Number(a.priorDay) || loadOrder(a, b) : byDay(a, b) || loadOrder(a, b)) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }); })
-      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: 'BEHIND', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: PLAIN, fg: INK }; });
+      .map(function (x) { return x.late ? { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: x.minutesUntil === null || x.minutesUntil >= 0 ? 'BEHIND' : 'LATE', bg: RED, fg: '#ffffff' } : { area: x.area, day: x.deliveryDate, prior: x.priorDay, loadDate: x.loadDate, route: routeNumber(x.route), name: shortRun(x), depart: x.depart, word: '', est: (x.id && fcBy[x.id]) || null, bg: PLAIN, fg: INK }; });
     // Joe 10/26: the delivery-day headings are for today's loads (what is left over from yesterday has its own heading).
     var days = {}; loaded.concat(notLoaded).forEach(function (x) { if (!x.prior && dayNum(x.day) !== null) days[x.day] = 1; });
     var splitDays = Object.keys(days).length > 1;
     var sectionOf = function (x) { if (x.prior) return -1e9; var n = dayNum(x.day); return n === null ? 1e9 : splitDays ? n : 0; };
     var H = [];
     // Joe 10/28: no route behind but the forecast has loads potentially late = a yellow banner that says so (never green on-time).
-    var late = !behind && fc && fc.late > 0 ? fc.late : 0;
-    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind ? RED : late ? YELLOW : GREEN) + ';color:' + (late ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? '' : 'S') + ' POTENTIALLY LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
+    // Joe 11/1: the banner counts the loads late now (truck should have left, not loaded); with none, the loads that will miss
+    // their truck at this pace turn it yellow.
+    // A load left over from the last shift whose truck has not left yet says BEHIND (red) when nothing is late or missing.
+    var tc = truckCheck(r), leftBehind = 0; behind = tc.lateNow.length;
+    var late = !behind && tc.miss.length ? tc.miss.length : 0;
+    if (!behind && !late) leftBehind = tc.leftOver;
+    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind || leftBehind ? RED : late ? YELLOW : GREEN) + ';color:' + (late ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL MISS ITS TRUCK' : 'S WILL MISS THEIR TRUCKS') : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + ' &middot; ' + loadedCount + ' of ' + total + ' loaded</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
-    if (fc) H.push(forecastBox(fc));
+    if (fc) H.push(forecastBox(tc));
     H.push(head('Routes', loadedCount + ' of ' + total + ' loaded'));
     // Joe 10/19: one group per load type (Case, Box, Tote, Tanker), each with its own Loaded then Not loaded list and a dark
     // line between types. A type with no loads, or a list with none, is left out.
@@ -1522,5 +1557,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempChecked: tempChecked, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
-    REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
+    truckCheck: truckCheck, truckCheckSummary: truckCheckSummary, REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

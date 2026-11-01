@@ -88,9 +88,10 @@ async function openPage(browser, url, w, h, opts) {
     assert.match(await lo.evaluate(() => document.body.innerText), /Behind\s*4/, 'every load left over from last night is behind');
     assert.deepEqual(lo.errors, []);
 
-    // Manager Center: the same four behind; the Late Forecast tile counts the knock-on.
+    // Manager Center: the same four left over; Joe 11/1: two of them (971 at 2:00 AM, 909 at 6:00 AM) should already have left,
+    // so the subject says 2 routes late (901 and 907 leave later: behind, not late yet).
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
-    await mc.waitForFunction(() => /4 routes behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
+    await mc.waitForFunction(() => /2 routes late/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
     // Every load reaches Manager Center through runDays (a trigger on each run): wait for all nine.
     // A slow test computer can take longer than 20 seconds to run the nine triggers.
     await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 45000 });
