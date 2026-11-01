@@ -185,7 +185,15 @@ async function openPage(browser, width, height, url, touch) {
     assert.deepEqual(st.errors, []);
     results.push('Plant Station Case Loadout: T-778 red, T-993 green');
     // Yesterday's two cards were saved as Not recorded, with the reason in their notes.
-    const nr = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-07').get()).docs.map(x => x.data()), '2026-10-07');
+    // The screens save them on their own once both days are read, so wait for both saves (up to 30 seconds, as above): the
+    // second one can still be on its way when this reads.
+    let nr = {};
+    for (let i = 0; i < 120; i++) {
+      nr = R.latestUnloads((await d.collection('plantJournal').where('date', '==', '2026-10-07').get()).docs.map(x => x.data()), '2026-10-07');
+      const a = nr['2026-10-07|856|UT DSD MILK'], b = nr['2026-10-07|857|UT DSD MILK'];
+      if (a && a.notRecorded && b && b.notRecorded) break;
+      await new Promise(r => setTimeout(r, 250));
+    }
     const n954 = nr['2026-10-07|856|UT DSD MILK'], n889 = nr['2026-10-07|857|UT DSD MILK'];
     assert.ok(n954 && n954.dropped && n954.notRecorded && /^Not recorded: T-954 went out again on 10-8-26/.test(n954.notes), 'T-954 yesterday: Not recorded ' + JSON.stringify(n954));
     assert.ok(n889 && n889.dropped && n889.notRecorded && /^Not recorded: T-889 loaded again on 10-8-26 \(857\)/.test(n889.notes), 'T-889 yesterday: Not recorded ' + JSON.stringify(n889));
