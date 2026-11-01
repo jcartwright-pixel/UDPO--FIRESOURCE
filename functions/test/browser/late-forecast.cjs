@@ -2,8 +2,8 @@
 /*
  * Late Forecast (Joe 10/19, option t): Manager Center's Late Forecast tile opens the Late Forecast screen; with Monday 10-19-26's
  * real loadout at 7:00 PM, Marietta (909) and Fairmont (907) are done after 6:00 AM but before their own dispatch, so they are on
- * time (Joe 10/22: late only after the load's own dispatch); a Walmart load added last in line (6301, 5:00 AM) misses its
- * dispatch and shows red with the reason; 10 loads are due by 5:00 AM, and the screen fits 1536 x 790 without scrolling. Send Test to Me saves a test-only report that
+ * time (Joe 10/22: late only after the load's own dispatch); a Walmart load added last in line that leaves tonight
+ * (6301, 7:30 PM, Load Day) misses its dispatch even loaded first (Joe 11/1: behind, the truck that leaves first loads first) and shows red with the reason; 10 loads are due by 5:00 AM, and the screen fits 1536 x 790 without scrolling. Send Test to Me saves a test-only report that
  * does not start a new round. Pictures go to SHOTS_DIR.
  */
 const assert = require('node:assert/strict');
@@ -27,7 +27,7 @@ const LOADS = [
   ['6304', 'UT WALMART', 65, T(1), 887, '2026-10-19T21:53:05Z', '2026-10-19T22:57:31Z'], ['845', 'I/W BALTIMORE', 20, T(21), 316], ['950_1', 'CHARLESTON TRANSFER', 40, T(16), 668],
   ['971', 'PAINTSVILLE TRANSFER', 50, T(2), 812], ['813', 'DSD', 70, T(1, 30), 477], ['803', 'DSD', 75, T(4), 503], ['812', 'DSD', 80, T(5), 450], ['822', 'DSD', 85, T(4, 30), 350],
   ['808', 'DSD', 90, T(4), 516], ['8303_1', 'UT WALMART', 95, T(5, 30), 996], ['825', 'DSD', 100, T(5), 252], ['805', 'DSD', 105, T(5), 115], ['901_1', 'PRODUCT 1', 110, T(7), 853],
-  ['909_1', 'MARIETTA LOAD 1', 115, T(21), 1067], ['907_1', 'FAIRMONT TRANSFER', 120, T(9), 1073], ['6301_1', 'UT WALMART', 125, T(5), 900]];
+  ['909_1', 'MARIETTA LOAD 1', 115, T(21), 1067], ['907_1', 'FAIRMONT TRANSFER', 120, T(9), 1073], ['6301_1', 'UT WALMART', 125, T(19, 30), 900]];
 
 async function openPage(browser, url, w, h, opts) {
   const page = await browser.newPage(Object.assign({ viewport: { width: w, height: h }, serviceWorkers: 'block' }, opts || {}));
@@ -53,10 +53,10 @@ async function openPage(browser, url, w, h, opts) {
   await runTransfer({ db: d, reader: F.fakeReader(PD.plantSheets()), sources: PD.PLANT_SOURCES, now: () => new Date('2026-10-08T14:00:00Z') });
   for (const c of ['runs', 'pickups', 'plantJournal', 'plantReports']) for (const r of (await d.collection(c).get()).docs) await r.ref.delete();
   for (const [i, [route, run, seq, time, cases, started, done]] of LOADS.entries()) {
-    const day = { runs: true, loadDayOffset: -1, loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: route === '845' ? '2026-10-19' : '2026-10-20', dispatchTime: time, loadSequence: seq, casesOut: cases };
+    const day = { runs: true, loadDayOffset: -1, loadDate: '2026-10-19', deliveryDate: '2026-10-20', departureDate: route === '845' || route === '6301_1' ? '2026-10-19' : '2026-10-20', dispatchTime: time, loadSequence: seq, casesOut: cases };
     if (started) Object.assign(day, { plantStartedAt: started, completeTime: done, loadStatus: 'COMPLETE' });
     await d.collection('runs').doc('2026-10-18__' + route).set({ weekStart: '2026-10-18', sheetRow: 10 + i, route, run, routeId: 'rte_' + route, runId: 'run_' + route, active: true, loadType: 'Case Loadout',
-      masterShow: { leavesOn: route === '845' ? 'LOAD DAY' : 'DELIVERY DAY' }, days: { tue: day } });
+      masterShow: { leavesOn: route === '845' || route === '6301_1' ? 'LOAD DAY' : 'DELIVERY DAY' }, days: { tue: day } });
   }
   // Last Monday and the Monday before: 4 one-hour loads each, 785 and 744 cases an hour.
   for (const [week, load, delivery, rate] of [['2026-10-11', '2026-10-12', '2026-10-13', 785], ['2026-10-04', '2026-10-05', '2026-10-06', 744]]) {
@@ -100,8 +100,10 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(sent.late, 1, 'the report counts the same one late load as the tile');
     assert.equal(sent.allDoneWhen, tileDone, 'the report has the tile\'s all-done time');
     assert.deepEqual(sent.loads.filter(x => x.late).map(x => String(x.route).split('_')[0]), ['6301']);
-    // Joe 11/1: the window names the load that will miss its truck; here it is the last one, so its time is the tile's all-done time.
-    assert.match(await mc.textContent('#rp-body'), new RegExp('Will miss its truck: 6301[\\s\\S]*?est\\. loaded ' + tileDone));
+    // Joe 11/1: the window names the load that will miss its truck; behind, it loads first (it leaves first), so it is done tonight.
+    assert.equal(sent.order, 'first to leave');
+    assert.equal(String(sent.loads[0].route).split('_')[0], '6301');
+    assert.match(await mc.textContent('#rp-body'), /Will miss its truck: 6301[\s\S]*?Leaves Mon 7:30 PM · est\. loaded Mon \d+:\d\d PM/);
     assert.deepEqual(mc.errors, []);
 
     await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.dp-line[href="forecast.html"]')]);
@@ -119,7 +121,7 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(await mc.$$eval('.fc-row:not(.fc-head)', r => r.length), 15);
     assert.deepEqual(await mc.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]), [1536, 790], 'fits without scrolling');
     await mc.selectOption('#due-by', '180');
-    assert.match(await mc.textContent('#band'), /Due by 3:00 AM\s*3 loads/);
+    assert.match(await mc.textContent('#band'), /Due by 3:00 AM\s*4 loads/); // 6301 (7:30 PM), 845, 813, 971
     if (SHOTS) await mc.screenshot({ path: path.join(SHOTS, 'late-forecast-1536.png') });
     assert.deepEqual(mc.errors, []);
 
@@ -130,7 +132,7 @@ async function openPage(browser, url, w, h, opts) {
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'late-forecast-390.png'), fullPage: true });
     assert.deepEqual(phone.errors, []);
     // Audit batch 7: the Loadout Center's Behind count agrees: no load is past its own dispatch yet, so none is Behind,
-    // and the one late load (6301, 5:00 AM) is late only on the forecast.
+    // and the one late load (6301, 7:30 PM) is late only on the forecast.
     const lo = await openPage(browser, '/loadout.html?' + MANAGER, 1536, 790);
     await lo.waitForFunction(() => /Behind \d/.test((document.getElementById('strip') || {}).textContent || ''), null, { timeout: 20000 });
     assert.match((await lo.textContent('#strip')).replace(/\s+/g, ' '), /Behind 0\b/);
