@@ -33,8 +33,10 @@
          opens on the right (its table, settings or screen) without leaving the page. Nothing from the old tab is left out. -->
     <div class="adm-shell" id="shell">
       <aside class="adm-nav" aria-label="Administration items">
-        <div class="adm-nav-head"><div class="adm-title-row"><h1>Administration</h1><button type="button" class="adm-repairs" id="repairs" hidden></button></div><input type="search" id="find" placeholder="Find a setting" aria-label="Find a setting"></div>
+        <!-- Joe 11/1 (mock-up 1): Hide menu folds the whole menu to a thin strip so the open item gets the full width. -->
+        <div class="adm-nav-head"><div class="adm-title-row"><h1>Administration</h1><button type="button" class="adm-repairs" id="repairs" hidden></button></div><div class="adm-find-row"><input type="search" id="find" placeholder="Find a setting" aria-label="Find a setting"><button type="button" class="adm-hide" id="hide-menu">&laquo; Hide menu</button></div></div>
         <div class="adm-nav-list" id="nav"></div>
+        <button type="button" class="adm-show" id="show-menu">Show menu &raquo;</button>
       </aside>
       <section class="adm-panel" id="panel" aria-live="polite"></section>
     </div>
@@ -55,6 +57,18 @@
     let admin = null, find = '', current = ADMIN_GROUPS[0][2][0][0];
     // Review item 54 (Joe 10/13): ?item=<key> opens that item first (Phone Screens' one line points to Links & Codes this way).
     { const want = new URLSearchParams(location.search).get('item'); if (want && adminItem(want)) current = want; }
+    // Joe 11/1 (mock-up 1): each group is a red bar that folds open and shut. One group is open at a time: the open item's
+    // group to start with; pressing a bar opens it (and closes the others), pressing it again closes it.
+    let openGroup = adminItem(current).group;
+    // Hide menu is remembered on this computer only (try/catch: some browsers block it, and then the menu simply shows).
+    const HIDE_KEY = 'udAdminMenuHidden';
+    let hidden = false;
+    try { hidden = localStorage.getItem(HIDE_KEY) === '1'; } catch (e) { /* menu shows */ }
+    function setHidden(h) {
+      hidden = h;
+      try { if (h) localStorage.setItem(HIDE_KEY, '1'); else localStorage.removeItem(HIDE_KEY); } catch (e) { /* only this visit */ }
+      document.getElementById('shell').classList.toggle('adm-folded', h);
+    }
     // Joe 10/26: the "?" opens the help for the item that is open (the page it shows, or the item's own part).
     window.udHelpFor = () => { const it = current && adminItem(current); return it && it.page ? it.page : 'administration.html' + (it ? '?item=' + it.key : ''); };
     const icon = (k) => /\.webp$/.test(k) ? '<img src="img/library/' + k + '" alt="">' : '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || ICON.gear) + '</svg>';
@@ -68,12 +82,15 @@
         // Batch 8 (10/23): an item that moved onto the Dispatch Administration page shows here only when searched for or open.
         const shown = items.map(i => adminItem(i[0])).filter(it => q ? (it.title + ' ' + it.what + ' ' + group).toLowerCase().indexOf(q) >= 0 : !it.moved || it.key === current);
         if (!shown.length) return '';
-        return '<div class="adm-nav-group"><h2>' + escapeHtml(group) + '</h2>' + shown.map(it => {
+        // While Find a setting has words in it, every group with a match is open.
+        const isOpen = q ? true : group === openGroup;
+        return '<div class="adm-nav-group' + (isOpen ? ' open' : '') + '"><h2><button type="button" class="adm-gh" data-group="' + escapeHtml(group) + '" data-count="' + shown.length + '" aria-expanded="' + isOpen + '">' + escapeHtml(group) + '</button></h2>' +
+          '<div class="adm-items"' + (isOpen ? '' : ' hidden') + '>' + shown.map(it => {
           const st = state(it);
           // Review item 51 (Joe 10/13): menus are words only, so the side menu has no icons (the open item's title keeps its picture).
           return '<button type="button" class="adm-item ' + st + (it.key === current ? ' on' : '') + '" data-key="' + it.key + '"' + (it.key === current ? ' aria-current="true"' : '') + '>' +
             '<span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : '') + '</button>';
-        }).join('') + '</div>';
+        }).join('') + '</div></div>';
       }).join('') || '<p class="adm-none">Nothing matches. Try another word.</p>';
     }
 
@@ -94,7 +111,7 @@
 
     // What a page may ask of Administration: open another item, and update the "Repairs · N" count.
     const CTX = {
-      open: (key) => { current = key; renderNav(); renderPanel(); },
+      open: (key) => { current = key; openGroup = adminItem(key).group; renderNav(); renderPanel(); },
       repairs: (n) => { const b = document.getElementById('repairs'); b.textContent = 'Repairs \u00b7 ' + n; b.hidden = !(n > 0); }
     };
     document.getElementById('repairs').addEventListener('click', () => CTX.open('repair-items'));
@@ -113,13 +130,19 @@
       callServer('admin', { op: 'repairCount' }).then(r => CTX.repairs(r.count)).catch(() => {});
     }
     document.getElementById('nav').addEventListener('click', e => {
+      const g = e.target.closest('.adm-gh');
+      if (g) { openGroup = openGroup === g.dataset.group && !find.trim() ? null : g.dataset.group; if (find.trim()) { find = ''; document.getElementById('find').value = ''; } renderNav(); return; }
       const b = e.target.closest('[data-key]');
       if (!b || b.dataset.key === current) return;
       current = b.dataset.key;
+      openGroup = adminItem(current).group;
       renderNav();
       renderPanel();
     });
     document.getElementById('find').addEventListener('input', e => { find = e.target.value; renderNav(); });
+    document.getElementById('hide-menu').addEventListener('click', () => setHidden(true));
+    document.getElementById('show-menu').addEventListener('click', () => setHidden(false));
+    setHidden(hidden);
     requireSignIn(async (user) => {
       const { db } = await start();
       // Machine Connections reads each plant's machines itself, for the plants this person may see.

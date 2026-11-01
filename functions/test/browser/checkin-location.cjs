@@ -15,6 +15,8 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 
+// Joe 11/1 (mock-up 1): Administration's groups fold shut; press the item's red group bar first when its group is closed.
+const showItem = (pg, key) => pg.waitForSelector('.adm-item[data-key="' + key + '"]', { state: 'attached' }).then(() => pg.$eval('.adm-item[data-key="' + key + '"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); }));
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height } });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
@@ -35,7 +37,7 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
   const results = [];
   try {
     const p = await openPage(browser, 1920, 1080, '/administration.html?testEmail=admin.test@uniteddairy.com');
-    await p.waitForSelector('.adm-item[data-key="checkin-email"]');
+    await showItem(p, 'checkin-email');
     await p.click('.adm-item[data-key="checkin-email"]');
     await p.waitForSelector('#ce-plant');
     await p.waitForFunction(() => document.querySelector('#ce-from').value === 'callcenter@lauttamus.com');

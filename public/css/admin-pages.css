@@ -218,3 +218,31 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 .mx-cc { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .mx-cc .ap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 @media (max-width: 900px) { .mx-split { grid-template-columns: 1fr; grid-template-rows: auto minmax(480px, 1fr); } .mx-list { max-height: 260px; } .ap .mx-top input[type=search] { margin-left: 0; width: 100%; } }
+/* Joe 11/1 (mock-up 1): the Administration menu's groups are red bars that fold open and shut (one open at a time); the items
+   under a group are blue, the open item solid blue. Hide menu folds the whole menu to a thin strip with Show menu. */
+.adm-shell { grid-template-columns: 330px 1fr; }
+.adm-find-row { display: flex; gap: 8px; }
+.adm-find-row input { flex: 1; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid #cfd9e3; border-radius: 9px; font: inherit; }
+.adm-hide { flex: none; font: inherit; font-size: 16px; font-weight: 800; color: #1565c0; background: #e8f1fb; border: 1px solid #b9d3f0; border-radius: 9px; padding: 0 10px; cursor: pointer; white-space: nowrap; }
+.adm-hide:hover { background: #d6e7fa; }
+.adm-nav-list { padding: 8px 10px 12px; }
+.adm-nav-group { margin: 0 0 6px; }
+.adm-nav-group h2 { margin: 0; font-size: 17px; letter-spacing: 0; text-transform: none; }
+.adm-gh { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; border: 0; border-radius: 9px; background: #c8102e; color: #fff; font: inherit; font-size: 17px; font-weight: 900; text-align: left; padding: 8px 12px; cursor: pointer; }
+.adm-gh:hover { background: #a90d26; }
+.adm-gh::before { content: '\25B8'; width: 16px; flex: none; }
+.adm-nav-group.open .adm-gh::before { content: '\25BE'; }
+.adm-gh::after { content: attr(data-count); margin-left: auto; font-size: 16px; font-weight: 800; background: rgba(255, 255, 255, .22); border-radius: 999px; padding: 1px 9px; }
+.adm-items { margin: 4px 0 8px 10px; padding: 4px 0 4px 10px; border-left: 4px solid #1565c0; }
+.adm-items[hidden] { display: none; }
+.adm-items .adm-item { color: #1565c0; font-weight: 800; }
+.adm-items .adm-item:hover { background: #e8f1fb; }
+.adm-items .adm-item.on { background: #1565c0; color: #fff; }
+.adm-show { display: none; }
+.adm-shell.adm-folded { grid-template-columns: 56px 1fr; }
+.adm-folded .adm-nav-head, .adm-folded .adm-nav-list { display: none; }
+.adm-folded .adm-show { display: block; margin: 10px auto; font: inherit; font-size: 16px; font-weight: 800; color: #fff; background: #c8102e; border: 0; border-radius: 9px; padding: 12px 6px; writing-mode: vertical-rl; transform: rotate(180deg); cursor: pointer; }
+@media (max-width: 900px) {
+  .adm-shell, .adm-shell.adm-folded { grid-template-columns: 1fr; }
+  .adm-folded .adm-show { writing-mode: horizontal-tb; transform: none; width: calc(100% - 20px); }
+}

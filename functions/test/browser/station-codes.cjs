@@ -23,6 +23,8 @@ const ADMIN = '?testEmail=admin.test@uniteddairy.com';
 // The stations themselves are opened with a manager's account: an Administrator is never locked to a station (Joe 10/29).
 const MGR = '?testEmail=manager.test@uniteddairy.com';
 
+// Joe 11/1 (mock-up 1): Administration's groups fold shut; press the item's red group bar first when its group is closed.
+const showItem = (pg, key) => pg.waitForSelector('.adm-item[data-key="' + key + '"]', { state: 'attached' }).then(() => pg.$eval('.adm-item[data-key="' + key + '"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); }));
 async function openPage(browser, width, height, url) {
   const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
@@ -78,7 +80,7 @@ async function codeFitsPhones(p, name) {
   try {
     const p = await openPage(browser, 1536, 864, '/administration.html' + ADMIN);
     await p.waitForSelector('.adm-item.on[data-key="people"]');
-    const open = async (key) => { await p.click('.adm-item[data-key="' + key + '"]'); await p.waitForSelector('#st-list .ap-item'); await p.waitForTimeout(300); };
+    const open = async (key) => { await showItem(p, key); await p.click('.adm-item[data-key="' + key + '"]'); await p.waitForSelector('#st-list .ap-item'); await p.waitForTimeout(300); };
     // Give the station named `name` its code and keep it.
     const makeCode = async (name) => {
       const row = p.locator('#st-list .ap-item', { has: p.locator('b', { hasText: new RegExp('^' + name + '$') }) });
@@ -124,6 +126,7 @@ async function codeFitsPhones(p, name) {
     results.push('Plant Managers App: its own page with the Plant Managers link and its code; Create code works');
 
     // Joe 10/31: the Sales app: just its link, for any United Dairy account (no code).
+    await showItem(p, 'sales-app');
     await p.click('.adm-item[data-key="sales-app"]');
     await p.waitForSelector('.ap-link[data-link="sales"]');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['sales']);
