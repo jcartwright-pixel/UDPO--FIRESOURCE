@@ -24,7 +24,7 @@
     'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
     'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',
     'garageSignatures', 'garageTechs', 'gpsAlerts', 'gpsDays', 'gpsReefer', 'gpsReeferReadings', 'gpsTemps',
-    'gpsTrucks', 'jugTrailers', 'locationAreas', 'mailCopies', 'mailSeen', 'maintenance', 'masterOutbox',
+    'gpsTrucks', 'jugTrailerLists', 'jugTrailers', 'locationAreas', 'mailCopies', 'mailSeen', 'maintenance', 'masterOutbox',
     'menuSetup', 'meta', 'odometers', 'opsAssignments', 'otrColumns', 'otrComments', 'otrDaily',
     'otrMonthRuns', 'otrMonthly', 'otrRoutes', 'otrSeed', 'outbox', 'personAccess', 'personRights',
     'pickups', 'plantAccess', 'plantEvents', 'plantJournal', 'plantLineStatus', 'plantLoads', 'plantMachines',

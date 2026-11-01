@@ -772,18 +772,27 @@ screens: jug-trailers.html
 
 Part of **Inventory**, under Shipping & Receiving (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
-1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
+The list starts with each trailer's **Trailer Company** and **Unit** number, United Dairy's trailers first, then the other companies'. It also shows how full it is, what is on it and its **Location**.
+
+1. A trailer comes into the lot: press `+ Add Trailer`. First pick its **Trailer Company**. For **United Dairy**, pick the **Unit number** from our fleet list (this plant's trailers, dry boxes first). For any other company, pick the unit number from the list of that company's trailers we have had, or pick `+ New ... unit number` and type it. A company that is not on the list: pick `+ New trailer company` and type its name. Press `Add to the Lot`. It goes on the list as Empty.
 2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
-3. Under **What is on it**, type each item on its own line with how many pallets (for example "Gallon jugs" and 22). A new empty line appears for the next item. To take an item off, clear its line.
-4. **Notes** is for anything else the plant should know.
-5. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
+3. Under **What is on it**, pick each item from the drop-down on its own line with how many pallets (for example "Ferry White 1/2" and 22). A new empty line appears for the next item. An item that is not on the list: pick `+ New item` and type it. To take an item off, pick the blank at the top of its drop-down.
+4. Pick where the trailer is under **Location** (for example "In Dock"). A new place: pick `+ New location` and type it.
+5. **Notes** is for anything else the plant should know.
+6. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
 
 - Every box saves when you leave it; there is no Save button.
+- `Edit Lists` (top right) adds to and deletes from the drop-down lists: trailer companies and their unit numbers, what is on it, and locations. Type in an Add box and press `Add`; press `Delete` to take one off. Press `Done` to go back.
+- **United Dairy** is protected: it cannot be deleted, and its unit numbers come from the fleet list.
+- Anything a trailer in the lot is using shows **In the lot** instead of `Delete`. It can be deleted after that trailer leaves the lot.
+- A new company, unit number, item or location typed on a trailer goes on its list, so the next person can pick it.
 - **History** under the trailer shows what changed, when and who changed it.
 - The drop-down at the top right shows only the Loaded, Half Full or Empty trailers.
-- Each plant has its own list. A trailer added by its number is kept on this list only; it is not added to the main trailer list or the sheets.
+- Each plant has its own lists. Nothing here is added to the main trailer list or the sheets.
 
 > A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
+
+!> Do not type "IN DOCK" as part of what is on a trailer. Pick **In Dock** under Location.
 
 !> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
 

@@ -24,6 +24,19 @@
 .jt-page .jt-or { font-size: 16px; font-weight: 800; color: var(--muted); text-align: center; }
 .jt-page .jt-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
 .jt-page .jt-help { color: var(--muted); font-size: 16px; margin: 6px 0 0; }
+/* Joe 11/1 (mock-up 2): Trailer Company, Add Trailer steps, Edit Lists. */
+.jt-page .jt-ud { color: var(--ud-blue); }
+.jt-page .jt-step { display: flex; align-items: center; gap: 8px; color: var(--ud-blue-dark); }
+.jt-page .jt-step b { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ud-blue); color: #fff; font-size: 16px; }
+.jt-page .jt-lists { display: grid; gap: 0; }
+.jt-page .jt-co { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid #e3eaf1; font-size: 17px; color: var(--ud-blue-dark); }
+.jt-page .jt-units { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.jt-page .jt-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #9fb3c8; border-radius: 8px; padding: 3px 4px 3px 10px; font-size: 16px; font-weight: 800; background: #fff; color: var(--ud-blue-dark); }
+.jt-page .jt-del { font: inherit; font-size: 16px; font-weight: 900; border: 1px solid #b42318; color: #b42318; background: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.jt-page .jt-del:disabled { opacity: .5; cursor: default; }
+.jt-page .jt-lock { font-size: 16px; font-weight: 800; color: var(--muted); white-space: nowrap; padding: 0 4px; }
+.jt-page .jt-addbox { display: inline-flex; gap: 6px; align-items: center; margin: 6px 0; }
+.jt-page .jt-addbox .jt-in { width: 200px; }
 @media (max-width: 900px) {
   .jt-page .mach-split { grid-template-columns: 1fr; }
   .jt-page .jt-big button { font-size: 18px; }
@@ -33,6 +46,10 @@
   .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding: 7px 6px; }
   .jt-page .jt-big { gap: 6px; }
   /* On a phone the status sits under the trailer number, so what is on it has the room. */
-  .jt-page.pm-page table.pm-table tr > :nth-child(2) { display: none; }
+  /* Joe 11/1: on a phone the company sits over the unit number, so what is on it has the room. */
+  .jt-page.pm-page table.pm-table tr > :nth-child(1), .jt-page.pm-page table.pm-table tr > :nth-child(3), .jt-page.pm-page table.pm-table tr > :nth-child(5) { display: none; }
+  .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
+  .jt-page .head .actions.in-head { flex-wrap: wrap; justify-content: flex-start; }
+  .jt-page .jt-co { grid-template-columns: 1fr; }
   .jt-page .jt-phone { display: table; margin-top: 4px; }
 }
