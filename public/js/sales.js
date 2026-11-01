@@ -1,7 +1,7 @@
 /*
  * The Sales app. Joe 11/1 (mock-up 1): it opens on two cards, Where the routes are and Customers by route.
- * Where the routes are (Joe 10/31, mock-up 2d): the map stays on top, every route of the division scrolls under it (Route,
- * Driver, Status, Where now), and a tap on a route moves the map to that truck.
+ * Where the routes are (Joe 10/31, mock-up 2d): the map stays on top, every route of the division scrolls under it, and a tap
+ * on a route moves the map to that truck. Joe 11/1 (mock-up 3): each route is two lines, route and status, then driver · where now.
  * Customers by route (Joe 11/1, mock-ups 2 and 3): pick a route and a day to see every customer on it, or type a customer to
  * see every day and route it gets a delivery, or (mock-ups 4 and 5) open a group like Dairy Queen to see its customers. From the
  * division's customer list (Administration > Sales App). Read only. Any United Dairy account may use it ("as long
@@ -48,7 +48,7 @@ function drawMap() {
     frame.hidden = true; none.hidden = false; none.textContent = 'No route picked yet.';
     return;
   }
-  $('sa-map-title').innerHTML = '<b>' + escapeHtml(r.route + (r.driver ? ' ' + r.driver : '')) + '</b>' + (r.gpsAt ? ', GPS at ' + escapeHtml(r.gpsAt) : '');
+  $('sa-map-title').innerHTML = '<b>' + escapeHtml(r.route + (r.driver ? ' ' + nameCase(r.driver) : '')) + '</b>' + (r.gpsAt ? ', GPS at ' + escapeHtml(r.gpsAt) : '');
   $('sa-map-where').textContent = r.where;
   if (r.lat === null || r.lon === null) {
     frame.hidden = true; none.hidden = false;
@@ -66,17 +66,26 @@ function drawMap() {
   none.hidden = true;
 }
 
+// "KODRIC JR, THOMAS" reads "Kodric Jr, Thomas" (narrower, so the full name fits). Names typed in mixed case stay as typed.
+function nameCase(n) {
+  const t = String(n || '').trim();
+  if (t !== t.toUpperCase()) return t;
+  return t.toLowerCase().replace(/(^|[\s,'-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+}
+
 function drawList(data) {
   rows = {};
   const list = $('sa-list');
   if (!data.groups.length) { list.innerHTML = '<p class="sa-empty">No routes today or yesterday for this division.</p>'; picked = ''; drawMap(); return; }
   list.innerHTML = data.groups.map(g => '<h2 class="sa-group">' + escapeHtml(g.label) + '</h2>' + g.rows.map(r => {
     rows[r.id] = r;
+    // Joe 11/1 (mock-up 3): two lines, never more. The route and its status; under it the driver's full name and where
+    // the truck is now. Anything too long ends in "…"; tapping the route shows the whole place over the map.
     return '<button type="button" class="sa-row" data-id="' + escapeHtml(r.id) + '" aria-pressed="false">' +
-      '<b class="sa-route">' + escapeHtml(r.route) + '</b>' +
-      '<span class="sa-driver">' + escapeHtml(r.driver || 'No driver') + '</span>' +
-      '<span><span class="sa-pill ' + escapeHtml(r.tone) + '">' + escapeHtml(r.status) + '</span></span>' +
-      '<span class="sa-where">' + escapeHtml(r.where) + '</span></button>';
+      '<span class="sa-l1"><b class="sa-route">' + escapeHtml(r.route) + '</b>' +
+      '<span class="sa-pill ' + escapeHtml(r.tone) + '">' + escapeHtml(r.status) + '</span></span>' +
+      '<span class="sa-l2"><b class="sa-driver">' + escapeHtml(nameCase(r.driver) || 'No driver') + '</b>' +
+      ' <span class="sa-dot" aria-hidden="true">&middot;</span> <span class="sa-where">' + escapeHtml(r.where) + '</span></span></button>';
   }).join('')).join('');
   if (!rows[picked]) picked = '';
   drawMap();

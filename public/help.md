@@ -772,18 +772,27 @@ screens: jug-trailers.html
 
 Part of **Inventory**, under Shipping & Receiving (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
-1. A trailer comes into the lot: press `+ Add Trailer`. Pick it from **United Dairy trailer** (this plant's trailers on the main trailer list, dry boxes first), or type its number under **Trailer number** for any other trailer. Press `Add to the Lot`. It goes on the list as Empty.
+The list starts with each trailer's **Trailer Company** and **Unit** number, United Dairy's trailers first, then the other companies'. It also shows how full it is, what is on it and its **Location**.
+
+1. A trailer comes into the lot: press `+ Add Trailer`. First pick its **Trailer Company**. For **United Dairy**, pick the **Unit number** from our fleet list (this plant's trailers, dry boxes first). For any other company, pick the unit number from the list of that company's trailers we have had, or pick `+ New ... unit number` and type it. A company that is not on the list: pick `+ New trailer company` and type its name. Press `Add to the Lot`. It goes on the list as Empty.
 2. Pick a trailer on the list. Press `Empty`, `Half Full` or `Loaded` for how full it is.
-3. Under **What is on it**, type each item on its own line with how many pallets (for example "Gallon jugs" and 22). A new empty line appears for the next item. To take an item off, clear its line.
-4. **Notes** is for anything else the plant should know.
-5. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
+3. Under **What is on it**, pick each item from the drop-down on its own line with how many pallets (for example "Ferry White 1/2" and 22). A new empty line appears for the next item. An item that is not on the list: pick `+ New item` and type it. To take an item off, pick the blank at the top of its drop-down.
+4. Pick where the trailer is under **Location** (for example "In Dock"). A new place: pick `+ New location` and type it.
+5. **Notes** is for anything else the plant should know.
+6. When the trailer leaves the lot, press `Left the Lot`. It comes off the list.
 
 - Every box saves when you leave it; there is no Save button.
+- `Edit Lists` (top right) adds to and deletes from the drop-down lists: trailer companies and their unit numbers, what is on it, and locations. Type in an Add box and press `Add`; press `Delete` to take one off. Press `Done` to go back.
+- **United Dairy** is protected: it cannot be deleted, and its unit numbers come from the fleet list.
+- Anything a trailer in the lot is using shows **In the lot** instead of `Delete`. It can be deleted after that trailer leaves the lot.
+- A new company, unit number, item or location typed on a trailer goes on its list, so the next person can pick it.
 - **History** under the trailer shows what changed, when and who changed it.
 - The drop-down at the top right shows only the Loaded, Half Full or Empty trailers.
-- Each plant has its own list. A trailer added by its number is kept on this list only; it is not added to the main trailer list or the sheets.
+- Each plant has its own lists. Nothing here is added to the main trailer list or the sheets.
 
 > A trailer that left the lot and comes back is added again the same way; its old history comes back with it.
+
+!> Do not type "IN DOCK" as part of what is on a trailer. Pick **In Dock** under Location.
 
 !> Do not leave a trailer on the list after it has gone. Press `Left the Lot`, so the plant does not go looking for it.
 
@@ -1507,11 +1516,11 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 2. Add it to the home screen. It is called **UD Sales**.
 3. Pick the **Division** at the top right (Uniontown, Charleston or Martins Ferry). The phone remembers it.
 4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). `Back` at the top comes back to the cards.
-5. Scroll the routes. Tap a route and the map at the top moves to that truck. The map stays on top while you keep scrolling; tap another route to move it again.
+5. Scroll the routes. Tap a route and the map at the top moves to that truck, and the whole place shows under the map. The map stays on top while you keep scrolling; tap another route to move it again.
 
-- **Route, Driver, Status, Where now.** The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
-- **Status** is the same as the 6:00 AM sales email: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1 hr 12 min late** (red), **Not departed, 35 min behind** (loaded, past its dispatch time, still here), **Not loaded, 20 min behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
-- **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road near** or **Stopped at**). In the yard it says **At the plant**, or **Back at the plant** once it has been out.
+- **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
+- **Status** is the same as the 6:00 AM sales email, written shorter so it fits on one line: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1h 12m late** (red; h is hours, m is minutes), **Not departed, 35m behind** (loaded, past its dispatch time, still here), **Not loaded, 20m behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
 - **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
 - `?` opens this Help. `Sign out` is at the bottom.

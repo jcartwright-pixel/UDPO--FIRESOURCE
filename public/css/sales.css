@@ -26,15 +26,24 @@ html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Robo
 .sa-map-box { height: 26vh; min-height: 160px; max-height: 320px; border-radius: 8px; overflow: hidden; background: #e9efe4; display: flex; align-items: center; justify-content: center; }
 .sa-map-box iframe { width: 100%; height: 100%; border: 0; }
 .sa-map-none { margin: 0; padding: 12px; color: #4b5563; text-align: center; }
-.sa-cols, .sa-row { display: grid; grid-template-columns: 56px minmax(84px, 1fr) minmax(104px, 1.2fr) minmax(96px, 1.4fr); gap: 8px; }
-.sa-cols { padding: 8px 10px; background: #1e3a64; color: #fff; font-weight: 700; font-size: 16px; }
+/* Joe 11/1 (mock-up 3): every route is two lines, never wrapped. Line 1: route and status. Line 2, starting under the route
+   number: the driver's name in bold, a dot, where now. Too long ends in "…" (tap the route to see all of it over the map). */
+.sa-cols, .sa-row { display: block; }
+.sa-l1, .sa-l2 { display: flex; align-items: center; min-width: 0; white-space: nowrap; overflow: hidden; }
+.sa-l1 .sa-route { flex: 0 0 52px; }
+.sa-l1 .sa-pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sa-l2 { display: block; text-overflow: ellipsis; margin-top: 4px; }
+.sa-cols { padding: 6px 10px; background: #1e3a64; color: #fff; font-weight: 700; font-size: 16px; }
+.sa-cols .sa-l2 { font-weight: 400; margin-top: 2px; }
+.sa-dot { color: #6b7280; }
+.sa-where { color: #26323f; }
 
 .sa-list { background: #fff; }
 .sa-group { margin: 0; padding: 8px 10px; background: #e6edf6; color: #1e3a64; font-size: 16px; border-bottom: 1px solid #d5dde8; }
-.sa-row { width: 100%; padding: 10px; border: 0; border-bottom: 1px solid #dde3ea; background: #fff; color: inherit; font: inherit; font-size: 16px; text-align: left; cursor: pointer; align-items: start; }
+.sa-row { width: 100%; padding: 8px 10px; border: 0; border-bottom: 1px solid #dde3ea; background: #fff; color: inherit; font: inherit; font-size: 16px; text-align: left; cursor: pointer; align-items: start; }
 .sa-row.on { background: #dbe8f8; box-shadow: inset 4px 0 0 #0e138d; }
 .sa-route { font-size: 17px; }
-.sa-pill { display: inline-block; padding: 3px 9px; border-radius: 10px; font-weight: 700; font-size: 16px; }
+.sa-pill { display: inline-block; padding: 2px 8px; white-space: nowrap; border-radius: 10px; font-weight: 700; font-size: 16px; }
 .sa-pill.ok { background: #e3f3e5; color: #1d7a2c; }
 .sa-pill.late { background: #fbe3e3; color: #b3261e; }
 .sa-pill.loaded { background: #e1edfb; color: #174ea6; }
