@@ -50,9 +50,9 @@ async function routeBook(db, plant, route, day) {
   return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops, updatedAt: rd.updatedAt || '' };
 }
 
-/** The Sales app's lines from the Customer List: { rows: [{ day, route, account, chain, name }], savedAt }, or null when it has none. */
+/** The Sales app's lines from the Customer List: { rows: [{ day, route, account, chain, name }], savedAt, fileName, savedBy }, or null when it has none. */
 async function salesRows(db, plant) {
-  // A plant whose list was never imported here has none (the Sales app keeps its own upload then).
+  // A plant whose list was never imported in the Customer List has none (no customers in the Sales app yet).
   if (!(await db.collection('private').doc('udcl_' + plant).get()).exists) return null;
   const d = await readPlant(db, plant);
   if (!d.routeDays.length) return null;
@@ -60,7 +60,7 @@ async function salesRows(db, plant) {
   d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '' }); }));
   ((d.meta && d.meta.unrouted) || []).forEach(x => rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '' }));
   const at = d.routeDays.map(r => r.updatedAt || '').concat(Object.values(d.customers).map(c => c.updatedAt || '')).sort().pop() || '';
-  return { rows, savedAt: at };
+  return { rows, savedAt: at, fileName: (d.meta && d.meta.fileName) || '', savedBy: (d.meta && d.meta.by) || '' };
 }
 
 module.exports = { salesRows, routeBook, readPlant, CUSTOMERS, ROUTE_DAYS };

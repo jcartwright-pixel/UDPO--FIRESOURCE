@@ -4,8 +4,8 @@
  * stays on top; the routes scroll under it (Route, Driver, Status, Where now); a tap moves the map to that truck. A place marked
  * in Fleet shows by its name. Pictures at 390, 768, 1024 and 1536 go to SHOTS_DIR.
  * Joe 11/1 (mock-ups 1-5): the app opens on two cards; Customers by route lists a route's customers for a day, every day and
- * route of a customer, and a group's customers (Dairy Queen). The list is loaded on Administration > Sales App from the Route
- * Menu workbook (its Customer By Route tab); a group can be renamed there. Made-up customers only.
+ * route of a customer, and a group's customers (Dairy Queen). The list comes from the Customer List app; a group can be renamed
+ * on Administration > Sales App. Made-up customers only.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -19,8 +19,7 @@ const localCalls = require('./local-calls.cjs');
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
-const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-// The Route Menu's Customer By Route tab, made up: [day, route, chain, account, name].
+// The customer lines, made up: [day, route, chain, account, name].
 const MENU = [
   ['TUE', 803, 0, 1196, 'ACORN CORNER MARKET'], ['FRI', 803, 0, 1196, 'ACORN CORNER MARKET'], ['TUE', 803, 0, 40463, 'DQ HILLVIEW'],
   ['TUE', 803, 0, 40471, '...DQ RIVERSIDE'], ['THU', 805, 0, 13590, 'DQ BETHEL KNOLL'], ['SAT', 805, 0, 13590, 'DQ BETHEL KNOLL'],
@@ -29,7 +28,7 @@ const MENU = [
   ['FRI', 803, 0, 231705, 'FIFTH STREET MARKET']
 ];
 
-// Joe 11/1 (mock-ups 2-5): Customers by route, on a phone, after the list was loaded on Administration (below).
+// Joe 11/1 (mock-ups 2-5): Customers by route, on a phone, from the Customer List (below).
 async function customers(pg) {
   await pg.click('[data-go="customers"]');
   await pg.waitForSelector('#cu-route option[value="803"]', { state: 'attached' });
@@ -72,11 +71,25 @@ async function customers(pg) {
   assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll on Customers');
 }
 
-// Administration > Sales App: the Route Menu workbook in, the list saved for Uniontown, a group renamed.
-async function uploadMenu(browser) {
+// Joe 11/1 ("we need to remove that list from UDPO"): the list is the Customer List app's (its records in the main database,
+// made up here as its import would leave them). Administration > Sales App only shows it and renames a group.
+async function seedCustomerList() {
+  const plant = 'fac_uniontown', seen = new Set(), days = {}, b = db().batch();
+  MENU.forEach(([day, route, chain, account, name]) => {
+    const key = String(account), k = route + '__' + day;
+    if (!route || seen.has(k + key)) return;
+    seen.add(k + key);
+    (days[k] = days[k] || { plant, route: String(route), day, stops: [], startTime: '', notes: '', map: null, rev: 1, updatedAt: '2026-11-01T14:00:00.000Z' }).stops.push({ key, account: key, name, chain: chain ? String(chain) : '', loadSeq: 1, note: '' });
+    b.set(db().collection('udclCustomers').doc(plant + '__' + key), { plant, key, account: key, name, chain: chain ? String(chain) : '', active: true });
+  });
+  Object.keys(days).forEach(k => b.set(db().collection('udclRouteDays').doc(plant + '__' + k), days[k]));
+  b.set(db().collection('private').doc('udcl_' + plant), { plant, at: '2026-11-01T14:00:00.000Z', by: 'sales.admin@uniteddairy.com', fileName: 'Route Menu.xlsb', unrouted: MENU.filter(r => !r[1]).map(([day, , chain, account, name]) => ({ day, route: '', account: String(account), chain: chain ? String(chain) : '', name })) });
+  await b.commit();
+}
+
+async function adminSalesApp(browser) {
   const ctx = await browser.newContext({ viewport: { width: 1536, height: 864 }, serviceWorkers: 'block' });
   await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));
-  if (process.env.XLSX_LOCAL) await ctx.route(XLSX_URL, r => r.fulfill({ path: process.env.XLSX_LOCAL, contentType: 'application/javascript' }));
   await localCalls(ctx);
   const p = await ctx.newPage();
   const errors = [];
@@ -87,28 +100,9 @@ async function uploadMenu(browser) {
   await p.$eval('.adm-item[data-key="sales-app"]', b => { if (!b.offsetParent) b.closest('.adm-nav-group').querySelector('.adm-gh').click(); });
   await p.click('.adm-item[data-key="sales-app"]');
   await p.waitForSelector('#sc-list tr');
-  assert.match(await p.textContent('#sc-list'), /UniontownNot loaded/);
-  // The workbook, made in the page with the Excel reader: a tab before it, then Customer By Route with Joe's headings.
-  await p.evaluate((u) => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = u; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }), XLSX_URL);
-  const b64 = await p.evaluate((menu) => {
-    const X = window.XLSX, wb = X.utils.book_new();
-    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Chain', 'Account', 'Customer'], [0, 1, 'NOT THIS ONE']]), 'Cases By Cust Vol');
-    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['DAY', 'ROUTE', 'Chain', 'Account', 'Name']].concat(menu)), 'Customer By Route');
-    return X.write(wb, { type: 'base64', bookType: 'xlsx' });
-  }, MENU);
-  await p.setInputFiles('#sc-file', { name: 'Route Menu.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(b64, 'base64') });
-  await p.waitForSelector('#sc-check .ap-msg');
-  assert.match(await p.textContent('#sc-check'), /Route Menu\.xlsx: 9 customers on 4 routes \(13 lines\)\. 1 line has no route.*Pick the division/);
-  assert.ok(await p.isDisabled('#sc-save'), 'no save until the division is picked');
-  await p.selectOption('#sc-plant', 'fac_uniontown');
-  await p.click('#sc-save');
-  await p.waitForSelector('.ap > .ap-msg.good:not([hidden])');
-  assert.match(await p.textContent('.ap > .ap-msg.good'), /Saved 9 customers on 4 routes for Uniontown/);
-  const saved = (await db().collection('salesCustomers').doc('fac_uniontown').get()).data();
-  assert.equal(saved.rows.length, 12, 'the line in twice is kept once');
-  assert.deepEqual(saved.rows.find(r => r.name === 'LAKESIDE SCOOPS'), { day: 'FRI', route: '', account: '271285', chain: '', name: 'LAKESIDE SCOOPS' });
-  assert.equal(saved.savedBy, 'sales.admin@uniteddairy.com');
-  // Group names: the guesses, then Walmart renamed (it stays through the next upload).
+  assert.match(await p.textContent('#sc-list'), /Uniontown9412.*Route Menu\.xlsb/, 'the Customer List\'s numbers: 9 customers, 4 routes, 12 lines');
+  assert.equal(await p.$$eval('#sc-file, #sc-save', x => x.length), 0, 'no upload here any more');
+  // Group names: the guesses, then Walmart renamed.
   assert.deepEqual(await p.$$eval('#sc-groups tbody tr', r => r.map(x => x.querySelector('input').value + ' ' + x.children[1].textContent)), ['Dairy Queen 3', 'Walmart 2']);
   await p.fill('.sc-group[data-key="chain:990"]', 'Big Box Stores');
   await p.press('.sc-group[data-key="chain:990"]', 'Tab');
@@ -150,7 +144,8 @@ async function uploadMenu(browser) {
 
   const browser = await chromium.launch();
   try {
-    await uploadMenu(browser);
+    await seedCustomerList();
+    await adminSalesApp(browser);
     for (const w of [390, 768, 1024, 1536]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, isMobile: w < 700, hasTouch: true, serviceWorkers: 'block' });
       await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));

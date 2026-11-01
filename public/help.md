@@ -1361,7 +1361,7 @@ Every link and code people use to reach the app:
 - An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
-- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list**: pick the **Division**, choose the Route Menu workbook (its **Customer By Route** tab is read), check the count it shows and press `Save Customer List`. A new upload replaces that division's whole list. Once a division has a list in the **Customer List** app, the Sales app reads that instead, and this upload is only kept for a division without one; the group names still count. **Group names** below lets you rename a group (Dairy Queen, Walmart); it saves when you leave the box.
+- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list** shows each division's customers, routes and lines as the Sales app reads them, and the last import. They come from the **Customer List** app: the Route Menu is imported there, not here. A division not in the Customer List has no customers in the Sales app yet. **Group names** below lets you rename a group (Dairy Queen, Walmart); it saves when you leave the box.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1594,7 +1594,7 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 id: sales-customers
 screens: sales.html?view=customers
 
-The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app (until a division has one there, from the list the office loads on Administration, **Sales App**). It only shows; nothing can be changed from it.
+The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app (a division not imported there has none yet). It only shows; nothing can be changed from it.
 
 1. Tap **Customers by route** on the app's first screen.
 2. Pick a tab: `By route`, `By customer` or `By group`.
