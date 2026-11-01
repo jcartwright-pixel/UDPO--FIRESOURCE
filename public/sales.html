@@ -11,16 +11,18 @@
   <meta name="apple-mobile-web-app-title" content="UD Sales">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Route Status · UD Sales</title>
+  <title>UD Sales</title>
   <link rel="stylesheet" href="css/sales.css">
   <script src="js/logic.js"></script>
 </head>
-<!-- Joe 10/31 (mock-up 2d): a phone app just for sales. The map stays on top; under it every route of the division (Route,
-     Driver, Status, Where now) scrolls. Tap a route and the map moves to that truck. Any United Dairy account may use it; it
+<!-- Joe 10/31 (mock-up 2d): a phone app just for sales. It opens on two cards (Joe 11/1). Where the routes are: the map stays
+     on top; under it every route of the division (Route, Driver, Status, Where now) scrolls. Tap a route and the map moves to
+     that truck. Customers by route: the customers on a route for a day, or every day a customer gets a delivery. Any United Dairy account may use it; it
      only reads. The division drop-down picks Uniontown, Charleston or Martins Ferry (the plants that are running). -->
 <body class="sales-page">
   <header class="sa-hdr">
-    <h1>Route Status</h1>
+    <button type="button" class="sa-back" id="sa-back" hidden>&#8592; Back</button>
+    <h1 id="sa-title">UD Sales</h1>
     <a class="sa-help" id="sa-help" href="help.html?for=sales.html" title="Help for this screen" aria-label="Help for this screen">?</a>
   </header>
 
@@ -33,21 +35,55 @@
   <main id="screen" hidden>
     <div class="sa-top">
       <div class="sa-sub">
-        <span class="sa-when"><span id="sa-day"></span><br>Last refreshed <span id="sa-refreshed">-</span></span>
+        <span class="sa-when"><span id="sa-day"></span><span id="sa-ref-line" hidden><br>Last refreshed <span id="sa-refreshed">-</span></span></span>
         <label class="sa-div"><span>Division</span><select id="sa-division" aria-label="Division"></select></label>
       </div>
-      <div class="sa-map">
-        <p class="sa-map-title" id="sa-map-title">Tap a route to see it on the map.</p>
-        <div class="sa-map-box" id="sa-map-box">
-          <iframe id="sa-map" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
-          <p class="sa-map-none" id="sa-map-none">No route picked yet.</p>
+      <!-- Only on Where the routes are: the map and the column names stay on top with the division while the routes scroll. -->
+      <div id="sa-maparea" hidden>
+        <div class="sa-map">
+          <p class="sa-map-title" id="sa-map-title">Tap a route to see it on the map.</p>
+          <div class="sa-map-box" id="sa-map-box">
+            <iframe id="sa-map" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
+            <p class="sa-map-none" id="sa-map-none">No route picked yet.</p>
+          </div>
+          <p class="sa-map-where" id="sa-map-where"></p>
         </div>
-        <p class="sa-map-where" id="sa-map-where"></p>
+        <div class="sa-cols" aria-hidden="true"><span>Route</span><span>Driver</span><span>Status</span><span>Where now</span></div>
       </div>
-      <div class="sa-cols" aria-hidden="true"><span>Route</span><span>Driver</span><span>Status</span><span>Where now</span></div>
     </div>
-    <div id="sa-list" class="sa-list"></div>
-    <p class="sa-foot">Where now comes from the trailer's GPS, or the truck's if the trailer has none. The list refreshes every 2 minutes.</p>
+
+    <!-- Joe 11/1 (mock-up 1): the app opens on two cards. -->
+    <section id="v-home" class="sa-cards" hidden>
+      <button type="button" class="sa-card" data-go="routes"><span class="sa-card-ic" aria-hidden="true">&#128205;</span><b>Where the routes are</b><span>Every route today, who is driving, if it left on time, and the map.</span></button>
+      <button type="button" class="sa-card" data-go="customers"><span class="sa-card-ic" aria-hidden="true">&#128203;</span><b>Customers by route</b><span>Tap a route to see every customer on it for a day, or type a customer to see every day it gets a delivery.</span></button>
+    </section>
+
+    <section id="v-routes" hidden>
+      <div id="sa-list" class="sa-list"></div>
+      <p class="sa-foot">Where now comes from the trailer's GPS, or the truck's if the trailer has none. The list refreshes every 2 minutes.</p>
+    </section>
+
+    <!-- Joe 11/1 (mock-ups 2-5): every customer on a route for a day, every day and route a customer gets a delivery, or a group's customers. -->
+    <section id="v-customers" hidden>
+      <div class="sa-tabs" role="tablist">
+        <button type="button" class="on" data-tab="route" role="tab" aria-selected="true">By route</button><button type="button" data-tab="customer" role="tab" aria-selected="false">By customer</button><button type="button" data-tab="group" role="tab" aria-selected="false">By group</button>
+      </div>
+      <div id="cu-by-route" class="sa-box">
+        <label class="sa-lbl" for="cu-route">Route</label>
+        <select id="cu-route" class="sa-select"></select>
+        <p class="sa-lbl">Delivery day <span class="sa-light">(dark = the route runs that day)</span></p>
+        <div class="sa-days" id="cu-days"></div>
+      </div>
+      <div id="cu-by-customer" class="sa-box" hidden>
+        <label class="sa-lbl" for="cu-find">Type part of a customer name or number</label>
+        <input id="cu-find" class="sa-search" type="search" autocomplete="off" placeholder="Customer name or number">
+      </div>
+      <!-- Joe 11/1 (mock-ups 4 and 5): the customers of a group (Dairy Queen, Walmart), each with its days and routes. -->
+      <div id="cu-by-group" class="sa-box" hidden><p class="sa-lbl" id="cu-group-say">Tap a group to see its customers.</p><button type="button" class="sa-all" id="cu-all-groups" hidden>&#8592; All groups</button></div>
+      <div id="cu-list" class="sa-list"></div>
+      <p class="sa-foot" id="cu-foot"></p>
+    </section>
+
     <p class="sa-foot"><button type="button" id="signout">Sign out</button> <span id="who"></span></p>
   </main>
 

@@ -1,6 +1,10 @@
 /*
- * The Sales app (Joe 10/31, mock-up 2d): the map stays on top, every route of the division scrolls under it (Route, Driver,
- * Status, Where now), and a tap on a route moves the map to that truck. Read only. Any United Dairy account may use it ("as long
+ * The Sales app. Joe 11/1 (mock-up 1): it opens on two cards, Where the routes are and Customers by route.
+ * Where the routes are (Joe 10/31, mock-up 2d): the map stays on top, every route of the division scrolls under it (Route,
+ * Driver, Status, Where now), and a tap on a route moves the map to that truck.
+ * Customers by route (Joe 11/1, mock-ups 2 and 3): pick a route and a day to see every customer on it, or type a customer to
+ * see every day and route it gets a delivery, or (mock-ups 4 and 5) open a group like Dairy Queen to see its customers. From the
+ * division's customer list (Administration > Sales App). Read only. Any United Dairy account may use it ("as long
  * as they have a United Dairy account, they can use it. No other access information is needed."), so it is not checked against
  * the Users list. The rows come from the server (functions/src/salesapp.js), the same status words as the 6:00 AM sales email.
  */
@@ -13,10 +17,19 @@ const DIVISION_KEY = 'udSalesDivision';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const $ = (id) => document.getElementById(id);
 
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const VIEWS = ['home', 'routes', 'customers'];
+const TITLES = { home: 'UD Sales', routes: 'Route Status', customers: 'Customers' };
+
+let view = 'home';
 let picked = '';     // the route on the map (its id)
 let rows = {};       // id -> row
 let timer = null;
 let loading = false;
+let signedIn = false;
+// Customers by route: the division's list (read once per division), the tab, the route and day picked.
+let cust = null, custDivision = '', custLoading = null, tab = 'route', cuRoute = '', cuDay = '', cuGroup = '', today = '';
 
 const kept = () => { try { return localStorage.getItem(DIVISION_KEY) || ''; } catch (e) { return ''; } };
 const keep = (v) => { try { localStorage.setItem(DIVISION_KEY, v); } catch (e) { /* private window */ } };
@@ -43,8 +56,14 @@ function drawMap() {
     return;
   }
   const url = mapUrl(r);
-  if (frame.getAttribute('src') !== url) frame.setAttribute('src', url);
-  frame.hidden = false; none.hidden = true;
+  // A new frame for each move: changing a frame's address would add a step to the phone's Back (Back would move the map).
+  if (frame.getAttribute('src') !== url) {
+    const next = frame.cloneNode(false);
+    next.setAttribute('src', url);
+    frame.replaceWith(next);
+    next.hidden = false;
+  } else frame.hidden = false;
+  none.hidden = true;
 }
 
 function drawList(data) {
@@ -63,14 +82,18 @@ function drawList(data) {
   drawMap();
 }
 
+function drawDivisions(data) {
+  const sel = $('sa-division');
+  sel.innerHTML = data.divisions.map(d => '<option value="' + escapeHtml(d.id) + '"' + (d.id === data.division ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
+  sel.value = data.division;
+}
+
 async function load() {
-  if (loading) return;
+  if (loading || view !== 'routes') return;
   loading = true;
   try {
     const data = await callServer('sales', { division: $('sa-division').value || kept() });
-    const sel = $('sa-division');
-    sel.innerHTML = data.divisions.map(d => '<option value="' + escapeHtml(d.id) + '"' + (d.id === data.division ? ' selected' : '') + '>' + escapeHtml(d.name) + '</option>').join('');
-    sel.value = data.division;
+    drawDivisions(data);
     $('sa-day').textContent = data.todayText;
     $('sa-refreshed').textContent = data.refreshed;
     showError('');
@@ -80,10 +103,147 @@ async function load() {
   } finally { loading = false; }
 }
 
+/* ---------- Customers by route ---------- */
+
+const dayName = (d) => DAY_NAMES[DAYS.indexOf(d)] || d;
+const byNumber = (a, b) => a.localeCompare(b, undefined, { numeric: true });
+const todayDay = () => (today ? DAYS[new Date(today + 'T12:00:00').getDay()] : '');
+
+async function loadCustomers() {
+  const want = $('sa-division').value || kept();
+  if (cust && custDivision === want) { drawCustomers(); return; }
+  if (custLoading) return custLoading;
+  $('cu-list').innerHTML = '<p class="sa-empty">Getting the customers…</p>';
+  custLoading = (async () => {
+    try {
+      const data = await callServer('sales', { division: want, what: 'customers' });
+      drawDivisions(data);
+      today = data.today || '';
+      $('sa-day').textContent = today ? dayName(todayDay()) + ' ' + today.slice(5, 7) + '-' + today.slice(8, 10) + '-' + today.slice(2, 4) : '';
+      cust = data.customers || { rows: [] };
+      custDivision = data.division;
+      showError('');
+      const routes = routeList();
+      if (!routes.includes(cuRoute)) { cuRoute = ''; cuDay = ''; }
+      drawCustomers();
+    } catch (e) {
+      $('cu-list').innerHTML = '';
+      showError('Could not get the customers: ' + (e && e.message || e));
+    } finally { custLoading = null; }
+  })();
+  return custLoading;
+}
+
+function routeList() { return [...new Set((cust ? cust.rows : []).map(r => r.route).filter(Boolean))].sort(byNumber); }
+
+function drawCustomers() {
+  const rows = cust ? cust.rows : [];
+  document.querySelectorAll('.sa-tabs button').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  $('cu-by-route').hidden = tab !== 'route';
+  $('cu-by-customer').hidden = tab !== 'customer';
+  $('cu-by-group').hidden = tab !== 'group';
+  if (!rows.length) {
+    $('cu-list').innerHTML = '<p class="sa-empty">The customer list has not been loaded for this division yet. Ask the office to load it on Administration, Sales App.</p>';
+    $('cu-foot').textContent = '';
+    return;
+  }
+  $('cu-foot').textContent = 'From the customer list loaded ' + (cust.savedAt ? cust.savedAt.slice(5, 7) + '-' + cust.savedAt.slice(8, 10) + '-' + cust.savedAt.slice(2, 4) : '') + '.';
+  if (tab === 'route') drawByRoute(rows); else if (tab === 'group') drawByGroup(rows); else drawByCustomer(rows);
+}
+
+function drawByRoute(rows) {
+  const sel = $('cu-route');
+  sel.innerHTML = '<option value="">Pick a route</option>' + routeList().map(r => '<option value="' + escapeHtml(r) + '">' + escapeHtml(r) + '</option>').join('');
+  sel.value = cuRoute;
+  const on = rows.filter(r => r.route === cuRoute);
+  const runs = new Set(on.map(r => r.day));
+  if (cuRoute && !runs.has(cuDay)) cuDay = runs.has(todayDay()) ? todayDay() : DAYS.find(d => runs.has(d)) || '';
+  $('cu-days').innerHTML = DAYS.map(d => '<button type="button" class="sa-day' + (runs.has(d) ? ' has' : '') + (d === cuDay ? ' on' : '') + '" data-day="' + d + '"' +
+    (runs.has(d) ? '' : ' disabled') + ' aria-pressed="' + (d === cuDay) + '">' + dayName(d).slice(0, 3) + '</button>').join('');
+  if (!cuRoute) { $('cu-list').innerHTML = '<p class="sa-empty">Pick a route to see its customers.</p>'; return; }
+  const list = on.filter(r => r.day === cuDay).sort((a, b) => a.name.localeCompare(b.name));
+  $('cu-list').innerHTML = '<h2 class="sa-group">Route ' + escapeHtml(cuRoute) + ', ' + escapeHtml(dayName(cuDay)) + ': ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + '</h2>' +
+    list.map(r => '<div class="cu-row"><span>' + escapeHtml(r.name) + '</span><span class="cu-num">' + (r.account ? '#' + escapeHtml(r.account) : '') + '</span></div>').join('');
+}
+
+const SHOW_MOST = 40;
+function drawByCustomer(rows) {
+  const q = $('cu-find').value.trim().toUpperCase();
+  if (q.length < 2) { $('cu-list').innerHTML = '<p class="sa-empty">Type at least 2 letters or numbers.</p>'; return; }
+  const found = new Map();
+  rows.forEach(r => {
+    if (!(r.name.toUpperCase().includes(q) || (r.account && r.account.startsWith(q)))) return;
+    const key = r.account || r.name;
+    if (!found.has(key)) found.set(key, { name: r.name, account: r.account, days: [] });
+    found.get(key).days.push(r);
+  });
+  const all = [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!all.length) { $('cu-list').innerHTML = '<p class="sa-empty">No customer matches "' + escapeHtml($('cu-find').value.trim()) + '".</p>'; return; }
+  $('cu-list').innerHTML = all.slice(0, SHOW_MOST).map(c => '<div class="cu-res"><h3><span>' + escapeHtml(c.name) + '</span><span class="cu-num">' + (c.account ? '#' + escapeHtml(c.account) : '') + '</span></h3>' +
+    '<div class="cu-grid"><b>Delivery day</b><b>Route</b>' + c.days.sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || byNumber(a.route, b.route)).map(r => '<span>' + escapeHtml(dayName(r.day)) + '</span>' +
+      (r.route ? '<span><button type="button" class="cu-go" data-route="' + escapeHtml(r.route) + '" data-day="' + r.day + '">' + escapeHtml(r.route) + '</button></span>' : '<span class="sa-light">No route</span>')).join('') + '</div></div>').join('') +
+    '<p class="sa-foot">' + all.length + ' customer' + (all.length === 1 ? '' : 's') + ' found' + (all.length > SHOW_MOST ? ', the first ' + SHOW_MOST + ' shown. Type more to narrow it down' : '') + '. Tap a route to see everyone else on it that day.</p>';
+}
+
+// Joe 11/1 (mock-ups 4 and 5): the groups (Dairy Queen, Walmart, ...; Independents last), then a group's customers, each on one line
+// with its number and group and its delivery days and routes underneath.
+const NO_GROUP = 'Independents';
+function customersOf(rows) {
+  const found = new Map();
+  rows.forEach(r => { const k = r.account || r.name; if (!found.has(k)) found.set(k, { name: r.name, account: r.account, group: r.group || NO_GROUP, days: [] }); found.get(k).days.push(r); });
+  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+function drawByGroup(rows) {
+  const all = customersOf(rows), count = {};
+  all.forEach(c => { count[c.group] = (count[c.group] || 0) + 1; });
+  if (cuGroup && !count[cuGroup]) cuGroup = '';
+  $('cu-all-groups').hidden = !cuGroup;
+  $('cu-group-say').hidden = !!cuGroup;
+  if (!cuGroup) {
+    const names = Object.keys(count).sort((a, b) => (a === NO_GROUP) - (b === NO_GROUP) || count[b] - count[a] || a.localeCompare(b));
+    $('cu-list').innerHTML = names.map(g => '<button type="button" class="cu-grp" data-group="' + escapeHtml(g) + '"><b>' + escapeHtml(g) + '</b><span>' + count[g] + ' customer' + (count[g] === 1 ? '' : 's') + ' &#8250;</span></button>').join('');
+    return;
+  }
+  const list = all.filter(c => c.group === cuGroup);
+  $('cu-list').innerHTML = '<h2 class="sa-group">' + escapeHtml(cuGroup) + ': ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + '</h2>' + list.map(c =>
+    '<div class="cu-cust"><div class="cu-top"><b>' + escapeHtml(c.name) + '</b><span class="cu-num">' + (c.account ? '#' + escapeHtml(c.account) : '') + '</span></div><div class="cu-num">' + escapeHtml(c.group) + '</div><div class="cu-chips">' +
+    c.days.sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || byNumber(a.route, b.route)).map(r => r.route ?
+      '<button type="button" class="cu-go" data-route="' + escapeHtml(r.route) + '" data-day="' + r.day + '">' + escapeHtml(dayName(r.day).slice(0, 3) + ' ' + r.route) + '</button>' :
+      '<span class="cu-chip">' + escapeHtml(dayName(r.day).slice(0, 3)) + ', no route</span>').join('') + '</div></div>').join('');
+}
+
+/* ---------- The three views ---------- */
+
+function showView(v, push) {
+  view = VIEWS.includes(v) ? v : 'home';
+  if (push) history.pushState({ view }, '', view === 'home' ? 'sales.html' + keepTest() : 'sales.html?view=' + view + keepTest('&'));
+  $('v-home').hidden = view !== 'home';
+  $('v-routes').hidden = view !== 'routes';
+  $('v-customers').hidden = view !== 'customers';
+  $('sa-maparea').hidden = view !== 'routes';
+  $('sa-ref-line').hidden = view !== 'routes';
+  $('sa-back').hidden = view === 'home';
+  $('sa-title').textContent = TITLES[view];
+  $('sa-help').href = helpHref();
+  window.scrollTo(0, 0);
+  if (!signedIn) return;
+  if (view === 'routes') load();
+  if (view === 'customers') loadCustomers();
+  // The home cards still show the date and the division: the customer call brings both (and has the list ready).
+  if (view === 'home' && !$('sa-division').options.length) loadCustomers();
+}
+// Local testing keeps its made-up sign-in in the address.
+function keepTest(join) { const t = new URLSearchParams(location.search).get('testEmail'); return t ? (join || '?') + 'testEmail=' + encodeURIComponent(t) : ''; }
+// The routes' map sits right under the header, which stays on top.
+const fitTop = () => document.documentElement.style.setProperty('--sa-hdr-h', document.querySelector('.sa-hdr').offsetHeight + 'px');
+window.addEventListener('resize', fitTop);
+fitTop();
+window.udHelpFor = () => 'sales.html' + (view === 'home' ? '' : '?view=' + view);
+
 function startRefreshing() {
   clearInterval(timer);
   timer = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
-  load();
+  showView(view, false);
 }
 
 $('sa-list').addEventListener('click', (ev) => {
@@ -92,9 +252,30 @@ $('sa-list').addEventListener('click', (ev) => {
   picked = b.dataset.id;
   drawMap();
 });
-$('sa-division').addEventListener('change', () => { keep($('sa-division').value); picked = ''; $('sa-list').innerHTML = ''; load(); });
+$('sa-division').addEventListener('change', () => {
+  keep($('sa-division').value); picked = ''; $('sa-list').innerHTML = ''; cust = null; cuRoute = ''; cuDay = ''; cuGroup = '';
+  if (view === 'routes') load();
+  if (view === 'customers') loadCustomers();
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('screen').hidden) load(); });
-$('sa-help').href = helpHref();
+$('v-home').addEventListener('click', (ev) => { const b = ev.target.closest('[data-go]'); if (b) showView(b.dataset.go, true); });
+$('sa-back').addEventListener('click', () => { if (history.state && history.state.view) history.back(); else { history.replaceState(null, '', 'sales.html' + keepTest()); showView('home', false); } });
+window.addEventListener('popstate', () => showView(new URLSearchParams(location.search).get('view') || 'home', false));
+$('v-customers').addEventListener('click', (ev) => {
+  const t = ev.target.closest('[data-tab]');
+  if (t) { tab = t.dataset.tab; drawCustomers(); if (tab === 'customer') $('cu-find').focus(); return; }
+  const gr = ev.target.closest('.cu-grp');
+  if (gr) { cuGroup = gr.dataset.group; drawCustomers(); window.scrollTo(0, 0); return; }
+  if (ev.target.closest('#cu-all-groups')) { cuGroup = ''; drawCustomers(); return; }
+  const d = ev.target.closest('.sa-day');
+  if (d && !d.disabled) { cuDay = d.dataset.day; drawCustomers(); return; }
+  const g = ev.target.closest('.cu-go');
+  if (g) { tab = 'route'; cuRoute = g.dataset.route; cuDay = g.dataset.day; drawCustomers(); window.scrollTo(0, 0); }
+});
+$('cu-route').addEventListener('change', () => { cuRoute = $('cu-route').value; cuDay = ''; drawCustomers(); });
+$('cu-find').addEventListener('input', () => drawCustomers());
+view = VIEWS.includes(new URLSearchParams(location.search).get('view')) ? new URLSearchParams(location.search).get('view') : 'home';
+showView(view, false);
 
 const { auth } = await start();
 $('signin-button').addEventListener('click', async () => {
@@ -111,6 +292,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   $('signin').hidden = !!user;
   $('screen').hidden = !user;
+  signedIn = !!user;
   if (!user) { clearInterval(timer); return; }
   showError('');
   $('who').textContent = user.email || '';

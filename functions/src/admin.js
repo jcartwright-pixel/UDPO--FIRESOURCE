@@ -14,6 +14,7 @@
  *   Email Senders         emailSenders, saveEmailSenders                               private/emailSettings (senders, fromWho)
  *   Remaining Repairs     repairItems, saveRepairItem, completeRepairItem              repairItems/{id}
  *   Sales Route Email     salesEmail, saveSalesEmail, salesEmailTest                   private/salesRouteEmail (salesmail.js)
+ *   Sales App customers   salesCustomers, saveSalesCustomers, renameSalesGroup         salesCustomers/<plant> (salescustomers.js)
  * The email, schedule and diagnostics items are in admintools.js.
  */
 'use strict';
@@ -461,6 +462,10 @@ const OPS = {
   salesEmail: (db) => require('./salesmail').adminView(db),
   saveSalesEmail: async (db, email, input, stamp) => { try { return await require('./salesmail').adminSave(db, email, input, stamp); } catch (e) { if (e.code === 'BAD_REQUEST') fail('BAD_REQUEST', e.message); throw e; } },
   salesEmailTest: (db, email, input, stamp, d) => require('./salesmail').adminTest(db, email, input, stamp, d.mailDeps),
+  // Joe 11/1: the Sales app's customer list (Customers card), one per division, from the Route Menu's Customer By Route tab.
+  salesCustomers: (db) => require('./salescustomers').adminView(companyDb(db), activePlants()),
+  saveSalesCustomers: async (db, email, input, stamp) => { try { return await require('./salescustomers').adminSave(companyDb(db), activePlants(), email, input, stamp); } catch (e) { if (e.code === 'BAD_REQUEST') fail('BAD_REQUEST', e.message); throw e; } },
+  renameSalesGroup: async (db, email, input, stamp) => { try { return await require('./salescustomers').adminRename(companyDb(db), activePlants(), email, input, stamp); } catch (e) { if (e.code === 'BAD_REQUEST') fail('BAD_REQUEST', e.message); throw e; } },
   // Station codes (stations.js): Plant Station, Garage Station and kiosk codes.
   stations: STATIONS.stations, stationAdd: STATIONS.stationAdd, stationCode: STATIONS.stationCode, stationRemove: STATIONS.stationRemove, noAccountSet: STATIONS.noAccountSet
 };
