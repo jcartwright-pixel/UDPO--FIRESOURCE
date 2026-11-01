@@ -79,7 +79,8 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     await cs.click(cc('p811|fri') + ' [data-act="start"]');
     await cs.waitForSelector(cc('p811|fri') + ' .sw-refuse:text-is("2 loads are already loading. Finish or pause one first.")');
     assert.equal(await cs.textContent('#error'), '2 loads are already loading. Finish or pause one first.');
-    assert.ok(parseFloat(await cs.$eval(cc('p811|fri') + ' .sw-refuse', e => getComputedStyle(e).fontSize)) >= 16);
+    // Read in one step: the live card can redraw between finding the note and reading its size.
+    assert.ok(await cs.evaluate((sel) => { const e = document.querySelector(sel); return !!e && parseFloat(getComputedStyle(e).fontSize) >= 16; }, cc('p811|fri') + ' .sw-refuse'));
     await cs.$eval(cc('p811|fri'), e => e.scrollIntoView({ block: 'center' }));
     await shot(cs, 'case-limit-refused-1024.png');
     // Pause 808 (a reason is required), then the waiting load starts.
