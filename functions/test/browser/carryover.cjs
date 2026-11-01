@@ -88,9 +88,10 @@ async function openPage(browser, url, w, h, opts) {
     assert.match(await lo.evaluate(() => document.body.innerText), /Behind\s*4/, 'every load left over from last night is behind');
     assert.deepEqual(lo.errors, []);
 
-    // Manager Center: the same four behind; the Late Forecast tile counts the knock-on.
+    // Manager Center: the same four left over; Joe 11/1: two of them (971 at 2:00 AM, 909 at 6:00 AM) should already have left,
+    // so the subject says 2 routes late (901 and 907 leave later: behind, not late yet).
     const mc = await openPage(browser, '/manager.html?' + MANAGER, 1536, 790);
-    await mc.waitForFunction(() => /4 routes behind/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
+    await mc.waitForFunction(() => /2 routes late/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
     // Every load reaches Manager Center through runDays (a trigger on each run): wait for all nine.
     // A slow test computer can take longer than 20 seconds to run the nine triggers.
     await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 45000 });
@@ -103,9 +104,12 @@ async function openPage(browser, url, w, h, opts) {
     const rep = JSON.parse(reports[0].reportJson), f = rep.forecast;
     assert.deepEqual(rep.behind.map(x => x.route).sort(), ['901_1', '907_1', '909_1', '971'], 'Routes Behind lists every left-over load');
     assert.ok(rep.behind.filter(x => x.route !== '971').every(x => /left over from Mon 10-19-26/.test(x.late)), 'a left-over load not yet past its dispatch says it is left over');
-    // The forecast takes last night's loads first (901, paused, waits its turn like the rest), then today's in order.
-    assert.deepEqual(f.loads.map(x => x.route), ['971', '901_1', '909_1', '907_1', '855', '856', '852', '849', '813']);
-    assert.ok(f.loads[1].est > f.loads[0].est, 'the paused load is not counted as nearly done');
+    // The forecast takes last night's loads first (901, paused, waits its turn like the rest), then today's.
+    // Joe 11/1: behind, the truck that leaves first loads first (by dispatch time), so 909 (6:00 AM) goes before 901,
+    // and Jersey 852 (1:00 PM) before Save-A-Lot 2 (3:00 PM).
+    assert.equal(f.order, 'first to leave');
+    assert.deepEqual(f.loads.map(x => x.route), ['971', '909_1', '901_1', '907_1', '855', '852', '856', '813', '849']);
+    assert.ok(f.loads[2].est > f.loads[1].est, 'the paused load is not counted as nearly done');
     const lastPrior = f.loads[3].est, first = f.loads[4];
     assert.ok(first.start >= lastPrior, 'today starts after last night\'s leftovers');
     assert.equal(first.late, true, 'Save-A-Lot 855 (8:00 AM) cannot leave on time behind four left-over loads');
@@ -113,7 +117,8 @@ async function openPage(browser, url, w, h, opts) {
     // Joe 10/20: the email lists what is left over from yesterday first, then today's loads (Save-A-Lot included), in loading order.
     const html = R.reportHtml(rep, ''), plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
     // Joe 10/26: today's loads under their delivery day, each day once (Save-A-Lot delivers Tuesday, the rest Wednesday).
-    assert.match(plainText, /Left over from Mon 10-19-26 971 [\s\S]*901 [\s\S]*909 [\s\S]*907 [\s\S]*Delivers Tuesday 10-20-26 855 Save-A-Lot 1 [\s\S]*856 Save-A-Lot 2 [\s\S]*Delivers Wednesday 10-21-26 852 [\s\S]*849 [\s\S]*813 /);
+    // Joe 11/1: behind, the forecast's order is first to leave, so 909 (6:00 AM) before 901 (7:00 AM) and 813 (1:30 AM Wed) before 849.
+    assert.match(plainText, /Left over from Mon 10-19-26 971 [\s\S]*909 [\s\S]*901 [\s\S]*907 [\s\S]*Delivers Tuesday 10-20-26 855 Save-A-Lot 1 [\s\S]*856 Save-A-Lot 2 [\s\S]*Delivers Wednesday 10-21-26 852 [\s\S]*813 [\s\S]*849 /);
     fs.writeFileSync(path.join(SHOTS || require('os').tmpdir(), 'carryover-email.html'), html);
     assert.deepEqual(mc.errors, []);
 
@@ -122,7 +127,7 @@ async function openPage(browser, url, w, h, opts) {
     await fc.waitForFunction(() => document.querySelectorAll('.fc-row:not(.fc-head)').length === 9, null, { timeout: 20000 });
     await shot(fc, 'carryover-forecast-1536');
     const order = await fc.$$eval('.fc-row:not(.fc-head)', rows => rows.map(r => r.querySelector('b').textContent));
-    assert.deepEqual(order, ['971', '901', '909', '907', '855', '856', '852', '849', '813']);
+    assert.deepEqual(order, ['971', '909', '901', '907', '855', '852', '856', '813', '849']);
     assert.deepEqual(await fc.$$eval('.fc-why', els => els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent)), [], 'every late reason shows whole');
     assert.deepEqual(await fc.$$eval('.fc-row:not(.fc-head) .fc-est', els => els.map(e => e.textContent).filter(t => !/:\d[05] [AP]M/.test(t))), [], 'every Est. Done is on a 5-minute mark');
     assert.match(await fc.$eval('.fc-row:nth-of-type(6)', r => r.className + ' ' + r.textContent).catch(() => ''), /.*/);

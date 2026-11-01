@@ -159,20 +159,27 @@ test('the email and the report carry the forecast', () => {
   assert.equal(r.forecast, forecast);
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
   assert.match(html, /Forecast at 7:00 PM \(estimated\)/i);
-  assert.match(html, new RegExp(forecast.late + ' loads? potentially late'));
-  // Joe 10/20: "I don't need this great big long recap up here": how far behind, not a line for every late load.
-  assert.ok(forecast.behind > 0 && forecast.behind % 5 === 0);
-  assert.match(html, new RegExp('About ' + R.forecastSummary(forecast).behindText.replace(/^About /, '')));
-  assert.doesNotMatch(html, /est\. [0-9:]+ [AP]M, (leaves|past the)/);
-  assert.match(r.text, /About .* behind/);
-  // Joe 10/22 (option az): every time has its day.
-  assert.match(html, /Due by Tue 5:00 AM: \d+ loads, [\d,]+ cases.*est\. Tue \d+:\d\d [AP]M/);
-  assert.match(html, /All loads done.*est\. (Mon|Tue) \d+:\d\d [AP]M/);
+  // Joe 11/1 ("will all the trucks be loaded … whenever they leave? That's the estimate"): the box answers that one question,
+  // with the loads that will miss their truck and by how much, then every other truck; no "About … behind", no cases.
+  const t = R.truckCheck(JSON.parse(JSON.stringify(r)));
+  // Joe 11/1: behind, so the first truck to leave loads first: Fairmont (Tue 9:00 AM) now makes its truck.
+  assert.equal(forecast.order, 'first to leave');
+  assert.deepEqual(t.miss.map(x => x.id), ['6304_2', '845']);
+  assert.deepEqual(t.miss.map(x => x.value), ['1 hr 15 min late', '15 min late']);
+  assert.equal(t.miss[0].sub, 'Leaves Mon 7:30 PM · est. loaded Mon 8:45 PM');
+  assert.deepEqual([t.lateNow.length, t.ok, t.okLast], [0, 13, 'Tue 9:20 AM']);
+  assert.match(html, /Not every truck will be loaded before it leaves/);
+  assert.match(html, /2 will miss their trucks · the other 13 make it/);
+  assert.match(html, /Will miss its truck<\/td>[^]*6304 Walmart<div[^>]*>Leaves Mon 7:30 PM · est\. loaded Mon 8:45 PM<\/div>[^]*1 hr 15 min late/);
+  assert.match(html, /Every other truck[^]*13 loads<div[^>]*>Last one est\. loaded Tue 9:20 AM[^]*On time/);
+  [html, r.text].forEach(x => assert.doesNotMatch(x, /About .* behind|potentially late|Due by|Cases left|\bcases\b/i));
+  // The banner: no route late now, 3 will miss their trucks.
+  assert.match(html, /&#9888; 2 LOADS WILL MISS THEIR TRUCKS/);
   // Joe 10/26: loaded and not loaded share one list, so an estimated time says "est." in front of it.
   assert.match(html, />est\. \d+:\d\d [AP]M/);
-  assert.match(html, /misses dispatch/);
-  assert.match(r.text, /^LATE FORECAST \(ESTIMATED\)/m);
-  assert.match(r.text, /Due by Tue 5:00 AM: 10 loads, [\d,]+ cases, est\. done Tue \d+:\d\d [AP]M/);
+  assert.match(r.text, /^FORECAST \(ESTIMATED\) AT 7:00 PM: not every truck will be loaded before it leaves$/m);
+  assert.match(r.text, /^ {2}Will miss its truck: 6304 Walmart, Leaves Mon 7:30 PM · est\. loaded Mon 8:45 PM, 1 hr 15 min late$/m);
+  assert.match(r.text, /^ {2}Every other truck: 13 loads on time, last one est\. loaded Tue 9:20 AM$/m);
   // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
   [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
@@ -194,10 +201,10 @@ test('Send Test to Me goes only to the sender on live; the forecast box reaches 
   const group = await run(base);
   assert.deepEqual(group.sent.to, ['a@uniteddairy.com', 'b@uniteddairy.com']);
   assert.doesNotMatch(group.sent.html, /Forecast at|Est\. Done/, 'the groups do not get the box until it is switched on');
-  assert.doesNotMatch(group.sent.text, /LATE FORECAST|est\. done/);
+  assert.doesNotMatch(group.sent.text, /FORECAST \(ESTIMATED\)|est\. loaded/);
   const everyone = await run(base, { forecastEveryone: true });
   assert.match(everyone.sent.html, /Forecast at/);
-  assert.match(everyone.sent.text, /LATE FORECAST/);
+  assert.match(everyone.sent.text, /FORECAST \(ESTIMATED\)/);
   assert.equal(RM.recipients(Object.assign({}, base, { testOnly: true }), env).copy, true);
 });
 
@@ -217,9 +224,13 @@ test('after the 6 a.m. roll, last night\'s open loads are behind and are loaded 
   const ahead = R.plantReport({ loads: [left('950', 668, H(16), { deliveryDate: WED, departureDate: WED })] }, at);
   assert.deepEqual([ahead.behind.length, ahead.nextUp.length], [0, 1], 'left over but leaving after this shift (a Saturday loadout for Monday): not behind yet');
   const f = R.loadForecast({ date: TUE, loads }, at);
-  assert.deepEqual(f.loads.map(x => x.route), ['971', '901', '909', '855', '852'], 'left-over loads first, in their order, then today\'s');
-  assert.equal(f.loads[1].start, f.loads[0].est, 'the paused load is not loading: it follows the one before it');
-  assert.ok(f.loads[3].start >= f.loads[2].est, 'today\'s first load starts after the last left-over one');
+  // Joe 11/1 ("whenever we get behind, we go by … dispatch time"): in the load order (last night's first) Save-A-Lot 855
+  // could not leave at 8:00 AM, so the plant is behind and the truck that leaves first loads first: 971 (2:00 AM), 909
+  // (6:00 AM), 901 (7:00 AM, paused, so it waits its turn like the rest), 855 (8:00 AM), then 852.
+  assert.equal(f.order, 'first to leave');
+  assert.deepEqual(f.loads.map(x => x.route), ['971', '909', '901', '855', '852']);
+  assert.equal(f.loads[2].start, f.loads[1].est, 'the paused load is not loading: it follows the one before it');
+  assert.ok(f.loads[3].start >= f.loads[2].est, 'Save-A-Lot follows the left-over loads that leave before it');
   assert.equal(f.loads[3].late, true);
   assert.equal(f.loads[3].reason, 'misses dispatch');
 });
@@ -238,9 +249,9 @@ test('the forecast says how far behind it is and what was made up or lost since 
   assert.equal(R.forecastSummary(caught).changeText, 'Made up 45 min since the 12:00 PM report');
   const html = R.reportHtml({ dayLabel: 'Tue', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [], totalLoads: 0, leftToLoad: 0,
     forecast: Object.assign({ due: { loads: 0, cases: 0, late: 0 }, dueByText: '5:00 AM', allDoneText: '', casesLeft: 0, byTime: [] }, f, { before: { asOf: '8:42 AM', behind: 860 } }) }, '');
-  assert.match(html, /2 loads potentially late/);
-  assert.match(html, /About 13 hr behind/);
-  assert.match(html, /Made up 1 hr 20 min since the 8:42 AM report/);
+  // Joe 11/1 ("the whole plant is not 11 hours behind"): the email no longer says how far behind or what was made up; the
+  // box says which trucks will be late instead.
+  assert.doesNotMatch(html, /About 13 hr behind|Made up 1 hr 20 min/);
 });
 
 // Joe 10/20 (10:42 AM report: every load 1 hr 40 min): a load with no case count yet is sized from its own route's past
@@ -351,11 +362,15 @@ test('the morning after a slow night: left-over loads on their own line, today o
   assert.ok(f.behind <= 120, 'behind by the left-over loading only, not 8 hours: ' + f.behind);
   assert.match(f.allDoneWhen, /^Thu /);
   const r = R.plantReport({ loads, forecast: f }, at), html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
-  assert.match(html, /Left over from Wed 10-21-26: 2 loads, 1,700 cases/);
-  assert.match(html, /Today&#39;s loads|Today's loads/);
-  assert.match(html, /On time/);
-  assert.match(r.text, /Left over from Wed 10-21-26: 2 loads, 1,700 cases, est\. done Thu \d+:\d\d AM/);
-  assert.match(r.text, /Today's loads: on time/);
+  // Joe 11/1: the email's box shows each left-over load: 901 should have left at 7:00 AM (late now); 907 leaves at 8:00 AM
+  // and will miss its truck; every one of today's loads is on time. No cases.
+  assert.match(html, /Late now: truck should have left[^]*901 Product 1<div[^>]*>Should have left Thu 7:00 AM · left over from Wed 10-21-26<\/div>[^]*est\. Thu \d+:\d\d AM/);
+  assert.match(html, /Will miss its truck[^]*907 Fairmont Transfer<div[^>]*>Leaves Thu 8:00 AM · est\. loaded Thu \d+:\d\d AM · left over from Wed 10-21-26/);
+  assert.match(html, /Every other truck[^]*22 loads[^]*On time/);
+  assert.match(html, /&#9888; 1 ROUTE LATE/);
+  assert.doesNotMatch(html, /\bcases\b/i);
+  assert.match(r.text, /1 late now · 1 more will miss its truck · the other 22 make it/);
+  assert.equal(r.subject, 'Plant Update 10/22 7:36 AM: 1 route late');
 });
 
 // Joe 10/22 ("When these are paused, you're showing time like total time. That shouldn't count as loading time"): paused
@@ -382,16 +397,70 @@ test('paused minutes are not loading time: Total Time, the clean loading time an
 });
 
 // Joe 10/28: "ALL ROUTES ON TIME" in green over "7 loads potentially late" misled; the banner turns yellow and says so.
-test('the banner is yellow and says potentially late when the forecast has late loads and no route is behind', () => {
+test('the banner is yellow and says how many loads will miss their truck when the forecast has some and no route is late', () => {
+  // Joe 11/1: the banner counts the routes late now (truck should have left, not loaded); with none, the loads that will
+  // miss their truck turn it yellow; a load left over from the last shift whose truck has not left yet is BEHIND.
   const base = { dayLabel: 'Tue', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [], totalLoads: 27, leftToLoad: 11 };
-  const fc = (late) => ({ asOf: '11:54 PM', late, loads: [], due: { loads: 0, cases: 0, late: 0 }, dueByText: '5:00 AM', allDoneText: '', casesLeft: 0, byTime: [] });
+  const ld = (id, late, leaves) => ({ id, route: id, run: '', late, leaves, est: 600, estText: '10:00 AM', estDay: 'Tue', shiftEnd: 360 });
+  const fc = (late, now) => ({ asOf: '11:54 PM', now: now || 0, late, loads: Array.from({ length: late }, (_, i) => ld('m' + i, true, 500)).concat([ld('ok', false, 900)]) });
   const banner = (html) => html.match(/<td style="[^"]*padding:16px 14px;background:(#[0-9a-f]+)[^>]*><div[^>]*>([^<]*)/);
   const late = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(7) }), ''));
   assert.equal(late[1], '#f5c518');
-  assert.equal(late[2], '&#9888; 7 LOADS POTENTIALLY LATE');
-  assert.equal(banner(R.reportHtml(Object.assign({}, base, { forecast: fc(1) }), ''))[2], '&#9888; 1 LOAD POTENTIALLY LATE');
+  assert.equal(late[2], '&#9888; 7 LOADS WILL MISS THEIR TRUCKS');
+  assert.equal(banner(R.reportHtml(Object.assign({}, base, { forecast: fc(1) }), ''))[2], '&#9888; 1 LOAD WILL MISS ITS TRUCK');
   const ok = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(0) }), ''));
   assert.deepEqual([ok[1], ok[2]], ['#1f7a4d', '&#10003; ALL ROUTES ON TIME']);
-  const behind = banner(R.reportHtml(Object.assign({}, base, { behind: [{ route: '855' }], forecast: fc(7) }), ''));
-  assert.deepEqual([behind[1], behind[2]], ['#b42318', '&#9888; 1 ROUTE BEHIND'], 'a route already behind stays red');
+  const gone = banner(R.reportHtml(Object.assign({}, base, { behind: [{ id: '855', route: '855', minutesUntil: -60 }], forecast: fc(7) }), ''));
+  assert.deepEqual([gone[1], gone[2]], ['#b42318', '&#9888; 1 ROUTE LATE'], 'a route whose truck should have left stays red');
+  const over = banner(R.reportHtml(Object.assign({}, base, { behind: [{ id: '909', route: '909', minutesUntil: 120, priorDay: true }], forecast: fc(0) }), ''));
+  assert.deepEqual([over[1], over[2]], ['#b42318', '&#9888; 1 ROUTE BEHIND'], 'left over, truck not gone yet: behind');
+  // A forecast load whose leaving time has gone by is late now even inside the report's 45 minutes.
+  const now = R.truckCheck({ behind: [], forecast: fc(1, 520) });
+  assert.deepEqual([now.lateNow.length, now.miss.length, now.ok], [1, 0, 1]);
+});
+
+// Joe 11/1 (Sunday email, Save-A-Lot 2 "6:50 PM" late behind Saturday's left-over loads): "whenever we get behind, we go by
+// what gets delivered first … Save-A-Lot load 2 should be right after Save-A-Lot load 1, and then it will go to Jersey."
+test('behind: the truck that leaves first loads first; on time: the load order stays', () => {
+  const SAT = '2026-10-31', SUN = '2026-11-01', MON = '2026-11-02', at = Date.parse('2026-11-01T14:00:00Z'); // Sunday 9:00 AM
+  const row = (id, route, run, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', state: 'WAITING', quantity: 900, dispatchTime: dispatch, prior: false }, extra);
+  const left = (id, route, run, dispatch, extra) => row(id, route, run, dispatch, Object.assign({ loadDate: SAT, deliveryDate: MON, departureDate: MON, leavesOn: 'Delivery Day', prior: true }, extra));
+  const loads = [
+    left('j2', '852_2', 'UT JERSEY LOAD 2', H(13), { departureDate: SUN, leavesOn: 'Load Day' }), left('w1', '8301', 'UT WALMART', H(3)), left('w2', '8302', 'UT WALMART', H(4)),
+    row('s1', '855', 'SAVE-A-LOT 1', H(8), { loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day', state: 'LOADING', startedAt: '2026-11-01T13:30:00Z' }),
+    row('s2', '856', 'SAVE-A-LOT 2', H(9, 30), { loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day' })];
+  const f = R.loadForecast({ date: SUN, loads }, at);
+  assert.equal(f.order, 'first to leave');
+  assert.deepEqual(f.loads.map(x => x.id), ['s1', 's2', 'j2', 'w1', 'w2'], 'Save-A-Lot 1 (loading), Save-A-Lot 2, then Jersey, then Monday\'s Walmarts');
+  assert.equal(f.loads[1].start, f.loads[0].est, 'Save-A-Lot 2 goes right after Save-A-Lot 1');
+  assert.deepEqual(f.loads.slice(2).map(x => x.late), [false, false, false], 'Jersey and the Walmarts are just running behind, not late');
+  // Nothing late in the load order: the load order stays (left-over loads first).
+  // Sunday 6:00 AM with small loads, nothing started yet.
+  const easy = R.loadForecast({ date: SUN, loads: loads.map(r => Object.assign({}, r, { quantity: 100, state: 'WAITING', startedAt: '' })) }, Date.parse('2026-11-01T11:00:00Z'));
+  assert.equal(easy.order, 'load order');
+  assert.deepEqual(easy.loads.map(x => x.id), ['j2', 'w1', 'w2', 's1', 's2']);
+  assert.ok(easy.loads.every(x => !x.late));
+});
+
+// Joe 11/1 (10:32 AM email "All loads on time"): "sal 1 was a little late think we should show". A load finished after its own
+// dispatch time is loaded late: the subject, a yellow banner (when nothing is late or behind now), the forecast box, the text
+// and its Done time all say so.
+test('a load loaded after its dispatch time shows as loaded late', () => {
+  const SUN = '2026-11-01', at = Date.parse('2026-11-01T15:32:00Z'); // Sunday 10:32 AM
+  const row = (id, route, run, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', quantity: 900, dispatchTime: dispatch, prior: false, loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day' }, extra);
+  const loads = [row('s1', '855', 'SAVE-A-LOT 1', H(8), { state: 'DONE', startedAt: '2026-11-01T12:00:00Z', completedAt: '2026-11-01T13:20:00Z' }),
+    row('s2', '856', 'SAVE-A-LOT 2', H(9, 30), { state: 'DONE', startedAt: '2026-11-01T13:20:00Z', completedAt: '2026-11-01T14:15:00Z' }),
+    row('j2', '852', 'UT JERSEY LOAD 2', H(13), { state: 'WAITING', quantity: 300 })];
+  const r = R.plantReport({ loads, forecast: R.loadForecast({ date: SUN, loads }, at) }, at);
+  assert.deepEqual(r.loaded.map(x => [x.route, x.loadedLate || 0]).sort(), [['855', 20], ['856', 0]], 'Save-A-Lot 1 was loaded 20 minutes after its 8:00 AM dispatch');
+  assert.match(r.subject, /: 1 route loaded late$/);
+  const t = R.truckCheck(r);
+  assert.deepEqual(t.loadedLate.map(x => [x.name, x.sub, x.value]), [['855 Save-A-Lot 1', 'Dispatch Sun 8:00 AM · loaded 8:20 AM', '20 min late']]);
+  assert.match(R.truckCheckSummary(t), /1 already loaded late/);
+  const html = R.reportHtml(r, ''), plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(html, /padding:16px 14px;background:#f5c518[^>]*><div[^>]*>&#9888; 1 ROUTE LOADED LATE/);
+  assert.match(plain, /Already loaded, but late 855 Save-A-Lot 1 Dispatch Sun 8:00 AM · loaded 8:20 AM 20 min late/);
+  assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
+  assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
+  assert.match(r.text, /LOADED LATE \(1\)\n {2}855 Save-A-Lot 1, Dispatch Sun 8:00 AM · loaded 8:20 AM, 20 min late/);
 });

@@ -105,7 +105,8 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
       const page = await openPage(browser, w, h, '/manager.html' + MANAGER);
       await page.waitForFunction(() => /Plant Update/.test(document.getElementById('pv-subject').textContent) && /of 4/.test(document.querySelector('[data-card="dept"]').textContent));
       const behind = seed.behind;
-      assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? behind$'));
+      // Joe 11/1: 502 is past its depart time and not loaded, so its truck should have left: the subject says late.
+      assert.match(await page.textContent('#pv-subject'), new RegExp('^Plant Update .+: ' + behind + ' routes? late$'));
       // Joe 10/26: four department cards, two by two (Today, Waiting, Loading, Done), each opening its own screen.
       assert.deepEqual(await page.$$eval('[data-card="dept"] .dp-card', d => d.map(x => x.querySelector('strong').textContent + ' ' + x.dataset.href)),
         ['Case Loading loadout.html?area=CASE', 'Tote Loading loadout.html?area=TOTES', 'Box Loading loadout.html?area=BOXING', 'Case Unloading unloading.html']);
@@ -185,13 +186,14 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
     }
     // Joe 10/11: the card's preview is a brief: routes behind and other problems only, never the loaded or still-to-load list.
     const brief = await page.textContent('#pv-list');
-    assert.match(brief, /Routes1 of 4 loaded[\s\S]*Routes behind[\s\S]*502[\s\S]*BEHIND/, brief);
+    assert.match(brief, /Routes1 of 4 loaded[\s\S]*Routes late or behind[\s\S]*502[\s\S]*LATE/, brief);
     assert.doesNotMatch(brief, /501|LOADED$|NOT LOADED/, brief);
     await page.click('.mc-preview');
     await page.waitForSelector('#modal:not([hidden])');
     const body = await page.textContent('#rp-body');
-    // Joe 10/14: each tile is the route number and the run's short name; only BEHIND has a word (green is loaded, red is not).
-    assert.match(body, new RegExp(seed.behind + ' ROUTES? BEHIND[\\s\\S]*Loaded \\(1\\)501 Akron[\\s\\S]*Not loaded \\(3\\)502 CantonBEHIND503 Massillon(BEHIND)?504 Wooster(BEHIND)?Routes behind'));
+    // Joe 10/14: each tile is the route number and the run's short name; only a late (Joe 11/1: truck should have left) or
+    // behind route has a word (green is loaded, red is not).
+    assert.match(body, new RegExp(seed.behind + ' ROUTES? LATE[\\s\\S]*Loaded \\(1\\)501 Akron[\\s\\S]*Not loaded \\(3\\)502 CantonLATE503 Massillon(LATE)?504 Wooster(LATE)?Routes late or behind'));
     assert.doesNotMatch((await page.$$eval('#rp-body .mc-routes', d => d.map(x => x.textContent))).join(' '), /LOADED/, 'the route tiles have no LOADED / NOT LOADED words');
     assert.match(body, /Pickups open1PICKUP 503 MASSILLON3 cases Chocolate milk/);
     assert.match(body, /Plant breakdowns1Palletizer/);
@@ -202,7 +204,7 @@ const tileText = (page, card, label) => page.$eval('[data-card="' + card + '"]',
     await page.waitForFunction(() => /Report saved\. Email is not set up in Operations yet/.test(document.getElementById('saved').textContent) && document.getElementById('modal').hidden);
     const kept = (await db().collection('plantReports').get()).docs.map(x => x.data());
     assert.equal(kept.length, 1);
-    assert.match(kept[0].text, new RegExp('^NOTE: Short staffed on second shift\\n\\nROUTES BEHIND \\(' + seed.behind + '\\)'));
+    assert.match(kept[0].text, new RegExp('^NOTE: Short staffed on second shift\\n\\nROUTES LATE OR BEHIND \\(' + seed.behind + '\\)'));
     results.push('Send Current Report: kept as sent (' + kept[0].subject + '), not emailed');
     const phone = await openPage(browser, 412, 860, '/manager.html' + MANAGER);
     await phone.waitForFunction(() => /of 4/.test(document.getElementById('pv-chips').textContent) && !document.getElementById('send-card').hidden);

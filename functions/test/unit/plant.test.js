@@ -366,13 +366,13 @@ test('Manager Center: scheduler, quality, temperature and shift-note numbers, an
     lines: [{ name: 'BOXING', last: { status: 'DOWN', product: 'Skim', notes: 'Belt' } }],
     temps: [{ location: 'Cooler North', status: 'MANUAL ONLY', lastManualTemperature: 44.5, lastStatus: 'HIGH', lowLimit: 33, highLimit: 41, sensorTemp: '', locked: true }, { location: 'Cooler Middle', status: 'MANUAL ONLY', lastManualTemperature: '', lastStatus: '', lowLimit: '', highLimit: '', sensorTemp: '', locked: false }]
   }, now);
-  assert.equal(r.subject, 'Plant Update 10/8 10:00 AM: 1 route behind');
+  assert.equal(r.subject, 'Plant Update 10/8 10:00 AM: 1 route late');
   assert.deepEqual(r.behind.map(x => [x.route, x.late]), [['799', '24 h 0 min late']]);
   assert.deepEqual([r.nextUp.map(x => x.route), r.loaded.map(x => x.route), r.leftToLoad, r.totalLoads], [['801', '803'], ['802'], 3, 4]);
   assert.deepEqual(r.counts, { behind: 1, leftToLoad: 3, pickups: 1, down: 1, linesDown: 1, tempsOut: 1 });
   // Joe 10/16: the email's route row shows when the load was done and its dispatch time.
   assert.deepEqual([r.loaded[0].doneAt, r.loaded[0].depart], ['8:40 AM', '5:00 AM']);
-  assert.match(r.text, /ROUTES BEHIND \(1\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
+  assert.match(r.text, /ROUTES LATE OR BEHIND \(1\)\n {2}799 {2}depart 10:00 AM {2}NOT LOADED {2}24 h 0 min late/);
   assert.match(r.text, /PLANT BREAKDOWNS \(1\)\n {2}Palletizer {2}Jammed {2}logged 9:00 AM first shift {2}OPEN/);
   assert.match(r.text, /STILL TO LOAD: 3 of 4 {3}Case 2 of 3 · Totes 1 of 1/);
   assert.match(r.text, /TEMPERATURES\n {2}Cooler North {2}44\.5°F {2}HIGH \(limit 33–41\)\n {2}Cooler Middle {2}- {2}NO CHECK {2}check due/);
