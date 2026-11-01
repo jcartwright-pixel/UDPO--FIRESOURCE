@@ -31,19 +31,30 @@ test('rows: driver, status, where now from the trailer first, else the truck; to
   const today = out.groups[0].rows, yday = out.groups[1].rows;
   assert.deepEqual(today.map(r => [r.route, r.driver, r.status, r.where, r.by, r.gpsAt]), [['815', 'Tina Moss', 'Not loaded', 'At the plant', 'TRUCK', '10:10 PM 11-2-26']]);
   assert.deepEqual(yday.map(r => r.route), ['802', '811'], '820 (Ended Up Not Running) left off');
-  assert.deepEqual([yday[0].status, yday[0].where, yday[0].by, yday[0].lat, yday[0].gpsAt], ['On time, left 3:32 AM', 'On the road near I-79 N, Cranberry, PA', 'TRAILER', 40.6, '10:41 AM']);
+  assert.deepEqual([yday[0].status, yday[0].where, yday[0].by, yday[0].lat, yday[0].gpsAt], ['On time, left 3:32 AM', 'On the road: I-79 N, Cranberry, PA', 'TRAILER', 40.6, '10:41 AM']);
   // T-102 has no GPS unit: the truck's.
-  assert.deepEqual([yday[1].status, yday[1].where, yday[1].by], ['Left 5:42 AM, 1 hr 12 min late', 'At Giant Eagle 44', 'TRUCK']);
+  assert.deepEqual([yday[1].status, yday[1].where, yday[1].by], ['Left 5:42 AM, 1h 12m late', 'At Giant Eagle 44', 'TRUCK']);
 });
 
 test('where now in words', () => {
   assert.equal(A.whereOf(null, [], false), 'No GPS');
   assert.equal(A.whereOf({ place: 'Uniontown Plant' }, [], false), 'At the plant');
   assert.equal(A.whereOf({ place: 'Uniontown Branch' }, [], true), 'Back at the plant');
-  assert.equal(A.whereOf({ address: 'US-19, Canonsburg, PA', speedMph: 45 }, [], true), 'On the road near US-19, Canonsburg, PA');
-  assert.equal(A.whereOf({ address: '12 Main St, Wheeling, WV', speedMph: 0 }, [], true), 'Stopped at 12 Main St, Wheeling, WV');
+  assert.equal(A.whereOf({ address: 'US-19, Canonsburg, PA', speedMph: 45 }, [], true), 'On the road: US-19, Canonsburg, PA');
+  assert.equal(A.whereOf({ address: '12 Main St, Wheeling, WV', speedMph: 0 }, [], true), 'Stopped: 12 Main St, Wheeling, WV');
   // Joe 10/31: a place marked in Fleet shows by its name instead of the address.
   assert.equal(A.whereOf({ place: 'Walmart 2291', address: '100 Mall Rd, Morgantown, WV', speedMph: 0 }, [], true), 'At Walmart 2291');
+});
+
+// Joe 11/1 (two-line mock-up 3): the GPS's "US|21795|Mary Rd [MD-63]" reads "Mary Rd (MD-63), 21795"; the status is short.
+test('where now and status, short for two lines', () => {
+  assert.equal(A.cleanAddress('US|21795|Mary Rd [MD-63]'), 'Mary Rd (MD-63), 21795');
+  assert.equal(A.cleanAddress('12 Main St, Wheeling, WV'), '12 Main St, Wheeling, WV');
+  assert.equal(A.whereOf({ address: 'US|21795|Mary Rd [MD-63]', speedMph: 0 }, [], true), 'Stopped: Mary Rd (MD-63), 21795');
+  assert.equal(A.shortStatus('Left 10:12 AM, 2 hr 12 min late'), 'Left 10:12 AM, 2h 12m late');
+  assert.equal(A.shortStatus('Not departed, 1 hr behind'), 'Not departed, 1h behind');
+  assert.equal(A.shortStatus('Not loaded, 35 min behind'), 'Not loaded, 35m behind');
+  assert.equal(A.shortStatus('On time, left 10:32 AM'), 'On time, left 10:32 AM');
 });
 
 test('the call: picks the division asked for, else the first; nothing written', async () => {
