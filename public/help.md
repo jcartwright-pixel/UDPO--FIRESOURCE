@@ -1277,7 +1277,7 @@ Every link and code people use to reach the app:
 - An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
-- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code.
+- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list**: pick the **Division**, choose the Route Menu workbook (its **Customer By Route** tab is read), check the count it shows and press `Save Customer List`. A new upload replaces that division's whole list. **Group names** below lets you rename a group (Dairy Queen, Walmart); it saves when you leave the box.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1484,14 +1484,15 @@ On the Driver Room tablet, 5 minutes with no taps signs the driver out and shows
 
 ## Sales app: where every route is
 id: sales
-screens: sales.html
+screens: sales.html, sales.html?view=routes
 
 The salespeople's phone app (**UD Sales** on the home screen). It shows every route of a division: who is driving it, its status and where it is now, with a map on top. It only shows; nothing can be changed from it. Anyone with a United Dairy account can use it.
 
 1. Open the Sales App link (Administration, **Sales App**) and sign in with your United Dairy Google account.
 2. Add it to the home screen. It is called **UD Sales**.
 3. Pick the **Division** at the top right (Uniontown, Charleston or Martins Ferry). The phone remembers it.
-4. Scroll the routes. Tap a route and the map at the top moves to that truck. The map stays on top while you keep scrolling; tap another route to move it again.
+4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). `Back` at the top comes back to the cards.
+5. Scroll the routes. Tap a route and the map at the top moves to that truck. The map stays on top while you keep scrolling; tap another route to move it again.
 
 - **Route, Driver, Status, Where now.** The driver is the one on Daily Dispatch. Today's loads are first, under **Today**; the day before's loads, which may still be out, follow under **Loaded** with that date.
 - **Status** is the same as the 6:00 AM sales email: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1 hr 12 min late** (red), **Not departed, 35 min behind** (loaded, past its dispatch time, still here), **Not loaded, 20 min behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
@@ -1503,6 +1504,26 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 > To see a route on a bigger map, tap the map and open it in Google Maps.
 
 !> Do not read **No GPS** as lost. It means neither the trailer nor the truck on that load has a GPS unit the app knows about; ask Dispatch.
+
+## Sales app: customers
+id: sales-customers
+screens: sales.html?view=customers
+
+The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the customer list the office loads on Administration, **Sales App** (the Route Menu's Customer By Route tab). It only shows; nothing can be changed from it.
+
+1. Tap **Customers by route** on the app's first screen.
+2. Pick a tab: `By route`, `By customer` or `By group`.
+3. **By route:** pick the **Route**, then tap a day. Dark days are the days the route runs; today is picked when it runs today. Every customer on that route that day is listed with its customer number.
+4. **By customer:** type part of a customer's name or number. Each customer found shows every **Delivery day** and its **Route**. Tap a route to see everyone else on it that day.
+5. **By group:** tap a group (Dairy Queen, Walmart, BFS Foods, Independents). Each customer is on one line with its number and group, and its days and routes underneath. `All groups` goes back to the list.
+
+- Every name starting with DQ is in **Dairy Queen**. Everyone else is grouped by the chain number in the Route Menu; a customer with no chain, or the only one in its chain, is under **Independents**.
+- A day that says **no route** is a line in the Route Menu with no route number.
+- The bottom line says when the customer list was last loaded.
+
+> The customer list changes only when the office loads a new Route Menu. If a customer is missing or on the wrong day, tell the office.
+
+!> Do not read this list as today's loads. It is the regular route menu; for where a truck is now, use **Where the routes are**.
 
 ## Plant Station tablet
 id: plant-station

@@ -226,7 +226,7 @@ exports.garage = onCall({ maxInstances: 3 }, async (request) => {
 exports.sales = onCall({ maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
   if (!unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with your United Dairy account.');
   const divisions = PLANTS.activePlants().filter(plantReady).map(p => ({ id: p.id, name: p.name }));
-  try { return await require('./src/salesapp').salesCall(divisions, (id) => PLANTS.dbFor(id, db), request.data || {}); } catch (error) { throw asHttps(error); }
+  try { return await require('./src/salesapp').salesCall(divisions, (id) => PLANTS.dbFor(id, db), request.data || {}, { rootDb: db }); } catch (error) { throw asHttps(error); }
 });
 
 exports.newRouteCode = onCall(async (request) => {

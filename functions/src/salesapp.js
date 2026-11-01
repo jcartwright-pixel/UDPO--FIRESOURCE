@@ -99,13 +99,18 @@ async function readInput(db, nowMs) {
 
 /**
  * The one call. divisions: [{ id, name }] the plants that are running; dbFor(id) their databases. input: { division }.
- * Returns { divisions, division, refreshed, todayText, groups }.
+ * Returns { divisions, division, refreshed, todayText, groups }; with input.what 'customers', { divisions, division, today, customers }.
  */
 async function salesCall(divisions, dbFor, input, deps) {
   const nowMs = deps && deps.now ? deps.now() : Date.now();
   const want = text(input && input.division), pick = divisions.find(d => d.id === want) || divisions[0];
-  if (!pick) return { divisions: [], division: '', groups: [], todayText: '', refreshed: '' };
+  if (!pick) return { divisions: [], division: '', groups: [], todayText: '', refreshed: '', customers: { rows: [], savedAt: '' } };
   const R = require('./plant-rules');
+  // Joe 11/1: the Customers card reads the division's customer list (salescustomers.js), kept in the main database.
+  if (text(input && input.what) === 'customers') {
+    const customers = await require('./salescustomers').forSales((deps && deps.rootDb) || dbFor(pick.id), pick.id);
+    return { divisions, division: pick.id, today: L.operatingDay(new Date(nowMs)), customers };
+  }
   const screen = salesScreen(await readInput(dbFor(pick.id), nowMs), nowMs);
   return Object.assign({ divisions, division: pick.id, refreshed: S.clock12(R.wallClock(nowMs)) }, screen);
 }
