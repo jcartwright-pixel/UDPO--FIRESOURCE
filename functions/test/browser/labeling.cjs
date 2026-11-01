@@ -149,6 +149,14 @@ const laneText = (page, id) => page.$eval('[data-lane="' + id + '"]', e => e.inn
     await lr.waitForFunction(id => !/HOLD LABELS/.test(document.querySelector('[data-lane="' + id + '"]').textContent), NEW_HALF);
     results.push('Hold labels on the filler\'s tablet turns its Labeling Room panel red; Filler running again clears it');
 
+    // 6.78 full test: a filler never saved on Products shows its starting list, and every label offered there saves.
+    await db().collection('plantProducts').doc(GALLON).delete();
+    await lr.waitForFunction(id => [...document.querySelectorAll('[data-lane="' + id + '"] [data-pick="labeling"] option')].some(o => o.value === 'Broughton 2% Gallon'), GALLON);
+    await lr.selectOption('[data-lane="' + GALLON + '"] [data-pick="labeling"]', 'Broughton 2% Gallon');
+    await until('starting-list label saved', async () => ((await lineDoc(GALLON)).labeling || {}).product === 'Broughton 2% Gallon');
+    await lr.waitForFunction(() => !document.getElementById('error') || !/not saved/i.test(document.getElementById('error').textContent));
+    results.push('A label from a filler\'s starting list (never saved on Products) saves from the Labeling now drop-down');
+
     // Laptop and tablet widths: no sideways scrolling.
     for (const [w, h] of [[1920, 1080], [1024, 768], [390, 844]]) {
       const p = await openPage(browser, w, h, '/labeling.html?' + ADMIN);
