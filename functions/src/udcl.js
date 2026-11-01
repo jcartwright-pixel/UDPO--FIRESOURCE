@@ -7,8 +7,8 @@
  *   udclRouteDays/<plant>__<route>__<DAY>     the route day: stops in run order, start time, instructions, load map
  *   private/udcl_<plant>                      the last import
  *
- * Operations only reads them, here: the Sales app's Customers card takes its lines from the Customer List once a plant has
- * one (salescustomers.js forSales), and the drivers' phone (Route Check-In) shows a route day's Route Book (phone.js routeBook).
+ * Operations only reads them, here: the Sales app's Customers card takes its lines only from the Customer List (Joe 11/1:
+ * "Any changes or ever, it goes through that"; salescustomers.js forSales), and the drivers' phone (Route Check-In) shows a route day's Route Book (phone.js routeBook).
  * Nothing in Operations changes them. udcl-rules.js is the Customer List's rules file (the same file as in that app).
  */
 'use strict';
@@ -52,7 +52,7 @@ async function routeBook(db, plant, route, day) {
 
 /** The Sales app's lines from the Customer List: { rows: [{ day, route, account, chain, name }], savedAt }, or null when it has none. */
 async function salesRows(db, plant) {
-  // A plant whose list was never imported here has none (the Sales app keeps its own upload then).
+  // A plant whose list was never imported into the Customers app has none (the Sales app shows an empty list then).
   if (!(await db.collection('private').doc('udcl_' + plant).get()).exists) return null;
   const d = await readPlant(db, plant);
   if (!d.routeDays.length) return null;

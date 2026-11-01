@@ -693,86 +693,15 @@ export async function renderGarageCodes(box, ctx) { await Promise.all([renderApp
 // Joe 10/18: the Plant Managers app: its link, then each plant's Plant Managers code.
 export async function renderManagerAppCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, MANAGER_APP_LINKS, stationSection('MANAGER')), bindStations(box, 'MANAGER')]); }
 // Joe 10/31: the Sales app's link (copy, print a QR, Launch).
-// Joe 11/1: under the link, each division's customer list for the app's Customers card, loaded from his Route Menu workbook.
-const SALES_CUSTOMERS = '<div class="ap-section" id="sc-section" style="margin-top:10px"><h3>Customer list (the app\'s Customers card)</h3>' +
-  '<p class="ap-note">Which customers each route delivers to on each day. Upload the Route Menu workbook: the app reads its <b>Customer By Route</b> tab ' +
-  '(Day, Route, Chain, Account, Name). A new upload replaces the whole list for that division.</p>' +
-  '<div class="ap-grid2"><label class="ap-field">Division<select id="sc-plant"></select></label>' +
-  '<label class="ap-field">Route Menu workbook<small>Excel (.xlsx, .xlsb or .xls)</small><input type="file" id="sc-file" accept=".xlsx,.xlsb,.xls,.xlsm"></label></div>' +
-  '<div id="sc-check"></div><div class="ap-acts"><button type="button" class="ap-btn main" id="sc-save" disabled>Save Customer List</button></div>' +
-  '<table class="ap-t" style="margin-top:10px"><thead><tr><th>Division</th><th>Customers</th><th>Routes</th><th>Lines</th><th>Loaded</th></tr></thead><tbody id="sc-list"></tbody></table>' +
-  '<h3 style="margin-top:14px">Group names (the app\'s By group)</h3><p class="ap-note">Every name starting with DQ is Dairy Queen; everyone else goes by the Chain number in the file, and a customer with no chain (or alone in its chain) is an Independent. ' +
-  'The file has no chain names, so the app guesses them. Type a better name to change it; it saves when you leave the box and stays through new uploads. Clear it to go back to the guess.</p>' +
-  '<div id="sc-groups"></div></div>';
-const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again.')); document.head.appendChild(el); });
-const SC_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const scText = (v) => (v === null || v === undefined ? '' : String(v).trim());
-
-/** The Customer By Route tab's lines, from a sheet's cells (rows of values; the heading row has DAY, ROUTE and NAME). */
-export function customerRows(cells) {
-  const hi = cells.findIndex(r => { const h = (r || []).map(c => scText(c).toUpperCase()); return h.includes('DAY') && (h.includes('ROUTE') || h.includes('RT')) && h.includes('NAME'); });
-  if (hi < 0) return null;
-  const h = cells[hi].map(c => scText(c).toUpperCase()), at = (...n) => h.findIndex(x => n.includes(x));
-  const c = { day: at('DAY'), route: at('ROUTE', 'RT'), chain: at('CHAIN'), account: at('ACCOUNT', 'ACCT', 'CUSTOMER NUMBER'), name: at('NAME') };
-  return cells.slice(hi + 1).map(r => ({ day: scText(r[c.day]).toUpperCase().slice(0, 3), route: scText(r[c.route]), chain: c.chain >= 0 ? scText(r[c.chain]) : '', account: c.account >= 0 ? scText(r[c.account]) : '', name: scText(r[c.name]) }))
-    .filter(x => SC_DAYS.includes(x.day) && x.name);
-}
-
-export async function renderSalesApp(box, ctx) {
-  await renderAppLinks(box, ctx, SALES_LINKS, SALES_CUSTOMERS);
-  const $ = (s) => box.querySelector(s);
-  let picked = null;
-  function draw(d) {
-    const sel = $('#sc-plant'), was = sel.value;
-    sel.innerHTML = '<option value=""></option>' + d.plants.map(p => '<option value="' + e(p.id) + '">' + e(p.name) + '</option>').join('');
-    sel.value = was;
-    $('#sc-list').innerHTML = d.plants.map(p => '<tr><td>' + e(p.name) + '</td><td>' + (p.count ? p.customers : '') + '</td><td>' + (p.count ? p.routes : '') + '</td><td>' + (p.count ? p.count : '<span class="ap-chip bad">Not loaded</span>') + '</td><td>' +
-      (p.savedAt ? e(when(p.savedAt)) + (p.savedBy ? ' by ' + e(p.savedBy) : '') + (p.fileName ? '<br><small>' + e(p.fileName) + '</small>' : '') : '') + '</td></tr>').join('');
-    if (box.querySelector('#sc-groups input:focus')) return;
-    const withGroups = d.plants.filter(p => p.groups && p.groups.length);
-    $('#sc-groups').innerHTML = withGroups.length ? withGroups.map(p => '<table class="ap-t" style="margin-top:6px"><thead><tr><th>' + e(p.name) + ' group</th><th>Customers</th><th>The app\'s guess</th></tr></thead><tbody>' +
-      p.groups.map(g => '<tr><td><input class="sc-group" data-plant="' + e(p.id) + '" data-key="' + e(g.key) + '" value="' + e(g.name) + '" data-was="' + e(g.name) + '" maxlength="60" aria-label="Group name"></td><td>' + g.count + '</td><td>' + e(g.guess) + '</td></tr>').join('') + '</tbody></table>').join('') :
-      '<p class="ap-note">No customer list loaded yet.</p>';
-  }
-  function check() {
-    $('#sc-save').disabled = !(picked && picked.rows.length && $('#sc-plant').value);
-    if (!picked) { $('#sc-check').innerHTML = ''; return; }
-    const r = picked.rows, routes = new Set(r.map(x => x.route).filter(Boolean)), people = new Set(r.map(x => x.account || x.name)), none = r.filter(x => !x.route).length;
-    $('#sc-check').innerHTML = r.length ? '<div class="ap-msg good">' + e(picked.fileName) + ': ' + people.size + ' customers on ' + routes.size + ' routes (' + r.length + ' lines).' +
-      (none ? ' ' + none + ' line' + (none === 1 ? ' has' : 's have') + ' no route; they show under the customer as No route.' : '') + (!$('#sc-plant').value ? ' Pick the division, then save.' : '') + '</div>' :
-      '<div class="ap-msg bad">No Customer By Route tab with Day, Route and Name headings was found in ' + e(picked.fileName) + '.</div>';
-  }
-  async function load() { try { const d = await call('salesCustomers'); if (box.isConnected) draw(d); } catch (err) { say(box, errText(err), 'bad'); } }
-  $('#sc-file').addEventListener('change', async () => {
-    const f = $('#sc-file').files[0];
-    picked = null; check();
-    if (!f) return;
-    try {
-      const X = await loadXlsx();
-      const wb = X.read(await f.arrayBuffer(), { type: 'array' });
-      const tab = wb.SheetNames.find(n => n.trim().toUpperCase() === 'CUSTOMER BY ROUTE');
-      const order = tab ? [tab] : wb.SheetNames;
-      let rows = [];
-      for (const n of order) { const got = customerRows(X.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' })); if (got && got.length) { rows = got; break; } }
-      picked = { fileName: f.name, rows };
-      say(box, '');
-    } catch (err) { say(box, 'Could not read ' + f.name + ': ' + errText(err), 'bad'); }
-    check();
-  });
-  $('#sc-plant').addEventListener('change', check);
-  box.addEventListener('change', ev => {
-    const i = ev.target.closest('.sc-group');
-    if (!i || i.value.trim() === i.dataset.was) return;
-    call('renameSalesGroup', { plant: i.dataset.plant, key: i.dataset.key, name: i.value }).then(d => { i.blur(); draw(d); say(box, ''); }).catch(err => say(box, errText(err), 'bad'));
-  });
-  $('#sc-save').addEventListener('click', () => busy(box, $('#sc-save'), async () => {
-    const d = await call('saveSalesCustomers', { plant: $('#sc-plant').value, fileName: picked.fileName, rows: picked.rows });
-    picked = null; $('#sc-file').value = ''; draw(d); check();
-    say(box, d.message, 'good');
-  }).then(check));
-  await load();
-}
+// Joe 11/1: "remove the customer list from this ... our sales app needs to pull that information from there. Any changes or
+// ever, it goes through that." The app's Customers card reads only Joe's separate Customers app; nothing is uploaded here.
+// Its web site is this one's with -customers on the end (ud-distribution-sandbox -> ud-distribution-sandbox-customers).
+export const customersAppUrl = (host) => /\.web\.app$/.test(host) ? 'https://' + host.replace(/\.web\.app$/, '-customers.web.app') + '/' : '';
+const salesCustomersNote = () => { const u = customersAppUrl(location.hostname);
+  return '<div class="ap-section" id="sc-section" style="margin-top:10px"><h3>Customer list (the app\'s Customers card)</h3>' +
+  '<p class="ap-note" id="sc-from">The Customers card shows the customers from the <b>Customer List</b> app. Every change to a customer, a route or a day is made there and shows in the Sales app by itself.</p>' +
+  (u ? '<div class="ap-acts"><a class="ap-btn main" id="sc-open" href="' + u + '">Open the Customer List</a></div>' : '') + '</div>'; };
+export async function renderSalesApp(box, ctx) { await renderAppLinks(box, ctx, SALES_LINKS, salesCustomersNote()); }
 export async function renderDriverCodes(box, ctx) { await Promise.all([renderAppLinks(box, ctx, DRIVER_LINKS, stationSection('KIOSK'), DRIVER_MORE), bindStations(box, 'KIOSK')]); }
 
 /* ---------- Manager Report Recipients ---------- */

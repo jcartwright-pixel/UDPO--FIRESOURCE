@@ -1,54 +1,52 @@
 'use strict';
-// Joe 11/1 (mock-ups 1-5): the Sales app's customer list, from the Route Menu's Customer By Route tab. Made-up customers only.
+// Joe 11/1: the Sales app's customers come only from the Customer List app (udcl.js); this app keeps no list of its own
+// ("Any changes or ever, it goes through that"). Groups (mock-ups 4 and 5). Made-up customers only.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('../../src/salescustomers');
 
 const LINES = [
-  { day: 'TUE', route: 803, chain: 0, account: 1196, name: 'ACORN CORNER MARKET' }, { day: 'tue', route: '803.0', chain: '0', account: '1196.0', name: 'ACORN  CORNER MARKET' },
-  { day: 'FRI', route: '', chain: 0, account: 271285, name: 'LAKESIDE SCOOPS' }, { day: 'XYZ', route: 803, name: 'NOT A DAY' }, { day: 'MON', route: 803, name: '' },
-  { day: 'THU', route: 805, chain: 498, account: 13590, name: '...DQ BETHEL KNOLL' }, { day: 'MON', route: 808, chain: 990, account: 2603, name: 'WAL-MART #2603 MAPLETON' },
-  { day: 'WED', route: 808, chain: 990, account: 1885, name: 'WAL-MART #1885 PINEDALE' }, { day: 'WED', route: 812, chain: 10, account: 48, name: 'BFS FOODS #48 OAKMONT' }
+  { day: 'TUE', route: '803', chain: '', account: '1196', name: 'ACORN CORNER MARKET' }, { day: 'FRI', route: '', chain: '', account: '271285', name: 'LAKESIDE SCOOPS' },
+  { day: 'THU', route: '805', chain: '498', account: '13590', name: '...DQ BETHEL KNOLL' }, { day: 'MON', route: '808', chain: '990', account: '2603', name: 'WAL-MART #2603 MAPLETON' },
+  { day: 'WED', route: '808', chain: '990', account: '1885', name: 'WAL-MART #1885 PINEDALE' }, { day: 'WED', route: '812', chain: '10', account: '48', name: 'BFS FOODS #48 OAKMONT' }
 ];
 
-test('lines are cleaned: numbers as plain words, chain 0 = none, no day or name = left out, the same line once', () => {
-  const rows = S.cleanRows(LINES);
-  assert.equal(rows.length, 6);
-  assert.deepEqual(rows[0], { day: 'TUE', route: '803', account: '1196', chain: '', name: 'ACORN CORNER MARKET' });
-  assert.deepEqual(rows[1], { day: 'FRI', route: '', account: '271285', chain: '', name: 'LAKESIDE SCOOPS' });
-  assert.deepEqual(S.summary(rows), { count: 6, customers: 6, routes: 4, noRoute: 1 });
-  assert.throws(() => S.cleanRows([]), /No customer lines/);
-  assert.throws(() => S.cleanRows([{ day: 'MON', name: '' }]), /No customer lines/);
+test('groups: every DQ name is Dairy Queen, the rest by chain; one customer in a chain is no group', () => {
+  assert.equal(S.groupKey(LINES[2]), 'DQ');
+  assert.deepEqual(S.groupsOf(LINES).map(g => [g.key, g.name, g.count]), [['chain:990', 'Walmart', 2], ['DQ', 'Dairy Queen', 1]]);
 });
 
-test('groups: every DQ name is Dairy Queen, the rest by chain; one customer in a chain is no group; a rename wins', () => {
-  const rows = S.cleanRows(LINES);
-  assert.equal(S.groupKey(rows.find(r => r.name.includes('BETHEL'))), 'DQ');
-  assert.deepEqual(S.groupsOf(rows, {}).map(g => [g.key, g.name, g.count]), [['chain:990', 'Walmart', 2], ['DQ', 'Dairy Queen', 1]]);
-  assert.deepEqual(S.groupsOf(rows, { 'chain:990': 'Big Box Stores' }).map(g => [g.name, g.guess]), [['Big Box Stores', 'Walmart'], ['Dairy Queen', 'Dairy Queen']]);
-});
-
-function fakeDb() {
-  const docs = {};
-  const merge = (a, b) => { const o = Object.assign({}, a); Object.keys(b).forEach(k => { o[k] = b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) ? merge(o[k] || {}, b[k]) : b[k]; }); return o; };
-  return { docs, collection: (c) => ({ doc: (id) => ({
-    get: async () => ({ exists: !!docs[c + '/' + id], data: () => docs[c + '/' + id] }),
-    set: async (v, opt) => { docs[c + '/' + id] = opt && opt.merge ? merge(docs[c + '/' + id] || {}, v) : v; }
-  }) }) };
+// A small stand-in for the database: the Customer List's records, and the old upload this app no longer reads.
+function fakeDb(seed) {
+  const docs = seed;
+  const snap = (k) => ({ exists: k in docs, data: () => docs[k] });
+  return { collection: (c) => ({
+    doc: (id) => ({ get: async () => snap(c + '/' + id) }),
+    where: (f, op, v) => ({ get: async () => ({ docs: Object.keys(docs).filter(k => k.startsWith(c + '/') && docs[k][f] === v).map(snap) }) })
+  }) };
 }
 
-test('Administration saves a division\'s list, a rename stays through the next upload, and the app gets each line\'s group', async () => {
-  const db = fakeDb(), plants = [{ id: 'fac_uniontown', name: 'Uniontown' }];
-  await assert.rejects(S.adminSave(db, plants, 'a@uniteddairy.com', { plant: 'nowhere', rows: LINES }, 'T1'), /Pick the division/);
-  const out = await S.adminSave(db, plants, 'a@uniteddairy.com', { plant: 'fac_uniontown', fileName: 'Route Menu.xlsb', rows: LINES }, '2026-11-01T14:00:00.000Z');
-  assert.equal(out.message, 'Saved 6 customers on 4 routes for Uniontown.');
-  assert.equal(out.plants[0].noRoute, 1);
-  await S.adminRename(db, plants, 'a@uniteddairy.com', { plant: 'fac_uniontown', key: 'chain:990', name: ' Big  Box Stores ' }, 'T2');
-  await assert.rejects(S.adminRename(db, plants, 'a@uniteddairy.com', { plant: 'fac_uniontown', key: 'rows', name: 'x' }, 'T2'), /not on the customer list/);
-  await S.adminSave(db, plants, 'a@uniteddairy.com', { plant: 'fac_uniontown', fileName: 'Route Menu 2.xlsb', rows: LINES }, 'T3');
-  const got = await S.forSales(db, 'fac_uniontown');
-  assert.equal(got.savedAt, 'T3');
-  assert.deepEqual(got.rows.map(r => r.name + ' = ' + r.group), ['...DQ BETHEL KNOLL = Dairy Queen', 'ACORN CORNER MARKET = Independents', 'BFS FOODS #48 OAKMONT = Independents',
-    'LAKESIDE SCOOPS = Independents', 'WAL-MART #1885 PINEDALE = Big Box Stores', 'WAL-MART #2603 MAPLETON = Big Box Stores']);
+test('the Sales app reads only the Customer List; the old upload is not read, and a division with none is empty', async () => {
+  const P = 'fac_uniontown', seed = {
+    ['private/udcl_' + P]: { at: '2026-11-01T12:00:00Z', unrouted: [{ day: 'FRI', account: '271285', name: 'LAKESIDE SCOOPS' }] },
+    // The old upload: left in the database, never shown again.
+    ['salesCustomers/' + P]: { rows: [{ day: 'MON', route: '999', name: 'OLD UPLOAD ONLY' }], savedAt: 'T0' },
+    ['salesCustomers/fac_charleston']: { rows: [{ day: 'MON', route: '999', name: 'OLD UPLOAD ONLY' }], savedAt: 'T0' }
+  };
+  LINES.filter(l => l.route).forEach(l => { seed['udclCustomers/' + P + '__' + l.account] = { plant: P, key: l.account, account: l.account, chain: l.chain, name: l.name, active: true, updatedAt: '2026-11-01T13:00:00Z' }; });
+  const days = {};
+  LINES.filter(l => l.route).forEach(l => { const k = l.route + '__' + l.day; (days[k] = days[k] || { plant: P, route: l.route, day: l.day, stops: [] }).stops.push({ key: l.account, name: l.name }); });
+  Object.keys(days).forEach(k => { seed['udclRouteDays/' + P + '__' + k] = days[k]; });
+  const db = fakeDb(seed);
+  const got = await S.forSales(db, P);
+  assert.equal(got.savedAt, '2026-11-01T13:00:00Z');
+  assert.deepEqual(got.rows.map(r => r.name + ' ' + (r.route || 'no route') + ' = ' + r.group), ['...DQ BETHEL KNOLL 805 = Dairy Queen', 'ACORN CORNER MARKET 803 = Independents', 'BFS FOODS #48 OAKMONT 812 = Independents',
+    'LAKESIDE SCOOPS no route = Independents', 'WAL-MART #1885 PINEDALE 808 = Walmart', 'WAL-MART #2603 MAPLETON 808 = Walmart']);
   assert.deepEqual(await S.forSales(db, 'fac_charleston'), { rows: [], savedAt: '' });
+});
+
+test('nothing in Operations uploads or changes the customer list any more', () => {
+  const admin = require('fs').readFileSync(require.resolve('../../src/admin.js'), 'utf8');
+  assert.doesNotMatch(admin, /saveSalesCustomers|renameSalesGroup/);
+  assert.equal(S.adminSave, undefined);
 });

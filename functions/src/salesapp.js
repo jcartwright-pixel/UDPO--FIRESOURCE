@@ -124,7 +124,7 @@ async function salesCall(divisions, dbFor, input, deps) {
   const want = text(input && input.division), pick = divisions.find(d => d.id === want) || divisions[0];
   if (!pick) return { divisions: [], division: '', groups: [], todayText: '', refreshed: '', customers: { rows: [], savedAt: '' } };
   const R = require('./plant-rules');
-  // Joe 11/1: the Customers card reads the division's customer list (salescustomers.js), kept in the main database.
+  // Joe 11/1: the Customers card reads the division's customers from the Customers app (salescustomers.js, udcl.js), in the main database.
   if (text(input && input.what) === 'customers') {
     const customers = await require('./salescustomers').forSales((deps && deps.rootDb) || dbFor(pick.id), pick.id);
     return { divisions, division: pick.id, today: L.operatingDay(new Date(nowMs)), customers };

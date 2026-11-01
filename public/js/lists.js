@@ -32,7 +32,7 @@
     'plantReturns', 'plantSetup', 'plantShifts', 'plantUploadLog', 'plantUploads', 'plantWash', 'plantWorkOrders',
     'private', 'productSetup', 'productSheet', 'productionLines', 'productionRuns', 'receivingItems', 'receivingScans',
     'redzoneChecks', 'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routes', 'runDays',
-    'runs', 'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'salesCustomers', 'scorecard', 'scorecardExcuses',
+    'runs', 'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'scorecard', 'scorecardExcuses',
     'scorecardRatings', 'sensors', 'sentEmails', 'stationAccess', 'tempLocations', 'textLog', 'transfers',
     'udclCustomers', 'udclLog', 'udclRouteDays', 'users', 'vacations', 'walkPhotoData', 'walkPhotos', 'weeks', 'windowTests', 'workOrders',
     'workOrdersDeleted'
