@@ -154,9 +154,6 @@ export const MENU = [
   // Joe 10/10: Over the Road and Trucks Today (GPS) are manager reports (he prints Over the Road), so they sit here only.
   // Joe 10/10 evening: GPS / Fleet is not a Fleet & Maintenance section; GPS Setup and Driver Scorecard sit in Manager Reports.
   ['Manager Reports', [['Driver Scorecard', 'scorecard.html', 'star'], ['Over the Road', 'otr.html', 'road'], ['Trucks Today', 'trucks.html', 'pin'], ['GPS Setup', 'gps.html', 'gear']]],
-  // Joe 11/1: the United Dairy Customer List (UDCL): every customer by customer, route and day, the route sequence, the truck
-  // load maps and the plant's load map kiosk, each with its own Print menu.
-  ['Customer List', [['Customers', 'customers.html', 'people'], ['Route Sequence', 'route-sequence.html', 'road'], ['Truck Load Map', 'load-map.html', 'load'], ['Load Map Kiosk', 'load-map.html?kiosk=1', 'load']]],
   ['Overall', [['Driver Check-ins', 'checkins.html', 'check'], ['Driver Station', 'driver-station.html', 'people'], ['Sheet Conflicts', 'conflicts.html', 'alert']]],
   // Joe 10/10: Dispatch Administration has its own Administration section (out of the Dispatch menu).
   ['Administration', [['Dispatch Administration', 'admin.html', 'gear'], ['Operational Assignments', 'ops.html', 'people'], ['Print Layouts', 'print.html', 'day'], ['Dispatch Settings', 'settings.html', 'gear']]],
@@ -234,9 +231,6 @@ export const SIDES = [
   { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'labeling.html', pic: 'box-v1.webp', note: 'Taking the bottles out of their bags and labeling them for the fillers', sections: ['Debag / Labeling Room'], building: true },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch Template', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
-  // Joe 11/1: the United Dairy Customer List (UDCL), its own card under Route Distribution: the one customer list every app reads.
-  { key: 'customers', group: 'routeops', name: 'Customer List', short: 'Customer List', home: 'customers.html', icon: 'map', note: 'Every customer by route and day, route sequence and truck load maps', sections: ['Customer List'],
-    quick: [['Customers', 'customers.html'], ['Route Sequence', 'route-sequence.html'], ['Truck Load Map', 'load-map.html']] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },
   { key: 'garage', group: 'routeops', quick: [['Work Orders', 'garage.html']], name: 'Garage', home: 'garage.html', pic: 'maintenance-trailer-v1-560.webp', note: 'Garage work orders and the garage station', sections: ['Garage'] },
   { key: 'reports', name: 'Reports', home: 'reportcenter.html', icon: 'chart', note: 'Every report in one place: plant, shift, drivers, over the road and fleet', sections: ['Walkthrough Reports', 'Driver Reports', 'Plant Reports', 'Garage Reports'],
@@ -696,8 +690,6 @@ const PAGE_ICON = {
   'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-fire.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
   // Joe 10/31: Plant Material Trailers' own icon (boxes, a bag and a bottle on a pallet).
   'jug-trailers.html': 'materials',
-  // Joe 11/1: the United Dairy Customer List.
-  'customers.html': 'people', 'route-sequence.html': 'road', 'load-map.html': 'load',
   'drivers.html': 'people', 'template.html': 'week', 'vacations.html': 'vacation', 'checkins.html': 'check', 'conflicts.html': 'alert'
 };
 (function addTitleIcon() {

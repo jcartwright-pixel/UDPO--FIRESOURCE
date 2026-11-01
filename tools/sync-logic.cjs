@@ -17,7 +17,6 @@ const SHARED_FILES = [
   'crew-rules.js',       // Plant Schedule & Vacations (Joe 10/25)
   'scan-rules.js',       // barcode scans (audit 10/29: it was copied by hand)
   'lists.js',           // the one index of every database list (Joe 10/30)
-  'udcl-rules.js',      // the United Dairy Customer List (Joe 11/1)
 ];
 const SRC = path.join(__dirname, '..', 'functions', 'src');
 const DEST = path.join(__dirname, '..', 'public', 'js');

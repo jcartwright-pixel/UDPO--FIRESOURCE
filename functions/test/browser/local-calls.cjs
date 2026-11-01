@@ -1,6 +1,6 @@
 'use strict';
 /*
- * LOCAL_CALLS=1: answer the admin, stationRelease, garage, phone, save, sms, lineReader, sales and customers callables in this process (the functions emulator cannot run
+ * LOCAL_CALLS=1: answer the admin, stationRelease, garage, phone, save, sms, lineReader and sales callables in this process (the functions emulator cannot run
  * everywhere). The signed-in person comes from the auth emulator's token. CI runs the real functions emulator instead.
  */
 const { db } = require('../emulator/helpers');
@@ -28,7 +28,7 @@ const { unitedDairyUser } = require('../../src/auth');
 module.exports = async function localCalls(page) {
   if (!process.env.LOCAL_CALLS) return;
   const A = require('../../src/admin'), { garageCall } = require('../../src/garage');
-  await page.route(/:5001\/[^/]+\/[^/]+\/(admin|stationRelease|garage|stationSignIn|setSwitch|phone|save|sms|lineReader|sales|customers)$/, async (route) => {
+  await page.route(/:5001\/[^/]+\/[^/]+\/(admin|stationRelease|garage|stationSignIn|setSwitch|phone|save|sms|lineReader|sales)$/, async (route) => {
     const req = route.request(), name = req.url().split('/').pop(), data = (req.postDataJSON() || {}).data || {};
     let user = null;
     try { user = JSON.parse(Buffer.from(String(req.headers().authorization || '').split(' ')[1].split('.')[1], 'base64url').toString()); } catch (e) { /* no sign-in */ }
@@ -51,15 +51,6 @@ module.exports = async function localCalls(page) {
       if (name === 'sales') {
         if (!unitedDairyUser(user && { uid: user.user_id, token: user })) throw new Error('Sign in with your United Dairy account.');
         const result = await require('../../src/salesapp').salesCall([{ id: 'fac_uniontown', name: 'Uniontown' }, { id: 'fac_charleston', name: 'Charleston' }], () => db(), data);
-        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
-        return;
-      }
-      // index.js customers (Joe 11/1): the United Dairy Customer List, for the plant the screen names.
-      if (name === 'customers') {
-        const u = unitedDairyUser(user && { uid: user.user_id, token: user });
-        if (!u) throw new Error('Sign in with your United Dairy Google account');
-        const P = require('../../src/plants'), plant = await P.callPlant(db(), data, u);
-        const result = await require('../../src/udcl').udclCall(db(), u, plant, data);
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
         return;
       }
