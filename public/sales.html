@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/sales/apple-touch-icon.png">
+  <!-- Joe 10/31: the Sales app is its own install ("UD Sales"), opening on this screen only. -->
+  <link rel="manifest" href="sales.webmanifest">
+  <meta name="theme-color" content="#0e138d">
+  <meta name="apple-mobile-web-app-title" content="UD Sales">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Route Status · UD Sales</title>
+  <link rel="stylesheet" href="css/sales.css">
+  <script src="js/logic.js"></script>
+</head>
+<!-- Joe 10/31 (mock-up 2d): a phone app just for sales. The map stays on top; under it every route of the division (Route,
+     Driver, Status, Where now) scrolls. Tap a route and the map moves to that truck. Any United Dairy account may use it; it
+     only reads. The division drop-down picks Uniontown, Charleston or Martins Ferry (the plants that are running). -->
+<body class="sales-page">
+  <header class="sa-hdr">
+    <h1>Route Status</h1>
+    <a class="sa-help" id="sa-help" href="help.html?for=sales.html" title="Help for this screen" aria-label="Help for this screen">?</a>
+  </header>
+
+  <section class="sa-signin" id="signin" hidden>
+    <p>Sign in with your United Dairy Google account to see the routes.</p>
+    <button type="button" id="signin-button">Sign in with Google</button>
+  </section>
+  <p class="sa-error" id="error" role="alert" hidden></p>
+
+  <main id="screen" hidden>
+    <div class="sa-top">
+      <div class="sa-sub">
+        <span class="sa-when"><span id="sa-day"></span><br>Last refreshed <span id="sa-refreshed">-</span></span>
+        <label class="sa-div"><span>Division</span><select id="sa-division" aria-label="Division"></select></label>
+      </div>
+      <div class="sa-map">
+        <p class="sa-map-title" id="sa-map-title">Tap a route to see it on the map.</p>
+        <div class="sa-map-box" id="sa-map-box">
+          <iframe id="sa-map" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
+          <p class="sa-map-none" id="sa-map-none">No route picked yet.</p>
+        </div>
+        <p class="sa-map-where" id="sa-map-where"></p>
+      </div>
+      <div class="sa-cols" aria-hidden="true"><span>Route</span><span>Driver</span><span>Status</span><span>Where now</span></div>
+    </div>
+    <div id="sa-list" class="sa-list"></div>
+    <p class="sa-foot">Where now comes from the trailer's GPS, or the truck's if the trailer has none. The list refreshes every 2 minutes.</p>
+    <p class="sa-foot"><button type="button" id="signout">Sign out</button> <span id="who"></span></p>
+  </main>
+
+  <script type="module" src="js/sales.js"></script>
+</body>
+</html>

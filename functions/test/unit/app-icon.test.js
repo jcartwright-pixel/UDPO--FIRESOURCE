@@ -7,7 +7,7 @@ const path = require('node:path');
 // icon, so installing from any screen gives "UD Operations" with the Q check (tools/make-icons.py makes the sizes).
 const PUBLIC = path.join(__dirname, '../../../public');
 const pages = fs.readdirSync(PUBLIC).filter(f => f.endsWith('.html'));
-const STATION_ICON = { 'plant-station.html': 'plant-station', 'garage-station.html': 'garage-station', 'driver-station.html': 'driver-station', 'driver-room.html': 'driver-station' };
+const STATION_ICON = { 'plant-station.html': 'plant-station', 'garage-station.html': 'garage-station', 'driver-station.html': 'driver-station', 'driver-room.html': 'driver-station', 'sales.html': 'sales' };
 
 test('the app has a name and a 192 and 512 icon Chrome can install and mask', () => {
   const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'manifest.webmanifest'), 'utf8'));
@@ -34,7 +34,7 @@ test('every screen links the icon, and every signed-in screen links the app', ()
     if (!html.includes(own)) bad.push(f + ': phone icon');
     // The public driver Check-In and the coded stations (Plant, Garage, Driver Station and the Driver Room Check-In tablet,
     // Joe 10/12) are their own installs: each opens its own page full screen, not the signed-in launcher.
-    if (!['route.html', 'plant-station.html', 'driver-room.html', 'driver-station.html', 'garage-station.html'].includes(f) && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
+    if (!['route.html', 'plant-station.html', 'driver-room.html', 'driver-station.html', 'garage-station.html', 'sales.html'].includes(f) && !html.includes('<link rel="manifest" href="manifest.webmanifest">')) bad.push(f + ': manifest');
   });
   assert.deepEqual(bad, []);
 });
@@ -96,7 +96,7 @@ test('installed from a station link, the station opens full screen in its own wi
 test('each station app has its own icon in every size, different from the others', () => {
   const sets = { 'plant-station.webmanifest': 'plant-station', 'plant-station-noaccount.webmanifest': 'plant-station',
     'garage-station.webmanifest': 'garage-station', 'driver-station.webmanifest': 'driver-station',
-    'plant-managers.webmanifest': 'plant-managers' };
+    'plant-managers.webmanifest': 'plant-managers', 'sales.webmanifest': 'sales' };
   const seen = {};
   for (const [file, dir] of Object.entries(sets)) {
     const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, file), 'utf8'));
@@ -126,4 +126,17 @@ test('the Plant Managers link installs as its own app with its own icon', () => 
   const html = fs.readFileSync(path.join(PUBLIC, 'walkthrough.html'), 'utf8');
   assert.match(html, /plant-managers\.webmanifest/);
   assert.match(html, /img\/app-icon\/plant-managers\/apple-touch-icon\.png/);
+});
+
+// Joe 10/31: the Sales app installs as its own icon, "UD Sales", opening on the Sales screen only.
+test('installed from the Sales App link, "UD Sales" opens the Sales screen in its own window', () => {
+  const html = fs.readFileSync(path.join(PUBLIC, 'sales.html'), 'utf8');
+  assert.ok(html.includes('<link rel="manifest" href="sales.webmanifest">'));
+  assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
+  const m = JSON.parse(fs.readFileSync(path.join(PUBLIC, 'sales.webmanifest'), 'utf8'));
+  assert.equal(m.short_name, 'UD Sales');
+  assert.equal(m.start_url, '/sales.html');
+  assert.equal(m.id, '/sales.html');
+  assert.equal(m.display, 'standalone');
+  m.icons.forEach(i => assert.ok(fs.existsSync(path.join(PUBLIC, i.src)), i.src));
 });

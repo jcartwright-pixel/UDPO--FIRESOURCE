@@ -221,6 +221,14 @@ exports.garage = onCall({ maxInstances: 3 }, async (request) => {
   } catch (error) { throw asHttps(error); }
 });
 
+// Joe 10/31: the Sales app (src/salesapp.js). Any United Dairy account may use it ("No other access information is needed"):
+// it is not checked against the Users list. Read only. Divisions = the plants that are running.
+exports.sales = onCall({ maxInstances: 5, timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
+  if (!unitedDairyUser(request.auth)) throw new HttpsError('unauthenticated', 'Sign in with your United Dairy account.');
+  const divisions = PLANTS.activePlants().filter(plantReady).map(p => ({ id: p.id, name: p.name }));
+  try { return await require('./src/salesapp').salesCall(divisions, (id) => PLANTS.dbFor(id, db), request.data || {}); } catch (error) { throw asHttps(error); }
+});
+
 exports.newRouteCode = onCall(async (request) => {
   const user = signedIn(request);
   try { return await newRouteCode(await plantDb(request, user), user); } catch (error) { throw asHttps(error); }

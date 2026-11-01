@@ -180,7 +180,8 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/25: Menu Setup, Plant Schedule Setup, Maintenance Schedule Setup and Maintenance Equipment added under Plant Setup.
     // Joe 10/31: Sales Route Email added under Email & Schedules.
     // Joe 10/31 (mock-up 1): Employees added under People & Access (everyone at the plant, brought over from UDMS).
-    assert.equal(all, 41, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    // Joe 10/31: Sales App added under Links & Codes (the salespeople's phone app link).
+    assert.equal(all, 42, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
     assert.deepEqual(await adm.$$eval('.adm-nav-group:has(h2:text-is("Dispatch")) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
@@ -207,7 +208,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     assert.equal(/Being built/.test(await adm.textContent('#shell')), false);
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'administration-repair-email-1920.png') });
     await adm.fill('#find', 'QR');
-    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes', 'Plant Managers App']);
+    assert.deepEqual(await adm.$$eval('.adm-item .adm-name', s => s.map(x => x.textContent)), ['Access & QR Codes', 'Manager Links', 'Plant Station Codes', 'Garage Station Codes', 'Driver Station Codes', 'Plant Managers App', 'Sales App']);
     await adm.fill('#find', '');
     await adm.fill('#find', 'Print Layouts');
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);

@@ -15,7 +15,9 @@ export const ADMIN_GROUPS = [
     ['garage-codes', 'Garage Station Codes', 'The Garage Station and Maintenance Station links (copy, print a QR, Launch in a new window), then the garage stations and the Maintenance Station: + Add Station, each station\'s code, New code, Remove.', '', 'gear'],
     ['driver-codes', 'Driver Station Codes', 'The Driver Station link, for the Driver\'s Kiosk Station (the TV) and the Driver Room Check-In Station (the drivers\' tablet, its code opens the drivers\' Check-In, like their phones): copy, print a QR, open; then the stations: + Add Station, each tablet, TV or kiosk\'s code (typed on it once), New code, Remove; and the drivers\' phone link with its Route Distribution code: new code, turn it off (press twice).', '', 'people'],
     // Joe 10/18: "send them the link and have a code".
-    ['manager-app-codes', 'Plant Managers App', 'The Plant Managers link for the managers\' phones, iPads and tablets (copy, print a QR, Launch): they sign in with their United Dairy account and type the Plant Managers code once; then each plant\'s Plant Managers code: Create code, New code.', '', 'people']
+    ['manager-app-codes', 'Plant Managers App', 'The Plant Managers link for the managers\' phones, iPads and tablets (copy, print a QR, Launch): they sign in with their United Dairy account and type the Plant Managers code once; then each plant\'s Plant Managers code: Create code, New code.', '', 'people'],
+    // Joe 10/31: the Sales app link: any United Dairy account, no code.
+    ['sales-app', 'Sales App', 'The Sales app link for the salespeople\'s phones (copy, print a QR, Launch): every route of their division, its driver, status and where it is now on the map. Any United Dairy account opens it.', '', 'truck']
   ]],
   ['Email & Schedules', 'Where email goes, how often, and how often the app refreshes', [
     ['repair-email', 'Repair Email', 'Where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and Send now.', '', 'alert'],

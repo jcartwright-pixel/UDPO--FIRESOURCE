@@ -1,0 +1,42 @@
+/* The Sales app (Joe 10/31, mock-up 2d): phone first (390-1024 wide), text at least 16px, the map fixed on top. */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Roboto, Arial, sans-serif; }
+.sales-page { max-width: 1024px; margin: 0 auto; }
+.sa-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #0e138d; color: #fff; }
+.sa-hdr h1 { margin: 0; font-size: 22px; }
+.sa-help { width: 36px; height: 36px; border: 2px solid #fff; border-radius: 50%; color: #fff; text-decoration: none; font-weight: 800; font-size: 20px; display: inline-flex; align-items: center; justify-content: center; }
+.sa-signin { padding: 24px 16px; font-size: 18px; }
+.sa-signin button, .sa-foot button { font: 700 18px Arial, sans-serif; padding: 12px 20px; border: 0; border-radius: 8px; background: #0e138d; color: #fff; cursor: pointer; }
+.sa-foot button { font-size: 16px; padding: 8px 14px; background: #4b5563; }
+.sa-error { margin: 10px 16px; padding: 10px 14px; border-radius: 8px; background: #fde7e5; color: #8a1c13; font-weight: 700; }
+
+/* The top stays put while the routes scroll under it. */
+.sa-top { position: sticky; top: 0; z-index: 2; background: #f4f6f9; }
+.sa-sub { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; background: #cfe3f7; }
+.sa-when { font-size: 16px; color: #26323f; }
+.sa-div { display: flex; flex-direction: column; align-items: flex-end; font-size: 16px; }
+.sa-div span { font-size: 16px; color: #26323f; }
+.sa-div select { font-size: 17px; padding: 6px 8px; border: 1px solid #8892a0; border-radius: 6px; background: #fff; min-width: 140px; }
+.sa-map { padding: 8px 12px 6px; }
+.sa-map-title, .sa-map-where { margin: 0 0 6px; font-size: 16px; }
+.sa-map-where { margin: 6px 0 0; color: #26323f; }
+.sa-map-box { height: 26vh; min-height: 160px; max-height: 320px; border-radius: 8px; overflow: hidden; background: #e9efe4; display: flex; align-items: center; justify-content: center; }
+.sa-map-box iframe { width: 100%; height: 100%; border: 0; }
+.sa-map-none { margin: 0; padding: 12px; color: #4b5563; text-align: center; }
+.sa-cols, .sa-row { display: grid; grid-template-columns: 56px minmax(84px, 1fr) minmax(104px, 1.2fr) minmax(96px, 1.4fr); gap: 8px; }
+.sa-cols { padding: 8px 10px; background: #1e3a64; color: #fff; font-weight: 700; font-size: 16px; }
+
+.sa-list { background: #fff; }
+.sa-group { margin: 0; padding: 8px 10px; background: #e6edf6; color: #1e3a64; font-size: 16px; border-bottom: 1px solid #d5dde8; }
+.sa-row { width: 100%; padding: 10px; border: 0; border-bottom: 1px solid #dde3ea; background: #fff; color: inherit; font: inherit; font-size: 16px; text-align: left; cursor: pointer; align-items: start; }
+.sa-row.on { background: #dbe8f8; box-shadow: inset 4px 0 0 #0e138d; }
+.sa-route { font-size: 17px; }
+.sa-pill { display: inline-block; padding: 3px 9px; border-radius: 10px; font-weight: 700; font-size: 16px; }
+.sa-pill.ok { background: #e3f3e5; color: #1d7a2c; }
+.sa-pill.late { background: #fbe3e3; color: #b3261e; }
+.sa-pill.loaded { background: #e1edfb; color: #174ea6; }
+.sa-pill.waiting { background: #fff3d4; color: #8a5a00; }
+.sa-empty { margin: 0; padding: 16px; }
+.sa-foot { margin: 0; padding: 10px 16px; color: #4b5563; font-size: 16px; }
+@media (min-width: 700px) { .sa-map-box { height: 300px; } }

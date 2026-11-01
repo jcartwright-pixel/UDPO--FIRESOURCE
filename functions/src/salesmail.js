@@ -78,7 +78,7 @@ function loadsOn(runs, loadDate) {
       const day = run.days[b.prefix];
       out.push({ runDocId: run.id, day: b.prefix, route: L.routeNumber(run.route), run: L.runText(run), loadDate, deliveryDate: b.deliveryDate,
         departureDate: text(day.departureDate) || b.deliveryDate, leavesOn: text(run.masterShow && run.masterShow.leavesOn), dispatchTime: day.dispatchTime,
-        truck: text(day.truck) || text(day.truckId), trailer: text(day.trailer) || text(day.trailerId), loaded: loaded(day), completedAt: text(day.completeTime) });
+        driver: text(day.driver), truck: text(day.truck) || text(day.truckId), trailer: text(day.trailer) || text(day.trailerId), loaded: loaded(day), completedAt: text(day.completeTime) });
     });
   });
   return out;
@@ -242,4 +242,4 @@ async function adminTest(db, email, input, stamp, deps) {
   return { ok: out.status === 'SENT', message: out.status === 'SENT' ? 'Sent to ' + email + '.' : (out.reason || 'The test did not go out.') };
 }
 
-module.exports = { adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, LATE_GRACE, SETTINGS_DOC };
+module.exports = { unitKey, shortDate, weekdayOf, adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, LATE_GRACE, SETTINGS_DOC };
