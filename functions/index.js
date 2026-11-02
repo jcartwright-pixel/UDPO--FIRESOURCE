@@ -562,6 +562,16 @@ async function fleetSyncWrite() {
   return real && (await realFleetSyncOn()) ? { target: real, allowReal: true } : null;
 }
 
+// Joe 11/2 ("yes, create GPS trip fuel"): yesterday's trips for every truck, from Verizon Fleet, added to the separate GPS Trip
+// Fuel sheet each morning, and its rows older than six months deleted (src/tripfuel.js). Production only (the sandbox and test
+// servers never write it), and held while Administration > Go-Live Switches > Pause writing to the sheets is on.
+exports.gpsTripFuelDaily = onSchedule({ schedule: '30 5 * * *', timeZone: 'America/New_York', timeoutSeconds: 540, memory: '1GiB', maxInstances: 1 }, async () => {
+  if (!realLive()) return;
+  if (sheetsPaused((await db.collection('config').doc('app').get()).data() || {})) return;
+  const r = await require('./src/tripfuel').dailyTripFuel({ db, sheets: makeSheetsWriter() });
+  if (r.error) console.error('gpsTripFuel', r.error);
+});
+
 exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   const run = await fleetSyncWrite();
   if (!run || run.paused) return;
