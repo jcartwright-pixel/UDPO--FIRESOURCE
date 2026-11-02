@@ -50,3 +50,15 @@ test('nothing in Operations uploads or changes the customer list any more', () =
   assert.doesNotMatch(admin, /saveSalesCustomers|renameSalesGroup/);
   assert.equal(S.adminSave, undefined);
 });
+
+test('Joe 11/2: a group picked on the Customer List wins over the chain; chain 0 is no group', () => {
+  const lines = [
+    { day: 'TUE', route: '803', chain: '415', account: '1526', name: 'KUHNS OAK HILL', group: "Kuhn's Market" },
+    { day: 'TUE', route: '803', chain: '415', account: '2111', name: 'MAPLE SHOP N SAVE', group: "Shop 'n Save" },
+    { day: 'WED', route: '805', chain: '415', account: '2112', name: 'PINE SHOP N SAVE', group: "Shop 'n Save" },
+    { day: 'TUE', route: '803', chain: '0', account: '1196', name: 'ACORN CORNER MARKET' },
+    { day: 'FRI', route: '803', chain: '0', account: '1984', name: 'QUICK STOP' }
+  ];
+  assert.equal(S.groupKey(lines[3]), '');
+  assert.deepEqual(S.groupsOf(lines).map(g => [g.name, g.count]), [["Shop 'n Save", 2], ["Kuhn's Market", 1]]);
+});
