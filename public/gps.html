@@ -67,7 +67,14 @@
         <div id="probe-out"></div>
       </section>
       <section class="gps-card wide">
-        <h2>5. What the app reads from Fleet</h2>
+        <h2>5. Trip check</h2>
+        <p class="hint">Type one truck and pick a day, then press Check trips. The app asks Verizon for that truck's GPS readings that day and lists each trip: when it left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. It only reads; nothing is saved.</p>
+        <div class="gps-ask"><label>Truck<input id="t-tag" autocomplete="off"></label><label>Day<input id="t-date" type="date"></label><div class="gps-buttons"><button type="button" class="primary" id="trips">Check trips</button></div></div>
+        <p class="hint" id="trips-when"></p>
+        <div id="trips-out"></div>
+      </section>
+      <section class="gps-card wide">
+        <h2>6. What the app reads from Fleet</h2>
         <ol class="gps-steps">
           <li>Where each truck is now: last report time, place, speed, ignition on or off, and the driver Fleet shows.</li>
           <li>Each truck's odometer and engine hours, and the miles it drove today with its first and last movement.</li>
@@ -172,7 +179,7 @@
     const alertsToday = (s) => s.alertsDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped
     // part way. A server that stopped says so, names the step, and the line under the buttons is read again.
-    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read', probe: 'asking Verizon' };
+    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read', probe: 'asking Verizon', trips: 'the trip check' };
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
@@ -217,6 +224,32 @@
       await call({ op: 'probe', tag: $('p-tag').value }, $('probe'));
       renderProbe();
     };
+    // Joe 11/1: one truck's trips for one day (unit, left and back with places, miles, fuel counter, fuel used, MPG).
+    const num1 = (v) => v === null || v === undefined || v === '' ? '' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const place = (addr, lat, lon) => addr || (lat != null && lon != null ? lat + ', ' + lon : '');
+    function renderTrips(t) {
+      const box = $('trips-out');
+      if (!t) { box.innerHTML = ''; return; }
+      const table = (cols, rows) => '<div class="gps-probe-rows"><table><thead><tr>' + cols.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr></thead><tbody>' +
+        rows.map(r => '<tr>' + r.map(c => '<td>' + escapeHtml(String(c)) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+      const fuelHere = t.fields.filter(f => f.points > 0);
+      box.innerHTML = '<p>' + escapeHtml(t.tag + ': ' + t.points + ' GPS readings on ' + shortDay(t.date) + '. ' + (t.trips.length ? t.trips.length + ' trip' + (t.trips.length === 1 ? '' : 's') + '.' : 'No trips that day.')) + '</p>' +
+        (t.trips.length ? table(['Left yard', 'From', 'Back', 'To', 'Miles', 'Fuel counter start (gal)', 'Fuel counter end (gal)', 'Fuel used (gal)', 'MPG', 'Note'],
+          t.trips.map(x => [stamp(x.left), place(x.leftAddress, x.leftLat, x.leftLon), x.back ? stamp(x.back) : 'Not back', place(x.backAddress, x.backLat, x.backLon), num1(x.miles),
+            num1(x.fuelCounterStart), num1(x.fuelCounterEnd), num1(x.fuelUsed), num1(x.mpg), x.note || ''])) : '') +
+        '<p class="hint">' + escapeHtml(fuelHere.length ? 'Fuel and odometer readings this truck sent: ' + fuelHere.map(f => f.description || f.name).join(', ') + '.' :
+          'This truck sent no fuel readings that day, so fuel used and MPG are blank.') + '</p>' +
+        (t.notes || []).map(n => '<p class="hint">' + escapeHtml(n) + '</p>').join('');
+    }
+    $('t-date').value = (() => { const d = new Date(Date.now() - 86400000); return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); })();
+    $('trips').onclick = async () => {
+      if (!$('t-tag').value.trim()) { showError('Type a truck first, as Fleet shows it.'); return; }
+      $('trips-when').textContent = 'Asking Verizon. This can take up to 2 minutes...';
+      const r = await call({ op: 'trips', tag: $('t-tag').value, date: $('t-date').value }, $('trips'));
+      $('trips-when').textContent = '';
+      renderTrips(r && r.trips);
+    };
+    $('t-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('trips').click(); } });
     $('p-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('probe').click(); } });
     // Enter in a login box saves it.
     ['f-fleet', 'f-user', 'f-pass'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('save').click(); } }));
