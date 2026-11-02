@@ -53,18 +53,16 @@ test('month read: trips build as points stream in, across midnight, with the fue
   assert.equal(t[1].fuelUsed, 5);
 });
 
-// Joe 11/2: the GPS Trip Fuel sheet keeps six months; older rows are deleted, last run first.
-test('GPS Trip Fuel: rows older than six months are found and deleted in runs, last first', () => {
-  const { oldRows, deleteRequests, rowDay, tripRow } = require('../../src/tripfuel');
-  assert.equal(rowDay('10-31-26 9:27 AM'), '2026-10-31');
-  assert.equal(rowDay('Not back'), '');
-  const rows = oldRows([['4-1-26 1:00 AM'], ['4-2-26 1:00 AM'], ['10-31-26 2:00 PM'], ['3-30-26 5:00 AM'], ['']], '2026-05-03');
-  assert.deepEqual(rows, [2, 3, 5]);
-  assert.deepEqual(deleteRequests(0, rows).map(r => [r.deleteDimension.range.startIndex, r.deleteDimension.range.endIndex]), [[4, 5], [1, 3]]);
-  const row = tripRow({ tag: '123891', left: '2026-10-31T14:09:00Z', back: '', miles: 10, fuelUsed: null, note: 'x' });
-  assert.equal(row.length, 17);
-  assert.equal(row[1], '10-31-26 10:09 AM');
-  assert.equal(row[14], '');
+// Joe 11/2: the trips live in the app's database: October first, then each new day; one record per trip.
+test('GPS trip fuel: the days to store run from October to yesterday, and a trip is one record keyed by unit and time', () => {
+  const { daysToStore, tripDoc, tripId } = require('../../src/tripfuel');
+  assert.equal(daysToStore('', '2026-11-02').length, 32);
+  assert.deepEqual(daysToStore('2026-11-01', '2026-11-02'), []);
+  assert.deepEqual(daysToStore('2026-10-30', '2026-11-02'), ['2026-10-31', '2026-11-01']);
+  const t = { tag: '123891', unitId: 1421492810, left: '2026-10-31T14:09:00.000Z', back: '', miles: 244.9, fuelUsed: 36.85, mpg: 6.7, note: '' };
+  assert.equal(tripId(t), '1421492810_20261031T140900000');
+  const d = tripDoc(t, 'now');
+  assert.deepEqual([d.day, d.unitId, d.fuelUsed, d.odometerStart], ['2026-10-31', '1421492810', 36.85, null]);
 });
 
 // 11/2: a truck that never comes to Uniontown has its own home: where it stands still in the small hours.
