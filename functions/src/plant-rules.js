@@ -1110,10 +1110,11 @@
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence), outside: !!r.outside };
-      // Joe 11/2 ("outside carriers don't count towards being late … I don't even want to see it in here"): an outside
-      // carrier's load (Darden, GFS, ...) is left out of the report altogether: not late, not counted, not listed.
-      if (r.outside) return;
       areas[r.area].total++; out.total++;
+      // Joe 11/2 ("Any of these plant side carrier pickups are not to be marked late. We record them. But we do not mark them
+      // late."): an outside carrier's load (Darden, GFS, ...) is listed and counted like any load, loaded or not, but never
+      // late, behind or loaded late, and the forecast box leaves it out.
+      if (r.outside) { if (r.state === 'DONE') out.loaded.push(item); else { areas[r.area].left++; out.leftToLoad++; out.nextUp.push(item); } return; }
       // Joe 11/1 ("sal 1 was a little late think we should show"): a load finished after its own dispatch time was loaded late,
       // by the minutes between the two.
       if (r.state === 'DONE') { var doneWall = wallMinutes(r.completedAt); if (leaves !== null && doneWall !== null && doneWall - leaves >= 1) item.loadedLate = Math.round(doneWall - leaves); out.loaded.push(item); return; }

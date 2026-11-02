@@ -35,7 +35,7 @@ test('a Scheduler load is outside when marked Carrier or its run is an outside c
   assert.equal(R.scheduleOutside({ runId: 'OTHER', route: '838', scheduleType: 'ROUTE' }, hidden), true);
 });
 
-test('the shift report: Darden and GFS are left out altogether (Joe: "I don\'t even want to see it in here")', () => {
+test('the shift report: Darden and GFS are listed ("we record them") but never marked late', () => {
   const loads = [
     load('d1', '878', 'Darden Load 1', 'BOXING', 8 * 60 + 20, { outside: true, routeName: 'Darden' }),
     load('d2', '878', 'Darden Load 2', 'BOXING', 9 * 60 + 21, { outside: true, routeName: 'Darden' }),
@@ -44,15 +44,18 @@ test('the shift report: Darden and GFS are left out altogether (Joe: "I don\'t e
     load('j1', '852', 'JERSEY LOAD 1', 'CASE', 8 * 60)];
   const r = R.plantReport({ loads }, NOW);
   assert.deepEqual(r.behind.map(x => x.id), ['j1'], 'only the United Dairy truck is late');
-  assert.equal(r.loaded.length, 0, 'no outside carrier in Loaded (so never loaded late)');
-  assert.equal(r.nextUp.length, 0);
-  assert.equal(r.totalLoads, 1, 'not counted in the loads');
+  assert.deepEqual(r.loaded.map(x => x.id).sort(), ['d3', 'g1'], 'recorded as loaded');
+  assert.ok(r.loaded.every(x => !x.loadedLate), 'never loaded late');
+  assert.deepEqual(r.nextUp.map(x => x.id).sort(), ['d1', 'd2'], 'still to load, not late');
+  assert.equal(r.totalLoads, 5, 'counted like any load');
   assert.match(r.subject, /1 route late/);
   const t = R.truckCheck(JSON.parse(JSON.stringify(r)));
   assert.equal(t.lateNow.length, 1);
   assert.equal(t.loadedLate.length, 0);
+  assert.ok(t.lateNow.every(x => !/878|838/.test(x.name)));
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
-  assert.doesNotMatch(html, /Darden|Gordon|GORDON/, 'not in the email at all');
+  assert.match(html, /Darden/, 'listed in the Routes table');
+  assert.doesNotMatch(html, /Darden Load 1<\/td>[^]*?LATE/, 'no LATE bar on Darden');
 });
 
 test('the forecast: an outside carrier\'s load takes its time but is never late', () => {
