@@ -79,7 +79,7 @@ function nameCase(n) {
 function drawList(data) {
   rows = {};
   const list = $('sa-list');
-  if (!data.groups.length) { list.innerHTML = '<p class="sa-empty">No routes today or yesterday for this division.</p>'; picked = ''; drawMap(); return; }
+  if (!data.groups.length) { list.innerHTML = '<p class="sa-empty">No routes delivering today for this division.</p>'; picked = ''; drawMap(); return; }
   list.innerHTML = data.groups.map(g => '<h2 class="sa-group">' + escapeHtml(g.label) + '</h2>' + g.rows.map(r => {
     rows[r.id] = r;
     // Joe 11/1 (mock-up 3): two lines, never more. The route and its status; under it the driver's full name and where

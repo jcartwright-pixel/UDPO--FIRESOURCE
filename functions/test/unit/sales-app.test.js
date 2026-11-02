@@ -131,3 +131,63 @@ test('Save-A-Lot drop and hook: the truck\'s next route', () => {
   assert.equal(r.where, 'On the road: US-22 W');
   assert.equal(r.note, 'Trailer dropped at SAL Williamsport at 1:05 PM. Truck: On the road: US-22 W. Next route for this truck: 812.');
 });
+
+// Joe 11/2: "I only want to see the routes that are ran by that location".
+test('a division shows only the routes it runs', () => {
+  const others = ['Charleston', 'Martins Ferry'];
+  const own = (r) => A.ownRoute(Object.assign({ coverageType: 'UNITED DAIRY', movementType: 'COMPANY_ROUTE' }, r), 'Uniontown', others);
+  assert.equal(own({ streamId: '811', run: 'DSD', routeName: 'DSD' }), true);
+  assert.equal(own({ streamId: '6301', run: '6301_1', routeName: 'WALMART' }), true);
+  assert.equal(own({ streamId: 'MARIETTA 1', run: 'MARIETTA LOAD 1', coverageType: 'BRANCH' }), false, 'a branch runs it');
+  assert.equal(own({ streamId: 'Darden', run: 'Darden', coverageType: 'OUTSIDE CARRIER', movementType: 'CARRIER_LOAD' }), false, 'an outside carrier');
+  assert.equal(own({ streamId: 'BECKLEY TRANSFER', run: 'BECKLEY TRANSFER' }), false, 'a transfer to a distributor');
+  assert.equal(own({ streamId: 'FERRY PRODUCT', run: 'PRODUCT 1', routeName: 'MF' }), false, 'Martins Ferry runs it');
+  assert.equal(own({ streamId: 'SUN VALLEY', run: 'SUN VALLEY', coverageType: '' }), true, 'no coverage = United Dairy');
+});
+
+test('All: every division on one list; a division alone only its own', async () => {
+  const runs = (db) => db === 'u'
+    ? [run('a', '811', { prefix: 'tue', fields: { dispatchTime: 210, driver: 'Sam Porter' } }, { coverageType: 'UNITED DAIRY', streamId: '811' }),
+      run('b', '909', { prefix: 'tue', fields: { dispatchTime: 210, driver: 'Kim Rhodes' } }, { coverageType: 'BRANCH', streamId: 'MARIETTA 1' })]
+    : [run('c', '901', { prefix: 'tue', fields: { dispatchTime: 210, driver: 'Lee Shaw' } }, { coverageType: 'UNITED DAIRY', streamId: '901' })];
+  const fakeDb = (db) => ({
+    collection: (name) => ({ where: () => ({ where: () => ({ get: async () => ({ docs: [] }) }), get: async () => ({ docs: name === 'runs' ? runs(db).map(r => ({ id: r.id, data: () => r })) : [] }) }), get: async () => ({ docs: [] }), doc: () => ({}) }),
+    getAll: async () => []
+  });
+  const divisions = [{ id: 'fac_uniontown', name: 'Uniontown' }, { id: 'fac_martins_ferry', name: 'Martins Ferry' }];
+  const dbFor = (id) => fakeDb(id === 'fac_uniontown' ? 'u' : 'm');
+  const ut = await A.salesCall(divisions, dbFor, { division: 'fac_uniontown' }, { now: () => NOW });
+  assert.deepEqual(ut.divisions.map(d => d.name), ['Uniontown', 'Martins Ferry', 'All']);
+  assert.deepEqual(ut.groups.flatMap(g => g.rows.map(r => r.route)), ['811'], 'the Marietta branch route is not Uniontown\'s');
+  const all = await A.salesCall(divisions, dbFor, { division: 'all' }, { now: () => NOW });
+  assert.equal(all.division, 'all');
+  assert.deepEqual(all.groups.flatMap(g => g.rows.map(r => r.route)), ['811', '901', '909']);
+});
+
+// Joe 11/2: "if something is not moving and the other unit is, then maybe the tractor and or the trailer was changed out";
+// "if there is a failed GPS unit that's not reporting ... unknown".
+test('two units: follow the one that moves; a unit not reporting is Unknown', () => {
+  const runs = [
+    run('a', '802', { prefix: 'tue', fields: { dispatchTime: 210, driver: 'Bob Baird', trailer: 'T-101', truck: '501', completeTime: iso('2026-11-03T02:00:00') } }),
+    run('b', '811', { prefix: 'tue', fields: { dispatchTime: 270, driver: 'Dana Whitfield', trailer: 'T-102', truck: '502', completeTime: iso('2026-11-03T03:00:00') } }),
+    run('c', '812', { prefix: 'tue', fields: { dispatchTime: 270, driver: 'Ray Lowe', trailer: 'T-103', truck: '503', completeTime: iso('2026-11-03T03:00:00') } })
+  ];
+  const units = {
+    // 802's trailer sits in Wheeling since Saturday (changed out); its truck is out driving.
+    'T-101': { tag: 'T-101', unitId: 'U1', lat: 40.06, lon: -80.7, place: '', address: 'Main St, Wheeling, WV', speedMph: 0, lastReport: iso('2026-11-03T10:30:00') },
+    501: { tag: '501', unitId: 'U5', lat: 40.4, lon: -79.9, place: '', address: 'I-376 W, Pittsburgh, PA', speedMph: 55, lastReport: iso('2026-11-03T10:40:00') },
+    // 811's trailer unit failed on Sunday: its truck is followed.
+    'T-102': { tag: 'T-102', unitId: 'U2', lat: 39.9, lon: -79.7, place: 'Uniontown Plant', lastReport: iso('2026-11-01T09:00:00') },
+    502: { tag: '502', unitId: 'U6', lat: 40.2, lon: -80.2, place: 'Giant Eagle 44', speedMph: 0, lastReport: iso('2026-11-03T10:40:00') },
+    // 812: neither unit has reported since Sunday.
+    'T-103': { tag: 'T-103', unitId: 'U3', lat: 39.9, lon: -79.7, place: 'Uniontown Plant', lastReport: iso('2026-11-01T09:00:00') },
+    503: { tag: '503', unitId: 'U7', lat: 39.9, lon: -79.7, place: 'Uniontown Plant', lastReport: iso('2026-11-01T09:00:00') }
+  };
+  const gpsDays = [{ tag: '501', date: '2026-11-03', miles: 82, yardOut: iso('2026-11-03T04:05:00') }, { tag: 'T-101', date: '2026-10-31', miles: 40 },
+    { tag: '502', date: '2026-11-03', miles: 30, yardOut: iso('2026-11-03T04:40:00') }, { tag: '503', date: '2026-11-03', yardOut: iso('2026-11-03T04:40:00') }];
+  const rows = A.salesScreen({ runs, reefer: {}, gpsDays, units }, NOW).groups[0].rows;
+  const by = {}; rows.forEach(r => { by[r.route] = r; });
+  assert.deepEqual([by['802'].where, by['802'].by], ['On the road: I-376 W, Pittsburgh, PA', 'TRUCK']);
+  assert.deepEqual([by['811'].where, by['811'].by], ['At Giant Eagle 44', 'TRUCK']);
+  assert.equal(by['812'].where, 'Unknown: GPS not reporting');
+});

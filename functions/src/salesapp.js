@@ -29,6 +29,9 @@ const { trailerKey, trailerUnits, runTrucks, inYard, yardSpots } = require('./fl
 const { safeIdPart } = require('./model');
 
 const MOVING_MPH = 3;
+const ALL = { id: 'all', name: 'All' };
+// Joe 11/2: a GPS unit not heard from in this long has failed (or is off): Where now says Unknown.
+const SILENT_MS = 24 * 3600 * 1000, UNKNOWN = 'Unknown: GPS not reporting';
 // Joe 11/2: how far back to look for loads still to be delivered: a Load Day route is loaded the day before (Saturday for
 // Monday), and a load from an earlier delivery day that never left stays on as a leftover for LEFTOVER_DAYS.
 const LOOK_BACK = 3, LEFTOVER_DAYS = 2;
@@ -90,6 +93,35 @@ function droppedAt(x, reefer) {
   return isFinite(ms) ? { at: R.wallClock(ms), place } : null;
 }
 
+/** Joe 11/2: whether a GPS unit drove any miles on `fromDate` or after (gpsDays: one doc per unit per day). */
+function movedSince(gpsDays, tag, fromDate) {
+  const k = S.unitKey(tag), kt = S.unitKey(trailerKey(tag));
+  return (gpsDays || []).some(g => { const gk = S.unitKey(g.tag); return (gk === k || gk === kt) && text(g.date) >= text(fromDate) && Number(g.miles) > 0; });
+}
+
+/**
+ * Joe 11/2: "I only want to see the routes that are ran by that location": a division's list leaves off the routes it does not
+ * run: a branch's (Route Master coverage BRANCH: Fairmont 907, Marietta 909, ...), an outside carrier's or a customer's own pickup,
+ * a transfer to a branch or distributor (TRANSFER in its name), and a run to another division (its name names that division, like
+ * 901 FERRY PRODUCT for Martins Ferry). `others`: the other divisions' names.
+ */
+function ownRoute(run, divisionName, others) {
+  const cov = text(run && run.coverageType).toUpperCase(), move = text(run && run.movementType).toUpperCase().replace(/\s+/g, '_');
+  if (move === 'CARRIER_LOAD' || move === 'CUSTOMER_PICKUP') return false;
+  if (cov && cov !== 'UNITED DAIRY' && cov !== text(divisionName).toUpperCase()) return false;
+  const words = ' ' + [run.streamId, run.run, run.routeName].map(text).join(' ').toUpperCase().replace(/[^A-Z0-9]+/g, ' ') + ' ';
+  if (words.includes(' TRANSFER ')) return false;
+  return !(others || []).some(n => nameWords(n).some(w => words.includes(' ' + w + ' ')));
+}
+// "Martins Ferry" -> MARTINS FERRY, MARTINS, FERRY, MF.
+function nameWords(name) {
+  const parts = text(name).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+  if (!parts.length) return [];
+  const out = [parts.join(' ')].concat(parts.filter(w => w.length > 3));
+  if (parts.length > 1) out.push(parts.map(w => w[0]).join(''));
+  return out;
+}
+
 /** Joe 11/2: the loads delivered today, and those of the LEFTOVER_DAYS before it, whatever day they were loaded. */
 function loadsFor(runs, today) {
   const seen = new Set(), out = [];
@@ -129,18 +161,28 @@ function salesScreen(input, nowMs) {
       const tu = x.trailer ? trailerGps[trailerKey(x.trailer)] : null, tk = byTruck[S.unitKey(x.truck)] || null;
       const drop = salDropHook(runOf[x.runDocId], master) ? droppedAt(x, input.reefer) : null;
       let unit = tu || tk, by = unit ? (tu ? 'TRAILER' : 'TRUCK') : '', where, note = '';
+      // Joe 11/2 (two-unit check): once the load has left, when the trailer's GPS has not moved since the load day but the
+      // truck's has, the trailer was changed out: follow the unit that is moving.
+      // Joe 11/2: a unit that has stopped reporting is not believed: the other one is followed, and with none reporting Where now
+      // says Unknown.
+      const silent = (u) => !u || !(nowMs - Date.parse(u.lastReport || '') < SILENT_MS);
+      if (tu && tk && silent(tu) !== silent(tk)) { unit = silent(tu) ? tk : tu; by = silent(tu) ? 'TRUCK' : 'TRAILER'; }
+      else if (tu && tk && left && left.at !== null) {
+        const tuMoved = movedSince(input.gpsDays, tu.tag || x.trailer, x.loadDate), tkMoved = movedSince(input.gpsDays, tk.tag || x.truck, x.loadDate);
+        if (!tuMoved && tkMoved) { unit = tk; by = 'TRUCK'; }
+      }
       if (drop) {
         // Dropped: the status says when; Where now follows the driver's truck (the trailer stays at the store).
         const dd = Math.floor(drop.at / 1440), when = S.clock12(drop.at) + (dd !== Math.floor(now / 1440) ? ' ' + S.weekdayOf(new Date(dd * 86400000).toISOString().slice(0, 10)) : '');
         const leftWord = s.tone === 'late' && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
         s = { word: 'Dropped ' + when + ', ' + leftWord, tone: s.tone };
         unit = tk; by = tk ? 'TRUCK' : '';
-        where = tk ? whereOf(tk, spots, true) : 'No GPS on the truck';
+        where = !tk ? 'No GPS on the truck' : silent(tk) ? UNKNOWN : whereOf(tk, spots, true);
         // The truck's next trip: another of these loads on the same truck that has not left yet, or left after the drop.
         const next = S.unitKey(x.truck) && flat.find(y => y !== x && S.unitKey(y.truck) === S.unitKey(x.truck) && y.loadDate >= x.loadDate &&
           (l => !l || l.at === null || l.at > drop.at)(S.leftAt(y, input.reefer, input.gpsDays)));
         note = 'Trailer dropped at ' + drop.place + ' at ' + when + '. Truck: ' + where + (next ? '. Next route for this truck: ' + next.route : '') + '.';
-      } else where = whereOf(unit, spots, !!(left && left.at !== null));
+      } else where = unit && silent(unit) ? UNKNOWN : whereOf(unit, spots, !!(left && left.at !== null));
       const hasPoint = unit && typeof unit.lat === 'number' && typeof unit.lon === 'number';
       const seen = unit && Date.parse(unit.lastReport || '');
       return {
@@ -197,16 +239,35 @@ async function readInput(db, nowMs) {
  */
 async function salesCall(divisions, dbFor, input, deps) {
   const nowMs = deps && deps.now ? deps.now() : Date.now();
-  const want = text(input && input.division), pick = divisions.find(d => d.id === want) || divisions[0];
+  // Joe 11/2: "if it's selected All then ... shows all": All (when there is more than one division) is every division's routes.
+  const list = divisions.length > 1 ? divisions.concat([ALL]) : divisions.slice();
+  const want = text(input && input.division), pick = list.find(d => d.id === want) || divisions[0];
   if (!pick) return { divisions: [], division: '', groups: [], todayText: '', refreshed: '', customers: { rows: [], savedAt: '' } };
   const R = require('./plant-rules');
+  const picked = pick.id === ALL.id ? divisions : [pick];
   // Joe 11/1: the Customers card reads the division's customers from the Customers app (salescustomers.js, udcl.js), in the main database.
   if (text(input && input.what) === 'customers') {
-    const customers = await require('./salescustomers').forSales((deps && deps.rootDb) || dbFor(pick.id), pick.id);
-    return { divisions, division: pick.id, today: L.operatingDay(new Date(nowMs)), customers };
+    const parts = await Promise.all(picked.map(d => require('./salescustomers').forSales((deps && deps.rootDb) || dbFor(d.id), d.id)));
+    const customers = parts.length === 1 ? parts[0] : { rows: [].concat(...parts.map(c => c.rows)).sort((a, b) => a.name.localeCompare(b.name)), savedAt: parts.map(c => c.savedAt).sort().pop() || '' };
+    return { divisions: list, division: pick.id, today: L.operatingDay(new Date(nowMs)), customers };
   }
-  const screen = salesScreen(await readInput(dbFor(pick.id), nowMs), nowMs);
-  return Object.assign({ divisions, division: pick.id, refreshed: S.clock12(R.wallClock(nowMs)) }, screen);
+  // Joe 11/2: each division shows only the routes it runs (ownRoute); All shows everything.
+  const names = [...new Set(divisions.map(d => d.name).concat((L.PLANTS || []).map(p => p.name)).filter(Boolean))];
+  const screens = await Promise.all(picked.map(async (d) => {
+    const data = await readInput(dbFor(d.id), nowMs);
+    if (pick.id !== ALL.id) data.runs = data.runs.filter(r => ownRoute(r, d.name, names.filter(n => n !== d.name)));
+    return salesScreen(data, nowMs);
+  }));
+  const screen = screens.length === 1 ? screens[0] : mergeScreens(screens);
+  return Object.assign({ divisions: list, division: pick.id, refreshed: S.clock12(R.wallClock(nowMs)) }, screen);
 }
 
-module.exports = { salesCall, salesScreen, whereOf, salDropHook, droppedAt, cleanAddress, shortStatus, readInput };
+// All divisions on one list: the groups of the same day together, leftovers first, routes in order.
+function mergeScreens(screens) {
+  const by = {};
+  screens.forEach(sc => sc.groups.forEach(g => { const k = (g.leftover ? '0' : '1') + g.deliveryDate; if (!by[k]) by[k] = Object.assign({}, g, { rows: [] }); by[k].rows = by[k].rows.concat(g.rows); }));
+  const groups = Object.keys(by).sort().map(k => Object.assign(by[k], { rows: by[k].rows.sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.driver.localeCompare(b.driver)) }));
+  return { today: screens[0].today, todayText: screens[0].todayText, groups };
+}
+
+module.exports = { ownRoute, movedSince, salesCall, salesScreen, whereOf, salDropHook, droppedAt, cleanAddress, shortStatus, readInput };
