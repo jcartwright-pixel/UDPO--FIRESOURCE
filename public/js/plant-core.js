@@ -72,7 +72,9 @@ function rowFor(run, block, loadDate, prior) {
     startedAt: day.plantStartedAt || '', completedAt: day.completeTime || '', state: loadState(day),
     // Joe 10/12: a paused load is started but not loading now (it does not count toward the loadout's limit).
     paused: loadState(day) === 'LOADING' && String(day.loadStatus || '').trim().toUpperCase() === 'PAUSED',
-    pauseMark: day.pauseMark || null
+    pauseMark: day.pauseMark || null,
+    // Joe 11/2: a load an outside carrier hauls (Darden, GFS, ...) never counts as late or behind.
+    outside: !!(window.UDPlant && window.UDPlant.outsideCarrier && window.UDPlant.outsideCarrier(run))
   };
 }
 
@@ -162,7 +164,7 @@ export function nowMinutes(now) {
 // Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load left over from last night (still open
 // after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is behind before its dispatch time too.
 export function isBehind(row, today, now) {
-  if (row.state === 'DONE') return false;
+  if (row.state === 'DONE' || row.outside) return false;
   const leaves = departWall(row), n = wallNowMinutes(now);
   if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return true;
   if (leaves === null) return false;

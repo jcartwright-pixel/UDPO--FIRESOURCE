@@ -185,6 +185,18 @@
     return out.sort(function (a, b) { return a.date.localeCompare(b.date) || (a.pickupTime || '99:99').localeCompare(b.pickupTime || '99:99'); });
   }
 
+  // Joe 11/2 ("Darden's, GFS, anything … outside carriers don't count towards being late … does not count against loadout at
+  // all"): a load an outside carrier hauls is never late or behind. A run is an outside carrier's when Route Master's
+  // coverage_type is OUTSIDE CARRIER (or a carrier's own name, or a customer pickup) or its movement_type is CARRIER_LOAD /
+  // CUSTOMER_PICKUP; United Dairy and its branches (Fairmont, Marietta, Charleston, ...) still count. A Scheduler load marked
+  // Carrier is the customer's own carrier, so it does not count either.
+  function outsideCarrier(r) {
+    if (!r) return false;
+    var cov = text(r.coverageType).toUpperCase(), move = text(r.movementType).toUpperCase().replace(/\s+/g, '_');
+    if (move === 'CARRIER_LOAD' || move === 'CUSTOMER_PICKUP') return true;
+    return !!cov && cov !== 'UNITED DAIRY' && cov !== 'UNIONTOWN' && cov !== 'BRANCH';
+  }
+
   // Shipping's customers: Route Master runs that are active and shown to the plant (routes = route docs with runId).
   function scheduleCustomers(routes) {
     var list = [];
@@ -193,7 +205,7 @@
       if ((status && status !== 'ACTIVE') || r.active === false || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
       if (!route && !run) return;
-      list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName), loadType: loadArea(r.loadType) });
+      list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName), loadType: loadArea(r.loadType), outside: outsideCarrier(r) });
     });
     list.sort(function (a, b) { return a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run); });
     // An as-needed customer (Aldi - Charleston LOAD 1 to 4) is one customer; its first slot names the run, and its runs are
@@ -203,9 +215,9 @@
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(r.run);
       if (!m || !m[1].trim()) { out.push(r); return; }
       var base = m[1].trim(), baseRoute = r.route.replace(/_[0-9]+$/, ''), key = baseRoute + '|' + base.toUpperCase();
-      var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]), loadType: r.loadType };
+      var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]), loadType: r.loadType, outside: r.outside };
       if (byKey[key]) { byKey[key].slots.push(slot); return; }
-      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, loadType: r.loadType, grouped: true, slots: [slot] };
+      byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, loadType: r.loadType, outside: r.outside, grouped: true, slots: [slot] };
       out.push(byKey[key]);
     });
     out.forEach(function (c) {
@@ -239,6 +251,14 @@
   }
   // A numbered load's type: its own, else its LOAD N run's on Route Master.
   function scheduleArea(x, customers) { return x.loadType || routeLoadType(customers, (x.slot && x.slot.runId) || x.runId); }
+  // A Scheduler load an outside carrier takes: marked Carrier, or its run (or its LOAD N run) is an outside carrier's.
+  function scheduleOutside(x, customers) {
+    if (!x) return false;
+    if (x.scheduleType === 'CARRIER') return true;
+    var ids = [x.slot && x.slot.runId, x.runId].filter(Boolean), hit = false;
+    (customers || []).some(function (c) { return (c.slots || [c]).some(function (s) { if (s.runId && ids.indexOf(s.runId) >= 0) { hit = !!(s.outside || c.outside); return true; } return false; }); });
+    return hit;
+  }
 
   // Joe 10/14: a customer's loads on one delivery day are numbered by pickup time (Load 1, Load 2, Load 3; one load is Load 1).
   // An as-needed customer's Load N goes on its LOAD N run (slot), so each load has its own line for a driver, truck and cases;
@@ -271,7 +291,7 @@
     if (routes && routes.length) return routes;
     var seen = {};
     return (runs || []).filter(function (r) { return r.runId && !seen[r.runId] && (seen[r.runId] = true); }).map(function (r) {
-      return { runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '' };
+      return { runId: r.runId, routeId: r.routeId || r.runId, route: r.route, run: r.run, routeName: '', displayPlant: true, loadType: r.loadType || (r.masterShow && r.masterShow.loadType) || '', coverageType: r.coverageType || '', movementType: r.movementType || '' };
     });
   }
   // The day's Shipping loads (by load day), numbered, from the Scheduler records (plantJournal).
@@ -289,13 +309,14 @@
       var kind = scheduleArea(x, customers), slot = x.slot ? Object.assign({}, x, x.slot) : x;
       var r = x.overSlots ? null : (live || []).find(function (b) { return b.area === kind && !b.prior && !on[b.id] && sameRun(b, slot); });
       if (r) { on[r.id] = x; return; }
+      var outside = scheduleOutside(x, customers);
       var w = x.work || {}, n = Number(w.count);
       extra.push({ id: 'sch:' + x.id, sched: x, area: kind, prior: false, route: (x.slot && x.slot.route) || x.route, run: loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo),
         driver: x.scheduleType === 'CARRIER' ? 'Carrier' : '', truck: '', trailer: x.trailer, quantity: w.count === '' || w.count === undefined || !isFinite(n) ? null : n,
-        state: scheduleLoadState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '', notes: w.notes || '', pauseMark: w.pauseMark || null });
+        state: scheduleLoadState(w), paused: w.state === 'PAUSED', startedAt: w.startedAt || '', completedAt: w.completedAt || '', notes: w.notes || '', pauseMark: w.pauseMark || null, outside: outside });
     });
     extra.sort(function (a, b) { return (a.sched.pickupTime || '99:99').localeCompare(b.sched.pickupTime || '99:99'); });
-    return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id] }) : r; }).concat(extra);
+    return (live || []).map(function (r) { return on[r.id] ? Object.assign({}, r, { schedLine: on[r.id], outside: !!r.outside || on[r.id].scheduleType === 'CARRIER' }) : r; }).concat(extra);
   }
   // Joe 10/25 ("Gmail report is not showing the boxing loading"): the report's loads are the loadouts' loads, Scheduler loads
   // included (most box loads are Scheduler loads). A Scheduler load of its own leaves at its pickup time on its delivery day,
@@ -1082,8 +1103,10 @@
       if (!areas[r.area]) return;
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
-        startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence) };
+        startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence), outside: !!r.outside };
       areas[r.area].total++; out.total++;
+      // Joe 11/2: an outside carrier's load (Darden, GFS, ...) is never late or behind; it stays on the list to load.
+      if (r.outside) { if (r.state === 'DONE') out.loaded.push(item); else { areas[r.area].left++; out.leftToLoad++; out.nextUp.push(item); } return; }
       // Joe 11/1 ("sal 1 was a little late think we should show"): a load finished after its own dispatch time was loaded late,
       // by the minutes between the two.
       if (r.state === 'DONE') { var doneWall = wallMinutes(r.completedAt); if (leaves !== null && doneWall !== null && doneWall - leaves >= 1) item.loadedLate = Math.round(doneWall - leaves); out.loaded.push(item); return; }
@@ -1235,7 +1258,7 @@
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) });
       var loadDay = dayNum(r.loadDate), shiftEnd = loadDay === null ? null : (loadDay + 1) * 1440 + FORECAST.shiftEnd;
       return { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), loadDate: text(r.loadDate), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), status: r.state,
-        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior, paused: !!r.paused };
+        cases: cases, noCases: !cases, minutes: minutes, leaves: leaves, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), shiftEnd: shiftEnd, priorDay: !!r.prior, paused: !!r.paused, outside: !!r.outside };
     };
     // Loads loading now finish their own time after they started (at least 5 minutes from now); the rest follow them, one
     // after another in loading order: last night's left-over loads first (Joe 10/20: the plant carries straight on through the
@@ -1258,7 +1281,8 @@
         // done after its own dispatch time; the 6:00 AM shift end counts only for a load with no dispatch time.
         var deadline = x.leaves === null ? x.shiftEnd : x.leaves;
         x.estText = minutesText12(((x.est % 1440) + 1440) % 1440); x.estDay = dayShort(x.est);
-        x.late = deadline !== null && x.est > deadline;
+        // Joe 11/2: an outside carrier's load still takes its loading time, but is never late.
+        x.late = !x.outside && deadline !== null && x.est > deadline;
         x.reason = !x.late ? '' : x.leaves !== null ? 'misses dispatch' : 'past the 6:00 AM shift end';
         // Joe 10/21 ("whenever it shifts over, just add the length of that remaining route"): a load left over from an earlier
         // night is behind only by the loading it still has to do, not by the hours since its old dispatch or the 6 a.m. roll.
@@ -1352,8 +1376,11 @@
       lateNow.push({ id: x.id, name: name(x), area: x.area, value: e ? 'est. ' + e.estDay + ' ' + e.estText : 'Not loaded',
         sub: 'Should have left ' + [x.departDay, x.depart].filter(Boolean).join(' ') + (x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '') });
     });
+    // Joe 11/2: an outside carrier's load still to load is not counted as late, will miss or on time; the email only says how many.
+    var outsideList = (r.nextUp || []).filter(function (x) { return x.outside; }), outside = outsideList.length;
+    var outsideNames = []; outsideList.forEach(function (x) { var n = routeNumber(x.route) + (x.routeName ? ' ' + x.routeName : ''); if (outsideNames.indexOf(n) < 0) outsideNames.push(n); });
     (f ? f.loads : []).forEach(function (x) {
-      if (ids[x.id]) return;
+      if (ids[x.id] || x.outside) return;
       var deadline = x.leaves === null ? x.shiftEnd : x.leaves, when = function (m) { return dayShort(m) + ' ' + minutesText12(((m % 1440) + 1440) % 1440); };
       var over = x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '';
       if (x.leaves !== null && x.leaves <= f.now) lateNow.push({ id: x.id, name: name(x), area: 'CASE', value: 'est. ' + x.estDay + ' ' + x.estText, sub: 'Should have left ' + when(x.leaves) + over });
@@ -1365,12 +1392,13 @@
     var loadedLate = (r.loaded || []).filter(function (x) { return x.loadedLate > 0; }).sort(function (a, b) { return (a.doneMs || 0) - (b.doneMs || 0); }).map(function (x) {
       return { id: x.id, name: name(x), area: x.area, value: spanText(x.loadedLate) + ' late', sub: 'Dispatch ' + [x.departDay, x.depart].filter(Boolean).join(' ') + ' · loaded ' + x.doneAt };
     });
-    return { lateNow: lateNow, miss: miss, loadedLate: loadedLate, leftOver: leftOver, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
+    return { lateNow: lateNow, miss: miss, loadedLate: loadedLate, leftOver: leftOver, outside: outside, outsideNames: outsideNames, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
   }
   function truckCheckSummary(t) {
     return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
       t.ok ? (t.lateNow.length || t.miss.length ? 'the other ' + t.ok + ' make it' : 'all ' + t.ok + ' make it') : '',
-      (t.loadedLate || []).length ? t.loadedLate.length + ' already loaded late' : ''].filter(Boolean).join(' · ');
+      (t.loadedLate || []).length ? t.loadedLate.length + ' already loaded late' : '',
+      t.outside ? t.outside + ' outside carrier load' + (t.outside === 1 ? '' : 's') + ' not counted' : ''].filter(Boolean).join(' · ');
   }
 
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
@@ -1489,7 +1517,8 @@
         (t.lateNow.length ? lab('Late now: truck should have left', RED) + t.lateNow.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         (t.miss.length ? lab('Will miss its truck', RED) + t.miss.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         (t.ok ? lab(bad ? 'Every other truck' : 'Every truck still to load', GREEN) + line(t.ok + ' load' + (t.ok === 1 ? '' : 's'), 'Last one est. loaded ' + t.okLast, '&#10003; On time', false) : '') +
-        (!t.lateNow.length && !t.miss.length && !t.ok ? line('Nothing left to load', '', '&ndash;', false) : '') +
+        (t.outside ? lab('Outside carriers: never counted late', GREY) + line(t.outside + ' load' + (t.outside === 1 ? '' : 's'), (t.outsideNames || []).join(', '), 'Not counted', false) : '') +
+        (!t.lateNow.length && !t.miss.length && !t.ok && !t.outside ? line('Nothing left to load', '', '&ndash;', false) : '') +
         (t.loadedLate.length ? lab('Already loaded, but late', RED) + t.loadedLate.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         '</table></div></td></tr>';
     }
@@ -1614,5 +1643,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempChecked: tempChecked, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
-    truckCheck: truckCheck, truckCheckSummary: truckCheckSummary, REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
+    truckCheck: truckCheck, truckCheckSummary: truckCheckSummary, outsideCarrier: outsideCarrier, scheduleOutside: scheduleOutside, REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
 });

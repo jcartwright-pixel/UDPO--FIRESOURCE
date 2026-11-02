@@ -54,7 +54,9 @@ export function loadOutcome(row, nowWall) {
   const depart = departAt(row), done = U.wallMinutes(row.completedAt), started = U.wallMinutes(row.startedAt);
   const out = { route: text(row.route), run: text(row.run), area: row.area, depart, done, started, late: null, taken: done !== null && started !== null && done >= started ? Math.max(0, done - started - U.pausedMinutes(row)) : null,
     truck: text(row.truck), trailer: text(row.trailer), runDocId: row.runDocId, day: row.day, runId: row.runId, loadDate: row.loadDate, deliveryDate: row.deliveryDate };
-  if (row.state === 'DONE') {
+  // Joe 11/2: an outside carrier's load (Darden, GFS, ...) is not judged on time or late.
+  if (row.outside) out.result = 'OUTSIDE CARRIER';
+  else if (row.state === 'DONE') {
     if (done === null || depart === null) out.result = 'LOADED';
     else { out.late = done - depart; out.result = out.late <= ON_TIME_MINUTES ? 'ON TIME' : 'LATE'; }
   } else if (depart !== null && nowWall > depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';

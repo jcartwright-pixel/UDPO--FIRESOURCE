@@ -605,6 +605,8 @@ The plant's front page for managers. Each department has a small card: Case Load
 
 > Last night's left-over loads show on their own line, before today's.
 
+> Loads an outside carrier hauls (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are never counted as late or behind. They still show, so the plant loads them.
+
 ## Send Current Report
 id: send-report
 screens: manager.html?report=1
@@ -623,6 +625,7 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Will miss their trucks** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 45 minutes after it leaves. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
 - The forecast box answers one question: at this pace, will every truck be loaded before it leaves? It lists the loads **late now** (with when each should be loaded), the loads that **will miss their truck** (and by how much), and says every other truck is **On time**, with when the last one should be loaded. Below that, **Already loaded, but late** names each load finished after its dispatch time and by how much. It never shows cases.
+- **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) never count as late, behind or loaded late. The forecast box has one line, **Outside carriers: never counted late**, with how many are still to load and which ones. They still show in the Routes list so the plant loads them. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
 
 > One late route does not make the whole plant late: the box names the trucks that will leave late and says the rest are on time.
 
@@ -681,6 +684,7 @@ Will the plant be late? Every case load still to load, in the order it will be l
 - **Loads due by each time** totals the loads and cases due by each hour.
 - **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
 - Last night's left-over loads are marked at the left edge.
+- A load an outside carrier hauls says **Outside carrier, not counted late**. It still takes its loading time, but it is never red.
 
 > Example: Save-A-Lot 1 leaves 8:00 AM and Save-A-Lot 2 leaves 9:30 AM, so when the plant is behind Save-A-Lot 2 is loaded right after Save-A-Lot 1, then Jersey (1:00 PM).
 
@@ -997,6 +1001,7 @@ screens: reports.html
 The plant's reports. Pick the **Report** at the top: Weekly Scorecard, Shift Comparison, Day-of-Week Trends or Loading Rundown. Then pick the **Loadout**, and the **Day**, **Week** or number of **Weeks** with the arrows.
 
 - `Print` prints the report. `TV display` shows it full screen for a TV.
+- Loads an outside carrier hauls (Darden, Gordon Food Service, a customer's own truck) are not judged on time or late, so they never pull the on-time share down.
 
 ## Loading Rundown
 id: rundown

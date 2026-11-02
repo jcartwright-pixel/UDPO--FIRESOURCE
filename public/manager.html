@@ -301,7 +301,8 @@
         (r.forecast ? sect('Forecast (estimated) at ' + r.forecast.asOf, U.truckCheckSummary(tc) || 'nothing left to load', tc.lateNow.length || tc.miss.length ? 'bad' : '',
           tc.lateNow.map(z => row('Late now: ' + z.name, z.sub + ' · ' + z.value, 'bad')).concat(tc.miss.map(z => row('Will miss its truck: ' + z.name, z.sub + ' · ' + z.value, 'bad')),
             tc.ok ? [row(tc.lateNow.length || tc.miss.length ? 'Every other truck' : 'Every truck still to load', tc.ok + ' load' + (tc.ok === 1 ? '' : 's') + ' on time · last one est. loaded ' + tc.okLast)] : [],
-            tc.loadedLate.map(z => row('Already loaded, but late: ' + z.name, z.sub + ' · ' + z.value, 'bad'))), '') : '') +
+            tc.loadedLate.map(z => row('Already loaded, but late: ' + z.name, z.sub + ' · ' + z.value, 'bad')),
+            tc.outside ? [row('Outside carriers: never counted late', tc.outside + ' load' + (tc.outside === 1 ? '' : 's') + ' · ' + tc.outsideNames.join(', '))] : []), '') : '') +
         // Joe 11/1: a load loaded after its dispatch time shows, forecast or not.
         (!r.forecast && tc.loadedLate.length ? sect('Loaded late', tc.loadedLate.length, 'bad', tc.loadedLate.map(z => row(z.name, z.sub + ' · ' + z.value, 'bad')), '') : '') +
         '<section><h3>Routes<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em></h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +
