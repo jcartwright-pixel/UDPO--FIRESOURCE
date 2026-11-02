@@ -66,3 +66,11 @@ test('GPS Trip Fuel: rows older than six months are found and deleted in runs, l
   assert.equal(row[1], '10-31-26 10:09 AM');
   assert.equal(row[14], '');
 });
+
+// 11/2: a truck that never comes to Uniontown has its own home: where it stands still in the small hours.
+test('a truck\'s home is where it stands still between 1 and 4 a.m.', () => {
+  const { homeOf } = require('../../src/fleettrips');
+  const at = (h) => '2026-10-01T' + String(h + 4).padStart(2, '0') + ':00:00Z'; // New York hour h (EDT)
+  const pts = [1, 2, 3].map(h => ({ at: at(h), lat: 37.8104, lon: -82.7991, miles: 0 })).concat([{ at: at(12), lat: 38, lon: -82, miles: 0 }, { at: at(13), lat: 38, lon: -82, miles: 0 }, { at: at(14), lat: 38, lon: -82, miles: 0 }, { at: at(15), lat: 38, lon: -82, miles: 0 }]);
+  assert.deepEqual(homeOf(pts), { lat: 37.81, lon: -82.799 });
+});

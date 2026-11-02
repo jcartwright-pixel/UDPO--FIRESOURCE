@@ -224,6 +224,17 @@ function tripStream(yards) {
   };
 }
 
+/** A truck's home: the spot (about 100 yards) where it stood still most between 1 and 4 a.m. New York, else most overall. */
+function homeOf(points) {
+  const count = (list) => { const n = {}; list.forEach(p => { if (p.lat === null || p.lon === null) return; const k = p.lat.toFixed(3) + ',' + p.lon.toFixed(3); n[k] = (n[k] || 0) + 1; }); return n; };
+  const still = points.filter(p => !(p.miles > 0.05));
+  const night = still.filter(p => { const h = Number(new Date(p.at).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false })); return h >= 1 && h < 4; });
+  const n = count(night.length >= 3 ? night : still), best = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+  if (!best) return null;
+  const [lat, lon] = best.split(',').map(Number);
+  return { lat, lon };
+}
+
 /** input: {from, to} (yyyy-mm-dd New York days, both kept). Returns {trips: [{tag, ...trip}], days: {date: points}, notes}. */
 async function tripSpan(db, input, options) {
   const o = withDefaults(options), at = o.now().toISOString();
@@ -243,7 +254,7 @@ async function tripSpan(db, input, options) {
   const output = ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time', 'Lat = Input.Lat', 'Lon = Input.Lon', 'Address = Input.Address', 'MilesDelta(mile) = Input.OdometerDelta']
     .concat(Object.keys(want).filter(k => want[k]).map(k => outName(want[k].name) + ' = Input.' + want[k].name));
   await saveProbeTemplate(d, o, token, 'UDPO_TripDayAll', 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'], ['Time = Between(Since, Until)'], output);
-  const streams = {}, days = {}, notes = [];
+  const streams = {}, byUnit = {}, days = {}, notes = [];
   const val = (r, k) => want[k] ? toOurs(r[outName(want[k].name)], want[k].unitName, want[k].type).value : null;
   const read = async (a, b, depth) => {
     try { return await run('UDPO_TripDayAll', { Since: fleetTime(a), Until: fleetTime(b) }, true); }
@@ -259,13 +270,20 @@ async function tripSpan(db, input, options) {
     const rows = (await read(a, b, 0)).filter(r => tagOf[String(r.UnitId)]);
     const pts = rows.map(r => ({ unit: String(r.UnitId), at: utcIso(r.Time), lat: num(r.Lat), lon: num(r.Lon), address: plainAddress(r.Address), miles: num(r.MilesDelta) || 0,
       fuel: val(r, 'fuel'), tripFuel: val(r, 'tripFuel'), odo: val(r, 'odo') })).filter(p => p.at).sort((x, y) => x.at < y.at ? -1 : x.at > y.at ? 1 : 0);
-    pts.forEach(p => { (streams[p.unit] = streams[p.unit] || tripStream(yards)).add(p); const day = nyDate(p.at); days[day] = (days[day] || 0) + 1; });
+    pts.forEach(p => { (byUnit[p.unit] = byUnit[p.unit] || []).push(p); const day = nyDate(p.at); days[day] = (days[day] || 0) + 1; });
     if (o.progress) o.progress(a.toISOString(), pts.length);
   }
+  // 11/2 October run: most of the fleet never comes to Uniontown (Paintsville, ...), so each truck also has its own home:
+  // where it stands still most in the small hours (1 to 4 a.m. New York), else where it stands still most.
   const trips = [];
-  Object.keys(streams).forEach(u => streams[u].finish().forEach(x => trips.push(Object.assign({ tag: tagOf[u], unitId: u }, x))));
+  Object.keys(byUnit).forEach(u => {
+    const home = homeOf(byUnit[u]), mine = home && !yards.some(y => milesApart(y, home) <= 1) ? yards.concat([home]) : yards;
+    const st = streams[u] = tripStream(mine);
+    byUnit[u].forEach(p => st.add(p));
+    st.finish().forEach(x => trips.push(Object.assign({ tag: tagOf[u], unitId: u }, x)));
+  });
   trips.sort((x, y) => String(x.tag).localeCompare(String(y.tag), undefined, { numeric: true }) || (x.left < y.left ? -1 : 1));
   return { at, from: input.from, to: input.to, trucks: Object.keys(streams).length, fields: Object.keys(want).filter(k => want[k]).map(k => want[k].name), days, trips, notes };
 }
 
-module.exports = { tripCheck, tripSpan, tripStream, tripsOf, toOurs, plainAddress };
+module.exports = { tripCheck, tripSpan, tripStream, homeOf, tripsOf, toOurs, plainAddress };
