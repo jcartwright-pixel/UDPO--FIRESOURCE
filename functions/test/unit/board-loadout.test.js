@@ -35,3 +35,21 @@ test('the Driver Room board keeps yesterday\'s unfinished loads after the 6 a.m.
   assert.deepEqual(rows.map(r => [r.route, r.prior, r.state]), [['901', true, 'WAITING'], ['902', true, 'LOADING'], ['855', true, 'WAITING'], ['905', false, 'WAITING']]);
   assert.deepEqual(B.loadoutBoardRows(runs, [], '2026-10-30').map(r => r.route), ['905']);
 });
+
+// Joe 11/2: on Sunday a driver sees Monday's loads, loaded or not, even though they were loaded Saturday; at 6 a.m. Monday the
+// board rolls to Monday's own loadout. A Load Day route left the day it was loaded, and Sunday's own deliveries have left.
+test('Sunday\'s board shows Monday\'s loads loaded on Saturday until Monday\'s 6 a.m. roll', () => {
+  const run = (id, route, days, leavesOn) => ({ id, weekStart: '2026-11-01', route, run: 'R' + id, days, masterShow: leavesOn ? { leavesOn } : undefined });
+  const runs = [
+    run('m1', '901', { mon: { runs: true, loadSequence: 1, loadDayOffset: -2, driver: 'MONDAY LOADED', completeTime: '2026-10-31T20:00:00Z' } }),
+    run('m2', '902', { mon: { runs: true, loadSequence: 2, loadDayOffset: -2, driver: 'MONDAY WAITING' } }),
+    run('ld', '852', { mon: { runs: true, loadSequence: 3, loadDayOffset: -2, driver: 'LEFT SATURDAY' } }, 'LOAD DAY'),
+    run('su', '903', { sun: { runs: true, loadSequence: 4, driver: 'SUNDAY RUN', completeTime: '2026-10-31T21:00:00Z' } }),
+    run('tu', '904', { tue: { runs: true, loadSequence: 1, driver: 'TUESDAY RUN' } })
+  ];
+  // 902 is not loaded yet: left over from Saturday, so first.
+  assert.deepEqual(B.loadoutBoardRows(runs, [], '2026-11-01', { carry: true }).map(r => [r.route, r.state, r.deliveryDate, r.prior]),
+    [['902', 'WAITING', '2026-11-02', true], ['901', 'LOADED', '2026-11-02', false]]);
+  assert.deepEqual(B.loadoutBoardRows(runs, [], '2026-11-02', { carry: true }).map(r => r.route), ['904']);
+  assert.deepEqual(B.loadoutBoardRows(runs, [], '2026-11-01').map(r => r.route), [], 'the texts keep the day\'s own loadout');
+});
