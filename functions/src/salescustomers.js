@@ -8,7 +8,7 @@
  * upload; a division with nothing in the Customers app shows an empty list. The old upload (salesCustomers/<plant>) is left in
  * the database untouched and is no longer read.
  *
- * Groups (Joe 11/1, mock-ups 4 and 5, his pick iz): every name starting with DQ is Dairy Queen; every other customer goes by the
+ * Groups (Joe 11/1, mock-ups 4 and 5, his pick iz; Joe 11/2: a group picked on the Customer List wins): every name starting with DQ is Dairy Queen; every other customer goes by the
  * Chain number on the Customer List; no chain, or a chain with only one customer, = Independents (Joe 11/1: "they're called
  * independents"). The list has chain numbers but no chain names, so the app guesses a name (the word most of the chain's
  * customers start with, or a few known ones).
@@ -26,8 +26,17 @@ const isDq = (name) => /^\.*DQ\b/i.test(name);
 const firstWord = (name) => text(name).replace(/^\.+/, '').split(/[\s#\-/]+/)[0].replace(/[.`']/g, '').toUpperCase();
 const title = (w) => w.charAt(0) + w.slice(1).toLowerCase();
 
-/** Which group a line's customer is in: 'DQ', 'chain:<number>', or '' (no group). */
-function groupKey(r) { return isDq(r.name) ? 'DQ' : r.chain ? 'chain:' + r.chain : ''; }
+/**
+ * Which group a line's customer is in: 'group:<name>' when one was picked on the Customer List's Directory (Joe 11/2: "add one
+ * more column for the grouping ... change it with a drop-down"), else 'DQ', 'chain:<number>', or '' (no group). Chain 0 is no
+ * chain (Joe 11/2: the Customer List now shows a chain of 0 as 0).
+ */
+function groupKey(r) {
+  const g = text(r.group);
+  if (g) return 'group:' + g;
+  const chain = text(r.chain);
+  return isDq(r.name) ? 'DQ' : chain && chain !== '0' ? 'chain:' + chain : '';
+}
 
 /** The app's guess at each group's name, from its customers' names. */
 function guessNames(rows) {
@@ -38,6 +47,7 @@ function guessNames(rows) {
   rows.forEach(r => { nameOf[r.account || r.name] = r.name; });
   Object.keys(members).forEach(k => {
     if (k === 'DQ') { names[k] = 'Dairy Queen'; return; }
+    if (k.startsWith('group:')) { names[k] = k.slice(6); return; }
     const chain = k.slice(6), list = [...members[k]].map(id => nameOf[id]);
     if (KNOWN_CHAINS[chain]) { names[k] = KNOWN_CHAINS[chain]; return; }
     const count = {};
@@ -53,7 +63,8 @@ function groupsOf(rows) {
   const guess = guessNames(rows), count = {}, seen = new Set();
   rows.forEach(r => { const id = r.account || r.name, k = groupKey(r); if (!k || seen.has(k + '|' + id)) return; seen.add(k + '|' + id); count[k] = (count[k] || 0) + 1; });
   // A chain with one customer is not much of a group: it shows under Independents.
-  return Object.keys(count).filter(k => k === 'DQ' || count[k] > 1).map(k => ({ key: k, name: guess[k], count: count[k] }))
+  // A group picked by hand on the Customer List is kept even with one customer.
+  return Object.keys(count).filter(k => k === 'DQ' || k.startsWith('group:') || count[k] > 1).map(k => ({ key: k, name: guess[k], count: count[k] }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
