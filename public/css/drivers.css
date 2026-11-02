@@ -73,3 +73,7 @@ label.panel-check { display: flex; align-items: center; gap: 8px; text-transform
 .drivers-page .panel input[type="tel"] { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; color: var(--ink); min-width: 0; width: 100%; }
 .drivers-page .panel-row > label { min-width: 0; }
 .drivers-page .panel-row input { min-width: 0; width: 100%; box-sizing: border-box; }
+/* Joe 11/2: Delete (asks twice) beside Make Inactive; the second ask is said in words under the buttons. */
+.drivers-page .panel-actions #d-delete { color: #fff; background: #b42318; border-color: #b42318; }
+.drivers-page .panel-actions #d-delete[data-sure] { white-space: normal; }
+.drivers-page .delete-ask { margin: 0 0 8px; padding: 8px 10px; border: 1px solid #f1b4ae; background: #fef3f2; color: #8a1c12; border-radius: 6px; font-size: 16px; line-height: 1.35; }

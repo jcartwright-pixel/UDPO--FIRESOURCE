@@ -324,3 +324,52 @@ test('Joe 10/31 (im): a sample of the new text, the driver\'s own week, goes onl
   const logs = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'SAMPLE');
   assert.deepEqual(logs.map(x => x.name + ' ' + x.status).sort(), ['Sample: CASEY, LEE NOT SENT', 'Sample: CASEY, LEE SENT']);
 });
+
+test('Joe 11/2: a wrong number fixed on the Driver Roster, then Resend texts only that driver, at the new number', async () => {
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-resend-0001', driverId: 'drv_test_casey', phone: '3305559999' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-resend-0002', driverId: 'drv_test_brook', phone: '3305558888' });
+  for (const id of ['drv_test_casey', 'drv_test_brook']) await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-resend-' + id, driverId: id, kind: 'SCHEDULE', on: true });
+  const calls = [], fetch = async (url, init) => { calls.push(new URLSearchParams(String(init.body))); return { ok: true, status: 201, json: async () => ({}) }; };
+  const live = (t) => ({ env: { LIVE_TEXTS: '1' }, fetch, now: () => new Date(t) });
+  await post();
+  await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:00:00Z'));
+  assert.equal(calls.length, 2);
+  const caseyLog = (await db().collection('textLog').get()).docs.find(x => x.data().driverId === 'drv_test_casey');
+  // The number was wrong: fixed on the Driver Roster, then Resend on Casey's text.
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-resend-0003', driverId: 'drv_test_casey', phone: '3305551234' });
+  await assert.rejects(SMS.smsCall(db(), DISPATCHER, { op: 'resend', logId: caseyLog.id }, live('2026-10-17T23:20:00Z')), /Only an administrator/);
+  const r = await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: caseyLog.id }, live('2026-10-17T23:20:00Z'));
+  assert.deepEqual(r.resend, { name: 'CASEY, LEE', to: '330-555-1234', status: 'SENT', reason: '' });
+  assert.equal(calls.length, 3, 'one more text, to one driver');
+  assert.deepEqual([calls[2].get('To'), calls[2].get('Body')], ['+13305551234', SMS.messageFor(WEEK)]);
+  const again = (await db().collection('textLog').get()).docs.map(x => Object.assign({ id: x.id }, x.data())).find(x => x.kind === 'RESEND');
+  assert.deepEqual([again.week, again.driverId, again.to, again.status, again.by], [WEEK, 'drv_test_casey', '+13305551234', 'SENT', ADMIN.email]);
+  assert.equal((await SMS.smsCall(db(), ADMIN, { op: 'status' })).lastSend.drivers, 2, 'the week\'s Send record is left alone');
+  // A resent text can be resent again.
+  await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: again.id }, live('2026-10-17T23:25:00Z'));
+  assert.equal(calls.length, 4);
+  // Not a schedule text, an old week, an unticked driver, or no such row: refused, nothing sent.
+  await SMS.smsCall(db(), ADMIN, { op: 'test', phone: '3305557777' }, live('2026-10-17T23:30:00Z'));
+  const testLog = (await db().collection('textLog').get()).docs.find(x => x.data().kind === 'TEST');
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'resend', logId: testLog.id }, live('2026-10-17T23:31:00Z')), /Only a schedule text/);
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'resend', logId: 'nope' }, live('2026-10-17T23:31:00Z')), /Only a schedule text/);
+  await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-resend-off', driverId: 'drv_test_casey', kind: 'SCHEDULE', on: false });
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'resend', logId: caseyLog.id }, live('2026-10-17T23:32:00Z')), /CASEY, LEE is not ticked for schedule texts/);
+  await db().collection('config').doc('app').set({ liveWeeks: { current: L.addDays(WEEK, 7) } }, { merge: true });
+  await assert.rejects(SMS.smsCall(db(), ADMIN, { op: 'resend', logId: caseyLog.id }, live('2026-10-17T23:33:00Z')), /Only the posted week/);
+  assert.equal(calls.length, 5, 'only the test text went out');
+});
+
+test('Joe 11/2: on the test copy Resend only writes the text to the list', async () => {
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-resend-0004', driverId: 'drv_test_casey', phone: '3305551234' });
+  await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-resend-0004', driverId: 'drv_test_casey', kind: 'SCHEDULE', on: true });
+  await post();
+  const calls = [], opts = { env: {}, fetch: async () => { calls.push(1); return { ok: true }; } };
+  await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, opts);
+  const first = (await db().collection('textLog').get()).docs.find(x => x.data().driverId === 'drv_test_casey');
+  const r = await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: first.id }, Object.assign({ now: () => new Date('2026-10-18T12:00:00Z') }, opts));
+  assert.equal(r.resend.status, 'NOT SENT');
+  assert.equal(calls.length, 0);
+});

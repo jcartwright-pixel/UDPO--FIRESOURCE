@@ -1,0 +1,33 @@
+/* The hub's own look on top of app.css (the same look as the Customer List). */
+.hub-page .head { align-items: center; }
+.hub-page .head .actions.in-head { margin-left: auto; padding: 0; }
+.hub-nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 16px 0; background: var(--band, #eef3f8); border-bottom: 1px solid var(--line); }
+.hub-nav a { padding: 8px 14px; border-radius: 8px 8px 0 0; color: var(--ud-blue); font-weight: 700; text-decoration: none; }
+.hub-nav a[aria-current="page"] { background: var(--ud-blue); color: #fff; }
+.hub-nav a:hover:not([aria-current]) { background: #fff; }
+.topbar .plant-pick { font: inherit; font-weight: 700; border-radius: 8px; padding: 7px 10px; border: 1px solid #b9c7d3; color: var(--ud-blue); }
+.topbar .who.initials { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; font-weight: 800; }
+.hub-home { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 20px 16px; max-width: 1200px; }
+.hub-home a { display: block; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px; text-decoration: none; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.hub-home a strong { display: block; font-size: 22px; color: var(--ud-blue-dark); margin-bottom: 6px; }
+.hub-home a:hover { border-color: var(--ud-blue); }
+.hub-help { max-width: 900px; padding: 8px 20px 40px; line-height: 1.5; }
+.hub-help h2 { color: var(--ud-blue-dark); border-top: 1px solid var(--line); padding-top: 16px; }
+.hub-help .tip { background: var(--band, #eef3f8); border-left: 4px solid var(--ud-blue); padding: 8px 12px; border-radius: 6px; }
+.hub-help .dont { background: var(--error-bg); color: var(--error-ink); border-left: 4px solid currentColor; padding: 8px 12px; border-radius: 6px; }
+@media print { .hub-nav { display: none; } }
+/* Administration shows only to administrators (Joe 11/1). */
+body:not(.is-admin) .admin-only { display: none !important; }
+.topbar .brand:has(+ #go-admin) { margin-right: 0; }
+.topbar #go-admin { margin: 0 auto 0 16px; }
+/* Get the hub as its own app on the computer. */
+.hub-install { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 16px; padding: 14px 16px; border: 1px solid #c9d6e3; border-radius: 10px; background: #fff; }
+.hub-install b { font-size: 17px; color: #074c84; }
+.hub-install button { margin-left: auto; }
+/* An app tile: the name, what it is for, and where it opens. */
+.hub-home a small { display: block; margin-top: 10px; color: var(--muted); font-size: 14px; }
+.hub-empty { margin: 20px 16px; padding: 16px; border-radius: 10px; background: var(--band, #eef3f8); font-weight: 600; }
+/* The screen shows all at once when its list is in (shell.js requireSignIn). */
+body.waiting #screen > :not(.topbar):not(.hub-nav):not(.notice):not(.update-ready):not(.screen-loading) { visibility: hidden; }
+.screen-loading { display: none; }
+body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 0; top: 45%; text-align: center; font-size: 20px; font-weight: 700; color: var(--muted); }

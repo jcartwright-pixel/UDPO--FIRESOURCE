@@ -139,7 +139,7 @@
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, showError, callServer, dateTimeText, serverText } from './js/app.js';
-    import { collection, query, orderBy, limit, onSnapshot } from './js/firebase.js';
+    import { collection, query, orderBy, limit, onSnapshot, doc } from './js/firebase.js';
 
     let s = null, armed = null, askArmed = null, sendArmed = null;
     const $ = (id) => document.getElementById(id);
@@ -269,16 +269,33 @@
     $('fwd-phone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('fwd-phone').blur(); } });
     // The texts and replies (textLog), newest first; the list follows new ones as they come.
     const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received', SENDING: 'Sending', STOPPED: 'Replied STOP' };
-    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply', SAMPLE: 'Sample to you' };
+    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply', SAMPLE: 'Sample to you', RESEND: 'Schedule, resent' };
     const FWD = { SENT: 'Sent to your cell', FAILED: 'Not sent to your cell' };
     const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
+    // Joe 11/2 ("wrong phone number ... can I change and then resend?"): a schedule text for the posted week has Resend, which
+    // texts that one driver again at the number on the Driver Roster now (press twice).
+    let logDocs = [], postedWeek = '', resendArmed = null, resendId = '';
+    const resendable = (m) => m.direction === 'out' && (!m.kind || m.kind === 'RESEND') && m.week && m.driverId && m.week === postedWeek;
+    function drawLog() {
+      $('log').innerHTML = logDocs.map(x => Object.assign({ id: x.id }, x.data())).map(m => { const inbound = m.direction === 'in';
+        const resend = resendable(m) ? '<br><button type="button" class="texts-resend' + (resendId === m.id ? ' armed' : '') + '" data-resend="' + escapeHtml(m.id) + '">' +
+          (resendId === m.id ? 'Tap again: text ' + escapeHtml(m.name || 'this driver') : 'Resend') + '</button>' : '';
+        return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td data-l="When">' + escapeHtml(stamp(m.at)) + '</td><td data-l="Driver">' + escapeHtml(m.name || 'Unknown number') + '</td><td data-l="Kind">' + escapeHtml(KIND[m.kind] || (inbound ? 'Reply' : 'Schedule')) + '</td><td data-l="Phone">' + escapeHtml(phone(inbound ? m.from : m.to)) +
+          '</td><td data-l="Message">' + escapeHtml(m.body || '') + '</td><td data-l="Status">' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && ['FAILED', 'STOPPED'].indexOf(m.status) >= 0 ? '<br>' + escapeHtml(m.reason) : '') + (FWD[m.forwardStatus] ? '<br>' + FWD[m.forwardStatus] : '') + resend + '</td></tr>'; }).join('') ||
+        '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
+    }
+    $('log').addEventListener('click', async ev => {
+      const b = ev.target.closest('[data-resend]');
+      if (!b) return;
+      const id = b.dataset.resend;
+      if (resendId !== id) { clearTimeout(resendArmed); resendId = id; resendArmed = setTimeout(() => { resendId = ''; drawLog(); }, 5000); drawLog(); return; }
+      clearTimeout(resendArmed); resendId = ''; drawLog();
+      await call({ op: 'resend', logId: id }, b);
+    });
     function watchLog(db) {
-      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(300)), snap => {
-        $('log').innerHTML = snap.docs.map(x => x.data()).map(m => { const inbound = m.direction === 'in';
-          return '<tr class="' + (inbound ? 'texts-in' : '') + '"><td>' + escapeHtml(stamp(m.at)) + '</td><td>' + escapeHtml(m.name || 'Unknown number') + '</td><td>' + escapeHtml(KIND[m.kind] || (inbound ? 'Reply' : 'Schedule')) + '</td><td>' + escapeHtml(phone(inbound ? m.from : m.to)) +
-            '</td><td>' + escapeHtml(m.body || '') + '</td><td>' + escapeHtml(STATUS[m.status] || m.status || '') + (m.reason && ['FAILED', 'STOPPED'].indexOf(m.status) >= 0 ? '<br>' + escapeHtml(m.reason) : '') + (FWD[m.forwardStatus] ? '<br>' + FWD[m.forwardStatus] : '') + '</td></tr>'; }).join('') ||
-          '<tr><td colspan="6" class="hint">No texts or replies yet.</td></tr>';
-      }, e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
+      onSnapshot(doc(db, 'config', 'app'), snap => { postedWeek = ((snap.data() || {}).liveWeeks || {}).current || ''; drawLog(); }, () => {});
+      onSnapshot(query(collection(db, 'textLog'), orderBy('at', 'desc'), limit(300)), snap => { logDocs = snap.docs; drawLog(); },
+        e => { $('log').innerHTML = '<tr><td colspan="6" class="hint">Could not read the texts: ' + escapeHtml(e.message) + '</td></tr>'; });
     }
     requireSignIn(async () => { const { db } = await start(); watchLog(db); await refresh(); await loadSample(''); });
   </script>

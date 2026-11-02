@@ -115,7 +115,8 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
   if (req.employeeId && !emp) throw new SaveError('NOT_FOUND', 'Employee ' + req.employeeId + ' is not on the Employees list');
   if (req.employeeId && !existing) {
     const twin = (await tx.get(db.collection(C.drivers).where('employeeId', '==', emp.employeeId).limit(1))).docs[0];
-    if (twin) throw new SaveError('NOT_ALLOWED', emp.name + ' is already on the Driver Roster');
+    // A driver deleted from the roster (Joe 11/2) can be added again: the new entry is a fresh one, the old one stays deleted.
+    if (twin && !L.driverDeleted(twin.data())) throw new SaveError('NOT_ALLOWED', emp.name + ' is already on the Driver Roster');
   }
   const phoneRef = !existing && req.phone ? db.collection('driverPhones') : null;
   const truckId = await truckByUnit(tx, db, req.truck);
@@ -162,6 +163,28 @@ async function removeDrivers(tx, db, req, email, stamp, logRef, mode) {
   });
   const result = { ok: true, requestId: req.requestId, runs: [] };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after: { status: 'INACTIVE' }, result });
+  return result;
+}
+
+/*
+ * Joe 11/2 ("I also want the ability to delete a driver. I want to keep inactive, but also delete too"): Delete on the Driver
+ * Roster, pressed twice. The driver record is kept, marked DELETED, so old loads, history, the scorecard and the logs still
+ * show the name; the driver leaves the roster and every driver list (L.driverActive is false). Nothing is written to the
+ * Driver Master sheet: deletedDrivers/{id} remembers it, and the sheet copy (transfer.js) keeps the driver deleted when that
+ * row is read again. Their Texts ticks are cleared so no text goes to them.
+ */
+async function deleteDriver(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId)), phoneRef = db.collection('driverPhones').doc(M.safeIdPart(req.driverId));
+  const [snap, phone] = await Promise.all([tx.get(ref), tx.get(phoneRef)]);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not on the Driver Roster');
+  const d = snap.data(), id = d.id || req.driverId;
+  const before = { status: d.status || '', unavailableReason: d.unavailableReason || '' };
+  const after = { status: 'DELETED', deleted: true, unavailableReason: 'Deleted from the Driver Roster', deletedAt: stamp, deletedBy: email };
+  tx.update(ref, Object.assign({}, after, { testEdited: true, editedAt: stamp, editedBy: email }));
+  tx.set(db.collection('deletedDrivers').doc(M.safeIdPart(id)), { driverId: id, name: d.name || '', employeeId: d.employeeId || '', statusBefore: before.status, at: stamp, by: email, mode: mode.mode });
+  if (phone.exists) tx.set(phoneRef, { scheduleText: false, loadText: false, updatedAt: stamp, updatedBy: email }, { merge: true });
+  const result = { ok: true, requestId: req.requestId, runs: [], driverId: id };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: id, name: d.name || '', before, after, result });
   return result;
 }
 
@@ -281,4 +304,4 @@ async function saveOpsAssignment(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };
+module.exports = { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, deleteDriver, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment };

@@ -115,3 +115,29 @@ test('a manager adds a driver, renames one, edits dates, and removes drivers (ke
   await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
   assert.ok((await db().collection('drivers').doc(added.driverId).get()).exists);
 });
+
+// Joe 11/2: Delete on the Driver Roster. The record stays (marked DELETED) so old loads keep the name; the driver is off every
+// list, cannot be put on a run, gets no texts, nothing goes to the Driver Master sheet, and the sheet copy keeps them deleted.
+test('a manager deletes a driver: kept as DELETED, out of every list, and still deleted after the sheet is copied again', async () => {
+  await applyAction(db(), MANAGER, { action: 'setDriverText', requestId: rid(), driverId: 'drv_test_brook', kind: 'SCHEDULE', on: true });
+  const outboxBefore = (await db().collection('masterOutbox').get()).size;
+  await applyAction(db(), MANAGER, { action: 'deleteDriver', requestId: rid(), driverId: 'drv_test_brook' });
+  const d = (await db().collection('drivers').doc('drv_test_brook').get()).data();
+  assert.equal(d.status, 'DELETED');
+  assert.equal(d.deleted, true);
+  assert.ok(d.name, 'the name is kept for old loads');
+  assert.equal(L.driverActive(d), false);
+  assert.equal(L.driverRosterRows([d], '2026-10-09')[0].deleted, true);
+  assert.equal((await db().collection('driverPhones').doc('drv_test_brook').get()).data().scheduleText, false);
+  assert.equal((await db().collection('masterOutbox').get()).size, outboxBefore, 'Delete writes nothing to the Driver Master sheet');
+  assert.equal((await db().collection('deletedDrivers').doc('drv_test_brook').get()).data().by, MANAGER.email);
+  await assert.rejects(applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: RUN, day: 'tue', driverId: 'drv_test_brook', override: true }), /deleted on the Driver Roster/);
+  // The sheet's row for the driver changes and is copied again: still deleted.
+  const sheet = tabs["'DRIVERS_MASTER'"], nameCol = sheet[0].indexOf('name'), row = sheet.find(r => r.includes('drv_test_brook'));
+  row[nameCol] = 'BROOK, SAMUEL';
+  await runTransfer({ db: db(), reader: F.fakeReader(tabs), sources: F.SOURCES, now: tick });
+  const again = (await db().collection('drivers').doc('drv_test_brook').get()).data();
+  assert.equal(again.status, 'DELETED');
+  assert.equal(again.name, 'BROOK, SAMUEL', 'the row was copied again');
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'deleteDriver', requestId: rid(), driverId: 'drv_nobody' }), /not on the Driver Roster/);
+});

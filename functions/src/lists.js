@@ -21,7 +21,7 @@
   const NAMES = Object.freeze([
     'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
     'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dataLoads', 'dateBackups', 'driverBackups',
-    'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
+    'deletedDrivers', 'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
     'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',
     'garageSignatures', 'garageTechs', 'gpsAlerts', 'gpsDays', 'gpsReefer', 'gpsReeferReadings', 'gpsTemps', 'gpsTripFuel',
     'gpsTrucks', 'inventoryMoves', 'jugTrailerLists', 'jugTrailers', 'locationAreas', 'mailCopies', 'mailSeen', 'maintenance', 'masterOutbox',

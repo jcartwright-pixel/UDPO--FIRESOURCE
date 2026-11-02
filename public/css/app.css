@@ -1181,6 +1181,16 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
+.texts-page .texts-resend { margin-top: 6px; font-size: 16px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-weight: 700; }
+.texts-page .texts-resend.armed { background: #c0392b; border-color: #c0392b; color: #fff; }
+/* Phones: each text is a small card (label, then the words), so nothing is squeezed into a narrow column. */
+@media (max-width: 600px) {
+  .texts-page .texts-log colgroup, .texts-page .texts-log thead { display: none; }
+  .texts-page .texts-log, .texts-page .texts-log tbody, .texts-page .texts-log tr, .texts-page .texts-log td { display: block; width: auto; }
+  .texts-page .texts-log tr { border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .texts-page .texts-log td { border: 0; padding: 2px 8px; height: auto; overflow: visible; white-space: normal; line-height: 1.3; }
+  .texts-page .texts-log td[data-l]::before { content: attr(data-l) ': '; font-weight: 800; }
+}
 /* Texts (Joe 10/26): a part per kind of text, its switch and text on the left, who gets it on the right; the example text. */
 .texts-page .texts-kind-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; }
 .texts-page .texts-kind h3 { font-size: 18px; margin: 0 0 6px; }

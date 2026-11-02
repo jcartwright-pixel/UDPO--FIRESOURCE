@@ -552,6 +552,15 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // A save written to the sheet after this copy began reading it is not in what was read: hold it too.
   const masterJustWritten = await db.collection(C.masterOutbox).where('doneAt', '>=', readFrom).get();
   masterWaiting.docs.concat(masterJustWritten.docs).forEach(d => { (masterHold[d.data().list] = masterHold[d.data().list] || {})[d.data().docId] = true; });
+  // Joe 11/2: a driver deleted on the Driver Roster stays deleted when the sheet's row for them is copied again
+  // (Delete does not write to the Driver Master sheet).
+  if (masters.drivers) {
+    const gone = await db.collection('deletedDrivers').get();
+    gone.docs.forEach(g => {
+      const id = M.safeIdPart(g.data().driverId || g.id), doc = masters.drivers.docs[id];
+      if (doc) Object.assign(doc, { status: 'DELETED', deleted: true, unavailableReason: 'Deleted from the Driver Roster', deletedAt: g.data().at || '', deletedBy: g.data().by || '' });
+    });
+  }
   for (const kind of Object.keys(masters)) {
     const metaRef = db.collection(META).doc(kind);
     const prev = (await metaRef.get()).data() || {};

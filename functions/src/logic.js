@@ -196,8 +196,11 @@
   }
 
   // A driver is active unless Driver Master says INACTIVE, TERMINATED or DISABLED (udpoV7000DriverIsActive_; a blank status is active).
+  // Joe 11/2: a driver deleted on the Driver Roster (DELETED) is never active either, and is left off the roster itself.
+  function driverDeleted(d) { return !!d && (d.deleted === true || String(d.status || '').trim().toUpperCase() === 'DELETED'); }
   function driverActive(d) {
     if (!d) return false;
+    if (driverDeleted(d)) return false;
     if (['INACTIVE', 'TERMINATED', 'DISABLED'].indexOf(String(d.status || '').trim().toUpperCase()) >= 0) return false;
     return d.active === undefined || d.active === null || d.active === '' ? true : d.active === true;
   }
@@ -881,7 +884,7 @@
       return {
         id: d.id, name: d.name || '', status: d.status || '', reliefDriver: !!d.reliefDriver, seniorityDate: seniority,
         hireDate: dateKey(d.hireDate), vacationWeeks: vacationWeeks(d.hireDate, asOf), defaultTruckId: d.defaultTruckId || '',
-        unavailableReason: d.unavailableReason || '', active: driverActive(d)
+        unavailableReason: d.unavailableReason || '', active: driverActive(d), deleted: driverDeleted(d)
       };
     });
     rows.sort(function (a, b) {
@@ -1639,7 +1642,7 @@
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
-    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
+    UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
     SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive, OFF_SHEETS: OFF_SHEETS, offSheet: offSheet,

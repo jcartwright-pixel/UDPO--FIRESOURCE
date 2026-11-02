@@ -113,8 +113,8 @@ const unitWhy = (e, opts) => L.unitOff(e) ? L.unitOffWhy(e) : (opts && opts.conf
 const KINDS = {
   driver: { action: 'assignDriver', field: 'driverId', idKey: 'driverId', textKey: 'driver', list: (opts) => {
     opts = opts || {};
-    const pool = opts.override ? lists.allDrivers : lists.drivers;
-    return pool.map(d => {
+    // Joe 11/2: an inactive (or deleted) driver is never offered, OVR or not; OVR still offers drivers who are off that day.
+    return lists.drivers.map(d => {
       const off = opts.date ? L.exceptionOn(lists.exceptions, d.id, opts.date) : null;
       if (off && !opts.override) return null;
       const why = !L.driverActive(d) ? d.status : off ? L.exceptionLabel(off) : '';
@@ -131,7 +131,10 @@ const KINDS = {
 // offered as if free: the type-to-pick list leaves it out unless OVR is ticked (then marked with why); the Edit box's
 // drop-down still shows what is on the run, marked [DOWN].
 function keepCurrent(kind, current, list, opts, editBox) {
-  if (!current || kind === 'driver' || list.some(o => o.id === current) || !pickText(kind, current)) return;
+  if (!current || list.some(o => o.id === current) || !pickText(kind, current)) return;
+  // The driver already on the run stays shown in the Edit box, marked Inactive, so the box does not read as empty;
+  // nobody else inactive is listed (Joe 11/2).
+  if (kind === 'driver') { const d = lists.allDrivers.find(x => x.id === current); if (d && !L.driverActive(d) && editBox) list.unshift({ id: current, text: d.name + '  [INACTIVE]', why: true }); return; }
   const e = (kind === 'truck' ? lists.fleetTrucks : lists.fleetTrailers).find(x => x.id === current);
   if (e && L.unitOff(e)) {
     if (editBox || (opts && opts.override)) list.unshift({ id: current, text: e.unit + '  [' + L.unitOffWhy(e) + ']', why: true });
@@ -176,8 +179,11 @@ export function driverChoices(current, busy, opts) {
   L.driverRosterRows(lists.allDrivers, opts.date).forEach(r => {
     const d = lists.allDrivers.find(x => x.id === r.id) || {};
     const off = opts.date ? L.exceptionOn(lists.exceptions, r.id, opts.date) : null;
-    const why = !L.driverActive(d) ? (d.status || 'INACTIVE') : off ? L.exceptionLabel(off) : busy && busy[r.id] ? busy[r.id].replace(/^on /, 'On ') : '';
-    const c = { value: r.id, label: r.name, key: r.name };
+    // Joe 11/2 ("an inactive driver should never show up on my drop-down list, no matter what"): inactive and deleted drivers
+    // are left out, not listed under Unavailable; only the driver already on the run stays, marked Inactive.
+    if (!r.active && r.id !== current) return;
+    const why = off ? L.exceptionLabel(off) : busy && busy[r.id] ? busy[r.id].replace(/^on /, 'On ') : '';
+    const c = { value: r.id, label: r.name + (r.active ? '' : '  (Inactive)'), key: r.name };
     if (why && r.id !== current) blocked.push(Object.assign(c, { group: 'blocked', head: 'UNAVAILABLE', reason: why, blocked: !opts.override }));
     else if (r.reliefDriver) relief.push(Object.assign(c, { group: 'relief', head: 'RELIEF DRIVERS' }));
     else regular.push(Object.assign(c, { group: 'regular', head: 'REGULAR DRIVERS' }));

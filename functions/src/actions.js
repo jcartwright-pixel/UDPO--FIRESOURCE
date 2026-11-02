@@ -33,7 +33,7 @@ const { isHome, companyDb } = require('./plants');
 // Each screen's saves are in their own file (review item 81, Joe 10/13); this file checks, routes and logs every save.
 const { SaveError, text, requireTestMode, queueSheetCells, queueLoadoutHistory } = require('./actions-common');
 const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily');
-const { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
+const { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, deleteDriver, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
 const { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
@@ -72,6 +72,8 @@ const ACTIONS = Object.freeze({
   setDriverText: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriver: { roles: DRIVER_ROLES, screen: 'drivers' },
   removeDrivers: { roles: DRIVER_ROLES, screen: 'drivers' },
+  // Joe 11/2: Delete on the Driver Roster (asks twice); the driver leaves the roster and every list, old loads keep the name.
+  deleteDriver: { roles: DRIVER_ROLES, screen: 'drivers' },
   saveDriverException: { roles: SAVE_ROLES, screen: 'drivers' },
   saveVacation: { roles: DRIVER_ROLES, screen: 'vacations' },
   publishWeek: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
@@ -308,6 +310,11 @@ function validate(input) {
   if (action === 'publishWeek' || action === 'resetWeek') {
     if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
     out.weekStart = input.weekStart;
+    return out;
+  }
+  if (action === 'deleteDriver') {
+    out.driverId = text(input.driverId);
+    if (!out.driverId) throw new SaveError('BAD_REQUEST', 'Pick the driver to delete');
     return out;
   }
   if (action === 'removeDrivers') {
@@ -757,8 +764,10 @@ async function resolveAssignment(tx, db, req, stamp, run) {
     const snap = await tx.get(db.collection(C.drivers).doc(M.safeIdPart(req.driverId)));
     if (!snap.exists) throw new SaveError('NOT_FOUND', 'Driver ' + req.driverId + ' is not in Driver Master');
     const d = snap.data();
+    // Joe 11/2 ("an inactive driver should never show up on my drop-down list, no matter what"): OVR no longer puts an
+    // inactive or deleted driver on a run; mark them Active on the Driver Roster first.
+    if (!L.driverActive(d) && was.driverId !== d.id) throw new SaveError('NOT_ALLOWED', d.name + ' is ' + (L.driverDeleted(d) ? 'deleted' : 'Inactive') + ' on the Driver Roster. Mark them Active there first.');
     if (!req.override) {
-      if (!L.driverActive(d)) throw new SaveError('NOT_ALLOWED', d.name + ' is ' + d.status + ' in Driver Master (tick OVR to use them anyway)');
       const date = L.addDays(run.weekStart, L.DAYS.indexOf(req.day));
       const off = await tx.get(db.collection(C.exceptions).where('driverId', '==', d.id));
       const e = L.exceptionOn(off.docs.map(x => x.data()), d.id, date);
@@ -887,6 +896,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'setDriverText') return setDriverText(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriver') return saveDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'removeDrivers') return removeDrivers(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'deleteDriver') return deleteDriver(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverException') return saveDriverException(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveVacation') return saveVacation(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
