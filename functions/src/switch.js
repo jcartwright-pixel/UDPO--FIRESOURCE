@@ -60,7 +60,10 @@ async function setSwitch(db, user, input, ready, now) {
   const has = (k) => Object.prototype.hasOwnProperty.call(input, k);
   // Go-Live Switches (Joe 10/12): move one screen, mark it fully live (its tag comes off the cards), or turn on everything
   // that is ready (the write-back and every ready screen) in one press.
-  const kind = input.allReady === true ? 'allReady' : has('sheetsPaused') ? 'sheetsPaused' : has('fullyLive') ? 'fullyLive' : has('screen') ? 'screen' : 'writeBack';
+  const kind = has('offSheet') ? 'offSheet' : input.allReady === true ? 'allReady' : has('sheetsPaused') ? 'sheetsPaused' : has('fullyLive') ? 'fullyLive' : has('screen') ? 'screen' : 'writeBack';
+  // Joe 11/2: move one Google sheet's list into Operations (logic.js OFF_SHEETS). One way only.
+  const sheetList = kind === 'offSheet' ? L.OFF_SHEETS.filter(x => x.list === input.offSheet)[0] : null;
+  if (kind === 'offSheet' && !sheetList) throw new SwitchError('BAD_REQUEST', 'Unknown sheet ' + String(input.offSheet).slice(0, 40));
   if (kind === 'screen' || kind === 'fullyLive') {
     if (!SCREENS[input.screen]) throw new SwitchError('BAD_REQUEST', 'Unknown screen ' + String(input.screen).slice(0, 40));
     if (kind === 'screen' && input.owner !== 'old' && input.owner !== 'new') throw new SwitchError('BAD_REQUEST', 'owner must be old or new');
@@ -106,6 +109,14 @@ async function setSwitch(db, user, input, ready, now) {
       if (input.writeBack && !ready) throw new SwitchError('NOT_ALLOWED', 'The server has no sandbox sheet to write to yet (WRITEBACK_JSON)');
       if (!input.writeBack && anyNew(config)) throw new SwitchError('NOT_ALLOWED', 'The screens that are on need the write-back. To stop the app writing to the sheets, press Pause writing to the sheets.');
       after.writeBack = input.writeBack;
+    }
+    if (kind === 'offSheet') {
+      if (!sheetList.ready) throw new SwitchError('NOT_ALLOWED', sheetList.name + ' is not ready to move into Operations yet: ' + sheetList.why);
+      const already = L.offSheet(config, sheetList.list);
+      const result = { ok: true, requestId, offSheet: sheetList.list, already };
+      if (!already) tx.set(configRef, { offSheets: { [sheetList.list]: { at: stamp, by: email } } }, { merge: true });
+      tx.set(logRef, { action: 'moveOffSheet', by: email, at: stamp, screen: '', list: sheetList.list, sheet: sheetList.sheet, result });
+      return result;
     }
     const result = { ok: true, requestId, screenOwners: after.screenOwners, writeBack: after.writeBack, fullyLive: after.fullyLive, sheetsPaused: after.sheetsPaused };
     if (kind === 'sheetsPaused') {
