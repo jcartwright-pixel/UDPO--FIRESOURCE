@@ -1,0 +1,14 @@
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Clean up after an earlier stopped run: ok 
+WRITE 6.66 screens at 1536, 1024 and 390 (look only): ok 
+NOTE New phone code: no loads on the practice copy today (2026-11-01), so the test put one of its own on today's list and took it off after: 2026-11-01__practice_split_mvyiydx11 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-01, delivered 2026-11-01)
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE New phone code opens the drivers' phone screen: ok New phone code 1112ms, Continue with the code 1329ms
+WRITE Home screen cards open the right screens (look only): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Sales app: no routes today or yesterday for Uniontown on the practice copy
+NOTE Sales app: no Save-A-Lot drop and hook route on the practice copy right now (no routes on Sunday 11-1-26), so its Dropped line could not be looked at
+WRITE Sales app opens and a route goes on the map: ok 
+WRITE Administration Sales App has no customer list upload (look only): FAILED Administration > Sales App still has the customer list upload; Administration > Sales App has no Sales app link 
+NOTE Administration menu: all eight group bars fit at 1536 x 790; below them the practice copy's own Sandbox tools (not on the live app) scroll 86 px
+WRITE Administration menu: eight folding groups and Hide menu (look only): ok 
