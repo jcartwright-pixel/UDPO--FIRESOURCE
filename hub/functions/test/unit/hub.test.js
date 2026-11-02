@@ -58,3 +58,17 @@ test('every page in public/ has its part in help.md', () => {
   const covered = [...md.matchAll(/^screens: (.+)$/gm)].flatMap(m => m[1].split(',').map(s => s.trim()));
   fs.readdirSync(pub).filter(f => f.endsWith('.html')).forEach(f => assert.ok(covered.includes(f), f + ' has no part in help.md'));
 });
+
+test('People & Access shows the same apps as the tiles', async () => {
+  const { appsFor } = await import('../../../public/js/apps.js');
+  const people = [
+    { status: 'ACTIVE', roles: ['Administrator'] }, { status: 'ACTIVE', roles: ['admin'] }, { status: 'ACTIVE', roles: ['MANAGER'] },
+    { status: 'ACTIVE', roles: ['Driver'] }, { status: 'INACTIVE', roles: ['ADMINISTRATOR'] }, { status: 'active', roles: [] }
+  ];
+  const names = Object.fromEntries(H.apps('ud-distribution').map(a => [a.key, a.name]));
+  for (const p of people) {
+    const tiles = H.apps('ud-distribution').filter(a => a.may(p)).map(a => a.name);
+    assert.deepEqual(appsFor(p), tiles, JSON.stringify(p));
+  }
+  assert.ok(names.operations);
+});

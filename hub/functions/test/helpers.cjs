@@ -34,4 +34,36 @@ async function localCalls(ctx) {
     }
   });
 }
-module.exports = { PROJECT, db, clear, localCalls };
+
+/*
+ * Operations' own admin call (people, savePerson) stands in here as a small copy with the same answers, so the hub's browser
+ * tests need no Operations server. Operations' tests cover the real one.
+ */
+const ROLES = ['VIEWER', 'EMPLOYEE', 'DRIVER', 'DRIVER_CHECKIN', 'PLANT_EMPLOYEE', 'MECHANIC', 'DISPATCHER', 'SUPERVISOR', 'MANAGER', 'ADMINISTRATOR'];
+const PLANTS = [{ id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' }, { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' }, { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }];
+const rev = (p) => p ? String(p.updatedAt || 'first') : 'new';
+async function fakeAdmin(email, data) {
+  const users = db().collection('users'), me = (await users.doc(email).get()).data();
+  if (!me || me.status !== 'ACTIVE' || !(me.roles || []).some(r => String(r).toUpperCase() === 'ADMINISTRATOR')) throw Object.assign(new Error('Only an administrator can use Administration'), { status: 'PERMISSION_DENIED' });
+  if (data.op === 'people') {
+    const snap = await users.get();
+    return { people: snap.docs.map(d => Object.assign({ email: d.id, grants: [], denials: [], revision: rev(d.data()), primary: d.id === 'pat.admin@uniteddairy.com' }, d.data())), roles: ROLES, plants: PLANTS, newRevision: 'new' };
+  }
+  if (data.op === 'savePerson') {
+    const ref = users.doc(data.email), before = (await ref.get()).data();
+    if (!data.isNew && rev(before) !== data.revision) throw Object.assign(new Error('Someone changed this person since you opened them. Reload this person before saving.'), { status: 'ABORTED' });
+    await ref.set({ name: data.name, status: data.status, roles: data.roles, facilities: data.facilities, updatedAt: new Date().toISOString(), updatedBy: email }, { merge: true });
+    return { ok: true, message: 'Person access saved.', email: data.email };
+  }
+  throw Object.assign(new Error('Unknown request.'), { status: 'INVALID_ARGUMENT' });
+}
+async function localAdmin(ctx) {
+  await ctx.route(/:5001\/[^/]+\/[^/]+\/admin$/, async (route) => {
+    const req = route.request(), data = (req.postDataJSON() || {}).data || {};
+    let token = null;
+    try { token = JSON.parse(Buffer.from(String(req.headers().authorization || '').split(' ')[1].split('.')[1], 'base64url').toString()); } catch (e) { /* no sign-in */ }
+    try { await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: await fakeAdmin(token && token.email, data) }) }); }
+    catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: e.status || 'INTERNAL', message: e.message } }) }); }
+  });
+}
+module.exports = { PROJECT, db, clear, localCalls, localAdmin };
