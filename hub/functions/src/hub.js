@@ -15,7 +15,8 @@
 'use strict';
 
 const ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
-const UDMS_URL = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbwRaau45OQuDKGPNDAhT59T4uvairyIwv4exsidR-a1LnWgF5SsCGmuZ3mFQsU7cvnI/exec';
+// Joe 11-2-26: the old Apps Script address opens "Sorry, unable to open the file"; UDMS now runs on its own Firebase site.
+const UDMS_URL = 'https://udms-bfccd.web.app/';
 
 class HubError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
