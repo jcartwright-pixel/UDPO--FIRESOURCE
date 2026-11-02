@@ -256,7 +256,7 @@ exports.sms = onCall({ timeoutSeconds: 60 }, async (request) => {
   try { return await SMS.smsCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
 });
 
-exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+exports.gps = onCall({ timeoutSeconds: 180, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(await plantDb(request, user), user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });
