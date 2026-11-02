@@ -23,7 +23,7 @@ test('an administrator sees all four apps, live addresses on the live project', 
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/');
   assert.equal(r.tiles[1].url, 'https://ud-distribution-customers.web.app/');
   assert.equal(r.tiles[2].url, 'https://ud-distribution-fuel.web.app/');
-  assert.equal(r.tiles[3].url, H.UDMS_URL);
+  assert.equal(r.tiles[3].url, 'https://udms-bfccd.web.app/');
 });
 
 test('the practice copy links to the practice copies', async () => {
