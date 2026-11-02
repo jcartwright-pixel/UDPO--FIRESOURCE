@@ -91,7 +91,7 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       const log = await tx.$$eval('#log tr', r => r.map(x => [...x.cells].map(c => c.textContent)));
       const rows = log.map(x => [x[1], x[2], x[3], x[5]].join('|'));
       assert.equal(rows[0], 'CASEY, LEE|Reply|330-555-1234|Received');
-      assert.deepEqual(rows.slice(1).sort(), ['ADAMS, PAT|Schedule||No number', 'CASEY, LEE|Schedule|330-555-1234|Test copy, not sent']);
+      assert.deepEqual(rows.slice(1).sort(), ['ADAMS, PAT|Schedule||No numberResend', 'CASEY, LEE|Schedule|330-555-1234|Test copy, not sentResend'], 'Joe 11/2: posted-week schedule texts have Resend');
       assert.equal(log[0][4], 'Got it. Can I swap Tuesday?', 'the newest, the reply, on top');
       assert.ok(await fits(tx) <= 0, 'no side scroll on Texts at ' + w);
       assert.deepEqual(await small(tx), [], 'Texts: no text under 16px at ' + w);

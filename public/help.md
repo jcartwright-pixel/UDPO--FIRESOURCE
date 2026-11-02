@@ -267,7 +267,7 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 - `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
 - Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
 
-> The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used.
+> The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used. After fixing a wrong number, press `Resend` on that driver's schedule text in [Texts](#schedule-texts), part 6.
 
 !> Do not remove a driver who is only off for a while. Mark the time off on the Vacation Schedule.
 
@@ -1533,6 +1533,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
+8. A driver's number was wrong: fix it on the **Driver Roster** first. Then in **Texts and replies**, find that driver's schedule text and press `Resend` twice. Only that driver gets it, at the new number. `Resend` shows only on texts for the posted week.
 
 > To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
 
@@ -1541,6 +1542,8 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
 
 > Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
+
+!> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 
