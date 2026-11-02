@@ -1,2 +1,0 @@
-ERROR: (gcloud.logging.read) PERMISSION_DENIED: Permission denied for all log views. This command is authenticated as github-deploy@ud-distribution-sandbox.iam.gserviceaccount.com which is the active account specified by the [core/account] property
-firebase-schedule-gpsTripFuelEvery30Minutes-us-east4	every 30 minutes	ENABLED	2026-11-02T05:39:01.700936Z	13

@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   trip-check:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]') || contains(github.event.head_commit.message, '[trip logs]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]') || contains(github.event.head_commit.message, '[trip logs]') || contains(github.event.head_commit.message, '[trip save]')
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 180
@@ -73,8 +73,14 @@ jobs:
       - name: Install
         if: "!contains(github.event.head_commit.message, '[trip logs]')"
         run: npm ci
+      - name: Trip saving once, as the job does (practice copy)
+        if: contains(github.event.head_commit.message, '[trip save]')
+        env:
+          KEY: ${{ runner.temp }}/practice.json
+          NODE_OPTIONS: --max-old-space-size=900
+        run: timeout 600 node ../tools/gps-trip-save.cjs
       - name: Trip check (read only)
-        if: "!contains(github.event.head_commit.message, '[trip logs]')"
+        if: "!contains(github.event.head_commit.message, '[trip logs]') && !contains(github.event.head_commit.message, '[trip save]')"
         env:
           KEY: ${{ runner.temp }}/practice.json
           TAG: ${{ inputs.tag }}
