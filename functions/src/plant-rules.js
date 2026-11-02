@@ -199,8 +199,10 @@
 
   // Shipping's customers: Route Master runs that are active and shown to the plant (routes = route docs with runId).
   function scheduleCustomers(routes) {
-    var list = [];
+    var list = [], outsideRuns = {}, outsideRoutes = {};
     (routes || []).forEach(function (r) {
+      // Joe 11/2: every outside carrier's run and route number, shown to the plant or not (scheduleOutside).
+      if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = text(r.routeCode || r.route).replace(/_[0-9]+$/, ''); if (code) outsideRoutes[code.toUpperCase()] = true; }
       var status = text(r.routeStatus).toUpperCase();
       if ((status && status !== 'ACTIVE') || r.active === false || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
@@ -225,6 +227,7 @@
       c.slots.sort(function (a, b) { return a.n - b.n; });
       c.routeId = c.slots[0].routeId; c.runId = c.slots[0].runId; c.loadType = c.slots[0].loadType || c.loadType;
     });
+    out.outsideRuns = outsideRuns; out.outsideRoutes = outsideRoutes;
     return out;
   }
 
@@ -256,6 +259,9 @@
     if (!x) return false;
     if (x.scheduleType === 'CARRIER') return true;
     var ids = [x.slot && x.slot.runId, x.runId].filter(Boolean), hit = false;
+    var runs = (customers && customers.outsideRuns) || {}, routes = (customers && customers.outsideRoutes) || {};
+    if (ids.some(function (id) { return runs[id]; })) return true;
+    if (routes[text((x.slot && x.slot.route) || x.route).replace(/_[0-9]+$/, '').toUpperCase()]) return true;
     (customers || []).some(function (c) { return (c.slots || [c]).some(function (s) { if (s.runId && ids.indexOf(s.runId) >= 0) { hit = !!(s.outside || c.outside); return true; } return false; }); });
     return hit;
   }
@@ -1104,9 +1110,10 @@
       var leaves = departWall({ departureDate: r.departureDate, deliveryDate: r.deliveryDate, loadDate: r.loadDate, leavesOn: r.leavesOn, dispatchTime: clockMinutes(r.dispatchTime) }), until = leaves === null ? null : leaves - now;
       var item = { id: text(r.id), route: text(r.route), run: text(r.run), routeName: text(r.routeName), deliveryDate: text(r.deliveryDate || r.departureDate || r.loadDate), area: r.area, status: r.state, depart: minutesText12(clockMinutes(r.dispatchTime)), departDay: leaves === null ? '' : dayShort(leaves), minutesUntil: until, truck: text(r.truck), trailer: text(r.trailer),
         startedAt: r.startedAt ? clockOf(r.startedAt) : '', doneAt: r.completedAt ? clockOf(r.completedAt) : '', doneMs: r.completedAt ? when(r.completedAt) || 0 : 0, priorDay: !!r.prior, loadDate: text(r.loadDate), loadSequence: r.loadSequence === null || r.loadSequence === undefined ? 999999 : Number(r.loadSequence), outside: !!r.outside };
+      // Joe 11/2 ("outside carriers don't count towards being late … I don't even want to see it in here"): an outside
+      // carrier's load (Darden, GFS, ...) is left out of the report altogether: not late, not counted, not listed.
+      if (r.outside) return;
       areas[r.area].total++; out.total++;
-      // Joe 11/2: an outside carrier's load (Darden, GFS, ...) is never late or behind; it stays on the list to load.
-      if (r.outside) { if (r.state === 'DONE') out.loaded.push(item); else { areas[r.area].left++; out.leftToLoad++; out.nextUp.push(item); } return; }
       // Joe 11/1 ("sal 1 was a little late think we should show"): a load finished after its own dispatch time was loaded late,
       // by the minutes between the two.
       if (r.state === 'DONE') { var doneWall = wallMinutes(r.completedAt); if (leaves !== null && doneWall !== null && doneWall - leaves >= 1) item.loadedLate = Math.round(doneWall - leaves); out.loaded.push(item); return; }
@@ -1376,9 +1383,7 @@
       lateNow.push({ id: x.id, name: name(x), area: x.area, value: e ? 'est. ' + e.estDay + ' ' + e.estText : 'Not loaded',
         sub: 'Should have left ' + [x.departDay, x.depart].filter(Boolean).join(' ') + (x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '') });
     });
-    // Joe 11/2: an outside carrier's load still to load is not counted as late, will miss or on time; the email only says how many.
-    var outsideList = (r.nextUp || []).filter(function (x) { return x.outside; }), outside = outsideList.length;
-    var outsideNames = []; outsideList.forEach(function (x) { var n = routeNumber(x.route) + (x.routeName ? ' ' + x.routeName : ''); if (outsideNames.indexOf(n) < 0) outsideNames.push(n); });
+    // Joe 11/2: an outside carrier's load is left out of the report; the forecast skips it too.
     (f ? f.loads : []).forEach(function (x) {
       if (ids[x.id] || x.outside) return;
       var deadline = x.leaves === null ? x.shiftEnd : x.leaves, when = function (m) { return dayShort(m) + ' ' + minutesText12(((m % 1440) + 1440) % 1440); };
@@ -1392,13 +1397,12 @@
     var loadedLate = (r.loaded || []).filter(function (x) { return x.loadedLate > 0; }).sort(function (a, b) { return (a.doneMs || 0) - (b.doneMs || 0); }).map(function (x) {
       return { id: x.id, name: name(x), area: x.area, value: spanText(x.loadedLate) + ' late', sub: 'Dispatch ' + [x.departDay, x.depart].filter(Boolean).join(' ') + ' · loaded ' + x.doneAt };
     });
-    return { lateNow: lateNow, miss: miss, loadedLate: loadedLate, leftOver: leftOver, outside: outside, outsideNames: outsideNames, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
+    return { lateNow: lateNow, miss: miss, loadedLate: loadedLate, leftOver: leftOver, ok: ok.length, okLast: last === null ? '' : dayShort(last) + ' ' + minutesText12(((last % 1440) + 1440) % 1440), forecast: !!f, asOf: f ? f.asOf : '' };
   }
   function truckCheckSummary(t) {
     return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
       t.ok ? (t.lateNow.length || t.miss.length ? 'the other ' + t.ok + ' make it' : 'all ' + t.ok + ' make it') : '',
-      (t.loadedLate || []).length ? t.loadedLate.length + ' already loaded late' : '',
-      t.outside ? t.outside + ' outside carrier load' + (t.outside === 1 ? '' : 's') + ' not counted' : ''].filter(Boolean).join(' · ');
+      (t.loadedLate || []).length ? t.loadedLate.length + ' already loaded late' : ''].filter(Boolean).join(' · ');
   }
 
   function reportName(x) { return x.route + (x.run && x.run !== x.route ? ' ' + x.run : ''); }
@@ -1517,8 +1521,7 @@
         (t.lateNow.length ? lab('Late now: truck should have left', RED) + t.lateNow.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         (t.miss.length ? lab('Will miss its truck', RED) + t.miss.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         (t.ok ? lab(bad ? 'Every other truck' : 'Every truck still to load', GREEN) + line(t.ok + ' load' + (t.ok === 1 ? '' : 's'), 'Last one est. loaded ' + t.okLast, '&#10003; On time', false) : '') +
-        (t.outside ? lab('Outside carriers: never counted late', GREY) + line(t.outside + ' load' + (t.outside === 1 ? '' : 's'), (t.outsideNames || []).join(', '), 'Not counted', false) : '') +
-        (!t.lateNow.length && !t.miss.length && !t.ok && !t.outside ? line('Nothing left to load', '', '&ndash;', false) : '') +
+        (!t.lateNow.length && !t.miss.length && !t.ok ? line('Nothing left to load', '', '&ndash;', false) : '') +
         (t.loadedLate.length ? lab('Already loaded, but late', RED) + t.loadedLate.map(function (x) { return line(x.name, x.sub, e(x.value), true); }).join('') : '') +
         '</table></div></td></tr>';
     }
