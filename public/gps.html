@@ -68,8 +68,9 @@
       </section>
       <section class="gps-card wide">
         <h2>5. Trip check</h2>
-        <p class="hint">Type one truck and pick a day, then press Check trips. The app asks Verizon for that truck's GPS readings that day and lists each trip: when it left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. It only reads; nothing is saved.</p>
+        <p class="hint">Type one truck and pick a day, then press Check trips. The app asks Verizon for that truck's GPS readings that day and lists each trip: when it left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. Checking only reads. Separately, the app saves every truck's trips by itself every 30 minutes (the line below says how far it has got) and keeps them six months.</p>
         <div class="gps-ask"><label>Truck<input id="t-tag" autocomplete="off"></label><label>Day<input id="t-date" type="date"></label><div class="gps-buttons"><button type="button" class="primary" id="trips">Check trips</button></div></div>
+        <p class="hint" id="trips-saved"></p>
         <p class="hint" id="trips-when"></p>
         <div id="trips-out"></div>
       </section>
@@ -111,6 +112,18 @@
         : 'Reading this week\'s history (' + dayRange(h.days) + '): ' + h.done + ' of ' + h.total + ' parts done' + (h.error ? '. Last try failed: ' + h.error : '') + '. It goes on every 5 minutes.';
       renderCheck();
       renderProbe();
+      renderSaved();
+    }
+    // Joe 11/2: every truck's trips (out of the yard and back, gallons used) are kept in the app every 30 minutes, from
+    // 10-1-26 on, for six months. This line says how far that has got.
+    let tripFuel = null; // only the status answer carries it; the other buttons' answers keep the last one
+    function renderSaved() {
+      if (s.tripFuel) tripFuel = s.tripFuel;
+      if (!tripFuel) return;
+      const f = tripFuel, n = f.count === null || f.count === undefined ? '' : ', ' + Number(f.count).toLocaleString('en-US') + ' trip' + (f.count === 1 ? '' : 's') + ' kept';
+      $('trips-saved').textContent = f.error && (!f.at || f.errorAt > f.at) ? 'Saving every truck\'s trips failed ' + stamp(f.errorAt) + ': ' + f.error + ' It tries again every 30 minutes.'
+        : f.lastDate ? 'Every truck\'s trips are saved through ' + shortDay(f.lastDate) + n + '. Last saved ' + stamp(f.at) + '.'
+        : 'Every truck\'s trips are not saved yet. Saving starts within 30 minutes of the Verizon login being saved, from 10-1-26 on.';
     }
     // Joe 10/20 ("try to ask for everything and see what it returns. No matter what."): each answer as Fleet sent it.
     function renderProbe() {
