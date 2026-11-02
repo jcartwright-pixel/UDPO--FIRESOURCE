@@ -520,7 +520,8 @@ async function runTransfer({ db, reader, sources, now, force, admin }) {
   // 1. Master lists.
   // Read side by side: each master list is its own spreadsheet.
   const masters = {};
-  const kinds = Object.keys(sources.masters || {});
+  // Joe 11/2: a list moved into Operations (logic.js OFF_SHEETS) is no longer copied; Operations holds the only record of it.
+  const kinds = Object.keys(sources.masters || {}).filter(kind => !L.offSheet(config, kind));
   const reads = await Promise.all(kinds.map(kind => reader.batchGet(sources.masters[kind].spreadsheetId, ["'" + sources.masters[kind].tab + "'"])));
   kinds.forEach((kind, i) => { masters[kind] = parseMaster(kind, reads[i][0]); });
   const lookups = lookupsFrom(masters);

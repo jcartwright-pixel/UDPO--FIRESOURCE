@@ -592,6 +592,25 @@
   };
   // Shown on Go-Live Switches but not a switch yet. (Plant Loading became a switch on 10/12.)
   var GO_LIVE_LATER = [];
+  // Joe 11/2 ("I think it should be all moved off of Google Drive"): the Google sheets that move into Operations, one at a time.
+  // Once a list is moved (Administration > Go-Live Switches), the app stops copying that sheet and stops writing to it, so the
+  // list in Operations is the only record and the sheet is left exactly as it was, as a backup (never cleared or deleted). A list
+  // that is moved stays moved: copying the old sheet again would undo every change made since. Only a ready list can move.
+  var OFF_SHEETS = [
+    { list: 'users', name: 'People (who can sign in)', sheet: 'UDPO USER ACCESS MASTER - ALL LOCATIONS', ready: true,
+      why: 'Administration > People becomes the only place to add or change a person.' },
+    { list: 'exceptions', name: 'Day offs', sheet: 'UDPO DRIVER VACATIONS & AVAILABILITY & EXCEPTIONS - UNIONTOWN', ready: false, why: 'Next, with Vacations.' },
+    { list: 'vacations', name: 'Vacations', sheet: 'UDPO DRIVER VACATIONS - UNIONTOWN', ready: false, why: 'Next, with Day offs.' },
+    { list: 'routes', name: 'Route Master', sheet: 'UDPO ROUTE MASTER - UNIONTOWN', ready: false, why: 'After the day offs and vacations.' },
+    { list: 'equipment', name: 'Equipment Master', sheet: 'UDPO EQUIPMENT MASTER - UNIONTOWN', ready: false, why: 'After Route Master. The United Dairy Fleet List stays on Google; its nightly sync will fill the list in Operations.' },
+    { list: 'drivers', name: 'Driver Master', sheet: 'UDPO DRIVER MASTER - UNIONTOWN', ready: false, why: 'Will come from UDMS, like the Employees list.' },
+    { list: 'live', name: 'Live sheet', sheet: 'UDPO LIVE DATA - UNIONTOWN', ready: false, why: 'Last, because it is the biggest.' }
+  ];
+  function offSheet(config, list) {
+    var o = config && config.offSheets && config.offSheets[list];
+    return !!(o && o.at);
+  }
+
   // "Fully live": the screen is switched on for good. Switching it off clears it.
   function fullyLive(config, screen) {
     return screenOwners(config)[screen] === 'new' && !!(config && config.fullyLive && config.fullyLive[screen] === true);
@@ -1623,7 +1642,7 @@
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
-    SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive,
+    SCREENS: SCREENS, APP_ONLY: APP_ONLY, screenOwners: screenOwners, screenState: screenState, GO_LIVE: GO_LIVE, GO_LIVE_LATER: GO_LIVE_LATER, fullyLive: fullyLive, OFF_SHEETS: OFF_SHEETS, offSheet: offSheet,
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,

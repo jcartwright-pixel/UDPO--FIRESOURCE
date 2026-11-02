@@ -1,0 +1,236 @@
+{
+ "at": "2026-11-02T04:01:41.308Z",
+ "project": "ud-distribution-sandbox",
+ "calls": [
+  {
+   "fn": "save",
+   "label": "cold?",
+   "ms": 2180,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown save: (none)\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "save",
+   "label": "warm",
+   "ms": 104,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown save: (none)\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "admin",
+   "label": "cold?",
+   "ms": 1865,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown Administration step: \",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "admin",
+   "label": "warm",
+   "ms": 70,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown Administration step: \",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "phone",
+   "label": "cold?",
+   "ms": 2988,
+   "status": 403,
+   "answer": "{\"error\":{\"message\":\"That code is not right. Ask Dispatch for the Route Distribution code.\",\"status\":\"PERMISSION_DENIED\"}}"
+  },
+  {
+   "fn": "phone",
+   "label": "warm",
+   "ms": 274,
+   "status": 403,
+   "answer": "{\"error\":{\"message\":\"That code is not right. Ask Dispatch for the Route Distribution code.\",\"status\":\"PERMISSION_DENIED\"}}"
+  },
+  {
+   "fn": "garage",
+   "label": "cold?",
+   "ms": 2874,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown request\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "garage",
+   "label": "warm",
+   "ms": 143,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown request\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "sales",
+   "label": "cold?",
+   "ms": 3908,
+   "status": 200,
+   "answer": "{\"result\":{\"divisions\":[{\"id\":\"fac_uniontown\",\"name\":\"Uniontown\"}],\"division\":\"fac_uniontown\",\"refreshed\":\"11:02 PM\",\"today\":\"2026-11-01\",\"todayText\":\"Sunday 11"
+  },
+  {
+   "fn": "sales",
+   "label": "warm",
+   "ms": 829,
+   "status": 200,
+   "answer": "{\"result\":{\"divisions\":[{\"id\":\"fac_uniontown\",\"name\":\"Uniontown\"}],\"division\":\"fac_uniontown\",\"refreshed\":\"11:02 PM\",\"today\":\"2026-11-01\",\"todayText\":\"Sunday 11"
+  },
+  {
+   "fn": "people",
+   "label": "cold?",
+   "ms": 2763,
+   "status": 200,
+   "answer": "{\"result\":{\"people\":[{\"email\":\"administrator@uniteddairy.com\",\"name\":\"Andrew\",\"status\":\"ACTIVE\",\"roles\":[\"ADMINISTRATOR\"],\"facilities\":[\"*\"]},{\"email\":\"bbircher"
+  },
+  {
+   "fn": "people",
+   "label": "warm",
+   "ms": 208,
+   "status": 200,
+   "answer": "{\"result\":{\"people\":[{\"email\":\"administrator@uniteddairy.com\",\"name\":\"Andrew\",\"status\":\"ACTIVE\",\"roles\":[\"ADMINISTRATOR\"],\"facilities\":[\"*\"]},{\"email\":\"bbircher"
+  },
+  {
+   "fn": "sms",
+   "label": "cold?",
+   "ms": 2751,
+   "status": 200,
+   "answer": "{\"result\":{\"replyAddress\":\"https://us-east4-ud-distribution-sandbox.cloudfunctions.net/smsReply\",\"hasSid\":false,\"hasToken\":false,\"from\":\"\",\"live\":false,\"savedAt"
+  },
+  {
+   "fn": "sms",
+   "label": "warm",
+   "ms": 183,
+   "status": 200,
+   "answer": "{\"result\":{\"replyAddress\":\"https://us-east4-ud-distribution-sandbox.cloudfunctions.net/smsReply\",\"hasSid\":false,\"hasToken\":false,\"from\":\"\",\"live\":false,\"savedAt"
+  },
+  {
+   "fn": "gps",
+   "label": "cold?",
+   "ms": 3547,
+   "status": 200,
+   "answer": "{\"result\":{\"hasUser\":false,\"hasPassword\":false,\"hasAppId\":false,\"baseUrl\":\"https://fim.api.us.fleetmatics.com\",\"lastTest\":null,\"savedAt\":\"\",\"savedBy\":\"\"}}"
+  },
+  {
+   "fn": "gps",
+   "label": "warm",
+   "ms": 211,
+   "status": 200,
+   "answer": "{\"result\":{\"hasUser\":false,\"hasPassword\":false,\"hasAppId\":false,\"baseUrl\":\"https://fim.api.us.fleetmatics.com\",\"lastTest\":null,\"savedAt\":\"\",\"savedBy\":\"\"}}"
+  },
+  {
+   "fn": "setSwitch",
+   "label": "cold?",
+   "ms": 1563,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"requestId is missing\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "setSwitch",
+   "label": "warm",
+   "ms": 67,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"requestId is missing\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "stationSignIn",
+   "label": "cold?",
+   "ms": 2436,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown station step\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "stationSignIn",
+   "label": "warm",
+   "ms": 135,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown station step\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "save",
+   "label": "A first",
+   "ms": 3442,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A again",
+   "ms": 2757,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A again",
+   "ms": 1737,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A again",
+   "ms": 1449,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A again",
+   "ms": 1120,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A again",
+   "ms": 1164,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"savePlantLoad\":true,\"savePlantSchedule\":true,\"saveUnloading\":true,\"completeWash\":true,\"addReturn\":true,\"saveShiftNote\":true,\"saveTemperat"
+  },
+  {
+   "fn": "save",
+   "label": "A one ask",
+   "ms": 193,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"saveShiftNote\":true}}}"
+  },
+  {
+   "fn": "save",
+   "label": "A one ask",
+   "ms": 227,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"saveShiftNote\":true}}}"
+  },
+  {
+   "fn": "save",
+   "label": "A one ask",
+   "ms": 197,
+   "status": 200,
+   "answer": "{\"result\":{\"allowed\":{\"saveShiftNote\":true}}}"
+  },
+  {
+   "fn": "save",
+   "label": "A refused",
+   "ms": 65,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown save: noSuchSave\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "save",
+   "label": "A refused",
+   "ms": 65,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown save: noSuchSave\",\"status\":\"INVALID_ARGUMENT\"}}"
+  },
+  {
+   "fn": "save",
+   "label": "A refused",
+   "ms": 65,
+   "status": 400,
+   "answer": "{\"error\":{\"message\":\"Unknown save: noSuchSave\",\"status\":\"INVALID_ARGUMENT\"}}"
+  }
+ ],
+ "log": null,
+ "notes": [
+  "Practice database location: nam5; server region us-east4",
+  "Request log not readable: ERROR: (gcloud.logging.read) PERMISSION_DENIED: Permission denied for all log views. This command is authenticated as github-deploy@ud-distribution-sandbox.iam.gserviceaccount.com which is the active ",
+  "Firebase app named \"click-wait\" already exists and initializeApp was invoked with an optional Credential. The SDK cannot confirm the equality of Credential objects with the existing app. Please use getApp or getApps to reuse the existing app instead."
+ ]
+}

@@ -1337,6 +1337,7 @@ Everyone who can sign in. Add a person, then set their role, whether their accou
 
 - Each change saves at once and nothing on the page moves.
 - A person with no screens ticked sees every screen, as before.
+- Once the People list is moved into Operations (Administration > Go-Live Switches), this screen is the only place to add or change a person. The old Users sheet is kept as a backup and no longer changes.
 
 !> Do not set someone Inactive to hide a screen from them. Untick the screen instead.
 
@@ -1425,6 +1426,14 @@ Which screens are switched on, and the emergency stop.
 - One button turns on everything that is ready.
 
 > Use Pause if something is writing wrong values to the sheets. Nothing is lost while paused.
+
+**Google sheets moving into Operations.** The rows at the bottom are the Google sheets the app is moving off of, one at a time. A sheet that is moved lives only in Operations from then on: the app stops copying it and stops writing to it, and the sheet is kept exactly as it was, as a backup.
+
+1. Find the sheet's row. Only a row that says `Ready` can move.
+2. Press `Move into Operations`, then press it again.
+3. The row changes to `In Operations` with the day it moved. From then on, make changes on the app's screen (for the People list, Administration > People), not in the sheet.
+
+!> Do not type in a sheet after it is moved. The app no longer reads it, so the change would not show anywhere. A moved sheet cannot be moved back.
 
 ## Machine Connections
 id: machine-connections

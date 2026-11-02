@@ -123,8 +123,10 @@ async function savePerson(db, email, input, stamp, deps) {
     if (String(input.revision || '') !== personRevision(before, exBefore)) fail('CHANGED', 'Someone changed this person since you opened them. Reload this person before saving.');
     // The Users list is a sheet: the change must reach the sheet copy, or the next copy from the sheet would undo it.
     const c = cfg.exists ? cfg.data() : {};
-    const mode = { writeBack: !!(c.writeBack && c.writeBack.enabled === true) || usersCopy(deps && deps.env) };
-    if (!mode.writeBack) fail('NOT_ALLOWED', 'This change was not saved: the Users sheet cannot be updated from here yet. Turn the write-back on (Route Distribution page) and save again.');
+    // Joe 11/2: once the People list is moved into Operations (Go-Live Switches) there is no sheet to keep in step.
+    const moved = L.offSheet(c, 'users');
+    const mode = { writeBack: !moved && (!!(c.writeBack && c.writeBack.enabled === true) || usersCopy(deps && deps.env)) };
+    if (!moved && !mode.writeBack) fail('NOT_ALLOWED', 'This change was not saved: the Users sheet cannot be updated from here yet. Turn the write-back on (Route Distribution page) and save again.');
     const id = before && before.cells && before.cells.id ? before.cells.id : 'usr_' + crypto.randomBytes(10).toString('hex');
     const version = Number(before && before.cells && before.cells.version || 0) + 1;
     const fields = { name, status, roles, facilities: admin && facilities.length === 0 ? ['*'] : facilities, 'cells.version': String(version) };

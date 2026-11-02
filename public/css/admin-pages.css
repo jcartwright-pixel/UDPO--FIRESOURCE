@@ -246,3 +246,4 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
   .adm-shell, .adm-shell.adm-folded { grid-template-columns: 1fr; }
   .adm-folded .adm-show { writing-mode: horizontal-tb; transform: none; width: calc(100% - 20px); }
 }
+.gl-done { font-weight: 800; color: #0b3d6b; white-space: nowrap; }
