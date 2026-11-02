@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { tripsOf, toOurs } = require('../../src/fleettrips');
+const { tripsOf, toOurs, plainAddress } = require('../../src/fleettrips');
 
 // Joe 11/1: trip start/end and where, miles, fuel counter at both ends, fuel used and MPG.
 const YARD = { lat: 39.9, lon: -79.73 };
@@ -31,4 +31,10 @@ test('Fleet units become gallons, miles and miles per gallon', () => {
   assert.deepEqual(toOurs('100', 'Kilometer', 'Distance'), { value: 62.1, unit: 'mi' });
   assert.deepEqual(toOurs('2.55', 'Kilometers per liter', 'FuelEfficiency'), { value: 6, unit: 'mpg' });
   assert.equal(toOurs('', 'Liter').value, null);
+});
+
+test('Fleet fuel economy (kilometres per litre) becomes MPG, and its addresses read plainly', () => {
+  assert.deepEqual(toOurs('2.76', 'KilometersPerLiter', 'FuelEfficiency'), { value: 6.49, unit: 'mpg' });
+  assert.equal(plainAddress('US|15401|Pennsylvania|Uniontown|Morgantown St'), 'Morgantown St, Uniontown, Pennsylvania 15401');
+  assert.equal(plainAddress('123 Main St'), '123 Main St');
 });

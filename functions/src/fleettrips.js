@@ -5,8 +5,8 @@
  * GPS Setup's Trip check: one truck, one New York day, read only. It asks Verizon Connect Fleet (fleetgps.js login) for:
  *   1. the fields Fleet offers (the same lists Ask Verizon reads), keeping the GPS point readings about fuel, odometer,
  *      fuel economy, ignition and trips, and naming any other table that sounds like trips (Trip, DrivingPeriod, Stop);
- *   2. that truck's GPS points for the day with those readings (asked with the truck's unit number; if Fleet refuses a
- *      unit list, as it did 10/21, every unit's points by time a few hours at a time, keeping this truck's);
+ *   2. that truck's GPS points for the day with those readings (every unit's points by time, a few hours at a time, keeping
+ *      this truck's: Fleet refuses a unit list with a 500);
  *   3. trips worked out here: leaving the Uniontown yard to coming back (the Fleet places named Uniontown ... and the
  *      Loading Dock, as the rest of the app uses), miles, the fuel counter at both ends, fuel used and MPG.
  * Nothing is saved in the app and nothing is written to the sheets; in Fleet it only saves its own UDPO_Trip* reports
@@ -29,7 +29,8 @@ function toOurs(v, unitName, typeName) {
   const n = num(v), u = String(unitName || '').toLowerCase(), t = String(typeName || '').toLowerCase();
   if (n === null) return { value: null, unit: '' };
   const r = (x, p) => Math.round(x * p) / p;
-  if (/kilomet(er|re)s? per lit|km\/l/.test(u)) return { value: r(n * 2.35215, 100), unit: 'mpg' };
+  // Fuel economy: Fleet keeps it in kilometres per litre (11/2 practice run: 2.76 for a tractor that does about 6.5 mpg).
+  if (/kilomet.*lit|km.*\/\s*l\b|kmpl/.test(u) || (/economy|efficien/.test(t) && !/100|mile|gallon/.test(u))) return { value: r(n * 2.35215, 100), unit: 'mpg' };
   if (/lit(er|re)s? per 100|l\/100/.test(u)) return { value: n > 0 ? r(235.215 / n, 100) : null, unit: 'mpg' };
   if (/miles? per gallon|mpg/.test(u)) return { value: r(n, 100), unit: 'mpg' };
   if (/lit(er|re)|^l$/.test(u)) return { value: r(n * 0.264172, 100), unit: 'gal' };
@@ -38,6 +39,14 @@ function toOurs(v, unitName, typeName) {
   if (/^met(er|re)s?$|^m$/.test(u) && /distance/.test(t)) return { value: r(n / 1609.344, 10), unit: 'mi' };
   if (/mile/.test(u)) return { value: r(n, 10), unit: 'mi' };
   return { value: n, unit: unitName || '' };
+}
+
+/** Fleet's "US|15401|Pennsylvania|Uniontown|Morgantown St" as "Morgantown St, Uniontown, Pennsylvania 15401". */
+function plainAddress(a) {
+  const p = String(a || '').split('|').map(x => x.trim());
+  if (p.length < 4) return String(a || '').trim();
+  const [, zip, state, city, ...street] = p;
+  return [street.filter(Boolean).join(' '), city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
 }
 
 /** The trips in one truck's day. points: [{at, lat, lon, address, miles, v: {field: value in our units}}] sorted by time. */
@@ -140,26 +149,19 @@ async function tripCheck(db, input, options) {
   const to = next < o.now() ? next : o.now();
   const output = ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time', 'Lat = Input.Lat', 'Lon = Input.Lon', 'Address = Input.Address', 'MilesDelta(mile) = Input.OdometerDelta']
     .concat(cols.map(c => outName(c.name) + ' = Input.' + c.name));
-  let rows = [], how = 'asked for this truck only';
-  try {
-    await saveProbeTemplate(d, o, token, 'UDPO_TripDay', 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"', 'Ids(Set<Text>) = "Ids"'],
-      ['Time = Between(Since, Until)', 'UnitId = In(Ids)'], output);
-    rows = await run('UDPO_TripDay', { Since: fleetTime(from), Until: fleetTime(to), Ids: String(unit.unitId) }, true);
-  } catch (e) {
-    if (!(e instanceof F.FleetError)) throw e;
-    notes.push('Asking for this truck only failed (' + short(e.message) + '); asked for every unit a few hours at a time instead.');
-    how = 'every unit asked, this truck kept';
-    await saveProbeTemplate(d, o, token, 'UDPO_TripDayAll', 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'], ['Time = Between(Since, Until)'], output);
-    for (let t = from.getTime(); t < to.getTime(); t += 3 * 3600000) {
-      if (o.now().getTime() - began > budget) { notes.push('Ran out of time at ' + new Date(t).toISOString() + '; the rest of the day was not read.'); break; }
-      const end = new Date(Math.min(to.getTime(), t + 3 * 3600000));
-      (await run('UDPO_TripDayAll', { Since: fleetTime(new Date(t)), Until: fleetTime(end) }, true)).forEach(r => { if (String(r.UnitId) === String(unit.unitId)) rows.push(r); });
-    }
+  // Fleet answers 500 to a GPS point read with a unit list (10/21 and the 11/2 practice run), so every unit's points are
+  // asked for a few hours at a time and this truck's are kept (about 1.5 minutes for a day).
+  const rows = [], how = 'every unit asked, this truck kept';
+  await saveProbeTemplate(d, o, token, 'UDPO_TripDayAll', 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'], ['Time = Between(Since, Until)'], output);
+  for (let t = from.getTime(); t < to.getTime(); t += 3 * 3600000) {
+    if (o.now().getTime() - began > budget) { notes.push('Ran out of time at ' + new Date(t).toISOString() + '; the rest of the day was not read.'); break; }
+    const end = new Date(Math.min(to.getTime(), t + 3 * 3600000));
+    (await run('UDPO_TripDayAll', { Since: fleetTime(new Date(t)), Until: fleetTime(end) }, true)).forEach(r => { if (String(r.UnitId) === String(unit.unitId)) rows.push(r); });
   }
   const points = rows.filter(r => String(r.UnitId) === String(unit.unitId)).map(r => {
     const v = {};
     cols.forEach(c => { const x = toOurs(r[outName(c.name)], c.unitName, c.type); if (x.value !== null) v[c.name] = x.value; });
-    return { at: utcIso(r.Time), lat: num(r.Lat), lon: num(r.Lon), address: r.Address || '', miles: num(r.MilesDelta) || 0, v };
+    return { at: utcIso(r.Time), lat: num(r.Lat), lon: num(r.Lon), address: plainAddress(r.Address), miles: num(r.MilesDelta) || 0, v };
   }).filter(p => p.at).sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
   const fields = cols.map(c => {
     const have = points.filter(p => p.v[c.name] != null);
@@ -170,4 +172,4 @@ async function tripCheck(db, input, options) {
     sample: points.filter((p, i) => i % Math.max(1, Math.floor(points.length / 40)) === 0).slice(0, 40) };
 }
 
-module.exports = { tripCheck, tripsOf, toOurs };
+module.exports = { tripCheck, tripsOf, toOurs, plainAddress };
