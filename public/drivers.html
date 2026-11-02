@@ -56,7 +56,7 @@
             <tbody id="rows"></tbody>
           </table>
         </div>
-        <div class="footer"><span id="count"></span><a id="incidents-link" href="scorecard.html?tab=incidents">Incidents &amp; Complaints list</a><span>Vacation weeks follow the hire date. Removed drivers stay on the list as Inactive.</span></div>
+        <div class="footer"><span id="count"></span><a id="incidents-link" href="scorecard.html?tab=incidents">Incidents &amp; Complaints list</a><span>Vacation weeks follow the hire date. Inactive drivers stay on the list but are never in a driver drop-down. Deleted drivers leave the list.</span></div>
       </div>
       <div class="split-side">
         <div class="summary">
@@ -122,7 +122,8 @@
 
     function render() {
       if (typing) return; // someone is typing a truck; the list redraws when they leave the box
-      rows = L.driverRosterRows(drivers, today);
+      // Joe 11/2: a deleted driver is off the roster (the record is kept so old loads keep the name).
+      rows = L.driverRosterRows(drivers, today).filter(r => !r.deleted);
       const edit = canEdit();
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: CHANGES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
       document.getElementById('truck-list').innerHTML = lists.trucks.map(t => '<option value="' + escapeHtml(t.unit) + '">').join('');
@@ -201,7 +202,8 @@
         (r ? '<div class="panel-facts"><span>Seniority: <b>' + years(r.seniorityDate) + '</b></span><span>Vacation: <b>' + r.vacationWeeks + ' wks</b></span></div>' : '') +
         '<label class="panel-check"><input id="d-relief" type="checkbox"' + (v.reliefDriver ? ' checked' : '') + '> Relief driver</label>' +
         (r ? '<div class="panel-state"><span>Available</span><span class="status' + (r.active ? '' : ' off') + '">' + (r.active ? 'Active' : 'Inactive') + '</span></div>' : '') +
-        '<div class="panel-actions">' + (r && r.active ? '<button id="d-remove" class="danger" type="button">Remove</button>' : '') + (r ? '<button id="d-cancel" type="button">Close</button>' : '<button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Add Driver</button>') + '</div>' +
+        (r ? '<p class="delete-ask" id="d-delete-ask" hidden></p>' : '') +
+        '<div class="panel-actions">' + (r && r.active ? '<button id="d-remove" class="danger" type="button">Make Inactive</button>' : '') + (r ? '<button id="d-delete" class="danger" type="button">Delete</button>' : '') + (r ? '<button id="d-cancel" type="button">Close</button>' : '<button id="d-cancel" type="button">Cancel</button><button id="d-save" class="primary" type="button">Add Driver</button>') + '</div>' +
         (r ? '<div class="inc-box"><h3>Accidents, complaints &amp; PDA <a href="scorecard.html?tab=incidents">See all</a></h3><div id="d-inc-list"></div><div class="inc-add"><button type="button" id="d-add-accident">Add accident / incident</button><button type="button" id="d-add-complaint">Add complaint</button><button type="button" id="d-add-pda">Add PDA</button></div><div id="d-inc-form"></div></div>' : '');
       incForm = '';
       render();
@@ -218,6 +220,22 @@
         saveOptimistic('removeDrivers', { driverIds: [r.id] },
           () => Object.assign(d, { status: 'INACTIVE', unavailableReason: 'Removed from operational roster' }),
           () => Object.assign(d, { status: before.status, unavailableReason: before.reason }), render);
+      };
+      // Joe 11/2: Delete asks twice. The first press says what it does; the second press deletes. The driver leaves the roster
+      // and every driver list; old loads, history and the scorecard keep the name. Close leaves the driver as they were.
+      const del = document.getElementById('d-delete');
+      if (del) del.onclick = () => {
+        const ask = document.getElementById('d-delete-ask');
+        if (!del.dataset.sure) {
+          del.dataset.sure = '1'; del.textContent = 'Yes, delete ' + r.name;
+          ask.textContent = 'Delete ' + r.name + ' for good? Old loads and history keep the name. Close keeps them.';
+          ask.hidden = false; del.scrollIntoView({ block: 'nearest' }); return;
+        }
+        const d = drivers.find(x => x.id === r.id), before = { status: d.status, deleted: d.deleted, reason: d.unavailableReason };
+        closePanel();
+        saveOptimistic('deleteDriver', { driverId: r.id },
+          () => Object.assign(d, { status: 'DELETED', deleted: true, unavailableReason: 'Deleted from the Driver Roster' }),
+          () => Object.assign(d, { status: before.status, deleted: before.deleted, unavailableReason: before.reason }), render);
       };
       // Batch 5 (10/23): an existing driver has no Save Driver button; each box saves when it is left and Relief when it is ticked.
       // A new driver keeps its one Add Driver button.
@@ -270,7 +288,7 @@
     // The Employees list drop-down: active employees not on the roster yet, by name or employee ID; picking one fills the boxes.
     function bindPick() {
       const box = document.getElementById('d-pick'), list = document.getElementById('d-picks');
-      const taken = new Set(drivers.map(d => idKey(d.employeeId)).filter(Boolean));
+      const taken = new Set(drivers.filter(d => !L.driverDeleted(d)).map(d => idKey(d.employeeId)).filter(Boolean));
       const draw = () => {
         const q = box.value.trim().toUpperCase();
         const found = employees.filter(e => e.active && !taken.has(e.idKey) && (!q || e.name.indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);

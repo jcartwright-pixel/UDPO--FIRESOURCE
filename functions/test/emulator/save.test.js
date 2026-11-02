@@ -70,7 +70,9 @@ test('only people with a dispatch role may save', async () => {
 
 test('unknown, inactive and wrong-type units and drivers are refused', async () => {
   const base = { requestId: '', runDocId: RUN, day: 'tue' };
-  await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignDriver', requestId: rid(), driverId: 'drv_test_dunn' })), /INACTIVE/);
+  await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignDriver', requestId: rid(), driverId: 'drv_test_dunn' })), /Inactive on the Driver Roster/);
+  // Joe 11/2: OVR no longer puts an inactive driver on a run.
+  await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignDriver', requestId: rid(), driverId: 'drv_test_dunn', override: true })), /Inactive on the Driver Roster/);
   await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignDriver', requestId: rid(), driverId: 'drv_nobody' })), /not in Driver Master/);
   await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignTruck', requestId: rid(), equipmentId: 'veh_trailer_t_901' })), /is a TRAILER/);
   await assert.rejects(applyAction(db(), DISPATCHER, Object.assign({}, base, { action: 'assignTrailer', requestId: rid(), equipmentId: 'veh_trailer_t_903' })), /INACTIVE/);

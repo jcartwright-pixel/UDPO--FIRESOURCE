@@ -161,13 +161,15 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.equal(names[0], '\u2014 NEEDS DRIVER \u2014');
     assert.deepEqual(await p.$$eval('.cell-pop [data-i]', n => n.slice(1, 3).map(x => x.textContent)), ['CASEY, LEE', 'BROOK, SAM']);
     const off = await p.$$eval('.cell-pop [data-i].off', n => n.map(x => x.textContent));
-    assert.ok(off.includes('ADAMS, PATOn 801') && off.some(t => /^DUNN, ROBININACTIVE/.test(t)), 'unavailable: ' + off.join(' | '));
+    assert.ok(off.includes('ADAMS, PATOn 801'), 'unavailable: ' + off.join(' | '));
+    // Joe 11/2: an inactive driver is never in the list, not even under Unavailable.
+    assert.ok(!names.some(t => /DUNN, ROBIN/.test(t)), 'DUNN (Inactive) is not listed: ' + names.join(' | '));
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'daily-keys-list-1920.png') });
     await p.click('.cell-pop [data-i]:has-text("ADAMS, PAT")');
     assert.ok(await p.$('.cell-pop'), 'an unavailable driver cannot be clicked without OVR');
     await p.click('.cell-pop [data-i]:has-text("CASEY, LEE")');
     await p.waitForFunction((s) => document.querySelector(s).children[3].textContent === 'CASEY, LEE', R802);
-    results.push('a double-click opened the whole driver list grouped Regular (seniority order), Relief, Other CVG, Unavailable (ADAMS "On 801", DUNN INACTIVE, greyed and not pickable); clicking CASEY, LEE saved it');
+    results.push('a double-click opened the whole driver list grouped Regular (seniority order), Relief, Other CVG, Unavailable (ADAMS "On 801", greyed and not pickable; DUNN, who is Inactive, not listed at all); clicking CASEY, LEE saved it');
 
     // Joe 10/19: typing "needs" finds NEEDS DRIVER; Enter takes the driver off and the load counts as needing a driver.
     await p.click(R802 + ' td[data-edit="driver"]');

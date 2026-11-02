@@ -138,6 +138,8 @@ Administrators see a strip above the loads: **Schedule texts for the posted week
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
 
+In the driver list, OVR also offers drivers who are off that day. Inactive drivers are never in the list, OVR or not. To use one, make them Active on the [Driver Roster](#drivers) first.
+
 The lists show only this plant's units, using the plant the fleet list gives each one. A few trailers the fleet list puts at another plant (533, 824, 876 and 950) are counted as Uniontown's. If a trailer you use is missing from the list, check its location on the fleet list.
 
 > When a route's regular trailer is down, its Trailer box is left blank. Pick another trailer from the list.
@@ -264,12 +266,28 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 - `Edit` on a line opens the driver beside the list.
 - In the driver's box: change the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
-- `Remove` (press it twice) makes the driver Inactive. The driver stays on the list.
+- `Make Inactive` (press it twice) makes the driver Inactive. The driver stays on the list, shown as Inactive, and can be made Active again with the switch on their line.
+- An Inactive driver never shows in any driver list anywhere in Operations: Daily Dispatch, the Weekly Dispatch Template, the Vacation Schedule, the driver phone and the texts. Ticking **OVR** does not bring them back either. A driver already on a load stays on it, marked Inactive, until you pick someone else.
 - Under **Texts**, tick **Schedule** to text that driver their schedule when you press Send schedule texts on Administration > Texts, and **Load** to text them when the plant finishes their load, with any pickups (Administration > Texts turns load done texts on or off). Untick to stop. A driver who texted back STOP is unticked and shows "Replied STOP" in red.
 
 > The mobile phone here is the one the texts go to. If it is blank, the Driver Master phone is used. After fixing a wrong number, press `Resend` on that driver's schedule text in [Texts](#schedule-texts), part 6.
 
-!> Do not remove a driver who is only off for a while. Mark the time off on the Vacation Schedule.
+### Delete a driver
+
+`Delete` takes a driver off the roster for good. It asks twice.
+
+1. Press `Edit` on the driver's line.
+2. Press `Delete`. A red line asks "Delete ... for good?" and the button turns into `Yes, delete` with their name.
+3. Press `Yes, delete` to delete them, or `Close` to keep them.
+
+- A deleted driver leaves the Driver Roster and every driver list, and gets no more texts.
+- Old loads, history and the Driver Scorecard still show their name.
+- Delete does not change the Driver Master Google sheet. The driver stays deleted here even when that sheet is read again.
+- Someone deleted by mistake can be added back with `+ Add Driver`.
+
+!> Do not make a driver Inactive or delete them when they are only off for a while. Mark the time off on the Vacation Schedule.
+
+!> Do not delete a driver who may come back. Make them Inactive instead; Delete is for someone who is gone for good or was added by mistake.
 
 ## Driver Weekly Template
 id: template

@@ -65,7 +65,7 @@
     // Where each employee is used: the Driver Roster, the plant schedule, the Maintenance Schedule.
     function usedOn(e) {
       const out = [];
-      if (drivers.some(d => idKey(d.employeeId) === e.idKey && String(d.status || '').toUpperCase() !== 'INACTIVE')) out.push('Driver Roster');
+      if (drivers.some(d => idKey(d.employeeId) === e.idKey && ['INACTIVE', 'DELETED'].indexOf(String(d.status || '').toUpperCase()) < 0)) out.push('Driver Roster');
       const on = crew.filter(p => idKey(p.employeeId) === e.idKey && String(p.status || '').toUpperCase() !== 'RETIRED');
       if (on.some(p => p.team !== 'maint')) out.push('Plant Schedule');
       if (on.some(p => p.team === 'maint')) out.push('Maintenance Schedule');

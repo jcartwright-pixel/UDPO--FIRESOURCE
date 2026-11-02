@@ -294,11 +294,13 @@
         (d.runs || plantOpen ? '<option value="__OFF__">NOT RUNNING</option>' : '') + (plantOff ? '<option value="__PLANT__">' + plantText + '</option>' : '');
       const relief = [], regular = [], blocked = [];
       L.driverRosterRows(lists.allDrivers, today).forEach(x => {
-        const off = L.exceptionOn(lists.exceptions, x.id, date), why = !x.active ? x.status : off ? L.exceptionLabel(off) : busy[x.id] ? busy[x.id] : '';
+        // Joe 11/2: an inactive or deleted driver is never in the list; only the driver already on the day stays, marked Inactive.
+        if (!x.active && x.id !== d.driverId) return;
+        const off = L.exceptionOn(lists.exceptions, x.id, date), why = !x.active ? 'INACTIVE' : off ? L.exceptionLabel(off) : busy[x.id] ? busy[x.id] : '';
         // Joe 10/16: a driver marked Backup that day is offered as usual, marked BACKUP.
         // Joe 10/23: a driver with a Day Note that day is offered too, with the note, so nobody puts him on a route by mistake.
         const dayNote = !why && L.dayNoteOn(lists.backups, x.id, date);
-        const item = { id: x.id, label: x.name + (dayNote ? ' — ' + dayNote.toUpperCase() : !why && L.backupOn(lists.backups, x.id, date) ? ' — BACKUP' : ''), why };
+        const item = { id: x.id, label: x.name + (!x.active ? ' — INACTIVE' : dayNote ? ' — ' + dayNote.toUpperCase() : !why && L.backupOn(lists.backups, x.id, date) ? ' — BACKUP' : ''), why };
         if (why && x.id !== d.driverId) blocked.push(item); else (x.reliefDriver ? relief : regular).push(item);
       });
       const group = (name, items) => items.length ? '<optgroup label="' + escapeHtml(name) + '">' + items.map(x => '<option value="' + escapeHtml(x.id) + '"' + (x.id === d.driverId ? ' selected' : '') + '>' +
