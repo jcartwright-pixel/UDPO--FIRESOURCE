@@ -66,6 +66,18 @@
       if (opts && opts.carry) L.loadBlocksFor(run, yesterday).forEach(function (b) {
         boardRows([run], pickups, b.deliveryDate).forEach(function (r) { if (r.state === 'LOADED') return; r.deliveryDate = b.deliveryDate; r.prior = true; rows.push(r); });
       });
+      // Joe 11/2 ("yesterday was Sunday. The person should have got on the app and seen if his route was loaded and what was
+      // loaded for Monday. Even though it was loaded Saturday"): with opts.carry the board also keeps loads made on an earlier
+      // day that have not left yet (they leave after today), loaded or not, so Sunday shows Monday's loads loaded on Saturday.
+      // A Load Day route left the day it was loaded. Monday at 6 a.m. the board rolls to Monday's own loadout.
+      if (opts && opts.carry) L.DAYS.forEach(function (p, i) {
+        var day = run.days && run.days[p];
+        if (!day || !day.runs) return;
+        var delivery = L.addDays(run.weekStart, i), offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
+        var loaded = L.addDays(delivery, offset), leaves = text(day.departureDate) || (/LOAD/i.test(text(run.masterShow && run.masterShow.leavesOn)) ? loaded : delivery);
+        if (loaded >= loadDate || leaves <= loadDate || rows.some(function (x) { return x.runDocId === run.id && x.day === p; })) return;
+        boardRows([run], pickups, delivery).forEach(function (r) { r.deliveryDate = delivery; r.prior = false; rows.push(r); });
+      });
     });
     return rows.sort(function (a, b) {
       return (Number(b.prior) - Number(a.prior)) || (Number(a.sequence == null || a.sequence === '' ? 999999 : a.sequence) - Number(b.sequence == null || b.sequence === '' ? 999999 : b.sequence)) ||
