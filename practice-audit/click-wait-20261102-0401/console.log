@@ -1,0 +1,49 @@
+NOTE Practice database location: nam5; server region us-east4
+NOTE Request log not readable: ERROR: (gcloud.logging.read) PERMISSION_DENIED: Permission denied for all log views. This command is authenticated as github-deploy@ud-distribution-sandbox.iam.gserviceaccount.com which is the active 
+cold? save                                2180 ms  400
+warm save                                  104 ms  400
+cold? admin                               1865 ms  400
+warm admin                                  70 ms  400
+cold? phone                               2988 ms  403
+warm phone                                 274 ms  403
+cold? garage                              2874 ms  400
+warm garage                                143 ms  400
+cold? sales                               3908 ms  200
+warm sales                                 829 ms  200
+cold? people                              2763 ms  200
+warm people                                208 ms  200
+cold? sms                                 2751 ms  200
+warm sms                                   183 ms  200
+cold? gps                                 3547 ms  200
+warm gps                                   211 ms  200
+cold? setSwitch                           1563 ms  400
+warm setSwitch                              67 ms  400
+cold? stationSignIn                       2436 ms  400
+warm stationSignIn                         135 ms  400
+A first save                              3442 ms  200
+A again save                              2757 ms  200
+A again save                              1737 ms  200
+A again save                              1449 ms  200
+A again save                              1120 ms  200
+A again save                              1164 ms  200
+A one ask save                             193 ms  200
+A one ask save                             227 ms  200
+A one ask save                             197 ms  200
+A refused save                              65 ms  400
+A refused save                              65 ms  400
+A refused save                              65 ms  400
+Waiting 16 minutes idle...
+FirebaseAppError: Firebase app named "click-wait" already exists and initializeApp was invoked with an optional Credential. The SDK cannot confirm the equality of Credential objects with the existing app. Please use getApp or getApps to reuse the existing app instead.
+    at validateAppOptionsSupportDeepEquals (/home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/node_modules/firebase-admin/lib/app/lifecycle.js:141:15)
+    at AppStore.initializeApp (/home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/node_modules/firebase-admin/lib/app/lifecycle.js:62:9)
+    at FirebaseNamespaceInternals.initializeApp (/home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/node_modules/firebase-admin/lib/app/firebase-namespace.js:43:35)
+    at FirebaseNamespace.initializeApp (/home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/node_modules/firebase-admin/lib/app/firebase-namespace.js:246:30)
+    at idToken (/home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/test/browser/click-wait.cjs:32:19)
+    at /home/runner/work/UDPO--FIRESOURCE/UDPO--FIRESOURCE/functions/test/browser/click-wait.cjs:102:19 {
+  errorInfo: {
+    code: 'app/invalid-app-options',
+    message: 'Firebase app named "click-wait" already exists and initializeApp was invoked with an optional Credential. The SDK cannot confirm the equality of Credential objects with the existing app. Please use getApp or getApps to reuse the existing app instead.'
+  },
+  codePrefix: 'app'
+}
+NOTE Firebase app named "click-wait" already exists and initializeApp was invoked with an optional Credential. The SDK cannot confirm the equality of Credential objects with the existing app. Please use getApp or getApps to reuse the existing app instead.
