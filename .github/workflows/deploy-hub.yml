@@ -1,0 +1,90 @@
+name: Deploy Hub (Firebase)
+
+# The hub's code is in hub/ of this repository for now (Joe 11-2-26: "Can't you take over and do all that?"), so it needs no
+# new repository. It deploys only the hub, never Operations.
+# Puts the United Dairy Hub on its own web site in Operations' Firebase project: <project>-hub.web.app.
+# Practice copy first (the plan, 11-2-26): every push to main goes to the practice copy (ud-distribution-sandbox-hub.web.app).
+# The live copy goes out only by Run workflow with target production, from main.
+# Needs this repository's secret FIREBASE_SERVICE_ACCOUNT_SANDBOX (or _PRODUCTION): the same Firebase deploy key Operations uses.
+# Without it, it stops with a notice and deploys nothing. It deploys only the hub's site and functions (group hub), never
+# Operations' screens, functions or database rules.
+on:
+  push:
+    branches: [main]
+    paths: ['hub/**', '.github/workflows/deploy-hub.yml']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: sandbox or production
+        required: true
+        default: sandbox
+        type: choice
+        options: [sandbox, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-hub-${{ inputs.target || 'sandbox' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Check settings
+        id: settings
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+          SA_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+          TARGET: ${{ inputs.target || 'sandbox' }}
+          REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = production ]; then
+            [ "$REF" = refs/heads/main ] || { echo "::error::Production deploys only from main"; exit 1; }
+            sa="$SA_PRODUCTION"
+          else sa="$SA_SANDBOX"; fi
+          if [ -z "$sa" ]; then echo "::notice::No deploy key for $TARGET in this repository's secrets; nothing was deployed."; echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          printf '%s' "$sa" > "$RUNNER_TEMP/sa.json"
+          echo "project=$(node -e 'console.log(require(process.argv[1]).project_id)' "$RUNNER_TEMP/sa.json")" >> "$GITHUB_OUTPUT"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Install and test
+        if: steps.settings.outputs.ready == 'true'
+        working-directory: hub/functions
+        run: npm ci --no-audit --no-fund && npm test
+      - name: Deploy the site and the server call
+        if: steps.settings.outputs.ready == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          PROJECT: ${{ steps.settings.outputs.project }}
+        run: |
+          set -euo pipefail
+          fb() { npx --prefix functions firebase "$@"; }
+          site="$PROJECT-hub"
+          fb hosting:sites:get "$site" --project "$PROJECT" > /dev/null 2>&1 || fb hosting:sites:create "$site" --project "$PROJECT" --non-interactive
+          fb target:apply hosting hub "$site" --project "$PROJECT"
+          fb deploy --project "$PROJECT" --only hosting:hub,functions:hub --non-interactive --force
+          # Google sign-in opens only on addresses Firebase sign-in knows: add this site's two addresses once.
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          token=$(gcloud auth print-access-token)
+          api="https://identitytoolkit.googleapis.com/admin/v2/projects/$PROJECT/config"
+          if cur=$(curl -sf -H "Authorization: Bearer $token" -H "x-goog-user-project: $PROJECT" "$api"); then
+            body=$(SITE="$site" node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s),want=[process.env.SITE+".web.app",process.env.SITE+".firebaseapp.com"],have=c.authorizedDomains||[];const add=want.filter(d=>have.indexOf(d)<0);console.log(add.length?JSON.stringify({authorizedDomains:have.concat(add)}):"")})' <<< "$cur")
+            if [ -n "$body" ]; then
+              curl -sf -X PATCH -H "Authorization: Bearer $token" -H "x-goog-user-project: $PROJECT" -H 'Content-Type: application/json' "$api?updateMask=authorizedDomains" -d "$body" > /dev/null \
+                && echo "Sign-in allowed on $site.web.app" \
+                || echo "::warning::Could not add $site.web.app to sign-in's Authorized domains (Firebase console, Authentication, Settings)."
+            fi
+          else
+            echo "::warning::Could not read sign-in settings; check $site.web.app is in Authentication, Settings, Authorized domains."
+          fi
+          echo "### Hub: https://$site.web.app" >> "$GITHUB_STEP_SUMMARY"
