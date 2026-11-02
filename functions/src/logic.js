@@ -602,6 +602,7 @@
     { list: 'exceptions', name: 'Day offs', sheet: 'UDPO DRIVER VACATIONS & AVAILABILITY & EXCEPTIONS - UNIONTOWN', ready: false, why: 'Next, with Vacations.' },
     { list: 'vacations', name: 'Vacations', sheet: 'UDPO DRIVER VACATIONS - UNIONTOWN', ready: false, why: 'Next, with Day offs.' },
     { list: 'routes', name: 'Route Master', sheet: 'UDPO ROUTE MASTER - UNIONTOWN', ready: false, why: 'After the day offs and vacations.' },
+    { list: 'equipment', name: 'Equipment Master', sheet: 'UDPO EQUIPMENT MASTER - UNIONTOWN', ready: false, why: 'After Route Master. The United Dairy Fleet List stays on Google; its nightly sync will fill the list in Operations.' },
     { list: 'drivers', name: 'Driver Master', sheet: 'UDPO DRIVER MASTER - UNIONTOWN', ready: false, why: 'Will come from UDMS, like the Employees list.' },
     { list: 'live', name: 'Live sheet', sheet: 'UDPO LIVE DATA - UNIONTOWN', ready: false, why: 'Last, because it is the biggest.' }
   ];
