@@ -654,7 +654,7 @@ const savePlant = (req, db) => {
   const here = (L.PLANTS.find(p => p.db === ((db && db.databaseId) || '(default)')) || {}).id;
   return here || 'fac_uniontown';
 };
-async function requireSaver(tx, db, user, roles, action, plantId) {
+async function requireSaver(tx, db, user, roles, action, plantId, reader) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
   if (user && user.station) {
     if (STATIONS.STATION_ACTIONS.indexOf(action) < 0) throw new SaveError('NOT_ALLOWED', 'A Plant Station with no UD account cannot make this save. Sign in with a United Dairy account.');
@@ -664,7 +664,7 @@ async function requireSaver(tx, db, user, roles, action, plantId) {
   // Joe 10/26: the Users list, Role Templates and People & Roles' Allow / Deny are the company's, kept in Uniontown's database;
   // a save at another plant (its own database) reads them there.
   const here = isHome(db);
-  const read = (ref) => (here ? tx.get(ref) : ref.get());
+  const read = reader || ((ref) => (here ? tx.get(ref) : ref.get()));
   const company = companyDb(db);
   const snap = await read(company.collection(C.users).doc(M.safeIdPart(email)));
   const person = snap.exists ? snap.data() : null;
@@ -809,10 +809,13 @@ async function resolveAssignment(tx, db, req, stamp, run) {
 // checked the role alone. Only names in ACTIONS are answered.
 async function checkSaves(db, user, actions, facilityId) {
   const out = {}, plantId = savePlant({ facilityId }, db);
-  for (const action of (Array.isArray(actions) ? actions : []).slice(0, 20)) {
-    if (!ACTIONS[action]) continue;
-    try { await db.runTransaction(tx => requireSaver(tx, db, user, ACTIONS[action].roles, action, plantId)); out[action] = true; } catch (e) { out[action] = false; }
-  }
+  // Joe 11/2 (buttons slow): the person, Role Templates and their Allow / Deny are read once for every save asked about
+  // (they were read again in a transaction of their own for each one, one after another). Nothing is saved here.
+  const seen = new Map();
+  const reader = (ref) => { if (!seen.has(ref.path)) seen.set(ref.path, ref.get()); return seen.get(ref.path); };
+  const asked = (Array.isArray(actions) ? actions : []).slice(0, 20).filter(a => ACTIONS[a]);
+  const answers = await Promise.all(asked.map(action => requireSaver(null, db, user, ACTIONS[action].roles, action, plantId, reader).then(() => true, () => false)));
+  asked.forEach((action, i) => { out[action] = answers[i]; });
   return out;
 }
 
@@ -846,14 +849,19 @@ async function applyAction(db, user, input, now, deps) {
   }
   const out = await db.runTransaction(async (tx) => {
     const logRef = db.collection(C.actions).doc(req.requestId);
-    const logSnap = await tx.get(logRef);
+    // Joe 11/2 (buttons slow): the save's first reads (was it saved already, the screen's switch, the person's rights) go
+    // together instead of one after another. A save already made still answers as before, whatever the others say.
+    const [logTry, modeTry, personTry] = await Promise.allSettled([tx.get(logRef), requireTestMode(tx, db, spec.screen), requireSaver(tx, db, user, spec.roles, req.action, savePlant(input, db))]);
+    if (logTry.status === 'rejected') throw logTry.reason;
+    const logSnap = logTry.value;
     if (logSnap.exists) {
       const prior = logSnap.data();
       if (prior.by !== email || prior.action !== req.action) throw new SaveError('BAD_REQUEST', 'requestId was already used for a different save');
       return Object.assign({}, prior.result, { repeated: true });
     }
-    const mode = await requireTestMode(tx, db, spec.screen);
-    const person = await requireSaver(tx, db, user, spec.roles, req.action, savePlant(input, db));
+    if (modeTry.status === 'rejected') throw modeTry.reason;
+    if (personTry.status === 'rejected') throw personTry.reason;
+    const mode = modeTry.value, person = personTry.value;
     // Joe 10/13: managers may load past the loadout's limit from the Loadout Center; a Plant Station tablet never can.
     req.manager = !(user && user.station) && L.hasRole(person, MANAGER_ROLES);
     // Loading Rundown (Joe 10/15): who saved a load's Start / End, and whether from a Plant Station tablet (plant.js markTimes).

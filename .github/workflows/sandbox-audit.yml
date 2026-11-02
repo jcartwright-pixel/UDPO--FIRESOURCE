@@ -9,10 +9,13 @@ name: Practice copy test (live data copy + full browser test)
 # - [audit] in the commit message: the full browser test against the practice copy (functions/test/browser/practice-audit.cjs).
 # - [clicks] in the commit message (audit 10/29, Joe: "I'd also want to do a click speed test"): only the click speed pass of
 #   practice-audit.cjs (arrows, tabs, view pickers and moving screen to screen; nothing is saved).
+# - [click wait] in the commit message (Joe 11/2: "Every time I click an action button" it takes a long time): how long the
+#   practice copy's servers take to answer a button's call, idle first and then straight after (functions/test/browser/
+#   click-wait.cjs; nothing is saved), and its request log for the last 14 days.
 # Neither one deploys anything or changes the live app.
 on:
   push:
-    branches: [claude/project-thread-wsuoyf, claude/project-thread-ivjfyh]
+    branches: [claude/project-thread-wsuoyf, claude/project-thread-ivjfyh, claude/project-thread-cwzf6i]
 
 permissions:
   contents: write
@@ -125,4 +128,47 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add practice-audit
           git commit -q -m "Practice copy test results $(basename "$OUT")"
+          for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
+
+  click-wait:
+    if: contains(github.event.head_commit.message, '[click wait]')
+    runs-on: ubuntu-24.04
+    environment: distribution-sandbox
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Key
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
+          node -e "if (require('$RUNNER_TEMP/practice.json').project_id !== 'ud-distribution-sandbox') process.exit(1)"
+      - name: Install
+        run: npm ci
+      - name: Time the servers' answers
+        continue-on-error: true
+        env:
+          KEY: ${{ runner.temp }}/practice.json
+        run: |
+          out="../practice-audit/click-wait-$(date -u +%Y%m%d-%H%M)"
+          echo "OUT=$out" >> "$GITHUB_ENV"
+          mkdir -p "$out"
+          node test/browser/click-wait.cjs "$out/click-wait.json" 2>&1 | tee "$out/console.log"
+      - name: Keep the results on the branch
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -n "${OUT:-}" ] && [ -d "$OUT" ] || { echo "No results"; exit 0; }
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add practice-audit
+          git commit -q -m "Click wait results $(basename "$OUT")"
           for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
