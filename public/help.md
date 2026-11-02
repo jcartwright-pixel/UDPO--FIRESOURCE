@@ -565,6 +565,9 @@ The connection to Verizon Connect Fleet (administrators).
 
 - `Pull now` reads Verizon at once instead of waiting.
 - `Ask Verizon` asks for every field Verizon offers, to see what is there.
+- **Trip check:** type one truck, pick a day and press `Check trips`. It lists each trip that day: when the truck left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. It only reads; nothing is saved.
+
+> Fuel used and MPG only show for trucks whose GPS box is plugged into the engine. Trailers never send fuel.
 
 !> Do not remove the login unless Verizon changed it. Trucks Today and the Scorecard stop getting GPS.
 

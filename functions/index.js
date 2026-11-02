@@ -562,6 +562,16 @@ async function fleetSyncWrite() {
   return real && (await realFleetSyncOn()) ? { target: real, allowReal: true } : null;
 }
 
+// Joe 11/2: every truck's trips, from Verizon Fleet, kept in the app's own database (gpsTripFuel, src/tripfuel.js) for six months
+// for his fuel import: October first, then each day the next morning. Every 30 minutes until caught up; wherever a Fleet login
+// is saved. Nothing is written to a sheet.
+exports.gpsTripFuelEvery30Minutes = onSchedule({ schedule: 'every 30 minutes', timeoutSeconds: 540, memory: '1GiB', maxInstances: 1 }, async () => {
+  await eachPlant('gpsTripFuel', async (pdb) => {
+    const r = await require('./src/tripfuel').dailyTripFuel({ db: pdb, budgetMs: 2 * 60000 });
+    if (r.error) console.error('gpsTripFuel', r.error);
+  });
+});
+
 exports.fleetSyncNightly = onSchedule({ schedule: '0 2 * * *', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   const run = await fleetSyncWrite();
   if (!run || run.paused) return;
