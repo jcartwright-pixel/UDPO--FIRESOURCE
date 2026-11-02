@@ -29,7 +29,7 @@ const note = (s) => { report.notes.push(s); console.log('NOTE ' + s); };
 async function idToken() {
   const r = require('module').createRequire(path.join(__dirname, '..', '..', 'package.json'));
   const admin = r('firebase-admin');
-  const a = admin.initializeApp({ credential: admin.credential.cert(KEY), projectId: PROJECT }, 'click-wait');
+  const a = admin.apps.find(x => x && x.name === 'click-wait') || admin.initializeApp({ credential: admin.credential.cert(KEY), projectId: PROJECT }, 'click-wait');
   const custom = await r('firebase-admin/auth').getAuth(a).createCustomToken('practice-audit', { email: EMAIL, email_verified: true });
   const init = await (await fetch('https://' + PROJECT + '.web.app/__/firebase/init.json')).json();
   const res = await (await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=' + init.apiKey, {
