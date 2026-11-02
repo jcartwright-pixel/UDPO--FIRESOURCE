@@ -105,7 +105,7 @@
         const k = z.late ? 'late' : '', dep = z.leaves === null ? '–' : e(when(z.leaves, z.depart, z.departDay));
         // Joe 10/20: last night's left-over loads carry straight on, first in line, marked at the left edge.
         return '<div class="fc-row ' + k + (z.status === 'LOADING' && !z.paused ? ' loading' : '') + (z.priorDay ? ' left' : '') + '"' + (z.priorDay ? ' title="Left over from last night"' : '') + '><b>' + e(U.routeNumber(z.route)) + '</b>' +
-          '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' && !z.paused ? ' <em class="fc-pill">Loading</em>' : '') + (z.paused ? ' <em class="fc-pill">Paused</em>' : '') +
+          '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' && !z.paused ? ' <em class="fc-pill">Loading</em>' : '') + (z.paused ? ' <em class="fc-pill">Paused</em>' : '') + (z.outside ? ' <em class="fc-pill">Outside carrier, not counted late</em>' : '') +
           (z.late ? '<small class="fc-why-sm">Late: ' + e(z.reason) + ' by ' + span(z.lateBy) + '</small>' : '') +
 '</span>' +
           '<span class="num">' + (z.noCases ? '–' : n(z.cases)) + '</span><span>' + dep + '</span>' +
