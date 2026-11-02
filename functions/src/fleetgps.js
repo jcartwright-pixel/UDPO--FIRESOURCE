@@ -937,7 +937,7 @@ async function probe(db, d, o, email, tagIn) {
   return save({ at, by: email, tag, steps });
 }
 
-/* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag}. The caller has
+/* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag} | trips {tag, date}. The caller has
  * already checked the person is a manager or administrator. */
 async function fleetCall(db, email, input, options) {
   const o = withDefaults(options);
@@ -985,6 +985,11 @@ async function fleetCall(db, email, input, options) {
     const probed = await probe(db, d, o, email, input.tag);
     return Object.assign(status((await ref.get()).data() || {}, await hist()), { coverage: await coverage(db, o.now()), probe: probed });
   }
+  // Joe 11/1: one truck's trips for one day (fleettrips.js), read only; nothing is kept.
+  if (op === 'trips') {
+    const trips = await require('./fleettrips').tripCheck(db, { tag: input.tag, date: input.date }, options);
+    return Object.assign(status((await ref.get()).data() || {}, await hist()), { coverage: await coverage(db, o.now()), probe: (await db.collection('private').doc('gpsProbe').get()).data() || null, trips });
+  }
   if (op === 'pull') {
     const r = await pull(db, options);
     const fresh = (await ref.get()).data() || {};
@@ -993,4 +998,7 @@ async function fleetCall(db, email, input, options) {
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
-module.exports = { atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+// Shared with fleettrips.js (Joe 11/1: the read-only Trip check).
+const internals = { key, execute, saveProbeTemplate, utcIso, nyDate, nyMidnight, addDays, num, yes, milesApart, fleetTime, withDefaults, short, YARD_MILES };
+
+module.exports = { internals, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
