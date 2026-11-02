@@ -7,7 +7,7 @@
  * is "Pause writing to the sheets": the screens keep saving and the saves wait until Resume writes them.
  * The server (functions/src/switch.js) checks the same rules (logic.js GO_LIVE).
  */
-import { escapeHtml, callServer, start } from './app.js';
+import { escapeHtml, callServer, start, shortDate } from './app.js';
 import { say, errText, twice } from './admin-pages.js';
 import { doc, onSnapshot } from './firebase.js';
 
@@ -50,6 +50,18 @@ export async function renderGoLive(box) {
       const head = r.area !== area ? '<tr class="gl-grp"><td colspan="5">' + e(area = r.area) + '</td></tr>' : '';
       return head + '<tr data-row="' + e(r.key || r.name) + '"><td class="gl-name">' + e(r.name) + '</td><td>' + chip + '</td><td>' + (r.ready ? '<span class="gl-chip ready">Ready</span>' : '<span class="gl-chip not">Not ready</span>') +
         '</td><td class="gl-why">' + e(r.why) + '</td><td><div class="gl-acts">' + acts + '</div></td></tr>';
+    }).join('') + sheetRows();
+  }
+
+  // Joe 11/2: the Google sheets moving into Operations, one at a time (logic.js OFF_SHEETS). A moved list stays moved.
+  function sheetRows() {
+    return '<tr class="gl-grp"><td colspan="5">Google sheets moving into Operations</td></tr>' + L.OFF_SHEETS.map(s => {
+      const moved = L.offSheet(config, s.list), when = moved ? shortDate(new Date(config.offSheets[s.list].at)) : '';
+      const chip = moved ? '<span class="gl-chip live">In Operations</span>' : '<span class="gl-chip old">On Google</span>';
+      const act = moved ? '<span class="gl-done">Moved ' + e(when) + '</span>'
+        : '<button type="button" class="ap-btn small' + (s.ready ? ' main' : '') + '" data-sheet="' + e(s.list) + '"' + (s.ready ? '' : ' disabled') + '>Move into Operations</button>';
+      return '<tr data-row="sheet-' + e(s.list) + '"><td class="gl-name">' + e(s.name) + '</td><td>' + chip + '</td><td>' + (moved || s.ready ? '<span class="gl-chip ready">Ready</span>' : '<span class="gl-chip not">Not ready</span>') +
+        '</td><td class="gl-why">' + e(moved ? 'The app no longer copies or writes the sheet ' + s.sheet + '. It is kept as it was, as a backup.' : s.why) + '</td><td><div class="gl-acts">' + act + '</div></td></tr>';
     }).join('');
   }
 
@@ -69,6 +81,7 @@ export async function renderGoLive(box) {
     if (btn.id === 'gl-all') return send(btn, { allReady: true }, 'Press again to turn them on');
     const paused = !!(config.sheetWrites && config.sheetWrites.paused === true);
     if (btn.id === 'gl-wb-btn') return send(btn, wb ? { sheetsPaused: !paused } : { writeBack: true }, 'Press again');
+    if (btn.dataset.sheet) return send(btn, { offSheet: btn.dataset.sheet }, 'Press again to move it');
     const key = btn.dataset.key, act = btn.dataset.act;
     if (!key) return;
     if (act === 'new') return send(btn, { screen: key, owner: 'new' }, 'Press again');

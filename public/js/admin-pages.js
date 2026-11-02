@@ -107,7 +107,7 @@ export async function renderPeople(box) {
     // address never breaks mid-word (it may break only after the @). Joe 10/26: Home screen, the page each person lands on when
     // they open the app, picked right in the list and saved as soon as it is picked.
     '<div class="ap-scroll"><table class="issues adm-table people-table"><colgroup><col style="width:15%"><col style="width:24%"><col style="width:13%"><col style="width:10%"><col style="width:9%"><col style="width:29%"></colgroup><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plants</th><th>Status</th><th>Home screen</th></tr></thead><tbody id="people"></tbody></table></div>' +
-    '<p class="ap-note">Click a person to change or disable them. Disabled people stay visible; no account is deleted. Changes are also written to the Users sheet.</p>' +
+    '<p class="ap-note">Click a person to change or disable them. Disabled people stay visible; no account is deleted. Until the People list is moved into Operations (Go-Live Switches), changes are also written to the Users sheet.</p>' +
     '<div class="ap-modal" id="p-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Person"><div class="ap-msg" id="p-modal-msg" hidden></div><div class="ap-card" id="p-edit"></div></div></div>' +
     '<div class="ap-modal" id="r-modal" hidden><div class="ap-modal-box" role="dialog" aria-modal="true" aria-label="Add Role"><div class="ap-card" id="r-edit"></div></div></div></div>';
   const $ = (s) => box.querySelector(s);
@@ -313,7 +313,7 @@ export async function renderPeople(box) {
         const out = await call('savePerson', Object.assign({ email: draft.email, name: draft.name, roles: draft.roles, status: draft.status, facilities: draft.facilities, grants: draft.grants, denials: draft.denials,
           isNew: !sel, revision: sel ? sel.revision : data.newRevision }, draft.screensChanged ? { screenAccess: draft.screens } : {}));
         await load();
-        say(box, 'Saved ' + out.email + '. The Users sheet gets it within a minute.', 'good');
+        say(box, 'Saved ' + out.email + '.', 'good');
       });
       if (!sensitive) { go(); return; }
       if (b.dataset.armed !== '1') say(box, 'This changes enabled status or administrator access. Click Save Person Access again to confirm.');

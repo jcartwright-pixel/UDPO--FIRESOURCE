@@ -113,11 +113,15 @@ async function runMasterWriteBack({ db, sheets, targets, now, only, allowReal, s
   const stamp = (now ? now() : new Date()).toISOString();
   // Claim the oldest waiting saves first, so two passes at once (the save trigger and the minute pass) never both add
   // the same new row. A claim older than five minutes (a pass that died) is taken over.
+  // Joe 11/2: a list moved into Operations (logic.js OFF_SHEETS) is never written to its sheet again; the sheet stays as it
+  // was, as a backup. A save still waiting for that sheet is closed as "offSheet" (the save itself is already in Operations).
+  const cfg = (await db.collection(C.config).doc('app').get()).data() || {};
   const claim = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), stale = new Date(Date.parse(stamp) - 5 * 60000).toISOString();
   const items = await db.runTransaction(async tx => {
     const q = await tx.get(db.collection(C.masterOutbox).where('status', 'in', ['pending', 'writing']).orderBy('at').orderBy('requestId').limit(BATCH));
     // only: just the lists named in targets (the Users copy while the write-back switch is off); the rest wait.
-    const mine = q.docs.filter(d => (d.data().status === 'pending' || String(d.data().claimedAt || '') < stale) && (!only || targets[d.data().list]));
+    q.docs.filter(d => L.offSheet(cfg, d.data().list)).forEach(d => tx.update(d.ref, { status: 'offSheet', doneAt: stamp }));
+    const mine = q.docs.filter(d => !L.offSheet(cfg, d.data().list) && (d.data().status === 'pending' || String(d.data().claimedAt || '') < stale) && (!only || targets[d.data().list]));
     const old = since ? mine.filter(d => String(d.data().at || '') < since) : [];
     old.forEach(d => tx.update(d.ref, { status: 'held', heldAt: stamp, heldWhy: 'queued before the real sheets were turned on (' + since + '); not written' }));
     const take = mine.filter(d => old.indexOf(d) < 0);
