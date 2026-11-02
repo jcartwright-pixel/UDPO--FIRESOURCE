@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>United Dairy Hub</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/hub.css">
+</head>
+<body class="hub-page" data-help="home">
+  <div class="signin" id="signin" hidden>
+    <h1>United Dairy Hub</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1></div></div>
+    <div class="hub-home" id="tiles"></div>
+    <div class="hub-empty" id="empty" hidden>You are on the Users list, but no app is turned on for you yet. Ask an administrator.</div>
+    <div class="hub-install" id="install-box" hidden>
+      <b>Get the hub app</b>
+      <span>It opens on this computer in its own window, with its own icon, like the Operations app.</span>
+      <button type="button" class="primary" id="install">Install the app</button>
+    </div>
+  </div>
+  <script type="module">import { requireSignIn, callServer, escapeHtml as e, showError, serverText, installed, installApp, canInstall } from './js/shell.js';
+function showInstall() { document.getElementById('install-box').hidden = installed() || !canInstall(); }
+document.addEventListener('hub-installable', showInstall);
+document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };
+showInstall();
+requireSignIn(async () => {
+  try {
+    const d = await callServer('hub', { op: 'home' });
+    if (d.name) document.getElementById('hello').textContent = 'Your apps, ' + d.name.split(/\s+/)[0];
+    // Each app opens in its own tab, so the hub stays open to go to the next one.
+    document.getElementById('tiles').innerHTML = (d.tiles || []).map(t => '<a href="' + e(t.url) + '" target="_blank" rel="noopener" data-app="' + e(t.key) + '"><strong>' + e(t.name) + '</strong>' + e(t.note) + '<small>Opens in a new tab</small></a>').join('');
+    document.getElementById('empty').hidden = (d.tiles || []).length > 0;
+  } catch (err) { showError(serverText(err, 'the hub')); }
+});</script>
+</body>
+</html>

@@ -4,3 +4,4 @@ node_modules/
 functions/.env.local
 functions/shots/
 functions/.env
+hub/public/version.json

@@ -1,0 +1,20 @@
+{
+  "name": "ud-hub-functions",
+  "private": true,
+  "description": "United Dairy Hub server: one call, hub. Same Firebase project as Operations, its own functions group (hub).",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "test": "node --test test/unit/*.test.js",
+    "test:browser": "firebase emulators:exec --only firestore,auth,hosting --project demo-ud-distribution \"node test/browser/hub.cjs http://127.0.0.1:5000\""
+  },
+  "dependencies": {
+    "firebase-admin": "13.10.0",
+    "firebase-functions": "7.2.0"
+  },
+  "devDependencies": {
+    "firebase": "12.18.0",
+    "firebase-tools": "15.30.2",
+    "playwright": "1.56.1"
+  }
+}
