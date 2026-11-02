@@ -1607,10 +1607,12 @@ screens: sales.html, sales.html?view=routes
 
 The salespeople's phone app (**UD Sales** on the home screen). It shows every route of a division: who is driving it, its status and where it is now, with a map on top. It only shows; nothing can be changed from it. Anyone with a United Dairy account can use it.
 
+The bar at the top has the United Dairy logo, **UD SALES** in small gold letters, and the name of the screen you are on (**Welcome** on the two cards).
+
 1. Open the Sales App link the office sends you and sign in with your United Dairy Google account.
 2. Add it to the home screen. It is called **UD Sales**.
 3. Pick the **Division** at the top right (Uniontown, Charleston or Martins Ferry). The phone remembers it.
-4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). `Back` at the top left comes back to the cards.
+4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). The arrow at the top left (Back) comes back to the cards.
 5. Scroll the routes. Tap a route and the map at the top moves to that truck, and the whole place shows under the map. The map stays on top while you keep scrolling; tap another route to move it again.
 
 - **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the Driver Room board. A route that is not delivering today is not on it. A load from an earlier delivery day that has not left yet stays at the top, under **Left over from** that day, until it leaves.
@@ -1619,14 +1621,14 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 - **Save-A-Lot drop and hook.** A Save-A-Lot route ticked **Drop and Hook** in the Route Editor leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the Save-A-Lot (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2h 12m late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
 - **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
-- `?` at the top right opens this Help inside the Sales app. `Back` at the top left goes back to the screen you were on. `Sign out` is at the bottom.
+- `?` at the top right opens this Help inside the Sales app. The arrow at the top left (Back) goes back to the screen you were on. `Sign out` is at the bottom.
 - The Sales app is all a salesperson sees. Nothing in it, Help included, opens any other part of Operations.
 
 > To see a route on a bigger map, tap the map and open it in Google Maps.
 
 !> Do not read **Where now** on a dropped Save-A-Lot load as the trailer. It is the driver's truck; the trailer is still at the store.
 
-!> Do not look for Home or a menu. The Sales app has only its two cards; `Back` at the top left always brings you back to them.
+!> Do not look for Home or a menu. The Sales app has only its two cards; the arrow at the top left (Back) always brings you back to them.
 
 !> Do not read **No GPS** as lost. It means neither the trailer nor the truck on that load has a GPS unit the app knows about; ask Dispatch.
 
@@ -1646,7 +1648,7 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 - A day that says **no route** is a customer day on the Customer List with no route number yet.
 - The bottom line says when the Customer List was last changed.
 - A division with nothing on the Customer List yet shows no customers.
-- `Back` at the top left goes back one step: from a group to the groups, then to the two cards. `?` opens this Help inside the app.
+- The arrow at the top left (Back) goes back one step: from a group to the groups, then to the two cards. `?` opens this Help inside the app.
 
 > The list changes only in the **Customer List** app, and shows here by itself. If a customer is missing or on the wrong day, tell the office.
 

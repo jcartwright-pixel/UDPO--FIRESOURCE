@@ -20,9 +20,12 @@
      that truck. Customers by route: the customers on a route for a day, or every day a customer gets a delivery. Any United Dairy account may use it; it
      only reads. The division drop-down picks Uniontown, Charleston or Martins Ferry (the plants that are running). -->
 <body class="sales-page">
+  <!-- Joe 11/2 (header mock-up 3): navy to blue with a gold line; the United Dairy logo in a gold-edged white pill; "UD SALES"
+       in small gold letters over the screen's name; Back is a gold-edged arrow. -->
   <header class="sa-hdr">
-    <button type="button" class="sa-back" id="sa-back" hidden>&#8592; Back</button>
-    <h1 id="sa-title">UD Sales</h1>
+    <button type="button" class="sa-back" id="sa-back" title="Back" aria-label="Back" hidden>&#8592;</button>
+    <img class="sa-logo" src="img/ud-logo.webp" alt="United Dairy">
+    <h1><small>UD SALES</small><span id="sa-title">Welcome</span></h1>
     <!-- Joe 11/1: Help opens inside the Sales app (only the Sales app's help); nothing here leads into the rest of Operations. -->
     <button type="button" class="sa-help" id="sa-help" title="Help for this screen" aria-label="Help for this screen" hidden>?</button>
   </header>

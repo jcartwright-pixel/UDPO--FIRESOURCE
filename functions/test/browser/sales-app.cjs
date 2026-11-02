@@ -210,6 +210,10 @@ async function adminNote(browser) {
       await pg.waitForSelector('#v-home:not([hidden]) .sa-card');
       assert.deepEqual(await pg.$$eval('.sa-card b', b => b.map(x => x.textContent)), ['Where the routes are', 'Customers by route']);
       assert.ok(await pg.isHidden('#sa-back'), 'no Back on the cards');
+      // Joe 11/2 (header mock-up 3): the United Dairy logo, "UD SALES" over the screen's name, all on one row at every width.
+      assert.ok(await pg.$eval('.sa-logo', i => i.complete && i.naturalWidth > 0), 'the logo loads');
+      assert.equal(await pg.textContent('.sa-hdr h1'), 'UD SALESWelcome');
+      assert.ok(await pg.$eval('.sa-hdr', h => [...h.children].filter(e => !e.hidden).every(e => Math.abs(e.getBoundingClientRect().top - h.children[1].getBoundingClientRect().top) < 30) && h.scrollWidth <= h.clientWidth), 'header on one row');
       await pg.waitForFunction(() => document.querySelector('#sa-division').options.length > 0);
       if (w === 390) await insideHelp(pg, 'Where every route is', 'home');
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-' + w + '-cards.png') });

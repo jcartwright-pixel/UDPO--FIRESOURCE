@@ -20,7 +20,7 @@ const $ = (id) => document.getElementById(id);
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const VIEWS = ['home', 'routes', 'customers', 'help'];
-const TITLES = { home: 'UD Sales', routes: 'Route Status', customers: 'Customers', help: 'Help' };
+const TITLES = { home: 'Welcome', routes: 'Route Status', customers: 'Customers', help: 'Help' };
 
 let view = 'home';
 let helpFrom = 'home';  // Joe 11/1: the screen the ? was pressed on (Back from Help comes back to it)
