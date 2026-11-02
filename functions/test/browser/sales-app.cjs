@@ -155,7 +155,8 @@ async function adminNote(browser) {
 (async () => {
   await clear();
   await db().collection('users').doc('sales.admin@uniteddairy.com').set({ name: 'Test Admin', status: 'ACTIVE', roles: ['ADMIN'], facilities: ['*'], cells: { id: 'usr_sadm', version: '1' } });
-  // Today's loads (delivered tomorrow) and yesterday's (delivered today), each with a trailer, a truck and a made-up driver.
+  // Joe 11/2: the loads delivered today (loaded yesterday), each with a trailer, a truck and a made-up driver; a leftover from
+  // yesterday's deliveries that never left; and today's loading for tomorrow, which is not on the list.
   const today = L.operatingDay(new Date()), now = new Date().toISOString();
   const b = db().batch();
   const add = (id, route, loadDate, day, extra) => {
@@ -168,7 +169,8 @@ async function adminNote(browser) {
   // Joe 11/1 (mock-up 3): a name typed in capitals, the GPS's "US|zip|road [route]" address, and a place too long for one line.
   add('sa812', '812', L.addDays(today, -1), { dispatchTime: 300, driver: 'PRATT JR, MICHAEL', trailer: 'T-803', truck: '703', completeTime: L.addDays(today, -1) + 'T23:40:00-04:00' });
   add('sa813', '813', L.addDays(today, -1), { dispatchTime: 330, driver: 'Ortiz, Samuel', trailer: 'T-804', truck: '704', completeTime: L.addDays(today, -1) + 'T23:50:00-04:00' });
-  add('sa815', '815', today, { dispatchTime: 1400, driver: 'Tina Moss', trailer: 'T-805', truck: '705' });
+  add('sa815', '815', L.addDays(today, -2), { dispatchTime: 1400, driver: 'Tina Moss', trailer: 'T-805', truck: '705' });
+  add('sa817', '817', today, { dispatchTime: 1400, driver: 'Not Tomorrow', trailer: 'T-807', truck: '707' });
   add('sa820', '820', today, { runs: false, dispatchTime: 1300, driver: 'Nobody Running' });
   // Joe 11/1: a Save-A-Lot drop and hook. Its trailer was dropped at the Save-A-Lot; the driver's truck is back at the plant.
   add('sa855', '855', L.addDays(today, -1), { dispatchTime: 360, driver: 'Reyes, Marco', trailer: 'T-806', truck: '706', completeTime: L.addDays(today, -1) + 'T23:55:00-04:00' },
@@ -215,11 +217,11 @@ async function adminNote(browser) {
       await pg.waitForSelector('.sa-row');
       assert.equal(await pg.textContent('#sa-title'), 'Route Status');
       assert.match(pg.url(), /sales\.html\?view=routes/);
-      assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Today', 'Loaded']);
+      assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Left', 'Delivering'], 'leftovers first, then delivering today');
       const rows = await pg.$$eval('.sa-row', x => x.map(r => ['.sa-route', '.sa-driver', '.sa-where'].map(c => r.querySelector(c).textContent.trim())));
       assert.deepEqual(rows, [['815', 'Tina Moss', 'At the plant'], ['802', 'Sam Porter', 'On the road: I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291'],
         ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502'],
-        ['855', 'Reyes, Marco', 'Back at the plant']], '820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
+        ['855', 'Reyes, Marco', 'Back at the plant']], '815 left over from yesterday first; 817 (delivers tomorrow) and 820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
       // Joe 11/1: the dropped Save-A-Lot trailer's status says when it was dropped, and still says how it left.
       assert.match(await pg.textContent('.sa-row[data-id*="sa855"] .sa-pill'), /^Dropped \d{1,2}:\d{2} [AP]M( \w+day)?, left (on time|(\d+h )?\d+m late)$/);
       assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^Left \d{1,2}:\d{2} [AP]M( \w+day)?, (\d+h )?\d+m late$/, 'the status short: 1h 12m, not 1 hr 12 min (with the day when it left on another day, salesmail.js statusOf)');
