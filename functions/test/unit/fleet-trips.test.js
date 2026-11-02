@@ -38,3 +38,17 @@ test('Fleet fuel economy (kilometres per litre) becomes MPG, and its addresses r
   assert.equal(plainAddress('US|15401|Pennsylvania|Uniontown|Morgantown St'), 'Morgantown St, Uniontown, Pennsylvania 15401');
   assert.equal(plainAddress('123 Main St'), '123 Main St');
 });
+
+// Joe 11/2: every truck's October trips; a trip crossing midnight stays one trip.
+test('month read: trips build as points stream in, across midnight, with the fuel counter at both ends', () => {
+  const { tripStream } = require('../../src/fleettrips');
+  const s = tripStream([YARD]);
+  const p = (at, out, miles, fuel) => ({ at, lat: out ? 40.2 : YARD.lat, lon: out ? -79.9 : YARD.lon, address: out ? 'Out' : 'Yard', miles, fuel, tripFuel: null, odo: null });
+  [p('2026-10-01T02:00:00Z', false, 0, 500), p('2026-10-01T03:00:00Z', true, 10, 502), p('2026-10-01T05:00:00Z', true, 40, 508), p('2026-10-01T06:00:00Z', false, 10, 510),
+   p('2026-10-02T01:00:00Z', false, 0, 510), p('2026-10-02T02:00:00Z', true, 30, 515)].forEach(x => s.add(x));
+  const t = s.finish();
+  assert.equal(t.length, 2);
+  assert.deepEqual([t[0].left, t[0].back, t[0].miles, t[0].fuelUsed, t[0].mpg], ['2026-10-01T02:00:00Z', '2026-10-01T06:00:00Z', 60, 10, 6]);
+  assert.equal(t[1].back, '');
+  assert.equal(t[1].fuelUsed, 5);
+});

@@ -6,6 +6,8 @@ name: GPS Trip check on the practice copy
 # this run's summary and its "gps-trip-check" download.
 # - Run workflow (truck and day), or a push to the Trip check branch with [trip check] in the commit message
 #   (truck: the one with the most miles yesterday).
+# - Joe 11/2: first and last day filled in (or [trip month] in the commit message: all of October 2026) reads EVERY truck's
+#   trips over those days instead, into trips-all-trucks.csv and trucks-summary.csv.
 on:
   push:
     branches: [claude/project-thread-g66yeh]
@@ -17,16 +19,24 @@ on:
       date:
         description: Day, yyyy-mm-dd (blank = yesterday)
         required: false
+      from:
+        description: Every truck from this day, yyyy-mm-dd (with the last day; truck and day are then not used)
+        required: false
+      to:
+        description: Every truck through this day, yyyy-mm-dd
+        required: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   trip-check:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]')
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
-    timeout-minutes: 20
+    timeout-minutes: 180
+    env:
+      FROM_SET: ${{ (inputs.from != '' && inputs.from != null || contains(github.event.head_commit.message, '[trip month]')) && '1' || '' }}
     defaults:
       run:
         working-directory: functions
@@ -49,6 +59,8 @@ jobs:
           KEY: ${{ runner.temp }}/practice.json
           TAG: ${{ inputs.tag }}
           DATE: ${{ inputs.date }}
+          FROM: ${{ inputs.from || (contains(github.event.head_commit.message, '[trip month]') && '2026-10-01' || '') }}
+          TO: ${{ inputs.to || (contains(github.event.head_commit.message, '[trip month]') && '2026-10-31' || '') }}
           OUT: ${{ runner.temp }}/gps-trip-check
         run: |
           set -euo pipefail
@@ -61,3 +73,18 @@ jobs:
           path: ${{ runner.temp }}/gps-trip-check
           if-no-files-found: ignore
           retention-days: 14
+      # A whole span is too big to read in the run's summary: it is put on this branch (gps-trip-results/) for Claude to
+      # pick up, and taken off again before the pull request is merged.
+      - name: Keep a span's spreadsheets on the branch
+        if: always() && env.FROM_SET == '1'
+        run: |
+          set -euo pipefail
+          [ -f "$RUNNER_TEMP/gps-trip-check/trips-all-trucks.csv" ] || { echo "No results"; exit 0; }
+          cd ..
+          mkdir -p gps-trip-results && cp "$RUNNER_TEMP"/gps-trip-check/*.csv "$RUNNER_TEMP"/gps-trip-check/*.md gps-trip-results/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gps-trip-results
+          git commit -q -m "GPS trip results (take off before merge)"
+          for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
+

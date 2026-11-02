@@ -99,6 +99,22 @@ function pick(cols, tests, unit) {
   return '';
 }
 
+/** Every field Fleet offers, with table, type and unit names from Fleet's own lists (the same reports Ask Verizon saves). */
+async function fieldsOf(d, o, token, run) {
+  const tables = {}, types = {}, units = {};
+  const list = async (name, table, out, fill) => { try { await saveProbeTemplate(d, o, token, name, table, [], [], out); (await run(name, {})).forEach(fill); } catch (e) { if (!(e instanceof F.FleetError)) throw e; } };
+  await list('UDPO_ProbeTables', 'Table-1.0', ['Id = Input.Id', 'Name = Input.Name'], r => { tables[r.Id] = r.Name; });
+  await list('UDPO_ProbeTypes', 'DataType-1.0', ['Id = Input.Id', 'Name = Input.Name', 'IsMeasurement = Input.IsMeasurement', 'UnitId = Input.ReferenceMeasurementUnitId'], r => { types[r.Id] = r; });
+  await list('UDPO_ProbeUnits', 'MeasurementUnit-1.0', ['Id = Input.Id', 'Name = Input.Name', 'Abbreviation = Input.Abbreviation'], r => { units[r.Id] = r; });
+  await saveProbeTemplate(d, o, token, 'UDPO_ProbeColumns', 'Column-1.0', [], [], ['TableId = Input.TableId', 'Name = Input.Name', 'Description = Input.Description', 'DataType = Input.DataTypeId', 'IsDiagnostic = Input.IsDiagnostic', 'IsReadable = Input.IsReadable']);
+  const all = (await run('UDPO_ProbeColumns', {})).map(r => {
+    const t = types[r.DataType] || {}, u = units[t.UnitId] || {};
+    return { tableId: r.TableId, table: String(tables[r.TableId] || r.TableId), name: r.Name || '', description: r.Description || '', type: t.Name || r.DataType || '',
+      unitName: /^true$/i.test(t.IsMeasurement || '') ? (u.Name || u.Abbreviation || '') : '', diagnostic: yes(r.IsDiagnostic), readable: !/^false$/i.test(r.IsReadable || '') };
+  });
+  return { all, tables };
+}
+
 /** input: {tag, date (yyyy-mm-dd, New York day; blank = yesterday)}. Read only. */
 async function tripCheck(db, input, options) {
   const o = withDefaults(options), began = o.now().getTime(), at = o.now().toISOString(), budget = o.budgetMs || BUDGET_MS;
@@ -124,17 +140,7 @@ async function tripCheck(db, input, options) {
   const notes = [];
 
   // 1. The fields Fleet offers (the same lists and report names as Ask Verizon).
-  const tables = {}, types = {}, units = {};
-  const list = async (name, table, out, fill) => { try { await saveProbeTemplate(d, o, token, name, table, [], [], out); (await run(name, {})).forEach(fill); } catch (e) { if (!(e instanceof F.FleetError)) throw e; } };
-  await list('UDPO_ProbeTables', 'Table-1.0', ['Id = Input.Id', 'Name = Input.Name'], r => { tables[r.Id] = r.Name; });
-  await list('UDPO_ProbeTypes', 'DataType-1.0', ['Id = Input.Id', 'Name = Input.Name', 'IsMeasurement = Input.IsMeasurement', 'UnitId = Input.ReferenceMeasurementUnitId'], r => { types[r.Id] = r; });
-  await list('UDPO_ProbeUnits', 'MeasurementUnit-1.0', ['Id = Input.Id', 'Name = Input.Name', 'Abbreviation = Input.Abbreviation'], r => { units[r.Id] = r; });
-  await saveProbeTemplate(d, o, token, 'UDPO_ProbeColumns', 'Column-1.0', [], [], ['TableId = Input.TableId', 'Name = Input.Name', 'Description = Input.Description', 'DataType = Input.DataTypeId', 'IsDiagnostic = Input.IsDiagnostic', 'IsReadable = Input.IsReadable']);
-  const all = (await run('UDPO_ProbeColumns', {})).map(r => {
-    const t = types[r.DataType] || {}, u = units[t.UnitId] || {};
-    return { tableId: r.TableId, table: String(tables[r.TableId] || r.TableId), name: r.Name || '', description: r.Description || '', type: t.Name || r.DataType || '',
-      unitName: /^true$/i.test(t.IsMeasurement || '') ? (u.Name || u.Abbreviation || '') : '', diagnostic: yes(r.IsDiagnostic), readable: !/^false$/i.test(r.IsReadable || '') };
-  });
+  const { all, tables } = await fieldsOf(d, o, token, run);
   const pointId = Object.keys(tables).find(id => /^point-2/i.test(tables[id])) || (() => { const n = {}; all.filter(f => f.diagnostic).forEach(f => { n[f.tableId] = (n[f.tableId] || 0) + 1; }); return Object.keys(n).sort((x, y) => n[y] - n[x])[0]; })();
   const offered = all.filter(f => f.tableId === pointId && f.diagnostic && f.readable && WORDS.test(f.name));
   const rank = (f) => { const i = WANT.findIndex(w => w.toLowerCase() === f.name.toLowerCase()); return i < 0 ? 99 : i; };
@@ -172,4 +178,94 @@ async function tripCheck(db, input, options) {
     sample: points.filter((p, i) => i % Math.max(1, Math.floor(points.length / 40)) === 0).slice(0, 40) };
 }
 
-module.exports = { tripCheck, tripsOf, toOurs, plainAddress };
+/*
+ * Joe 11/2 ("some of my fuel wasn't recorded ... get the data for all the trucks for the complete whole month of October"):
+ * every truck's trips over a span of days, read only. Every unit's GPS points are read by time WINDOW_HOURS at a time (a
+ * window Fleet refuses is split in half and asked again), and each truck's trips are built as the points stream in, so a
+ * trip that crosses midnight stays one trip. Trailers (T- units) are left out: they send no fuel.
+ */
+const WINDOW_HOURS = 6;
+/** One truck's trips, a point at a time. p: {at, lat, lon, address, miles, fuel, tripFuel, odo}. */
+function tripStream(yards) {
+  const trips = [];
+  let prev = null, prevYard = null, trip = null, fuel = null, odo = null;
+  const yardAt = (p) => yards.length && p.lat !== null && p.lon !== null ? yards.some(y => milesApart(y, p) <= YARD_MILES) : null;
+  const end = (p, open) => {
+    const miles = Math.round(trip.miles * 10) / 10;
+    if (miles >= 1) {
+      const counter = trip.fuel0 !== null && fuel !== null && fuel >= trip.fuel0 ? Math.round((fuel - trip.fuel0) * 100) / 100 : null;
+      const tripFuel = trip.tripFuel > 0 ? Math.round(trip.tripFuel * 100) / 100 : null;
+      const used = counter > 0 ? counter : tripFuel;
+      const odoMiles = trip.odo0 !== null && odo !== null && odo >= trip.odo0 ? Math.round((odo - trip.odo0) * 10) / 10 : null;
+      trips.push({ left: trip.start.at, leftLat: trip.start.lat, leftLon: trip.start.lon, leftAddress: trip.start.address,
+        back: open ? '' : p.at, backLat: p.lat, backLon: p.lon, backAddress: p.address, miles, odometerStart: trip.odo0, odometerEnd: odo, odometerMiles: odoMiles,
+        fuelCounterStart: trip.fuel0, fuelCounterEnd: fuel, fuelUsed: used, mpg: used ? Math.round(((odoMiles || miles) / used) * 10) / 10 : null,
+        note: open ? 'Not back in the yard by the end of the span' : trip.already ? 'Already out at the start of the span' : '' });
+    }
+    trip = null;
+  };
+  return {
+    add(p) {
+      const y = yardAt(p);
+      if (!trip && y === false && (prevYard === true || prev === null)) {
+        const s = prevYard === true ? prev : p;
+        trip = { start: s, already: prev === null, miles: 0, tripFuel: 0, fuel0: fuel !== null && s === prev ? fuel : p.fuel, odo0: odo !== null && s === prev ? odo : p.odo };
+      }
+      if (p.fuel !== null && p.fuel !== undefined) fuel = p.fuel;
+      if (p.odo !== null && p.odo !== undefined) odo = p.odo;
+      if (trip && trip.start !== p) { if (p.miles > 0 && p.miles < 200) trip.miles += p.miles; if (p.tripFuel > 0) trip.tripFuel += p.tripFuel; }
+      if (trip && trip.fuel0 == null && fuel !== null) trip.fuel0 = fuel;
+      if (trip && trip.odo0 == null && odo !== null) trip.odo0 = odo;
+      if (trip && y === true) end(p, false);
+      if (y !== null) prevYard = y;
+      prev = p;
+    },
+    finish() { if (trip && prev) end(prev, true); return trips; }
+  };
+}
+
+/** input: {from, to} (yyyy-mm-dd New York days, both kept). Returns {trips: [{tag, ...trip}], days: {date: points}, notes}. */
+async function tripSpan(db, input, options) {
+  const o = withDefaults(options), at = o.now().toISOString();
+  const ref = db.collection('private').doc('gpsFleet'), d = (await ref.get()).data() || {};
+  if (!d.fleet || !d.user || !d.password) throw new F.FleetError('LOGIN', 'Save the Fleet login first.');
+  const ok = (x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+  if (!ok(input.from) || !ok(input.to) || input.to < input.from) throw new F.FleetError('BAD_REQUEST', 'Pick a first and last day.');
+  const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
+  const tagOf = {}; trucks.forEach(t => { if (t.unitId && !/^T-/i.test(String(t.tag || ''))) tagOf[String(t.unitId)] = t.tag; });
+  const yards = trucks.filter(t => F.atYardPlace(t) && t.lat != null && t.lon != null).map(t => ({ lat: t.lat, lon: t.lon }));
+  const token = await key(ref, d, o, false);
+  const run = (name, params, points) => execute(d, o, token, name, params, { points, maxPolls: 60 });
+  const { all, tables } = await fieldsOf(d, o, token, run);
+  const pointId = Object.keys(tables).find(id => /^point-2/i.test(tables[id]));
+  const field = (names) => names.map(n => all.find(f => f.tableId === pointId && f.name.toLowerCase() === n.toLowerCase())).find(Boolean) || null;
+  const want = { fuel: field(['TotalFuelUsed']), tripFuel: field(['TripFuelUsed']), odo: field(['Odometer']) };
+  const output = ['UnitId = Input.UnitId', 'Time(yyyy-MM-dd HH:mm:ss, UTC) = Input.Time', 'Lat = Input.Lat', 'Lon = Input.Lon', 'Address = Input.Address', 'MilesDelta(mile) = Input.OdometerDelta']
+    .concat(Object.keys(want).filter(k => want[k]).map(k => outName(want[k].name) + ' = Input.' + want[k].name));
+  await saveProbeTemplate(d, o, token, 'UDPO_TripDayAll', 'Point-2.0', ['Since(Timestamp,UTC) = "Since"', 'Until(Timestamp,UTC) = "Until"'], ['Time = Between(Since, Until)'], output);
+  const streams = {}, days = {}, notes = [];
+  const val = (r, k) => want[k] ? toOurs(r[outName(want[k].name)], want[k].unitName, want[k].type).value : null;
+  const read = async (a, b, depth) => {
+    try { return await run('UDPO_TripDayAll', { Since: fleetTime(a), Until: fleetTime(b) }, true); }
+    catch (e) {
+      if (!(e instanceof F.FleetError) || depth >= 3) { notes.push('Not read ' + a.toISOString() + ' to ' + b.toISOString() + ': ' + short(e.message)); return []; }
+      const mid = new Date((a.getTime() + b.getTime()) / 2);
+      return (await read(a, mid, depth + 1)).concat(await read(mid, b, depth + 1));
+    }
+  };
+  const start = new Date(nyMidnight(new Date(input.from + 'T16:00:00Z'))), stop = new Date(Math.min(o.now().getTime(), Date.parse(nyMidnight(new Date(addDays(input.to, 1) + 'T16:00:00Z')))));
+  for (let t = start.getTime(); t < stop.getTime(); t += WINDOW_HOURS * 3600000) {
+    const a = new Date(t), b = new Date(Math.min(stop.getTime(), t + WINDOW_HOURS * 3600000));
+    const rows = (await read(a, b, 0)).filter(r => tagOf[String(r.UnitId)]);
+    const pts = rows.map(r => ({ unit: String(r.UnitId), at: utcIso(r.Time), lat: num(r.Lat), lon: num(r.Lon), address: plainAddress(r.Address), miles: num(r.MilesDelta) || 0,
+      fuel: val(r, 'fuel'), tripFuel: val(r, 'tripFuel'), odo: val(r, 'odo') })).filter(p => p.at).sort((x, y) => x.at < y.at ? -1 : x.at > y.at ? 1 : 0);
+    pts.forEach(p => { (streams[p.unit] = streams[p.unit] || tripStream(yards)).add(p); const day = nyDate(p.at); days[day] = (days[day] || 0) + 1; });
+    if (o.progress) o.progress(a.toISOString(), pts.length);
+  }
+  const trips = [];
+  Object.keys(streams).forEach(u => streams[u].finish().forEach(x => trips.push(Object.assign({ tag: tagOf[u], unitId: u }, x))));
+  trips.sort((x, y) => String(x.tag).localeCompare(String(y.tag), undefined, { numeric: true }) || (x.left < y.left ? -1 : 1));
+  return { at, from: input.from, to: input.to, trucks: Object.keys(streams).length, fields: Object.keys(want).filter(k => want[k]).map(k => want[k].name), days, trips, notes };
+}
+
+module.exports = { tripCheck, tripSpan, tripStream, tripsOf, toOurs, plainAddress };

@@ -6,6 +6,7 @@
  * leaves the server side of this script and is never printed.
  *   KEY  practice copy deploy key (must be ud-distribution-sandbox)   TAG  truck (blank: most miles that day)
  *   DATE yyyy-mm-dd New York day (blank: yesterday)                   OUT  folder for trip-check.json / .md / .csv
+ *   FROM, TO  yyyy-mm-dd (Joe 11/2): every truck's trips over those days instead (trips-all-trucks.csv, trucks-summary.csv)
  */
 'use strict';
 const path = require('path');
@@ -13,7 +14,7 @@ const fs = require('fs');
 const req = require('module').createRequire(path.join(__dirname, '..', 'functions', 'package.json'));
 const admin = req('firebase-admin');
 const { getFirestore } = req('firebase-admin/firestore');
-const { tripCheck } = require('../functions/src/fleettrips');
+const { tripCheck, tripSpan } = require('../functions/src/fleettrips');
 
 const key = require(process.env.KEY);
 if (key.project_id !== 'ud-distribution-sandbox') { console.error('Practice copy only.'); process.exit(1); }
@@ -25,7 +26,28 @@ const ny = (iso) => iso ? new Date(iso).toLocaleString('en-US', { timeZone: 'Ame
 const cell = (v) => v === null || v === undefined ? '' : String(v);
 const csv = (rows) => rows.map(r => r.map(x => /[",\n]/.test(cell(x)) ? '"' + cell(x).replace(/"/g, '""') + '"' : cell(x)).join(',')).join('\n') + '\n';
 
+async function span() {
+  const r = await tripSpan(db, { from: process.env.FROM, to: process.env.TO }, { progress: (at, n) => console.log('read', at, n, 'truck points') });
+  const rnd = (x, p) => x === null || x === undefined ? '' : Math.round(x * p) / p;
+  fs.writeFileSync(path.join(out, 'trips-all-trucks.csv'), csv([['Unit', 'Left yard', 'Left from address', 'Left from lat', 'Left from lon', 'Back in yard', 'Back at address', 'Back at lat', 'Back at lon',
+    'Trip miles (GPS)', 'Odometer start', 'Odometer end', 'Fuel counter start (gal)', 'Fuel counter end (gal)', 'Fuel used (gal)', 'Trip MPG', 'Note']]
+    .concat(r.trips.map(t => [t.tag, ny(t.left), t.leftAddress, t.leftLat, t.leftLon, ny(t.back), t.backAddress, t.backLat, t.backLon, t.miles,
+      t.odometerStart, t.odometerEnd, t.fuelCounterStart, t.fuelCounterEnd, t.fuelUsed, t.mpg, t.note]))));
+  const by = {};
+  r.trips.forEach(t => { const b = by[t.tag] = by[t.tag] || { trips: 0, miles: 0, fuel: 0, fuelMiles: 0 }; b.trips++; b.miles += t.miles; if (t.fuelUsed) { b.fuel += t.fuelUsed; b.fuelMiles += t.odometerMiles || t.miles; } });
+  const tags = Object.keys(by).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  fs.writeFileSync(path.join(out, 'trucks-summary.csv'), csv([['Unit', 'Trips', 'Miles', 'Fuel used (gal)', 'MPG']].concat(tags.map(k => [k, by[k].trips, rnd(by[k].miles, 10), rnd(by[k].fuel, 100), by[k].fuel ? rnd(by[k].fuelMiles / by[k].fuel, 10) : '']))));
+  const dayList = Object.keys(r.days).sort();
+  const md = ['# Every truck\'s trips ' + r.from + ' to ' + r.to, '', r.trips.length + ' trips from ' + tags.length + ' trucks (' + r.trucks + ' trucks sent GPS). Readings used: ' + r.fields.join(', ') + '.', '',
+    '## GPS readings per day', '', dayList.map(k => k + ': ' + r.days[k]).join('  \n'), '', '## Notes', ''].concat(r.notes.length ? r.notes.map(n => '- ' + n) : ['None.'])
+    .concat(['', '## Trucks', '', '| Unit | Trips | Miles | Fuel used (gal) | MPG |', '|---|---|---|---|---|'])
+    .concat(tags.map(k => '| ' + [k, by[k].trips, rnd(by[k].miles, 10), rnd(by[k].fuel, 100), by[k].fuel ? rnd(by[k].fuelMiles / by[k].fuel, 10) : ''].join(' | ') + ' |')).join('\n') + '\n';
+  fs.writeFileSync(path.join(out, 'trip-check.md'), md);
+  console.log(md);
+}
+
 (async () => {
+  if (process.env.FROM && process.env.TO) { await span(); process.exit(0); }
   const r = await tripCheck(db, { tag: process.env.TAG || '', date: process.env.DATE || '' }, { budgetMs: 600000 });
   fs.writeFileSync(path.join(out, 'trip-check.json'), JSON.stringify(r, null, 2));
   fs.writeFileSync(path.join(out, 'trips.csv'), csv([['Unit', 'Left yard', 'Left from (lat, lon)', 'Left from address', 'Back in yard', 'Back at (lat, lon)', 'Back at address', 'Trip miles (GPS)',
