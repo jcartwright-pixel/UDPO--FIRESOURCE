@@ -3108,10 +3108,12 @@ async function writes() {
     await open(p, 'administration.html?item=sales-app');
     await p.waitForSelector('#panel h2', { timeout: 30000 });
     await p.waitForTimeout(2500);
-    rec.look = await p.evaluate(() => { const t = document.getElementById('panel').innerText; return { title: document.querySelector('#panel h2').textContent, upload: !!document.querySelector('#sc-section, #sc-save, #panel input[type=file]'), words: /Customer list \(the app|Route Menu workbook|Save Customer List/.test(t), link: /sales\.html/.test(t) }; });
+    rec.look = await p.evaluate(() => { const t = document.getElementById('panel').innerText; return { title: document.querySelector('#panel h2').textContent, upload: !!document.querySelector('#sc-save, #panel input[type=file]'), words: /Route Menu workbook|Save Customer List|Customer By Route/.test(t),
+      link: /Copy Link/.test(t) && /Launch/.test(t), fromApp: /from the Customer List app/.test(t) }; });
     if (rec.look.title !== 'Sales App') bad.push('the item opens ' + rec.look.title);
     if (rec.look.upload || rec.look.words) bad.push('Administration > Sales App still has the customer list upload');
     if (!rec.look.link) bad.push('Administration > Sales App has no Sales app link');
+    if (!rec.look.fromApp) bad.push('Administration > Sales App does not say the customers come from the Customer List app');
     if (p.w.calls.some(c => c.fn === 'save')) bad.push('a look-only step saved');
     if (p.w.errors.length) bad.push('page errors: ' + p.w.errors.slice(0, 3).join(' | '));
     rec.bad = bad;
