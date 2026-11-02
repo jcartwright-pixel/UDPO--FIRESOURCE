@@ -565,7 +565,7 @@ The connection to Verizon Connect Fleet (administrators).
 
 - `Pull now` reads Verizon at once instead of waiting.
 - `Ask Verizon` asks for every field Verizon offers, to see what is there.
-- **Trip check:** type one truck, pick a day and press `Check trips`. It lists each trip that day: when the truck left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. Checking only reads.
+- **Trip check:** type one truck, pick a day and press `Check trips`. It lists each trip that day: when the truck left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. A day the app has already saved shows at once; a day not saved yet (like today) asks Verizon and can take up to 2 minutes. Checking only reads.
 - **Saved trips:** the line under Trip check says how far the app has got saving every truck's trips by itself (it does this every 30 minutes, from 10-1-26 on, and keeps six months). "Saved through" yesterday means it is up to date. If it says saving failed, it tries again on its own; check the Verizon login above.
 
 > Fuel used and MPG only show for trucks whose GPS box is plugged into the engine. Trailers never send fuel.

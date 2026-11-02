@@ -134,6 +134,14 @@ async function tripCheck(db, input, options) {
   } else unit = trucks.find(t => bare(t.tag) === bare(tag)) || null;
   if (!unit || !unit.unitId) throw new F.FleetError('BAD_REQUEST', 'Fleet\'s last read has no unit ' + tag + '. Type the number as Fleet shows it.');
   tag = unit.tag;
+  // 6.80 practice test: asking Verizon for one day takes about 2 minutes, longer than the screen waits. A day the app has
+  // already saved for every truck (tripfuel.js, gpsTripFuel) is answered from there at once.
+  const saved = (await db.collection('private').doc('gpsTripFuel').get()).data() || {};
+  if (!input.fresh && saved.lastDate && date <= saved.lastDate && date >= addDays(nyDate(at), -183)) {
+    const snap = await db.collection('gpsTripFuel').where('unitId', '==', String(unit.unitId)).where('day', '==', date).get();
+    const trips = snap.docs.map(x => x.data()).sort((a, b) => String(a.left).localeCompare(String(b.left)));
+    return { at, date, tag, unitId: String(unit.unitId), how: 'saved', saved: true, points: null, fields: [], otherTables: [], trips, notes: [] };
+  }
   const yards = trucks.filter(t => F.atYardPlace(t) && t.lat != null && t.lon != null).map(t => ({ lat: t.lat, lon: t.lon }));
   const token = await key(ref, d, o, false);
   const run = (name, params, points) => execute(d, o, token, name, params, { points, maxPolls: 25 });

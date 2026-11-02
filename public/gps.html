@@ -196,7 +196,8 @@
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
-      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields)); render(); return s; }
+      // 6.80 practice test: a trip check that asks Verizon takes about 2 minutes; the usual 70-second wait gave up first.
+      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields), fields.op === 'trips' || fields.op === 'probe' ? { timeout: 150000 } : undefined); render(); return s; }
       catch (e) {
         const code = String(e && e.code || '').replace(/^functions\//, '');
         if (fields.op !== 'status' && /^(internal|unknown|deadline-exceeded)$/.test(code)) {
@@ -245,19 +246,19 @@
       if (!t) { box.innerHTML = ''; return; }
       const table = (cols, rows) => '<div class="gps-probe-rows"><table><thead><tr>' + cols.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr></thead><tbody>' +
         rows.map(r => '<tr>' + r.map(c => '<td>' + escapeHtml(String(c)) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
-      const fuelHere = t.fields.filter(f => f.points > 0);
-      box.innerHTML = '<p>' + escapeHtml(t.tag + ': ' + t.points + ' GPS readings on ' + shortDay(t.date) + '. ' + (t.trips.length ? t.trips.length + ' trip' + (t.trips.length === 1 ? '' : 's') + '.' : 'No trips that day.')) + '</p>' +
+      const fuelHere = t.saved ? [] : t.fields.filter(f => f.points > 0), withFuel = t.trips.some(x => x.fuelUsed);
+      box.innerHTML = '<p>' + escapeHtml(t.tag + ': ' + (t.saved ? 'the trips the app saved for ' : t.points + ' GPS readings on ') + shortDay(t.date) + '. ' + (t.trips.length ? t.trips.length + ' trip' + (t.trips.length === 1 ? '' : 's') + '.' : 'No trips that day.')) + '</p>' +
         (t.trips.length ? table(['Left yard', 'From', 'Back', 'To', 'Miles', 'Fuel counter start (gal)', 'Fuel counter end (gal)', 'Fuel used (gal)', 'MPG', 'Note'],
           t.trips.map(x => [stamp(x.left), place(x.leftAddress, x.leftLat, x.leftLon), x.back ? stamp(x.back) : 'Not back', place(x.backAddress, x.backLat, x.backLon), num1(x.miles),
             num1(x.fuelCounterStart), num1(x.fuelCounterEnd), num1(x.fuelUsed), num1(x.mpg), x.note || ''])) : '') +
-        '<p class="hint">' + escapeHtml(fuelHere.length ? 'Fuel and odometer readings this truck sent: ' + fuelHere.map(f => f.description || f.name).join(', ') + '.' :
+        '<p class="hint">' + escapeHtml(t.saved ? (withFuel || !t.trips.length ? '' : 'This truck sent no fuel readings that day, so fuel used and MPG are blank. ') + 'Already saved, so Verizon was not asked again.' : fuelHere.length ? 'Fuel and odometer readings this truck sent: ' + fuelHere.map(f => f.description || f.name).join(', ') + '.' :
           'This truck sent no fuel readings that day, so fuel used and MPG are blank.') + '</p>' +
         (t.notes || []).map(n => '<p class="hint">' + escapeHtml(n) + '</p>').join('');
     }
     $('t-date').value = (() => { const d = new Date(Date.now() - 86400000); return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); })();
     $('trips').onclick = async () => {
       if (!$('t-tag').value.trim()) { showError('Type a truck first, as Fleet shows it.'); return; }
-      $('trips-when').textContent = 'Asking Verizon. This can take up to 2 minutes...';
+      $('trips-when').textContent = 'Looking up the trips. If the app has not saved that day yet it asks Verizon, which can take up to 2 minutes...';
       const r = await call({ op: 'trips', tag: $('t-tag').value, date: $('t-date').value }, $('trips'));
       $('trips-when').textContent = '';
       renderTrips(r && r.trips);

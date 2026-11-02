@@ -72,3 +72,33 @@ test('a truck\'s home is where it stands still between 1 and 4 a.m.', () => {
   const pts = [1, 2, 3].map(h => ({ at: at(h), lat: 37.8104, lon: -82.7991, miles: 0 })).concat([{ at: at(12), lat: 38, lon: -82, miles: 0 }, { at: at(13), lat: 38, lon: -82, miles: 0 }, { at: at(14), lat: 38, lon: -82, miles: 0 }, { at: at(15), lat: 38, lon: -82, miles: 0 }]);
   assert.deepEqual(homeOf(pts), { lat: 37.81, lon: -82.799 });
 });
+
+test('Trip check answers a day the app already saved from the saved trips, without asking Verizon', async () => {
+  const { tripCheck } = require('../../src/fleettrips');
+  const docs = {
+    'private/gpsFleet': { fleet: 'f', user: 'u', password: 'p' },
+    'private/gpsTripFuel': { lastDate: '2026-10-31' }
+  };
+  const saved = [
+    { unitId: '77', tag: '123891', day: '2026-10-30', left: '2026-10-30T14:00:00.000Z', fuelUsed: 20 },
+    { unitId: '77', tag: '123891', day: '2026-10-30', left: '2026-10-30T09:00:00.000Z', fuelUsed: 10 },
+    { unitId: '78', tag: '999', day: '2026-10-30', left: '2026-10-30T09:00:00.000Z' }
+  ];
+  const query = (filters) => ({
+    where: (f, op, v) => query(filters.concat([[f, v]])),
+    get: async () => {
+      const rows = saved.filter(r => filters.every(([f, v]) => r[f] === v));
+      return { docs: rows.map(r => ({ data: () => r })), empty: !rows.length };
+    }
+  });
+  const db = {
+    collection: (c) => c === 'private'
+      ? { doc: (id) => ({ get: async () => ({ data: () => docs['private/' + id] }) }) }
+      : c === 'gpsTrucks' ? { get: async () => ({ docs: [{ data: () => ({ tag: '123891', unitId: '77' }) }] }) }
+      : query([])
+  };
+  const fail = () => { throw new Error('Verizon was asked'); };
+  const r = await tripCheck(db, { tag: '123891', date: '2026-10-30' }, { now: () => new Date('2026-11-02T12:00:00Z'), fetch: fail });
+  assert.equal(r.how, 'saved');
+  assert.deepEqual(r.trips.map(t => t.fuelUsed), [10, 20], 'that truck only, in the order they left');
+});
