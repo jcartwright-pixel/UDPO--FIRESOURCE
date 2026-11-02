@@ -524,6 +524,11 @@ function reeferTrips(prev, loaded, units, at) {
       if (t.out) {
         const sp = u.speedMph === undefined ? null : u.speedMph, seen = u.lastReport || at;
         t.where = short(u.place || u.address || ''); t.speedMph = sp;
+        // Joe 11/1 (drop and hook at Save-A-Lot): the place marked in Fleet it is at now and when it was first seen there, so
+        // the Sales app can say when the trailer was dropped. Cleared when it is not at a marked place.
+        const place = String(u.place || '').trim();
+        if (!place) { t.place = ''; t.placeSince = ''; }
+        else if (place !== t.place) { t.place = place; t.placeSince = seen; }
         if (sp === null || sp > REEFER_MOVING_MPH) t.stillSince = '';
         else if (!t.stillSince) t.stillSince = seen;
       }

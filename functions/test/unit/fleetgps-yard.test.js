@@ -109,6 +109,19 @@ test('reefer recording: starts when the load is complete, keeps going on the roa
   assert.deepEqual([s.trips['T-701'].recording, s.trips['T-701'].id], [true, 'w__r2|tue'], 'its next load starts a new recording');
 });
 
+// Joe 11/1 (Save-A-Lot drop and hook): the trip keeps the place marked in Fleet it is at and when it was first seen there.
+test('reefer recording: the place it is at and since when', () => {
+  const { reeferTrips } = require('../../src/fleetgps');
+  const load = [{ trailer: 'T-702', runDocId: 'w__s1', day: 'mon', routeRun: 'SAVE-A-LOT 1', completedAt: '2026-10-18T12:00:00Z' }];
+  const unit = (place, lastReport) => ({ 'T-702': { unitId: 'u2', tag: 'T-702', place, address: 'I-80 E', speedMph: 0, lastReport } });
+  let s = reeferTrips({}, load, unit('Loading Dock', '2026-10-18T12:04:00.000Z'), '2026-10-18T12:05:00.000Z');
+  s = reeferTrips(s, load, unit('', '2026-10-18T14:00:00.000Z'), '2026-10-18T14:05:00.000Z');
+  assert.deepEqual([s.trips['T-702'].place, s.trips['T-702'].placeSince], ['', '']);
+  s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T19:03:00.000Z'), '2026-10-18T19:05:00.000Z');
+  s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T21:00:00.000Z'), '2026-10-18T21:05:00.000Z');
+  assert.deepEqual([s.trips['T-702'].place, s.trips['T-702'].placeSince], ['SAL Williamsport', '2026-10-18T19:03:00.000Z'], 'first seen there, kept while it stays');
+});
+
 test('reefer recording: a load taken off before leaving stops; no GPS unit; 4-day limit; "701" is T-701', () => {
   const { reeferTrips, trailerKey } = require('../../src/fleetgps');
   assert.deepEqual(['701', 'T701', 't-701', 'T 701'].map(trailerKey), ['T-701', 'T-701', 'T-701', 'T-701']);

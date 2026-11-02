@@ -51,7 +51,8 @@ function drawMap() {
     return;
   }
   $('sa-map-title').innerHTML = '<b>' + escapeHtml(r.route + (r.driver ? ' ' + nameCase(r.driver) : '')) + '</b>' + (r.gpsAt ? ', GPS at ' + escapeHtml(r.gpsAt) : '');
-  $('sa-map-where').textContent = r.where;
+  // Joe 11/1: a dropped Save-A-Lot trailer says where and when it was dropped, and where the driver's truck is now.
+  $('sa-map-where').textContent = r.note || r.where;
   if (r.lat === null || r.lon === null) {
     frame.hidden = true; none.hidden = false;
     none.textContent = r.by ? 'The GPS has not given a spot for this route yet.' : 'No GPS for this route\'s trailer or truck.';

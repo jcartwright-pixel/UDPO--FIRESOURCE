@@ -13,6 +13,13 @@
  *
  * Where it is: the trailer's GPS unit (Verizon Connect Fleet, gpsTrucks) first, else the truck's: its last report, as words
  * (At the plant, At a place, Stopped: an address, On the road: an address) and as a point for the map.
+ *
+ * Drop and hook at Save-A-Lot (Joe 11/1: "this is a drop and hook so we can point to it was dropped at Save-A-Lot using the
+ * trailer but the driver actually is coming back so if he had another trip we'd like to know ... Save A Lot only if they're
+ * dropping hooks at what time it was delivered there"): a Save-A-Lot load with Route Master's Drop and Hook tick whose trailer is
+ * at a Save-A-Lot place in Fleet (SAL Williamsport) reads "Dropped 3:05 PM, left on time" (when the trailer was first seen
+ * there), and Where now follows the driver's truck instead of the trailer. The map goes to the truck; the words under it say
+ * where the trailer was dropped, and the truck's next route when it has one.
  */
 'use strict';
 
@@ -22,6 +29,8 @@ const { trailerKey, trailerUnits, runTrucks, inYard, yardSpots } = require('./fl
 const { safeIdPart } = require('./model');
 
 const MOVING_MPH = 3;
+const SAVE_A_LOT = /SAVE[\s-]*A[\s-]*LOT/i;
+const SAL_PLACE = /\bSAL\b|SAVE[\s-]*A[\s-]*LOT/i;
 const UNITS_KEEP_MS = 60 * 1000; // the 520 GPS units are read at most once a minute per server (the GPS itself is read every 5)
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 
@@ -61,6 +70,23 @@ function gpsWhen(ms, now) {
   return S.clock12(wall) + (day !== Math.floor(now / 1440) ? ' ' + S.shortDate(new Date(day * 86400000).toISOString().slice(0, 10)) : '');
 }
 
+// Joe 11/1: a Save-A-Lot route (its name or stream) with Route Master's Drop and Hook tick. master: {runId: routes doc}.
+function salDropHook(run, master) {
+  const m = (master || {})[run && run.runId] || {};
+  const named = [run && run.routeName, run && run.streamId, run && run.run, m.routeName, m.streamId].some(v => SAVE_A_LOT.test(text(v)));
+  return named && !!((run && run.dropAndHook) || m.dropAndHook);
+}
+
+// When the trailer was dropped, as wall minutes, or null: the trip of this load is at a Save-A-Lot place in Fleet.
+function droppedAt(x, reefer) {
+  const trip = x.trailer ? (reefer || {})[trailerKey(x.trailer)] : null;
+  if (!trip || text(trip.id) !== x.runDocId + '|' + x.day || !text(trip.out)) return null;
+  const place = text(trip.place) || text(trip.where);
+  if (!SAL_PLACE.test(place)) return null;
+  const R = require('./plant-rules'), ms = Date.parse(text(trip.placeSince) || text(trip.stillSince));
+  return isFinite(ms) ? { at: R.wallClock(ms), place } : null;
+}
+
 /**
  * The screen's rows. input: { runs, reefer, gpsDays, units: {key: gpsTrucks doc} }. Returns
  * { today, groups: [{ loadDate, label, rows: [{ id, route, driver, status, tone, where, gpsAt, by, lat, lon }] }] }.
@@ -74,16 +100,35 @@ function salesScreen(input, nowMs) {
   const dates = [L.addDays(today, -1), today];
   const all = dates.map(d => S.loadsOn(input.runs, d));
   const trailerGps = trailerUnits(units, [].concat(...all).map(x => x.trailer).filter(Boolean), runTrucks(input.runs));
+  const master = {};
+  (input.routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
+  const runOf = {};
+  (input.runs || []).forEach(r => { runOf[r.id] = r; });
+  const flat = [].concat(...all);
   const groups = dates.map((loadDate, i) => {
     const rows = all[i].map(x => {
-      const left = S.leftAt(x, input.reefer, input.gpsDays), s = S.statusOf(x, left, now);
-      const tu = x.trailer ? trailerGps[trailerKey(x.trailer)] : null, unit = tu || byTruck[S.unitKey(x.truck)] || null;
+      const left = S.leftAt(x, input.reefer, input.gpsDays);
+      let s = S.statusOf(x, left, now);
+      const tu = x.trailer ? trailerGps[trailerKey(x.trailer)] : null, tk = byTruck[S.unitKey(x.truck)] || null;
+      const drop = salDropHook(runOf[x.runDocId], master) ? droppedAt(x, input.reefer) : null;
+      let unit = tu || tk, by = unit ? (tu ? 'TRAILER' : 'TRUCK') : '', where, note = '';
+      if (drop) {
+        // Dropped: the status says when; Where now follows the driver's truck (the trailer stays at the store).
+        const dd = Math.floor(drop.at / 1440), when = S.clock12(drop.at) + (dd !== Math.floor(now / 1440) ? ' ' + S.weekdayOf(new Date(dd * 86400000).toISOString().slice(0, 10)) : '');
+        const leftWord = s.tone === 'late' && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
+        s = { word: 'Dropped ' + when + ', ' + leftWord, tone: s.tone };
+        unit = tk; by = tk ? 'TRUCK' : '';
+        where = tk ? whereOf(tk, spots, true) : 'No GPS on the truck';
+        // The truck's next trip: another of these loads on the same truck that has not left yet, or left after the drop.
+        const next = S.unitKey(x.truck) && flat.find(y => y !== x && S.unitKey(y.truck) === S.unitKey(x.truck) && y.loadDate >= x.loadDate &&
+          (l => !l || l.at === null || l.at > drop.at)(S.leftAt(y, input.reefer, input.gpsDays)));
+        note = 'Trailer dropped at ' + drop.place + ' at ' + when + '. Truck: ' + where + (next ? '. Next route for this truck: ' + next.route : '') + '.';
+      } else where = whereOf(unit, spots, !!(left && left.at !== null));
       const hasPoint = unit && typeof unit.lat === 'number' && typeof unit.lon === 'number';
       const seen = unit && Date.parse(unit.lastReport || '');
       return {
         id: x.runDocId + '|' + x.day, route: x.route, driver: x.driver, status: shortStatus(s.word), tone: s.tone,
-        where: whereOf(unit, spots, !!(left && left.at !== null)), by: unit ? (tu ? 'TRAILER' : 'TRUCK') : '',
-        gpsAt: gpsWhen(seen, now),
+        where, note, by, gpsAt: gpsWhen(seen, now),
         lat: hasPoint ? unit.lat : null, lon: hasPoint ? unit.lon : null
       };
     }).sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.driver.localeCompare(b.driver));
@@ -112,7 +157,10 @@ async function readInput(db, nowMs) {
   const reefer = {};
   if (trailers.length) (await db.getAll(...trailers.map(t => db.collection('gpsReefer').doc(safeIdPart(t))))).forEach((s, i) => { if (s.exists) reefer[trailers[i]] = s.data(); });
   const gpsDays = (await db.collection('gpsDays').where('date', '>=', dates[0]).where('date', '<=', L.addDays(today, 1)).get()).docs.map(x => x.data());
-  return { runs, reefer, gpsDays, units: await readUnits(db, nowMs) };
+  // Joe 11/1: Route Master's Drop and Hook tick, for the Save-A-Lot loads only.
+  const routes = runs.some(r => SAVE_A_LOT.test(text(r.routeName) + ' ' + text(r.streamId) + ' ' + text(r.run)))
+    ? (await db.collection('routes').get()).docs.map(x => Object.assign({ id: x.id }, x.data())) : [];
+  return { runs, reefer, gpsDays, routes, units: await readUnits(db, nowMs) };
 }
 
 /**
@@ -133,4 +181,4 @@ async function salesCall(divisions, dbFor, input, deps) {
   return Object.assign({ divisions, division: pick.id, refreshed: S.clock12(R.wallClock(nowMs)) }, screen);
 }
 
-module.exports = { salesCall, salesScreen, whereOf, cleanAddress, shortStatus, readInput };
+module.exports = { salesCall, salesScreen, whereOf, salDropHook, droppedAt, cleanAddress, shortStatus, readInput };
