@@ -4,7 +4,7 @@
  * on a route moves the map to that truck. Joe 11/1 (mock-up 3): each route is two lines, route and status, then driver · where now.
  * Customers by route (Joe 11/1, mock-ups 2 and 3): pick a route and a day to see every customer on it, or type a customer to
  * see every day and route it gets a delivery, or (mock-ups 4 and 5) open a group like Dairy Queen to see its customers. From the
- * division's customer list (Administration > Sales App). Read only. Any United Dairy account may use it ("as long
+ * division's customers from the Customer List app. Read only. Any United Dairy account may use it ("as long
  * as they have a United Dairy account, they can use it. No other access information is needed."), so it is not checked against
  * the Users list. The rows come from the server (functions/src/salesapp.js), the same status words as the 6:00 AM sales email.
  */
@@ -155,11 +155,11 @@ function drawCustomers() {
   $('cu-by-customer').hidden = tab !== 'customer';
   $('cu-by-group').hidden = tab !== 'group';
   if (!rows.length) {
-    $('cu-list').innerHTML = '<p class="sa-empty">The customer list has not been loaded for this division yet. Ask the office to load it on Administration, Sales App.</p>';
+    $('cu-list').innerHTML = '<p class="sa-empty">This division has no customers in the Customer List app yet. Ask the office to add them there.</p>';
     $('cu-foot').textContent = '';
     return;
   }
-  $('cu-foot').textContent = 'From the customer list loaded ' + (cust.savedAt ? cust.savedAt.slice(5, 7) + '-' + cust.savedAt.slice(8, 10) + '-' + cust.savedAt.slice(2, 4) : '') + '.';
+  $('cu-foot').textContent = 'From the Customer List app' + (cust.savedAt ? ', last changed ' + cust.savedAt.slice(5, 7) + '-' + cust.savedAt.slice(8, 10) + '-' + cust.savedAt.slice(2, 4) : '') + '.';
   if (tab === 'route') drawByRoute(rows); else if (tab === 'group') drawByGroup(rows); else drawByCustomer(rows);
 }
 

@@ -1361,7 +1361,7 @@ Every link and code people use to reach the app:
 - An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
 - **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
 - **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
-- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list**: pick the **Division**, choose the Route Menu workbook (its **Customer By Route** tab is read), check the count it shows and press `Save Customer List`. A new upload replaces that division's whole list. **Group names** below lets you rename a group (Dairy Queen, Walmart); it saves when you leave the box.
+- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list** says where the app's customers come from: the **Customer List** app. Every change to a customer, a route or a day is made there (`Open the Customer List`), never here, and the Sales app shows it by itself.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1554,6 +1554,7 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **Check-In** (after the route): truck, trailer and pallet jack, cases delivered and returned, over or short, refused or returned product, truck, trailer and pallet jack problems, whether the trailer needs cleaning, and notes. Then `Check In`.
 - **DVIR** (truck inspection): pick Pre-trip or Post-trip. Every item starts as no defect; tick only what is wrong and write it up. The odometer starts at the truck's GPS reading. `+ Add trailer inspection` for a second trailer. Sign, then `Submit` (or `Review inspection` first).
 - **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
+- **Route Book** (on the Check-In list) shows the route book for the driver's loads that day: the stops in the order to run them, each with its load number, address (tap it for the map), keys or door code, phone and notes, then the route's instructions. It comes from the **Customer List** app's **Route Sequence**, so a change there shows here at once.
 - **View Loadout** shows the route list and each load's status, updating by itself. Loads left over from yesterday that are not loaded yet are at the top under a light orange **Yesterday's loads** line; today's loads follow under a light blue **Today's loads** line.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
 - **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
@@ -1599,7 +1600,7 @@ The salespeople's phone app (**UD Sales** on the home screen). It shows every ro
 id: sales-customers
 screens: sales.html?view=customers
 
-The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the customer list the office loads on Administration, **Sales App** (the Route Menu's Customer By Route tab). It only shows; nothing can be changed from it.
+The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app. It only shows; nothing can be changed from it.
 
 1. Tap **Customers by route** on the app's first screen.
 2. Pick a tab: `By route`, `By customer` or `By group`.
@@ -1607,12 +1608,13 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 4. **By customer:** type part of a customer's name or number. Each customer found shows every **Delivery day** and its **Route**. Tap a route to see everyone else on it that day.
 5. **By group:** tap a group (Dairy Queen, Walmart, BFS Foods, Independents). Each customer is on one line with its number and group, and its days and routes underneath. `All groups`, or `Back` at the top left, goes back to the list of groups.
 
-- Every name starting with DQ is in **Dairy Queen**. Everyone else is grouped by the chain number in the Route Menu; a customer with no chain, or the only one in its chain, is under **Independents**.
-- A day that says **no route** is a line in the Route Menu with no route number.
-- The bottom line says when the customer list was last loaded.
+- Every name starting with DQ is in **Dairy Queen**. Everyone else is grouped by the chain number on the Customer List; a customer with no chain, or the only one in its chain, is under **Independents**.
+- A day that says **no route** is a customer day on the Customer List with no route number yet.
+- The bottom line says when the Customer List was last changed.
+- A division with nothing on the Customer List yet shows no customers.
 - `Back` at the top left goes back one step: from a group to the groups, then to the two cards. `?` opens this Help inside the app.
 
-> The customer list changes only when the office loads a new Route Menu. If a customer is missing or on the wrong day, tell the office.
+> The list changes only in the **Customer List** app, and shows here by itself. If a customer is missing or on the wrong day, tell the office.
 
 !> Do not read this list as today's loads. It is the regular route menu; for where a truck is now, use **Where the routes are**.
 

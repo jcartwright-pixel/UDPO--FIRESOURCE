@@ -78,7 +78,9 @@
   <section class="phone-card" id="step-loads" hidden>
     <!-- Joe 10/10: the old Route Distribution menu's other two cards, View Loadout and DVIR, beside the Check-In. -->
     <div class="drv-menu"><button type="button" id="to-board" class="drv-card blue"><b>View Loadout</b><small>Read-only route list and loadout status</small></button>
-      <button type="button" id="to-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button></div>
+      <button type="button" id="to-dvir" class="drv-card gold"><b>DVIR</b><small>Driver vehicle inspection report</small></button>
+      <!-- Joe 11/1: the route book, from the United Dairy Customer List: the order to run the stops and the instructions. -->
+      <button type="button" id="to-book" class="drv-card green"><b>Route Book</b><small>Your stops in order and the instructions</small></button></div>
     <div class="phone-days" id="days"></div>
     <!-- Joe 10/13 (the old Check-In's managers' switch): a manager signed in on this phone sees every route of the day. -->
     <button type="button" id="all-routes" class="phone-all" hidden aria-pressed="false">All routes</button>
@@ -133,6 +135,11 @@
   </form>
 
   <!-- View Loadout: the Driver Room board, read only, rolling. -->
+  <section class="phone-card" id="step-book" hidden>
+    <div class="drv-head"><h1>Route Book</h1><button type="button" id="book-back">&larr; Back</button></div>
+    <div id="book"></div>
+  </section>
+
   <section class="phone-card" id="step-board" hidden>
     <div class="drv-head"><h1>View Loadout</h1><button type="button" id="board-refresh" class="primary">Refresh</button><button type="button" data-back>&larr; Back</button></div>
     <p class="drv-hint" id="board-updated"></p>
@@ -235,7 +242,7 @@
         throw e;
       }
     }
-    const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir', 'step-sched-id', 'step-sched'];
+    const steps = ['step-code', 'step-menu', 'step-name', 'step-loads', 'step-form', 'step-board', 'step-dvir', 'step-sched-id', 'step-sched', 'step-book'];
     function step(id) { steps.forEach(s => { document.getElementById(s).hidden = s !== id; }); }
 
     // A slower show() still waiting on the server when a newer one starts (say the 5-minute sign-out while the loads were being
@@ -576,6 +583,30 @@
       boardTimer = setInterval(() => { watchBoard().catch(() => {}); if (!document.hidden && !document.getElementById('step-board').hidden && Date.now() - boardAt > (room ? 120000 : 30000)) readBoard(); }, room ? 30000 : 10000);
     }
     document.getElementById('to-board').addEventListener('click', () => { want = 'board'; openBoard(); });
+    // Joe 11/1: the route book for the loads shown (each route and day once): the stops in run order with the load number, the
+    // address, keys or door code and notes, then the route's instructions. Read only; the office changes it on Route Sequence.
+    document.getElementById('to-book').addEventListener('click', async () => {
+      const box = document.getElementById('book'), seen = new Set(), want2 = [];
+      loads.forEach(l => { const r = String(l.route || '').replace(/_\d+$/, ''), k = r + '|' + l.day; if (r && !seen.has(k)) { seen.add(k); want2.push([r, l.day]); } });
+      step('step-book');
+      if (!want2.length) { box.innerHTML = '<p class="phone-empty">No load for you on this day, so there is no route book to show.</p>'; return; }
+      box.innerHTML = '<p class="phone-empty">Reading the route book&hellip;</p>';
+      const parts = [];
+      for (const [r, d] of want2) {
+        try {
+          const b = await call('routeBook', { route: r, day: d });
+          if (!b.found) { parts.push('<h2>Route ' + escapeHtml(r) + '</h2><p class="phone-empty">This route has no route book for this day yet. Ask Dispatch.</p>'); continue; }
+          parts.push('<h2>Route ' + escapeHtml(b.route) + ' · ' + escapeHtml(b.dayName) + (b.startTime ? ' · Start ' + escapeHtml(b.startTime) : '') + '</h2>' +
+            (b.notes ? '<p class="book-notes" style="white-space:pre-wrap;background:#fff4e5;border-radius:8px;padding:8px"><b>Instructions</b><br>' + escapeHtml(b.notes) + '</p>' : '') +
+            '<ol class="book-stops" style="padding-left:22px">' + b.stops.map(x => '<li style="margin:0 0 10px"><b>' + escapeHtml(x.name) + '</b>' + (x.loadSeq ? ' <small>(load ' + x.loadSeq + ')</small>' : '') +
+              (x.address ? '<br>' + (x.lat && x.lon ? '<a href="https://maps.google.com/?q=' + x.lat + ',' + x.lon + '">' : '<a href="https://maps.google.com/?q=' + encodeURIComponent(x.address) + '">') + escapeHtml(x.address) + '</a>' : '') +
+              (x.keys ? '<br>Keys / door code: ' + escapeHtml(x.keys) : '') + (x.phone ? '<br>Phone: <a href="tel:' + escapeHtml(x.phone) + '">' + escapeHtml(x.phone) + '</a>' : '') +
+              ([x.note, x.notes].filter(Boolean).length ? '<br><i>' + escapeHtml([x.note, x.notes].filter(Boolean).join(' · ')) + '</i>' : '') + '</li>').join('') + '</ol>');
+        } catch (err) { parts.push('<h2>Route ' + escapeHtml(r) + '</h2><p class="phone-empty">' + escapeHtml(err.message || String(err)) + '</p>'); }
+      }
+      box.innerHTML = parts.join('');
+    });
+    document.getElementById('book-back').addEventListener('click', () => step('step-loads'));
     document.getElementById('board-refresh').addEventListener('click', readBoard);
     document.getElementById('board-pause').addEventListener('click', e => { boardPaused = !boardPaused; document.getElementById('board-track').classList.toggle('paused', boardPaused); e.target.textContent = boardPaused ? 'Resume scrolling' : 'Pause scrolling'; });
     document.addEventListener('visibilitychange', () => document.getElementById('board-track').classList.toggle('paused', boardPaused || document.hidden));
