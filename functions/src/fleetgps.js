@@ -945,7 +945,15 @@ async function fleetCall(db, email, input, options) {
   const d = (await ref.get()).data() || {};
   const op = String(input.op || 'status');
   const hist = async () => (await db.collection('private').doc('gpsFleetHistory').get()).data();
-  if (op === 'status') return Object.assign(status(d, await hist()), { coverage: await coverage(db, o.now()), probe: (await db.collection('private').doc('gpsProbe').get()).data() || null });
+  // Joe 11/2 ("Can I verify the GPS is pulling information? And is it moving it to our [storage]?"): what the trip fuel
+  // store (tripfuel.js) holds, for the line under Trip check.
+  const tripFuel = async () => {
+    const st = (await db.collection('private').doc('gpsTripFuel').get()).data() || {};
+    let count = null;
+    try { count = (await db.collection('gpsTripFuel').count().get()).data().count; } catch (e) { count = null; }
+    return { lastDate: st.lastDate || '', count, at: st.at || '', error: st.error || '', errorAt: st.errorAt || '' };
+  };
+  if (op === 'status') return Object.assign(status(d, await hist()), { coverage: await coverage(db, o.now()), probe: (await db.collection('private').doc('gpsProbe').get()).data() || null, tripFuel: await tripFuel() });
   if (op === 'save') {
     const next = Object.assign({}, d);
     if (String(input.fleet || '').trim()) next.fleet = cleanFleet(input.fleet);

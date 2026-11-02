@@ -256,7 +256,7 @@ exports.sms = onCall({ timeoutSeconds: 60 }, async (request) => {
   try { return await SMS.smsCall(await plantDb(request, user), user, request.data); } catch (error) { throw asHttps(error); }
 });
 
-exports.gps = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+exports.gps = onCall({ timeoutSeconds: 180, memory: '512MiB' }, async (request) => {
   const user = signedIn(request);
   try { return await gpsCall(await plantDb(request, user), user, request.data, { local: process.env.FUNCTIONS_EMULATOR === 'true' }); } catch (error) { throw asHttps(error); }
 });
@@ -564,8 +564,9 @@ async function fleetSyncWrite() {
 
 // Joe 11/2: every truck's trips, from Verizon Fleet, kept in the app's own database (gpsTripFuel, src/tripfuel.js) for six months
 // for his fuel import: October first, then each day the next morning. Every 30 minutes until caught up; wherever a Fleet login
-// is saved. Nothing is written to a sheet.
-exports.gpsTripFuelEvery30Minutes = onSchedule({ schedule: 'every 30 minutes', timeoutSeconds: 540, memory: '1GiB', maxInstances: 1 }, async () => {
+// is saved. Nothing is written to a sheet. 6.80 practice test: one day of every truck's GPS readings uses about 1.3 GB, so
+// at 1 GiB each run was stopped before it saved anything (tools/gps-trip-save.cjs measures it).
+exports.gpsTripFuelEvery30Minutes = onSchedule({ schedule: 'every 30 minutes', timeoutSeconds: 540, memory: '4GiB', maxInstances: 1 }, async () => {
   await eachPlant('gpsTripFuel', async (pdb) => {
     const r = await require('./src/tripfuel').dailyTripFuel({ db: pdb, budgetMs: 2 * 60000 });
     if (r.error) console.error('gpsTripFuel', r.error);

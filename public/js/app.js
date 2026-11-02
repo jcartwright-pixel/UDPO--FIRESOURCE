@@ -1350,7 +1350,7 @@ function mayHaveSaved(e) {
   const code = String(e && e.code || '').replace(/^functions\//, '');
   return ['deadline-exceeded', 'unavailable', 'internal', 'unknown', 'cancelled'].indexOf(code) >= 0 || /network|Failed to fetch|offline|timed? ?out/i.test(String(e && e.message || ''));
 }
-export async function callServer(name, fields) {
+export async function callServer(name, fields, opts) {
   const { functions } = await start();
   // A screen that sends its own requestId keeps it; otherwise the same call after a doubtful failure gets the same one.
   let key = '';
@@ -1362,7 +1362,7 @@ export async function callServer(name, fields) {
     // screen's own plant box picked (facilityId), else the plant the screen is open at.
     const f = fields || {};
     const udPlant = f.udPlant || (knownPlant(f.facilityId) ? f.facilityId : currentPlant());
-    const result = await httpsCallable(functions, name)(Object.assign({ requestId, udPlant }, fields));
+    const result = await httpsCallable(functions, name, opts && opts.timeout ? { timeout: opts.timeout } : undefined)(Object.assign({ requestId, udPlant }, fields));
     if (key) inDoubt.delete(key);
     return result.data;
   } catch (e) {
