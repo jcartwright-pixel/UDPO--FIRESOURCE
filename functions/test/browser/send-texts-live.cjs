@@ -133,6 +133,31 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       assert.deepEqual(tx.errors, []);
       await tx.context().close();
     }
+    // Joe 11/2 ("wrong phone number ... can I change and then resend?"): Resend on a posted-week schedule text in part 6 texts
+    // only that driver again, at the Driver Roster's number now. An older week's text has no Resend.
+    await db().collection('textLog').doc('old_week_casey').set({ direction: 'out', week: '2026-10-04', driverId: 'drv_test_casey', name: 'CASEY, LEE', to: '+13305551234', body: 'old', at: '2026-10-03T12:00:00.000Z', status: 'SENT' });
+    for (const [w, h] of [[1536, 790], [390, 844]]) {
+      const tx = await openPage(browser, w, h, '/texts.html?' + ADMIN);
+      await tx.waitForSelector('#log [data-resend]', { timeout: 15000 });
+      assert.equal(await tx.locator('#log [data-resend="old_week_casey"]').count(), 0, 'no Resend on an older week');
+      const before = (await db().collection('textLog').get()).docs.filter(x => x.data().kind === 'RESEND').length;
+      const b = tx.locator('#log [data-resend]').first(), id = await b.getAttribute('data-resend');
+      const who = (await db().collection('textLog').doc(id).get()).data();
+      assert.equal(await b.textContent(), 'Resend');
+      assert.ok(parseFloat(await b.evaluate(el => getComputedStyle(el).fontSize)) >= 16, '16px button');
+      await b.click();
+      assert.equal(await tx.locator('#log [data-resend="' + id + '"]').textContent(), 'Tap again: text ' + who.name);
+      if (SHOTS) await tx.locator('#log').locator('xpath=ancestor::section').screenshot({ path: path.join(SHOTS, 'resend-armed-' + w + '.png') });
+      await tx.locator('#log [data-resend="' + id + '"]').click();
+      await tx.waitForFunction((n) => (document.getElementById('log').textContent.match(/Schedule, resent/g) || []).length > n, before, { timeout: 15000 });
+      const resent = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'RESEND');
+      assert.equal(resent.length, before + 1, 'one text, one driver');
+      assert.ok(resent.every(x => x.driverId === who.driverId && x.week === '2026-10-11' && x.status === 'NOT SENT'));
+      assert.ok(await fits(tx) <= 0, 'no side scroll on Texts at ' + w);
+      if (SHOTS) await tx.locator('#log').locator('xpath=ancestor::section').screenshot({ path: path.join(SHOTS, 'resend-' + w + '.png') });
+      assert.deepEqual(tx.errors, []);
+      await tx.context().close();
+    }
     console.log('send-texts-live: ok');
   } finally { await browser.close(); }
   process.exit(0);

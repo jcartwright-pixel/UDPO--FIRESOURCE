@@ -121,7 +121,8 @@ const status = (d, env, project) => ({ replyAddress: project ? replyAddress(proj
 
 /* input.op: status | save {accountSid, authToken, fromNumber} | clear | preview | sendSchedule {again}
  *           | doneList | setDoneOn {on} | test {phone} | doneAsk   (Load Done Texts, below; the drivers are ticked on the Driver Roster)
- *           | setForward {phone}   (driver replies sent on to that phone; blank turns it off) */
+ *           | setForward {phone}   (driver replies sent on to that phone; blank turns it off)
+ *           | resend {logId}   (one driver's schedule text again, at the Driver Roster's number now) */
 async function smsCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a), project: process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || '' }, options || {});
@@ -187,6 +188,31 @@ async function smsCall(db, user, input, options) {
     const next = Object.assign({}, d, { lastSend, sendingAt: '' });
     await ref.set(next);
     return status(next, o.env, o.project);
+  }
+  // Joe 11/2 ("if I accidentally had the wrong phone number listed for a driver, can I change and then resend?"): Resend on a
+  // schedule text in part 6 texts that one driver again, at the number now on the Driver Roster. Only the posted week's texts
+  // can be resent, and only to a driver still ticked for schedule texts (a driver who replied STOP is unticked).
+  if (op === 'resend') {
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
+    const id = String(input.logId || '');
+    const was = id && !/[\/]/.test(id) ? (await db.collection('textLog').doc(id).get()).data() : null;
+    if (!was || was.direction !== 'out' || (was.kind && was.kind !== 'RESEND') || !was.week || !was.driverId) throw new SmsError('BAD_REQUEST', 'Only a schedule text can be resent.');
+    const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
+    if (was.week !== week) throw new SmsError('NOT_ALLOWED', 'Only the posted week\'s schedule texts can be resent.');
+    const x = (await activeDrivers(db)).find(r => r.driverId === was.driverId);
+    if (!x) throw new SmsError('NOT_ALLOWED', 'That driver is not on the Driver Roster.');
+    if (!x.scheduleText) throw new SmsError('NOT_ALLOWED', x.name + ' is not ticked for schedule texts on the Driver Roster.');
+    if (!x.phone) throw new SmsError('NOT_ALLOWED', 'Type ' + x.name + '\'s mobile phone on the Driver Roster first.');
+    const body = messageFor(week), log = { direction: 'out', kind: 'RESEND', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp, by: email };
+    if (!liveTexts(o.env)) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+    else {
+      let r;
+      try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+      if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
+    }
+    await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '')).set(log);
+    return Object.assign(status(d, o.env, o.project), { resend: { name: x.name, to: phoneText(x.phone), status: log.status, reason: log.reason || '' } });
   }
   if (op === 'doneList') {
     const list = await activeDrivers(db);
