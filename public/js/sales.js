@@ -31,7 +31,7 @@ let timer = null;
 let loading = false;
 let signedIn = false;
 // Customers by route: the division's list (read once per division), the tab, the route and day picked.
-let cust = null, custDivision = '', custLoading = null, tab = 'route', cuRoute = '', cuDay = '', cuGroup = '', today = '';
+let cust = null, custDivision = '', custLoading = null, tab = 'group', cuSort = 'name', cuRoute = '', cuDay = '', cuGroup = '', today = '';
 
 const kept = () => { try { return localStorage.getItem(DIVISION_KEY) || ''; } catch (e) { return ''; } };
 const keep = (v) => { try { localStorage.setItem(DIVISION_KEY, v); } catch (e) { /* private window */ } };
@@ -217,11 +217,20 @@ function drawByGroup(rows) {
     return;
   }
   const list = all.filter(c => c.group === cuGroup);
-  $('cu-list').innerHTML = '<h2 class="sa-group">' + escapeHtml(cuGroup) + ': ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + '</h2>' + list.map(c =>
-    '<div class="cu-cust"><div class="cu-top"><b>' + escapeHtml(c.name) + '</b><span class="cu-num">' + (c.account ? '#' + escapeHtml(c.account) : '') + '</span></div><div class="cu-num">' + escapeHtml(c.group) + '</div><div class="cu-chips">' +
-    c.days.sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || byNumber(a.route, b.route)).map(r => r.route ?
-      '<button type="button" class="cu-go" data-route="' + escapeHtml(r.route) + '" data-day="' + r.day + '">' + escapeHtml(dayName(r.day).slice(0, 3) + ' ' + r.route) + '</button>' :
-      '<span class="cu-chip">' + escapeHtml(dayName(r.day).slice(0, 3)) + ', no route</span>').join('') + '</div></div>').join('');
+  // Joe 11/2: a group's customers sorted by name (A to Z) or by route (under each route's number, with that route's days).
+  const sortBar = '<div class="cu-sort" role="group" aria-label="Sort"><span>Sort by</span><button type="button" data-sort="name" class="' + (cuSort === 'name' ? 'on' : '') + '">Name</button><button type="button" data-sort="route" class="' + (cuSort === 'route' ? 'on' : '') + '">Route</button></div>';
+  const chip = (r) => r.route ? '<button type="button" class="cu-go" data-route="' + escapeHtml(r.route) + '" data-day="' + r.day + '">' + escapeHtml(dayName(r.day).slice(0, 3) + ' ' + r.route) + '</button>' :
+    '<span class="cu-chip">' + escapeHtml(dayName(r.day).slice(0, 3)) + ', no route</span>';
+  const card = (c, days) => '<div class="cu-cust"><div class="cu-top"><b>' + escapeHtml(c.name) + '</b><span class="cu-num">' + (c.account ? '#' + escapeHtml(c.account) : '') + '</span></div><div class="cu-chips">' +
+    days.sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || byNumber(a.route, b.route)).map(chip).join('') + '</div></div>';
+  let body;
+  if (cuSort === 'route') {
+    const routes = {};
+    list.forEach(c => c.days.forEach(d => { const k = d.route || ''; ((routes[k] = routes[k] || {})[c.account || c.name] = routes[k][c.account || c.name] || { c, days: [] }).days.push(d); }));
+    body = Object.keys(routes).sort((a, b) => (a === '') - (b === '') || byNumber(a, b)).map(k => { const cs = Object.values(routes[k]).sort((a, b) => a.c.name.localeCompare(b.c.name));
+      return '<h3 class="cu-rhead">' + (k ? 'Route ' + escapeHtml(k) : 'No route') + ' <span>' + cs.length + ' customer' + (cs.length === 1 ? '' : 's') + '</span></h3>' + cs.map(x => card(x.c, x.days)).join(''); }).join('');
+  } else body = list.slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => card(c, c.days)).join('');
+  $('cu-list').innerHTML = '<h2 class="sa-group">' + escapeHtml(cuGroup) + ': ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + '</h2>' + sortBar + body;
 }
 
 /* ---------- Help, inside the app ---------- */
@@ -322,6 +331,8 @@ $('v-customers').addEventListener('click', (ev) => {
   const gr = ev.target.closest('.cu-grp');
   if (gr) { cuGroup = gr.dataset.group; drawCustomers(); window.scrollTo(0, 0); return; }
   if (ev.target.closest('#cu-all-groups')) { cuGroup = ''; drawCustomers(); return; }
+  const so = ev.target.closest('[data-sort]');
+  if (so) { cuSort = so.dataset.sort; drawCustomers(); return; }
   const d = ev.target.closest('.sa-day');
   if (d && !d.disabled) { cuDay = d.dataset.day; drawCustomers(); return; }
   const g = ev.target.closest('.cu-go');

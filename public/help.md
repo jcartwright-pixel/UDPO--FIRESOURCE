@@ -1602,11 +1602,11 @@ screens: sales.html?view=customers
 
 The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app. It only shows; nothing can be changed from it.
 
-1. Tap **Customers by route** on the app's first screen.
-2. Pick a tab: `By route`, `By customer` or `By group`.
+1. Tap **Customers by route** on the app's first screen. It opens on the groups.
+2. Pick a tab: `By group`, `By route` or `By customer`.
 3. **By route:** pick the **Route**, then tap a day. Dark days are the days the route runs; today is picked when it runs today. Every customer on that route that day is listed with its customer number.
 4. **By customer:** type part of a customer's name or number. Each customer found shows every **Delivery day** and its **Route**. Tap a route to see everyone else on it that day.
-5. **By group:** tap a group (Dairy Queen, Walmart, BFS Foods, Independents). Each customer is on one line with its number and group, and its days and routes underneath. `All groups`, or `Back` at the top left, goes back to the list of groups.
+5. **By group:** tap a group (Dairy Queen, Walmart, BFS Foods, Independents). **Sort by** `Name` lists its customers A to Z; `Route` puts them under each route number with that route's days (No route last). Tap a day and route to see everyone on it. `All groups`, or `Back` at the top left, goes back to the list of groups.
 
 - Every name starting with DQ is in **Dairy Queen**. Everyone else is grouped by the chain number on the Customer List; a customer with no chain, or the only one in its chain, is under **Independents**.
 - A day that says **no route** is a customer day on the Customer List with no route number yet.

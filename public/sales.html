@@ -67,9 +67,9 @@
     <!-- Joe 11/1 (mock-ups 2-5): every customer on a route for a day, every day and route a customer gets a delivery, or a group's customers. -->
     <section id="v-customers" hidden>
       <div class="sa-tabs" role="tablist">
-        <button type="button" class="on" data-tab="route" role="tab" aria-selected="true">By route</button><button type="button" data-tab="customer" role="tab" aria-selected="false">By customer</button><button type="button" data-tab="group" role="tab" aria-selected="false">By group</button>
+        <button type="button" class="on" data-tab="group" role="tab" aria-selected="true">By group</button><button type="button" data-tab="route" role="tab" aria-selected="false">By route</button><button type="button" data-tab="customer" role="tab" aria-selected="false">By customer</button>
       </div>
-      <div id="cu-by-route" class="sa-box">
+      <div id="cu-by-route" class="sa-box" hidden>
         <label class="sa-lbl" for="cu-route">Route</label>
         <select id="cu-route" class="sa-select"></select>
         <p class="sa-lbl">Delivery day <span class="sa-light">(dark = the route runs that day)</span></p>
@@ -80,7 +80,7 @@
         <input id="cu-find" class="sa-search" type="search" autocomplete="off" placeholder="Customer name or number">
       </div>
       <!-- Joe 11/1 (mock-ups 4 and 5): the customers of a group (Dairy Queen, Walmart), each with its days and routes. -->
-      <div id="cu-by-group" class="sa-box" hidden><p class="sa-lbl" id="cu-group-say">Tap a group to see its customers.</p><button type="button" class="sa-all" id="cu-all-groups" hidden>&#8592; All groups</button></div>
+      <div id="cu-by-group" class="sa-box"><p class="sa-lbl" id="cu-group-say">Tap a group to see its customers.</p><button type="button" class="sa-all" id="cu-all-groups" hidden>&#8592; All groups</button></div>
       <div id="cu-list" class="sa-list"></div>
       <p class="sa-foot" id="cu-foot"></p>
     </section>

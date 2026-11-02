@@ -62,10 +62,14 @@ async function insideHelp(pg, title, from) {
 // Joe 11/1 (mock-ups 2-5): Customers by route, on a phone, from the Customer List app (below).
 async function customers(pg) {
   await pg.click('[data-go="customers"]');
-  await pg.waitForSelector('#cu-route option[value="803"]', { state: 'attached' });
+  // Joe 11/2 (mock-up 1): Customers opens on the groups, By group the first tab.
+  await pg.waitForSelector('.cu-grp');
+  assert.deepEqual(await pg.$$eval('.sa-tabs button', b => b.map(x => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['By group*', 'By route', 'By customer']);
   assert.equal(await pg.textContent('#sa-title'), 'Customers');
   // Help is inside the app, on the customers part, and Back comes back here.
   await insideHelp(pg, 'Customers', 'customers');
+  await pg.click('[data-tab="route"]');
+  await pg.waitForSelector('#cu-route option[value="803"]', { state: 'attached' });
   // By route: the routes (the line with no route is not one), a blank pick first.
   assert.deepEqual(await pg.$$eval('#cu-route option', o => o.map(x => x.value)), ['', '803', '805', '808', '812']);
   await pg.selectOption('#cu-route', '803');
@@ -90,12 +94,22 @@ async function customers(pg) {
   assert.equal(await pg.textContent('#cu-list .sa-group'), 'Route 805, Saturday: 1 customer');
   // By group: Dairy Queen (every DQ name, with its dots too), then the chains; a chain with one customer is with the Independents.
   await pg.click('[data-tab="group"]');
+  await pg.waitForSelector('.cu-grp');
   assert.deepEqual(await pg.$$eval('.cu-grp', g => g.map(x => x.textContent)), ['Dairy Queen3 customers ›', 'Walmart2 customers ›', 'Independents4 customers ›']);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-390-customers-groups.png'), fullPage: true });
   await pg.click('.cu-grp[data-group="Dairy Queen"]');
   assert.equal(await pg.textContent('#cu-list .sa-group'), 'Dairy Queen: 3 customers');
   assert.deepEqual((await pg.$$eval('.cu-cust', c => c.map(x => x.querySelector('b').textContent + ' | ' + [...x.querySelectorAll('.cu-go')].map(b => b.textContent).join(', ')))).sort(),
     ['...DQ RIVERSIDE | Tue 803', 'DQ BETHEL KNOLL | Thu 805, Sat 805', 'DQ HILLVIEW | Tue 803'].sort());
+  // Joe 11/2 (mock-ups 2 and 3): Sort by Name (A to Z) or Route (under each route's number, with that route's days).
+  assert.deepEqual(await pg.$$eval('.cu-sort button', b => b.map(x => x.textContent + (x.classList.contains('on') ? '*' : ''))), ['Name*', 'Route']);
+  assert.deepEqual(await pg.$$eval('.cu-cust b', b => b.map(x => x.textContent)), ['...DQ RIVERSIDE', 'DQ BETHEL KNOLL', 'DQ HILLVIEW']);
+  await pg.click('[data-sort="route"]');
+  await pg.waitForSelector('.cu-rhead');
+  assert.deepEqual(await pg.$$eval('#cu-list .cu-rhead, #cu-list .cu-cust', x => x.map(e => e.classList.contains('cu-rhead') ? e.textContent : e.querySelector('b').textContent + ' | ' + [...e.querySelectorAll('.cu-go')].map(b => b.textContent).join(', '))),
+    ['Route 803 2 customers', '...DQ RIVERSIDE | Tue 803', 'DQ HILLVIEW | Tue 803', 'Route 805 1 customer', 'DQ BETHEL KNOLL | Thu 805, Sat 805']);
+  if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-390-customers-dairy-queen-by-route.png'), fullPage: true });
+  await pg.click('[data-sort="name"]');
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-390-customers-dairy-queen.png'), fullPage: true });
   // Back (top left) closes the group first, back to the groups; it stays on Customers.
   await pg.click('#sa-back');
