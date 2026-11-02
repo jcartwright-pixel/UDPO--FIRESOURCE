@@ -1,0 +1,7 @@
+Clean up after an earlier stopped run
+Sales app opens and a route goes on the map
+Administration Sales App has no customer list upload (look only)
+New phone code opens the drivers' phone screen
+Home screen cards open the right screens (look only)
+Administration menu: eight folding groups and Hide menu (look only)
+6.66 screens at 1536, 1024 and 390 (look only)
