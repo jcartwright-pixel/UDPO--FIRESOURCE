@@ -9,12 +9,18 @@ screens: index.html
 The **United Dairy Hub** is the one place to sign in and open every United Dairy app. Sign in with the same United Dairy Google account as Operations. You see a tile for each app you are allowed to use.
 
 1. Press `Sign in with Google` and pick your United Dairy account.
-2. Press an app's tile. It opens in a new tab, so the hub stays open for the next one.
+2. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
 3. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
 
-### Which tiles you see
-- **Operations** and the **Customer List**: everyone who is active on the Users list.
-- **Fuel Reporting** and **UDMS**: administrators. UDMS keeps its own access list too, so it checks again when it opens.
+### The apps
+- **Plant & Distribution** (the Operations app): dispatch, the plant floor, fleet, schedules and plant reports.
+- **Customers & Routes** (the Customer List): every customer, delivery route and day, the route book and truck load maps.
+- **Fuel Tracking** (the Fuel app): monthly fuel use, fuel prices, tank deliveries and trip fuel.
+- **Employees & Compliance** (UDMS): employee records, driver qualification, accidents, workers' comp and hiring.
+
+### Which cards you see
+- **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
+- **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed.
 
@@ -24,7 +30,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 id: people
 screens: people.html
 
-**People & Access** is the one list of who can sign in to the United Dairy apps: their role, their plants, and which apps they can open. It is the same Users list as Operations' **People & Roles**, saved the same way, so a change here is a change in every app. Administrators only.
+**People & Access** is the one list of who can sign in to the United Dairy apps: their role, their plants, and which apps they can open. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
 2. Press a person's line. Their details open on the right.
@@ -38,9 +44,9 @@ screens: people.html
 - `Save`: saves the person for every app.
 - `Cancel`: closes the person without saving.
 
-> Single-right changes (Allow or Deny one right) and the screens ticked for each plant are still set in Operations, Administration, People & Roles. Saving here keeps them as they are.
+> Single-right changes (Allow or Deny one right) and the screens ticked for each plant are still set in Plant & Distribution, Administration, People & Roles. Saving here keeps them as they are.
 
-> Who sees which app: everyone Enabled gets Operations and the Customer List; Administrators also get Fuel Reporting and UDMS.
+> Who sees which app: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
 
 !> Do not disable someone to take away one app. Change their role instead; Disabled shuts them out of every app.
 

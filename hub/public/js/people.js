@@ -45,7 +45,7 @@ function drawEdit() {
     '<label class="tick"><input type="radio" name="f-status" value="INACTIVE"' + (draft.status !== 'ACTIVE' ? ' checked' : '') + (primary ? ' disabled' : '') + '> Disabled</label></fieldset>' +
     '<div class="pfield"><span>Apps they can open</span><div id="f-apps"></div></div>' +
     (primary ? '<p class="note">The primary administrator always stays an Enabled Administrator.</p>' : '') +
-    (draft.grants.length || draft.denials.length ? '<p class="note">This person also has ' + (draft.grants.length + draft.denials.length) + ' single-right change(s) set in Operations. Saving here keeps them.</p>' : '') +
+    (draft.grants.length || draft.denials.length ? '<p class="note">This person also has ' + (draft.grants.length + draft.denials.length) + ' single-right change(s) set in Plant & Distribution. Saving here keeps them.</p>' : '') +
     '<div class="msg" id="f-msg" hidden></div>' +
     '<div class="actions"><button type="button" class="primary" id="f-save">' + (draft.isNew ? 'Add Person' : 'Save') + '</button><button type="button" id="f-cancel">Cancel</button></div>' +
     (draft.updatedAt ? '<p class="muted small">Last changed ' + e(shortDate(draft.updatedAt)) + (draft.updatedBy ? ' by ' + e(draft.updatedBy) : '') + '</p>' : '');

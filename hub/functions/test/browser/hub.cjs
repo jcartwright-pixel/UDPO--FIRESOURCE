@@ -36,6 +36,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms']);
     assert.equal(await p.textContent('#hello'), 'Your apps, Pat');
     assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 4, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 });
     await p.waitForSelector('#tiles a');
@@ -48,10 +50,10 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
     await p.waitForSelector('#rows tr[data-email]');
     assert.equal(await p.$$eval('#rows tr[data-email]', r => r.length), 2);
-    assert.match(await p.textContent('#rows tr[data-email="sam.sales@uniteddairy.com"]'), /Operations.*Customer List/);
+    assert.match(await p.textContent('#rows tr[data-email="sam.sales@uniteddairy.com"]'), /Plant & Distribution.*Customers & Routes/);
     await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"]');
     await p.selectOption('#f-role', 'ADMINISTRATOR');
-    assert.match(await p.textContent('#f-apps'), /Fuel Reporting.*UDMS/, 'the apps change before saving');
+    assert.match(await p.textContent('#f-apps'), /Fuel Tracking.*Employees & Compliance/, 'the apps change before saving');
     await p.selectOption('#f-role', 'MANAGER');
     await p.check('#f-all');
     await shot(p, 'hub-people-1920');
