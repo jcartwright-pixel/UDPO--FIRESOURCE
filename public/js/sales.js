@@ -131,7 +131,7 @@ async function loadCustomers() {
       const data = await callServer('sales', { division: want, what: 'customers' });
       drawDivisions(data);
       today = data.today || '';
-      $('sa-day').textContent = today ? dayName(todayDay()) + ' ' + today.slice(5, 7) + '-' + today.slice(8, 10) + '-' + today.slice(2, 4) : '';
+      $('sa-day').textContent = today ? dayName(todayDay()) + ' ' + Number(today.slice(5, 7)) + '-' + Number(today.slice(8, 10)) + '-' + today.slice(2, 4) : '';
       cust = data.customers || { rows: [] };
       custDivision = data.division;
       showError('');

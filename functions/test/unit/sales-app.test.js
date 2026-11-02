@@ -1,24 +1,28 @@
 'use strict';
 // The Sales app (Joe 10/31): each route of a division, its driver, the 6 AM email's status and where it is now: the trailer's GPS
-// unit first, else the truck's. Today's loads and the day before's (still out). Ended Up Not Running left off.
+// unit first, else the truck's. Joe 11/2: what is delivered today (whatever day it was loaded), then leftovers from earlier
+// delivery days that have not left. A route not delivering today is not on it. Ended Up Not Running left off.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const A = require('../../src/salesapp');
 
-// Tuesday 11-3-26 10:42 AM in New York (UTC-5): today's loads are Tuesday 11-3's, yesterday's are Monday 11-2's.
+// Tuesday 11-3-26 10:42 AM in New York (UTC-5): today's deliveries are Tuesday 11-3's (loaded Monday 11-2).
 const NOW = Date.parse('2026-11-03T15:42:00Z');
 const iso = (local) => new Date(Date.parse(local + '-05:00')).toISOString();
 const run = (id, route, day, extra) => Object.assign({ id, weekStart: '2026-11-01', route, run: 'Run ' + route, routeStatus: 'ACTIVE', masterShow: { daily: true, leavesOn: 'Delivery Day' },
   days: { [day.prefix]: Object.assign({ runs: true }, day.fields) } }, extra || {});
 
-test('rows: driver, status, where now from the trailer first, else the truck; today first', () => {
+test('rows: driver, status, where now from the trailer first, else the truck; delivering today, leftovers first', () => {
   const runs = [
     run('a', '802', { prefix: 'tue', fields: { dispatchTime: 210, driver: 'Sam Porter', trailer: 'T-101', truck: '501', completeTime: iso('2026-11-03T02:00:00') } }),
     run('b', '811', { prefix: 'tue', fields: { dispatchTime: 270, driver: 'Dana Whitfield', trailer: 'T-102', truck: '502', completeTime: iso('2026-11-03T03:00:00') } }),
     run('c', '815', { prefix: 'wed', fields: { dispatchTime: 420, driver: 'Tina Moss', trailer: 'T-105', truck: '505' } }),
-    run('g', '820', { prefix: 'tue', fields: { runs: false, dispatchTime: 300, driver: 'Nobody Here' } })
+    run('g', '820', { prefix: 'tue', fields: { runs: false, dispatchTime: 300, driver: 'Nobody Here' } }),
+    // Monday's deliveries: 816 never left (a leftover, on top); 817 left on Monday (gone).
+    run('d', '816', { prefix: 'mon', fields: { dispatchTime: 360, driver: 'Ray Lowe', trailer: 'T-106', truck: '506' } }),
+    run('e', '817', { prefix: 'mon', fields: { dispatchTime: 360, driver: 'Jo Banks', trailer: 'T-107', truck: '507', completeTime: iso('2026-11-02T02:00:00') } })
   ];
-  const reefer = { 'T-101': { id: 'a|tue', unitId: 'U1', out: iso('2026-11-03T03:32:00') } };
+  const reefer = { 'T-101': { id: 'a|tue', unitId: 'U1', out: iso('2026-11-03T03:32:00') }, 'T-107': { id: 'e|mon', unitId: 'U7', out: iso('2026-11-02T06:10:00') } };
   const units = {
     'T-101': { tag: 'T-101', unitId: 'U1', lat: 40.6, lon: -80.1, place: '', address: 'I-79 N, Cranberry, PA', speedMph: 62, lastReport: iso('2026-11-03T10:41:00') },
     502: { tag: '502', unitId: 'U9', lat: 40.2, lon: -80.2, place: 'Giant Eagle 44', address: '', speedMph: 0, lastReport: iso('2026-11-03T10:40:00') },
@@ -27,10 +31,11 @@ test('rows: driver, status, where now from the trailer first, else the truck; to
   };
   const out = A.salesScreen({ runs, reefer, gpsDays: [{ tag: '502', date: '2026-11-03', yardOut: iso('2026-11-03T05:42:00') }], units }, NOW);
   assert.equal(out.todayText, 'Tuesday 11-3-26');
-  assert.deepEqual(out.groups.map(g => g.label), ['Today, Tuesday 11-3-26', 'Loaded Monday 11-2-26']);
-  const today = out.groups[0].rows, yday = out.groups[1].rows;
-  assert.deepEqual(today.map(r => [r.route, r.driver, r.status, r.where, r.by, r.gpsAt]), [['815', 'Tina Moss', 'Not loaded', 'At the plant', 'TRUCK', '10:10 PM 11-2-26']]);
-  assert.deepEqual(yday.map(r => r.route), ['802', '811'], '820 (Ended Up Not Running) left off');
+  // Joe 11/2: 815 is loaded today for tomorrow: not delivering today, so not on the list (it said "Not loaded" before).
+  assert.deepEqual(out.groups.map(g => g.label), ['Left over from Monday 11-2-26', 'Delivering today, Tuesday 11-3-26']);
+  const left = out.groups[0].rows, yday = out.groups[1].rows;
+  assert.deepEqual(left.map(r => r.route), ['816'], '817 left on Monday: not a leftover');
+  assert.deepEqual(yday.map(r => r.route), ['802', '811'], '820 (Ended Up Not Running) left off; 815 (delivers tomorrow) not on');
   assert.deepEqual([yday[0].status, yday[0].where, yday[0].by, yday[0].lat, yday[0].gpsAt], ['On time, left 3:32 AM', 'On the road: I-79 N, Cranberry, PA', 'TRAILER', 40.6, '10:41 AM']);
   // T-102 has no GPS unit: the truck's.
   assert.deepEqual([yday[1].status, yday[1].where, yday[1].by], ['Left 5:42 AM, 1h 12m late', 'At Giant Eagle 44', 'TRUCK']);
@@ -96,7 +101,7 @@ test('Save-A-Lot drop and hook: dropped time, then the truck', () => {
   };
   const late = Date.parse('2026-11-04T01:30:00Z'); // 8:30 PM Tuesday
   const out = A.salesScreen({ runs, reefer, gpsDays: [], routes, units }, late);
-  const by = {}; out.groups[0].rows.forEach(r => { by[r.route] = r; });
+  const by = {}; out.groups.find(g => !g.leftover).rows.forEach(r => { by[r.route] = r; });
   assert.equal(by['855'].status, 'Dropped 3:05 PM, left 2h 12m late');
   assert.equal(by['855'].where, 'Back at the plant');
   assert.equal(by['855'].by, 'TRUCK');

@@ -29,6 +29,9 @@ const { trailerKey, trailerUnits, runTrucks, inYard, yardSpots } = require('./fl
 const { safeIdPart } = require('./model');
 
 const MOVING_MPH = 3;
+// Joe 11/2: how far back to look for loads still to be delivered: a Load Day route is loaded the day before (Saturday for
+// Monday), and a load from an earlier delivery day that never left stays on as a leftover for LEFTOVER_DAYS.
+const LOOK_BACK = 3, LEFTOVER_DAYS = 2;
 const SAVE_A_LOT = /SAVE[\s-]*A[\s-]*LOT/i;
 const SAL_PLACE = /\bSAL\b|SAVE[\s-]*A[\s-]*LOT/i;
 const UNITS_KEEP_MS = 60 * 1000; // the 520 GPS units are read at most once a minute per server (the GPS itself is read every 5)
@@ -87,9 +90,23 @@ function droppedAt(x, reefer) {
   return isFinite(ms) ? { at: R.wallClock(ms), place } : null;
 }
 
+/** Joe 11/2: the loads delivered today, and those of the LEFTOVER_DAYS before it, whatever day they were loaded. */
+function loadsFor(runs, today) {
+  const seen = new Set(), out = [];
+  for (let i = LOOK_BACK + LEFTOVER_DAYS; i >= 0; i--) {
+    S.loadsOn(runs, L.addDays(today, -i)).forEach(x => {
+      const k = x.runDocId + '|' + x.day;
+      if (seen.has(k) || x.deliveryDate > today || x.deliveryDate < L.addDays(today, -LEFTOVER_DAYS)) return;
+      seen.add(k);
+      out.push(x);
+    });
+  }
+  return out;
+}
+
 /**
  * The screen's rows. input: { runs, reefer, gpsDays, units: {key: gpsTrucks doc} }. Returns
- * { today, groups: [{ loadDate, label, rows: [{ id, route, driver, status, tone, where, gpsAt, by, lat, lon }] }] }.
+ * { today, groups: [{ deliveryDate, leftover, label, rows: [{ id, route, driver, status, tone, where, note, gpsAt, by, lat, lon }] }] }.
  */
 function salesScreen(input, nowMs) {
   const R = require('./plant-rules');
@@ -97,16 +114,16 @@ function salesScreen(input, nowMs) {
   const units = input.units || {}, spots = yardSpots(units);
   const byTruck = {};
   Object.keys(units).forEach(k => { const u = units[k], key = S.unitKey(u.tag); if (key && (!byTruck[key] || String(u.lastReport || '') > String(byTruck[key].lastReport || ''))) byTruck[key] = u; });
-  const dates = [L.addDays(today, -1), today];
-  const all = dates.map(d => S.loadsOn(input.runs, d));
-  const trailerGps = trailerUnits(units, [].concat(...all).map(x => x.trailer).filter(Boolean), runTrucks(input.runs));
+  // Joe 11/2: the list is what is delivered today (by delivery date; the list rolls at 6 a.m.), plus leftovers: earlier
+  // deliveries that have not left yet, like the Driver Room kiosk. A route not delivering today is not on it. A Load Day route
+  // is loaded the day before (Monday's on Saturday), so the loads are read from LOOK_BACK load days back.
+  const flat = loadsFor(input.runs, today);
+  const trailerGps = trailerUnits(units, flat.map(x => x.trailer).filter(Boolean), runTrucks(input.runs));
   const master = {};
   (input.routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
   const runOf = {};
   (input.runs || []).forEach(r => { runOf[r.id] = r; });
-  const flat = [].concat(...all);
-  const groups = dates.map((loadDate, i) => {
-    const rows = all[i].map(x => {
+  const rowOf = (x) => {
       const left = S.leftAt(x, input.reefer, input.gpsDays);
       let s = S.statusOf(x, left, now);
       const tu = x.trailer ? trailerGps[trailerKey(x.trailer)] : null, tk = byTruck[S.unitKey(x.truck)] || null;
@@ -129,12 +146,21 @@ function salesScreen(input, nowMs) {
       return {
         id: x.runDocId + '|' + x.day, route: x.route, driver: x.driver, status: shortStatus(s.word), tone: s.tone,
         where, note, by, gpsAt: gpsWhen(seen, now),
-        lat: hasPoint ? unit.lat : null, lon: hasPoint ? unit.lon : null
+        lat: hasPoint ? unit.lat : null, lon: hasPoint ? unit.lon : null,
+        gone: !!((left && left.at !== null) || drop)
       };
-    }).sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.driver.localeCompare(b.driver));
-    const label = (loadDate === today ? 'Today, ' : 'Loaded ') + S.weekdayOf(loadDate) + ' ' + S.shortDate(loadDate);
-    return { loadDate, label, rows };
-  }).filter(g => g.rows.length).reverse();
+  };
+  const byRoute = (a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.driver.localeCompare(b.driver);
+  const strip = (r) => { const o = Object.assign({}, r); delete o.gone; return o; };
+  // Leftovers first (still here from an earlier delivery day), then today's deliveries.
+  const earlier = [...new Set(flat.filter(x => x.deliveryDate < today).map(x => x.deliveryDate))].sort();
+  const groups = earlier.map(d => ({
+    deliveryDate: d, leftover: true, label: 'Left over from ' + S.weekdayOf(d) + ' ' + S.shortDate(d),
+    rows: flat.filter(x => x.deliveryDate === d).map(rowOf).filter(r => !r.gone).sort(byRoute).map(strip)
+  })).concat([{
+    deliveryDate: today, leftover: false, label: 'Delivering today, ' + S.weekdayOf(today) + ' ' + S.shortDate(today),
+    rows: flat.filter(x => x.deliveryDate === today).map(rowOf).sort(byRoute).map(strip)
+  }]).filter(g => g.rows.length);
   return { today, todayText: S.weekdayOf(today) + ' ' + S.shortDate(today), groups };
 }
 
@@ -150,10 +176,12 @@ async function readUnits(db, nowMs) {
 
 /** Reads what the screen needs at `nowMs` from one plant's database. */
 async function readInput(db, nowMs) {
-  const today = L.operatingDay(new Date(nowMs)), dates = [L.addDays(today, -1), today];
-  const weeks = [...new Set(dates.flatMap(d => [L.weekStart(d), L.weekStart(L.addDays(d, 6))]))];
+  const today = L.operatingDay(new Date(nowMs)), first = L.addDays(today, -(LOOK_BACK + LEFTOVER_DAYS));
+  // Every week a load date or delivery date in the window falls in (a run's week is its delivery week).
+  const weeks = [...new Set([0, 1, 2, 3, 4, 5, 6, 7].map(i => L.weekStart(L.addDays(first, i))).concat([L.weekStart(today)]))];
   const runs = (await db.collection('runs').where('weekStart', 'in', weeks).get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
-  const trailers = [...new Set(dates.flatMap(d => S.loadsOn(runs, d)).map(x => x.trailer ? trailerKey(x.trailer) : '').filter(Boolean))];
+  const dates = [first, today];
+  const trailers = [...new Set(loadsFor(runs, today).map(x => x.trailer ? trailerKey(x.trailer) : '').filter(Boolean))];
   const reefer = {};
   if (trailers.length) (await db.getAll(...trailers.map(t => db.collection('gpsReefer').doc(safeIdPart(t))))).forEach((s, i) => { if (s.exists) reefer[trailers[i]] = s.data(); });
   const gpsDays = (await db.collection('gpsDays').where('date', '>=', dates[0]).where('date', '<=', L.addDays(today, 1)).get()).docs.map(x => x.data());
