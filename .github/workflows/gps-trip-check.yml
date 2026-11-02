@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   trip-check:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]') || contains(github.event.head_commit.message, '[trip logs]')
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 180
@@ -52,9 +52,29 @@ jobs:
           set -euo pipefail
           printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
           node -e "if (require('$RUNNER_TEMP/practice.json').project_id !== 'ud-distribution-sandbox') process.exit(1)"
+      # 6.80 practice test: the every-30-minutes trip saving wrote nothing. Its last runs' log lines on the practice copy,
+      # and what it has saved so far, kept on this branch for Claude to read (taken off before merge).
+      - name: Trip saving logs (practice copy)
+        if: contains(github.event.head_commit.message, '[trip logs]')
+        run: |
+          set -uo pipefail
+          cd ..
+          mkdir -p gps-trip-results
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/practice.json" -q
+          gcloud logging read 'resource.labels.service_name="gpstripfuelevery30minutes" OR resource.labels.function_name="gpsTripFuelEvery30Minutes"' \
+            --project ud-distribution-sandbox --freshness=6h --limit 200 --format='value(timestamp,severity,textPayload,jsonPayload.message,httpRequest.status)' > gps-trip-results/logs.txt 2>&1 || true
+          gcloud scheduler jobs list --project ud-distribution-sandbox --location us-east4 --format='value(name,schedule,state,lastAttemptTime,status.code)' 2>&1 | grep -i trip >> gps-trip-results/logs.txt || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gps-trip-results
+          git commit -q -m "GPS trip saving logs (take off before merge)"
+          for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
+          exit 0
       - name: Install
+        if: "!contains(github.event.head_commit.message, '[trip logs]')"
         run: npm ci
       - name: Trip check (read only)
+        if: "!contains(github.event.head_commit.message, '[trip logs]')"
         env:
           KEY: ${{ runner.temp }}/practice.json
           TAG: ${{ inputs.tag }}
