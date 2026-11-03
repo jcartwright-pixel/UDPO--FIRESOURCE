@@ -135,10 +135,13 @@ test('no screen or server file keeps its own copy of a timing rule (they all use
   assert.deepEqual(found, []);
 });
 
+// The screens, and the sandbox-only pages the practice deploy copies in (sandbox-only/diagnostics.html).
+const PAGES = ['public', 'sandbox-only'].flatMap(d => fs.readdirSync(path.join(ROOT, d)).filter(n => n.endsWith('.html')).map(n => d + '/' + n));
+
 test('every page that loads the dispatch rules loads the timing rules first', () => {
   const missing = [];
-  for (const f of fs.readdirSync(path.join(ROOT, 'public')).filter(n => n.endsWith('.html'))) {
-    const s = fs.readFileSync(path.join(ROOT, 'public', f), 'utf8');
+  for (const f of PAGES) {
+    const s = fs.readFileSync(path.join(ROOT, f), 'utf8');
     const logic = s.indexOf('src="js/logic.js"');
     if (logic < 0) continue;
     const timing = s.indexOf('src="js/timing-rules.js"');
@@ -149,8 +152,8 @@ test('every page that loads the dispatch rules loads the timing rules first', ()
 
 test('screens that use UDTiming load it', () => {
   const missing = [];
-  for (const f of fs.readdirSync(path.join(ROOT, 'public')).filter(n => n.endsWith('.html'))) {
-    const s = fs.readFileSync(path.join(ROOT, 'public', f), 'utf8');
+  for (const f of PAGES) {
+    const s = fs.readFileSync(path.join(ROOT, f), 'utf8');
     if (/UDTiming/.test(s) && !/src="js\/timing-rules\.js"/.test(s)) missing.push(f);
   }
   assert.deepEqual(missing, []);
