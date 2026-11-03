@@ -158,7 +158,7 @@ test('the email and the report carry the forecast', () => {
   const r = R.plantReport({ loads, forecast }, NOW);
   assert.equal(r.forecast, forecast);
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
-  assert.match(html, /Estimated at 7:00 PM/);
+  assert.match(html, />7 of 22 loaded<\/div>/, 'the recap box is in the email');
   // Joe 11/1: the forecast still works out which loads will miss their truck and by how much (truckCheck).
   const t = R.truckCheck(JSON.parse(JSON.stringify(r)));
   // Joe 11/1: behind, so the first truck to leave loads first: Fairmont (Tue 9:00 AM) now makes its truck.
@@ -171,12 +171,15 @@ test('the email and the report carry the forecast', () => {
   // leave that will leave the latest: 6304, 1 hr 15 min, so red) and when the last load should be done. No route names.
   const c = R.shiftRecap(JSON.parse(JSON.stringify(r)));
   assert.deepEqual([c.loaded, c.left, c.total, c.late, c.behindMin, c.level, c.doneBy], [7, 15, 22, true, 75, 'bad', '9:20 AM']);
-  const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('Estimated at'));
+  const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('>Routes<'));
   assert.match(box, />7 of 22 loaded<\/div>[^]*>15 left to load<\/div>/);
   // Joe 11/3 (built-2-by-area, then colored bars): a block for each area, how many loaded and left, its own bar and status.
   assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total, a.level, a.status]), [['Case Loadout', 7, 22, 'bad', 'About 1 hr 15 min behind']]);
-  assert.match(box, />Case Loadout<\/td>[^]*>7 of 22<span[^>]*> &middot; 15 left<\/span>[^]*background:#b42318[^]*&#9888; About 1 hr 15 min behind<\/td>/);
-  assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last case load done about 9:20 AM/);
+  assert.match(box, />Case Loadout<\/td>[^]*>7 of 22<span[^>]*> &middot; 15 left<\/span>[^]*background:#b42318[^]*&#9888; About 1 hr 15 min behind<div/);
+  // Joe 11/3: under each loadout, On time or about how far behind (bigger print); Case Loadout also says when it is done.
+  // Nothing under the loadouts (no overall line, no "Estimated at").
+  assert.match(box, /&#9888; About 1 hr 15 min behind<div[^>]*>Done about 9:20 AM<\/div><\/td><\/tr><\/table><\/div>/);
+  assert.doesNotMatch(box, /Estimated at|Last case load/);
   // The banner takes the box's color: red, as the box is red (Joe 11/3).
   assert.match(html, /padding:16px 14px;background:#b42318[^>]*><div[^>]*>&#9888; 2 LOADS WILL BE LATE/);
   assert.doesNotMatch(box, /6304|Walmart|Will miss its truck|Every other truck|Already loaded/, 'no route names in the box');
@@ -191,7 +194,7 @@ test('the email and the report carry the forecast', () => {
   // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
   [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
-  assert.doesNotMatch(none, /Est\. Done|>est\. |Estimated at/, 'a report without a forecast reads as before');
+  assert.doesNotMatch(none, /Est\. Done|>est\. |left to load<\/div>/, 'a report without a forecast reads as before');
 });
 
 // Joe 10/19: "I would just like to be able to send it in the live version to see before I put it to everybody."
@@ -205,13 +208,13 @@ test('Send Test to Me goes only to the sender on live; the forecast box reaches 
   const test1 = await run(Object.assign({}, base, { testOnly: true }));
   assert.deepEqual(test1.sent.to, ['joe@uniteddairy.com'], 'only the person who pressed it');
   assert.equal(test1.ref.updates[0].testCopy, true);
-  assert.match(test1.sent.html, /Estimated at/, 'the test carries the recap box');
+  assert.match(test1.sent.html, /left to load<\/div>/, 'the test carries the recap box');
   const group = await run(base);
   assert.deepEqual(group.sent.to, ['a@uniteddairy.com', 'b@uniteddairy.com']);
-  assert.doesNotMatch(group.sent.html, /Estimated at|Est\. Done/, 'the groups do not get the box until it is switched on');
+  assert.doesNotMatch(group.sent.html, /left to load<\/div>|Est\. Done/, 'the groups do not get the box until it is switched on');
   assert.doesNotMatch(group.sent.text, /RECAP \(ESTIMATED\)|est\. loaded/);
   const everyone = await run(base, { forecastEveryone: true });
-  assert.match(everyone.sent.html, /Estimated at/);
+  assert.match(everyone.sent.html, /left to load<\/div>/);
   assert.match(everyone.sent.text, /RECAP \(ESTIMATED\)/);
   assert.equal(RM.recipients(Object.assign({}, base, { testOnly: true }), env).copy, true);
 });
@@ -379,7 +382,7 @@ test('the morning after a slow night: left-over loads on their own line, today o
   assert.equal(tk.ok, 22);
   const rc = R.shiftRecap(JSON.parse(JSON.stringify(r)));
   assert.equal(rc.behindMin, Math.max(5, Math.round(tk.miss[0].lateBy / 5) * 5));
-  assert.match(html, />0 of 24 loaded<\/div>[^]*>24 left to load<[^]*&#9888; About [^<]+ behind<\/div>/);
+  assert.match(html, />0 of 24 loaded<\/div>[^]*>24 left to load<[^]*Case Loadout[^]*&#9888; About [^<]+ behind<div[^>]*>Done about /);
   assert.match(html, /&#9888; 1 ROUTE LATE/);
   assert.doesNotMatch(html, /\bcases\b/i);
   assert.match(r.text, /^RECAP \(ESTIMATED\) AT 7:36 AM: Running about [^,]+ behind, all loaded by about \d+:\d\d [AP]M\n {2}0 loaded · 24 left to load$/m);
@@ -483,7 +486,7 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   // Joe 11/3: the recap box no longer lists loads already loaded late ("if it's already loaded" he does not need it there);
   // the route list still says "8:20 AM late" and the banner still says loaded late.
   assert.doesNotMatch(plain, /Already loaded, but late/);
-  assert.match(plain, /2 of 3 loaded 1 left to load [^]*On time Last case load done about 10:50 AM/);
+  assert.match(plain, /2 of 3 loaded 1 left to load [^]*Case Loadout [^]*On time Done about 10:50 AM/);
   assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
   assert.doesNotMatch(r.text, /LOADED LATE \(/);

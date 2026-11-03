@@ -89,7 +89,7 @@ async function openPage(browser, url, w, h) {
       const P = await import('/js/plant-core.js'), U = window.UDPlant, date = '2026-10-21';
       const kept = JSON.parse(localStorage.getItem('udForecastNights') || 'null'), history = kept ? kept.nights : [];
       const f = U.loadForecast({ date, loads: P.loadoutRows(runs, date), history }, Date.now());
-      return { late: f.late, behind: f.behind, html: U.reportHtml({ dayLabel: 'Wednesday, October 21, 2026', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [], totalLoads: 0, leftToLoad: 0, forecast: f }, '') };
+      return { late: f.late, behind: f.behind, html: U.reportHtml({ dayLabel: 'Wednesday, October 21, 2026', behind: [], loaded: [], nextUp: [], pickups: [], down: [], lines: [], temperatures: [], areas: [{ area: 'CASE', total: f.loads.length, left: f.loads.length }], totalLoads: f.loads.length, leftToLoad: f.loads.length, forecast: f }, '') };
     }, runs);
     const mail = await browser.newPage({ viewport: { width: 1536, height: 790 } });
     await mail.setContent(box.html);

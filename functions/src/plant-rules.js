@@ -1419,13 +1419,15 @@
       var late = miss.length + lateNow.length > 0, about = late ? Math.max(5, Math.round(worst / 5) * 5) : 0;
       return { late: late, behindMin: about, level: levelOf(late, about), status: late ? 'About ' + spanText(about) + ' behind' : 'On time' };
     };
+    // Only Case loads have an estimate (the forecast); its last one is when the Case Loadout should be done.
+    var ests = (f ? f.loads : []).map(function (x) { return x.est; }).filter(function (m) { return typeof m === 'number' && isFinite(m); });
+    var last = ests.length ? Math.max.apply(null, ests) : null;
     var inArea = function (k) { return function (x) { return (x.area || 'CASE') === k; }; };
     var areas = (r.areas || []).filter(function (a) { return a.total > 0; }).slice().sort(function (x, y) { return RECAP_ORDER.indexOf(x.area) - RECAP_ORDER.indexOf(y.area); })
       .map(function (a) { var j = judge(t.miss.filter(inArea(a.area)), t.lateNow.filter(inArea(a.area)));
-        return { area: a.area, name: RECAP_AREA[a.area] || a.area, total: a.total, left: a.left, late: j.late, behindMin: j.behindMin, level: j.level, status: a.left || j.late ? j.status : 'All loaded' }; });
+        return { area: a.area, name: RECAP_AREA[a.area] || a.area, total: a.total, left: a.left, late: j.late, behindMin: j.behindMin, level: j.level, status: a.left || j.late ? j.status : 'All loaded',
+          doneBy: a.area === 'CASE' && a.left && last !== null ? minutesText12(((last % 1440) + 1440) % 1440) : '' }; });
     var all = judge(t.miss, t.lateNow);
-    var ests = (f ? f.loads : []).map(function (x) { return x.est; }).filter(function (m) { return typeof m === 'number' && isFinite(m); });
-    var last = ests.length ? Math.max.apply(null, ests) : null;
     return { loaded: total - left, left: left, total: total, late: all.late, behindMin: all.behindMin, level: all.level,
       headline: all.late ? 'Running about ' + spanText(all.behindMin) + ' behind' : left ? 'Everything is on time' : 'Everything is loaded',
       status: all.late ? all.status : left ? 'On time' : 'Everything is loaded',
@@ -1542,7 +1544,9 @@
     function forecastBox() {
       var c = shiftRecap(r), L = LEVEL[c.level], fg = L.fg, bg = L.bg;
       var bar = function (done, all, h, color) { var pct = all ? Math.round(done / all * 100) : 0; return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + (pct ? '<td width="' + pct + '%" style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:' + color + '">&nbsp;</td>' : '') + (pct < 100 ? '<td style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:#ffffff">&nbsp;</td>' : '') + '</tr></table>'; };
-      // Joe 11/3 (built-2-by-area, then bars): one block per area: how many loaded and left, its own bar, on time or behind.
+      // Joe 11/3 (built-2-by-area, then bars): one block per loadout: how many loaded and left, its own bar, and under it On time
+      // or about how far behind (Case Loadout also says when it should be done). The plant's own loadouts only (Charleston has
+      // no totes). No overall line at the bottom: each loadout says it (Joe 11/3).
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + bg + ';border-left:6px solid ' + fg + ';padding:14px 14px 16px">' +
         '<div style="font-size:28px;font-weight:800;line-height:1.15;color:' + INK + '">' + c.loaded + ' of ' + c.total + ' loaded</div>' +
         '<div style="font-size:18px;font-weight:700;margin-top:2px;color:' + GREY + '">' + (c.left ? c.left + ' left to load' : 'Nothing left to load') + '</div>' +
@@ -1551,10 +1555,8 @@
           var A = LEVEL[a.level];
           return '<tr><td style="' + F + 'padding:8px 0 0;font-size:17px;font-weight:800;color:' + INK + '">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:8px 0 0;font-size:16px;font-weight:700;color:' + INK + ';white-space:nowrap">' + (a.total - a.left) + ' of ' + a.total + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>' +
             '<tr><td colspan="2" style="padding:4px 0 2px">' + bar(a.total - a.left, a.total, 10, A.bar) + '</td></tr>' +
-            '<tr><td colspan="2" style="' + F + 'padding:0 0 2px;font-size:14px;font-weight:800;color:' + A.fg + '">' + (a.late ? '&#9888; ' : '&#10003; ') + e(a.status) + '</td></tr>'; }).join('') + '</table>' : '') +
-        '<div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:14px;color:' + fg + '">' + (c.late ? '&#9888; ' : '&#10003; ') + e(c.status) + '</div>' +
-        (c.doneBy && c.left ? '<div style="font-size:17px;font-weight:700;margin-top:2px;color:' + INK + '">Last case load done about ' + e(c.doneBy) + '</div>' : '') +
-        '<div style="font-size:13px;color:' + GREY + ';margin-top:8px">Estimated at ' + e(c.asOf) + '</div></div></td></tr>';
+            '<tr><td colspan="2" style="' + F + 'padding:2px 0 4px;font-size:18px;font-weight:800;color:' + A.fg + '">' + (a.late ? '&#9888; ' : '&#10003; ') + e(a.status) + (a.doneBy ? '<div style="font-size:16px;font-weight:700;color:' + INK + '">Done about ' + e(a.doneBy) + '</div>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
+        '</div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes in load order (Joe 10/20). Both are split by
