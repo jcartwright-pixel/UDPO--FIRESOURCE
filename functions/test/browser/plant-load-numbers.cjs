@@ -151,7 +151,7 @@ async function journal(id, ok) {
     await lo.click('#s-save');
     // Joe 10/20: "Confirm this load" first, with the load and delivery days; Go back keeps the box filled in.
     await lo.waitForSelector('#sched-confirm-modal:not([hidden])');
-    assert.match(await lo.textContent('#sc-confirm-body'), /905 · ALDI - CHARLESTON[\s\S]*Thursday 10-08-26[\s\S]*Friday 10-09-26[\s\S]*10:30 AM/);
+    assert.match(await lo.textContent('#sc-confirm-body'), /905 · ALDI - CHARLESTON[\s\S]*Thursday 10-8-26[\s\S]*Friday 10-9-26[\s\S]*10:30 AM/);
     await shot(lo, 'box-loadout-confirm-1536.png');
     await lo.click('#sc-back');
     await lo.waitForSelector('#sched-modal:not([hidden])');

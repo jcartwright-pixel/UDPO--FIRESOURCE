@@ -39,7 +39,8 @@ const COPIES = [
   /Number\(\w+\[\d\]\) \+ '-' \+ Number\(\w+\[\d\]\) \+ '-' \+/,
   /\+ '-' \+ (String\(\w+(\.\w+\(\))?\)|\w+(\[\d\])?)\.slice\(-?2\)/,
   /\+ '\/' \+ \w+(\[\d\])? \+ '\/' \+ \w+/,
-  /getMonth\(\) \+ 1\) \+ '[-\/]' \+ \w+\.getDate/
+  /getMonth\(\) \+ 1\) \+ '[-\/]' \+ \w+\.getDate/,
+  /\.slice\(5, 7\) \+ '[-\/]' \+/
 ];
 // Not dates written for people: Google Sheets values and barcode or text parsing.
 const ALLOWED = [/demo-sheets\.js/, /vendor\//];
