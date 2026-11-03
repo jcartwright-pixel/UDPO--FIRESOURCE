@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 const P = require('../../src/plant');
 const MAINT = require('../../src/maintenance');
 
-const equipment = [{ id: 'veh_trailer_t_533', type: 'TRAILER', unit: 'T-533', status: 'ACTIVE' }];
+const equipment = [{ id: 'veh_trailer_t_533', type: 'TRAILER', unit: 'T-533', status: 'ACTIVE' },
+  { id: 'veh_trailer_t_014', type: 'TRAILER', unit: 'T-014', status: 'INACTIVE' }];
 const saved = (typed) => P.typedTrailer(MAINT.resolveUnit(typed, 'TRAILER', equipment));
 
 test('a trailer number no unit matches saves as T- and the number, with no leading zeros', () => {
@@ -19,6 +20,12 @@ test('a trailer number no unit matches saves as T- and the number, with no leadi
 test('a trailer Equipment Master knows saves as its unit', () => {
   assert.equal(saved('533'), 'T-533');
   assert.equal(saved('0533'), 'T-533');
+});
+
+test('a trailer Equipment Master spells with leading zeros still saves as T- and the number', () => {
+  assert.equal(saved('014'), 'T-14');
+  assert.equal(saved('T014'), 'T-14');
+  assert.equal(MAINT.resolveUnit('014', 'TRAILER', equipment).id, 'veh_trailer_t_014');
 });
 
 test('TBA and N/A stay words', () => {
