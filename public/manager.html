@@ -301,6 +301,7 @@
         // when the last load should be done. No route names and no list of loads already loaded late.
         (r.forecast ? (rc => sect('Recap (estimated) at ' + rc.asOf, null, rc.level === 'good' ? '' : 'bad',
           [row(rc.loaded + ' of ' + rc.total + ' loaded', rc.left ? rc.left + ' left to load' : 'Nothing left to load'),
+            ...rc.areas.map(a => row(a.name, (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? ' · ' + a.left + ' left' : ''))),
             row((rc.late ? '⚠ ' : '✓ ') + rc.status, rc.doneBy && rc.left ? 'Last load done about ' + rc.doneBy : '', rc.level === 'good' ? '' : 'bad')], ''))(U.shiftRecap(r)) : '') +
         // Joe 11/3: with the recap above, the count is not said twice.
         '<section><h3>Routes' + (r.forecast ? '' : '<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em>') + '</h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +

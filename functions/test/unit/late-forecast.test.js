@@ -173,6 +173,9 @@ test('the email and the report carry the forecast', () => {
   assert.deepEqual([c.loaded, c.left, c.total, c.late, c.behindMin, c.level, c.doneBy], [7, 15, 22, true, 75, 'bad', '9:20 AM']);
   const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('Estimated at'));
   assert.match(box, />7 of 22 loaded<\/div>[^]*>15 left to load<\/div>/);
+  // Joe 11/3 (built-2-by-area): a line for each area, how many loaded and left.
+  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case', 7, 22]]);
+  assert.match(box, />Case<\/td>[^]*>7 of 22 loaded<span[^>]*> &middot; 15 left<\/span>/);
   assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last load done about 9:20 AM/);
   assert.doesNotMatch(box, /6304|Walmart|Will miss its truck|Every other truck|Already loaded/, 'no route names in the box');
   [html, r.text].forEach(x => assert.doesNotMatch(x, /potentially late|Due by|Cases left|\bcases\b/i));
@@ -474,4 +477,15 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
   assert.doesNotMatch(r.text, /LOADED LATE \(/);
+});
+
+// Joe 11/3 (built-2-by-area): the recap box has one line per area, in the order Case, Boxing, Tote, Tanker, and an area
+// with no loads is left out. On time with nothing late: green "On time".
+test('the shift recap lists each area in order: Case, Boxing, Tote, Tanker', () => {
+  const r = { totalLoads: 38, leftToLoad: 19, behind: [], loaded: [], nextUp: [],
+    areas: [{ area: 'CASE', total: 24, left: 14 }, { area: 'TOTES', total: 4, left: 1 }, { area: 'BOXING', total: 8, left: 3 }, { area: 'TANKER', total: 2, left: 1 }, { area: 'OTHER', total: 0, left: 0 }],
+    forecast: { asOf: '8:09 PM', now: 0, loads: [{ id: 'a', route: '801', est: 200, leaves: 300, late: false }] } };
+  const c = R.shiftRecap(r);
+  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case', 10, 24], ['Boxing', 5, 8], ['Tote', 3, 4], ['Tanker', 1, 2]]);
+  assert.deepEqual([c.loaded, c.left, c.late, c.level, c.status, c.doneBy], [19, 19, false, 'good', 'On time', '3:20 AM']);
 });

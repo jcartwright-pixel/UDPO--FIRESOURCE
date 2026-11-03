@@ -1406,7 +1406,7 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_RED_AFTER = 60, RECAP_BY_AREA = false;
+  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
     // How far behind is told by the trucks still to leave that will leave late (one load long overdue does not make the whole
@@ -1419,7 +1419,9 @@
       level: !late ? 'good' : about > RECAP_RED_AFTER ? 'bad' : 'warn',
       headline: late ? 'Running about ' + spanText(about) + ' behind' : left ? 'Everything is on time' : 'Everything is loaded',
       status: late ? 'About ' + spanText(about) + ' behind' : left ? 'On time' : 'Everything is loaded',
-      doneBy: last === null ? '' : minutesText12(((last % 1440) + 1440) % 1440), asOf: f ? f.asOf : '' };
+      doneBy: last === null ? '' : minutesText12(((last % 1440) + 1440) % 1440), asOf: f ? f.asOf : '',
+      areas: (r.areas || []).filter(function (a) { return a.total > 0; }).slice().sort(function (x, y) { return RECAP_ORDER.indexOf(x.area) - RECAP_ORDER.indexOf(y.area); })
+        .map(function (a) { return { area: a.area, name: RECAP_AREA[a.area] || a.area, total: a.total, left: a.left }; }) };
   }
   function truckCheckSummary(t) {
     return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
@@ -1529,14 +1531,14 @@
     function forecastBox() {
       var c = shiftRecap(r), fg = c.level === 'bad' ? RED : c.level === 'warn' ? '#9a5b00' : GREEN, bg = c.level === 'bad' ? '#fde8e6' : c.level === 'warn' ? '#fff4cc' : '#e2f4ea';
       var bar = function (done, all, h) { var pct = all ? Math.round(done / all * 100) : 0; return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + (pct ? '<td width="' + pct + '%" style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:' + GREEN + '">&nbsp;</td>' : '') + (pct < 100 ? '<td style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:#ffffff">&nbsp;</td>' : '') + '</tr></table>'; };
-      var AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
-      var areas = RECAP_BY_AREA ? (r.areas || []).slice().sort(function (x, y) { return ORDER.indexOf(x.area) - ORDER.indexOf(y.area); }) : [];
+      // Joe 11/3 (built-2-by-area): one line per area, how many loaded and left (Case, Boxing, Tote, Tanker).
+      var areas = c.areas;
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + bg + ';border-left:6px solid ' + fg + ';padding:14px 14px 16px">' +
         '<div style="font-size:28px;font-weight:800;line-height:1.15;color:' + INK + '">' + c.loaded + ' of ' + c.total + ' loaded</div>' +
         '<div style="font-size:18px;font-weight:700;margin-top:2px;color:' + GREY + '">' + (c.left ? c.left + ' left to load' : 'Nothing left to load') + '</div>' +
         '<div style="margin-top:10px">' + bar(c.loaded, c.total, 14) + '</div>' +
         (areas.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px">' + areas.map(function (a) {
-          return '<tr><td style="' + F + 'padding:6px 0;font-size:17px;font-weight:800;color:' + INK + ';border-bottom:1px solid #ffffff">' + e(AREA[a.area] || a.area) + '</td><td align="right" style="' + F + 'padding:6px 0;font-size:17px;font-weight:700;color:' + INK + ';white-space:nowrap;border-bottom:1px solid #ffffff">' + (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
+          return '<tr><td style="' + F + 'padding:6px 0;font-size:17px;font-weight:800;color:' + INK + ';border-bottom:1px solid #ffffff">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:6px 0;font-size:17px;font-weight:700;color:' + INK + ';white-space:nowrap;border-bottom:1px solid #ffffff">' + (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
         '<div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:14px;color:' + fg + '">' + (c.late ? '&#9888; ' : '&#10003; ') + e(c.status) + '</div>' +
         (c.doneBy && c.left ? '<div style="font-size:17px;font-weight:700;margin-top:2px;color:' + INK + '">Last load done about ' + e(c.doneBy) + '</div>' : '') +
         '<div style="font-size:13px;color:' + GREY + ';margin-top:8px">Estimated at ' + e(c.asOf) + '</div></div></td></tr>';
