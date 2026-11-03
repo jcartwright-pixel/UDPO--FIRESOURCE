@@ -21,7 +21,7 @@ async function open(browser, email, size, page) {
   await localAdmin(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => { throw e; });
-  await p.goto(HOSTING + '/' + (page || 'index.html') + '?testEmail=' + email);
+  await p.goto(HOSTING + '/' + (page || 'index.html') + ((page || '').indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + email);
   return p;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: true }); };
@@ -47,6 +47,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
 
     assert.ok(await p.isVisible('a[data-admin="people"]'), 'an administrator sees People & Access on Home');
     assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
+    assert.ok(await p.isVisible('a[data-admin="links"]'), 'and Links & Codes');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -160,10 +161,65 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Roles & Rights: no sideways page scroll on a phone');
     await shot(p, 'hub-roles-390');
 
+    // Links & Codes: Operations' own calls. A release code, the drivers' phone code, a Driver Room station, the no-account switch.
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'links.html');
+    await p.waitForSelector('#part .lc-card');
+    assert.equal(await p.$$eval('#parts a', a => a.length), 6);
+    assert.equal(await p.textContent('#part h2'), 'Manager links');
+    assert.ok(await p.isVisible('#practice'), 'the practice copy says so');
+    assert.match(await p.textContent('.lc-card[data-link="company"] .lc-url'), /\/index\.html$/);
+    await p.click('button[data-release="fac_uniontown"]');
+    await p.waitForSelector('#msg.good');
+    const first = await p.textContent('.lc-block code');
+    assert.match(first, /^[A-Z0-9]{4,}$/);
+    assert.ok((await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.hash, 'saved where Operations keeps it');
+    await p.click('button[data-release="fac_uniontown"]');
+    assert.match(await p.textContent('button[data-release="fac_uniontown"]'), /Press again to replace/);
+    assert.equal(await p.textContent('.lc-block code'), first, 'one press changes nothing');
+    await p.click('button[data-release="fac_uniontown"]');
+    await p.waitForFunction((c) => document.querySelector('.lc-block code') && document.querySelector('.lc-block code').textContent !== c, first);
+    await shot(p, 'hub-links-1920');
+    // The Driver Room and the drivers' phones.
+    await p.click('#parts a[data-part="drivers"]');
+    await p.waitForFunction(() => document.querySelector('#part h2').textContent === 'Driver Room & phones');
+    assert.match(p.url(), /part=drivers/);
+    assert.match(await p.textContent('#part [data-kind="KIOSK"]'), /Driver Room Check-In Station/);
+    await p.click('button[data-route="new"]');
+    await p.waitForSelector('.lc-card[data-link="route"] .pill.good');
+    assert.equal((await db().collection('config').doc('routePhone').get()).data().enabled, true);
+    await p.click('button[data-route="off"]');
+    await p.click('button[data-route="off"]');
+    await p.waitForSelector('.lc-card[data-link="route"] .pill.bad');
+    assert.equal((await db().collection('config').doc('routePhone').get()).data().enabled, false);
+    await p.fill('[data-kind="KIOSK"] [data-new-name]', 'Driver Room TV 2');
+    await p.selectOption('[data-kind="KIOSK"] [data-new-type]', 'TV');
+    await p.click('button[data-add="KIOSK"]');
+    await p.waitForFunction(() => /Driver Room TV 2/.test(document.querySelector('[data-kind="KIOSK"]').textContent));
+    const tv = await p.$$eval('[data-kind="KIOSK"] .lc-row', rows => rows.find(r => /Driver Room TV 2/.test(r.textContent)).querySelector('button[data-code]').dataset.code);
+    await p.click('button[data-code="' + tv + '"]');
+    await p.waitForFunction((k) => /New code for Driver Room TV 2/.test(document.querySelector('#msg').textContent), tv);
+    await shot(p, 'hub-links-drivers-1920');
+    await p.click('button[data-remove="' + tv + '"]');
+    await p.click('button[data-remove="' + tv + '"]');
+    await p.waitForFunction(() => !/Driver Room TV 2/.test(document.querySelector('[data-kind="KIOSK"]').textContent));
+    // The Plant Station with no United Dairy account: Off until turned On.
+    await p.click('#parts a[data-part="plant"]');
+    await p.waitForSelector('.lc-card[data-link="public"] .pill.bad');
+    await p.click('button[data-noaccount="on"]');
+    await p.waitForSelector('.lc-card[data-link="public"] .pill.good');
+    assert.equal((await db().collection('private').doc('stations').get()).data().noAccount.fac_uniontown, true);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'links.html?part=garage');
+    await p.waitForSelector('#part [data-kind="GARAGE"]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Links & Codes: no sideways page scroll on a phone');
+    await shot(p, 'hub-links-390');
+
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'links.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'roles.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);
