@@ -280,3 +280,6 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .em-log td { padding: 8px; border-top: 1px solid #eef2f6; vertical-align: top; overflow-wrap: anywhere; }
 .em-log td small { display: block; color: var(--muted, #5b6b7b); font-size: 12px; }
 @media (max-width: 560px) { .em-row > b { flex-basis: 100%; } }
+
+/* Plant Setup: a card per set-up screen, opened on the plant picked. */
+.ps { display: grid; gap: 18px; }
