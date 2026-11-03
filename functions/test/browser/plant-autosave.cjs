@@ -114,7 +114,7 @@ const rows = (page, sel) => page.$$eval(sel, r => r.length);
     // Joe 10/11: the Shift drop-down starts on the shift now (from Plant Shifts) and is kept with the entry.
     assert.match(await notes.inputValue('select.sn-shift'), /^(FIRST|SECOND|THIRD) SHIFT$/);
     assert.deepEqual(await notes.$$eval('#lines [data-kind]', b => b.map(x => x.dataset.kind)), ['Handoff', 'Breakdown', 'Maintenance Request', 'Incident', 'Safety', 'Quality', 'Other'], 'Joe 10/12: Maintenance Requests have their own button');
-    assert.match(await nWatch.textContent('#history'), /Cooler 2 floor · (FIRST|SECOND|THIRD) SHIFT/);
+    assert.match(await nWatch.textContent('#history'), /Cooler 2 floor[\s\S]*Reported [^·]* · (First|Second|Third) shift/);
     await notes.click('#another');
     assert.equal(await notes.inputValue('.sn-entry'), '', 'Start Another Entry empties the form');
     // The breakdown just made is now on the Still open list at the top, with its status drop-down and review box.
