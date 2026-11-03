@@ -20,7 +20,7 @@ export function watchMaint(db, facilityId, cb, fail, opts) {
   const openOnly = !!(opts && opts.openOrders), openWos = [], reqWos = {}, reqStops = {};
   const woOf = (d) => Object.assign({}, d.data(), { id: d.id });
   const normal = (w) => Object.assign(w, { status: String(w.status || 'NEW').toUpperCase() });
-  const mine = (d) => (String(d.facilityId || '').trim() || 'fac_uniontown') === facilityId;
+  const mine = (d) => window.UDLogic.plantOf(d) === facilityId;
   const mergeWos = () => {
     const byId = {};
     openWos.concat(Object.values(reqWos).filter(Boolean)).forEach(w => { byId[w.id] = w; });

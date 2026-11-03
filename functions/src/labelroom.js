@@ -44,7 +44,7 @@ function productsOf(saved, operationId) {
 async function saveLabelRoom(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const setup = await tx.get(db.collection('plantSetup').doc(docId(req.operationId))), sd = setup.exists ? setup.data() : null;
   if (!sd || sd.type !== 'PRODUCTION_AREA' || sd.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'That filler is not set up for this plant.');
-  const name = text(sd.name) || text(sd.area) || req.operationId, facilityId = text(sd.facilityId) || 'fac_uniontown';
+  const name = text(sd.name) || text(sd.area) || req.operationId, facilityId = require('./logic').plantOf(sd);
   if (P.lineKind(name) !== 'FILLER' || P.isBagFiller(name)) throw new SaveError('BAD_REQUEST', name + ' does not get its bottles from the Labeling Room.');
   if (req.op === 'labeling') {
     // Only one of the filler's own products (the plant's Products list for this line).

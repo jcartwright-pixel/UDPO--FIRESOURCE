@@ -63,7 +63,7 @@ async function loadingCaseLoad(tx, db, now) {
   const runs = (await tx.get(db.collection('runs').where('weekStart', 'in', weeks))).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
   let best = null;
   runs.forEach(run => {
-    if (text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
+    if (!L.runActive(run)) return;
     dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => {
       const day = run.days[b.prefix];
       if (plant().runAreaOf(run, b.prefix) !== 'CASE' || !plant().dayLoadingNow(day)) return;

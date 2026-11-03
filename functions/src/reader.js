@@ -69,7 +69,7 @@ function dateOf(v) {
 async function lineOf(get, db, operationId) {
   const s = await get(db.collection('plantSetup').doc(docId(operationId))), d = s.exists ? s.data() : null;
   if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new ReaderError('NOT_FOUND', 'That line is not set up for this plant.');
-  return { name: text(d.name) || text(d.area) || operationId, facilityId: text(d.facilityId) || 'fac_uniontown' };
+  return { name: text(d.name) || text(d.area) || operationId, facilityId: L.plantOf(d) };
 }
 
 // reads: [{upc, date, name?}] (name only from the test feed, for a product whose UPC is not on the list yet).
@@ -483,7 +483,7 @@ async function readerMinute(db, opts) {
     }
     // Quiet for 3 minutes on this shift: the line stopped (from its last jug).
     const plant = await db.collection('plantSetup').doc(docId(id)).get();
-    const fac = plant.exists ? text(plant.data().facilityId) || 'fac_uniontown' : 'fac_uniontown';
+    const fac = L.plantOf(plant.exists ? plant.data() : '');
     if (!shiftsOf[fac]) shiftsOf[fac] = db.collection('plantShifts').doc(docId(fac)).get();
     const shifts = await shiftsOf[fac];
     const shift = plantShift(shifts.exists ? shifts.data().shifts : null, ms);

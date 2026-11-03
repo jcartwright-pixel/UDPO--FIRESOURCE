@@ -44,7 +44,7 @@ function lineId(v, SaveError) {
 async function lineOf(tx, db, operationId, SaveError) {
   const s = await tx.get(db.collection('plantSetup').doc(docId(operationId))), d = s.exists ? s.data() : null;
   if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'That line is not set up for this plant.');
-  return { name: text(d.name) || text(d.area) || operationId, facilityId: text(d.facilityId) || 'fac_uniontown' };
+  return { name: text(d.name) || text(d.area) || operationId, facilityId: require('./logic').plantOf(d) };
 }
 
 function validateLineEntry(input, SaveError) {

@@ -145,7 +145,7 @@
     const $ = (id) => document.getElementById(id);
     const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
     const addDays = (k, n) => { const [y, m, d] = String(k).split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); };
-    const day = (k) => { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
+    const day = (k) => window.UDLogic.dateText(k);
     const list = (rows) => rows.map(d => '<tr><td>' + escapeHtml(d.name) + '</td><td>' + (d.phone ? escapeHtml(d.phone) : '<span class="texts-none">No number</span>') + '</td></tr>').join('') ||
       '<tr><td colspan="2" class="hint">Nobody ticked yet.</td></tr>';
     const pill = (el, on) => { el.textContent = on ? 'On' : 'Off'; el.className = 'pill ' + (on ? 'yes' : 'no'); };

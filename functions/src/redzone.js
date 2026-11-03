@@ -599,7 +599,7 @@ async function redzoneCall(db, user, input, options) {
     await db.collection('redzoneData').doc(fac).set(doc);
     // Which of our lines each RedZone line goes with (Line Targets can change it).
     const ours = (await db.collection('plantSetup').where('type', '==', 'PRODUCTION_AREA').get()).docs.map(x => x.data())
-      .filter(x => x.status === 'ACTIVE' && (text(x.facilityId) || 'fac_uniontown') === fac);
+      .filter(x => x.status === 'ACTIVE' && L.plantOf(x) === fac);
     const docs = {};
     (await db.collection('productionLines').get()).docs.forEach(x => { docs[x.data().operationId || x.id] = x.data(); });
     const matches = got.locations.map(l => {

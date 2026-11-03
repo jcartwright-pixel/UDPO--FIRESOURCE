@@ -109,7 +109,7 @@ async function makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError)
     const wo = had.data();
     return { ok: true, requestId: req.requestId, workOrderId: ref.id, woNumber: wo.woNumber, already: true, message: 'Already work order ' + wo.woNumber + '.' };
   }
-  const facilityId = text(note.facilityId || p.facilityId) || 'fac_uniontown';
+  const facilityId = L.plantOf(note.facilityId || p.facilityId);
   const all = await plantMachines(tx, db, facilityId);
   const num = await nextNumber(tx, db, facilityId), n = num.n;
   const words = text(v.Equipment), m = R.findMachine(all, words);
@@ -217,11 +217,11 @@ const FROM_WORD = { SHIFT_NOTES: 'Request from the plant', PM: 'PM', MAINTENANCE
 const MECH_LOGINS = 'plantMaintLogins', MECH_LOCKS = 'plantMaintLocks';
 const plantMechanic = (facilityId) => (p) => p && p.team === 'maint' && p.facilityId === facilityId && p.status !== 'RETIRED' && text(p.name) ? { id: text(p.id), name: short(p.name, 40) } : null;
 function maintSource(facilityId) {
-  const plant = plantOf(facilityId || 'fac_uniontown', A().SaveError);
+  const plant = plantOf(L.plantOf(facilityId), A().SaveError);
   return { station: 'MAINT', facilityId: plant, techs: 'crewPeople', logins: MECH_LOGINS, locks: MECH_LOCKS, tech: plantMechanic(plant), where: 'the Maintenance Station',
     noLogin: (name) => name + ' has no login ID yet. A manager adds it on Maintenance Schedule Setup, People.' };
 }
-const maintWant = (facilityId) => ({ station: 'MAINT', facilityId: plantOf(facilityId || 'fac_uniontown', A().SaveError) });
+const maintWant = (facilityId) => ({ station: 'MAINT', facilityId: plantOf(L.plantOf(facilityId), A().SaveError) });
 const loginKey = (facilityId, loginId) => 'id_' + require('crypto').createHash('sha256').update('UDPO-MAINT-ID|' + facilityId + '|' + String(loginId).trim()).digest('hex');
 // Maintenance Schedule Setup, People: set or change a plant mechanic's login ID (5 or 6 digits; two of the plant's mechanics cannot
 // share one). Reads first, then writes, inside the save's transaction. The number itself is never kept or logged.
@@ -248,7 +248,7 @@ function stationJob(o) {
 }
 
 async function stationBoard(db, input, nowMs) {
-  const facilityId = plantOf(input.facilityId || 'fac_uniontown', A().SaveError);
+  const facilityId = plantOf(L.plantOf(input), A().SaveError);
   const mech = plantMechanic(facilityId);
   const techs = (await db.collection('crewPeople').where('facilityId', '==', facilityId).get()).docs.map(d => mech(Object.assign({}, d.data(), { id: d.id }))).filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -277,7 +277,7 @@ function validateStation(input) {
   if (STATION_OPS.indexOf(op) < 0) throw SaveErr('BAD_REQUEST', 'Maintenance: unknown step ' + (op || '(none)') + '.');
   const requestId = short(input.requestId, 80);
   if (!/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) throw SaveErr('BAD_REQUEST', 'Each step needs a requestId');
-  const out = { op, requestId, facilityId: plantOf(input.facilityId || 'fac_uniontown', A().SaveError), id: short(input.id, 120) };
+  const out = { op, requestId, facilityId: plantOf(L.plantOf(input), A().SaveError), id: short(input.id, 120) };
   if (op === 'REPORT' || op === 'BREAKDOWN') {
     out.machineId = short(input.machineId, 120);
     if (!/^[A-Za-z0-9_-]+$/.test(out.machineId)) throw SaveErr('BAD_REQUEST', 'Tap the machine.');
