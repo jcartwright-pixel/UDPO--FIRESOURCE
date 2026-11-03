@@ -32,6 +32,10 @@ Operations is United Dairy's app for dispatch, the plant floor, fleet and mainte
 
 Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, trucks, settings and lists. A screen shows only the plant named in the top bar, and nothing you change there touches another plant. Only Home's **Operations Overview** shows all the plants together. You see a plant only when People & Roles gives it to you.
 
+### Trailer and truck numbers
+
+Type a trailer any way you like (**14**, **014**, **T14** or **T 14**). Operations always writes it as **T-** and the number with no zeros in front (**T-14**), on every screen, email and printout. Truck numbers lose their front zeros too when they are matched to their GPS, so **0601** and **601** are the same truck. **TBA** and **N/A** stay as they are.
+
 ### Buttons you see everywhere
 
 - `Back` goes back one step. If something is open on the screen (a window, a second tab) it closes that first.

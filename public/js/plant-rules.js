@@ -59,8 +59,10 @@
   function text(v) { return v === null || v === undefined ? '' : String(v).trim(); }
   function unloadKey(date, route, run) { return date + '|' + text(route) + '|' + text(run); }
   // "T-901", "901" and "t 901" are the same trailer.
-  function unitKey(v) { return text(v).toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/\s+/g, ''); }
-  function trailerText(v) { var t = text(v).toUpperCase().replace(/\s+/g, ''); return /^\d+$/.test(t) ? 'T-' + t : t; }
+  // A trailer or truck on the plant lists is matched by its number with or without the T- (T-864 and 864 are the same trailer);
+  // the number rules themselves are logic.js unitKey and trailerNumber (rules audit line 12).
+  function unitKey(v) { return LR.unitKey(text(v).replace(/^T\s*-?\s*(?=\d)/i, '')); }
+  function trailerText(v) { return LR.trailerNumber(v); }
   function when(v) { var t = Date.parse(v || ''); return isFinite(t) ? t : 0; }
 
   function payloadOf(doc) { return (doc && doc.payload) || {}; }
@@ -198,7 +200,7 @@
     var list = [], outsideRuns = {}, outsideRoutes = {};
     (routes || []).forEach(function (r) {
       // Joe 11/2: every outside carrier's run and route number, shown to the plant or not (scheduleOutside).
-      if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = text(r.routeCode || r.route).replace(/_[0-9]+$/, ''); if (code) outsideRoutes[code.toUpperCase()] = true; }
+      if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = LR.routeNumber(r.routeCode || r.route); if (code) outsideRoutes[code.toUpperCase()] = true; }
       if (!LR.runActive(r) || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
       if (!route && !run) return;
@@ -211,7 +213,7 @@
     list.forEach(function (r) {
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(r.run);
       if (!m || !m[1].trim()) { out.push(r); return; }
-      var base = m[1].trim(), baseRoute = r.route.replace(/_[0-9]+$/, ''), key = baseRoute + '|' + base.toUpperCase();
+      var base = m[1].trim(), baseRoute = LR.routeNumber(r.route), key = baseRoute + '|' + base.toUpperCase();
       var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]), loadType: r.loadType, outside: r.outside };
       if (byKey[key]) { byKey[key].slots.push(slot); return; }
       byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, loadType: r.loadType, outside: r.outside, grouped: true, slots: [slot] };
@@ -256,7 +258,7 @@
     var ids = [x.slot && x.slot.runId, x.runId].filter(Boolean), hit = false;
     var runs = (customers && customers.outsideRuns) || {}, routes = (customers && customers.outsideRoutes) || {};
     if (ids.some(function (id) { return runs[id]; })) return true;
-    if (routes[text((x.slot && x.slot.route) || x.route).replace(/_[0-9]+$/, '').toUpperCase()]) return true;
+    if (routes[LR.routeNumber((x.slot && x.slot.route) || x.route).toUpperCase()]) return true;
     (customers || []).some(function (c) { return (c.slots || [c]).some(function (s) { if (s.runId && ids.indexOf(s.runId) >= 0) { hit = !!(s.outside || c.outside); return true; } return false; }); });
     return hit;
   }
@@ -422,15 +424,7 @@
   /* ---------- Yard Checks ---------- */
   var YARD_LOCK_MINUTES = 120, FUEL_LEVELS = ['FULL', '3/4', '1/2', 'EMPTY'], YARD_ZONE = 'America/New_York', YARD_DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   // Trailer numbers as the current app writes them on a yard check (desktopV5069TrailerText_).
-  function yardTrailer(v) {
-    var t = text(v).toUpperCase(), c = t.replace(/\s+/g, '');
-    if (!t) return '';
-    if (c === 'N/A' || c === 'NA') return 'N/A';
-    if (c === 'TBA') return 'TBA';
-    if (/^\d+$/.test(c)) return 'T-' + c;
-    var m = c.match(/^T-?(\d+)$/);
-    return m ? 'T-' + m[1] : t;
-  }
+  function yardTrailer(v) { return LR.trailerNumber(v); }
   function dayNum(key) { var p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; }
   function dayKey(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
   // The plant's wall clock (New York) as minutes counted from 1/1/1970.
@@ -1438,7 +1432,7 @@
   // not LOADED / NOT LOADED (green is loaded, red is not). The plant's two-letter code (UT) and the word MILK are left off, words
   // with no vowel or a known short name stay capitals (DSD, KTI), the rest are written as names, and at most two words are kept (three when the third is a load number: "Marietta Load 1").
   var ACRONYMS = ['KTI', 'SAX', 'IGA', 'OTR', 'UDF'];
-  function routeNumber(route) { return text(route).replace(/_\d+$/, ''); }
+  function routeNumber(route) { return LR.routeNumber(route); }
   // Joe 10/17: a run with no name in the sheet (844, 8302) uses the route's name instead.
   function shortRun(x) {
     var run = text(x.run);

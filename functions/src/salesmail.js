@@ -62,7 +62,7 @@ function clockMinutes(v) {
   return h * 60 + Number(m[2]);
 }
 // Letters and digits only, the way the scorecard matches a truck to its GPS unit (sc-core scUnitKey_).
-const unitKey = (v) => text(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const unitKey = (v) => L.unitKey(v);
 
 // Whether the load is loaded: the one rule in logic.js (rules audit, Joe 11/3).
 function loaded(day) { return L.isLoaded(day); }

@@ -584,7 +584,7 @@
     const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
     const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:?\s*/i, '');
     // Like the current app: a short number finds the unit (893 finds 223893, 956 finds T-956) when only one unit ends with it.
-    const alnum = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const alnum = (v) => L.unitKey(v);
     function findUnit(typed) {
       const all = allUnits(), t = alnum(typed);
       const exact = all.filter(e => String(e.unit).toUpperCase() === typed);

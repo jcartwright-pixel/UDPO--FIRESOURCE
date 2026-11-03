@@ -364,10 +364,10 @@ function markTimes(day, after, stamp, saver) {
 // more than one trailer must be typed in full, and a down trailer cannot go on a load for today or later.
 const DOWN_STATUSES = ['DOWN', 'OUT OF SERVICE', 'OOS', 'REPAIR'];
 function assignCheck(typed, u, equipment, run, prefix, stamp, SaveError) {
-  const key = text(typed).toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/^0+(?=\d)/, '');
+  const key = R.unitKey(typed);
   if (!u.resolved && /^\d{1,4}$/.test(key)) {
     const suffix = key.length < 3 ? key.padStart(3, '0') : key;
-    const many = (equipment || []).filter(e => e.type === 'TRAILER' && /^\d+$/.test(text(e.unit).replace(/^T-?/i, '')) && text(e.unit).replace(/^T-?/i, '').replace(/^0+(?=\d)/, '').slice(-suffix.length) === suffix);
+    const many = (equipment || []).filter(e => e.type === 'TRAILER' && /^\d+$/.test(R.unitKey(e.unit)) && R.unitKey(e.unit).slice(-suffix.length) === suffix);
     if (many.length > 1) throw new SaveError('BAD_REQUEST', 'Trailer ' + text(typed) + ' matches ' + many.slice(0, 6).map(e => e.unit).join(', ') + '. Type the full number.');
   }
   const e = u.resolved ? (equipment || []).find(x => x.id === u.id) : null;

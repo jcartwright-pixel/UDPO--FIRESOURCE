@@ -69,7 +69,7 @@ function activeTechs(docs) {
 // The garage's units (udpoV7276Units_): trucks and trailers of this plant, trailers written T-<number>; leased ones marked.
 function unitText(unit, type) {
   const u = String(unit || '').toUpperCase().replace(/\s+/g, '');
-  if (type === 'TRAILER') { const m = /^T-?(\d+)$/.exec(u) || /^(\d+)$/.exec(u); return m ? 'T-' + m[1] : u; }
+  if (type === 'TRAILER') return L.trailerNumber(u);
   return u;
 }
 function garageUnits(equipment) {
@@ -79,7 +79,7 @@ function garageUnits(equipment) {
     .map(({ e, type }) => ({ unit: unitText(e.unit, type), type, leased: L.unitLeased(e) })).filter(u => !seen[u.unit] && (seen[u.unit] = true))
     .sort((a, b) => (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
 }
-const alnum = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const alnum = (s) => L.unitKey(s);
 // What a technician typed on Report a Problem to one unit: exact, T + typed, or the one unit that ends that way.
 function matchUnit(units, typed) {
   const key = alnum(typed);

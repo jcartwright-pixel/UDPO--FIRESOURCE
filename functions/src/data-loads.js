@@ -212,7 +212,7 @@ async function loadFleetStartMilesOnce(db, opts) {
     if (m.exists && m.data().status === 'DONE') return { skipped: true };
     const [equipment, gps, setup] = await Promise.all([tx.get(db.collection('equipment')), tx.get(db.collection('gpsTrucks')), tx.get(db.collection('fleetSetup'))]);
     // Fleet names a truck "223876" and a trailer "T-635"; ours are the same letters and digits (trailers T- plus number).
-    const key = (u) => String(u || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), byKey = {}, byDigits = {};
+    const key = (u) => L.unitKey(u), byKey = {}, byDigits = {};
     gps.docs.map(d => d.data()).forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
     if (!gps.docs.some(d => Number(d.data().odometerMiles) > 0)) return { waiting: 'no GPS odometers read yet' };
     const setupBy = {}; setup.docs.forEach(d => { setupBy[String(d.data().unit || d.id).toUpperCase()] = { ref: d.ref, data: d.data() }; });

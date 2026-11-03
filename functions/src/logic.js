@@ -270,14 +270,23 @@
     if ((type === 'TRUCK' || type === 'TRACTOR') && unit.sourcePresent === false) return false;
     return true;
   }
-  // A trailer number as typed on Daily, Weekly or the route editor: TBA and N/A stay as words; a bare number or T-number becomes
-  // T-###; anything else is kept as typed (Joe 10/15: "allow numbers, also allow TBA"; TBA used to become T-BA).
+  // A trailer number as typed anywhere (Daily, Weekly, the Route Editor, Loadout, Unloading, Washing, the yard, the garage): TBA
+  // and N/A stay as words; a bare number or a T-number becomes T- and the number; anything else is kept as typed (Joe 10/15:
+  // "allow numbers, also allow TBA"). Rules audit line 12 (Joe 11/3): "it always has to be T, then a dash. There's no beginning
+  // zeros at all ... make it all completely the same", so T-014, 014 and T 14 are all T-14. The one copy; every screen calls it.
   function trailerNumber(v) {
     var c = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return '';
     if (c === 'TBA' || c === 'N/A' || c === 'NA') return c === 'NA' ? 'N/A' : c;
-    var m = /^T-?(\d+)$/.exec(c) || /^(\d+)$/.exec(c);
-    return m ? 'T-' + m[1] : c;
+    var m = /^T?-?0*(\d+)$/.exec(c);
+    return m ? 'T-' + m[1] : /^T?-?0+$/.test(c) ? 'T-0' : c;
+  }
+  // The key two unit numbers are matched by (a GPS tag against a truck or trailer on a load): letters and digits only, no leading
+  // zeros, so "T-014", "T014" and "t 14" match, and "0601" matches "601". Rules audit line 12.
+  function unitKey(v) {
+    var c = String(v === null || v === undefined ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var m = /^([A-Z]*)0*(\d+)$/.exec(c);
+    return m ? m[1] + m[2] : c;
   }
 
   // Equipment Issues (the current app's Maintenance screen, udpoV740MaintenanceRowsFromTable_): the write-ups on TRUCK LIVE,
@@ -1248,7 +1257,7 @@
     (rows || []).forEach(function (r) {
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(String(r.run || '').trim());
       if (!r.runId || !m || !m[1].trim()) return;
-      var key = String(r.route || '').trim().replace(/_[0-9]+$/, '') + '|' + m[1].trim().toUpperCase();
+      var key = routeNumber(r.route) + '|' + m[1].trim().toUpperCase();
       if (groupOf[r.runId]) return;
       groupOf[r.runId] = key;
       (slots[key] = slots[key] || []).push({ runId: r.runId, n: Number(m[2]) });
@@ -1699,7 +1708,7 @@
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
-    plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
+    unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,

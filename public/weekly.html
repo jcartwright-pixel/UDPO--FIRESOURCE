@@ -199,7 +199,7 @@
     }
 
     // A split route's second load (6301_2) shows as 6301, as on the current screen.
-    function routeNumber(v) { const s = String(v || ''), i = s.lastIndexOf('_'); return i > 0 && /^\d+$/.test(s.slice(i + 1)) ? s.slice(0, i) : s; }
+    function routeNumber(v) { return L.routeNumber(v); }
 
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes

@@ -587,7 +587,7 @@
     // address, keys or door code and notes, then the route's instructions. Read only; the office changes it on Route Sequence.
     document.getElementById('to-book').addEventListener('click', async () => {
       const box = document.getElementById('book'), seen = new Set(), want2 = [];
-      loads.forEach(l => { const r = String(l.route || '').replace(/_\d+$/, ''), k = r + '|' + l.day; if (r && !seen.has(k)) { seen.add(k); want2.push([r, l.day]); } });
+      loads.forEach(l => { const r = window.UDLogic.routeNumber(l.route || ''), k = r + '|' + l.day; if (r && !seen.has(k)) { seen.add(k); want2.push([r, l.day]); } });
       step('step-book');
       if (!want2.length) { box.innerHTML = '<p class="phone-empty">No load for you on this day, so there is no route book to show.</p>'; return; }
       box.innerHTML = '<p class="phone-empty">Reading the route book&hellip;</p>';
@@ -685,7 +685,7 @@
       dvRequest = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9-]/g, '');
       const r = await call('loads', { driverId, date: dates[0] || '' });
       dvLoads = r.loads; dvOdometers = r.gpsOdometers || {};
-      $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(String(l.route).replace(/_\d+$/, '') + ' · ' + l.run) + '</option>').join('');
+      $('dv-route').innerHTML = '<option value="">Select route…</option>' + dvLoads.map((l, i) => '<option value="' + i + '">' + escapeHtml(window.UDLogic.routeNumber(l.route) + ' · ' + l.run) + '</option>').join('');
       if (dvLoads.length) { $('dv-route').value = '0'; fillRoute(); }
       $('dv-route-box').hidden = dvLoads.length === 1;
       if (!dvLoads.length) $('dv-msg').textContent = 'Dispatch has no route for you today, so there is nothing to inspect yet.';

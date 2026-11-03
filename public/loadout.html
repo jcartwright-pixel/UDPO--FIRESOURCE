@@ -197,7 +197,7 @@
     // rule counts the loads on Plant Departments, Manager Center and the Late Forecast (Joe 10/22).
     const withSched = (live) => R.withScheduleLoads(live, schedToday(), R.scheduleCustomers(slotRoutes()));
     // Joe 10/14: the Route column is the route number (905, not 905_2); the Run says which load it is.
-    const routeNo = (route) => String(route || '').replace(/_[0-9]+$/, '');
+    const routeNo = (route) => L.routeNumber(route);
     const schedTag = (x) => [x.poNumber ? 'PO ' + x.poNumber : '', x.pickupTime ? clock24(x.pickupTime) : ''].filter(Boolean).join(' · ');
 
     // Joe 10/14 (Daily Box Loadout, then "for the case type columns ... B, make them narrower too"): on every loadout but Tanker,
@@ -938,7 +938,7 @@
     // route today. A unit marked down is left off the list while it is down (Joe 10/11). Any number can still be typed. The trailer list starts with TBA: the trailer is not
     // known yet (saved as plain TBA, never T-TBA).
     let units = { TRUCK: [], TRAILER: [] }, unitsShown = { TRUCK: '', TRAILER: '' };
-    const unitKey = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const unitKey = (v) => L.unitKey(v);
     function drawTrailers(rows) {
       [['TRUCK', 'truck', 'lo-trucks'], ['TRAILER', 'trailer', 'lo-trailers']].forEach(([type, k, id]) => {
         const busy = new Set(rows.filter(r => !r.prior && r[k]).map(r => unitKey(r[k])));
