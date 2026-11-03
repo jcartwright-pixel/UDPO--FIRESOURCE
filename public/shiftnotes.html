@@ -396,7 +396,7 @@
           const up = (upBox && upBox.value) || (t.matches('[data-fix]') && t.value.trim() ? clockNow() : ''), fix = fixBox ? fixBox.value.trim() : '';
           if (!up) return;
           if (upBox) upBox.value = ''; if (fixBox) fixBox.value = '';
-          review(id, fix || 'Back up at ' + up, 'RESOLVED', Object.assign({ UpAt: up }, fix ? { Fix: fix } : {}));
+          review(id, fix || 'Back up at ' + clock12(up), 'RESOLVED', Object.assign({ UpAt: up }, fix ? { Fix: fix } : {}));
           return;
         }
         if (t.matches('[data-status]')) {
