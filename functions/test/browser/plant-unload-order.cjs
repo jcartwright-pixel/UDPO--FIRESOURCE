@@ -150,8 +150,11 @@ async function openPage(browser, width, height, url, touch) {
     const add = await o.waitForSelector('#rows tr[data-key*="ADDED"]');
     assert.match(await add.textContent(), /T-777/);
     assert.match(await add.textContent(), /UT DSD MILK/);
-    await add.$eval('[data-do="edit"]', b => b.click());
-    await o.click('[data-do="drop"]');
+    // Found fresh at the press: a live update can redraw the table after the row was found, and a press on the old
+    // copy of the button went nowhere (no Edit bar, so no Take Off the List: the check timed out).
+    await o.$eval('#rows tr[data-key*="ADDED"] [data-do="edit"]', b => b.click());
+    await o.waitForSelector('[data-do="drop"]');
+    await o.$eval('[data-do="drop"]', b => b.click());
     await o.waitForFunction(() => !document.querySelector('#rows tr[data-key*="ADDED"]'));
     let saved;
     // Up to 30 seconds: on a busy test machine one save has taken 10 to 17 seconds.
