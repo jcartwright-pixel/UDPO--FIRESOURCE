@@ -86,7 +86,9 @@ function matchUnit(units, typed) {
   if (!key) return { error: 'Type the truck or trailer number.' };
   const exact = units.filter(u => alnum(u.unit) === key || alnum(u.unit) === 'T' + key);
   if (exact.length === 1) return { unit: exact[0] };
-  const ends = key.length >= 2 ? units.filter(u => alnum(u.unit).endsWith(key)) : [];
+  // The last digits typed, as typed ("01" is the end of 900001 and T-901): front zeros only come off a whole number.
+  const tail = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), end = tail(typed);
+  const ends = end.length >= 2 ? units.filter(u => tail(u.unit).endsWith(end)) : [];
   if (ends.length === 1) return { unit: ends[0] };
   if (exact.length > 1 || ends.length > 1) return { error: text(typed, 12) + ' matches ' + (exact.length > 1 ? exact : ends).slice(0, 4).map(u => u.unit).join(', ') + '. Type the whole number.' };
   return { error: text(typed, 12) + ' is not one of our trucks or trailers.' };

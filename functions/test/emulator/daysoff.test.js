@@ -63,7 +63,7 @@ test('Vacation Schedule: an approved entry goes on Dispatch, at most 3 off a day
 
 test('the same driver cannot be off twice for the same day; editing or cancelling the entry itself is allowed', async () => {
   const one = await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), driverId: 'drv_test_dunn', startDate: '2026-12-07', endDate: '2026-12-11', status: 'APPROVED' });
-  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), driverId: 'drv_test_dunn', startDate: '2026-12-10', endDate: '2026-12-10', type: 'PERSONAL', status: 'PENDING' }), /DUNN, ROBIN is already off 12\/7\/2026 – 12\/11\/2026\. Edit that entry instead/);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), driverId: 'drv_test_dunn', startDate: '2026-12-10', endDate: '2026-12-10', type: 'PERSONAL', status: 'PENDING' }), /DUNN, ROBIN is already off 12-7-26 – 12-11-26\. Edit that entry instead/);
   await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), vacationId: one.vacationId, driverId: 'drv_test_dunn', startDate: '2026-12-08', endDate: '2026-12-11', status: 'APPROVED' });
   await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), vacationId: one.vacationId, driverId: 'drv_test_dunn', startDate: '2026-12-08', endDate: '2026-12-11', status: 'CANCELLED' });
   await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), driverId: 'drv_test_dunn', startDate: '2026-12-10', endDate: '2026-12-10', type: 'PERSONAL', status: 'APPROVED' });
