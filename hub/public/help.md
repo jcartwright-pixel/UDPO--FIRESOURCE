@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -114,6 +114,40 @@ screens: links.html
 !> Do not press `New code` to check a code. Every tablet or phone on the old code stops until someone types the new one.
 
 !> Do not send codes in a group text or email. Read them out or hand them over in person.
+
+## Email & Texts
+id: email
+screens: email.html
+
+**Email & Texts** is where Plant & Distribution's email and texts go and who gets them. It is the same set of settings as **Email & Texts** in Plant & Distribution's Administration, saved to the same place, so nothing has to be set up again. Administrators only.
+
+1. Pick a part on the left: **Sending & Sent Email**, **Plant Report**, **Sales Route Email**, **Who Email Comes From**, **Repair Email**, **Driver Check-In Email** or **Texts to Drivers**.
+2. For **Plant Report** and **Driver Check-In Email**, pick the **Plant** at the top. Each plant has its own.
+3. Type in a box and leave it (press Tab or click somewhere else). It saves then; there is no Save button. A list saves as soon as you pick from it.
+4. A green line says it saved. A red line says what was wrong, and what you typed stays in the box so you can fix it.
+5. **Sending & Sent Email** has the one switch for all email. When it is Off nothing is emailed, and every try is listed as stopped. Below it is every email sent, newest first.
+6. **Plant Report**: type the addresses for each group with commas between them. To add a group, type its name and addresses at the bottom and press `+ Add Group`.
+7. **Sales Route Email**: who gets the 6:00 AM route email, `Turn On` / `Turn Off`, and `Send a test to me`.
+8. **Who Email Comes From**: whether email someone sends comes from their own United Dairy email or the plant's, and each plant's address for automatic email.
+9. **Repair Email**: the addresses for Idealease and Penske, how often each is emailed, and the once-a-day time. `Send now` sends what is waiting.
+10. **Driver Check-In Email**: the mailbox the drivers' check-ins are read from. `Check now` reads it right away.
+11. **Texts to Drivers**: load done texts On or Off, and the cell phone driver replies are sent on to. The week's schedule texts are still sent from **Texts** in Plant & Distribution (`Open Texts in Plant & Distribution`).
+
+### Buttons
+- `Turn On` / `Turn Off`: all email (Sending), the sales email, or load done texts. Turning Sending on or off, and turning the sales email on, need a second press.
+- `Only me` / `Everyone`: who sees the forecast in the plant report email.
+- `+ Add Group` / `Remove`: a plant report group. `Remove` needs a second press.
+- `Send a test to me`: the sales email, to you only.
+- `Send now`: repair email that is waiting.
+- `Check now` / `Use the standard addresses`: the driver check-in mailbox.
+
+> The Twilio account for texts is in **Keys & Connections**. Who gets texts is ticked on the Driver Roster in Plant & Distribution.
+
+> On the practice copy email goes only to the person who pressed the button, and texts are never sent.
+
+!> Do not turn Sending off to stop one email. It stops every email, including the plant report and repair email.
+
+!> Do not type a customer's or a lessor's address into a plant report group. Those groups are for United Dairy people.
 
 ## Keys & Connections
 id: keys
