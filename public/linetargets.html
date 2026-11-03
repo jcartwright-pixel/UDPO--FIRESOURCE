@@ -348,11 +348,13 @@
       const box = document.getElementById('setup');
       if (box.contains(document.activeElement)) return;
       const info = data.lineInfo[line.operationId] || {}, val = (k) => info[k] === null || info[k] === undefined ? '' : info[k];
-      box.innerHTML = '<label>Changeover standard, minutes <input id="setup-co" data-setup="changeoverMin" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('changeoverMin')) + '"' + (ck ? '' : ' disabled') + '></label>' +
-        '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>' +
+      // Joe 11/3: the Blow Mold has no changeovers and no CIP washes, so it has neither box.
+      const bm = R.lineKind(line.name) === 'BLOWMOLD';
+      box.innerHTML = (bm ? '' : '<label>Changeover standard, minutes <input id="setup-co" data-setup="changeoverMin" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('changeoverMin')) + '"' + (ck ? '' : ' disabled') + '></label>' +
+        '<label>CIP wash every, hours <input id="setup-cip" data-setup="cipHours" inputmode="decimal" maxlength="4" value="' + escapeHtml(val('cipHours')) + '"' + (ck ? '' : ' disabled') + '></label>') +
         // Joe 10/14: the Blow Mold weighs a jug from each of its six heads; the tablet flags a head outside this range.
         (R.lineKind(line.name) === 'BLOWMOLD' ? [['jugWeightTarget', 'Jug weight target, g'], ['jugWeightLow', 'Lightest, g'], ['jugWeightHigh', 'Heaviest, g']].map(([k, l]) => '<label>' + l + ' <input id="setup-' + k + '" data-setup="' + k + '" inputmode="decimal" maxlength="6" value="' + escapeHtml(val(k)) + '"' + (ck ? '' : ' disabled') + '></label>').join('') : '') +
-        '<span>The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.' + (R.lineKind(line.name) === 'BLOWMOLD' ? ' The bottle check flags a head\'s jug lighter or heavier than the range.' : '') + ' Leave a box empty for none.</span>' +
+        '<span>' + (bm ? 'The bottle check flags a head\'s jug lighter or heavier than the range.' : 'The line tablet times each changeover against the standard, and shows the hours since the last CIP wash that passed against the hours between washes.') + ' Leave a box empty for none.</span>' +
         (R.hasFill(line.name) ? fillSetup(line, info, val, ck) : '') + (R.lineKind(line.name) === 'PACK' ? fedSetup(line, info, val, ck) : '') +
         (R.lineKind(line.name) === 'FILLER' && !R.isBagFiller(line.name) ? labelSetup(line, info, val, ck) : '');
     }

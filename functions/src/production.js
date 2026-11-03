@@ -241,6 +241,8 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   } else if (req.op === 'changeover') {
     const co = run.changeovers.filter(x => !x.end)[0];
     if (req.sub === 'start') {
+      // Joe 11/3: the Blow Mold has no changeovers (one left open from before can still be finished).
+      if (!P.hasChangeover(line.name)) throw new SaveError('BAD_REQUEST', line.name + ' has no changeovers.');
       if (co) throw new SaveError('CONFLICT', line.name + ' is already in a changeover.');
       if (run.changeovers.length >= P.LIMITS.CHANGEOVERS) throw new SaveError('BAD_REQUEST', 'This shift has too many changeovers to keep.');
       run.changeovers.push({ start: stamp, end: null, from: run.product || '', to: req.to, checks: {}, by: email });
@@ -264,6 +266,8 @@ async function saveLineEntry(tx, db, req, email, stamp, logRef, mode, SaveError)
   } else if (req.op === 'cip') {
     const c = run.cips.filter(x => !x.end)[0];
     if (req.sub === 'start') {
+      // Joe 11/3: the Blow Mold has no CIP washes (Boxing's tablet just has no CIP button, Joe 10/26).
+      if (P.lineKind(line.name) === 'BLOWMOLD') throw new SaveError('BAD_REQUEST', line.name + ' has no CIP washes.');
       if (c) throw new SaveError('CONFLICT', line.name + ' is already washing.');
       if (run.cips.length >= P.LIMITS.CIPS) throw new SaveError('BAD_REQUEST', 'This shift has too many CIP washes to keep.');
       run.cips.push({ start: stamp, end: null, result: '', by: email });

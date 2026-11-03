@@ -189,7 +189,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
     await tb.click('#state-btns [data-go="down"]');
     await tb.waitForFunction(() => document.querySelector('#reasons button') && document.querySelector('#reasons button').textContent === 'Blow mold is down');
     assert.deepEqual(await tb.$$eval('#reasons button', b => b.map(x => x.textContent)), ['Blow mold is down', 'Bottle Jam', 'Adjusting weights', 'No Orders', 'Resin feed', 'Leak tester down', 'Trimmer jam',
-      'Conveyor / bottle jam', 'Heater / temperature', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room; Mold change is the banner\'s button (Joe 10/26)');
+      'Conveyor / bottle jam', 'Heater / temperature', 'Maintenance called', 'Other'], 'RedZone\'s first, then ours while there is room; no Mold change (the Blow Mold has no changeovers, Joe 11/3)');
     await tb.$eval('#reasons', e => e.scrollIntoView({ block: 'center' }));
     await shot(tb, 'rz-line-tablet-stopped-1024');
     await tb.click('#reasons button[data-reason="Bottle Jam"]');

@@ -183,7 +183,7 @@
       tm.hidden = false;
       tm.textContent = Math.floor(sec / 3600) + ':' + String(Math.floor(sec / 60) % 60).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
     }
-    // Not reasons to be down: Changeover is its own button, the wash is the CIP tab.
+    // Not reasons to be down: Changeover is its own button, the wash is the CIP tab (the Blow Mold has neither, Joe 11/3).
     const NOT_DOWN = ['Changeover', 'Changeover / flush', 'Sanitation / CIP', 'Mold change'];
     function render() {
       // The code screen: nothing else shows until the code is typed.
@@ -314,6 +314,8 @@
       tm.dataset.since = since ? String(ms(since)) : '';
       tick();
       document.getElementById('go-co').textContent = coWord;
+      // Joe 11/3: no CHANGEOVER button on the Blow Mold (it has no changeovers); one left open still shows, and Running ends it.
+      document.getElementById('go-co').hidden = !v.hasChangeover && v.state !== 'CHANGEOVER';
       document.querySelectorAll('#state-btns button').forEach(b => { b.classList.toggle('cur', b.dataset.go === cur); b.disabled = busy || (b.dataset.go === cur && cur !== 'co'); });
       const rs = document.getElementById('reasons');
       rs.hidden = reasonFor < 0;
@@ -327,7 +329,7 @@
     // Efficiency stays off the tablet (Joe: managers only).
     const MORE = { changeover: 1, cip: 1, waste: 1, check: 1, crew: 1, notes: 1, divert: 1, source: 1, lot: 1, stock: 1, next: 1 };
     const ACTIONS = { FILLER: ['changeover', 'cip', 'waste', 'check', 'crew', 'notes'], PACK: ['changeover', 'cip', 'waste', 'check', 'crew', 'notes'],
-      HTST: ['divert', 'cip', 'source', 'changeover', 'crew', 'notes'], BLOWMOLD: ['changeover', 'lot', 'waste', 'check', 'crew', 'notes'] };
+      HTST: ['divert', 'cip', 'source', 'changeover', 'crew', 'notes'], BLOWMOLD: ['lot', 'waste', 'check', 'crew', 'notes'] };
     let wasteReason = '', coTo = '';
     // A box is drawn again only when what it shows has changed: a save's own redraw (before the saved value comes back) keeps what was just picked or typed.
     const drawn = {};
@@ -473,7 +475,7 @@
       drawBoxing(v);
       // The CIP clock (mock-up G): hours since the last CIP wash that passed, against the line's hours between washes.
       const cs = document.getElementById('cip-strip');
-      cs.hidden = !(k === 'HTST' || v.cipHours);
+      cs.hidden = !v.hasCip || !(k === 'HTST' || v.cipHours);
       if (!cs.hidden) {
         const of = v.cipHours, h = v.sinceCipHours, cls = v.cip ? 'n' : h === null ? 'a' : of && h >= of ? 'r' : of && h >= of * 0.8 ? 'a' : 'g';
         cs.className = 'lb-date ' + (cls === 'r' ? 'bad' : cls === 'g' ? 'ok' : '');
@@ -537,10 +539,11 @@
       catch (err) { showError('The Labeling Room was not told (' + (err.message || err) + ').'); }
       render();
     });
-    // The tabs in the head (Joe 10/26, mock-up 1): Line (the board), then the line's buttons. Boxing has no CIP (Joe 10/26).
+    // The tabs in the head (Joe 10/26, mock-up 1): Line (the board), then the line's buttons. Boxing has no CIP (Joe 10/26);
+    // the Blow Mold has no CIP and no changeover (Joe 11/3).
     function drawTabs(v) {
       const open = MORE[pane] ? pane : pane ? '' : 'board';
-      const tabs = [['board', 'Line', 'now', '']].concat((ACTIONS[v.kind] || ACTIONS.FILLER).filter(a => a !== 'cip' || v.hasCip).map(a => [a].concat(actionText(v, a))));
+      const tabs = [['board', 'Line', 'now', '']].concat((ACTIONS[v.kind] || ACTIONS.FILLER).filter(a => (a !== 'cip' || v.hasCip) && (a !== 'changeover' || v.hasChangeover)).map(a => [a].concat(actionText(v, a))));
       draw('actions', tabs.map(t => '<button type="button" data-act="' + t[0] + '" class="' + [t[3], t[0] === open ? 'cur' : ''].filter(Boolean).join(' ') + '">' + escapeHtml(t[1]) + '<small>' + escapeHtml(t[2]) + '</small></button>').join(''));
     }
     // ---------- Fill weight check (Joe 10/14): filled jugs weighed in grams, as often as Line Targets says ----------

@@ -162,12 +162,11 @@
     HTST: ['Startup / flush (gal)', 'Divert (gal)', 'Changeover purge (gal)', 'Other (gal)'],
     BLOWMOLD: ['Leak tester', 'Thin wall / short shot', 'Bad trim', 'Contaminated', 'Startup', 'Other']
   };
-  // The changeover checklist (mock-up D); Blow Mold's changeover is its mold change.
+  // The changeover checklist (mock-up D). The Blow Mold has no changeovers (Joe 11/3), so no checklist.
   var CHANGEOVER_CHECKS = {
     FILLER: [['purge', 'Product line purged', ''], ['labels', 'Labels changed to the new product', ''], ['caps', 'Caps changed (color)', ''], ['code', 'Code date set and read', ''], ['first', 'First jugs checked (fill, cap, label)', 'tap when 5 are good'], ['flush', 'Allergen / flavor flush done', 'only for chocolate to white']],
     PACK: [['purge', 'Product line purged', ''], ['labels', 'Labels or box changed to the new product', ''], ['code', 'Code date set and read', ''], ['first', 'First units checked (seal, label)', ''], ['flush', 'Allergen / flavor flush done', 'only for chocolate to white']],
-    HTST: [['flush', 'Product flushed (water push)', ''], ['valves', 'Valves set to the new product\'s tanks', ''], ['allergen', 'Allergen / flavor flush done', 'only for chocolate to white'], ['first', 'First product checked (temp, taste, look)', '']],
-    BLOWMOLD: [['mold', 'Mold changed', ''], ['weight', 'Bottle weight checked', ''], ['leak', 'Leak tester checked', '']]
+    HTST: [['flush', 'Product flushed (water push)', ''], ['valves', 'Valves set to the new product\'s tanks', ''], ['allergen', 'Allergen / flavor flush done', 'only for chocolate to white'], ['first', 'First product checked (temp, taste, look)', '']]
   };
   // The quality check each kind records (mock-ups E, G, H): every 2 hours, the HTST chart check every hour.
   var CHECK_FIELDS = {
@@ -293,7 +292,9 @@
       : { one: 'jug', many: 'jugs', One: 'Jug', empty: 'empty jug', Empty: 'Empty jug', cap: 'cap', Cap: 'Cap' };
   }
   // Joe 10/26: Boxing has no CIP / sanitation (no CIP button on its tablet); it does have changeovers.
-  function hasCip(lineName) { return text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, '') !== 'BOXING'; }
+  // Joe 11/3: the Blow Mold has no CIP washes and no changeovers either (no buttons on its tablet, no boxes on its page).
+  function hasCip(lineName) { var k = text(lineName).toUpperCase().replace(/[^A-Z0-9]/g, ''); return k !== 'BOXING' && lineKind(lineName) !== 'BLOWMOLD'; }
+  function hasChangeover(lineName) { return lineKind(lineName) !== 'BLOWMOLD'; }
   // Joe 10/26: the countdown for the product running now. qty = how many to run (typed on the tablet, or the Up next amount
   // when that product is started); made = counted since the product started this shift; left = what is still to run.
   function runLeft(run, nowMs) {
@@ -554,7 +555,7 @@
       fill: kind === 'FILLER' || isBagFiller(lname) ? { due: fillDue(r, ld, nowMs), tare: tareFor(ld.line || r.line, ld, (plant || {}).blowHeads, nowMs), cap: num(ld.capGrams),
         target: base.target ? num(base.target.fillGrams) : null, under: num(ld.fillUnder), over: num(ld.fillOver), totals: fillTotals(r, base.made),
         checks: (r.fills || []).map(fillOf), words: fillWords(lname) } : null,
-      boxing: boxingOf(ld, base.made, (plant || {}).feeders), runLeft: runLeft(r, nowMs), hasCip: hasCip(lname),
+      boxing: boxingOf(ld, base.made, (plant || {}).feeders), runLeft: runLeft(r, nowMs), hasCip: hasCip(lname), hasChangeover: hasChangeover(lname),
       lot: text(r.lot) || text(ld.lot), jugColor: text(r.color) || text(ld.color), lotAt: text(r.lotAt), lotCarried: !text(r.lot) && !!text(ld.lot),
       lotRuns: kind === 'BLOWMOLD' ? lotRuns(r, ld, nowMs) : [], stock: num(r.stock), note: text(r.note), next: ld.next && typeof ld.next === 'object' && text(ld.next.product) ? { product: text(ld.next.product), qty: num(ld.next.qty) } : null
     });
@@ -753,6 +754,6 @@
     lineKind: lineKind, packSide: packSide, KIND_LABEL: KIND_LABEL, WASTE_REASONS: WASTE_REASONS, CHANGEOVER_CHECKS: CHANGEOVER_CHECKS, CHECK_FIELDS: CHECK_FIELDS, CHECK_EVERY: CHECK_EVERY, DIVERT_REASONS: DIVERT_REASONS, STOP_REASONS: STOP_REASONS, stopReasons: stopReasons, LIMITS: LIMITS,
     CONTROLLER_BRANDS: CONTROLLER_BRANDS, CONTROLLER_PORTS: CONTROLLER_PORTS, READINGS: READINGS, readingsFor: readingsFor, JUGS_PER_SHOT: JUGS_PER_SHOT, KICK_HIGH: KICK_HIGH, COLORS: COLORS, colorName: colorName, lotRuns: lotRuns, blowHours: blowHours, TAG_HELP: TAG_HELP, CONTROLLER_FIELDS: CONTROLLER_FIELDS, tagOk: tagOk, controllerField: controllerField, machineFlag: machineFlag, machineNow: machineNow, speedNameFor: speedNameFor, weightFlag: weightFlag,
     OLD_CHECK_FIELDS: OLD_CHECK_FIELDS, headsAverage: headsAverage, FILL_JUGS: FILL_JUGS, FILL_MAX: FILL_MAX, FILL_MODES: FILL_MODES, FILL_DEFAULT_MIN: FILL_DEFAULT_MIN, TARE_HOURS: TARE_HOURS, GRAMS_PER_LB: GRAMS_PER_LB,
-    usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasCip: hasCip, runLeft: runLeft, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
+    usesBlowMoldJugs: usesBlowMoldJugs, isBagFiller: isBagFiller, hasCip: hasCip, hasChangeover: hasChangeover, runLeft: runLeft, hasFill: hasFill, fillWords: fillWords, boxingOf: boxingOf, tareFor: tareFor, fillFlag: fillFlag, fillOf: fillOf, fillDue: fillDue, fillTotals: fillTotals,
     countAt: countAt, checkDue: checkDue, labelLines: labelLines, labelDefault: labelDefault, labelView: labelView, sameItem: sameItem, weekScore: weekScore, lineMore: lineMore, hourly: hourly, timeline: timeline };
 });

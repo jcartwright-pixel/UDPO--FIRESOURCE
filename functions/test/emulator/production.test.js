@@ -144,6 +144,15 @@ test('Joe 10/14: the HTST\'s divert, silo and tanks; the Blow Mold\'s resin lot 
   assert.equal((await db().collection('productionLines').doc(LINE).get()).data().lastDivertAt, '2026-10-08T11:00:00.000Z');
 });
 
+// Joe 11/3: the Blow Mold has no CIP washes and no changeovers, so the server refuses to start either on it.
+test('Joe 11/3: the Blow Mold refuses a changeover or a CIP wash', async () => {
+  const blow = (op, fields) => applyAction(db(), { email: MANAGER }, Object.assign({ action: 'saveLineEntry', requestId: rid(), operationId: 'ut_prod_blow_mold', op, shift: SHIFT }, fields), at('2026-10-08T11:00:00Z'));
+  await assert.rejects(blow('changeover', { sub: 'start', to: '' }), /has no changeovers/);
+  await assert.rejects(blow('cip', { sub: 'start' }), /has no CIP washes/);
+  const r = (await db().collection('productionRuns').doc(P.runId('ut_prod_blow_mold', SHIFT.key)).get()).data() || {};
+  assert.deepEqual([(r.changeovers || []).length, (r.cips || []).length], [0, 0]);
+});
+
 test('Joe 10/14: a manager sets the changeover standard and CIP hours; a dispatcher may not', async () => {
   await applyAction(db(), { email: MANAGER }, { action: 'saveLineCounter', requestId: rid(), operationId: LINE, counter: 'SENSOR' });
   await applyAction(db(), { email: MANAGER }, { action: 'saveLineSetup', requestId: rid(), operationId: LINE, changeoverMin: '20' });
