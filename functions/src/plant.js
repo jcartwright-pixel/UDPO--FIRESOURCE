@@ -906,7 +906,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     else if (lines) payload.lines = [];
     if (had && had.payload && had.payload.received) payload.received = had.payload.received;
     rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
-      area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
+      area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: L.plantOf(had) };
   }
   delete rec.sheetRow; delete rec.cells;
   Object.assign(rec, { recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
@@ -1062,7 +1062,7 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Production area is not configured for this plant.');
   const record = { operationId: req.operationId, area: d.name, product: req.product, status: req.status, remainingOutput: req.remainingOutput, qualityCheck: req.qualityCheck,
     tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
-    facilityId: d.facilityId || 'fac_uniontown' };
+    facilityId: L.plantOf(d) };
   if (req.undone) record.undone = true;
   const id = req.checkId || 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   if (req.checkId) {
@@ -1260,7 +1260,7 @@ async function productSetupOf(tx, db, facilityId) {
   return { ref, had: d, areas: d && Array.isArray(d.areas) ? d.areas : (START_AREAS[facilityId] || []).map(n => ({ id: areaSlug(facilityId, n), name: n })),
     groups: d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice() };
 }
-const machinePlant = (d) => text(d.facilityId) || 'fac_uniontown';
+const machinePlant = (d) => L.plantOf(d);
 function validFacility(v, SaveError) {
   const facilityId = text(v);
   if (plantIds().indexOf(facilityId) < 0) throw new SaveError('BAD_REQUEST', 'Pick a plant.');

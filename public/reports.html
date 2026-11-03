@@ -50,7 +50,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
+    import { start, currentPlant, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
     import { collection, doc, getDoc, query, where, getDocs } from './js/firebase.js';
     import * as R from './js/plant-reports.js';
 
@@ -324,7 +324,8 @@
 
     requireSignIn(async () => {
       ({ db } = await start());
-      try { const s = await getDoc(doc(db, 'plantShifts', 'fac_uniontown')); shifts = R.shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); } catch (e) { /* the starting shifts */ }
+      // Rules audit line 11 (Joe 11/3): this plant's own Shift Times (they always read Uniontown's before).
+      try { const s = await getDoc(doc(db, 'plantShifts', currentPlant())); shifts = R.shiftsFor(s.exists() ? s.data() : null, currentPlant()); } catch (e) { /* the starting shifts */ }
       draw();
     });
   </script>

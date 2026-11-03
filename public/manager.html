@@ -124,7 +124,7 @@
     const dpLine = (href, label, side, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><b>' + escapeHtml(String(side)) + '</b><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></a>';
     // Joe 10/23: the walkthrough pictures still to go with a report, this plant's only.
     let taking = false;
-    const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
+    const myPics = () => data.pics.filter(p => L.plantOf(p) === plantFor(person, null).id);
     function picTile() {
       // The newest picture with its caption box; with more than one, the count opens the walkthrough, which lists them all.
       const pics = myPics(), SHOWN = 1;

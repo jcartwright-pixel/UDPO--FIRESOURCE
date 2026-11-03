@@ -127,7 +127,7 @@
   </section>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
+    import { start, currentPlant, requireSignIn, watchPerson, save, allowedSaves, escapeHtml, shortDate, showError, goLiveNote, maySave } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
     import { mountRowDrag } from './js/row-drag.js';
@@ -967,7 +967,7 @@
       onSnapshot(doc(db, 'caseCounters', 'palletizer'), s => { palletizer = s.data() || null; render(); }, () => { palletizer = null; });
       onSnapshot(collection(db, 'routes'), s => { routeDocs = s.docs.map(d => Object.assign({ runId: d.id }, d.data())); render(); }, () => { routeDocs = []; });
       onSnapshot(query(collection(db, 'equipment'), where('type', 'in', ['TRUCK', 'TRAILER'])), s => {
-        const all = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, 'fac_uniontown', true));
+        const all = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, currentPlant(), true));
         ['TRUCK', 'TRAILER'].forEach(t => { units[t] = all.filter(e => e.type === t).map(e => ({ unit: e.unit, down: !!e.status && String(e.status).toUpperCase() !== 'ACTIVE' })); });
         render();
       }, () => {});

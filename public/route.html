@@ -421,7 +421,7 @@
       document.getElementById('step-board').addEventListener('click', e => { if (e.target.closest('button')) return; clearInterval(boardTimer); want = ''; show().catch(err => showError(err.message)); });
       // Release: only with the plant's manager release code (none set: the tablet stays here).
       document.getElementById('m-station').addEventListener('click', async () => {
-        const fac = station.facilityId || 'fac_uniontown';
+        const fac = window.UDLogic.plantOf(station);
         // The release box sits under the three choices: the driver is signed out and the choices come back first.
         if (document.getElementById('step-menu').hidden) { signOut(); want = ''; clearInterval(boardTimer); await show(); }
         const ok = await askRelease(document.getElementById('release-box'), { status: () => call('roomStatus', { facilityId: fac }), release: (c) => call('roomRelease', { facilityId: fac, code: c }), onError: showError, mustHave: true });

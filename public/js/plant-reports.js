@@ -83,7 +83,7 @@ export const shiftSide = (x) => (text(x && x.side).toUpperCase() === 'PRODUCTION
 // The plant's shifts on one side (Distribution unless asked; side 'ALL' = every shift): the saved list (plantShifts/<facility>)
 // or the starting list. Loads, Shift Notes and Shift Reports go by the Distribution shifts.
 export function shiftsFor(saved, facilityId, side) {
-  const id = facilityId || 'fac_uniontown', want = side || 'DISTRIBUTION', starting = DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
+  const id = L.plantOf(facilityId), want = side || 'DISTRIBUTION', starting = DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
   let list = saved && Array.isArray(saved.shifts) && saved.shifts.length ? saved.shifts : starting;
   if (want !== 'ALL') { list = list.filter(x => shiftSide(x) === want); if (!list.length && want === 'DISTRIBUTION') list = starting; }
   return list.map(x => ({ name: text(x.name), start: text(x.start), end: text(x.end), side: shiftSide(x), from: hhmm(x.start), to: hhmm(x.end) })).filter(x => x.name && x.from !== null && x.to !== null);

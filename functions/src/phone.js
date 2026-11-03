@@ -398,7 +398,7 @@ async function saveDvir(db, input, who, dates, stamp) {
     req.trailers.forEach((t, i) => {
       if (had[i].exists) return;
       const checks = truckChecks.concat(t.checks), defect = checks.indexOf('Defect found') >= 0 || !!req.tractorIssues || !!t.issues;
-      tx.set(refs[i], { recordId: ids[i], type: 'DVIR', date, status: 'SUBMITTED', facilityId: run.facilityId || 'fac_uniontown', route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '',
+      tx.set(refs[i], { recordId: ids[i], type: 'DVIR', date, status: 'SUBMITTED', facilityId: L.plantOf(run), route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '',
         runDocId: req.runDocId, day: req.day, trailer: t.trailer, notes: req.notes, recordedAt: stamp, recordedBy: by, driverId: driver.id, driver: driver.name,
         payload: { requestId: req.requestId, actor: by, route: run.route || '', run: run.run || '', inspection: req.inspection, odometer: req.odometer, truck: req.truck, tractorIssues: req.tractorIssues,
           notes: req.notes, signatureName: req.signatureName, signature: req.signature, status: 'SUBMITTED', trailer: t.trailer, checks, trailerIssues: t.issues, trailerPosition: i + 1, trailerCount: req.trailers.length },

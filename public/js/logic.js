@@ -581,6 +581,14 @@
     { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED', db: 'martins-ferry' }
   ];
   var HOME_PLANT = 'fac_uniontown';
+  // Rules audit line 11 (Joe 11/3 "Yes, one plant rule everywhere"): the plant a record, setting or screen belongs to. A record
+  // saved before the plants were separated has no plant and is Uniontown's. v: a plant id, or a record with facilityId /
+  // facility_id. Every "blank means Uniontown" goes through here.
+  function plantOf(v) {
+    var id = v !== null && typeof v === 'object' ? (v.facilityId || v.facility_id) : v;
+    id = String(id == null ? '' : id).trim();
+    return id || HOME_PLANT;
+  }
   // The database a plant keeps its things in; '' for a plant not on the list.
   function plantDb(id) { var p = PLANTS.filter(function (x) { return x.id === id; })[0]; return p ? p.db : ''; }
   var PRIMARY_ADMINS = ['jcartwright@uniteddairy.com'];
@@ -1691,7 +1699,7 @@
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
-    hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
+    plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,

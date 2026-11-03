@@ -48,7 +48,7 @@
   <datalist id="ta-units"></datalist>
 
   <script type="module">
-    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, maySave, watchPerson } from './js/app.js';
+    import { start, currentPlant, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
 
@@ -210,7 +210,7 @@
       allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
-        trailers = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, 'fac_uniontown', true) && e.sourcePresent !== false);
+        trailers = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, currentPlant(), true) && e.sourcePresent !== false);
         trailersFailed = false;
         render();
       }, () => { trailersFailed = true; render(); });

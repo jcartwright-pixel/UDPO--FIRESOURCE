@@ -64,7 +64,7 @@
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
     // before plants were kept (no facility) is Uniontown's.
     let plant = { id: 'fac_uniontown', name: 'Uniontown' };
-    const plantOf = (x) => String((x && (x.facilityId || x.facility_id)) || '').trim() || 'fac_uniontown';
+    const plantOf = (x) => L.plantOf(x);
     const ours = (x) => plantOf(x) === plant.id;
     const rulesDoc = () => plant.id === 'fac_uniontown' ? 'fleetRules' : 'fleetRules_' + plant.id;
     const rules = () => Object.assign({}, L.FLEET_RULES, savedRules || {});

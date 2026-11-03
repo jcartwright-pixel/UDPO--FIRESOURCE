@@ -1309,6 +1309,8 @@ screens: shifts.html
 
 The plant's shifts: name, side (Distribution or Plant Production), start, end and hours. `+ Add Shift` adds one; `Remove` takes one off. `Starting Shifts` fills in the usual shifts. Each box saves when you leave it.
 
+> Each plant has its own shifts. Shift Notes, Shift Reports and Plant Reports use the shifts of the plant you are in, so Charleston's or Martins Ferry's times set here are the ones those screens go by.
+
 ## Location Areas
 id: location-areas
 screens: location-areas.html

@@ -659,7 +659,7 @@ const savePlant = (req, db) => {
   const id = String(req && (req.facilityId || req.plantId) || '');
   if (L.PLANTS.some(p => p.id === id)) return id;
   const here = (L.PLANTS.find(p => p.db === ((db && db.databaseId) || '(default)')) || {}).id;
-  return here || 'fac_uniontown';
+  return L.plantOf(here);
 };
 async function requireSaver(tx, db, user, roles, action, plantId, reader) {
   // A Plant Station signed in by its code alone (index.js checked its station): only the plant-floor saves.
@@ -683,7 +683,7 @@ async function requireSaver(tx, db, user, roles, action, plantId, reader) {
     throw new SaveError('NOT_ALLOWED', roleOk ? email + ' is not allowed this save (Administration > People & Roles)' : email + ' does not have a role that can make this save (' + roles.join(', ') + ')');
   }
   // Joe 10/14: the screens ticked for this person in People & Roles (none ticked yet = every screen, as before).
-  const plant = plantId || 'fac_uniontown';
+  const plant = L.plantOf(plantId);
   if (!RIGHTS.screenSaveAllowed(person, action, ex.exists ? ex.data() : null, plant)) {
     const name = (L.PLANTS.find(p => p.id === plant) || {}).name || plant;
     throw new SaveError('NOT_ALLOWED', email + ' does not have this screen ticked for ' + name + ' (Administration > People & Roles)');
