@@ -69,6 +69,9 @@ test('People & Access shows the same apps as the tiles', async () => {
   for (const p of people) {
     const tiles = H.apps('ud-distribution').filter(a => a.may(p)).map(a => a.name);
     assert.deepEqual(appsFor(p), tiles, JSON.stringify(p));
+    for (const ticks of [null, [], ['fuel'], ['customers', 'udms'], ['operations', 'customers', 'fuel', 'udms']]) {
+      assert.deepEqual(appsFor(p, ticks), H.appsOf(p, ticks).map(k => names[k]), JSON.stringify([p, ticks]));
+    }
   }
   assert.ok(names.operations);
 });
@@ -99,4 +102,24 @@ test('People & Access follows Operations\' own screen, Home screen and rights ru
     R.CATALOG.forEach(r => assert.equal(A.rightAllowed(Object.assign({}, p, ex), r.code, {}, R.DEFAULTS), want.indexOf(r.code) >= 0 || want.indexOf('*') >= 0,
       r.code + ' ' + JSON.stringify(p)));
   });
+});
+
+// Joe 11-3-26: each person's apps ticked in People & Access; Plant & Distribution always stays on.
+test('saved app ticks decide the tiles; only administrators change them, never their own', async () => {
+  const docs = { users: { 'pat.admin@uniteddairy.com': { status: 'ACTIVE', roles: ['Administrator'] }, 'sam.sales@uniteddairy.com': { status: 'ACTIVE', roles: ['Sales'] } }, appAccess: {}, actions: {} };
+  const ref = (c, id) => ({ c, id, get: async () => ({ exists: !!docs[c][id], data: () => docs[c][id] }) });
+  const mem = {
+    collection: (c) => ({ doc: (id) => ref(c, id), get: async () => ({ docs: Object.keys(docs[c]).map(id => ({ id, data: () => docs[c][id] })) }) }),
+    runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
+  };
+  const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'customers']);
+  await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
+  assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'fuel']);
+  assert.deepEqual((await H.hubCall(mem, pat, { op: 'appAccess' })).saved, { 'sam.sales@uniteddairy.com': ['operations', 'fuel'] });
+  await assert.rejects(H.hubCall(mem, sam, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['udms'] }), /Only an administrator/);
+  await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'pat.admin@uniteddairy.com', apps: ['fuel'] }), /from yourself/);
+  await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['statements'] }), /could not be read/);
+  assert.equal(Object.values(docs.actions).length, 1, 'each change is logged');
 });

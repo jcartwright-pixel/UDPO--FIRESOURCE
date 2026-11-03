@@ -63,7 +63,6 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .hub-section { margin: 8px 16px 0; color: var(--ud-blue-dark); font-size: 20px; }
 .people-list tbody td { white-space: normal; padding: 8px 10px; overflow: visible; text-overflow: clip; max-width: none; height: auto; }
 .people-list td b { overflow-wrap: anywhere; }
-@media (max-width: 700px) { .people-list th:nth-child(3), .people-list td:nth-child(3), .people-list th:nth-child(4), .people-list td:nth-child(4) { display: none; } }
 
 /* The app cards (Joe 11-2-26: "more professional ... icons"): a coloured picture, the name, what it is for, and Open. */
 .hub-sub { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
@@ -108,3 +107,50 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .people-edit table.rights select { width: auto; }
 .people-edit table.rights td { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; height: auto; }
 .people-edit table.rights td.l { width: 58%; }
+
+/* Joe 11-3-26: "You can't scroll on this screen": app.css locks the page for the plant screens; the hub's pages scroll. */
+html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflow: auto; overflow-x: hidden; }
+
+/* People & Access list (Joe 11-3-26: "it kind of looks lame"; each app a tick box on every line). */
+.people-list .scroll-list { box-shadow: 0 6px 18px rgba(13, 52, 87, .07); border-radius: 12px; }
+.people-list thead th { background: var(--ud-blue); color: #fff; font-size: 13px; letter-spacing: .02em; padding: 10px; vertical-align: bottom; position: sticky; top: 0; z-index: 1; }
+.people-list th.c-app { width: 104px; text-transform: none; letter-spacing: 0; }
+.people-list th.c-app small { display: block; font-size: 12px; font-weight: 700; line-height: 1.15; margin-top: 4px; color: #fff; white-space: normal; }
+.people-list .app-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff; color: var(--app); }
+.people-list tbody tr:nth-child(even) td { background: #f8fafc; }
+.people-list tbody td { vertical-align: middle; }
+.people-list td.who { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.people-list td.who > span:last-child { min-width: 0; }
+.people-list .avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #dbe7f3; color: var(--ud-blue-dark); font-weight: 800; font-size: 14px; }
+.people-list .avatar.admin { background: var(--ud-blue); color: #fff; }
+.role-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #eef3f8; color: var(--ud-blue-dark); font-size: 14px; font-weight: 700; white-space: nowrap; }
+.role-tag.admin { background: #e3eefa; color: var(--ud-blue); }
+.people-list td.c-plants { font-size: 14px; color: #3c4b5a; }
+.people-list td.c-app { text-align: center; }
+.list-msg { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; font-weight: 600; }
+.list-msg.good { background: var(--pill-green-bg, #dcf3e4); color: var(--pill-green-ink, #11703a); }
+.list-msg.bad { background: var(--error-bg, #fde8e8); color: var(--error-ink, #9b1c1c); }
+
+/* An app tick: a rounded box in the app's own colour. */
+.app-tick { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; cursor: pointer; }
+.app-tick input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.app-tick .box { width: 24px; height: 24px; border-radius: 7px; border: 2px solid #b9c7d5; background: #fff; display: grid; place-items: center; transition: background .12s, border-color .12s; }
+.app-tick input:checked + .box { background: var(--app); border-color: var(--app); }
+.app-tick input:checked + .box::after { content: ""; width: 6px; height: 12px; border: solid #fff; border-width: 0 3px 3px 0; transform: translateY(-1px) rotate(45deg); }
+.app-tick input:focus-visible + .box { outline: 3px solid #f2b705; outline-offset: 2px; }
+.app-tick input:disabled { cursor: not-allowed; }
+.app-tick input:disabled + .box { opacity: .55; }
+.app-tick:hover input:not(:disabled) + .box { border-color: var(--app); }
+.people-edit .app-ticks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.people-edit .app-pick { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+
+@media (max-width: 700px) {
+  .people-list .c-role, .people-list .c-plants { display: none; }
+  .people-list td.who { min-width: 150px; }
+  .people-list td.who small { overflow-wrap: anywhere; }
+  .people-list td.who .avatar { display: none; }
+  .people-list th.c-app { width: 40px; padding: 8px 2px; }
+  .people-list th.c-app small { display: none; }
+  .people-list td.c-app { padding: 6px 0; width: 40px; }
+  .people-list th:last-child, .people-list td:last-child { display: none; }
+}

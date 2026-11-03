@@ -33,9 +33,9 @@ screens: people.html
 **People & Access** is the one list of who can sign in to the United Dairy apps: their role, their plants, and which apps they can open. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
-2. Press a person's line. Their details open on the right.
-3. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**.
-4. **Apps they can open** changes as you go, so you can see what they will get before you save.
+2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
+3. Press a person's name to open their details on the right.
+4. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**. **Apps they can open** has the same tick boxes, saved with `Save`.
 5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
 6. Pick their **Home screen**: the page they land on when they open Plant & Distribution.
 7. To change one right for this person only, open **Single rights** and pick `Allow` or `Deny` (or `Use role`). The last column shows what they will get.
@@ -50,7 +50,11 @@ screens: people.html
 
 > Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
-> Who sees which app: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
+> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
+
+> Plant & Distribution is always ticked for everyone Enabled. To keep someone off part of it, untick screens under **What they see in Plant & Distribution**. Employees & Compliance still checks its own list too, so its tick only shows or hides the card on their Home.
+
+!> You cannot untick your own apps. Ask another administrator.
 
 !> Do not disable someone to hide a screen from them. Untick the screen instead.
 
