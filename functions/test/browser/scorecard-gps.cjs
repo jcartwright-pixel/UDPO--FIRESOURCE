@@ -55,8 +55,9 @@ async function seed(d) {
     const ws = weekOf(date), id = ws + '__sample_' + c.route, r = runs[id] || (runs[id] = { runId: 'sample_' + c.route, route: c.route, run: 'DAY', weekStart: ws, days: {} });
     const missed = (i === 3 && j % 4 === 1) || (i === 5 && j === 2);
     r.days[DAYS[new Date(date + 'T12:00:00Z').getUTCDay()]] = { runs: true, driver: c.name, driverId: c.id, truck: c.truck, startTime: '05:00',
-      // Time grade: EVANS leaves about half an hour before a 6:15 dispatch; FOX's route is due back by 1:15 PM.
-      dispatchTime: i === 4 ? '06:15' : '05:45', routeHours: i === 5 ? 7.5 : 8.5,
+      // Time grade: EVANS leaves about 45 minutes before a 6:30 dispatch (Joe 11-2-26: more than 30 minutes early counts);
+      // FOX's route is due back by 1:15 PM.
+      dispatchTime: i === 4 ? '06:30' : '05:45', routeHours: i === 5 ? 7.5 : 8.5,
       // Joe 10/25 cases by the 54: DIAZ is 120 short on 10-1 (-2), 60 over on 10-6 (+1) and 30 short on 10-8 (nothing).
       casesOut: 600, plantCaseReturn: i === 4 && j === 5 ? 594 : i === 3 && j === 0 ? 480 : i === 3 && j === 4 ? 660 : i === 3 && j === 6 ? 570 : 600, checkinCompletedAt: missed ? '' : iso(date, 5, 2) };
     b.set(d.collection('plantEvents').doc('sample_dvir_' + c.route + '_' + date), { type: 'DVIR', date, route: c.route, run: 'DAY', defect: i === 2 && j === 3 });
