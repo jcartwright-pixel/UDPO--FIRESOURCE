@@ -465,7 +465,7 @@ async function purgeReefer(db, at, opts) {
   return { deleted: n, done };
 }
 // "T-101", "101" and "T 101" are the same trailer (the yard check's way of writing it).
-const trailerKey = (v) => { const c = String(v || '').toUpperCase().replace(/\s+/g, ''); const m = c.match(/^T-?(\d+)$/) || c.match(/^(\d+)$/); return m ? 'T-' + m[1] : c; };
+const trailerKey = (v) => require('./logic').trailerNumber(v);
 // Joe 10/19: Fleet's tags for trailers aren't always "T-864". The trailer number is matched in the tag however it is written:
 // T-864, T864, TRL 864, Trailer 864, 864T, 864 Reefer. A bare "864" counts only when no truck on the loads has that number,
 // and only when no tag with a trailer word matches. Several units for one trailer: the one that reported last.
@@ -840,7 +840,7 @@ async function probe(db, d, o, email, tagIn) {
   if (!d.fleet || !d.user || !d.password) throw new FleetError('LOGIN', 'Save the Fleet login first.');
   if (!tag) throw new FleetError('BAD_REQUEST', 'Type a Fleet unit number, like T-933.');
   const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
-  const bare = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), unit = trucks.find(t => bare(t.tag) === bare(tag)) || null;
+  const bare = (x) => require('./logic').unitKey(x), unit = trucks.find(t => bare(t.tag) === bare(tag)) || null;
   const ref = db.collection('private').doc('gpsFleet'), saved = db.collection('private').doc('gpsProbe');
   const prev = (await saved.get()).data() || null, save = async (r) => { await saved.set(r); return r; };
   const cont = !!(prev && prev.next > 0 && Array.isArray(prev.cols) && unit && bare(prev.tag) === bare(tag) && Date.parse(at) - Date.parse(prev.at || 0) < PROBE_RESUME_MINUTES * 60000);

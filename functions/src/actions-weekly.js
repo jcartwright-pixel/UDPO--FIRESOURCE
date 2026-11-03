@@ -174,7 +174,7 @@ async function removeExtraRun(tx, db, req, email, stamp, logRef, mode) {
   if (!snap.exists) throw new SaveError('NOT_FOUND', 'That line is already gone');
   const run = snap.data();
   if (!run.extraRun) throw new SaveError('NOT_ALLOWED', 'Only a line added for this week can be removed here');
-  const loaded = L.DAYS.filter(p => { const d = (run.days || {})[p] || {}; return d.runs && (d.completeTime || d.loadedComplete === true || String(d.loadStatus || '').toUpperCase() === 'COMPLETE'); });
+  const loaded = L.DAYS.filter(p => { const d = (run.days || {})[p] || {}; return d.runs && L.isLoaded(d); });
   if (loaded.length) throw new SaveError('NOT_ALLOWED', L.runText(run) + ' was already loaded on ' + loaded.map(p => L.DAY_NAMES[L.DAYS.indexOf(p)]).join(', ') + ', so it stays');
   tx.delete(ref);
   const result = { ok: true, requestId: req.requestId, runs: [] };

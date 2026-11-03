@@ -51,7 +51,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
+    import { start, currentPlant, requireSignIn, escapeHtml, showError, shortTime } from './js/app.js';
     import { collection, doc, getDoc, query, where, getDocs } from './js/firebase.js';
     import * as R from './js/plant-reports.js';
 
@@ -75,7 +75,7 @@
     let db = null, ask = 0, shifts = R.shiftsFor(null), days = [];
     const cache = { runs: {}, pickups: {}, journal: {} };
     const fmt = (k) => { const p = k.split('-'); return Number(p[1]) + '-' + Number(p[2]); };
-    const fmtY = (k) => { const p = k.split('-'); return Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2); };
+    const fmtY = (k) => L.dateText(k);
     const nice = (name) => String(name).charAt(0) + String(name).slice(1).toLowerCase();
     const pctClass = (p) => p === null || p === undefined ? '' : p >= 90 ? 'good' : p >= 80 ? 'warn' : 'bad';
     const n = (v) => v === null || v === undefined ? '—' : String(v);
@@ -325,7 +325,8 @@
 
     requireSignIn(async () => {
       ({ db } = await start());
-      try { const s = await getDoc(doc(db, 'plantShifts', 'fac_uniontown')); shifts = R.shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); } catch (e) { /* the starting shifts */ }
+      // Rules audit line 11 (Joe 11/3): this plant's own Shift Times (they always read Uniontown's before).
+      try { const s = await getDoc(doc(db, 'plantShifts', currentPlant())); shifts = R.shiftsFor(s.exists() ? s.data() : null, currentPlant()); } catch (e) { /* the starting shifts */ }
       draw();
     });
   </script>

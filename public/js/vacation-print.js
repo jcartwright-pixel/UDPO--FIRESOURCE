@@ -12,7 +12,7 @@ const REQUEST_LINES = 14;
 const esc = escapeHtml;
 const pad = (n) => String(n).padStart(2, '0');
 const live = (v) => v.status !== 'CANCELLED' && v.status !== 'DENIED';
-const us = (key) => { const [y, m, d] = key.split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
+const us = (key) => L.dateText(key);
 
 // Day by day for the year: how many approved off (and of which type) and how many pending.
 function yearMarks(year, vacations, match) {

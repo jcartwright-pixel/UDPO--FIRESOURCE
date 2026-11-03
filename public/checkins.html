@@ -99,7 +99,7 @@
       const edit = canSave();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       document.getElementById('rows').innerHTML = rows.map((r, i) => {
-        const driver = r.driver || (r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '');
+        const driver = r.driver || L.coverageName(r);
         const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');
         const at = r.checkinCompletedAt ? new Date(r.checkinCompletedAt) : null;
         return '<tr data-index="' + i + '"' + (edit ? ' class="editable" tabindex="0" title="Enter or fix the check-in for ' + escapeHtml(r.route) + '"' : '') + '>' +

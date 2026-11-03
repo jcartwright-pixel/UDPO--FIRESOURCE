@@ -13,12 +13,13 @@ import { shortTime, dateTimeText, hoursMinutesText, escapeHtml } from './app.js'
 
 const L = window.UDLogic;
 
-export const AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+export const AREAS = L.AREA_ORDER;
 export const AREA = {
-  CASE: { title: 'Daily Case Loadout', tile: 'Cases', label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' },
-  TOTES: { title: 'Daily Tote Loadout', tile: 'Totes', label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' },
-  BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
-  TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
+  // The area words (title, tile) are the one set in logic.js (rules audit line 13: Boxing, Tanker, Tote).
+  CASE: Object.assign({ label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' }, L.AREA_WORDS.CASE),
+  TOTES: Object.assign({ label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' }, L.AREA_WORDS.TOTES),
+  BOXING: Object.assign({ label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
+  TANKER: Object.assign({ label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 };
 // Every time rule is timing-rules.js's (window.UDTiming; Joe 11-3-26). Behind = past the on-time window after the truck's
 // leaving time (30 minutes; it was 45 here), yellow up to 60 minutes, red after.
@@ -55,7 +56,7 @@ export function runArea(run, prefix) {
 // WAITING / LOADING / DONE (a stored READY counts as done, Joe 7.0.272).
 export function loadState(day) {
   const s = String(day.loadStatus || '').trim().toUpperCase();
-  if (day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0) return 'DONE';
+  if (L.isLoaded(day)) return 'DONE';
   if (day.plantStartedAt || s === 'LOADING' || s === 'PAUSED') return 'LOADING';
   return 'WAITING';
 }
@@ -277,7 +278,7 @@ export function localToStamp(local) {
 // The shared rules (js/plant-rules.js, the same file the server uses).
 const U = window.UDPlant;
 export const UNLOAD_UNIT = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Gallons' };
-export const UNLOAD_TILE = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Tankers' };
+export const UNLOAD_TILE = { CASE: L.AREA_WORDS.CASE.tile, TOTES: L.AREA_WORDS.TOTES.tile, BOXING: L.AREA_WORDS.BOXING.tile, TANKER: L.AREA_WORDS.TANKER.tile };
 const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
 // A count from the sheet or the app: a whole number, or '' when blank or not a number.
 const num = (v) => { const t = txt(v).replace(/,/g, ''); return t !== '' && isFinite(Number(t)) ? Number(t) : ''; };
@@ -391,7 +392,7 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
   const master = {};
   (routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
   (runs || []).forEach(run => {
-    const m = master[run.runId] || {}, dropAndHook = !!(run.dropAndHook || m.dropAndHook);
+    const m = master[run.runId] || {}, dropAndHook = L.dropAndHook(run, master);
     const area = runArea(run, run.weekStart === week ? prefix : ''), d = run.weekStart === week && run.days && run.days[prefix];
     if (!area || !shownForPlant(run) || !d || !d.runs) return;
     const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};
@@ -485,7 +486,7 @@ function carriedSplit(runs, date, journal, routes, plantStart) {
   });
   return { keep, skip };
 }
-const shortDay = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : d; };
+const shortDay = (d) => L.dateText(d);
 // Yesterday's cards that leave the list as "Not recorded" (see carriedSplit), each with its note.
 export function carriedNotRecorded(runs, date, journal, routes, plantStart) {
   return carriedSplit(runs, date, journal, routes, plantStart).skip;

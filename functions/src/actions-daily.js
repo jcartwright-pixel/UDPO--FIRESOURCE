@@ -197,7 +197,7 @@ async function reorder(tx, db, req, email, stamp, logRef, mode) {
   let skips = 0;
   if (req.action === 'reorderPlantLoads' && req.moved && req.moved.how === 'SKIP') {
     const dayOf = (t) => t.run.days[t.item.day];
-    const isDone = (d) => !!d.completeTime || d.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(String(d.loadStatus || '').trim().toUpperCase()) >= 0;
+    const isDone = (d) => L.isLoaded(d);
     const now = targets.slice().sort((a, b) => (a.seq == null ? 999999 : Number(a.seq)) - (b.seq == null ? 999999 : Number(b.seq)) ||
       String(a.run.route).localeCompare(String(b.run.route), undefined, { numeric: true }));
     const from = now.findIndex(t => t.item.runDocId === req.moved.runDocId && t.item.day === req.moved.day), me = now[from], d = dayOf(me);

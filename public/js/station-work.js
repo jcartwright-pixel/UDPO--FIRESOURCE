@@ -132,8 +132,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (carrier) return 'carrier';
     const route = routeDocs.find(r => x.runId && r.runId === x.runId) || routeDocs.find(r => up(r.routeCode || r.route) === up(x.route)) || {};
     const run = runs.find(r => x.runDocId && r.id === x.runDocId) || runs.find(r => x.runId && r.runId === x.runId) || {};
-    const t = up(route.coverageType || run.coverageType);
-    return t === 'BRANCH' ? 'branch' : t && t !== 'UNITED DAIRY' ? 'carrier' : 'ut';
+    // Rules audit (Joe 11/3): the one "who hauls it" rule in logic.js.
+    const h = L.hauler(route.coverageType || route.movementType ? route : run);
+    return h === 'BRANCH' ? 'branch' : h === 'OURS' ? 'ut' : 'carrier';
   }
   const minutesOf = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
   const clock = (hhmm) => { const m = minutesOf(hhmm); return m === null ? (hhmm || '') : P.timeOfDay(m); };
@@ -271,7 +272,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
     let html = '<article class="sw-card sched ' + (done ? 'done' : paused ? 'paused' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
     html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
-      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(((x.slot && x.slot.route) || x.route || '').replace(/_[0-9]+$/, '')) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
+      : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(L.routeNumber((x.slot && x.slot.route) || x.route || '')) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
     html += '<span class="sw-state">' + status + '</span>' + quick + chev(isOpen) + '</div>' + refusal(id);
     if (isOpen) {
       const dis = !ck || done;

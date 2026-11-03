@@ -64,7 +64,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
+    import { start, currentPlant, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { fillIn, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
@@ -111,7 +111,7 @@
         }, () => {});
       });
     }
-    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
+    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, currentPlant());
     const pending = [];
     const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const CARRY_WORD = { Handoff: 'handoff note', Breakdown: 'breakdown', 'Maintenance Request': 'maintenance request', Incident: 'incident', Safety: 'safety note', Quality: 'quality note', Other: 'note' };
@@ -522,7 +522,8 @@
       const watch = () => { const t = today(); if (t === day0) return; day0 = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: KEEP_DAYS }, (_, n) => L.addDays(t, -n)))), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
       watch();
       // The plant's own shifts; the drop-down follows the clock until someone picks a shift or the entry is saved.
-      onSnapshot(doc(db, 'plantShifts', 'fac_uniontown'), s => { shifts = shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); followClock(true); }, () => {});
+      // Rules audit line 11 (Joe 11/3): this plant's own Shift Times (they always read Uniontown's before).
+      onSnapshot(doc(db, 'plantShifts', currentPlant()), s => { shifts = shiftsFor(s.exists() ? s.data() : null, currentPlant()); followClock(true); }, () => {});
       function followClock(redraw) {
         const box = document.getElementById('shift-now');
         if (!box || !entry || entry.shiftPicked || entry.mine) return;

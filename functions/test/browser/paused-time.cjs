@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Browser check (Joe 10/22: "When these are paused, you're showing time like total time. That shouldn't count as loading
- * time"). On Daily Box Loadout at 10:00 AM:
+ * time"). On Daily Boxing Loadout at 10:00 AM:
  *   - Aldi Load 2, started 8:00 AM, paused 15 minutes earlier and again since 9:00 AM: Total Time 45 min, and it stays 45 min
  *     while it sits paused;
  *   - Aldi Load 3, started 8:00 AM, paused before pauses were timed (its note says Paused 10/8, 9:30 AM): 2 hours by 10:00 AM

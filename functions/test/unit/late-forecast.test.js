@@ -519,3 +519,24 @@ test('the shift recap counts a load already late only from now until it is loade
   const c = R.shiftRecap(r);
   assert.deepEqual([c.areas[0].behindMin, c.areas[0].level, c.areas[0].status], [30, 'warn', 'About 30 min behind']);
 });
+
+// Rules audit line 17 (Joe 11/1: when behind, the truck that leaves first loads first): Daily Case Loadout, Manager Center and
+// the report list the loads still to load in the forecast's order once it has switched; loaded loads stay where they are.
+test('one loading order: the lists follow the forecast once it loads the first truck to leave first', () => {
+  const loads = tonightDone.concat([wait('6304_2', 'WALMART', 1200, H(19, 30), { departureDate: MON, leavesOn: 'Load Day' })], tonightLeft), forecast = R.loadForecast({ date: MON, loads, history: [] }, NOW);
+  assert.equal(R.leaveFirst(forecast), true);
+  const shown = R.inLoadingOrder(loads, forecast), fcIds = forecast.loads.map(x => x.id);
+  // Loaded loads keep their places.
+  loads.forEach((r, i) => { if (r.state === 'DONE') assert.equal(shown[i], r); });
+  // The ones still to load read in the forecast's order.
+  assert.deepEqual(shown.filter(r => r.state !== 'DONE').map(r => r.id), fcIds.filter(id => loads.some(r => r.id === id && r.state !== 'DONE')));
+  // The report's Still to load list follows it too.
+  const r = R.plantReport({ loads, forecast }, NOW), text = R.reportText(JSON.parse(JSON.stringify(r)));
+  const still = R.inLoadingOrder(r.behind.concat(r.nextUp), forecast).map(x => x.id);
+  assert.deepEqual(still.filter(id => fcIds.includes(id)), fcIds.filter(id => still.includes(id)));
+  assert.ok(text.indexOf(R.reportName(r.behind.concat(r.nextUp).find(x => x.id === still[0]))) < text.indexOf(R.reportName(r.behind.concat(r.nextUp).find(x => x.id === still[still.length - 1]))));
+  // Not behind: the plant's own load order stands.
+  assert.equal(R.leaveFirst({ order: 'load order', loads: forecast.loads }), false);
+  assert.deepEqual(R.inLoadingOrder(loads, { order: 'load order', loads: forecast.loads.slice().reverse() }), loads);
+  assert.deepEqual(R.inLoadingOrder(loads, null), loads);
+});

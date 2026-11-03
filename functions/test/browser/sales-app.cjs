@@ -73,7 +73,7 @@ async function customers(pg) {
   await pg.click('#cu-days >> text=Tue');
   assert.equal(await pg.textContent('#cu-list .sa-group'), 'Route 803, Tuesday: 3 customers');
   assert.deepEqual((await pg.$$eval('#cu-list .cu-row', r => r.map(x => x.textContent))).sort(), ['...DQ RIVERSIDE#40471', 'ACORN CORNER MARKET#1196', 'DQ HILLVIEW#40463'].sort(), 'the old upload is not shown');
-  assert.equal(await pg.textContent('#cu-foot'), 'From the Customer List app, last changed 11-01-26.');
+  assert.equal(await pg.textContent('#cu-foot'), 'From the Customer List app, last changed 11-1-26.');
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, 'sales-390-customers-by-route.png'), fullPage: true });
   await pg.click('#cu-days >> text=Fri');
   assert.equal(await pg.textContent('#cu-list .sa-group'), 'Route 803, Friday: 2 customers', 'the line in twice counts once');

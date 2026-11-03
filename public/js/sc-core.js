@@ -3,9 +3,10 @@
  * The screen (scorecard.html) and the server (actions.js) both load this one file.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'));
-  else root.UDScore = factory(root.UDTiming);
-})(typeof self !== 'undefined' ? self : this, function (T) {
+  // Unit numbers are matched by the one rule in logic.js unitKey (rules audit line 12, Joe 11/3); times by timing-rules.js.
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'), require('./logic'));
+  else root.UDScore = factory(root.UDTiming, root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (T, LU) {
 /**
  * 7.0.279 Driver Scorecard: pure logic (no Apps Script services), so Node can test it (tools/test_driver_scorecard_core.cjs).
  * Screen DriverScorecard.html, server 225_V7279_DriverScorecardServer.gs, notes docs/DRIVER_SCORECARD.md. Joe picked screen A on 2026-10-09: one table of every driver for the month.
@@ -133,7 +134,7 @@ function scTruthy_(v) { return v === true || /^(true|yes|y|1|x|on|runs)$/i.test(
 function scPersonKey_(v) { return String(v == null ? '' : v).trim().replace(/\s+/g, ' ').toUpperCase(); }
 function scIsDriver_(name) { return !SC_CORE.NOT_A_DRIVER.test(String(name == null ? '' : name).trim()); }
 // Fleet names a truck "223876" and a trailer "T-635"; Daily Dispatch may type "223 876" or "t635". Letters and digits only.
-function scUnitKey_(v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function scUnitKey_(v) { return LU.unitKey(v); }
 
 /** Settings saved by Joe merged over the defaults; numbers are checked so a typo cannot break the board. */
 function scSettings_(saved) {

@@ -50,17 +50,20 @@
  *     Shift Notes not resolved; the subject is "Plant Update <time>: N routes behind" or "All routes on time".
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'));
-  else root.UDPlant = factory(root.UDTiming);
-})(typeof self !== 'undefined' ? self : this, function (T) {
   // Every time rule (the clock, 6 AM, when a truck leaves, on time / late) is timing-rules.js's (Joe 11-3-26).
+  // The load rules (who hauls a load, whether it is loaded, active runs) live once in logic.js (rules audit, Joe 11/3).
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'), require('./logic'));
+  else root.UDPlant = factory(root.UDTiming, root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (T, LR) {
   var DONE_WASH = /^(COMPLETE|COMPLETED|CLEANED|CLOSED|RESOLVED|WASHED|DONE|REMOVED)$/i;
 
   function text(v) { return v === null || v === undefined ? '' : String(v).trim(); }
   function unloadKey(date, route, run) { return date + '|' + text(route) + '|' + text(run); }
   // "T-901", "901" and "t 901" are the same trailer.
-  function unitKey(v) { return text(v).toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/\s+/g, ''); }
-  function trailerText(v) { var t = text(v).toUpperCase().replace(/\s+/g, ''); return /^\d+$/.test(t) ? 'T-' + t : t; }
+  // A trailer or truck on the plant lists is matched by its number with or without the T- (T-864 and 864 are the same trailer);
+  // the number rules themselves are logic.js unitKey and trailerNumber (rules audit line 12).
+  function unitKey(v) { return LR.unitKey(text(v).replace(/^T\s*-?\s*(?=\d)/i, '')); }
+  function trailerText(v) { return LR.trailerNumber(v); }
   function when(v) { var t = Date.parse(v || ''); return isFinite(t) ? t : 0; }
 
   function payloadOf(doc) { return (doc && doc.payload) || {}; }
@@ -185,21 +188,15 @@
   // coverage_type is OUTSIDE CARRIER (or a carrier's own name, or a customer pickup) or its movement_type is CARRIER_LOAD /
   // CUSTOMER_PICKUP; United Dairy and its branches (Fairmont, Marietta, Charleston, ...) still count. A Scheduler load marked
   // Carrier is the customer's own carrier, so it does not count either.
-  function outsideCarrier(r) {
-    if (!r) return false;
-    var cov = text(r.coverageType).toUpperCase(), move = text(r.movementType).toUpperCase().replace(/\s+/g, '_');
-    if (move === 'CARRIER_LOAD' || move === 'CUSTOMER_PICKUP') return true;
-    return !!cov && cov !== 'UNITED DAIRY' && cov !== 'UNIONTOWN' && cov !== 'BRANCH';
-  }
+  function outsideCarrier(r) { return !!r && LR.outsideHauler(r); }
 
   // Shipping's customers: Route Master runs that are active and shown to the plant (routes = route docs with runId).
   function scheduleCustomers(routes) {
     var list = [], outsideRuns = {}, outsideRoutes = {};
     (routes || []).forEach(function (r) {
       // Joe 11/2: every outside carrier's run and route number, shown to the plant or not (scheduleOutside).
-      if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = text(r.routeCode || r.route).replace(/_[0-9]+$/, ''); if (code) outsideRoutes[code.toUpperCase()] = true; }
-      var status = text(r.routeStatus).toUpperCase();
-      if ((status && status !== 'ACTIVE') || r.active === false || r.displayPlant !== true) return;
+      if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = LR.routeNumber(r.routeCode || r.route); if (code) outsideRoutes[code.toUpperCase()] = true; }
+      if (!LR.runActive(r) || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
       if (!route && !run) return;
       list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName), loadType: loadArea(r.loadType), outside: outsideCarrier(r) });
@@ -211,7 +208,7 @@
     list.forEach(function (r) {
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(r.run);
       if (!m || !m[1].trim()) { out.push(r); return; }
-      var base = m[1].trim(), baseRoute = r.route.replace(/_[0-9]+$/, ''), key = baseRoute + '|' + base.toUpperCase();
+      var base = m[1].trim(), baseRoute = LR.routeNumber(r.route), key = baseRoute + '|' + base.toUpperCase();
       var slot = { routeId: r.routeId, runId: r.runId, route: r.route, run: r.run, n: Number(m[2]), loadType: r.loadType, outside: r.outside };
       if (byKey[key]) { byKey[key].slots.push(slot); return; }
       byKey[key] = { routeId: r.routeId, runId: r.runId, route: baseRoute, run: base, name: r.name, loadType: r.loadType, outside: r.outside, grouped: true, slots: [slot] };
@@ -230,15 +227,9 @@
      has a Load Type (Case, Totes, Boxes, Tanker), filled in from Route Master's load_type for the picked run and changeable on
      Add / Edit Load. Each Daily Loadout shows the Scheduler loads of its own type. A load saved before it had one takes its run's
      Route Master type; a run with no type there is a box load (as before). */
-  var LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
-  function loadArea(t) {
-    t = text(t).toUpperCase();
-    if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
-    if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
-    if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') return 'BOXING';
-    if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
-    return '';
-  }
+  // The area words (Case, Tote, Boxing, Tanker) and which area a load type goes to live once in logic.js (rules audit line 13).
+  var LOAD_TYPES = LR.AREA_ORDER.map(function (a) { return [a, LR.areaName(a)]; });
+  function loadArea(t) { return LR.loadArea(t); }
   // The Route Master type of a customer's run (a LOAD N run's own type, else its customer's), or Boxes.
   function routeLoadType(customers, runId) {
     var hit = '';
@@ -256,7 +247,7 @@
     var ids = [x.slot && x.slot.runId, x.runId].filter(Boolean), hit = false;
     var runs = (customers && customers.outsideRuns) || {}, routes = (customers && customers.outsideRoutes) || {};
     if (ids.some(function (id) { return runs[id]; })) return true;
-    if (routes[text((x.slot && x.slot.route) || x.route).replace(/_[0-9]+$/, '').toUpperCase()]) return true;
+    if (routes[LR.routeNumber((x.slot && x.slot.route) || x.route).toUpperCase()]) return true;
     (customers || []).some(function (c) { return (c.slots || [c]).some(function (s) { if (s.runId && ids.indexOf(s.runId) >= 0) { hit = !!(s.outside || c.outside); return true; } return false; }); });
     return hit;
   }
@@ -337,7 +328,7 @@
   // delivery weekday's load day offset; blank = the day before). routes = Route Master docs (runId, routeName, days).
   var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], WEEK_PREFIX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   function weekdayOf(key) { var n = dayNum(key); return n === null ? -1 : ((n % 7) + 11) % 7; }
-  function shortDay(key) { var p = String(key || '').split('-'); return p.length === 3 ? p[1] + '-' + p[2] + '-' + p[0].slice(2) : text(key); }
+  function shortDay(key) { return LR.dateText(text(key)); }
   function dayText(key) { var w = weekdayOf(key); return (w < 0 ? '' : WEEKDAYS[w] + ' ') + shortDay(key); }
   function scheduleCheck(x, routes, today) {
     x = x || {};
@@ -421,15 +412,7 @@
   /* ---------- Yard Checks ---------- */
   var YARD_LOCK_MINUTES = T.TIMERS.yardLockMinutes, FUEL_LEVELS = ['FULL', '3/4', '1/2', 'EMPTY'], YARD_ZONE = 'America/New_York', YARD_DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   // Trailer numbers as the current app writes them on a yard check (desktopV5069TrailerText_).
-  function yardTrailer(v) {
-    var t = text(v).toUpperCase(), c = t.replace(/\s+/g, '');
-    if (!t) return '';
-    if (c === 'N/A' || c === 'NA') return 'N/A';
-    if (c === 'TBA') return 'TBA';
-    if (/^\d+$/.test(c)) return 'T-' + c;
-    var m = c.match(/^T-?(\d+)$/);
-    return m ? 'T-' + m[1] : t;
-  }
+  function yardTrailer(v) { return LR.trailerNumber(v); }
   var dayNum = T.dayNum, dayKey = T.dayKey;
   // The plant's wall clock (New York) as minutes counted from 1/1/1970, a saved time on it, and a time of day (timing-rules.js).
   var wallClock = T.wallClock, wallMinutes = T.wallMinutes, clockMinutes = T.clockMinutes;
@@ -462,10 +445,7 @@
     if (r && r.paused) return paused ? { at: text(m.at), minutes: minutes } : { at: '', minutes: pausedMinutes(r, Date.parse(stamp)) };
     return { at: paused ? stamp : '', minutes: minutes };
   }
-  function yardLoaded(day) {
-    var loaded = text(day.loadedComplete).toUpperCase();
-    return !!text(day.completeTime) || text(day.loadStatus).toUpperCase() === 'COMPLETE' || day.loadedComplete === true || ['TRUE', 'YES', 'Y', '1', 'LOADED', 'COMPLETE'].indexOf(loaded) >= 0;
-  }
+  function yardLoaded(day) { return LR.isLoaded(day); }
   // Loaded trailers on the yard for the operating day `date` (udpoV780LoadedTrailerHolds_): every day of the weeks given,
   // loaded, with a load date, a departure (or delivery) date and a trailer, and date between the load and delivery dates.
   function yardHolds(runs, date) {
@@ -1196,8 +1176,23 @@
   }
   // The same weekday's earlier operating days to compare with (date - 7, - 14, …).
   function forecastNights(date) { var n = dayNum(date), out = []; for (var w = 1; w <= FORECAST.weeksBack && n !== null; w++) out.push(dayKey(n - 7 * w)); return out; }
+  // Rules audit line 17 (Joe 11/1: "whenever we get behind, we go by what gets delivered first … by dispatch time"): the one
+  // loading order. When the Late Forecast has switched to the truck that leaves first (the plant is behind), every list of
+  // loads still to load (Daily Case Loadout, Manager Center, the report) follows the forecast's order. Only the loads the
+  // forecast holds move, and only among their own places, so loaded loads and other loadouts stay where they are.
+  function leaveFirst(forecast) { return !!(forecast && forecast.order === 'first to leave'); }
+  function inLoadingOrder(list, forecast) {
+    list = (list || []).slice();
+    if (!leaveFirst(forecast)) return list;
+    var at = {}; (forecast.loads || []).forEach(function (x, i) { at[x.id] = i; });
+    var slots = [], picked = [];
+    list.forEach(function (x, i) { var id = text(x && x.id); if (id && at[id] !== undefined && x.state !== 'DONE' && x.status !== 'DONE') { slots.push(i); picked.push(x); } });
+    picked.sort(function (a, b) { return at[text(a.id)] - at[text(b.id)]; });
+    slots.forEach(function (s, k) { list[s] = picked[k]; });
+    return list;
+  }
   function dayShort(m) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][((Math.floor(m / 1440) + 4) % 7 + 7) % 7]; }
-  function dateShort(key) { var p = String(key).split('-'); return Number(p[1]) + '-' + Number(p[2]) + '-' + String(p[0]).slice(2); }
+  function dateShort(key) { return LR.dateText(key); }
   // input: loads (the Loadout Center's rows for the operating day `date`), history ([{ date, loads }] for forecastNights),
   // dueBy (minutes after midnight, 5:00 AM unless changed).
   function loadForecast(input, nowMs) {
@@ -1366,7 +1361,7 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_RED_AFTER = T.WINDOWS.caution, RECAP_AREA = { CASE: 'Case Loadout', BOXING: 'Boxing Loadout', TOTES: 'Tote Loadout', TANKER: 'Tanker Loadout' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+  var RECAP_RED_AFTER = T.WINDOWS.caution, RECAP_AREA = { CASE: LR.areaName('CASE') + ' Loadout', BOXING: LR.areaName('BOXING') + ' Loadout', TOTES: LR.areaName('TOTES') + ' Loadout', TANKER: LR.areaName('TANKER') + ' Loadout' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
     // Joe 11/3: each area (Case, Boxing, Tote, Tanker) is on time or behind on its own: a Tanker loaded on time is good
@@ -1404,7 +1399,7 @@
   // not LOADED / NOT LOADED (green is loaded, red is not). The plant's two-letter code (UT) and the word MILK are left off, words
   // with no vowel or a known short name stay capitals (DSD, KTI), the rest are written as names, and at most two words are kept (three when the third is a load number: "Marietta Load 1").
   var ACRONYMS = ['KTI', 'SAX', 'IGA', 'OTR', 'UDF'];
-  function routeNumber(route) { return text(route).replace(/_\d+$/, ''); }
+  function routeNumber(route) { return LR.routeNumber(route); }
   // Joe 10/17: a run with no name in the sheet (844, 8302) uses the route's name instead.
   function shortRun(x) {
     var run = text(x.run);
@@ -1439,7 +1434,7 @@
     L.push('');
     L.push('STILL TO LOAD: ' + r.leftToLoad + ' of ' + r.totalLoads + (r.areas.length ? '   ' + r.areas.map(function (a) { return a.area.charAt(0) + a.area.slice(1).toLowerCase() + ' ' + a.left + ' of ' + a.total; }).join(' · ') : ''));
     var est = {}; (f ? f.loads : []).forEach(function (x) { est[x.id] = x; });
-    r.behind.concat(r.nextUp).forEach(function (x, i) { var e = x.id && est[x.id]; L.push('  ' + (i + 1) + '. ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.late ? '  ' + x.late : '') + (e ? '  est. done ' + e.estText + (e.late ? ' LATE (' + e.reason + ')' : '') : '') + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '') + (x.priorDay ? '  (from yesterday)' : '')); });
+    inLoadingOrder(r.behind.concat(r.nextUp), f).forEach(function (x, i) { var e = x.id && est[x.id]; L.push('  ' + (i + 1) + '. ' + reportName(x) + '  depart ' + (x.depart || '-') + '  ' + statusWord(x.status) + (x.late ? '  ' + x.late : '') + (e ? '  est. done ' + e.estText + (e.late ? ' LATE (' + e.reason + ')' : '') : '') + ((x.truck || x.trailer) ? '  ' + [x.truck, x.trailer].filter(Boolean).join(' / ') : '') + (x.priorDay ? '  (from yesterday)' : '')); });
     L.push('');
     L.push('PRODUCTION');
     if (!r.lines.length) L.push('  No production lines set up');
@@ -1480,7 +1475,7 @@
     // Joe 10/16: each route is one row: route number, a very short run name, when it was loaded (Done) and its dispatch time,
     // under one small heading row. Run names longer than 12 letters are cut so the row fits a phone.
     var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    function deliversLabel(day) { var n = dayNum(day); if (n === null) return 'Delivery day not set'; var p = String(day).split('-'); return 'Delivers ' + WEEKDAYS[new Date(n * 86400000).getUTCDay()] + ' ' + Number(p[1]) + '-' + Number(p[2]) + '-' + String(p[0]).slice(2); }
+    function deliversLabel(day) { var n = dayNum(day); if (n === null) return 'Delivery day not set'; return 'Delivers ' + WEEKDAYS[new Date(n * 86400000).getUTCDay()] + ' ' + LR.dateText(day); }
     // A cut that leaves under 4 letters of the last word drops that word ("Zanesville D" reads "Zanesville").
     function brief(v) { v = text(v); if (v.length <= 12) return v; v = v.replace(/\bLoad (\d+)$/, 'L$1'); if (v.length <= 12) return v;
       var cut = v.slice(0, 12), sp = cut.lastIndexOf(' '); return (sp > 0 && cut.length - sp - 1 < 4 ? cut.slice(0, sp) : cut).trim(); }
@@ -1528,7 +1523,7 @@
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is counted from when each load leaves (departWall).
     // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
-    var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+    var GROUP_NAME = { CASE: LR.areaName('CASE'), BOXING: LR.areaName('BOXING'), TOTES: LR.areaName('TOTES'), TANKER: LR.areaName('TANKER') }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
     var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
     var untilOf = function (x) { return x.minutesUntil === null || x.minutesUntil === undefined ? 1e9 : x.minutesUntil; };
@@ -1641,7 +1636,7 @@
   return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
-    scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
+    leaveFirst: leaveFirst, inLoadingOrder: inLoadingOrder, scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,
     shiftReport: shiftReport, QUALITY_TYPE: QUALITY_TYPE, LINE_STATUSES: LINE_STATUSES, qualitySkip: qualitySkip, SKIP_LIMIT: SKIP_LIMIT, skipsInARow: skipsInARow, skipWhy: skipWhy, outOfPlace: outOfPlace, isBlowMold: isBlowMold, isHtst: isHtst, productionLines: productionLines, qualityLines: qualityLines,

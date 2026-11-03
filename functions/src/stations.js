@@ -177,7 +177,7 @@ async function noAccountSet(db, email, input, stamp) {
 // Whether this kind of station needs a code at the plant (any of them has one).
 async function needsCode(db, kind, facilityId) {
   const list = await read(db);
-  return Object.keys(list).some(k => list[k].kind === kind && list[k].facilityId === (facilityId || 'fac_uniontown') && list[k].hash);
+  return Object.keys(list).some(k => list[k].kind === kind && list[k].facilityId === L.plantOf(facilityId) && list[k].hash);
 }
 
 // A typed code: the station it opens, or {ok:false, message}. 30 wrong codes a minute from one tablet (fails.js), then that

@@ -168,7 +168,7 @@
       station = null; remember(CODE_KEY, null); lineId = ''; write(''); pane = ''; history.replaceState(null, '', location.pathname);
       gate().catch(err => showError('Could not check this tablet\'s code: ' + (err.message || err)));
     });
-    const plant = () => { const ids = person ? L.plantsFor(person) : []; return params.get('plant') || ids[0] || 'fac_uniontown'; };
+    const plant = () => { const ids = person ? L.plantsFor(person) : []; return L.plantOf(params.get('plant') || ids[0]); };
     const plantName = (id) => ((L.PLANTS || []).find(p => p.id === id) || { name: 'Uniontown' }).name;
 
     // The banner's clock (Joe 10/26): h:mm:ss since the state began, every second.

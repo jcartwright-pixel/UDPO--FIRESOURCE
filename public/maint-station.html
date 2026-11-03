@@ -104,7 +104,7 @@
     // station, and its plant, after that.
     const CODE_KEY = 'udMaintStationCode';
     const kept = (() => { try { return JSON.parse(localStorage.getItem(CODE_KEY) || 'null') || {}; } catch (e) { return {}; } })();
-    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || kept.facilityId || 'fac_uniontown';
+    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || window.UDLogic.plantOf(kept);
     // No plant picker: the plant shows in the title (Joe 10/12).
     document.getElementById('title').textContent = 'Maintenance Station · ' + ({ fac_uniontown: 'Uniontown', fac_charleston: 'Charleston', fac_martins_ferry: 'Martins Ferry' }[PLANT] || PLANT);
     let machines = [];

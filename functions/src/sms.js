@@ -43,7 +43,7 @@ function phoneE164(v) {
 function phoneText(v) { const e = phoneE164(v); return e ? e.slice(2, 5) + '-' + e.slice(5, 8) + '-' + e.slice(8) : ''; }
 
 // 10-18-26, as every date in the app.
-const dateText = (k) => { const [y, m, d] = String(k).split('-'); return Number(m) + '-' + Number(d) + '-' + String(y).slice(2); };
+const dateText = (k) => L.dateText(k);
 // The text a driver's reply is sent on as (Joe 10/31).
 // The roster's "CASEY, LEE" reads Lee Casey.
 const personName = (v) => { const t = String(v || '').trim(), m = t.split(','); const w = (m.length === 2 ? m[1] + ' ' + m[0] : t).trim().toLowerCase();

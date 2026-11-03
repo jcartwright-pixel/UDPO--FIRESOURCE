@@ -18,8 +18,9 @@
   else root.UDBoard = factory(root.UDLogic);
 })(typeof self !== 'undefined' ? self : this, function (L) {
   function text(v) { return v === null || v === undefined ? '' : String(v).trim(); }
-  function routeNumber(route) { return text(route).replace(/_\d+$/, ''); }
-  function trailerText(v) { var t = text(v).toUpperCase(); var m = /^T?\s*-?\s*(\d+)$/.exec(t.replace(/\s+/g, '')); return m ? 'T-' + m[1] : t; }
+  // Rules audit line 12: route and trailer numbers are written by the one rule in logic.js.
+  function routeNumber(route) { return L.routeNumber(route); }
+  function trailerText(v) { return L.trailerNumber(v); }
 
   // Today's calendar day in New York (the board's day; the check-in and DVIR use the 6 AM operating day).
   // The calendar day in New York (no 6 AM change): timing-rules.js's one way, through logic.js.
@@ -27,7 +28,7 @@
 
   function boardState(day) {
     var s = text(day.loadStatus).toUpperCase();
-    if (day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0) return 'LOADED';
+    if (L.isLoaded(day)) return 'LOADED';
     if (day.plantStartedAt || s === 'LOADING' || s === 'PAUSED') return 'LOADING';
     return 'WAITING';
   }

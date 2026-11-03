@@ -34,7 +34,7 @@ function validatePhoto(action, input, SaveError) {
   if (image.length > MAX_IMAGE) throw new SaveError('BAD_REQUEST', 'The picture is too big. Take it again.');
   if (thumb && (!JPEG.test(thumb) || thumb.length > MAX_THUMB)) throw new SaveError('BAD_REQUEST', 'The picture did not come through. Take it again.');
   const area = AREAS.indexOf(text(input.area, 20)) >= 0 ? text(input.area, 20) : '';
-  return { image, thumb, area, note: text(input.note, 300), facilityId: text(input.facilityId, 60) || 'fac_uniontown',
+  return { image, thumb, area, note: text(input.note, 300), facilityId: L.plantOf(text(input.facilityId, 60)),
     width: Math.max(0, Math.round(Number(input.width) || 0)), height: Math.max(0, Math.round(Number(input.height) || 0)) };
 }
 
@@ -73,7 +73,7 @@ async function savePhoto(tx, db, req, email, stamp, logRef, mode, SaveError) {
 // The plant's pictures not yet sent to the group, oldest first, taken before the report was saved.
 async function pendingPhotos(db, facilityId, before) {
   const snap = await db.collection('walkPhotos').where('sentAt', '==', '').get();
-  return snap.docs.map(d => d.data()).filter(p => (p.facilityId || 'fac_uniontown') === (facilityId || 'fac_uniontown') && (!before || String(p.takenAt) <= String(before)))
+  return snap.docs.map(d => d.data()).filter(p => L.plantOf(p) === L.plantOf(facilityId) && (!before || String(p.takenAt) <= String(before)))
     .sort((a, b) => String(a.takenAt).localeCompare(String(b.takenAt)));
 }
 

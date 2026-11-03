@@ -12,9 +12,9 @@
  *   - every item code is kept as 14 digits (gtinKey), so a UPC and the same item's 14-digit code match.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDScan = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./logic'));
+  else root.UDScan = factory(root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (LS) {
   var GS = String.fromCharCode(29);
   var SEPARATORS = [GS, '|', '~'];
   // GS1 Application Identifiers Receiving uses: [AI, fixed length (0 = up to max), max, field name].
@@ -60,7 +60,7 @@
   // 2026-10-08 to 10-8-26 (Joe's dates everywhere).
   function shortDate(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text(iso));
-    return m ? Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2) : '';
+    return m ? LS.dateText(m[0]) : '';
   }
 
   function aiAt(s, i) {

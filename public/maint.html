@@ -70,8 +70,8 @@
 
     function units() {
       const seen = {};
-      return data.equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && L.unitAtPlant(e, 'fac_uniontown', false) &&
-        e.sourcePresent !== false && L.fleetOwnedHere(e, 'fac_uniontown', ownership) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
+      return data.equipment.map(e => ({ e, type: L.fleetKind(e.type) })).filter(({ e, type }) => type && e.unit && L.unitAtPlant(e, currentPlant(), false) &&
+        e.sourcePresent !== false && L.fleetOwnedHere(e, currentPlant(), ownership) && ['INACTIVE', 'DISABLED', 'RETIRED', 'SOLD'].indexOf(String(e.status || 'ACTIVE').toUpperCase()) < 0)
         .map(({ e, type }) => ({ unit: String(e.unit).toUpperCase(), type })).filter(u => !seen[u.unit] && (seen[u.unit] = true));
     }
     const miles = () => L.latestReadings(data.odometers, data.gpsTrucks);

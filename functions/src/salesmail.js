@@ -40,7 +40,7 @@ const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const dayNum = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 const keyOf = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
 // 10-8-26
-const shortDate = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : text(key); };
+const shortDate = (key) => L.dateText(text(key));
 const weekdayOf = (key) => { const n = dayNum(key); return n === null ? '' : WEEKDAY[((n % 7) + 11) % 7]; };
 // Wall minutes (New York, counted from 1/1/1970) as "4:05 AM", a length of time as "1 hr 12 min", a stored time as minutes
 // of the day: timing-rules.js's one way for each.
@@ -48,12 +48,10 @@ const clock12 = T.timeText;
 const howLong = T.spanText;
 const clockMinutes = T.clockMinutes;
 // Letters and digits only, the way the scorecard matches a truck to its GPS unit (sc-core scUnitKey_).
-const unitKey = (v) => text(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const unitKey = (v) => L.unitKey(v);
 
-function loaded(day) {
-  const s = text(day.loadStatus).toUpperCase();
-  return !!text(day.completeTime) || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0;
-}
+// Whether the load is loaded: the one rule in logic.js (rules audit, Joe 11/3).
+function loaded(day) { return L.isLoaded(day); }
 
 // The loads of one load date: Daily Dispatch's (shown on Daily, running that day).
 function loadsOn(runs, loadDate) {

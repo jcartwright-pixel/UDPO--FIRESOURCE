@@ -159,7 +159,7 @@ function drawCustomers() {
     $('cu-foot').textContent = '';
     return;
   }
-  $('cu-foot').textContent = 'From the Customer List app' + (cust.savedAt ? ', last changed ' + cust.savedAt.slice(5, 7) + '-' + cust.savedAt.slice(8, 10) + '-' + cust.savedAt.slice(2, 4) : '') + '.';
+  $('cu-foot').textContent = 'From the Customer List app' + (cust.savedAt ? ', last changed ' + window.UDLogic.dateText(cust.savedAt) : '') + '.';
   if (tab === 'route') drawByRoute(rows); else if (tab === 'group') drawByGroup(rows); else drawByCustomer(rows);
 }
 

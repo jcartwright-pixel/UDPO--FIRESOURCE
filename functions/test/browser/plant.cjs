@@ -65,7 +65,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       assert.match(await page.textContent('.divider.prior'), /PRIOR DAY LOADS/);
       assert.match(await page.textContent('#strip'), /Pickups 1 left of 2/);
       assert.equal(await page.textContent(row('805') + ' button.pu'), 'P/U1', 'an open pickup shows red with its count');
-      // Joe 10/14 ("for the case type columns ... B, make them narrower too"): as on Daily Box Loadout, Truck, Trailer and Cases Out
+      // Joe 10/14 ("for the case type columns ... B, make them narrower too"): as on Daily Boxing Loadout, Truck, Trailer and Cases Out
       // 20% narrower and Driver / CVG 30% (replacing Joe 10/11's one-line driver names); a driver's whole name still shows, at 16px
       // or more, wrapping when it is too long for the column.
       const drivers = await page.$$eval('#rows td.lo-driver', tds => tds.map(td => ({ name: td.textContent, fits: td.scrollWidth <= td.clientWidth + 1, size: parseFloat(getComputedStyle(td).fontSize) })));

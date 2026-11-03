@@ -3,7 +3,7 @@
  * Browser check (Joe 10/22: "whenever the trailers are being entered in for the Box loading for some reason it automatically
  * then starts like it's loading the truck"). Typing a trailer (or a box count) on a load not yet started saves it and leaves
  * the load Waiting with Start to press, on every loadout and on the Plant Station Boxing list:
- *   - Daily Box Loadout: a Scheduler load (Aldi Load 3) and a sheet box load (Sun Valley);
+ *   - Daily Boxing Loadout: a Scheduler load (Aldi Load 3) and a sheet box load (Sun Valley);
  *   - Daily Tote Loadout: a Scheduler load (Peck Load 2);
  *   - Plant Station Boxing: the same Aldi load still shows START LOADING.
  * With SHOTS_DIR=<folder> it saves pictures; BEFORE=1 only takes the pictures and checks nothing (for the screen before).
@@ -99,7 +99,7 @@ async function journal(id, ok) {
     // Start still starts it.
     await lo.click(row('sch:SCHED-a3') + ' [data-sclock]');
     await lo.waitForSelector(row('sch:SCHED-a3') + ' button.state.loading', { timeout: 5000 });
-    results.push('Daily Box Loadout: a trailer or box count typed on a load not yet started saves and leaves it Waiting (Scheduler load and sheet box load); Start still starts it');
+    results.push('Daily Boxing Loadout: a trailer or box count typed on a load not yet started saves and leaves it Waiting (Scheduler load and sheet box load); Start still starts it');
     // Daily Tote Loadout: Peck Load 2.
     await lo.click('#areas [data-area="TOTES"]');
     await lo.waitForSelector(row('sch:SCHED-k2'), { timeout: 10000 });

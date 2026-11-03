@@ -32,6 +32,18 @@ Operations is United Dairy's app for dispatch, the plant floor, fleet and mainte
 
 Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, trucks, settings and lists. A screen shows only the plant named in the top bar, and nothing you change there touches another plant. Only Home's **Operations Overview** shows all the plants together. You see a plant only when People & Roles gives it to you.
 
+### Trailer and truck numbers
+
+Type a trailer any way you like (**14**, **014**, **T14** or **T 14**). Operations always writes it as **T-** and the number with no zeros in front (**T-14**), on every screen, email and printout. Truck numbers lose their front zeros too when they are matched to their GPS, so **0601** and **601** are the same truck. **TBA** and **N/A** stay as they are.
+
+### Dates and weeks
+
+Every date is written the same way everywhere: month, day and year, like **10-8-26**. That goes for screens, emails, texts, printouts and the message after Publish. Every week starts on **Sunday** and ends on **Saturday**, and a week is named by its Sunday.
+
+### Loadout names
+
+The four loadouts have the same names everywhere: **Case**, **Tote**, **Boxing** and **Tanker** (Daily Case Loadout, Daily Tote Loadout, Daily Boxing Loadout, Daily Tanker Loadout). The Load Type list, the menus, the report email and the printouts all use these words. The counts keep their own words: Cases Out, Totes Out, Boxes Out and Gallons In.
+
 ### Buttons you see everywhere
 
 - `Back` goes back one step. If something is open on the screen (a window, a second tab) it closes that first.
@@ -136,7 +148,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Down Trucks / Trailers` lists every load from today on that still has a down unit, with one button to take them off.
 - `Driver Call-Off` marks a driver off for the day.
 - `+ Add Route / Run` adds an extra load for this day.
-- `Print Dispatch Sheet` prints the day's sheet.
+- `Print Dispatch Sheet` prints the day's sheet. Its heading names the Sunday the week begins.
 - `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 
@@ -617,7 +629,7 @@ The connection to Verizon Connect Fleet (administrators).
 id: manager
 screens: manager.html
 
-The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Box Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
+The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Boxing Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
 
 - A route tile is green when it is loaded and red when it is not. A LATE or BEHIND tile is yellow while its truck is 30 to 60 minutes past its leaving time, and dark red after that. Only LATE (its truck should already have left, or on a green tile: it was loaded after its dispatch time) and BEHIND (left over from the last shift, truck not gone yet) have a word.
 - Click a card to open its screen; click a line on a card to open that exact item.
@@ -626,6 +638,8 @@ The plant's front page for managers. Each department has a small card: Case Load
 - **Send Current Report:** see [Send Current Report](#send-report).
 
 > Last night's left-over loads show on their own line, before today's.
+
+> When the plant is behind, the routes not loaded and **Still to load** follow the truck that leaves first, the same order as Daily Case Loadout and the Late Forecast.
 
 > Loads an outside carrier hauls (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are never marked late or behind. They are still listed and counted, loaded or not.
 
@@ -658,13 +672,13 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 id: plant
 screens: plant.html
 
-One card for each department of Plant Distribution: Case, Tote, Box and Tanker loading and unloading, Truck Washing, Product Returns and Trailer Assignments. Click a card to open it.
+One card for each department of Plant Distribution: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns and Trailer Assignments. Click a card to open it.
 
-## Loading (Case, Tote, Box and Tanker)
+## Loading (Case, Tote, Boxing and Tanker)
 id: loadout
 screens: loadout.html
 
-The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tanker Loading (the menu opens the right one). Each line is one load: route, run, trailer, cases, start and end time, total time and its status.
+The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or Tanker Loading (the menu opens the right one). Each line is one load: route, run, trailer, cases, start and end time, total time and its status.
 
 ### Pick the day
 
@@ -687,7 +701,8 @@ The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tank
 - **Pickup Time** in `Add Pickup` takes a time typed any way (430p, 1630) and shows it as 4:30 PM.
 - **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
-- On a phone the four loadout buttons (Case, Tote, Box, Tanker) sit in two rows.
+- On a phone the four loadout buttons (Case, Tote, Boxing, Tanker) sit in two rows.
+- **Behind: load the truck that leaves first, first.** When the Late Forecast says the plant is behind, a yellow line says so at the top of Daily Case Loadout and the loads still to load are listed by which truck leaves first. Loaded loads stay where they are. When the plant catches up, the list goes back to the load order.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
 
@@ -719,7 +734,7 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 > **About … behind** counts the work still to do. A load that has already missed its time (left over from last night, or past its dispatch) counts only the time from now until it is loaded, not every hour since it should have left. Its own line still shows how late it is.
 
-## Unloading (Case, Tote, Box and Tanker)
+## Unloading (Case, Tote, Boxing and Tanker)
 id: unloading
 screens: unloading.html
 
@@ -796,7 +811,7 @@ screens: scheduler.html
 The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**).
 
 - Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
-- Each load is colored by who delivers it: Uniontown truck, Branch or Carrier. Holidays are marked.
+- Each load is colored by who delivers it: Uniontown truck, Branch or Carrier (an outside carrier, or a customer picking it up). It follows who covers the route on Route Master (United Dairy, a branch, an outside carrier or a customer pickup), the same rule every screen and the late count use. Holidays are marked.
 - Click a day's `+` (or `+ Add Load`) to add a load: schedule type, load type, load date, delivery date, pickup time, trailer, PO, cases, product and notes. Press `Confirm`; nothing saves until then.
 - **Pickup time:** type it any way (430p, 4:30 p, 1630). It shows as 4:30 PM when you leave the box.
 - Click a load to open it, change it, or `Delete Load` (it asks first).
@@ -1342,6 +1357,8 @@ screens: shifts.html
 
 The plant's shifts: name, side (Distribution or Plant Production), start, end and hours. Type a start or end time any way (6a, 230p, 1430); it shows as 2:30 PM. `+ Add Shift` adds one; `Remove` takes one off. `Starting Shifts` fills in the usual shifts. Each box saves when you leave it.
 
+> Each plant has its own shifts. Shift Notes, Shift Reports and Plant Reports use the shifts of the plant you are in, so Charleston's or Martins Ferry's times set here are the ones those screens go by.
+
 ## Location Areas
 id: location-areas
 screens: location-areas.html
@@ -1659,7 +1676,7 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 - **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the Driver Room board. A route that is not delivering today is not on it. A load from an earlier delivery day that has not left yet stays at the top, under **Left over from** that day, until it leaves.
 - **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
 - **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out. If the trailer's GPS has not moved since the load day but the truck's has (the trailer was changed out), **Where now** follows the truck. A GPS unit that has not reported for a day is not used; when neither the trailer nor the truck is reporting, it says **Unknown: GPS not reporting**.
-- **Save-A-Lot drop and hook.** A Save-A-Lot route ticked **Drop and Hook** in the Route Editor leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the Save-A-Lot (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2 hr 12 min late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
+- **Drop and hook.** Any route ticked **Drop and Hook** in the Route Editor (like the Save-A-Lot routes) leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the store (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2 hr 12 min late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
 - **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
 - `?` at the top right opens this Help inside the Sales app. The arrow at the top left (Back) goes back to the screen you were on. `Sign out` is at the bottom.
@@ -1667,7 +1684,7 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 
 > To see a route on a bigger map, tap the map and open it in Google Maps.
 
-!> Do not read **Where now** on a dropped Save-A-Lot load as the trailer. It is the driver's truck; the trailer is still at the store.
+!> Do not read **Where now** on a dropped load as the trailer. It is the driver's truck; the trailer is still at the store.
 
 !> Do not look for Home or a menu. The Sales app has only its two cards; the arrow at the top left (Back) always brings you back to them.
 
@@ -1699,7 +1716,7 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 id: plant-station
 screens: plant-station.html
 
-The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Box and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
+The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
 
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.

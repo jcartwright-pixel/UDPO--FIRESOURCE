@@ -277,7 +277,7 @@ export function mountJobStation(cfg) {
     $('job-start').hidden = j.status === 'PARTS';
     $('job-parts').innerHTML = j.status === 'PARTS' ? 'Parts are here' : 'Need Parts';
   }
-  const when = (iso) => { const d = new Date(iso); return isFinite(d) ? (d.getMonth() + 1) + '-' + d.getDate() + '-' + String(d.getFullYear()).slice(2) : ''; };
+  const when = (iso) => (isFinite(new Date(iso)) ? window.UDLogic.dateText(iso) : '');
   // Joe 10/28: Start Work, Pause, Waiting on Parts (Parts are here once it waits) and Complete; the notes boxes; the checklist.
   function drawSimpleJob() {
     const j = open;

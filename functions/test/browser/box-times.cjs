@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Browser check of typed Start and End times on Daily Box Loadout (Joe 10/20: "in the boxing section. I need to be able to edit
+ * Browser check of typed Start and End times on Daily Boxing Loadout (Joe 10/20: "in the boxing section. I need to be able to edit
  * the start and quit times of the route. In case the plant forgot"). Two Aldi Charleston Scheduler loads were started at 2:10 PM
  * and never ended, so at 7:30 PM they still show End and 5 hr 20 min:
  *   - Edit Load shows Start Time and End Time (not on + Add Load);
@@ -130,7 +130,7 @@ async function journal(id, ok) {
     await lo.setViewportSize({ width: 1920, height: 1040 });
     await lo.waitForTimeout(200);
     await shot(lo, 'box-loadout-after-1920.png');
-    assert.ok(await fits(lo), 'Daily Box Loadout fits 1920');
+    assert.ok(await fits(lo), 'Daily Boxing Loadout fits 1920');
     // Clearing End puts a load back to loading.
     await lo.click(row('sch:SCHED-a3') + ' [data-sedit]');
     await lo.waitForSelector('#sched-modal:not([hidden])');

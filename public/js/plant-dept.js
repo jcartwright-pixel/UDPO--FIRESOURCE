@@ -73,7 +73,7 @@ function model() {
     oldestBack: backWaiting.length ? backWaiting[0].back : null,
     // Polish item 4 (Joe 10/11): each department counts yesterday's leftover loads too, the same as its Loadout screen.
     loadLinks: P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
-    unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, ({ CASE: 'Case', TOTES: 'Tote', BOXING: 'Box', TANKER: 'Tanker' })[a] + ' Unloading', ac.complete + ' / ' + ac.total); }),
+    unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, window.UDLogic.areaName(a) + ' Unloading', ac.complete + ' / ' + ac.total); }),
     washLinks: openWash.slice(0, 3).map(w => link('washing.html?date=' + date, (w.trailer || 'Trailer') + ' · ' + w.need)), washMain: link('washing.html?date=' + date, 'Truck Washing', openWash.length + ' open', openWash.length > 0),
     retLinks: pend.slice(0, 3).map(x => link('returns.html?date=' + date, x.route + ' · ' + x.detail, 'Pending', true)), retMain: link('returns.html?date=' + date, 'Product Returns', pend.length + ' pending', pend.length > 0),
     loadNote: c.done + ' of ' + c.total + ' loads complete' + (all.prior ? '  ·  + ' + all.prior + ' from yesterday' : ''),

@@ -49,7 +49,7 @@
   <datalist id="ta-units"></datalist>
 
   <script type="module">
-    import { start, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, maySave, watchPerson } from './js/app.js';
+    import { start, currentPlant, requireSignIn, save, allowedSaves, escapeHtml, shortDate, showError, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import * as P from './js/plant-core.js';
 
@@ -66,9 +66,9 @@
     // A station tablet (Plant Station > Yard Services) may save by what Administration > People & Roles allows its account.
     let allowed = {};
     const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
-    const key = (v) => String(v || '').toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/[^A-Z0-9]/g, '');
-    const tText = (v) => { const t = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); const m = /^T?-?T?-?(\d+)$/.exec(t); return m ? 'T-' + m[1] : t; };
-    const AREA_SUB = { TOTES: 'Totes', BOXING: 'Box', TANKER: 'Tanker' };
+    const key = (v) => window.UDPlant.unitKey(v);
+    const tText = (v) => L.trailerNumber(v);
+    const AREA_SUB = { TOTES: L.areaName('TOTES'), BOXING: L.areaName('BOXING'), TANKER: L.areaName('TANKER') };
 
     function rowsNow() {
       return P.loadoutRows(runs, date).filter(r => r.state !== 'DONE').map(r => (r.id in pending ? Object.assign({}, r, { trailer: pending[r.id] }) : r));
@@ -89,11 +89,11 @@
         document.getElementById('rows').innerHTML = rows.map(r => {
           const k = key(r.trailer), others = k && on[k] ? on[k].filter(x => x.id !== r.id) : [];
           const cls = !r.trailer ? ' blank' : others.length ? ' dup' : '';
-          const note = !r.trailer ? 'Needs a trailer' : others.length ? 'Also on ' + others.map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : '';
+          const note = !r.trailer ? 'Needs a trailer' : others.length ? 'Also on ' + others.map(x => L.routeNumber(x.route)).join(', ') : '';
           const sub = (AREA_SUB[r.area] ? AREA_SUB[r.area] : '') + (r.prior ? (AREA_SUB[r.area] ? ' · ' : '') + 'Still open from ' + shortDate(r.loadDate) : '');
           // Review item 25 (Joe 10/13): data-l names each box on the phone's card (as on Yard Checks).
           return '<div class="ta-row' + cls + (r.id === selected ? ' sel' : '') + '" role="row" data-row="' + escapeHtml(r.id) + '">' +
-            '<span class="rt"><b>' + escapeHtml(String(r.route).replace(/_\d+$/, '')) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
+            '<span class="rt"><b>' + escapeHtml(L.routeNumber(r.route)) + '</b>' + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span>' +
             '<span data-l="Run">' + escapeHtml(L.runText(r)) + '</span><span data-l="Driver">' + escapeHtml(r.driver || '—') + '</span><span class="grey" data-l="Truck">' + escapeHtml(r.truck || '—') + '</span>' +
             '<span class="tr" data-l="Trailer"><input type="text" maxlength="20" list="ta-units" autocomplete="off" placeholder="Trailer #" value="' + escapeHtml(r.trailer) + '" data-trailer="' + escapeHtml(r.id) + '"' +
             ' aria-label="Trailer for route ' + escapeHtml(r.route + ' ' + r.run) + '"' + (can ? '' : ' disabled') + '><small>' + escapeHtml(note) + '</small></span>' +
@@ -110,16 +110,16 @@
         const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit);
         if (DOWN.indexOf(st) >= 0) down.push({ unit: t.unit, sub: (/DOWN:\s*([^|]+)/i.exec(t.notes || '') || [])[1] || st });
         else if (OFF.indexOf(st) >= 0) return;
-        else if (on[k]) busy.push({ unit: t.unit, sub: 'On ' + on[k].map(x => String(x.route).replace(/_\d+$/, '')).join(', ') });
+        else if (on[k]) busy.push({ unit: t.unit, sub: 'On ' + on[k].map(x => L.routeNumber(x.route)).join(', ') });
         else open.push({ unit: t.unit });
       });
       const sort = (a, b) => String(a.unit).localeCompare(String(b.unit), undefined, { numeric: true });
       const sel = rows.find(r => r.id === selected);
       const chips = (list, kind, empty) => list.length ? '<div class="ta-chips">' + list.sort(sort).map(t => '<button type="button" class="ta-chip ' + kind + '"' + (kind === 'open' && can && sel ? ' data-chip="' + escapeHtml(t.unit) + '"' : ' disabled') + '>' + escapeHtml(t.unit) + (t.sub ? '<small>' + escapeHtml(t.sub) + '</small>' : '') + '</button>').join('') + '</div>' : '<p class="empty">' + empty + '</p>';
-      document.getElementById('yard').innerHTML = '<p class="ta-help">' + (sel ? 'Route ' + escapeHtml(String(sel.route).replace(/_\d+$/, '')) + ' picked. Tap an open trailer to put it on.' : 'Pick a route.') + '</p>' +
+      document.getElementById('yard').innerHTML = '<p class="ta-help">' + (sel ? 'Route ' + escapeHtml(L.routeNumber(sel.route)) + ' picked. Tap an open trailer to put it on.' : 'Pick a route.') + '</p>' +
         '<h3>Open trailers</h3>' + chips(open, 'open', trailersFailed ? 'Could not read the trailer list; type trailer numbers in the boxes.' : 'No open trailers in Equipment Master.') + '<h3>On a route</h3>' + chips(busy, 'busy', 'None.') + '<h3>Down</h3>' + chips(down, 'down', 'None.');
       const list = trailers.filter(t => OFF.indexOf(String(t.status || '').trim().toUpperCase()) < 0 || DOWN.indexOf(String(t.status || '').trim().toUpperCase()) >= 0).sort(sort)
-        .map(t => { const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit); return '<option value="' + escapeHtml(t.unit) + '">' + (DOWN.indexOf(st) >= 0 ? 'Down' : on[k] ? 'On ' + on[k].map(x => String(x.route).replace(/_\d+$/, '')).join(', ') : 'Open') + '</option>'; }).join('');
+        .map(t => { const st = String(t.status || '').trim().toUpperCase(), k = key(t.unit); return '<option value="' + escapeHtml(t.unit) + '">' + (DOWN.indexOf(st) >= 0 ? 'Down' : on[k] ? 'On ' + on[k].map(x => L.routeNumber(x.route)).join(', ') : 'Open') + '</option>'; }).join('');
       const dl = document.getElementById('ta-units');
       if (dl.dataset.sig !== list) { dl.innerHTML = '<option value="TBA">Trailer not known yet</option>' + list; dl.dataset.sig = list; }
     }
@@ -211,7 +211,7 @@
       allowedSaves(['savePlantLoad']).then(a => { allowed = a; render(); });
       onSnapshot(doc(db, 'config', 'app'), s => { app = s.data() || {}; render(); });
       onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => {
-        trailers = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, 'fac_uniontown', true) && e.sourcePresent !== false);
+        trailers = s.docs.map(d => d.data()).filter(e => e.unit && L.unitAtPlant(e, currentPlant(), true) && e.sourcePresent !== false);
         trailersFailed = false;
         render();
       }, () => { trailersFailed = true; render(); });
