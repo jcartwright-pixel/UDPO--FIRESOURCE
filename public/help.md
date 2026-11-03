@@ -917,15 +917,21 @@ The Labeling Room and the fillers talk to each other here. The bottles come out 
 id: shiftnotes
 screens: shiftnotes.html
 
-The plant's shift log: notes for the next shift, breakdowns and anything that needs following up.
+The plant's shift log: notes for the next shift, breakdowns and anything that needs following up. Each kind of entry has its own button down the left, and its own history under the boxes.
 
-1. Pick the **Type** of entry (a note, a breakdown, a handoff...).
-2. Fill in the boxes: equipment or area, what broke, shift, down at and back up at, whether it can wait, next steps and notes.
-3. `Send to Maintenance` sends a breakdown or request to Plant Maintenance as a work order.
-4. `Start Another Entry` clears the form for the next one.
+1. Pick the kind of entry on the left (Handoff, Breakdowns, Maintenance Requests...), or pick the **Type** in the boxes.
+2. Fill in the boxes. They all start empty. For a breakdown: what broke, the shift, **Down at** (left empty, the time you put it on the log is used), what happened, and later **Back up at** and what fixed it.
+3. Each box saves when you leave it. A maintenance request goes to maintenance only when you press `Send to Maintenance`.
+4. `Start Another Entry` empties the boxes for the next one.
+5. To close a breakdown that is still open, type **Back up at** and **What fixed it** on it under **Still open**, or change its drop-down to Resolved.
 
-- **Current** shows what is open. **24-Hour History** shows the last 24 hours; a badge shows how many still need review.
-- A note stays until someone marks it **Resolved**. A report or the clock never clears it.
+- The button on the left is **red** while anything of that kind is still open (a breakdown still down), **orange** while one is on Monitor, and **green** only when every one of it is resolved ("all back up").
+- **Still open** at the top of each kind lists what is not resolved yet. It stays until someone marks it **Resolved**. A report or the clock never clears it.
+- **History** under the boxes lists every entry of that kind from the last 7 days, newest first. `Show 30 days` shows more. For breakdowns it shows what broke, when it went down, when it was reported, when it was back up, how long it was down and what fixed it.
+- The tiles at the top are buttons. `Entries 24 h`, `Needs attention`, `Monitor` and `Resolved` each show their entries on the **24-Hour History** tab. `Show everything` (or pressing the tile again) goes back.
+- **24-Hour History** shows the last 24 hours; a badge shows how many still need review.
+
+> A machine that is running again but still needs watching: put Back up at, then set it to Monitor. The tab turns orange instead of red.
 
 !> Do not mark a breakdown Resolved until it is running again. The time it was down stops counting then.
 
