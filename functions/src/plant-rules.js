@@ -1406,7 +1406,7 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+  var RECAP_AREA_BARS = false, RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
     // How far behind is told by the trucks still to leave that will leave late (one load long overdue does not make the whole
@@ -1538,6 +1538,7 @@
         '<div style="font-size:18px;font-weight:700;margin-top:2px;color:' + GREY + '">' + (c.left ? c.left + ' left to load' : 'Nothing left to load') + '</div>' +
         '<div style="margin-top:10px">' + bar(c.loaded, c.total, 14) + '</div>' +
         (areas.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px">' + areas.map(function (a) {
+          if (RECAP_AREA_BARS) return '<tr><td style="' + F + 'padding:7px 0 0;font-size:17px;font-weight:800;color:' + INK + '">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:7px 0 0;font-size:16px;font-weight:700;color:' + INK + ';white-space:nowrap">' + (a.total - a.left) + ' of ' + a.total + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr><tr><td colspan="2" style="padding:4px 0 3px">' + bar(a.total - a.left, a.total, 10) + '</td></tr>';
           return '<tr><td style="' + F + 'padding:6px 0;font-size:17px;font-weight:800;color:' + INK + ';border-bottom:1px solid #ffffff">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:6px 0;font-size:17px;font-weight:700;color:' + INK + ';white-space:nowrap;border-bottom:1px solid #ffffff">' + (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
         '<div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:14px;color:' + fg + '">' + (c.late ? '&#9888; ' : '&#10003; ') + e(c.status) + '</div>' +
         (c.doneBy && c.left ? '<div style="font-size:17px;font-weight:700;margin-top:2px;color:' + INK + '">Last load done about ' + e(c.doneBy) + '</div>' : '') +
