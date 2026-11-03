@@ -31,3 +31,49 @@ body:not(.is-admin) .admin-only { display: none !important; }
 body.waiting #screen > :not(.topbar):not(.hub-nav):not(.notice):not(.update-ready):not(.screen-loading) { visibility: hidden; }
 .screen-loading { display: none; }
 body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 0; top: 45%; text-align: center; font-size: 20px; font-weight: 700; color: var(--muted); }
+/* People & Access: the list on the left, the person being changed on the right (no pop-ups). */
+.people { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; padding: 0 16px 24px; align-items: start; }
+@media (max-width: 900px) { .people { grid-template-columns: 1fr; } }
+.people-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.people-bar input[type="search"] { flex: 1; min-width: 180px; }
+.people-bar input, .people-bar select, .people-edit input, .people-edit select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.people-bar button, .people-edit .actions button { min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.people-bar button.primary, .people-edit .actions button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.people-list .scroll-list { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: auto; }
+.people-list table { width: 100%; border-collapse: collapse; }
+.people-list th, .people-list td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: top; }
+.people-list th.l, .people-list td.l { text-align: left; }
+.people-list td small { display: block; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.people-list tr.pick { cursor: pointer; }
+.people-list tr.pick:hover td, .people-list tr.on td { background: #eaf3fc; }
+.people-list tr.inactive td { color: #8a97a5; }
+.app-chip { display: inline-block; margin: 0 4px 4px 0; padding: 2px 8px; border-radius: 999px; background: var(--band, #eef3f8); color: var(--ud-blue-dark); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.people-edit { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; position: sticky; top: 12px; }
+.people-edit h2 { margin: 0; color: var(--ud-blue-dark); font-size: 20px; overflow-wrap: anywhere; }
+.people-edit .pfield { display: grid; gap: 4px; font-weight: 700; border: 0; padding: 0; margin: 0; }
+.people-edit legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
+.people-edit .tick { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.people-edit .note { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--band, #eef3f8); font-size: 14px; }
+.people-edit .msg { padding: 8px 10px; border-radius: 8px; font-weight: 600; }
+.people-edit .msg.good { background: var(--runs-bg, #e6f4ea); color: var(--runs-ink, #146c2e); }
+.people-edit .msg.bad { background: var(--error-bg); color: var(--error-ink); }
+.people-edit .actions { display: flex; gap: 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.hub-section { margin: 8px 16px 0; color: var(--ud-blue-dark); font-size: 20px; }
+.people-list tbody td { white-space: normal; padding: 8px 10px; overflow: visible; text-overflow: clip; max-width: none; height: auto; }
+.people-list td b { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .people-list th:nth-child(3), .people-list td:nth-child(3), .people-list th:nth-child(4), .people-list td:nth-child(4) { display: none; } }
+
+/* The app cards (Joe 11-2-26: "more professional ... icons"): a coloured picture, the name, what it is for, and Open. */
+.hub-sub { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
+.hub-home { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; max-width: 1400px; }
+.hub-home a.app-tile { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: 1fr auto; gap: 6px 16px; padding: 20px 20px 16px; border: 1px solid var(--line); border-top: 4px solid var(--app); border-radius: 14px; background: #fff; color: var(--ink); text-decoration: none; box-shadow: 0 1px 3px rgba(16, 40, 70, .08); transition: box-shadow .15s, transform .15s, border-color .15s; min-height: 150px; }
+.hub-home a.app-tile:hover, .hub-home a.app-tile:focus-visible { box-shadow: 0 8px 22px rgba(16, 40, 70, .14); transform: translateY(-2px); border-color: var(--app); outline: none; }
+.app-icon { grid-row: 1 / span 2; width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; color: var(--app); background: color-mix(in srgb, var(--app) 12%, #fff); }
+.app-text strong { display: block; font-size: 21px; line-height: 1.2; color: var(--ud-blue-dark); margin: 2px 0 6px; }
+.app-text span { display: block; font-size: 15px; line-height: 1.4; color: #3d4f60; }
+.app-open { grid-column: 2; justify-self: start; margin-top: 8px; font-size: 14px; font-weight: 800; color: var(--app); letter-spacing: .02em; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hub-section { margin: 18px 16px 0; color: var(--muted); font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+@media (max-width: 480px) { .hub-home { grid-template-columns: 1fr; } .hub-home a.app-tile { min-height: 0; } }
