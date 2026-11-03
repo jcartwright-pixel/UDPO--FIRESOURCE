@@ -114,9 +114,9 @@ async function openPage(browser, url, w, h) {
       assert.doesNotMatch(fair.text, /3 h 20 min/);
       // The email box: the left-over load counts only its own loading, so "behind" is not hours and hours.
       assert.ok(box.behind <= 120, 'about ' + box.behind + ' min behind');
-      // Joe 11/1: the box answers "will every truck be loaded before it leaves?"; no hours behind, no cases.
-      assert.match(mailText, /Not every truck will be loaded before it leaves/);
-      assert.doesNotMatch(mailText, /About \d+ hr|\bcases\b/i);
+      // Joe 11/3: the recap box says about how far behind, told by the trucks still to leave: not hours and hours; no cases.
+      assert.match(mailText, /About (\d+ min|1 hr( \d+ min)?|2 hr) behind/);
+      assert.doesNotMatch(mailText, /About ([3-9]|\d\d) hr|\bcases\b/i);
       assert.deepEqual(fc.errors, []);
     }
     console.log('forecast-morning: ok');

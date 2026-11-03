@@ -158,9 +158,8 @@ test('the email and the report carry the forecast', () => {
   const r = R.plantReport({ loads, forecast }, NOW);
   assert.equal(r.forecast, forecast);
   const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
-  assert.match(html, /Forecast at 7:00 PM \(estimated\)/i);
-  // Joe 11/1 ("will all the trucks be loaded … whenever they leave? That's the estimate"): the box answers that one question,
-  // with the loads that will miss their truck and by how much, then every other truck; no "About … behind", no cases.
+  assert.match(html, /Estimated at 7:00 PM/);
+  // Joe 11/1: the forecast still works out which loads will miss their truck and by how much (truckCheck).
   const t = R.truckCheck(JSON.parse(JSON.stringify(r)));
   // Joe 11/1: behind, so the first truck to leave loads first: Fairmont (Tue 9:00 AM) now makes its truck.
   assert.equal(forecast.order, 'first to leave');
@@ -168,22 +167,26 @@ test('the email and the report carry the forecast', () => {
   assert.deepEqual(t.miss.map(x => x.value), ['1 hr 15 min late', '15 min late']);
   assert.equal(t.miss[0].sub, 'Leaves Mon 7:30 PM · est. loaded Mon 8:45 PM');
   assert.deepEqual([t.lateNow.length, t.ok, t.okLast], [0, 13, 'Tue 9:20 AM']);
-  assert.match(html, /Not every truck will be loaded before it leaves/);
-  assert.match(html, /2 will miss their trucks · the other 13 make it/);
-  assert.match(html, /Will miss its truck<\/td>[^]*6304 Walmart<div[^>]*>Leaves Mon 7:30 PM · est\. loaded Mon 8:45 PM<\/div>[^]*1 hr 15 min late/);
-  assert.match(html, /Every other truck[^]*13 loads<div[^>]*>Last one est\. loaded Tue 9:20 AM[^]*On time/);
-  [html, r.text].forEach(x => assert.doesNotMatch(x, /About .* behind|potentially late|Due by|Cases left|\bcases\b/i));
+  // Joe 11/3 (picture 2): the box is a short recap: how many loaded and left, then about how far behind (the truck still to
+  // leave that will leave the latest: 6304, 1 hr 15 min, so red) and when the last load should be done. No route names.
+  const c = R.shiftRecap(JSON.parse(JSON.stringify(r)));
+  assert.deepEqual([c.loaded, c.left, c.total, c.late, c.behindMin, c.level, c.doneBy], [7, 15, 22, true, 75, 'bad', '9:20 AM']);
+  const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('Estimated at'));
+  assert.match(box, />7 of 22 loaded<\/div>[^]*>15 left to load<\/div>/);
+  assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last load done about 9:20 AM/);
+  assert.doesNotMatch(box, /6304|Walmart|Will miss its truck|Every other truck|Already loaded/, 'no route names in the box');
+  [html, r.text].forEach(x => assert.doesNotMatch(x, /potentially late|Due by|Cases left|\bcases\b/i));
+  assert.doesNotMatch(html, /Routes<span/, 'the count is not said twice: no "of 22 loaded" on the Routes heading');
   // The banner: no route late now, 3 will miss their trucks.
   assert.match(html, /&#9888; 2 LOADS WILL MISS THEIR TRUCKS/);
   // Joe 10/26: loaded and not loaded share one list, so an estimated time says "est." in front of it.
   assert.match(html, />est\. \d+:\d\d [AP]M/);
-  assert.match(r.text, /^FORECAST \(ESTIMATED\) AT 7:00 PM: not every truck will be loaded before it leaves$/m);
-  assert.match(r.text, /^ {2}Will miss its truck: 6304 Walmart, Leaves Mon 7:30 PM · est\. loaded Mon 8:45 PM, 1 hr 15 min late$/m);
-  assert.match(r.text, /^ {2}Every other truck: 13 loads on time, last one est\. loaded Tue 9:20 AM$/m);
+  assert.match(r.text, /^RECAP \(ESTIMATED\) AT 7:00 PM: Running about 1 hr 15 min behind, all loaded by about 9:20 AM$/m);
+  assert.match(r.text, /^ {2}7 loaded · 15 left to load$/m);
   // Joe 10/20: "I don't want everybody to see basically our formula" - no pace, cases an hour or which nights it came from.
   [html, r.text].forEach(t => assert.doesNotMatch(t, /\bpace\b|cases an hour|cases\/hr|cushion|Mon 10-12-26/i));
   const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), '');
-  assert.doesNotMatch(none, /Est\. Done|>est\. |Forecast at/, 'a report without a forecast reads as before');
+  assert.doesNotMatch(none, /Est\. Done|>est\. |Estimated at/, 'a report without a forecast reads as before');
 });
 
 // Joe 10/19: "I would just like to be able to send it in the live version to see before I put it to everybody."
@@ -197,14 +200,14 @@ test('Send Test to Me goes only to the sender on live; the forecast box reaches 
   const test1 = await run(Object.assign({}, base, { testOnly: true }));
   assert.deepEqual(test1.sent.to, ['joe@uniteddairy.com'], 'only the person who pressed it');
   assert.equal(test1.ref.updates[0].testCopy, true);
-  assert.match(test1.sent.html, /Forecast at/, 'the test carries the forecast box');
+  assert.match(test1.sent.html, /Estimated at/, 'the test carries the recap box');
   const group = await run(base);
   assert.deepEqual(group.sent.to, ['a@uniteddairy.com', 'b@uniteddairy.com']);
-  assert.doesNotMatch(group.sent.html, /Forecast at|Est\. Done/, 'the groups do not get the box until it is switched on');
-  assert.doesNotMatch(group.sent.text, /FORECAST \(ESTIMATED\)|est\. loaded/);
+  assert.doesNotMatch(group.sent.html, /Estimated at|Est\. Done/, 'the groups do not get the box until it is switched on');
+  assert.doesNotMatch(group.sent.text, /RECAP \(ESTIMATED\)|est\. loaded/);
   const everyone = await run(base, { forecastEveryone: true });
-  assert.match(everyone.sent.html, /Forecast at/);
-  assert.match(everyone.sent.text, /FORECAST \(ESTIMATED\)/);
+  assert.match(everyone.sent.html, /Estimated at/);
+  assert.match(everyone.sent.text, /RECAP \(ESTIMATED\)/);
   assert.equal(RM.recipients(Object.assign({}, base, { testOnly: true }), env).copy, true);
 });
 
@@ -364,12 +367,17 @@ test('the morning after a slow night: left-over loads on their own line, today o
   const r = R.plantReport({ loads, forecast: f }, at), html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
   // Joe 11/1: the email's box shows each left-over load: 901 should have left at 7:00 AM (late now); 907 leaves at 8:00 AM
   // and will miss its truck; every one of today's loads is on time. No cases.
-  assert.match(html, /Late now: truck should have left[^]*901 Product 1<div[^>]*>Should have left Thu 7:00 AM · left over from Wed 10-21-26<\/div>[^]*est\. Thu \d+:\d\d AM/);
-  assert.match(html, /Will miss its truck[^]*907 Fairmont Transfer<div[^>]*>Leaves Thu 8:00 AM · est\. loaded Thu \d+:\d\d AM · left over from Wed 10-21-26/);
-  assert.match(html, /Every other truck[^]*22 loads[^]*On time/);
+  // Joe 11/3: the recap box says how far behind by the truck still to leave (Fairmont, left over), not by how overdue 901 is.
+  const tk = R.truckCheck(JSON.parse(JSON.stringify(r)));
+  assert.equal(tk.lateNow[0].sub, 'Should have left Thu 7:00 AM · left over from Wed 10-21-26');
+  assert.equal(tk.miss[0].name, '907 Fairmont Transfer');
+  assert.equal(tk.ok, 22);
+  const rc = R.shiftRecap(JSON.parse(JSON.stringify(r)));
+  assert.equal(rc.behindMin, Math.max(5, Math.round(tk.miss[0].lateBy / 5) * 5));
+  assert.match(html, />0 of 24 loaded<\/div>[^]*>24 left to load<[^]*&#9888; About [^<]+ behind<\/div>/);
   assert.match(html, /&#9888; 1 ROUTE LATE/);
   assert.doesNotMatch(html, /\bcases\b/i);
-  assert.match(r.text, /1 late now · 1 more will miss its truck · the other 22 make it/);
+  assert.match(r.text, /^RECAP \(ESTIMATED\) AT 7:36 AM: Running about [^,]+ behind, all loaded by about \d+:\d\d [AP]M\n {2}0 loaded · 24 left to load$/m);
   assert.equal(r.subject, 'Plant Update 10/22 7:36 AM: 1 route late');
 });
 
@@ -443,7 +451,7 @@ test('behind: the truck that leaves first loads first; on time: the load order s
 });
 
 // Joe 11/1 (10:32 AM email "All loads on time"): "sal 1 was a little late think we should show". A load finished after its own
-// dispatch time is loaded late: the subject, a yellow banner (when nothing is late or behind now), the forecast box, the text
+// dispatch time is loaded late: the subject, a yellow banner (when nothing is late or behind now)
 // and its Done time all say so.
 test('a load loaded after its dispatch time shows as loaded late', () => {
   const SUN = '2026-11-01', at = Date.parse('2026-11-01T15:32:00Z'); // Sunday 10:32 AM
@@ -459,8 +467,11 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   assert.match(R.truckCheckSummary(t), /1 already loaded late/);
   const html = R.reportHtml(r, ''), plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   assert.match(html, /padding:16px 14px;background:#f5c518[^>]*><div[^>]*>&#9888; 1 ROUTE LOADED LATE/);
-  assert.match(plain, /Already loaded, but late 855 Save-A-Lot 1 Dispatch Sun 8:00 AM · loaded 8:20 AM 20 min late/);
+  // Joe 11/3: the recap box no longer lists loads already loaded late ("if it's already loaded" he does not need it there);
+  // the route list still says "8:20 AM late" and the banner still says loaded late.
+  assert.doesNotMatch(plain, /Already loaded, but late/);
+  assert.match(plain, /2 of 3 loaded 1 left to load [^]*On time Last load done about 10:50 AM/);
   assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
-  assert.match(r.text, /LOADED LATE \(1\)\n {2}855 Save-A-Lot 1, Dispatch Sun 8:00 AM · loaded 8:20 AM, 20 min late/);
+  assert.doesNotMatch(r.text, /LOADED LATE \(/);
 });
