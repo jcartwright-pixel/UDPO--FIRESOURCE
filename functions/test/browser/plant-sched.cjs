@@ -123,7 +123,7 @@ async function shots(page, name, w) {
     await desk.waitForSelector('#f-route');
     await desk.selectOption('#f-route', { label: '892 · GARBER · Garber Farms' });
     // Joe 10/20: the time starts as Route Master's time for Garber's Saturday.
-    assert.equal(await desk.inputValue('#f-time'), '05:15', 'the Route Master time');
+    assert.equal(await desk.inputValue('#f-time'), '5:15 AM', 'the Route Master time');
     assert.equal(await desk.textContent('#f-time-note'), 'Route Master time');
     await desk.fill('#f-time', '');
     await desk.click('#f-save');
@@ -146,7 +146,7 @@ async function shots(page, name, w) {
     assert.equal((await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.filter(d => d.data().run === 'GARBER' && d.data().date === saturday).length, 0, 'nothing saved before Confirm');
     await desk.click('#f-back');
     await desk.waitForSelector('#f-load');
-    assert.deepEqual([await desk.inputValue('#f-load'), await desk.inputValue('#f-time'), await desk.inputValue('#f-cases')], ['2026-10-05', '05:45', '300'], 'Go back keeps what was typed');
+    assert.deepEqual([await desk.inputValue('#f-load'), await desk.inputValue('#f-time'), await desk.inputValue('#f-cases')], ['2026-10-05', '5:45 AM', '300'], 'Go back keeps what was typed');
     await desk.fill('#f-load', '2026-10-09');
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');
@@ -193,7 +193,7 @@ async function shots(page, name, w) {
     await desk.click('.sc-who:has(strong:text-is("Garber Farms")) .sc-plus');
     await desk.waitForSelector('#f-route');
     assert.equal(await desk.$eval('#f-route', s => s.selectedOptions[0].textContent), '892 · GARBER · Garber Farms');
-    assert.deepEqual([await desk.inputValue('#f-date'), await desk.inputValue('#f-time'), await desk.textContent('#f-time-note')], ['2026-10-08', '05:30', 'From the dispatch sheet']);
+    assert.deepEqual([await desk.inputValue('#f-date'), await desk.inputValue('#f-time'), await desk.textContent('#f-time-note')], ['2026-10-08', '5:30 AM', 'From the dispatch sheet']);
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-plus-1920.png'), scale: 'css' });
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');

@@ -47,7 +47,7 @@ PD.SCHEDULE.push(
     const total = (id) => page.$eval(row(id), tr => tr.querySelector('td:nth-last-child(3)').textContent.trim());
     assert.match(await page.textContent(row('sch:SCHED-a2') + ' button.state'), /Paused/);
     assert.equal(await total('sch:SCHED-a2'), '45 min', 'started 8:00, paused 15 min before and since 9:00: 45 minutes of loading');
-    assert.equal(await total('sch:SCHED-a3'), '90 min', 'a load paused before pauses were timed: its note gives the pause start');
+    assert.equal(await total('sch:SCHED-a3'), '1 hr 30 min', 'a load paused before pauses were timed: its note gives the pause start');
     // An hour later it is still paused: the time does not grow.
     await page.clock.fastForward('01:00:00');
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));

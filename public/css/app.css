@@ -1242,3 +1242,7 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
 .texts-page .texts-test select { font-size: 16px; min-width: 240px; padding: 6px 8px; }
 .texts-page .texts-week { white-space: pre-line; }
+
+/* Joe 11-3-26 (timing-rules.js): every time is typed into a plain box and turns into "4:30 PM" when the box is left. */
+input[data-time] { width: 8.5em; max-width: 100%; }
+input[data-time].bad-time { border-color: #b42318 !important; background: #fde8e6 !important; color: #b42318; }

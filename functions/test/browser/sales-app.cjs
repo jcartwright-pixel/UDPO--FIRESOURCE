@@ -227,8 +227,8 @@ async function adminNote(browser) {
         ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502'],
         ['855', 'Reyes, Marco', 'Back at the plant']], '815 left over from yesterday first; 817 (delivers tomorrow) and 820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
       // Joe 11/1: the dropped Save-A-Lot trailer's status says when it was dropped, and still says how it left.
-      assert.match(await pg.textContent('.sa-row[data-id*="sa855"] .sa-pill'), /^Dropped \d{1,2}:\d{2} [AP]M( \w+day)?, left (on time|(\d+h )?\d+m late)$/);
-      assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^Left \d{1,2}:\d{2} [AP]M( \w+day)?, (\d+h )?\d+m late$/, 'the status short: 1h 12m, not 1 hr 12 min (with the day when it left on another day, salesmail.js statusOf)');
+      assert.match(await pg.textContent('.sa-row[data-id*="sa855"] .sa-pill'), /^Dropped \d{1,2}:\d{2} [AP]M( \w+day)?, left (on time|(\d+ hr )?\d+ min (late|early))$/);
+      assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^On time, left \d{1,2}:\d{2} [AP]M( \w+day)?$/, 'Joe 11-2-26: 12 minutes after its 4:30 AM dispatch is within the 30 minutes on time (with the day when it left on another day, salesmail.js statusOf)');
       // Joe 11/1 (mock-up 3): every route is exactly two lines: route and status, then driver · where now, never wrapped.
       const lines = await pg.$$eval('.sa-row', x => x.map(r => {
         const one = r.querySelector('.sa-l1'), two = r.querySelector('.sa-l2'), lh = (e) => parseFloat(getComputedStyle(e).fontSize) * 1.6;

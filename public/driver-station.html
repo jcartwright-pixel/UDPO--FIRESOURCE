@@ -14,6 +14,7 @@
   <title>Driver Station · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
   <!-- Joe 10/13: with no signal the station opens from the tablet and shows the last board it had (js/offline-saves.js). -->
@@ -152,7 +153,7 @@
         if (tv && body && overflows('week-scroll')) wr.innerHTML = body + '<tr class="ds-band end"><td colspan="8">&#9632; END OF LIST</td></tr><tr class="ds-band start"><td colspan="8">&#9660; START OF LIST</td></tr>' + body;
         if (tv) fitCells(wr);
       }
-      document.getElementById('foot').textContent = 'Uniontown · ' + (navigator.onLine ? 'Updated ' : 'No signal · last board from ') + (updated || new Date()).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
+      document.getElementById('foot').textContent = 'Uniontown · ' + (navigator.onLine ? 'Updated ' : 'No signal · last board from ') + window.UDTiming.clockOf(updated || new Date()) + ' · ' + rows.length + ' route' + (rows.length === 1 ? '' : 's') + ', ' + B.remaining(rows) + ' not loaded · UNITED DAIRY ▪ QUALITY MILK & ICE CREAM PRODUCTS';
     }
 
     // Joe 10/28 (TV schedule as big as the Loadout): a name or route too wide for its cell even when wrapped is made

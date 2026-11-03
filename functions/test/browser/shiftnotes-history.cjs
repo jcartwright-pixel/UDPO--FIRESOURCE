@@ -69,7 +69,7 @@ async function note(id, at, values, status, extra) {
         assert.equal(r.length, 3);
         assert.deepEqual(await page.$$eval('#kind-history thead th', a => a.map(x => x.textContent)), ['Status', 'What broke', 'Down at', 'Reported', 'Back up at', 'Down time', 'What fixed it', 'Shift', 'By']);
         assert.match(r[0][0], /Still down/i); assert.match(r[0][1], /^Filler 4/); assert.match(r[0][4], /Still down/); assert.match(r[0][5], /so far/);
-        assert.match(r[1][1], /^Palletizer/); assert.match(r[1][5], /^1 h 0 min$/); assert.equal(r[1][6], 'Cleared the jam and reset the eye');
+        assert.match(r[1][1], /^Palletizer/); assert.match(r[1][5], /^1 hr$/); assert.equal(r[1][6], 'Cleared the jam and reset the eye');
         assert.match(r[1][2], /^\d{1,2}-\d{1,2}-\d\d \d{1,2}:\d\d (AM|PM)$/, 'down at like 11-2-26 4:30 PM');
         assert.match(r[2][1], /^Case packer/); assert.equal(r[2][7], 'First shift'); assert.equal(r[2][8], 'pat.sample');
         assert.match(await page.textContent('#kind-history .sn-sec'), /Breakdowns history\s*3/);
@@ -77,7 +77,7 @@ async function note(id, at, values, status, extra) {
         await page.$eval('#kind-history', x => x.scrollIntoView({ block: 'end' }));
         await shot('1b-breakdowns-history');
         await page.$eval('.sn-form', x => x.scrollTo(0, 0));
-        results.push('Breakdowns history lists Filler 4 (still down), Palletizer (1 h 0 min down, its fix) and Case packer, newest first');
+        results.push('Breakdowns history lists Filler 4 (still down), Palletizer (1 hr down, its fix) and Case packer, newest first');
 
         // The open breakdown shows 12-hour times, not 24-hour.
         assert.match(await page.textContent('#open-box .sn-down'), /Down at \d{1,2}:\d\d (AM|PM)/);

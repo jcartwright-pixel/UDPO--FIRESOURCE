@@ -146,7 +146,7 @@ function setupHtml() {
     const rows = (blank ? [{ id: '', name: '', shifts: {}, days: [1, 2, 3, 4, 5] }] : []).concat(data.areas.slice().sort(R.byOrder));
     html = '<table><thead><tr><th class="left">Area</th>' + R.SHIFTS.map(s => '<th>' + R.SHIFT_NAMES[s] + ' shift</th>').join('') + '<th>Days it runs</th><th>In use</th></tr></thead><tbody>' +
       (rows.map(a => '<tr data-op="area" data-id="' + esc(a.id) + '"><td class="left"><input data-k="name" maxlength="40" value="' + esc(a.name) + '" placeholder="Area name"' + dis() + '></td>' +
-        R.SHIFTS.map(s => { const t = (a.shifts || {})[s] || {}; return '<td class="nowrap"><input type="time" data-shift="' + s + '" data-end="start" value="' + esc(t.start || '') + '"' + dis() + '> - <input type="time" data-shift="' + s + '" data-end="end" value="' + esc(t.end || '') + '"' + dis() + '></td>'; }).join('') +
+        R.SHIFTS.map(s => { const t = (a.shifts || {})[s] || {}; return '<td class="nowrap"><input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" data-shift="' + s + '" data-end="start" value="' + esc(window.UDTiming.boxText(t.start || '')) + '"' + dis() + '> - <input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" data-shift="' + s + '" data-end="end" value="' + esc(window.UDTiming.boxText(t.end || '')) + '"' + dis() + '></td>'; }).join('') +
         '<td>' + daysBoxes(a.days, 'days') + '</td><td>' + (a.id ? inUse(a) : '') + '</td></tr>').join('') || empty(6)) + '</tbody></table>';
   } else if (tab === 'jobs') {
     const rows = (blank ? [{ id: '', name: '', areaId: area || (areas()[0] || {}).id || '', need: { 1: 1, 2: 0, 3: 0 } }] : []).concat(data.jobs.filter(j => !area || j.areaId === area).sort((a, b) => areaName(a.areaId).localeCompare(areaName(b.areaId)) || R.byOrder(a, b)));
@@ -266,10 +266,10 @@ body.addEventListener('change', e => {
   }
   if (t.dataset.day !== undefined) fields[t.dataset.k] = [...row.querySelectorAll('input[data-k="' + t.dataset.k + '"]:checked')].map(x => Number(x.dataset.day));
   else if (t.dataset.end) {
-    const s = t.dataset.shift, start = row.querySelector('[data-shift="' + s + '"][data-end="start"]').value, end = row.querySelector('[data-shift="' + s + '"][data-end="end"]').value;
+    const TV = (el) => window.UDTiming.hhmmOf(el.value), s = t.dataset.shift, start = TV(row.querySelector('[data-shift="' + s + '"][data-end="start"]')), end = TV(row.querySelector('[data-shift="' + s + '"][data-end="end"]'));
     if ((start && !end) || (!start && end)) return;
     const shifts = {};
-    R.SHIFTS.forEach(n => { const a = row.querySelector('[data-shift="' + n + '"][data-end="start"]').value, b = row.querySelector('[data-shift="' + n + '"][data-end="end"]').value; if (a && b) shifts[n] = { start: a, end: b }; });
+    R.SHIFTS.forEach(n => { const a = TV(row.querySelector('[data-shift="' + n + '"][data-end="start"]')), b = TV(row.querySelector('[data-shift="' + n + '"][data-end="end"]')); if (a && b) shifts[n] = { start: a, end: b }; });
     fields.shifts = shifts;
   } else if (t.dataset.need) {
     const need = {};

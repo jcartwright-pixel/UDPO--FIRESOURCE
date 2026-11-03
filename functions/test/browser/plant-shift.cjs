@@ -162,7 +162,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     assert.equal(await desk.inputValue('.sn-up'), '', 'Back up at stays blank while it is still down');
     await desk.fill('.sn-fix', 'Maintenance welded the plate back in place');
     await desk.press('.sn-fix', 'Tab');
-    assert.match(await desk.inputValue('.sn-up'), /^\d\d:\d\d$/, 'what fixed it fills Back up at with the time now');
+    assert.match(await desk.inputValue('.sn-up'), /^\d{1,2}:\d\d [AP]M$/, 'what fixed it fills Back up at with the time now');
     await watcher.waitForFunction(() => /long cooler track[\s\S]*Back up at[\s\S]*Fix: Maintenance welded/.test(document.getElementById('history').textContent), null, { timeout: 8000 });
     results.push('Breakdown: typing what fixed it fills Back up at, so it stops counting as down');
     for (const p of [desk, watcher, phone]) assert.deepEqual(p.errors, []);

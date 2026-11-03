@@ -66,7 +66,7 @@ function queueLoadoutHistory(tx, db, req, run, d, after, stamp, email) {
   if (!complete && status !== 'COMPLETE') return;
   if (!HISTORY_FIELDS.some(k => after[k] !== undefined)) return;
   const delivery = L.addDays(run.weekStart, L.DAYS.indexOf(req.day));
-  const offset = d.loadDayOffset === null || d.loadDayOffset === undefined || d.loadDayOffset === '' ? -1 : Number(d.loadDayOffset);
+  const offset = L.loadDayOffset(d.loadDayOffset);
   const loadDate = L.dateKey(d.loadDate) || L.addDays(delivery, offset), key = (run.runId || '') + '|' + loadDate;
   tx.set(db.collection(C.outbox).doc(req.requestId + '-h'), {
     status: 'pending', at: stamp, by: email, requestId: req.requestId, history: true, key, runDocId: req.runDocId,

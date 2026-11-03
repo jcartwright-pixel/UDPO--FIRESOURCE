@@ -2,7 +2,7 @@
 /*
  * Browser check of typed Start and End times on Daily Boxing Loadout (Joe 10/20: "in the boxing section. I need to be able to edit
  * the start and quit times of the route. In case the plant forgot"). Two Aldi Charleston Scheduler loads were started at 2:10 PM
- * and never ended, so at 7:30 PM they still show End and 5 h 20 min:
+ * and never ended, so at 7:30 PM they still show End and 5 hr 20 min:
  *   - Edit Load shows Start Time and End Time (not on + Add Load);
  *   - typing an End time (any form: 3:45p) marks the load loaded, the same as pressing End, and Total Time is worked out from it;
  *   - an End time before the Start, or a time not come yet, shows the red line and nothing is saved;
@@ -66,7 +66,7 @@ async function journal(id, ok) {
     const lo = await openPage(browser, 1536, 790, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
     await lo.waitForSelector(row('sch:SCHED-a3'), { timeout: 15000 });
     assert.equal(await lo.textContent(row('sch:SCHED-a2') + ' [data-sclock]'), 'End', 'the plant forgot End');
-    assert.equal(await lo.textContent(total('sch:SCHED-a2')), '5 h 20 min');
+    assert.equal(await lo.textContent(total('sch:SCHED-a2')), '5 hr 20 min');
     await shot(lo, 'box-loadout-1536.png');
     await lo.click(row('sch:SCHED-a2') + ' [data-sedit]');
     await lo.waitForSelector('#sched-modal:not([hidden])');
@@ -102,8 +102,8 @@ async function journal(id, ok) {
     await lo.waitForSelector(row('sch:SCHED-a2') + ' button.state.done', { timeout: 5000 });
     let w = await journal('SCHED-a2', x => x.state === 'COMPLETE');
     assert.deepEqual([w.startedAt, w.completedAt, w.startedBy, w.completedBy], ['2026-10-08T18:10:00Z', '2026-10-08T19:45:00.000Z', 'boxing@uniteddairy.com', 'manager.test@uniteddairy.com']);
-    await lo.waitForFunction((s) => document.querySelector(s).textContent === '95 min', total('sch:SCHED-a2'), { timeout: 5000 });
-    results.push('Edit Load: typing End 3:45p marks Load 2 loaded (Done) and Total Time is 95 min; Start stays as the plant pressed it');
+    await lo.waitForFunction((s) => document.querySelector(s).textContent === '1 hr 35 min', total('sch:SCHED-a2'), { timeout: 5000 });
+    results.push('Edit Load: typing End 3:45p marks Load 2 loaded (Done) and Total Time is 1 hr 35 min; Start stays as the plant pressed it');
     // A loaded load's times can be fixed: 345 is read as PM (the box held a PM time).
     await lo.click(row('sch:SCHED-a2') + ' [data-sedit]');
     await lo.waitForSelector('#sched-modal:not([hidden])');
@@ -114,7 +114,7 @@ async function journal(id, ok) {
     await lo.waitForSelector('#sched-modal', { state: 'hidden' });
     w = await journal('SCHED-a2', x => x.completedAt === '2026-10-08T19:30:00.000Z');
     assert.deepEqual([w.state, w.startedAt], ['COMPLETE', '2026-10-08T18:00:00.000Z']);
-    await lo.waitForFunction((s) => document.querySelector(s).textContent === '90 min', total('sch:SCHED-a2'), { timeout: 5000 });
+    await lo.waitForFunction((s) => document.querySelector(s).textContent === '1 hr 30 min', total('sch:SCHED-a2'), { timeout: 5000 });
     results.push('Edit Load: a loaded load\'s Start and End can be fixed (2 and 330 read as 2:00 PM and 3:30 PM)');
     // Load 3: both typed; a time before 6 AM is the night after the load date.
     await lo.click(row('sch:SCHED-a3') + ' [data-sedit]');

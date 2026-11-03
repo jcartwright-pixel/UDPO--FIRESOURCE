@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/stations.css">
   <link rel="stylesheet" href="css/production.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/production-rules.js"></script>
@@ -343,7 +344,7 @@
     function actionText(v, a) {
       const k = v.kind;
       if (a === 'changeover') return v.changeover ? [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', v.changeover.minutes + ' min running', 'on'] : [k === 'BLOWMOLD' ? 'Mold Change' : 'Changeover', 'start / finish', ''];
-      if (a === 'cip') return [k === 'HTST' ? 'CIP Wash' : 'CIP / Sanitation', v.cip ? 'washing ' + v.cip.minutes + ' min' : v.sinceCipHours !== null ? (v.sinceCipHours < 1 ? 'last under 1 h ago' : 'last ' + v.sinceCipHours + ' h ago') : 'start / finish', v.cip ? 'on' : v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours ? 'warn' : ''];
+      if (a === 'cip') return [k === 'HTST' ? 'CIP Wash' : 'CIP / Sanitation', v.cip ? 'washing ' + v.cip.minutes + ' min' : v.sinceCipHours !== null ? (v.sinceCipHours < 1 ? 'last under 1 hr ago' : 'last ' + window.UDTiming.spanText(v.sinceCipHours * 60) + ' ago') : 'start / finish', v.cip ? 'on' : v.cipHours && v.sinceCipHours !== null && v.sinceCipHours >= v.cipHours ? 'warn' : ''];
       if (a === 'waste') return ['Waste / Rejects', fmt(v.wasteTotal) + ' this shift', ''];
       if (a === 'check') return ['Quality Check', !v.check ? 'every ' + (R.CHECK_EVERY[k] || 2) + ' hours' : v.check.done ? 'next ' + clock(v.check.next) : 'due ' + clock(v.check.at), v.check && !v.check.done ? 'warn lb-flashbtn' : ''];
       if (a === 'crew') return ['Crew', v.crewOn.length + ' signed on', ''];

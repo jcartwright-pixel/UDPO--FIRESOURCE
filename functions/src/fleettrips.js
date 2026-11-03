@@ -192,7 +192,7 @@ async function tripCheck(db, input, options) {
  * window Fleet refuses is split in half and asked again), and each truck's trips are built as the points stream in, so a
  * trip that crosses midnight stays one trip. Trailers (T- units) are left out: they send no fuel.
  */
-const WINDOW_HOURS = 6;
+const WINDOW_HOURS = require('./timing-rules').TIMERS.gpsTripWindowHours;
 /** One truck's trips, a point at a time. p: {at, lat, lon, address, miles, fuel, tripFuel, odo}. */
 function tripStream(yards) {
   const trips = [];
@@ -236,7 +236,7 @@ function tripStream(yards) {
 function homeOf(points) {
   const count = (list) => { const n = {}; list.forEach(p => { if (p.lat === null || p.lon === null) return; const k = p.lat.toFixed(3) + ',' + p.lon.toFixed(3); n[k] = (n[k] || 0) + 1; }); return n; };
   const still = points.filter(p => !(p.miles > 0.05));
-  const night = still.filter(p => { const h = Number(new Date(p.at).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false })); return h >= 1 && h < 4; });
+  const night = still.filter(p => { const h = Math.floor(require('./timing-rules').minuteOfDay(new Date(p.at).getTime()) / 60); return h >= 1 && h < 4; });
   const n = count(night.length >= 3 ? night : still), best = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
   if (!best) return null;
   const [lat, lon] = best.split(',').map(Number);

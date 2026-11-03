@@ -75,7 +75,7 @@ function bookExisting(ctx, run) {
 // A day nobody may change from the masters any more: loaded (or loading) before today, changed by hand, or finished.
 function dayLocked(run, p, today) {
   const d = (run.days && run.days[p]) || {}, date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
-  const offset = d.loadDayOffset === null || d.loadDayOffset === undefined ? -1 : d.loadDayOffset;
+  const offset = L.loadDayOffset(d.loadDayOffset);
   const load = d.loadDate || L.addDays(date, offset);
   return load < today || L.yes(d.routeOverride) || L.isLoaded(d);
 }

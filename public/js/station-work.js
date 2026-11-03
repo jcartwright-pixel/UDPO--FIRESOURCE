@@ -323,7 +323,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
                 '<option value="__new">New item (type its name)</option></select>';
           }
         }
-        const when = l.at ? '<small>' + (l.sscc ? 'Pallet · ' : '') + escapeHtml(new Date(l.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })) + '</small>' : '';
+        const when = l.at ? '<small>' + (l.sscc ? 'Pallet · ' : '') + escapeHtml(window.UDTiming.clockOf(l.at)) + '</small>' : '';
         const n = Number(l.count) || 0;
         const cases = live ? '<span class="rv-qty"><button type="button" class="rv-step" data-act="rvminus" data-id="' + escapeHtml(k) + '" aria-label="One less">&minus;</button><b>' + n +
           '</b><button type="button" class="rv-step" data-act="rvplus" data-id="' + escapeHtml(k) + '" aria-label="One more">+</button></span>' : '<b>' + n + '</b>';

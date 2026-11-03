@@ -202,7 +202,8 @@ const FIXES = ['Replaced a part', 'Repaired', 'Adjusted', 'Cleaned', 'Lubricated
 const STATION_OPS = ['START', 'HELPER', 'PARTS', 'RESUME', 'STOP', 'DONE', 'REPORT', 'BREAKDOWN'];
 const SIGNATURE_MAX = 30000;
 const short = (v, max) => text(v).replace(/\s+/g, ' ').slice(0, max);
-const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+// The calendar day in New York: timing-rules.js's one way.
+const nyDay = (ms) => require('./timing-rules').calendarDay(ms);
 const CLOCK = require('./job-clock');
 const { laborOf, joinNames } = CLOCK;
 const FROM_WORD = { SHIFT_NOTES: 'Request from the plant', PM: 'PM', MAINTENANCE: 'Reported by maintenance' };

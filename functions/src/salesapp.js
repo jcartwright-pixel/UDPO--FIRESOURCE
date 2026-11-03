@@ -63,10 +63,9 @@ function whereOf(unit, spots, left) {
   return address ? 'Stopped: ' + address : 'Stopped';
 }
 
-// Joe 11/1 (mock-up 3): the status on one line: "Left 10:12 AM, 2h 12m late" (the 6 AM email keeps "2 hr 12 min").
-function shortStatus(word) {
-  return text(word).replace(/(\d+) hr (\d+) min/g, '$1h $2m').replace(/(\d+) hr\b/g, '$1h').replace(/(\d+) min\b/g, '$1m');
-}
+// Joe 11/1 (mock-up 3): the status on one line, "Left 10:12 AM, 2 hr 12 min late".
+// Joe 11-3-26 (item 5): lengths of time read the same as everywhere else ("1 hr 12 min", timing-rules.js), so the status is kept as is.
+function shortStatus(word) { return text(word); }
 
 // When the GPS last heard from the unit: "10:42 AM", with the date (10-30-26) when it was not today.
 function gpsWhen(ms, now) {
@@ -172,7 +171,7 @@ function salesScreen(input, nowMs) {
       if (drop) {
         // Dropped: the status says when; Where now follows the driver's truck (the trailer stays at the store).
         const dd = Math.floor(drop.at / 1440), when = S.clock12(drop.at) + (dd !== Math.floor(now / 1440) ? ' ' + S.weekdayOf(new Date(dd * 86400000).toISOString().slice(0, 10)) : '');
-        const leftWord = s.tone === 'late' && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
+        const leftWord = (s.tone === 'late' || s.tone === 'caution') && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
         s = { word: 'Dropped ' + when + ', ' + leftWord, tone: s.tone };
         unit = tk; by = tk ? 'TRUCK' : '';
         where = !tk ? 'No GPS on the truck' : silent(tk) ? UNKNOWN : whereOf(tk, spots, true);

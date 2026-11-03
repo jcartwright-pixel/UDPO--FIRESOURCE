@@ -23,11 +23,8 @@
   function trailerText(v) { return L.trailerNumber(v); }
 
   // Today's calendar day in New York (the board's day; the check-in and DVIR use the 6 AM operating day).
-  function calendarDay(now) {
-    var parts = {};
-    new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date()).forEach(function (p) { parts[p.type] = p.value; });
-    return parts.year + '-' + parts.month + '-' + parts.day;
-  }
+  // The calendar day in New York (no 6 AM change): timing-rules.js's one way, through logic.js.
+  function calendarDay(now) { return L.calendarDay(now); }
 
   function boardState(day) {
     var s = text(day.loadStatus).toUpperCase();
@@ -74,7 +71,7 @@
       if (opts && opts.carry) L.DAYS.forEach(function (p, i) {
         var day = run.days && run.days[p];
         if (!day || !day.runs) return;
-        var delivery = L.addDays(run.weekStart, i), offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
+        var delivery = L.addDays(run.weekStart, i), offset = L.loadDayOffset(day.loadDayOffset);
         var loaded = L.addDays(delivery, offset), leaves = text(day.departureDate) || (/LOAD/i.test(text(run.masterShow && run.masterShow.leavesOn)) ? loaded : delivery);
         if (loaded >= loadDate || leaves <= loadDate || rows.some(function (x) { return x.runDocId === run.id && x.day === p; })) return;
         boardRows([run], pickups, delivery).forEach(function (r) { r.deliveryDate = delivery; r.prior = false; rows.push(r); });
@@ -92,7 +89,7 @@
     (runs || []).forEach(function (run) {
       var day = run.days && run.days[p];
       if (run.weekStart !== week || !day || !day.runs || !L.liveFlagShown(run, 'displayMobileRoute', 'mobile')) return;
-      var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset, loadDate = L.addDays(date, offset);
+      var offset = L.loadDayOffset(day.loadDayOffset), loadDate = L.addDays(date, offset);
       var entered = (pickups || []).filter(function (x) {
         var same = x.runDocId ? x.runDocId === run.id && (!x.day || x.day === p) : (x.runId && text(x.runId) === text(run.runId)) || (!x.runId && text(x.route) === text(run.route) && text(x.run) === text(run.run));
         return same && (x.date === date || x.date === loadDate);

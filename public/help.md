@@ -58,6 +58,26 @@ Operations saves by itself the moment you change something. There is no Save but
 
 !> Do not keep two people typing in the same box at once. The last change wins.
 
+### Times
+
+Every time in Operations is written the same way: **4:30 PM**. A length of time is written **35 min**, **1 hr** or **1 hr 12 min** (past a day, **1 day 2 hr**).
+
+1. In any time box, type the time the quick way: **430p**, **4:30 p**, **1630** or **5** (5:00 AM).
+2. Leave the box. It turns your typing into **4:30 PM** by itself.
+
+- A box that already held a PM time stays PM when you type it again without a or p.
+- A box that turns red with **Type a time like 4:30 PM** did not get a time. Type it again.
+
+### On time, early and late
+
+One rule for the whole app, for the plant, the sales app, the emails and the Driver Scorecard:
+
+- **Green (on time):** within 30 minutes either side of the time the truck leaves.
+- **Yellow:** 30 to 60 minutes late (or, for the sales app and the Scorecard, 30 to 60 minutes early).
+- **Red:** more than 60 minutes late, or more than 60 minutes early.
+
+The plant is never marked early for loading ahead of time. Loads an outside carrier hauls are never marked late.
+
 ## Home
 id: home
 screens: index.html, company.html, group.html
@@ -554,6 +574,7 @@ How each driver is doing: one grade per area and an overall score, with rewards 
 - `Excuse` on a miss (a hard stop for a deer, FMLA) takes its points off. `Undo excuse` puts them back.
 - `Rate truck cleanliness` rates a driver's truck 1 (very dirty) to 5 (spotless), about once a month.
 - **Settings** sets the points for each area, the date the scorecard counts from, and which area grades the Driver Station TV shows next to the overall score.
+- **Time:** leaving the yard more than 30 minutes before the dispatch time is **Left too early**. Back more than 30 minutes after the expected return is **Back too late**; back 15 minutes or more before it earns **Back early**. These minutes are the app's one on-time rule (see [Times](#start)), so Settings shows them but does not change them. Only the points can be changed.
 - **No driver dispatched** lists GPS alerts on a truck nobody was put on. Put the driver on Daily Dispatch so it counts.
 - `Print` prints the board.
 
@@ -610,9 +631,10 @@ screens: manager.html
 
 The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Boxing Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
 
-- A route tile is green when it is loaded and red when it is not. Only LATE (its truck should already have left, or on a green tile: it was loaded after its dispatch time) and BEHIND (left over from the last shift, truck not gone yet) have a word.
+- A route tile is green when it is loaded and red when it is not. A LATE or BEHIND tile is yellow while its truck is 30 to 60 minutes past its leaving time, and dark red after that. Only LATE (its truck should already have left, or on a green tile: it was loaded after its dispatch time) and BEHIND (left over from the last shift, truck not gone yet) have a word.
 - Click a card to open its screen; click a line on a card to open that exact item.
 - **Manager Walkthrough:** each stop (Yard, Coolers, Production, Pictures) is green when done, yellow when due (2 hours) and red when past due (3 hours). `Check now` does the check; `View` shows the last one.
+- **Behind schedule** on a department card counts the loads not loaded 30 minutes after their truck's leaving time.
 - **Send Current Report:** see [Send Current Report](#send-report).
 
 > Last night's left-over loads show on their own line, before today's.
@@ -637,7 +659,7 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - The loads are the ones loaded today, by loadout (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout), with how many are loaded beside each name (for example **10 of 24**). Inside each loadout, each delivery day once: the loaded loads (green), then the ones not loaded yet.
 - **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet. **Loaded late** means the load is loaded, but it finished after its dispatch time; its Done time says "late" in red.
 - The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Loads will be late** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
-- A load from today's shift says LATE when it is not loaded 45 minutes after it leaves. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
+- A load from today's shift says LATE when it is not loaded 30 minutes after it leaves: yellow up to 60 minutes, red after that. **Loaded late** works the same way: a load done within 30 minutes of its dispatch time is on time. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
 - The box under the banner is a short recap: how many loads are loaded (for example **19 of 38 loaded**), how many are left, and a bar that fills as they are loaded. Then each loadout the plant has (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout) on its own: how many are loaded and left, its own bar, and under it **On time** or about how far behind that loadout is. Case Loadout also says about when it will be done. Each bar and line is green when on time, yellow up to an hour behind and red past an hour, and the banner at the top takes the same color as the box. It names no routes (they are in the list below) and never shows cases.
 - "About how far behind" goes by the trucks still to leave that will leave late, not by one load that is already long overdue. Only Case loads have an estimate; Boxing, Tote and Tanker are behind only when one of their trucks should already have left.
 - **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are still listed in the Routes list and counted in "X of Y loaded", but never marked late, behind or loaded late, and the forecast box leaves them out. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
@@ -675,6 +697,8 @@ The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or T
 - `Delete Load` (press twice) takes a Scheduler load off this screen and off the Scheduler.
 - **Pickups:** `Add Pickup` adds a customer's pickup; `Pickup Complete` finishes it.
 - A plant note on a load shows as a yellow line under it.
+- **Dispatch time colour:** a load not loaded 30 minutes after its truck's leaving time has its dispatch time in **yellow**, and in **red** once it is more than 60 minutes late (or left over from the last shift). **Behind** at the top counts them: yellow when all are under 60 minutes, red when any is red.
+- **Pickup Time** in `Add Pickup` takes a time typed any way (430p, 1630) and shows it as 4:30 PM.
 - **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
 - On a phone the four loadout buttons (Case, Tote, Boxing, Tanker) sit in two rows.
@@ -696,7 +720,7 @@ screens: forecast.html
 
 Will the plant be late? Every case load still to load, in the order it will be loaded, with its **Est. Done** time, compared with when it leaves.
 
-- **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A late one is red.
+- **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A load whose Est. Done is within 30 minutes of its departure is on time. 30 to 60 minutes after is yellow, more than 60 minutes after is red.
 - **Loads due by each time** totals the loads and cases due by each hour.
 - **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
 - Last night's left-over loads are marked at the left edge.
@@ -789,6 +813,7 @@ The calendar of loads going out. Shipping and Receiving are separate screens: op
 - Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
 - Each load is colored by who delivers it: Uniontown truck, Branch or Carrier (an outside carrier, or a customer picking it up). It follows who covers the route on Route Master (United Dairy, a branch, an outside carrier or a customer pickup), the same rule every screen and the late count use. Holidays are marked.
 - Click a day's `+` (or `+ Add Load`) to add a load: schedule type, load type, load date, delivery date, pickup time, trailer, PO, cases, product and notes. Press `Confirm`; nothing saves until then.
+- **Pickup time:** type it any way (430p, 4:30 p, 1630). It shows as 4:30 PM when you leave the box.
 - Click a load to open it, change it, or `Delete Load` (it asks first).
 - A Shipping load takes the dispatch sheet's time for its run once the Live week has it.
 - `Print Monthly` prints the month.
@@ -941,6 +966,7 @@ The plant's shift log: notes for the next shift, breakdowns and anything that ne
 4. `Start Another Entry` empties the boxes for the next one.
 5. To close a breakdown that is still open, type **Back up at** and **What fixed it** on it under **Still open**, or change its drop-down to Resolved.
 
+- **Down at**, **Back up at** and **Reading Time** start empty; left empty, the time it was put on the log is used. Type a time any way (430p, 1630); it shows as 4:30 PM.
 - The button on the left is **red** while anything of that kind is still open (a breakdown still down), **orange** while one is on Monitor, and **green** only when every one of it is resolved ("all back up").
 - **Still open** at the top of each kind lists what is not resolved yet. It stays until someone marks it **Resolved**. A report or the clock never clears it.
 - **History** under the boxes lists every entry of that kind from the last 7 days, newest first. `Show 30 days` shows more. For breakdowns it shows what broke, when it went down, when it was reported, when it was back up, how long it was down and what fixed it.
@@ -1023,6 +1049,7 @@ screens: reports.html
 The plant's reports. Pick the **Report** at the top: Weekly Scorecard, Shift Comparison, Day-of-Week Trends or Loading Rundown. Then pick the **Loadout**, and the **Day**, **Week** or number of **Weeks** with the arrows.
 
 - `Print` prints the report. `TV display` shows it full screen for a TV.
+- A load is **on time** when it is loaded within 30 minutes of its truck's leaving time, the same 30 minutes as everywhere else in the app.
 - Loads an outside carrier hauls (Darden, Gordon Food Service, a customer's own truck) are not judged on time or late, so they never pull the on-time share down.
 
 ## Loading Rundown
@@ -1272,7 +1299,7 @@ The mechanics' tablet in the plant. The plant's own maintenance mechanics sign i
 - **Mechanics:** the line across the top lists this plant's mechanics, the people on its Maintenance Schedule. A manager adds them, and each one's login ID, on Maintenance Schedule, `Setup`, `People`. With none yet, the line says so.
 - **Work Orders:** pick one to start or finish your time on it.
 - `+ Report a Problem`: pick the machine, say what is wrong and whether it is down (`Yes, it's down` or `No, it runs`), then `Send`.
-- `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up, then `Record`.
+- `Record a Breakdown`: a breakdown fixed on the spot. Type when it went down and came back up (430p or 1630 is fine; it shows as 4:30 PM), then `Record`.
 - The station has no Back or Home. `Release` (with the manager release code) is the only way out.
 - **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
 - **Station code:** once the plant's Maintenance Station has a code (Administration, Garage Station Codes), the tablet types it once. After that it opens only the Maintenance Station, and `Release` goes back to the code screen, never into the app.
@@ -1305,7 +1332,7 @@ Time off for the plant crew or the mechanics, like the driver Vacation Schedule.
 id: crew-setup
 screens: crew.html?view=setup, maint-crew.html?view=setup
 
-The areas with their own shift times, the jobs and how many people each needs, the people (name, employee ID, phone, usual job, shift, days off) and the vacation limits. Every box saves when you leave it.
+The areas with their own shift times (typed any way, like 6a or 230p, and shown as 2:30 PM), the jobs and how many people each needs, the people (name, employee ID, phone, usual job, shift, days off) and the vacation limits. Every box saves when you leave it.
 
 To add a person to the schedule:
 
@@ -1328,7 +1355,7 @@ On the Maintenance Schedule, the `People` tab also has a **Station login ID** bo
 id: shifts
 screens: shifts.html
 
-The plant's shifts: name, side (Distribution or Plant Production), start, end and hours. `+ Add Shift` adds one; `Remove` takes one off. `Starting Shifts` fills in the usual shifts. Each box saves when you leave it.
+The plant's shifts: name, side (Distribution or Plant Production), start, end and hours. Type a start or end time any way (6a, 230p, 1430); it shows as 2:30 PM. `+ Add Shift` adds one; `Remove` takes one off. `Starting Shifts` fills in the usual shifts. Each box saves when you leave it.
 
 > Each plant has its own shifts. Shift Notes, Shift Reports and Plant Reports use the shifts of the plant you are in, so Charleston's or Martins Ferry's times set here are the ones those screens go by.
 
@@ -1438,10 +1465,11 @@ The email the salespeople get at 6:00 AM, Monday through Saturday (never Sunday)
 
 What the status says:
 
-- **On time, left 4:05 AM:** the load left by its dispatch time.
-- **Left 5:42 AM, 1 hr 12 min late:** it left after its dispatch time, and by how much.
-- **Not departed, 35 min behind:** it is loaded, its dispatch time has passed, and it has not left.
-- **Not loaded, 20 min behind:** its dispatch time has passed and it is not loaded yet.
+- **On time, left 4:05 AM** (green): the load left within 30 minutes either side of its dispatch time.
+- **Left 5:42 AM, 1 hr 12 min late:** it left more than 30 minutes after its dispatch time, and by how much. Yellow up to 60 minutes, red after.
+- **Left 2:50 AM, 40 min early:** it left more than 30 minutes before its dispatch time. Yellow up to 60 minutes, red after.
+- **Not departed, 35 min behind:** it is loaded, its dispatch time passed more than 30 minutes ago, and it has not left.
+- **Not loaded, 45 min behind:** its dispatch time passed more than 30 minutes ago and it is not loaded yet.
 - **Loaded** or **Not loaded:** its dispatch time has not come yet.
 
 The time a load left comes from its trailer's GPS. When the trailer has no GPS, the truck's GPS is used.
@@ -1646,9 +1674,9 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 5. Scroll the routes. Tap a route and the map at the top moves to that truck, and the whole place shows under the map. The map stays on top while you keep scrolling; tap another route to move it again.
 
 - **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the Driver Room board. A route that is not delivering today is not on it. A load from an earlier delivery day that has not left yet stays at the top, under **Left over from** that day, until it leaves.
-- **Status** is the same as the 6:00 AM sales email, written shorter so it fits on one line: **On time, left 4:05 AM** (green), **Left 5:42 AM, 1h 12m late** (red; h is hours, m is minutes), **Not departed, 35m behind** (loaded, past its dispatch time, still here), **Not loaded, 20m behind**, and before the dispatch time **Loaded** or **Not loaded**. Late and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
 - **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out. If the trailer's GPS has not moved since the load day but the truck's has (the trailer was changed out), **Where now** follows the truck. A GPS unit that has not reported for a day is not used; when neither the trailer nor the truck is reporting, it says **Unknown: GPS not reporting**.
-- **Drop and hook.** Any route ticked **Drop and Hook** in the Route Editor (like the Save-A-Lot routes) leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the store (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2h 12m late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
+- **Drop and hook.** Any route ticked **Drop and Hook** in the Route Editor (like the Save-A-Lot routes) leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the store (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2 hr 12 min late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).
 - **Last refreshed** at the top says when the list was last brought up to date. It refreshes by itself every 2 minutes and whenever the app is opened again.
 - `?` at the top right opens this Help inside the Sales app. The arrow at the top left (Back) goes back to the screen you were on. `Sign out` is at the bottom.

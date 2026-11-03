@@ -10,6 +10,7 @@
   <title>Maintenance Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pmaint.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/pmaint-rules.js"></script>
@@ -71,7 +72,7 @@
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const hm = (n) => hoursMinutesText(n, { unit: 'm', short: 'min' });
     // A time of day on the plant's clock (20:58), as Down and back up read.
-    const clock = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }) : ''; };
+    const clock = (v) => window.UDTiming.clockOf(v);
     const who = (e) => String(e || '').split('@')[0];
     const pill = (word, c) => '<span class="pm-pill ' + c + '">' + escapeHtml(word) + '</span>';
     const WO_CLASS = { NEW: 'amber', WORKING: 'blue', PARTS: 'amber', DONE: 'green' };

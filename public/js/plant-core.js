@@ -21,7 +21,10 @@ export const AREA = {
   BOXING: Object.assign({ label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
   TANKER: Object.assign({ label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 };
-export const BEHIND_MINUTES = 45;
+// Every time rule is timing-rules.js's (window.UDTiming; Joe 11-3-26). Behind = past the on-time window after the truck's
+// leaving time (30 minutes; it was 45 here), yellow up to 60 minutes, red after.
+const T = window.UDTiming;
+export const BEHIND_MINUTES = T.SOURCES.plant.onTime;
 
 export function areaOf(loadType) {
   const t = String(loadType || '').trim().toUpperCase();
@@ -155,35 +158,29 @@ export function loadoutRows(runs, date, plantStart) {
   return out.sort(byLoad);
 }
 
-export function nowMinutes(now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
-  return Number(parts.hour) * 60 + Number(parts.minute);
-}
+// The minute of the day on the plant's clock.
+export function nowMinutes(now) { return T.minuteOfDay((now || new Date()).getTime()); }
 
-// Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
-// Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load left over from last night (still open
-// after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is behind before its dispatch time too.
-export function isBehind(row, today, now) {
-  if (row.state === 'DONE' || row.outside) return false;
+// Behind: a load not done past the on-time window after its route leaves (timing-rules.js departTiming; departure date +
+// dispatch time, not the load day), so a Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load
+// left over from last night (still open after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is
+// behind before its dispatch time too. behindTone: 'caution' (yellow, up to 60 minutes past) or 'late' (red), '' when not behind.
+export function behindTone(row, today, now) {
+  if (row.state === 'DONE' || row.outside) return '';
   const leaves = departWall(row), n = wallNowMinutes(now);
-  if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return true;
-  if (leaves === null) return false;
-  return n > leaves + BEHIND_MINUTES;
+  if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return 'late';
+  if (leaves === null) return '';
+  const t = T.departTiming(n - leaves, 'plant');
+  return t && t.late ? t.tone : '';
 }
-// Minutes since 1/1/1970 on the plant's wall clock (New York). When a load leaves (departWall) is plant-rules.js's own rule, the one
-// the Late Forecast and the report use (audit batch 1, Joe 10/22: every screen agrees); every page that loads this file loads it.
-const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
+export function isBehind(row, today, now) { return !!behindTone(row, today, now); }
 // The end of the shift running at wall minute n: 6 a.m. after the operating day that n falls in.
-export const shiftEndAfter = (n) => (Math.floor((n - 360) / 1440) + 1) * 1440 + 360;
-export function wallNowMinutes(now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    .formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
-  return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
-}
+export const shiftEndAfter = T.shiftEndAfter;
+// Minutes since 1/1/1970 on the plant's wall clock (New York).
+export function wallNowMinutes(now) { return T.wallClock((now || new Date()).getTime()); }
+// When a load leaves: timing-rules.js's one leaving rule, the one the Late Forecast and the report use (audit batch 1, Joe 10/22).
 export function departWall(row) {
-  return window.UDPlant.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: row.dispatchTime });
+  return T.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: row.dispatchTime });
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }

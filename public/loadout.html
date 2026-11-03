@@ -10,6 +10,7 @@
   <title>Loadout Center · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -87,7 +88,7 @@
       <label>Load Type<select id="s-kind"></select></label>
       <label>Load Date<input id="s-load" type="date"></label>
       <label>Delivery Date<input id="s-date" type="date"></label>
-      <label>Pickup Time<input id="s-time" type="time"></label>
+      <label>Pickup Time<input id="s-time" type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM"></label>
       <label class="s-times">Start Time<input id="s-start" autocomplete="off" maxlength="12" placeholder="Not started"></label>
       <label class="s-times">End Time<input id="s-end" autocomplete="off" maxlength="12" placeholder="Not loaded"></label>
       <label>Trailer<input id="s-trailer" list="lo-trailers" autocomplete="off" maxlength="24" placeholder="Pick or type a trailer"></label>
@@ -225,7 +226,7 @@
     function countedCell(r) {
       const c = caseCounts[r.runDocId + '|' + r.day], cmp = R.caseCompare(r.quantity, c ? c.counted : null, r.state === 'LOADING' && !r.paused ? 'RUNNING' : r.state === 'DONE' ? 'DONE' : '');
       if (!cmp || (r.state !== 'LOADING' && r.state !== 'DONE' && !c)) return '<td class="lo-counted"></td>';
-      return '<td class="lo-counted ' + cmp.kind + '"' + (c && c.lastAt ? ' title="Last case counted ' + escapeHtml(new Date(c.lastAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '"' : '') + '><b>' + escapeHtml(cmp.number) + '</b><small>' + escapeHtml(cmp.word) + '</small></td>';
+      return '<td class="lo-counted ' + cmp.kind + '"' + (c && c.lastAt ? ' title="Last case counted ' + escapeHtml(window.UDTiming.clockOf(c.lastAt)) + '"' : '') + '><b>' + escapeHtml(cmp.number) + '</b><small>' + escapeHtml(cmp.word) + '</small></td>';
     }
     // A driver's name stays on one line: when it is wider than its column the text shrinks until it fits (Joe 10/11).
     function fitDrivers() {
@@ -307,7 +308,9 @@
       drawTrailers(rows);
       const pk = P.withNotePickups(live, pickups);
       const pu = rows.flatMap(r => P.pickupsFor(r, pk)), puOpen = pu.filter(P.pickupOpen).length;
-      const behind = rows.filter(r => P.isBehind(r, today())).length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
+      // Joe 11-2-26 (timing-rules.js): behind once past the on-time window after the truck's leaving time, yellow up to 60
+      // minutes, red after.
+      const tones = rows.map(r => P.behindTone(r, today())).filter(Boolean), behind = tones.length, pct = c.total ? Math.round(c.done * 100 / c.total) : 0;
       document.getElementById('strip').innerHTML =
         '<span><b>' + c.done + ' of ' + c.total + '</b> loaded <span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
         '<span class="' + (c.prior ? 'amber' : '') + '">Left over <b>' + c.prior + '</b></span>' +
@@ -315,7 +318,7 @@
         (c.paused ? '<span>Paused <b>' + c.paused + '</b></span>' : '') +
         '<span>' + escapeHtml(info.label) + ' <b>' + c.quantity.toLocaleString() + '</b></span>' +
         '<span class="' + (puOpen ? 'red' : '') + '">Pickups <b>' + puOpen + ' left of ' + pu.length + '</b></span>' +
-        '<span class="' + (behind ? 'red' : '') + '">Behind <b>' + behind + '</b></span>' + countStrip(rows);
+        '<span class="' + (tones.includes('late') ? 'red' : behind ? 'amber' : '') + '">Behind <b>' + behind + '</b></span>' + countStrip(rows);
       const movable = canOrder() ? orderRows(rows).filter(r => r.state !== 'DONE') : [], ordering = canOrder() && rows.length > 0;
       const cols = counting() ? COUNTED_COLS : COLS[area === 'TANKER' ? area : 'normal'];
       setCols(cols);
@@ -364,7 +367,7 @@
         const long = st === 'LOADING' ? P.runningText(r.startedAt, mins) : '';
         const total = mins === null ? '' : stale && /forgot End\?$/.test(long) ? '<span class="stale" title="' + escapeHtml(long) + '">forgot End?</span>' :
           '<span class="' + (stale ? 'stale' : st === 'LOADING' ? 'running' : '') + '">' + (st === 'LOADING' ? long : P.minutesText(mins)) + '</span>';
-        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (isMoved ? ' moved' : '');
+        const cls = (st === 'DONE' ? 'done' : st === 'LOADING' ? 'loading' : '') + (isMoved ? ' moved' : ''), bt = P.behindTone(r, today());
         if (area === 'TANKER') {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + escapeHtml(L.runText(r)) + movedTag + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + trlInput(r, input) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' +
@@ -372,7 +375,7 @@
         } else {
           html += '<tr class="' + cls + '" data-row="' + r.id + '"' + dragAttrs(r) + '>' + routeCell(r) + '<td>' + runCell + '</td><td class="lo-driver">' + escapeHtml(r.driver) + '</td>' +
             '<td>' + input('truck', r.truck) + '</td><td>' + trlInput(r, input) + '</td><td>' + input('quantity', qty(r.quantity), true) + '</td>' + (counting() ? countedCell(r) : '') +
-            '<td>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
+            '<td' + (bt ? ' class="dep-' + bt + '" title="' + (bt === 'late' ? 'Late' : 'Running late') + ': past its leaving time"' : '') + '>' + escapeHtml(P.timeOfDay(r.dispatchTime)) + '</td><td>' + status + '</td><td>' + clockCell + '</td><td>' + total + '</td><td>' + puBtn + '</td>' +
             '<td><button type="button" class="edit-row" data-edit="' + r.id + '">Edit</button></td></tr>';
         }
         html += noteLine(r, r.notes, cols.length, 'data-edit');
@@ -677,7 +680,7 @@
       const kind = x ? R.scheduleArea(x, list) : '';
       document.getElementById('s-kind').innerHTML = (kind ? '' : '<option value=""></option>') + R.LOAD_TYPES.map(([v, t]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + t + '</option>').join('');
       put('s-type', x ? x.scheduleType : 'ROUTE'); put('s-load', x ? (x.loadDate || x.date) : date); put('s-date', x ? x.date : L.addDays(date, 1));
-      put('s-time', x ? x.pickupTime : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
+      put('s-time', x ? window.UDTiming.boxText(x.pickupTime) : ''); put('s-trailer', x ? x.trailer : ''); put('s-po', x ? x.poNumber : ''); put('s-cases', x ? x.cases : ''); put('s-product', x ? x.product : ''); put('s-notes', x ? x.notes : '');
       // Joe 10/20 ("in case the plant forgot"): a load already on the schedule shows its Start and End times to type or fix.
       document.querySelectorAll('#sched-form .s-times').forEach(b => { b.hidden = !x; });
       put('s-start', x && x.work && x.work.startedAt ? P.clock(x.work.startedAt) : ''); put('s-end', x && x.work && x.work.completedAt ? P.clock(x.work.completedAt) : '');
@@ -727,7 +730,7 @@
       const mins = L.typedTime(t, guess);
       if (mins === null) return null;
       const pad = (n) => String(n).padStart(2, '0');
-      return P.localToStamp((mins < 360 ? L.addDays(day, 1) : day) + 'T' + pad(Math.floor(mins / 60)) + ':' + pad(mins % 60));
+      return P.localToStamp((mins < window.UDTiming.DAY_ROLL ? L.addDays(day, 1) : day) + 'T' + pad(Math.floor(mins / 60)) + ':' + pad(mins % 60));
     }
     function schedTimes(x) {
       const w = (x && x.work) || {}, day = x.loadDate || x.date, pick = /^(\d{2}):(\d{2})$/.exec(x.pickupTime || '');
@@ -745,7 +748,7 @@
     function fillSchedTime() {
       const t = document.getElementById('s-time'), c = schedOptions[Number(document.getElementById('s-route').value)];
       if (schedEditing || (t.value && t.value !== schedFilled) || document.getElementById('s-route').value === '') return;
-      t.value = schedFilled = c ? R.defaultLoadTime(c.runId, document.getElementById('s-date').value, routeDocs, runs) : '';
+      t.value = schedFilled = c ? window.UDTiming.boxText(R.defaultLoadTime(c.runId, document.getElementById('s-date').value, routeDocs, runs)) : '';
     }
     document.getElementById('s-date').addEventListener('change', fillSchedTime);
     const schedError = (t) => { const e = document.getElementById('s-error'); e.textContent = t; e.hidden = !t; };
@@ -760,7 +763,7 @@
     document.getElementById('s-save').onclick = async () => {
       const c = schedOptions[Number(document.getElementById('s-route').value)], val = (id) => document.getElementById(id).value.trim();
       const key = val('s-date'), x = schedEditing;
-      const f = { routeId: c ? c.routeId : '', runId: c ? c.runId : '', route: c ? c.route : '', run: c ? c.run : '', scheduleType: val('s-type'), loadDate: val('s-load'), pickupTime: val('s-time'),
+      const f = { routeId: c ? c.routeId : '', runId: c ? c.runId : '', route: c ? c.route : '', run: c ? c.run : '', scheduleType: val('s-type'), loadDate: val('s-load'), pickupTime: window.UDTiming.hhmmOf(val('s-time')),
         trailer: val('s-trailer').toUpperCase(), poNumber: val('s-po'), cases: val('s-cases'), product: val('s-product'), notes: document.getElementById('s-notes').value, loadType: val('s-kind') };
       // The same checks as the server, so a mistake is fixed in the box.
       if (!c || document.getElementById('s-route').value === '') return schedError('Pick the route / run.');

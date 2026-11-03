@@ -150,7 +150,7 @@ async function addExtraRun(tx, db, req, email, stamp, logRef, mode) {
     EXTRA_KEEP.forEach(f => { if (was[f] !== undefined && was[f] !== null && was[f] !== '') day[f] = was[f]; });
     ['dispatchTime', 'startTime', 'routeHours', 'miles', 'loadDayOffset'].forEach(f => { if ((day[f] === null || day[f] === undefined) && lend[f] !== undefined) day[f] = lend[f]; });
     day.deliveryDate = day.deliveryDate || L.addDays(base.weekStart, i);
-    if (!day.loadDate) day.loadDate = L.addDays(day.deliveryDate, day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : Number(day.loadDayOffset));
+    if (!day.loadDate) day.loadDate = L.addDays(day.deliveryDate, L.loadDayOffset(day.loadDayOffset));
     day.runs = false;
     days[p] = day;
   });
