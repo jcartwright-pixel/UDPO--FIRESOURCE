@@ -188,3 +188,6 @@ if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || QS.get('updatetest'
   window.addEventListener('online', checkForUpdate);
 }
 window.HUB_checkForUpdate = checkForUpdate;
+
+/** The signed-in person's email (lower case), or '' before sign-in. */
+export const myEmail = () => String(services && services.auth.currentUser && services.auth.currentUser.email || '').toLowerCase();

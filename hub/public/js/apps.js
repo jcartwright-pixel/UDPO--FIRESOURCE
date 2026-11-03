@@ -2,10 +2,18 @@
 // the same). No imports, so the server's tests can read it too.
 export const roleKey = (r) => String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
 export const isAdminRole = (roles) => (roles || []).some(r => ['ADMINISTRATOR', 'ADMIN'].indexOf(roleKey(r)) >= 0);
-export function appsFor(p) {
+export const APPS = [
+  { key: 'operations', name: 'Plant & Distribution' }, { key: 'customers', name: 'Customers & Routes' },
+  { key: 'fuel', name: 'Fuel Tracking' }, { key: 'udms', name: 'Employees & Compliance' }
+];
+// ticks = the apps saved for this person in People & Access (appAccess), or null for the standard rule. Plant & Distribution
+// always stays on for an Enabled person.
+export function appKeysFor(p, ticks) {
   if (!p || String(p.status || '').trim().toUpperCase() !== 'ACTIVE') return [];
-  return ['Plant & Distribution', 'Customers & Routes'].concat(isAdminRole(p.roles) ? ['Fuel Tracking', 'Employees & Compliance'] : []);
+  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms'] : []);
+  return APPS.map(a => a.key).filter(k => k === 'operations' || ticks.indexOf(k) >= 0);
 }
+export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a => a.key === k).name);
 
 // Each app's picture and colour on its tile (Joe 11-2-26: "I want my cards to look more professional ... they don't have any icons").
 const path = (d) => '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';

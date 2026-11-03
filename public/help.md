@@ -1359,6 +1359,7 @@ screens: administration.html?item=people
 Everyone who can sign in. Add a person, then set their role, whether their account is active, which plants they see (All plants or each plant), the screens they may open, their Home screen, and each right (use the role's, allow or deny).
 
 - Each change saves at once and nothing on the page moves.
+- On the practice copy, a link at the top opens the same list in the United Dairy Hub (People & Access), where this page is moving. Either page saves to the same place.
 - A person with no screens ticked sees every screen, as before.
 - Once the People list is moved into Operations (Administration > Go-Live Switches), this screen is the only place to add or change a person. The old Users sheet is kept as a backup and no longer changes.
 
