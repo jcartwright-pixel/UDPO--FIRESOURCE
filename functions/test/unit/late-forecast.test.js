@@ -502,3 +502,12 @@ test('the shift recap lists each area in order: Case, Boxing, Tote, Tanker', () 
   assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case Loadout', 10, 24], ['Boxing Loadout', 5, 8], ['Tote Loadout', 3, 4], ['Tanker Loadout', 1, 2]]);
   assert.deepEqual([c.loaded, c.left, c.late, c.level, c.status, c.doneBy], [19, 19, false, 'good', 'On time', '3:20 AM']);
 });
+
+// Joe 10/31 (PR #570) kept in the recap: a Case load already past its leaving time counts only from now until it is loaded,
+// not since its dispatch (852 Jersey L2 left at 1 PM, it is 8:10 PM, loaded by about 8:40 PM: about 30 min behind, not 7 hr).
+test('the shift recap counts a load already late only from now until it is loaded', () => {
+  const r = { totalLoads: 1, leftToLoad: 1, behind: [], loaded: [], nextUp: [], areas: [{ area: 'CASE', total: 1, left: 1 }],
+    forecast: { asOf: '8:10 PM', now: 1210, loads: [{ id: 'j2', route: '852', run: 'JERSEY LOAD 2', est: 1240, estText: '8:40 PM', estDay: 'Mon', leaves: 780, late: true }] } };
+  const c = R.shiftRecap(r);
+  assert.deepEqual([c.areas[0].behindMin, c.areas[0].level, c.areas[0].status], [30, 'warn', 'About 30 min behind']);
+});

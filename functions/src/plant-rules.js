@@ -1381,7 +1381,9 @@
       // will make its truck (below); with no forecast it is only counted.
       if (!gone) { leftOver++; return; }
       ids[x.id] = 1; var e = x.id && est[x.id];
-      var lateBy = e && f && x.minutesUntil !== null && x.minutesUntil !== undefined ? e.est - (f.now + x.minutesUntil) : x.minutesUntil === null || x.minutesUntil === undefined ? 0 : -x.minutesUntil;
+      // Joe 10/31 (PR #570): a load already past its leaving time counts only from now until it is loaded; with no estimate
+      // (not a Case load), how long its truck has been waiting.
+      var lateBy = e && f ? e.est - f.now : x.minutesUntil === null || x.minutesUntil === undefined ? 0 : -x.minutesUntil;
       lateNow.push({ id: x.id, name: name(x), area: x.area, lateBy: Math.max(0, lateBy), value: e ? 'est. ' + e.estDay + ' ' + e.estText : 'Not loaded',
         sub: 'Should have left ' + [x.departDay, x.depart].filter(Boolean).join(' ') + (x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '') });
     });
@@ -1390,7 +1392,7 @@
       if (ids[x.id] || x.outside) return;
       var deadline = x.leaves === null ? x.shiftEnd : x.leaves, when = function (m) { return dayShort(m) + ' ' + minutesText12(((m % 1440) + 1440) % 1440); };
       var over = x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '';
-      if (x.leaves !== null && x.leaves <= f.now) lateNow.push({ id: x.id, name: name(x), area: 'CASE', lateBy: Math.max(0, x.est - x.leaves), value: 'est. ' + x.estDay + ' ' + x.estText, sub: 'Should have left ' + when(x.leaves) + over });
+      if (x.leaves !== null && x.leaves <= f.now) lateNow.push({ id: x.id, name: name(x), area: 'CASE', lateBy: Math.max(0, x.est - f.now), value: 'est. ' + x.estDay + ' ' + x.estText, sub: 'Should have left ' + when(x.leaves) + over });
       else if (x.late) miss.push({ id: x.id, name: name(x), area: 'CASE', lateBy: Math.max(0, x.est - deadline), value: spanText(x.est - deadline) + ' late', sub: (x.leaves === null ? 'Past the 6:00 AM shift end' : 'Leaves ' + when(x.leaves)) + ' · est. loaded ' + x.estDay + ' ' + x.estText + over });
       else ok.push(x);
     });
