@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, and **Links & Codes** has every link and code for managers, stations and drivers' phones.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -114,6 +114,30 @@ screens: links.html
 !> Do not press `New code` to check a code. Every tablet or phone on the old code stops until someone types the new one.
 
 !> Do not send codes in a group text or email. Read them out or hand them over in person.
+
+## Keys & Connections
+id: keys
+screens: keys.html
+
+**Keys & Connections** holds the sign-ins Plant & Distribution uses to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts**. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
+
+1. Each card says what the sign-in is for, what is saved, and how its last test went.
+2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong.
+3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
+4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
+5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
+
+### Buttons
+- `Test Connection`: checks the saved sign-in with that company.
+- `Replace` / `Set up` and `Save`: saves a new key, user name or password.
+- `Send test text`: one test text through Twilio.
+- `Remove key`: takes the sign-in away (press twice).
+
+> A saved key is never shown again, only its last few letters, so nobody can copy it from this screen.
+
+!> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
+
+!> Do not press `Remove key` to test something. The trucks, products, thermometers or texts stop until the key is saved again.
 
 ## Help
 id: help
