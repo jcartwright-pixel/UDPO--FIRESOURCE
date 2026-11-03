@@ -1479,9 +1479,10 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
-// A trailer as saved on a load: the Equipment Master unit when one matches, otherwise the typed number through the one trailer
-// rule (logic.js trailerNumber, rules audit line 12): 014, T014 and T-014 all save as T-14.
-function typedTrailer(u) { return u.resolved ? u.unit : L.trailerNumber(u.unit); }
+// A trailer as saved on a load: the Equipment Master unit when one matches, otherwise the typed number, both through the one
+// trailer rule (logic.js trailerNumber, rules audit line 12): 014, T014 and T-014 all save as T-14, even when Equipment Master
+// spells the unit "T-014" (6.84 practice re-test).
+function typedTrailer(u) { return L.trailerNumber(u.unit); }
 
 module.exports = { runAreaOf, dayLoadingNow, scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, ADDED_ROUTE, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
