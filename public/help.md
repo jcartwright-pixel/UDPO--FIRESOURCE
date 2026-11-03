@@ -613,6 +613,8 @@ The plant's front page for managers. Each department has a small card: Case Load
 
 > Last night's left-over loads show on their own line, before today's.
 
+> When the plant is behind, the routes not loaded and **Still to load** follow the truck that leaves first, the same order as Daily Case Loadout and the Late Forecast.
+
 > Loads an outside carrier hauls (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are never marked late or behind. They are still listed and counted, loaded or not.
 
 ## Send Current Report
@@ -644,9 +646,9 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 id: plant
 screens: plant.html
 
-One card for each department of Plant Distribution: Case, Tote, Box and Tanker loading and unloading, Truck Washing, Product Returns and Trailer Assignments. Click a card to open it.
+One card for each department of Plant Distribution: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns and Trailer Assignments. Click a card to open it.
 
-## Loading (Case, Tote, Box and Tanker)
+## Loading (Case, Tote, Boxing and Tanker)
 id: loadout
 screens: loadout.html
 
@@ -671,7 +673,8 @@ The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or T
 - A plant note on a load shows as a yellow line under it.
 - **Trailer colour:** the trailer is **green** once it is unloaded (or has nothing to unload) and **red** while it is still waiting on the Unloading list. The Plant Station's loading cards show the same colours. A loaded load has no colour.
 - With the palletizer's case counter on, a **Counted** column shows beside Cases.
-- On a phone the four loadout buttons (Case, Tote, Box, Tanker) sit in two rows.
+- On a phone the four loadout buttons (Case, Tote, Boxing, Tanker) sit in two rows.
+- **Behind: load the truck that leaves first, first.** When the Late Forecast says the plant is behind, a yellow line says so at the top of Daily Case Loadout and the loads still to load are listed by which truck leaves first. Loaded loads stay where they are. When the plant catches up, the list goes back to the load order.
 
 > Typing a trailer or a count never starts a load. Only the status button does.
 
@@ -703,7 +706,7 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 > **About … behind** counts the work still to do. A load that has already missed its time (left over from last night, or past its dispatch) counts only the time from now until it is loaded, not every hour since it should have left. Its own line still shows how late it is.
 
-## Unloading (Case, Tote, Box and Tanker)
+## Unloading (Case, Tote, Boxing and Tanker)
 id: unloading
 screens: unloading.html
 
@@ -1675,7 +1678,7 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 id: plant-station
 screens: plant-station.html
 
-The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Box and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
+The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
 
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
