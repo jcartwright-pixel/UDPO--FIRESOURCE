@@ -236,7 +236,7 @@ const runAreaOf = (run, prefix) => {
 // A day block is loading now: started (or marked Loading), not paused, not done.
 function dayLoadingNow(day) {
   const s = text(day && day.loadStatus).toUpperCase();
-  if (!day || day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY', 'PAUSED'].indexOf(s) >= 0) return false;
+  if (!day || L.isLoaded(day) || s === 'PAUSED') return false;
   return !!day.plantStartedAt || s === 'LOADING';
 }
 // The loads of an area loading now (today's and yesterday's still open; the Scheduler's shipments on Boxing), leaving out
@@ -247,7 +247,7 @@ async function loadingNow(tx, db, area, stamp, except) {
   const runs = (await tx.get(db.collection('runs').where('weekStart', 'in', weeks))).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
   let n = 0;
   runs.forEach(run => {
-    if (text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
+    if (!L.runActive(run)) return;
     dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => { if (runAreaOf(run, b.prefix) === area && run.id + '|' + b.prefix !== except && dayLoadingNow(run.days[b.prefix])) n++; }));
   });
   if (area === 'BOXING') {

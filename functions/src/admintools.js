@@ -954,7 +954,7 @@ async function updateLive(db, email, input, stamp, deps) {
       const update = {};
       L.DAYS.forEach((p, i) => {
         const was = (run.days && run.days[p]) || {}, date = L.addDays(run.weekStart, i), load = was.loadDate || L.addDays(date, Number((route.days[p] || {}).loadDayOffset) || 0);
-        if (load < today || L.yes(was.routeOverride) || was.completeTime || was.loadedComplete === true) return;
+        if (load < today || L.yes(was.routeOverride) || L.isLoaded(was)) return;
         const rd = route.days[p] || {}, want = {};
         // A run on two Live rows (different days) keeps its running days: which row a day belongs on is not Route Master's to say.
         const split = rowsOf[run.weekStart + '|' + run.runId] > 1;

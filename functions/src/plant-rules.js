@@ -50,9 +50,10 @@
  *     Shift Notes not resolved; the subject is "Plant Update <time>: N routes behind" or "All routes on time".
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDPlant = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  // The load rules (who hauls a load, whether it is loaded, active runs) live once in logic.js (rules audit, Joe 11/3).
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./logic'));
+  else root.UDPlant = factory(root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (LR) {
   var DONE_WASH = /^(COMPLETE|COMPLETED|CLEANED|CLOSED|RESOLVED|WASHED|DONE|REMOVED)$/i;
 
   function text(v) { return v === null || v === undefined ? '' : String(v).trim(); }
@@ -190,12 +191,7 @@
   // coverage_type is OUTSIDE CARRIER (or a carrier's own name, or a customer pickup) or its movement_type is CARRIER_LOAD /
   // CUSTOMER_PICKUP; United Dairy and its branches (Fairmont, Marietta, Charleston, ...) still count. A Scheduler load marked
   // Carrier is the customer's own carrier, so it does not count either.
-  function outsideCarrier(r) {
-    if (!r) return false;
-    var cov = text(r.coverageType).toUpperCase(), move = text(r.movementType).toUpperCase().replace(/\s+/g, '_');
-    if (move === 'CARRIER_LOAD' || move === 'CUSTOMER_PICKUP') return true;
-    return !!cov && cov !== 'UNITED DAIRY' && cov !== 'UNIONTOWN' && cov !== 'BRANCH';
-  }
+  function outsideCarrier(r) { return !!r && LR.outsideHauler(r); }
 
   // Shipping's customers: Route Master runs that are active and shown to the plant (routes = route docs with runId).
   function scheduleCustomers(routes) {
@@ -203,8 +199,7 @@
     (routes || []).forEach(function (r) {
       // Joe 11/2: every outside carrier's run and route number, shown to the plant or not (scheduleOutside).
       if (outsideCarrier(r)) { if (text(r.runId)) outsideRuns[text(r.runId)] = true; var code = text(r.routeCode || r.route).replace(/_[0-9]+$/, ''); if (code) outsideRoutes[code.toUpperCase()] = true; }
-      var status = text(r.routeStatus).toUpperCase();
-      if ((status && status !== 'ACTIVE') || r.active === false || r.displayPlant !== true) return;
+      if (!LR.runActive(r) || r.displayPlant !== true) return;
       var route = text(r.routeCode || r.route), run = text(r.run);
       if (!route && !run) return;
       list.push({ routeId: text(r.routeId), runId: text(r.runId), route: route, run: run, name: text(r.routeName), loadType: loadArea(r.loadType), outside: outsideCarrier(r) });
@@ -497,10 +492,7 @@
     if (r && r.paused) return paused ? { at: text(m.at), minutes: minutes } : { at: '', minutes: pausedMinutes(r, Date.parse(stamp)) };
     return { at: paused ? stamp : '', minutes: minutes };
   }
-  function yardLoaded(day) {
-    var loaded = text(day.loadedComplete).toUpperCase();
-    return !!text(day.completeTime) || text(day.loadStatus).toUpperCase() === 'COMPLETE' || day.loadedComplete === true || ['TRUE', 'YES', 'Y', '1', 'LOADED', 'COMPLETE'].indexOf(loaded) >= 0;
-  }
+  function yardLoaded(day) { return LR.isLoaded(day); }
   // Loaded trailers on the yard for the operating day `date` (udpoV780LoadedTrailerHolds_): every day of the weeks given,
   // loaded, with a load date, a departure (or delivery) date and a trailer, and date between the load and delivery dates.
   function yardHolds(runs, date) {

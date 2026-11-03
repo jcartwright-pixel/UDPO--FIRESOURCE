@@ -77,7 +77,7 @@ function dayLocked(run, p, today) {
   const d = (run.days && run.days[p]) || {}, date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
   const offset = d.loadDayOffset === null || d.loadDayOffset === undefined ? -1 : d.loadDayOffset;
   const load = d.loadDate || L.addDays(date, offset);
-  return load < today || L.yes(d.routeOverride) || !!d.completeTime || d.loadedComplete === true;
+  return load < today || L.yes(d.routeOverride) || L.isLoaded(d);
 }
 
 // Fill-only (the Current week at Publish): a running day's blank driver, truck and trailer get the standard ones.

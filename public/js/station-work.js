@@ -132,8 +132,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (carrier) return 'carrier';
     const route = routeDocs.find(r => x.runId && r.runId === x.runId) || routeDocs.find(r => up(r.routeCode || r.route) === up(x.route)) || {};
     const run = runs.find(r => x.runDocId && r.id === x.runDocId) || runs.find(r => x.runId && r.runId === x.runId) || {};
-    const t = up(route.coverageType || run.coverageType);
-    return t === 'BRANCH' ? 'branch' : t && t !== 'UNITED DAIRY' ? 'carrier' : 'ut';
+    // Rules audit (Joe 11/3): the one "who hauls it" rule in logic.js.
+    const h = L.hauler(route.coverageType || route.movementType ? route : run);
+    return h === 'BRANCH' ? 'branch' : h === 'OURS' ? 'ut' : 'carrier';
   }
   const minutesOf = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(hhmm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
   const clock = (hhmm) => { const m = minutesOf(hhmm); return m === null ? (hhmm || '') : P.timeOfDay(m); };

@@ -328,7 +328,7 @@
     function weeklyRule(r) {
       const live = liveRows[r.id], m = r.displayWeekly;
       if (!live) return { shown: false, why: 'Not on the Live sheet for the week of ' + shortDate(liveWeek) };
-      if (String(live.routeStatus || 'ACTIVE').trim().toUpperCase() !== 'ACTIVE' || live.active === false) return { shown: false, why: 'Live row says the run is not active' };
+      if (!L.runActive(live)) return { shown: false, why: 'Live row says the run is not active' };
       if (live.displayWeekly === false) return { shown: false, why: 'Live row says NO' };
       if (m === true) return { shown: true, why: 'Route Master says YES' };
       if (m === false) return { shown: false, why: 'Route Master says NO' };
