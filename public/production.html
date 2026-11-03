@@ -165,7 +165,7 @@
       if (bx) rows.push('Jugs in ' + b(fmt(bx.jugsIn)) + ' &nbsp; Boxed ' + (bx.boxed === null ? 'set jugs per box' : b(fmt(bx.boxed)) + (bx.diff < 0 ? ' &nbsp; <b class="pd-bad">' + fmt(-bx.diff) + ' more boxed than filled</b>' : ' &nbsp; Not boxed ' + (bx.diff > 2 * (bx.perBox || 1) ? '<b class="pd-due">' + fmt(bx.diff) + '</b>' : b(fmt(bx.diff))))));
       if (v.changeover) rows.push((v.kind === 'BLOWMOLD' ? 'Mold change ' : 'Changeover ') + b(v.changeover.minutes + (v.changeoverStd ? ' of ' + v.changeoverStd : '') + ' min') + (v.changeoverStd ? ' standard' : '') + ' &nbsp; Checklist ' + b(Object.keys(v.changeover.checks).length + ' of ' + (R.CHANGEOVER_CHECKS[v.kind] || []).length));
       if (v.cip) rows.push('CIP wash ' + b(v.cip.minutes + ' min') + ' since ' + clockOf(v.cip.start));
-      else if (v.cipHours && v.sinceCipHours !== null) rows.push('Since CIP ' + b(v.sinceCipHours + ' of ' + v.cipHours + ' h'));
+      else if (v.cipHours && v.sinceCipHours !== null) rows.push('Since CIP ' + b(v.sinceCipHours + ' of ' + v.cipHours + ' hr'));
       rows.push('<span' + (v.state === 'STOPPED' ? ' class="pd-bad"' : '') + '>Stopped ' + b(v.downMin + ' min') + (v.topReason ? ' · ' + escapeHtml(v.topReason) : '') + '</span>' + (v.wasteTotal ? ' &nbsp; Waste ' + b(fmt(v.wasteTotal)) : '') + (v.kind === 'BLOWMOLD' && v.stock !== null ? ' &nbsp; Jugs ahead ' + b(fmt(v.stock)) : ''));
       if (v.check && v.state !== 'IDLE') rows.push('Quality check ' + (v.check.done ? b('done') + ' · next ' + clockOf(v.check.next) : '<b class="pd-due">due ' + clockOf(v.check.at) + '</b>'));
       if (v.crewOn.length) rows.push('Crew: ' + escapeHtml(v.crewOn.join(', ')));

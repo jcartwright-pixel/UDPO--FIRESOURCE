@@ -62,13 +62,13 @@
     const L = window.UDLogic, U = window.UDPlant;
     const today = () => L.operatingDay(new Date());
     const DUE_CHOICES = [120, 180, 240, 270, 300, 330, 360];
+    const minutes = window.UDTiming.timeText;
     let date = today(), runs = [], history = [], loaded = false;
     let dueBy = 300;
     try { const v = Number(localStorage.getItem('udForecastDueBy')); if (DUE_CHOICES.indexOf(v) >= 0) dueBy = v; } catch (e) { /* 5:00 AM */ }
     const pick = document.getElementById('due-by');
     pick.innerHTML = DUE_CHOICES.map(m => '<option value="' + m + '"' + (m === dueBy ? ' selected' : '') + '>' + minutes(m) + '</option>').join('');
     pick.onchange = () => { dueBy = Number(pick.value); try { localStorage.setItem('udForecastDueBy', String(dueBy)); } catch (e) { /* this visit only */ } render(); };
-    const minutes = window.UDTiming.timeText;
     const n = (v) => Number(v || 0).toLocaleString('en-US');
     const e = escapeHtml;
     const span = window.UDTiming.spanText;

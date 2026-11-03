@@ -155,7 +155,7 @@ async function journal(id, ok) {
     await shot(lo, 'box-loadout-confirm-1536.png');
     await lo.click('#sc-back');
     await lo.waitForSelector('#sched-modal:not([hidden])');
-    assert.equal(await lo.inputValue('#s-time'), '10:30');
+    assert.equal(await lo.inputValue('#s-time'), '10:30 AM');
     await lo.click('#s-save');
     await lo.click('#sc-confirm');
     await lo.waitForSelector('#sched-confirm-modal', { state: 'hidden' });

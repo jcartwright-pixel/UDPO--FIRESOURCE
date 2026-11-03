@@ -2,7 +2,7 @@
 /*
  * Browser check of typed Start and End times on Daily Box Loadout (Joe 10/20: "in the boxing section. I need to be able to edit
  * the start and quit times of the route. In case the plant forgot"). Two Aldi Charleston Scheduler loads were started at 2:10 PM
- * and never ended, so at 7:30 PM they still show End and 5 h 20 min:
+ * and never ended, so at 7:30 PM they still show End and 5 hr 20 min:
  *   - Edit Load shows Start Time and End Time (not on + Add Load);
  *   - typing an End time (any form: 3:45p) marks the load loaded, the same as pressing End, and Total Time is worked out from it;
  *   - an End time before the Start, or a time not come yet, shows the red line and nothing is saved;
@@ -66,7 +66,7 @@ async function journal(id, ok) {
     const lo = await openPage(browser, 1536, 790, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
     await lo.waitForSelector(row('sch:SCHED-a3'), { timeout: 15000 });
     assert.equal(await lo.textContent(row('sch:SCHED-a2') + ' [data-sclock]'), 'End', 'the plant forgot End');
-    assert.equal(await lo.textContent(total('sch:SCHED-a2')), '5 h 20 min');
+    assert.equal(await lo.textContent(total('sch:SCHED-a2')), '5 hr 20 min');
     await shot(lo, 'box-loadout-1536.png');
     await lo.click(row('sch:SCHED-a2') + ' [data-sedit]');
     await lo.waitForSelector('#sched-modal:not([hidden])');

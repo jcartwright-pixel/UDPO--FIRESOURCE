@@ -118,6 +118,7 @@ const COPIES = [
   [/\* 1440 \+ 360/, 'its own 6 AM day start (use UDTiming.dayStartWall)'],
   [/loadDayOffset[^\n]{0,80}\? -1 :/, 'its own "blank Load Day = -1" (use loadDayOffset)'],
   [/' h ' \+/, 'its own length-of-time words (use UDTiming.spanText)'],
+  [/' h ago'|Math\.floor\(\w+ \/ 60\) \+ ' h'/, 'its own length-of-time words (use UDTiming.spanText)'],
   [/\b(BEHIND_MINUTES|REPORT_BEHIND|ON_TIME_MINUTES) = \d/, 'its own late number (use UDTiming.SOURCES)'],
   [/\bLATE_GRACE\b/, 'its own late number (use UDTiming.SOURCES.sales)'],
   [/hourCycle: 'h23' \}\)\.formatToParts\(new Date\(\)\)/, 'its own New York clock (use UDTiming.wallClock / operatingDay)']

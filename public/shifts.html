@@ -68,7 +68,7 @@
     // Shifts), once every shift has its name, start and end; one save at a time, in order. edits counts every change,
     // so the list read back from the database never overwrites a box being typed in.
     let db = null, unsub = null, rows = [], dirty = false, edits = 0, chain = Promise.resolve();
-    const hours = (a, b) => { const m = /^(\d{2}):(\d{2})$/, x = m.exec(a), y = m.exec(b); if (!x || !y) return ''; const len = ((Number(y[1]) * 60 + Number(y[2])) - (Number(x[1]) * 60 + Number(x[2])) + 1440) % 1440; return len ? Math.floor(len / 60) + ' h' + (len % 60 ? ' ' + (len % 60) + ' min' : '') : ''; };
+    const hours = (a, b) => { const m = /^(\d{2}):(\d{2})$/, x = m.exec(a), y = m.exec(b); if (!x || !y) return ''; const len = ((Number(y[1]) * 60 + Number(y[2])) - (Number(x[1]) * 60 + Number(x[2])) + 1440) % 1440; return len ? window.UDTiming.spanText(len) : ''; };
 
     function draw() {
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-i="' + i + '"><td><input data-k="name" maxlength="40" value="' + escapeHtml(r.name) + '" aria-label="Shift name"></td>' +

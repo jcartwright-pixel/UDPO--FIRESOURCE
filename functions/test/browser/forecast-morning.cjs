@@ -110,8 +110,8 @@ async function openPage(browser, url, w, h) {
       assert.ok(times.filter(t => !t.bad).every(t => /On time/.test(t.text)));
       // Joe 10/21: the left-over Fairmont is behind only by its own loading, and says it is left over.
       const fair = rows.find(x => /Fairmont/.test(x.text) && x.late);
-      assert.match(fair.text, /left over · (\d+ min|1 h( \d+ min)?)\b/);
-      assert.doesNotMatch(fair.text, /3 h 20 min/);
+      assert.match(fair.text, /left over · (\d+ min|1 hr( \d+ min)?)\b/);
+      assert.doesNotMatch(fair.text, /3 hr 20 min/);
       // The email box: the left-over load counts only its own loading, so "behind" is not hours and hours.
       assert.ok(box.behind <= 120, 'about ' + box.behind + ' min behind');
       // Joe 11/1: the box answers "will every truck be loaded before it leaves?"; no hours behind, no cases.

@@ -238,7 +238,7 @@
         (M.isOpen(wo) ? '<span class="sn-pill ' + (wo.status === 'PARTS' ? 'amber' : 'green') + '">' + escapeHtml(M.statusWord(wo.status)) + '</span>' : '<span class="sn-pill green">Done' + (wo.completedAt ? ' ' + escapeHtml(stamp(wo.completedAt)) : '') + '</span>' + (wo.fixedNote ? ' Fixed: ' + escapeHtml(wo.fixedNote) : ''));
       return '<div class="sn-down req">' + state + (x.urgency ? '<span>Can wait: <b>' + escapeHtml(x.urgency.toLowerCase()) + '</b></span>' : '') + '</div>';
     }
-    const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';
+    const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + window.UDTiming.spanText(hoursAgo(x.recordedAt) * 60) : '') + '</span>';
     const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
 
     function render() {
