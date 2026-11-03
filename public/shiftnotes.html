@@ -215,7 +215,7 @@
     const who = (e) => String(e || '').split('@')[0];
     function card(x, ck, tag, flag) {
       const id = escapeHtml(x.entryId), saved = x.entryId && !/^pending-/.test(x.entryId), st = x.status || 'OPEN';
-      const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#c62828';
+      const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#b42318';
       const status = ck && saved
         ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Follow-up status for ' + escapeHtml(x.equipment || x.type || 'this entry') + '">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
         : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';

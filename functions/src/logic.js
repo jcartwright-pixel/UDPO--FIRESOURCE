@@ -77,6 +77,11 @@
     return T.calendarDay(t);
   }
 
+  // Rules audit line 14 (Joe 11/3: "Yes to the color set"): the one set of status colors, named as the timing rule names them
+  // (green = on time, yellow = caution, red = late). Screens have the same values as CSS colors in app.css (--green, --red ...).
+  var COLORS = Object.freeze({ green: '#1f7a4d', greenBg: '#e2f4ea', yellow: '#f5c518', yellowInk: '#1c2733', amber: '#9a5b00', yellowBg: '#fff4d6',
+    red: '#b42318', redBg: '#fde8e6', blue: '#0b4f8a', blueBg: '#e8f0f8', gray: '#5b6775', grayBg: '#eef2f5' });
+
   // Rules audit lines 15 and 16 (Joe 11/3: "a centralized area where the format date is going to be exact"; "everything should
   // start on Sunday"): the one way a date is written on every screen, email, text, printout and message, like 10-8-26
   // (month-day-two-digit year, no zeros in front). Takes a day key (2026-10-08), a sheet date (10/08/2026) or a time (ISO
@@ -1727,7 +1732,7 @@
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
-    dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
+    COLORS: COLORS, dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,

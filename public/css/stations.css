@@ -21,10 +21,10 @@
 .gs-msg.ok { background: #e3f5ea; color: #145c37; }
 .gs-people { display: flex; align-items: center; gap: 14px; min-height: 46px; }
 .gs-people .p { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; }
-.gs-people .p i { width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; background: #1c7c4a; }
+.gs-people .p i { width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; background: #1f7a4d; }
 .gs-people .p + .p i { background: #6d28d9; }
 .gs-btn { border: 0; border-radius: 16px; font-weight: 800; font-size: 28px; min-height: 76px; padding: 8px 22px; color: #fff; background: #0b4f86; cursor: pointer; touch-action: manipulation; }
-.gs-btn.green { background: #1c7c4a; } .gs-btn.gray { background: #6b7b8c; } .gs-btn.red { background: #b42318; }
+.gs-btn.green { background: #1f7a4d; } .gs-btn.gray { background: #6b7b8c; } .gs-btn.red { background: #b42318; }
 .gs-btn.dark { background: #374151; font-size: 22px; min-height: 60px; }
 .gs-btn.line { background: #fff; color: #b42318; border: 3px solid #b42318; }
 .gs-btn.pick-on { box-shadow: inset 0 0 0 6px rgba(0, 0, 0, .35); }
@@ -42,34 +42,34 @@
 .gs-name { background: #fff; border: 3px solid #d7e1ec; border-radius: 16px; padding: 14px 10px; font-size: 26px; font-weight: 800; color: #1b2a3a; cursor: pointer; min-height: 92px; }
 .gs-name small { display: block; font-size: 16px; font-weight: 600; color: #6b7b8c; margin-top: 4px; }
 .gs-name.on { border-color: #6d28d9; background: #f3edff; }
-.gs-name.in { border-color: #1c7c4a; background: #e3f5ea; }
+.gs-name.in { border-color: #1f7a4d; background: #e3f5ea; }
 .gs-dots { display: flex; gap: 12px; justify-content: center; margin: 4px 0; }
 .gs-dots i { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #0b4f86; }
 .gs-dots i.on { background: #0b4f86; }
 .gs-dots i.extra { opacity: .45; }
 .gs-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .gs-keys button { min-height: 64px; font-size: 38px; font-weight: 800; border-radius: 14px; border: 2px solid #c9d6e3; background: #f7fafc; color: #1b2a3a; cursor: pointer; touch-action: manipulation; }
-.gs-keys button.go { background: #1c7c4a; color: #fff; border-color: #1c7c4a; font-size: 30px; }
+.gs-keys button.go { background: #1f7a4d; color: #fff; border-color: #1f7a4d; font-size: 30px; }
 .gs-keys button.go:disabled { opacity: .45; }
 .gs-keys button.small { font-size: 22px; }
 .gs-jobs { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .gs-job { display: grid; grid-template-columns: 200px 1fr 210px; align-items: center; gap: 14px; min-height: 96px; background: #fff; border-radius: 16px; border-left: 14px solid #1765a8; padding: 8px 16px; }
 .gs-job.parts { border-left-color: #7a8a9b; background: #f6f7f9; }
-.gs-job.working { border-left-color: #1c7c4a; background: #f3fbf6; }
+.gs-job.working { border-left-color: #1f7a4d; background: #f3fbf6; }
 .gs-job.down { border-left-color: #b42318; }
 .gs-job.office { border-left-color: #e69a1c; }
 .gs-job .unit { font-size: 38px; font-weight: 800; color: #0b4f86; }
 .gs-job .what { font-size: 24px; font-weight: 800; }
 .gs-job .what small { display: block; font-size: 19px; font-weight: 800; color: #6b7b8c; }
-.gs-job .what small.green { color: #1c7c4a; } .gs-job .what small.red { color: #b42318; }
+.gs-job .what small.green { color: #1f7a4d; } .gs-job .what small.red { color: #b42318; }
 .gs-empty { text-align: center; font-size: 28px; color: #6b7b8c; margin-top: 40px; }
 .gs-problem { font-size: 34px; font-weight: 800; margin: 6px 0; }
 .gs-label { font-size: 20px; color: #44515e; font-weight: 700; }
-.gs-now { font-size: 22px; font-weight: 800; color: #1c7c4a; min-height: 28px; }
+.gs-now { font-size: 22px; font-weight: 800; color: #1f7a4d; min-height: 28px; }
 .gs-two { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .gs-two .gs-btn { min-height: 120px; font-size: 34px; }
 .gs-done { font-size: 40px; min-height: 96px; }
-.gs-progress { display: flex; gap: 8px; } .gs-progress i { width: 120px; height: 10px; border-radius: 5px; background: #d7e1ec; } .gs-progress i.on { background: #1c7c4a; }
+.gs-progress { display: flex; gap: 8px; } .gs-progress i { width: 120px; height: 10px; border-radius: 5px; background: #d7e1ec; } .gs-progress i.on { background: #1f7a4d; }
 .gs-q { font-size: 34px; font-weight: 800; margin: 0; }
 .gs-fixes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .gs-fixes .gs-btn { min-height: 96px; }
@@ -81,7 +81,7 @@
 .gs-report { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; }
 .gs-report .gs-card { display: flex; flex-direction: column; gap: 10px; }
 .gs-typed { font-size: 40px; font-weight: 800; min-height: 54px; border-bottom: 3px solid #c9d6e3; display: flex; align-items: baseline; gap: 12px; }
-.gs-typed small { font-size: 20px; font-weight: 700; color: #1c7c4a; } .gs-typed small.bad { color: #b42318; }
+.gs-typed small { font-size: 20px; font-weight: 700; color: #1f7a4d; } .gs-typed small.bad { color: #b42318; }
 .gs-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; } .gs-cats .gs-btn { min-height: 64px; font-size: 24px; }
 .gs-matches { display: flex; gap: 8px; flex-wrap: wrap; } .gs-matches .gs-btn { min-height: 48px; font-size: 20px; }
 /* Joe 10/10 evening: work orders first, each mechanic's own clock on a job. */
@@ -90,14 +90,14 @@
 .gs-strip .gs-label { flex: none; }
 .gs-chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; border: 3px solid #d7e1ec; background: #fff; border-radius: 14px; padding: 6px 14px; font-size: 20px; font-weight: 800; color: #1b2a3a; min-height: 64px; cursor: pointer; touch-action: manipulation; }
 .gs-chip small { font-size: 16px; font-weight: 700; color: #6b7b8c; }
-.gs-chip.on { border-color: #1c7c4a; background: #e3f5ea; } .gs-chip.on small { color: #145c37; }
+.gs-chip.on { border-color: #1f7a4d; background: #e3f5ea; } .gs-chip.on small { color: #145c37; }
 .gs-crew { display: flex; flex-direction: column; gap: 8px; }
 .gs-clock { display: grid; grid-template-columns: 52px 1fr auto auto; align-items: center; gap: 14px; padding: 6px 0; border-top: 1px solid #e5ebf1; }
 .gs-clock:first-child { border-top: 0; }
-.gs-clock i { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; font-weight: 800; background: #1c7c4a; }
+.gs-clock i { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-style: normal; font-weight: 800; background: #1f7a4d; }
 .gs-clock:nth-child(2) i { background: #6d28d9; } .gs-clock:nth-child(3) i { background: #b45309; }
 .gs-clock b { font-size: 26px; }
-.gs-clock .t { font-size: 34px; font-weight: 800; color: #1c7c4a; font-variant-numeric: tabular-nums; }
+.gs-clock .t { font-size: 34px; font-weight: 800; color: #1f7a4d; font-variant-numeric: tabular-nums; }
 .gs-two .gs-btn[hidden] + .gs-btn { grid-column: 1 / -1; }
 .topbar .gs-people .p { color: #fff; }
 .gs-onclock { font-size: 16px; font-weight: 700; color: rgba(255, 255, 255, .85); }
@@ -118,7 +118,7 @@
 .gs-bigcard b { font-size: 84px; line-height: 1; font-weight: 900; color: #0b4f86; }
 .gs-bigcard span { font-size: 38px; font-weight: 800; }
 .gs-bigcard small { font-size: 20px; font-weight: 700; color: #6b7b8c; }
-.gs-bigcard small.red { color: #b42318; } .gs-bigcard small.green { color: #1c7c4a; }
+.gs-bigcard small.red { color: #b42318; } .gs-bigcard small.green { color: #1f7a4d; }
 .gs-btn.gs-back { background: #f2b705; color: #1b2a3a; font-size: 26px; min-height: 64px; padding: 0 24px; flex: none; }
 .gs-btn.amber { background: #c2410c; }
 /* Joe 10/28: when it was first written up and how many times. */
@@ -160,7 +160,7 @@
 /* Joe 10/28 evening: a service's hours, miles and the day it was finished. */
 .gs-read { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .gs-read label { display: flex; flex-direction: column; gap: 4px; font-size: 18px; font-weight: 800; color: #1b2a3a; padding: 4px; border-radius: 10px; }
-.gs-read label small { font-size: 16px; color: #1c7c4a; }
+.gs-read label small { font-size: 16px; color: #1f7a4d; }
 .gs-read input { font: inherit; font-size: 24px; font-weight: 800; min-height: 52px; padding: 4px 10px; border: 2px solid #c9d6e3; border-radius: 10px; width: 100%; box-sizing: border-box; }
 .gs-read label.need { box-shadow: inset 0 0 0 3px #b42318; } .gs-read label.need span { color: #b42318; }
 /* Joe 10/28 evening: tread depth on all 8 tires. */
@@ -168,7 +168,7 @@
 .gs-tires label { display: flex; flex-direction: column; gap: 2px; font-size: 16px; font-weight: 700; color: #44515e; }
 .gs-tires input { font: inherit; font-size: 22px; font-weight: 800; min-height: 48px; padding: 4px 8px; border: 2px solid #c9d6e3; border-radius: 10px; width: 100%; box-sizing: border-box; }
 .gs-ckb { min-height: 44px; min-width: 84px; padding: 0 12px; border: 2px solid #c9d6e3; border-radius: 10px; background: #fff; color: #1b2a3a; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
-.gs-ckb.on[data-r="OK"] { background: #1c7c4a; border-color: #1c7c4a; color: #fff; }
+.gs-ckb.on[data-r="OK"] { background: #1f7a4d; border-color: #1f7a4d; color: #fff; }
 .gs-ckb.on[data-r="FIX"] { background: #b42318; border-color: #b42318; color: #fff; }
 .gs-ckb.on[data-r="NA"] { background: #6b7b8c; border-color: #6b7b8c; color: #fff; }
 .gs-simple .gs-fixes .gs-btn { min-height: 64px; font-size: 22px; }
@@ -221,7 +221,7 @@
 .drv-row .rt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .drv-row .rt b { font-size: 18px; } .drv-row .rt i { font-style: normal; font-weight: 700; color: #193e66; }
 .drv-row .pill { font-weight: 700; font-size: 16px; padding: 4px 9px; border-radius: 8px; }
 .drv-row .pill.loaded { background: #e4f4e9; color: #24623e; } .drv-row .pill.loading { background: #fff1ca; color: #855d08; } .drv-row .pill.waiting { background: #edf1f5; color: #193e66; }
-.drv-row .pu { grid-column: 1 / 3; background: #fde5e3; color: #8f1d16; border: 1px solid #b42332; border-radius: 8px; padding: 4px 8px; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drv-row .pu { grid-column: 1 / 3; background: #fde5e3; color: #8f1d16; border: 1px solid #b42318; border-radius: 8px; padding: 4px 8px; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .drv-row .pu b { letter-spacing: .06em; }
 .drv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 .drv-col { display: grid; gap: 6px; align-content: start; padding: 0 8px; }
@@ -249,7 +249,7 @@
 .ds-headrow { background: #20578e; color: #fff; font-weight: 800; font-size: 16px; letter-spacing: .05em; }
 .ds-row .rt { font-size: 22px; font-weight: 800; color: #174a80; } .ds-row .span2 { grid-column: 1 / 3; }
 .ds-row.loading { background: #fff5d7; } .ds-row.loaded { background: #e6f6e9; }
-.ds-row .st { font-weight: 800; } .ds-row .pu-yes { color: #b42332; font-weight: 800; }
+.ds-row .st { font-weight: 800; } .ds-row .pu-yes { color: #b42318; font-weight: 800; }
 .ds-strip { grid-column: 1 / -1; margin-top: 6px; padding: 4px 10px; border-radius: 8px; font-size: 16px; }
 .ds-strip.pu { background: #fde5e3; color: #8f1d16; } .ds-strip.note { background: #e3effb; color: #134c85; }
 .ds-band { text-align: center; font-weight: 800; letter-spacing: .08em; padding: 10px; }
@@ -364,7 +364,7 @@ body.ds-tv .ds-weather { overflow: hidden; justify-content: safe center; }
 .ta-page .ta-row .grey { color: #6b7a89; }
 .ta-page .ta-row .tr input { width: 100%; text-align: center; text-transform: uppercase; font-weight: 700; font-size: 16px; padding: 6px; border: 1px solid #b9c7d6; border-radius: 6px; }
 .ta-page .ta-row .tr small { text-align: center; min-height: 14px; }
-.ta-page .ta-row.blank { background: #fff4f2; border-left-color: #c0392b; }
+.ta-page .ta-row.blank { background: #fff4f2; border-left-color: #b42318; }
 .ta-page .ta-row.blank .tr small { color: #a81916; font-weight: 700; }
 .ta-page .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
 .ta-page .ta-row.dup .tr small { color: #8a5a00; font-weight: 700; }
@@ -478,7 +478,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .phone-card .speak-box.area textarea { padding-bottom: 40px; }
 .phone-card button.speak { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 0; height: 30px; padding: 0 10px; font-size: 16px; border-radius: 7px; background: #eef4fa; border: 1px solid #c4d6e8; }
 .phone-card .speak-box.area button.speak { top: auto; bottom: 6px; transform: none; }
-.phone-card button.speak.on { background: #c62828; color: #fff; border-color: #c62828; }
+.phone-card button.speak.on { background: #b42318; color: #fff; border-color: #b42318; }
 /* The phone Check-In: what went wrong, right under the Check In button (improvements item 12). */
 .phone-card .send-error { margin: 8px 2px 0; color: #a3261b; font-weight: 700; font-size: 16px; }
 /* Polish 8: Trailer Assignments lines up with Loadout and Unloading: same margins, eyebrow line and heading size, a card
@@ -522,7 +522,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .st-code > * { min-width: 0; }
 .st-code input { width: 100%; box-sizing: border-box; font: inherit; font-size: 28px; letter-spacing: 4px; text-transform: uppercase; min-height: 60px; padding: 0 14px; border: 2px solid #9fb6cc; border-radius: 10px; }
 .st-code button { min-height: 58px; border: 0; border-radius: 10px; background: #0b3d6b; color: #fff; font: inherit; font-size: 20px; font-weight: 800; cursor: pointer; }
-.st-code .st-code-msg { min-height: 1.4em; color: #b3261e; font-weight: 700; }
+.st-code .st-code-msg { min-height: 1.4em; color: #b42318; font-weight: 700; }
 /* Joe 10/29: the Administrator's way off a locked tablet: a plain outline button under the code, not the main action. */
 .st-code button.st-admin { min-height: 48px; background: #fff; color: #0b3d6b; border: 2px solid #9fb6cc; font-size: 17px; font-weight: 700; justify-self: center; padding: 0 18px; }
 /* Joe 10/29: an Administrator on a station screen gets one way back to the app, bottom-left (Release keeps the bottom-right). */
@@ -568,7 +568,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 /* Joe 10/27: the trailer on a load is green once unloaded, red while it still waits on the Unloading list. */
 .sw-head .trailer.unl-ok, .sw-head .trailer.unl-no { color: #fff; border-radius: 6px; padding: 2px 8px; justify-self: start; }
 .sw-head .trailer.unl-ok { background: #1f7a3a; }
-.sw-head .trailer.unl-no { background: #b42332; }
+.sw-head .trailer.unl-no { background: #b42318; }
 .sw-head.tall { grid-template-columns: minmax(0, 1fr) auto auto 28px; }
 .sw-card.wash .sw-head.tall, .sw-list > .sw-card[data-sw] > .sw-head.tall:not([data-toggle]) { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
 .sw-title b { display: block; font-size: 21px; }
@@ -747,7 +747,7 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
   body.ta-page:not(.in-station) .ta-grid { background: transparent; border: 0; padding: 0 2px; }
   body.ta-page:not(.in-station) .ta-headrow { display: none; }
   body.ta-page:not(.in-station) .ta-row:not(.ta-headrow) { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 12px; padding: 12px 14px; background: #fff; border: 1px solid #d5dfea; border-left: 6px solid #388650; border-radius: 14px; font-size: 16px; }
-  body.ta-page:not(.in-station) .ta-row.blank { background: #fff4f2; border-left-color: #c0392b; }
+  body.ta-page:not(.in-station) .ta-row.blank { background: #fff4f2; border-left-color: #b42318; }
   body.ta-page:not(.in-station) .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
   body.ta-page:not(.in-station) .ta-row.sel { background: #eef5fd; border-left-color: #2f7de1; }
   body.ta-page:not(.in-station) .ta-row > span { display: flex; align-items: center; gap: 10px; padding: 0; text-align: left !important; overflow: visible; white-space: normal; overflow-wrap: normal; word-break: normal; }
@@ -791,7 +791,7 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .sw-title.unload b { display: flex; align-items: center; flex-wrap: wrap; gap: 0 14px; font-size: 26px; line-height: 1.2; }
 .sw-order { display: inline-grid; place-items: center; min-width: 36px; height: 36px; padding: 0 6px; border-radius: 999px; background: #0b3d6e; color: #fff; font-size: 20px; font-weight: 900; }
 .sw-trailer { font-size: 28px; font-weight: 900; letter-spacing: .01em; }
-.sw-chips i.back { background: #e3f4e8; color: #1d7a3e; border: 1px solid #9fd3ae; border-radius: 999px; }
+.sw-chips i.back { background: #e3f4e8; color: #1f7a4d; border: 1px solid #9fd3ae; border-radius: 999px; }
 .sw-chips i.road { background: #eef2f6; color: #5a6b7d; border: 1px solid #d3dce5; border-radius: 999px; }
 .sw-chips i.tt { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; }
 .sw-card.road { opacity: .6; border-left-color: #9fb3c8; }

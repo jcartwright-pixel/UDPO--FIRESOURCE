@@ -1278,7 +1278,7 @@ export function savePill(state) {
     pill.style.cssText = 'display:inline-block;margin-left:12px;padding:2px 12px;border-radius:999px;font:800 16px/1.25 Arial,sans-serif;letter-spacing:0;vertical-align:middle;white-space:nowrap';
     title.appendChild(pill); // on the title's line, without changing the header's height
   }
-  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b3261e'] }[state];
+  const look = { saving: ['Saving\u2026', '#fff4d6', '#8a5a00'], saved: ['Saved \u2713', '#dff4e6', '#126334'], failed: ['Not saved', '#fde8e6', '#b42318'] }[state];
   pill.textContent = look[0];
   pill.style.background = look[1];
   pill.style.color = look[2];

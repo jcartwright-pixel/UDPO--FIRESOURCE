@@ -1,6 +1,6 @@
 /* scorecard.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
-.sc.g-A { background: #e3f3e8; color: #1c6b3a; }
+.sc.g-A { background: #e3f3e8; color: #1f7a4d; }
 .sc.g-B { background: #e6f0fb; color: #1d5b91; }
 .sc.g-C { background: #fff4d6; color: #8a5a00; }
 .sc.g-D { background: var(--pill-red-bg); color: var(--pill-red-ink); }
@@ -13,7 +13,7 @@
 .sc-board thead th { text-transform: none; letter-spacing: 0; }
 .sc-rate .sc-rate-cancel { height: 38px; }
 .sc-board .sc-overall { min-width: 78px; display: inline-block; }
-.sc-board .sc-earned { color: #1c6b3a; font-weight: 600; margin-bottom: 6px; }
+.sc-board .sc-earned { color: #1f7a4d; font-weight: 600; margin-bottom: 6px; }
 .sc-board tr.sc-misses td { white-space: normal; overflow-wrap: anywhere; }
 .sc-rate { margin: 0 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; color: #4a5b6c; }
 .sc-rate small { flex-basis: 100%; }
@@ -50,7 +50,7 @@
 .sc-board tr.sc-pending td { background: #fff6e0; }
 .sc-review { display: inline-block; padding: 0 6px; border-radius: 6px; background: #ffe7a8; color: #7a4d00; font-weight: 800; }
 .sc-board .sc-excused .sc-what, .sc-board .sc-excused .sc-pts { text-decoration: line-through; color: #7a8a99; }
-.sc-ex { color: #1c6b3a; font-weight: 700; }
+.sc-ex { color: #1f7a4d; font-weight: 700; }
 .sc-carry { color: #647b8e; }
 .sc-board .sc-excuse, .sc-board .sc-unexcuse, .sc-board .sc-ex-form button { height: 32px; padding: 0 10px; font-size: 16px; }
 .sc-ex-form input { height: 32px; min-width: 300px; font: inherit; }
@@ -82,10 +82,10 @@ body.sc-kiosk .sc-board thead th { position: sticky; top: 0; z-index: 1; }
 .sc-report .sc-report-tiles div { background: #fff; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .sc-report .sc-report-tiles b { color: var(--ud-blue); }
 .sc-report .sc-report-tiles .warn b { color: #b42318; }
-.sc-report .sc-report-tiles .good b { color: #1d7a3e; }
+.sc-report .sc-report-tiles .good b { color: #1f7a4d; }
 .sc-report .sc-report-tiles span { font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
 .sc-board.sc-report-table td { font-size: 16px; }
 .sc-board.sc-report-table td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
 .sc-board.sc-report-table tr.sc-r-bad td { background: var(--pill-red-bg); color: var(--pill-red-ink); }
-.sc-board.sc-report-table tr.sc-r-good td { background: #e3f3e8; color: #1c6b3a; }
+.sc-board.sc-report-table tr.sc-r-good td { background: #e3f3e8; color: #1f7a4d; }
 .sc-board.sc-report-table tr.sc-r-total td { font-weight: 800; border-top: 2px solid var(--ud-blue); background: #f2f6fa; }

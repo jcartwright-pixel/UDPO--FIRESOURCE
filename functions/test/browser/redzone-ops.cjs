@@ -172,7 +172,7 @@ const SYNC = { at: RZ.at, by: RZ.by, lines: 6, sensors: 7, machines: 3, products
         await q.waitForSelector('#rz-checks tr td:nth-child(3)');
         const rows = await q.$$eval('#rz-checks tr', r => r.map(x => [...x.children].map(c => c.textContent)));
         assert.deepEqual(rows.map(r => [r[1], r[2], r[3], r[4]]), [['Blow Mold · Blow Molder', 'OPS - Weight Sheet', 'Fail', 'Head 1: 58.2 · Head 2: 61.0'], ['Gallon', 'GMP Audit', 'Pass', 'Floors clean: Yes']], 'failed first; older than 3 days left out');
-        assert.equal(await q.$eval('#rz-checks .rz-bad', e => getComputedStyle(e).color), 'rgb(198, 40, 40)', 'the failed entry is red');
+        assert.equal(await q.$eval('#rz-checks .rz-bad', e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'the failed entry is red');
         assert.match(await q.textContent('#foot'), /2 RedZone check sheets in the last 3 days, failed first/);
         assert.deepEqual(await small(q, '#pane-redzone'), [], 'text 16px or larger at ' + w);
         assert.ok(await fits(q) <= 0, 'no sideways scrolling at ' + w);

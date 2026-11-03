@@ -1,7 +1,7 @@
 /* fleet.html: the styles only this screen uses, moved out of app.css in their old order (review item 81, Joe 10/13). Linked right after
    app.css, so they still come after every shared rule. */
 /* Fleet Service */
-.fleet-page .tabs b { margin-left: 6px; color: #c62828; }
+.fleet-page .tabs b { margin-left: 6px; color: #b42318; }
 .fleet-page .tabs button[aria-selected="true"] b { color: #ffd7d7; }
 .fleet-page .pill.soon { background: #fff4d6; color: #8a5a00; border-color: #f0d38a; }
 .fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -22,9 +22,9 @@
 table.fs-grid td.gc { text-align: left; padding: 6px 10px; white-space: normal; border-left: 5px solid transparent; }
 table.fs-grid td.gc b { display: block; font-size: 16px; }
 table.fs-grid td.gc small { display: block; font-size: 16px; color: #5a6b7d; }
-table.fs-grid td.gc.OVERDUE b { color: #c62828; }
+table.fs-grid td.gc.OVERDUE b { color: #b42318; }
 table.fs-grid td.gc.DUE_SOON b { color: #b45f00; }
-table.fs-grid td.gc.OK b { color: #1d7a3e; }
+table.fs-grid td.gc.OK b { color: #1f7a4d; }
 table.fs-grid td.gc.SET_UP b, table.fs-grid td.gc.NO_MILES b { color: #5a6b7d; font-style: italic; }
 table.fs-grid td.gc.AT_GARAGE { border-left-color: #1f5f9e; }
 table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
@@ -52,7 +52,7 @@ table.fs-grid td.gc.AT_GARAGE b { color: #1f5f9e; }
 @media (max-width: 1200px) {
   .fleet-split.fs-setup { grid-template-columns: 1fr; }
 }
-.fs-setup input.fs-ours { width: 24px; height: 24px; cursor: pointer; accent-color: #1d7a3e; }
+.fs-setup input.fs-ours { width: 24px; height: 24px; cursor: pointer; accent-color: #1f7a4d; }
 .fs-type { display: flex; align-items: center; gap: 10px; margin: 0 4px 10px; font-size: 16px; font-weight: 700; color: var(--ud-blue-dark); }
 .fs-type select { height: 40px; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 16px; background: #fff; }
 .fs-setup .fs-rule input { width: 110px; }
@@ -68,5 +68,5 @@ table.fs-grid td.fs-cell.editing { background: #fff; cursor: default; outline: 2
 .fs-cell-edit label { display: flex; flex-direction: column; font-size: 16px; font-weight: 700; color: #415264; gap: 2px; }
 .fs-cell-edit input { font-size: 16px; padding: 4px 6px; min-height: 36px; width: 100%; box-sizing: border-box; }
 .fs-cell-edit .fs-cell-saved { font-size: 16px; min-height: 20px; }
-.fs-cell-edit .fs-cell-saved.ok { color: #1d7a3e; }
-.fs-cell-edit .fs-cell-saved.bad { color: #c62828; }
+.fs-cell-edit .fs-cell-saved.ok { color: #1f7a4d; }
+.fs-cell-edit .fs-cell-saved.bad { color: #b42318; }

@@ -1456,7 +1456,7 @@
   function followWord(v) { v = text(v).toUpperCase(); return v === 'RESOLVED' ? 'RESOLVED' : v === 'MONITOR' ? 'MONITOR' : 'NEEDS ATTENTION'; }
   function reportHtml(r, note) {
     function e(v) { return String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-    var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = '#b42318', GREEN = '#1f7a4d', YELLOW = '#f5c518', GREY = '#5b6775', INK = '#1c2733';
+    var F = 'font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;', RED = LR.COLORS.red, GREEN = LR.COLORS.green, YELLOW = LR.COLORS.yellow, GREY = LR.COLORS.gray, INK = LR.COLORS.yellowInk;
     // Joe 10/20: red only for a load that is behind; a load not loaded yet but on time has no shading.
     var PLAIN = '#ffffff';
     // Joe 11-2-26 (timing-rules.js): yellow from 30 to 60 minutes past the leaving time, red past 60. AMBER is yellow's words on white.

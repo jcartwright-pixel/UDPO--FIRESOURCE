@@ -15,5 +15,5 @@
 .ms-tools button:disabled { opacity: .35; cursor: default; }
 .ms-tools select, .ms-pick { font: inherit; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 8px; }
 .ms-pick { font-weight: 700; color: var(--ud-blue-dark); min-height: 40px; }
-.ms-btn.armed { background: #b3261e; border-color: #b3261e; color: #fff; }
+.ms-btn.armed { background: #b42318; border-color: #b42318; color: #fff; }
 .menu-setup-page .foot { color: var(--muted); font-size: 16px; }

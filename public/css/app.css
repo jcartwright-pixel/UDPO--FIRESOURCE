@@ -10,15 +10,22 @@
   --page: #f3f6f9;
   --card: #ffffff;
   --runs-bg: #e7f6ec;
-  --runs-ink: #1d7a3e;
+  --runs-ink: #1f7a4d;
   --missing: #fff1dc;
   --missing-edge: #e5891a;
-  --pickup: #c62828;
+  --pickup: #b42318;
   --test-bg: #fff4cc;
   --test-ink: #7a5600;
   --error-bg: #fde8e8;
-  --error-ink: #9b1c1c;
+  --error-ink: #b42318;
   --row: 34px;
+  /* Rules audit line 14 (Joe 11/3: "Yes to the color set"): the one set of status colors, named as the timing rule names them
+     (green = on time, yellow = caution, red = late). The same values are logic.js COLORS, for the emails. */
+  --green: #1f7a4d; --green-bg: #e2f4ea;
+  --yellow: #f5c518; --yellow-ink: #1c2733; --amber: #9a5b00; --yellow-bg: #fff4d6;
+  --red: #b42318; --red-bg: #fde8e6;
+  --blue: #0b4f8a; --blue-bg: #e8f0f8;
+  --gray: #5b6775; --gray-bg: #eef2f5;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -240,7 +247,7 @@ button.override.on { background: #fff4e5; color: #9a4b00; border-color: #f0b46a;
 .week td.c-plant { background: var(--c-plant) !important; color: #5b21b6; font-weight: 700; box-shadow: inset 3px 0 0 #7c3aed; }
 .week td.plant-load { outline: 2px dashed #7c3aed; outline-offset: -3px; }
 .week td.c-vacation-needs { background: var(--c-vacation) !important; color: #9b1c3a; font-weight: 700; }
-.week td.c-conflict, .week td.c-booked { background: var(--c-conflict) !important; color: #9b1c1c; }
+.week td.c-conflict, .week td.c-booked { background: var(--c-conflict) !important; color: #b42318; }
 .week td.c-carrier, .week td.c-open { background: #f4f6f8 !important; color: var(--ud-blue); font-weight: 700; }
 .week td.c-coverage { background: #f4f6f8 !important; color: var(--muted); }
 .board td.b-assigned { background: var(--c-assigned) !important; }
@@ -268,7 +275,7 @@ body.fill .scroll-list thead th { position: sticky; top: 0; z-index: 1; }
 .form-buttons button.primary { background: var(--ud-blue); color: #fff; border: 0; }
 .type { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 9px; font-size: 16px; font-weight: 700; vertical-align: middle; }
 .vstatus { padding: 0 10px; border-radius: 12px; font-size: 16px; font-weight: 700; background: #e6e9ee; color: #3b4652; }
-.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: var(--pill-warn-bg); color: var(--pill-warn-ink); } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #9b1c1c; }
+.vstatus.s-approved { background: #dcf3e4; color: #11703a; } .vstatus.s-pending { background: var(--pill-warn-bg); color: var(--pill-warn-ink); } .vstatus.s-denied, .vstatus.s-cancelled { background: #fde8e8; color: #b42318; }
 #cal-month, #print-who { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; background: #fff; }
 .cal-key span { display: inline-flex; align-items: center; gap: 4px; }
 .calendar { flex: 1; min-height: 0; margin: 0 16px; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 28px repeat(var(--weeks, 5), minmax(0, 1fr)); gap: 4px; }
@@ -506,7 +513,7 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .kpis b { font-size: 28px; color: var(--ud-blue); line-height: 1.1; }
 .issues-page .kpis span { font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .issues-page .kpis .warn b { color: #b45f00; }
-.issues-page .kpis .good b { color: #1d7a3e; }
+.issues-page .kpis .good b { color: #1f7a4d; }
 .issues-page .tabs button b { margin-left: 6px; display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 10px; background: #0b4f8a1a; font-size: 16px; }
 .issues-page .tabs button[aria-selected="true"] b { background: #ffffff33; }
 .issues-page table.issues td { height: 46px; }
@@ -522,7 +529,7 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
 .issues-page .work button { min-height: 30px; padding: 0 8px; font-size: 16px; white-space: nowrap; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font-weight: 700; cursor: pointer; }
-.issues-page .work button.good { background: #1d7a3e; color: #fff; border-color: #1d7a3e; }
+.issues-page .work button.good { background: #1f7a4d; color: #fff; border-color: #1f7a4d; }
 .issues-page .work button.link { color: #a8321f; border-color: #f0c6bf; }
 .issues-page .work button:disabled { opacity: .45; cursor: not-allowed; }
 .issues-page .foot { font-size: 16px; color: var(--muted); }
@@ -691,7 +698,7 @@ table.otr-bydate td { padding: 0; height: 36px; }
 
 /* Driver Scorecard */
 .sc { display: inline-block; min-width: 46px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
-.sc-board td.sc-ok { color: #1c6b3a; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
+.sc-board td.sc-ok { color: #1f7a4d; } .sc-board td.sc-bad { color: #b42318; font-weight: 700; }
 .sc-board th.later, .sc-board td.later { color: #9aa9b8; }
 .sc-board tr.sc-misses td { text-align: left; background: #f7fbfe; font-size: 16px; }
 .sc-period { font-size: 18px; color: var(--ud-blue); min-width: 170px; text-align: center; }
@@ -748,7 +755,7 @@ table.otr-bydate td { padding: 0; height: 36px; }
 .side-flyouts a.on { background: #fff; color: #0b3d6b; }
 @media print { .side-flyouts { display: none !important; } }
 /* Equipment (Joe 10/10): Sun to Sat show each unit's default runs; today's column is marked. */
-td.eq-day.busy { color: #b3261e; font-weight: 800; }
+td.eq-day.busy { color: #b42318; font-weight: 800; }
 
 /* Equipment: Sync fleet list tile with the last sync beside it. */
 .head .actions.fleet-sync { display: flex; align-items: center; gap: 10px; flex: none; }
@@ -773,7 +780,7 @@ td.eq-day.busy { color: #b3261e; font-weight: 800; }
 .hub-card-head strong { font-size: 21px; line-height: 1.15; color: var(--ud-blue-dark); }
 .hub-big small { font-size: 16px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .hub-wrench { width: 96px; height: 76px; border-radius: 12px; background: #e3f4e8; display: grid; place-items: center; }
-.hub-wrench svg { width: 46px; height: 46px; fill: none; stroke: #1d7a3e; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hub-wrench svg { width: 46px; height: 46px; fill: none; stroke: #1f7a4d; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .hub-tile span { font-size: 16px; font-weight: 700; color: var(--muted); line-height: 1.15; }
 /* Joe 10/10: the hub fits his screen with no scrolling: eleven write-ups, each a little shorter, ending in line with the cards. */
 .issues-page .hub-latest table.issues td { height: 40px; padding-top: 3px; padding-bottom: 3px; line-height: 1.15; }
@@ -821,7 +828,7 @@ table.set thead th { background: var(--ud-blue); color: #fff; }
 @media (max-width: 1100px) { .set-grid { grid-template-columns: 1fr; } }
 
 /* Fleet Service, mock-up A (Joe 10/10): one row per unit, colored words with a thin colored edge on each service cell. */
-table.fs-grid td.gc.OVERDUE { border-left-color: #c62828; }
+table.fs-grid td.gc.OVERDUE { border-left-color: #b42318; }
 table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; }
 
 
@@ -965,8 +972,8 @@ td.fit-wrap, td.fit-wrap * { white-space: normal !important; text-overflow: clip
 .equipment-page span.tag, table td span.tag { font-size: 16px; }
 table td button.warn { font-size: 16px; }
 /* Vacation calendar day box: Edit and Remove on each entry (Remove asks twice); a name on the calendar opens it to edit. */
-.day-row .day-acts button.danger { color: #b3261e; border-color: #e7b4b0; }
-.day-row .day-acts button.armed { background: #b3261e; color: #fff; border-color: #b3261e; }
+.day-row .day-acts button.danger { color: #b42318; border-color: #e7b4b0; }
+.day-row .day-acts button.armed { background: #b42318; color: #fff; border-color: #b42318; }
 
 /* Improvements 10/10: an error stays readable above an open pop-up's dimmed backdrop. */
 .notice.error:not([hidden]) { position: relative; z-index: 30; }
@@ -1034,7 +1041,7 @@ body.uc-locked #screen > :not(.topbar):not(.uc-refused) { display: none !importa
 
 
 /* Joe 10/12: a down truck or trailer still on a load (Daily Dispatch banner; Weekly unit text). */
-.week td.day .unit .unit-down { color: #b3261e; font-weight: 800; }
+.week td.day .unit .unit-down { color: #b42318; font-weight: 800; }
 
 /* Joe 10/12: Daily Dispatch keeps the picked day; "Go to today" shows when it is not today. The week-change warning. */
 .day-pin #go-today { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #e5891a; background: #fff4e5; color: #8a4b00; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
@@ -1056,7 +1063,7 @@ body.row-drag-on, body.row-drag-on * { cursor: grabbing !important; user-select:
 .row-drop-line { position: absolute; height: 3px; background: #1f6feb; z-index: 60; pointer-events: none; }
 
 /* Equipment: fleet list sync preview (Joe 10/12). Text 16px; the list scrolls under a sticky head. */
-.fp-list tr.fp-inactive td:nth-child(3) { color: #b3261e; font-weight: 700; }
+.fp-list tr.fp-inactive td:nth-child(3) { color: #b42318; font-weight: 700; }
 
 /* Route names (Joe 10/12): Route, Route Name and Run Name typed over in the Route Editor's own columns. */
 table.routes input.nm { width: 100%; height: calc(var(--row) - 6px); border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; color: inherit; padding: 0 6px; text-overflow: ellipsis; }
@@ -1121,7 +1128,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
    style sheets. Each colour pair is written once here and every pill points at it (Issues, GPS, Shift Notes, Plant Maintenance,
    Line Targets, the line board, Safety); each pill keeps its own size and shape. */
 :root {
-  --pill-green-bg: #e3f4e8; --pill-green-ink: #1d6b37;
+  --pill-green-bg: #e3f4e8; --pill-green-ink: #1f7a4d;
   --pill-good-bg: var(--runs-bg); --pill-good-ink: var(--runs-ink);
   --pill-amber-bg: #fff1dc; --pill-amber-ink: #8a5200;
   --pill-warn-bg: #fdecc4; --pill-warn-ink: #8a5a00;
@@ -1169,20 +1176,20 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .sched-day.daynote { border-left-color: #1f7a8c; background: #e6f4f6; }
 .sched-day.daynote .sched-status { color: #1f5f6c; }
 .sched-day.none .sched-status { color: var(--muted); font-weight: 700; }
-.sched-day.conflict { border-left-color: #b3261e; }
-.sched-day.conflict .sched-status { color: #b3261e; }
+.sched-day.conflict { border-left-color: #b42318; }
+.sched-day.conflict .sched-status { color: #b42318; }
 @media (min-width: 600px) { .sched-day { grid-template-columns: 150px minmax(0, 1fr); } .sched-run { display: block; } .sched-run small { display: block; } }
 .sched-run small span { white-space: nowrap; font-weight: 600; }
 /* Joe 10/15: Administration > Schedule Texts (texts.html), built on the GPS Setup page's cards. */
 .gps-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .texts-page .texts-list { width: 100%; border-collapse: collapse; font-size: 16px; }
 .texts-page .texts-list th, .texts-page .texts-list td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-.texts-page .texts-none { color: #b3261e; font-weight: 800; }
+.texts-page .texts-none { color: #b42318; font-weight: 800; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
 .texts-page .texts-resend { margin-top: 6px; font-size: 16px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-weight: 700; }
-.texts-page .texts-resend.armed { background: #c0392b; border-color: #c0392b; color: #fff; }
+.texts-page .texts-resend.armed { background: #b42318; border-color: #b42318; color: #fff; }
 /* Phones: each text is a small card (label, then the words), so nothing is squeezed into a narrow column. */
 @media (max-width: 600px) {
   .texts-page .texts-log colgroup, .texts-page .texts-log thead { display: none; }
@@ -1199,7 +1206,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 .texts-page .texts-test { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
 .texts-page .texts-test label { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 700; }
 .texts-page .texts-test input { font-size: 16px; width: 200px; }
-.drivers-page .sheet td.load-text .stopped { display: block; color: #b3261e; font-weight: 800; font-size: 16px; line-height: 1.1; white-space: normal; overflow-wrap: normal; }
+.drivers-page .sheet td.load-text .stopped { display: block; color: #b42318; font-weight: 800; font-size: 16px; line-height: 1.1; white-space: normal; overflow-wrap: normal; }
 .texts-page .texts-sample { background: #eef6ff; border-radius: 14px; padding: 10px 14px; font-size: 17px; line-height: 1.4; max-width: 520px; }
 
 /* Joe 10/21: the screen's own part shows once its first data is drawn (js/app.js holdUntilDrawn); the header and menu show at once.
@@ -1236,7 +1243,7 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip[hidden] { display: none; }
 .send-strip.sent { background: #e3f4e8; color: #1d5b2f; border-color: #a9d8b6; }
 .send-strip .send-button { background: var(--ud-blue); color: #fff; border: 0; padding: 6px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
-.send-strip .send-button.armed { background: #c0392b; }
+.send-strip .send-button.armed { background: #b42318; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }

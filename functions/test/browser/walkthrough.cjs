@@ -88,7 +88,7 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
       assert.ok(await page.$eval('.wk-row:nth-child(3) .wk-choice', a => a.classList.contains('late') && getComputedStyle(a).animationName === 'wk-flash'), 'past-due Production flashes');
       // Joe 10/18: beside each card a button in its colour: Yard done (no trucks), Coolers and Production past due (red).
       assert.deepEqual(await page.$$eval('.wk-act', a => a.map(x => x.textContent + ' ' + x.className + ' ' + x.getAttribute('href') + ' ' + getComputedStyle(x).backgroundColor)),
-        ['DONE wk-act ok yard.html?walk=1 rgb(31, 122, 77)', 'PAST DUE wk-act late temps.html?walk=1 rgb(198, 40, 40)', 'PAST DUE wk-act late quality.html?walk=1 rgb(198, 40, 40)', 'TAKE PICTURE wk-act take null rgb(11, 79, 138)']);
+        ['DONE wk-act ok yard.html?walk=1 rgb(31, 122, 77)', 'PAST DUE wk-act late temps.html?walk=1 rgb(180, 35, 24)', 'PAST DUE wk-act late quality.html?walk=1 rgb(180, 35, 24)', 'TAKE PICTURE wk-act take null rgb(11, 79, 138)']);
       assert.ok(await page.$$eval('.wk-row', r => r.every(x => { const a = x.querySelector('.wk-choice').getBoundingClientRect(), b = x.querySelector('.wk-act').getBoundingClientRect(); return b.left >= a.right && Math.abs(b.top - a.top) < 2; })), 'each button sits beside its card');
       // Who did each area's newest check, or done automatically.
       assert.deepEqual(await page.$$eval('.wk-who', a => a.map(x => x.textContent.replace(/\d{1,2}:\d\d [AP]M/, 'T'))), ['Done automatically', 'Last T · Supervisor Test', 'Last T · Supervisor Test']);

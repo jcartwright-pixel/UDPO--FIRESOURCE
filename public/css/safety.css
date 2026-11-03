@@ -1,6 +1,6 @@
 /* Safety Walkthrough (Joe 10/12, mock-ups B, D, E and F): the weekly walk, open issues, fire extinguishers, past walks and
    the checklist. Text stays 16px or more; each screen fits one page at 1536 and 1920 and scrolls inside its list. */
-.safety-page { --sw-green: #1d7a3e; --sw-red: #c62828; --sw-amber: #b86e00; }
+.safety-page { --sw-green: #1f7a4d; --sw-red: #b42318; --sw-amber: #b86e00; }
 .safety-page .head .title h1 { white-space: nowrap; }
 .sw-counts { display: block; margin-top: 4px; font-size: 17px; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .sw-counts b.g { color: var(--sw-green); } .sw-counts b.r { color: var(--sw-red); } .sw-counts b.a { color: var(--sw-amber); }

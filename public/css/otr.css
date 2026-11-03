@@ -28,9 +28,9 @@
 .otr-kd { flex: 1; min-height: 84px; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; padding: 10px 14px; }
 .otr-kd b { display: block; font-size: 16px; font-weight: 600; color: #36475a; }
 .otr-kd .big { font-size: 28px; font-weight: 800; color: #0b2540; }
-.otr-kd .big.bad { color: #c62828; }
+.otr-kd .big.bad { color: #b42318; }
 .otr-kd .vs { font-size: 16px; color: #5b6b7d; }
-.otr-kd .bad { color: #c62828; font-weight: 700; }
+.otr-kd .bad { color: #b42318; font-weight: 700; }
 .otr-kd .good { color: #2b8a3e; font-weight: 700; }
 .otr-top { display: flex; gap: 14px; align-items: stretch; margin: 0 0 12px; }
 svg.otr-trend { width: 560px; flex: none; background: #fff; border: 1px solid #d5e1eb; border-radius: 12px; }
@@ -52,7 +52,7 @@ table.otr-sheet .l { text-align: left; padding-left: 8px; }
 table.otr-sheet tr.wk td { border-top: 3px solid #074c84; }
 table.otr-sheet tr.tot td { background: #e8eef6; font-weight: 800; }
 table.otr-sheet tr.today td { background: #fff6d6; }
-table.otr-sheet td.neg { color: #c62828; font-weight: 700; }
+table.otr-sheet td.neg { color: #b42318; font-weight: 700; }
 table.otr-sheet td.pos { color: #2b8a3e; font-weight: 700; }
 table.otr-sheet td.ly { color: #5b6b7d; }
 table.otr-sheet .gap { background: #f4f6f9; border-color: #f4f6f9; padding: 0; }
