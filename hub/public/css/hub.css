@@ -229,3 +229,31 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
   .lc-row { display: flex; flex-wrap: wrap; }
   .lc-row > div { flex: 1 0 100%; }
 }
+
+/* Keys & Connections: one card per sign-in. */
+.keys { padding: 0 16px 24px; display: grid; gap: 12px; }
+.keys > p { margin: 0; max-width: 900px; }
+.key-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; align-items: start; }
+.key-card { background: #fff; border: 1px solid var(--line); border-top: 4px solid #8a2d3b; border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; box-shadow: 0 1px 3px rgba(16, 40, 70, .06); min-width: 0; }
+.key-card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.key-card h2 { margin: 0; font-size: 19px; color: var(--ud-blue); }
+.key-card p { margin: 0; }
+.key-saved { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; padding: 8px 10px; border-radius: 8px; background: #f5f8fb; }
+.key-saved dt { font-weight: 700; }
+.key-saved dd { margin: 0; overflow-wrap: anywhere; }
+.key-test { padding: 6px 10px; border-radius: 8px; background: #f5f8fb; }
+.key-test.good { background: var(--pill-green-bg, #dcf3e4); color: var(--pill-green-ink, #11703a); }
+.key-test.bad { background: var(--error-bg, #fde8e8); color: var(--error-ink, #9b1c1c); }
+.key-change summary { cursor: pointer; font-weight: 700; color: var(--ud-blue); padding: 4px 0; }
+.key-change { display: grid; gap: 8px; }
+.key-change[open] { padding: 8px 10px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.key-card label { display: grid; gap: 4px; font-weight: 600; margin-top: 6px; }
+.key-card label.inline { margin: 0; flex: 1 1 200px; }
+.key-card input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; min-width: 0; width: 100%; box-sizing: border-box; }
+.key-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 4px; }
+.key-acts button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.key-acts button.primary { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.key-acts button.warn { color: #8a4b00; border-color: #e3b46a; }
+.key-acts button.armed { background: #b42318; color: #fff; border-color: #b42318; }
+.key-acts button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 480px) { .key-cards { grid-template-columns: 1fr; } }

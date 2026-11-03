@@ -120,4 +120,22 @@ async function localAdmin(ctx) {
     catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: e.status || 'INTERNAL', message: e.message } }) }); }
   });
 }
-module.exports = { PROJECT, db, clear, localCalls, localAdmin };
+/*
+ * Keys & Connections: Operations' real gps, redzone, mocreo and sms calls on the emulator. Nothing reaches the outside: every
+ * outside request fails here, so a test shows the plain "could not reach" answer.
+ */
+const KEY_CALLS = {
+  gps: () => opsModule('gps').gpsCall, redzone: () => opsModule('redzone').redzoneCall, mocreo: () => opsModule('mocreo').mocreoCall, sms: () => opsModule('sms').smsCall
+};
+function opsModule(name) { opsAdmin(); return require('../../../functions/src/' + name); }
+const offline = { fetch: async () => { throw new Error('no outside network in the hub tests'); }, env: {}, project: 'demo-ud-distribution' };
+async function localKeys(ctx) {
+  await ctx.route(/:5001\/[^/]+\/[^/]+\/(gps|redzone|mocreo|sms)$/, async (route) => {
+    const req = route.request(), data = (req.postDataJSON() || {}).data || {}, name = req.url().split('/').pop();
+    let token = null;
+    try { token = JSON.parse(Buffer.from(String(req.headers().authorization || '').split(' ')[1].split('.')[1], 'base64url').toString()); } catch (e) { /* no sign-in */ }
+    try { await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: await KEY_CALLS[name]()(db(), { email: token && token.email }, data, offline) }) }); }
+    catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: CODES[e.code] || 'INTERNAL', message: e.message } }) }); }
+  });
+}
+module.exports = { PROJECT, db, clear, localCalls, localAdmin, localKeys };
