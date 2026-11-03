@@ -36,17 +36,23 @@ screens: people.html
 2. Press a person's line. Their details open on the right.
 3. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**.
 4. **Apps they can open** changes as you go, so you can see what they will get before you save.
-5. Press `Save`.
-6. To add someone, press `+ Add Person`, type their name and United Dairy email, pick a role and plants, then press `Add Person`.
+5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
+6. Pick their **Home screen**: the page they land on when they open Plant & Distribution.
+7. To change one right for this person only, open **Single rights** and pick `Allow` or `Deny` (or `Use role`). The last column shows what they will get.
+8. Press `Save`.
+9. To add someone, press `+ Add Person`, type their name and United Dairy email, pick a role and plants, then press `Add Person`. Open them again to pick their screens and Home screen.
 
 ### Buttons
 - `+ Add Person`: a new person on the Users list.
+- `Show screens` / `Hide screens`: the single screens of one area.
 - `Save`: saves the person for every app.
 - `Cancel`: closes the person without saving.
 
-> Single-right changes (Allow or Deny one right) and the screens ticked for each plant are still set in Plant & Distribution, Administration, People & Roles. Saving here keeps them as they are.
+> Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
 > Who sees which app: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
+
+!> Do not disable someone to hide a screen from them. Untick the screen instead.
 
 !> Do not disable someone to take away one app. Change their role instead; Disabled shuts them out of every app.
 

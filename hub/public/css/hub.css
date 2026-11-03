@@ -77,3 +77,34 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .hub-section { margin: 18px 16px 0; color: var(--muted); font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 480px) { .hub-home { grid-template-columns: 1fr; } .hub-home a.app-tile { min-height: 0; } }
+
+/* People & Access: what they see in Plant & Distribution, their Home screen and single rights (11-3-26). */
+.people { grid-template-columns: minmax(0, 1fr) 440px; }
+@media (max-width: 900px) { .people { grid-template-columns: 1fr; } }
+.people-edit .pblock { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 10px; }
+.people-edit .pblock h3, .people-edit .pblock summary { margin: 0; color: var(--ud-blue-dark); font-size: 17px; font-weight: 700; }
+.people-edit details.pblock summary { cursor: pointer; }
+.people-edit .pblock p { margin: 0; }
+.people-edit .prow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .people-edit .prow { grid-template-columns: 1fr; } }
+.people-edit .plain { font-weight: 500; padding: 8px 0; }
+.people-edit ul.areas, .people-edit ul.areas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.people-edit ul.areas > li { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.people-edit ul.areas ul { padding: 6px 0 2px 26px; }
+.people-edit .area-line { display: flex; align-items: center; gap: 8px; }
+.people-edit .area-line .tick { flex: 1; }
+.people-edit button.link { background: none; border: 0; padding: 4px; color: var(--ud-blue); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+.people-edit table.rights { width: 100%; border-collapse: collapse; font-size: 14px; }
+.people-edit table.rights td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: center; }
+.people-edit table.rights td.l { text-align: left; }
+.people-edit table.rights tr.group td { text-align: left; font-weight: 700; background: var(--band, #eef3f8); }
+.people-edit table.rights select { padding: 4px 6px; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.pill.good { background: var(--pill-green-bg, #dcf3e4); color: var(--pill-green-ink, #11703a); }
+.pill.muted { background: var(--pill-gray-bg, #eceff3); color: var(--pill-gray-ink, #4a5866); }
+.pill.warn { background: var(--pill-warn-bg, #fff4d6); color: var(--pill-warn-ink, #7a5200); }
+.people-edit { min-width: 0; box-sizing: border-box; }
+.people-edit input:not([type="checkbox"]):not([type="radio"]), .people-edit select { width: 100%; max-width: 100%; box-sizing: border-box; min-width: 0; }
+.people-edit table.rights select { width: auto; }
+.people-edit table.rights td { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; height: auto; }
+.people-edit table.rights td.l { width: 58%; }

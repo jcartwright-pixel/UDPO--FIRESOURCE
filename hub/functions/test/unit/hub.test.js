@@ -72,3 +72,31 @@ test('People & Access shows the same apps as the tiles', async () => {
   }
   assert.ok(names.operations);
 });
+
+// People & Access works out screens, Home screen choices and rights the same way Operations does (made-up people only).
+test('People & Access follows Operations\' own screen, Home screen and rights rules', async () => {
+  const A = await import('../../../public/js/access.js');
+  const L = require('../../../../functions/src/logic');
+  const R = require('../../../../functions/src/rights');
+  const areas = L.SCREEN_AREAS, plants = L.PLANTS;
+  assert.deepEqual(A.screenKeys(areas), L.SCREEN_KEYS);
+  const people = [
+    { status: 'ACTIVE', roles: ['MANAGER'], facilities: ['fac_uniontown'] },
+    { status: 'ACTIVE', roles: ['DISPATCHER'], facilities: [] },
+    { status: 'ACTIVE', roles: ['ADMINISTRATOR'], facilities: [] },
+    { status: 'ACTIVE', roles: ['SUPERVISOR'], facilities: ['*'] },
+    { status: 'INACTIVE', roles: ['MANAGER'], facilities: ['fac_uniontown'] }
+  ];
+  const accesses = [null, { fac_uniontown: ['daily', 'weekly', 'garage'] }, { fac_uniontown: [], fac_charleston: ['pmCenter'] }];
+  people.forEach(p => {
+    assert.deepEqual(A.plantsFor(p, plants), L.plantsFor(p), JSON.stringify(p));
+    accesses.forEach(a => {
+      assert.deepEqual(A.homeChoices(p, a, areas, plants), L.homeChoices(p, a), JSON.stringify([p, a]));
+      plants.forEach(pl => assert.deepEqual(A.screensFor(p, a, pl.id, areas, plants), L.screensFor(p, a, pl.id)));
+    });
+    const ex = { grants: ['fleet.write', 'dispatch.write'], denials: ['dispatch.write', 'drivers.read'] };
+    const want = R.effectiveRights(p, {}, ex);
+    R.CATALOG.forEach(r => assert.equal(A.rightAllowed(Object.assign({}, p, ex), r.code, {}, R.DEFAULTS), want.indexOf(r.code) >= 0 || want.indexOf('*') >= 0,
+      r.code + ' ' + JSON.stringify(p)));
+  });
+});

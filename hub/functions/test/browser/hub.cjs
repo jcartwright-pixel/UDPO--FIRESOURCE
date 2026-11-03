@@ -61,6 +61,31 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#f-msg.good');
     const sam = (await db().collection('users').doc('sam.sales@uniteddairy.com').get()).data();
     assert.deepEqual([sam.roles, sam.facilities, sam.status], [['MANAGER'], ['*'], 'ACTIVE']);
+    // What Sam sees in Plant & Distribution: start from the Dispatcher job (it opens Route Distribution), take Sheet
+    // Conflicts off, deny one right, then pick the Home screen.
+    await p.waitForSelector('#f-job');
+    assert.match(await p.textContent('.pblock'), /Nothing is limited yet/);
+    await p.selectOption('#f-plant', 'fac_uniontown');
+    await p.selectOption('#f-job', 'dispatcher');
+    assert.match(await p.textContent('.pblock'), /Not saved yet/);
+    assert.ok(await p.isVisible('input[data-keys="conflicts"]'), 'the job opens the areas it ticks');
+    await p.uncheck('input[data-keys="conflicts"]');
+    await p.click('#f-rights summary');
+    await p.selectOption('select[data-right="dispatch.publish"]', 'deny');
+    assert.match(await p.textContent('#f-rights summary'), /1 changed/);
+    await shot(p, 'hub-people-screens-1920');
+    await p.click('#f-save');
+    await p.waitForSelector('#f-msg.good');
+    let samNow = (await db().collection('users').doc('sam.sales@uniteddairy.com').get()).data();
+    assert.ok(samNow.screenAccess.fac_uniontown.indexOf('daily') >= 0 && samNow.screenAccess.fac_uniontown.indexOf('conflicts') < 0, JSON.stringify(samNow.screenAccess));
+    assert.ok(samNow.screenAccess.fac_uniontown.indexOf('manager') < 0, 'a screen the job does not have is off');
+    assert.deepEqual(samNow.denials, ['dispatch.publish']);
+    await p.selectOption('#f-home', 'daily.html');
+    await p.click('#f-save');
+    await p.waitForSelector('#f-msg.good');
+    samNow = (await db().collection('users').doc('sam.sales@uniteddairy.com').get()).data();
+    assert.equal(samNow.homeScreen, 'daily.html');
+    assert.equal(await p.inputValue('#f-home'), 'daily.html');
     // Add a person.
     await p.click('#add');
     await p.fill('#f-name', 'Robin Driver');
