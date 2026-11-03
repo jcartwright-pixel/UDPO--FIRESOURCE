@@ -5,6 +5,8 @@
  * the plant's own list; Empty / Half Full / Loaded, what is on it and notes save on their own; Left the Lot takes it off and
  * a trailer coming back keeps its history. Pictures go to SHOTS_DIR.
  * Joe 11/1 (mock-up 2): Trailer Company then Unit; What is on it and Location drop-downs; Edit Lists with United Dairy protected.
+ * Joe 11/3 (mock-up 2): Supplier; every United Dairy dry box trailer listed (NOT HERE); Edit for the location; our number typed;
+ * products from Suppliers & Products with how many; no All trailers; capitals.
  */
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -46,6 +48,11 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
   await db().collection('config').doc('app').set({ writeBack: { enabled: true } }, { merge: true });
   await unit('veh_trailer_t_601', 'T-601', 'Uniontown PA Branch', 'External Fleet: 2016 | UTILITY | 53 Ft');
   await unit('veh_trailer_t_602', 'T-602', 'Uniontown PA Branch', 'External Fleet: 2014 | GREAT DANE | Refrigerated');
+  await unit('veh_trailer_t_980', 'T-980', 'Uniontown PA Branch', 'External Fleet: 2018 | UTILITY | 53 Ft');
+  await unit('veh_trailer_t_985', 'T-0985', 'Uniontown PA Branch', 'External Fleet: 2018 | UTILITY | 53 Ft');
+  // Joe 11/3: what is on a trailer comes from Receiving's Suppliers & Products (made-up supplier and product).
+  await db().collection('plantJournal').doc('sup_silgan').set({ type: 'PLANT_SUPPLIER', recordId: 'sup_silgan', routeId: 'sup_silgan', runId: 'sup_silgan', notes: 'Silgan', status: 'ACTIVE', createdAt: '2026-11-01T12:00:00.000Z', recordedAt: '2026-11-01T12:00:00.000Z' });
+  await db().collection('receivingItems').doc('item_white_half').set({ name: 'WHITE 1/2 GAL JUG', supplierId: 'sup_silgan', kind: 'Packaging', unit: 'Bundles', status: 'ACTIVE' });
   await unit('veh_trailer_t_900', 'T-900', 'Charleston WV Branch', 'External Fleet: 2016 | UTILITY | 53 Ft', 'fac_charleston');
   const browser = await chromium.launch();
   const results = [];
@@ -72,115 +79,134 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await g.close();
     results.push('Plant Material Trailers is under Inventory on the Home screen\'s Shipping & Receiving card; Debag / Labeling Room is a Plant Operations department being built that opens the Labeling Room');
 
-    // Sam, on the plant floor, adds the trailers and fills them in.
-    // Joe 11/1 (mock-up 2): + Add Trailer asks for the Trailer Company first (a drop-down that starts blank), then the unit:
-    // United Dairy's from the fleet list, any other company's picked from its list or typed new.
+    // Joe 11/3 (mock-up 2): every United Dairy dry box trailer here is always on the list (NOT HERE when it is not in the lot),
+    // the company is the Supplier, Edit on each line changes where it is, + Add Trailer has the Supplier and Unit side by side
+    // (our number typed, 014 is T-14) and what is on it is a product from Suppliers & Products with how many. No All trailers.
     const p = await openPage(browser, 1536, 790, '/jug-trailers.html?testEmail=' + SAM);
-    await p.waitForSelector('#rows td.empty');
-    await p.waitForFunction(() => /No trailers in the lot yet/.test(document.querySelector('#rows').textContent));
-    assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Trailer Company', 'Unit', 'Status', 'What Is on It', 'Location']);
+    await p.waitForFunction(() => /United Dairy trailers · 0 here · 3 not here/.test(document.querySelector('#rows').textContent));
+    assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Supplier', 'Unit', 'Status', 'What Is on It', 'Location', '']);
+    assert.equal(await p.$('#show'), null, 'the All trailers drop-down is gone');
+    assert.match(await p.$eval('#products', a => a.getAttribute('href')), /^scheduler\.html\?lane=receiving&view=products/);
+    assert.equal(await p.$eval('.head h1', h => getComputedStyle(h).textTransform), 'uppercase', 'everything in capitals');
+    const rowsText = () => p.$$eval('#rows tr[data-id]', rs => rs.map(r => r.cells[1].querySelector('b').textContent + ':' + r.cells[4].textContent));
+    assert.deepEqual(await rowsText(), ['T-601:NOT HERE', 'T-980:NOT HERE', 'T-985:NOT HERE'], 'our dry box trailers here only (not the refrigerated one, not another plant\'s)');
     await p.click('#add');
     await p.waitForSelector('#add-company');
-    assert.equal(await p.$eval('#add-company', s => s.value), '', 'the company drop-down starts blank');
-    assert.deepEqual(await p.$$eval('#add-company option', o => o.map(x => x.textContent)), ['', 'United Dairy', 'BW', 'CKS', 'Compass', 'Duval', 'JD', 'Metro', '+ New trailer company…']);
-    assert.equal(await p.$('#add-unit, #add-pick, #add-number'), null, 'the unit number comes after the company');
+    assert.equal(await p.$eval('#add-company', s => s.value), '', 'the supplier drop-down starts blank');
+    assert.deepEqual(await p.$$eval('#add-company option', o => o.map(x => x.textContent)), ['', 'United Dairy', 'BW', 'CKS', 'Compass', 'Duval', 'JD', 'Metro', 'Silgan', '+ New supplier…'], 'Receiving\'s suppliers are on the list');
+    assert.ok(await p.$eval('.jt-pair', d => { const [a, b] = d.querySelectorAll('label'); return a.getBoundingClientRect().top === b.getBoundingClientRect().top; }), 'Supplier and Unit side by side');
     await p.selectOption('#add-company', 'United Dairy');
-    await p.waitForSelector('#add-unit');
-    assert.equal(await p.$eval('#add-unit', s => s.value), '', 'the drop-down starts blank');
-    const groups = await p.$$eval('#add-unit optgroup', gs => gs.map(x => [x.label, [...x.querySelectorAll('option')].map(o => o.textContent)]));
-    assert.deepEqual(groups, [['Dry box trailers', ['T-601']], ['Other United Dairy trailers', ['T-602']]], 'this plant\'s trailers only, dry boxes first');
+    await p.type('#add-number', '98');
+    await p.waitForFunction(() => [...document.querySelectorAll('#add-match button')].map(b => b.textContent).join(',') === 'T-980,T-985');
     await shot(p, '2-add-trailer-1536.png');
-    await p.selectOption('#add-unit', 'veh_trailer_t_601');
+    await p.fill('#add-number', '0985');
+    await p.waitForFunction(() => [...document.querySelectorAll('#add-match button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(',') === 'T-985*');
+    await p.fill('#add-number', '14');
+    await p.waitForFunction(() => /T-14 is not one of our/.test(document.querySelector('#add-match').textContent));
+    await p.fill('#add-number', '98');
+    await p.click('#add-match button:text-is("T-985")');
+    assert.equal(await p.$eval('#add-number', i => i.value), 'T-985');
+    assert.deepEqual(await p.$$eval('#add-item optgroup', g => g.map(x => x.label + ':' + [...x.querySelectorAll('option')].map(o => o.textContent).join('|'))),
+      ['Silgan:WHITE 1/2 GAL JUG (Bundles)', 'Other items:Clear 1/2|Clear Qt|Ferry White 1/2|White 1/2|White Qt']);
+    await p.selectOption('#add-item', 'WHITE 1/2 GAL JUG');
+    await p.waitForFunction(() => /How many Bundles/.test(document.querySelector('.jt-prod').textContent));
+    await p.fill('#add-count', '22');
+    assert.match(await p.$eval('.jt-addprod', a => a.getAttribute('href')), /view=products/, '+ Add Product opens Suppliers & Products');
     await p.click('#add-go');
-    await until(async () => { const t = await jug('fac_uniontown_T-601'); return t && t.inLot; }, 'T-601 added');
-    let t = await jug('fac_uniontown_T-601');
-    assert.equal(t.status, 'EMPTY');
-    assert.equal(t.unitedDairy, true);
-    assert.equal(t.company, 'United Dairy');
-    assert.equal(t.unit, 'T-601');
-    assert.equal(t.history[0].what, 'Came into the lot');
+    await until(async () => { const t = await jug('fac_uniontown_T-985'); return t && t.inLot; }, 'T-985 added');
+    let t = await jug('fac_uniontown_T-985');
+    assert.deepEqual([t.status, t.location, t.company, t.unit, t.unitedDairy], ['LOADED', 'UPPER LOT', 'United Dairy', 'T-985', true]);
+    assert.deepEqual(t.items, [{ item: 'WHITE 1/2 GAL JUG', pallets: '22', unit: 'Bundles' }]);
+    assert.equal(t.history[0].what, 'Came into the lot at UPPER LOT');
     assert.equal(t.history[0].by, 'Sam Ortiz');
-    assert.equal(await db().collection('equipment').doc('veh_trailer_t_601').get().then(d => Object.keys(d.data()).length), 6, 'the main trailer list is not changed');
-    // Another company's trailer: Metro, a new unit number typed.
+    assert.equal(await db().collection('equipment').doc('veh_trailer_t_985').get().then(d => Object.keys(d.data()).length), 6, 'the main trailer list is not changed');
+    await p.waitForFunction(() => /WHITE 1\/2 GAL JUG, 22 Bundles/.test(document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]').textContent));
+    results.push('Every United Dairy dry box trailer is listed (NOT HERE until it comes in); + Add Trailer: Supplier and Unit side by side, our number typed with matches to tap, a product from Suppliers & Products and how many');
+
+    // Edit on a NOT HERE line brings the trailer in; Edit to NOT HERE takes it out.
+    await p.click('#rows tr[data-id="fleet_veh_trailer_t_601"] button[data-edit]');
+    await p.waitForSelector('#rows select[data-loc]');
+    assert.deepEqual(await p.$$eval('#rows select[data-loc] option', o => o.map(x => x.textContent)), ['UPPER LOT', 'LOWER LOT', 'DEBAG', 'HOLD', 'NOT HERE']);
+    await p.selectOption('#rows select[data-loc]', 'DEBAG');
+    await shot(p, '3-edit-location-1536.png');
+    await p.click('#rows button[data-save]');
+    await until(async () => { const x = await jug('fac_uniontown_T-601'); return x && x.inLot && x.location === 'DEBAG'; }, 'T-601 in at Debag');
+    assert.equal((await jug('fac_uniontown_T-601')).status, 'EMPTY');
+    await p.waitForFunction(() => /United Dairy trailers · 2 here · 1 not here/.test(document.querySelector('#rows').textContent));
+    assert.deepEqual(await rowsText(), ['T-601:DEBAG', 'T-985:UPPER LOT', 'T-980:NOT HERE'], 'here first, NOT HERE at the bottom');
+    results.push('Edit on a line: a NOT HERE trailer comes into the lot at the place picked');
+
+    // Another supplier's trailer: Metro, typed.
     await p.click('#add');
     await p.selectOption('#add-company', 'Metro');
-    await p.waitForSelector('#add-pick');
-    assert.deepEqual(await p.$$eval('#add-pick option', o => o.map(x => x.textContent)), ['', '+ New Metro unit number…']);
-    await p.selectOption('#add-pick', '__new');
-    await p.waitForSelector('#add-number');
     await p.fill('#add-number', '5307');
     await p.click('#add-go');
     await until(async () => !!(await jug('fac_uniontown_METRO_5307')), 'Metro 5307 added');
     t = await jug('fac_uniontown_METRO_5307');
-    assert.deepEqual([t.company, t.unit, t.number, t.unitedDairy], ['Metro', '5307', 'METRO 5307', false]);
-    assert.equal((await db().collection('equipment').where('unit', '==', '5307').get()).size, 0, 'another company\'s trailer stays off the main trailer list');
+    assert.deepEqual([t.company, t.unit, t.number, t.unitedDairy, t.status, t.location], ['Metro', '5307', 'METRO 5307', false, 'EMPTY', 'UPPER LOT']);
+    assert.equal((await db().collection('equipment').where('unit', '==', '5307').get()).size, 0, 'another supplier\'s trailer stays off the main trailer list');
     const lists = () => db().collection('jugTrailerLists').doc('fac_uniontown').get().then(d => d.data());
     assert.deepEqual((await lists()).companies.find(c => c.name === 'Metro').units, ['5307'], 'the new unit number is saved on Metro\'s list');
-    await p.waitForSelector('#card h2');
-    assert.equal(await p.$eval('#card h2', h => h.textContent), 'Metro 5307');
-    // A new company, typed.
+    await p.waitForFunction(() => document.querySelector('#card h2') && document.querySelector('#card h2').textContent === 'Metro 5307');
+    // A new supplier, typed.
     await p.click('#add');
     await p.selectOption('#add-company', '__new');
     await p.fill('#add-company-new', 'Penske');
-    await p.waitForSelector('#add-number');
     await p.fill('#add-number', '88');
     await p.click('#add-go');
     await until(async () => !!(await jug('fac_uniontown_PENSKE_88')), 'Penske 88 added');
     assert.deepEqual((await lists()).companies.find(c => c.name === 'Penske').units, ['88']);
-    await p.waitForFunction(() => [...document.querySelectorAll('#rows tr[data-id]')].map(r => r.cells[0].textContent + ' ' + r.cells[1].querySelector('b').textContent).join(',') === 'United Dairy T-601,Metro 5307,Penske 88', null, { timeout: 15000 });
-    results.push('+ Add Trailer: Trailer Company first (blank drop-down), then the unit: United Dairy from the fleet list, others picked or typed; new companies and units go on their lists; the list shows United Dairy first');
+    await p.waitForFunction(() => /Other suppliers · 2 in the lot/.test(document.querySelector('#rows').textContent));
+    results.push('+ Add Trailer for other suppliers: typed; new suppliers and unit numbers go on their lists');
 
-    // Loaded, what is on it (a drop-down; a new item typed goes on its list), location, notes: each saves on its own.
-    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"]');
+    // Loaded, what is on it (products), how many, location, notes: each saves on its own.
+    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] td:first-child');
     await p.waitForFunction(() => document.querySelector('#card h2').textContent === 'Metro 5307');
     const before = await p.evaluate(() => scrollY);
     await p.click('#card button[data-status="LOADED"]');
     await until(async () => (await jug('fac_uniontown_METRO_5307')).status === 'LOADED', 'Loaded saved');
     assert.equal(await p.$eval('#lines select[data-line="item"]', s => s.value), '', 'the item drop-down starts blank');
-    assert.deepEqual(await p.$$eval('#lines select[data-line="item"] option', o => o.map(x => x.textContent)), ['', 'Clear 1/2', 'Clear Qt', 'Ferry White 1/2', 'White 1/2', 'White Qt', '+ New item…']);
-    await p.selectOption('#lines select[data-line="item"]', 'Ferry White 1/2');
-    await until(async () => JSON.stringify((await jug('fac_uniontown_METRO_5307')).items) === JSON.stringify([{ item: 'Ferry White 1/2', pallets: '' }]), 'item saved');
-    await p.fill('#lines [data-line="pallets"]', '22');
+    await p.selectOption('#lines select[data-line="item"]', 'WHITE 1/2 GAL JUG');
+    await until(async () => JSON.stringify((await jug('fac_uniontown_METRO_5307')).items) === JSON.stringify([{ item: 'WHITE 1/2 GAL JUG', pallets: '', unit: 'Bundles' }]), 'item saved');
+    await p.fill('#lines [data-line="pallets"]', '30');
     await p.keyboard.press('Tab');
-    await until(async () => JSON.stringify((await jug('fac_uniontown_METRO_5307')).items) === JSON.stringify([{ item: 'Ferry White 1/2', pallets: '22' }]), 'pallets saved');
-    await p.waitForFunction(() => document.querySelectorAll('#lines [data-line="item"]').length === 2);
-    await p.selectOption('#lines select[data-line="item"] >> nth=1', '__new');
-    await p.waitForSelector('#lines input[data-new]');
-    await p.fill('#lines input[data-new]', 'Gallon jugs');
-    await p.keyboard.press('Tab');
-    await until(async () => (await jug('fac_uniontown_METRO_5307')).items.length === 2, 'new item saved');
-    assert.ok((await lists()).items.includes('Gallon jugs'), 'a new item goes on the list');
-    await p.waitForFunction(() => document.querySelectorAll('#lines select[data-line="item"]').length === 3);
+    await until(async () => JSON.stringify((await jug('fac_uniontown_METRO_5307')).items) === JSON.stringify([{ item: 'WHITE 1/2 GAL JUG', pallets: '30', unit: 'Bundles' }]), 'how many saved');
+    await p.waitForFunction(() => document.querySelectorAll('#lines select[data-line="item"]').length === 2);
+    await p.selectOption('#lines select[data-line="item"] >> nth=1', 'Clear Qt');
+    await until(async () => (await jug('fac_uniontown_METRO_5307')).items.length === 2, 'second item saved');
     await p.fill('#card [data-notes]', 'Back row by the fence');
     await p.keyboard.press('Tab');
     await until(async () => (await jug('fac_uniontown_METRO_5307')).notes === 'Back row by the fence', 'notes saved');
     t = await jug('fac_uniontown_METRO_5307');
-    assert.deepEqual(t.history.map(h => h.what), ['What is on it changed', 'Loaded', 'Came into the lot'], 'choosing several items is one line in the history');
-    await p.selectOption('#loc', 'In Dock');
-    await until(async () => (await jug('fac_uniontown_METRO_5307')).location === 'In Dock', 'location saved');
-    assert.equal((await jug('fac_uniontown_METRO_5307')).history[0].what, 'Moved to In Dock');
+    assert.deepEqual(t.history.map(h => h.what), ['What is on it changed', 'Loaded', 'Came into the lot at UPPER LOT'], 'choosing several items is one line in the history');
+    await p.selectOption('#loc', 'LOWER LOT');
+    await until(async () => (await jug('fac_uniontown_METRO_5307')).location === 'LOWER LOT', 'location saved');
+    assert.equal((await jug('fac_uniontown_METRO_5307')).history[0].what, 'Moved to LOWER LOT');
     assert.equal(await p.evaluate(() => scrollY), before, 'saving never moves the page');
-    await p.waitForFunction(() => /Ferry White 1\/2, 22 pallets; Gallon jugs/.test(document.querySelector('#rows').textContent) && /In Dock/.test(document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]').textContent));
-    await p.click('#rows tr[data-id="fac_uniontown_T-601"]');
+    await p.waitForFunction(() => /WHITE 1\/2 GAL JUG, 30 Bundles; Clear Qt/.test(document.querySelector('#rows').textContent) && /LOWER LOT/.test(document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]').textContent));
+    await p.click('#rows tr[data-id="fac_uniontown_T-601"] td:first-child');
     await p.click('#card button[data-status="HALF"]');
     await until(async () => (await jug('fac_uniontown_T-601')).status === 'HALF', 'Half Full saved');
-    await p.waitForFunction(() => /3\s*trailers in the lot/.test(document.querySelector('#sum').textContent) && /1\s*Loaded/.test(document.querySelector('#sum').textContent) && /1\s*Half Full/.test(document.querySelector('#sum').textContent));
-    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"]');
+    await p.waitForFunction(() => /4\s*trailers in the lot/.test(document.querySelector('#sum').textContent) && /2\s*Loaded/.test(document.querySelector('#sum').textContent) && /1\s*Half Full/.test(document.querySelector('#sum').textContent) && /1\s*United Dairy not here/.test(document.querySelector('#sum').textContent));
+    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] td:first-child');
     await p.waitForTimeout(600);
     assert.equal(await p.$eval('.notice.error', n => n.hidden), true, 'no error');
     assert.equal(await p.$('.mach-saved, .saved-msg'), null, 'no saved message');
     const font = await p.$$eval('#rows td, #card input, #card select, #card button, #card li, .jt-sum span', els => Math.min(...els.map(x => parseFloat(getComputedStyle(x).fontSize))));
     assert.ok(font >= 16, 'text at least 16px, was ' + font);
-    await shot(p, '3-jug-trailers-1536.png');
-    results.push('Empty / Half Full / Loaded, what is on it (a drop-down; a new item typed goes on the list), location and notes save on their own; the list and the counts follow');
+    await shot(p, '4-jug-trailers-1536.png');
+    results.push('Empty / Half Full / Loaded, what is on it (products with what they are counted in), how many, location and notes save on their own; the list and the counts follow');
 
-    // A trailer saved before 11/1 ("CKS 4737", "White Qt IN DOCK") reads as CKS / 4737, White Qt, In Dock.
+    // Trailers saved before: "CKS 4737" with "White Qt IN DOCK" reads as CKS / 4737, White Qt, In Dock; our "822" is T-822.
     await db().collection('jugTrailers').doc('fac_uniontown_CKS_4737').set({ facilityId: 'fac_uniontown', number: 'CKS 4737', status: 'HALF', inLot: true, unitedDairy: false, items: [{ item: 'White Qt IN DOCK', pallets: '' }], notes: '', history: [] });
+    await db().collection('jugTrailers').doc('fac_uniontown_822').set({ facilityId: 'fac_uniontown', number: '822', status: 'EMPTY', inLot: true, unitedDairy: true, items: [{ item: 'Ferry White 1/2', pallets: '' }], location: 'In the Lot', notes: '', history: [] });
     await p.waitForSelector('#rows tr[data-id="fac_uniontown_CKS_4737"]');
-    assert.deepEqual(await p.$eval('#rows tr[data-id="fac_uniontown_CKS_4737"]', r => [...r.cells].map(c => c.textContent)), ['CKS', 'CKS4737Half Full', 'Half Full', 'White Qt', 'In Dock']);
-    results.push('Trailers saved before: "CKS 4737" reads as CKS / 4737, and IN DOCK moves to the Location');
+    assert.deepEqual(await p.$eval('#rows tr[data-id="fac_uniontown_CKS_4737"]', r => [...r.cells].map(c => c.textContent)), ['CKS', 'CKS4737Half FullWhite Qt', 'Half Full', 'White Qt', 'In Dock', 'Edit']);
+    await p.waitForSelector('#rows tr[data-id="fac_uniontown_822"]');
+    assert.equal(await p.$eval('#rows tr[data-id="fac_uniontown_822"] td:nth-child(2) b', b => b.textContent), 'T-822');
+    results.push('Trailers saved before: "CKS 4737" reads as CKS / 4737 with IN DOCK as the Location; our "822" reads as T-822');
 
-    // Edit Lists: United Dairy is protected; a company or unit with a trailer in the lot waits until it leaves.
+    // Edit Lists: United Dairy is protected; a company or unit with a trailer in the lot waits until it leaves; the four places stay.
     await p.click('#edit-lists');
     await p.waitForSelector('#card .jt-co');
     const row = (name) => p.$eval('#card .jt-co:has(> b:text-is("' + name + '"))', r => ({ text: r.textContent, dels: [...r.querySelectorAll('.jt-del')].map(b => b.textContent) }));
@@ -189,6 +215,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.match(ud.text, /Protected/);
     assert.deepEqual((await row('CKS')).dels, [], 'CKS 4737 is in the lot, so neither it nor CKS can be deleted yet');
     assert.deepEqual((await row('Duval')).dels, ['Delete Duval']);
+    assert.equal(await p.$('#card .jt-del[data-list="location"][data-value="DEBAG"]'), null, 'the four places stay');
     await shot(p, '5-edit-lists-1536.png');
     await p.click('#card .jt-del[data-list="company"][data-value="Duval"]');
     await until(async () => !(await lists()).companies.some(c => c.name === 'Duval'), 'Duval deleted');
@@ -198,40 +225,49 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.waitForSelector('#card .jt-del[data-list="unit"][data-value="3113"]');
     await p.click('#card .jt-del[data-list="unit"][data-value="3113"]');
     await until(async () => (await lists()).companies.find(c => c.name === 'Compass').units.length === 0, 'Compass 3113 deleted');
-    assert.equal(await p.$('#card .jt-del[data-list="item"][data-value="Ferry White 1/2"]'), null, 'an item on a trailer in the lot waits');
-    await p.click('#card .jt-del[data-list="item"][data-value="Clear Qt"]');
-    await until(async () => !(await lists()).items.includes('Clear Qt'), 'Clear Qt deleted');
+    assert.equal(await p.$('#card .jt-del[data-list="item"][data-value="Clear Qt"]'), null, 'an item on a trailer in the lot waits');
+    await p.click('#card .jt-del[data-list="item"][data-value="White 1/2"]');
+    await until(async () => !(await lists()).items.includes('White 1/2'), 'White 1/2 deleted');
     await p.fill('#card [data-add-list="location"]', 'Back Fence');
     await p.click('#card [data-add-go="location"]');
     await until(async () => (await lists()).locations.includes('Back Fence'), 'location added');
     await p.click('#lists-done');
     await p.waitForSelector('#card .jt-big');
-    results.push('Edit Lists: add and delete companies, units, items and locations; United Dairy is protected; anything a trailer in the lot uses waits until it leaves');
+    results.push('Edit Lists: add and delete suppliers, units, items and locations; United Dairy and the four places are protected; anything a trailer in the lot uses waits until it leaves');
 
-    // Left the Lot, then the trailer comes back with its history; the same trailer twice is refused.
-    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"]');
-    await p.click('#left');
-    await until(async () => (await jug('fac_uniontown_METRO_5307')).inLot === false, 'left the lot');
+    // Edit to NOT HERE: our trailer goes back to NOT HERE, another supplier's leaves the list; it comes back with its history.
+    await p.click('#rows tr[data-id="fac_uniontown_T-985"] button[data-edit]');
+    await p.selectOption('#rows select[data-loc]', 'NOT HERE');
+    await p.click('#rows button[data-save]');
+    await until(async () => (await jug('fac_uniontown_T-985')).inLot === false, 'T-985 left');
+    await p.waitForFunction(() => /NOT HERE/.test(document.querySelector('#rows tr[data-id="fleet_veh_trailer_t_985"]') ? document.querySelector('#rows tr[data-id="fleet_veh_trailer_t_985"]').textContent : ''));
+    await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] button[data-edit]');
+    await p.selectOption('#rows select[data-loc]', 'NOT HERE');
+    await p.press('#rows select[data-loc]', 'Enter');
+    await until(async () => (await jug('fac_uniontown_METRO_5307')).inLot === false, 'Metro left the lot');
     await p.waitForFunction(() => !document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]'));
     await p.click('#add');
     await p.selectOption('#add-company', 'Metro');
-    await p.selectOption('#add-pick', '5307');
+    assert.deepEqual(await p.$$eval('#add-units option', o => o.map(x => x.value)), ['5307'], 'Metro\'s unit numbers to pick from');
+    await p.fill('#add-number', '5307');
     await p.click('#add-go');
     await until(async () => (await jug('fac_uniontown_METRO_5307')).inLot === true, 'came back');
     t = await jug('fac_uniontown_METRO_5307');
     assert.equal(t.status, 'EMPTY');
     assert.deepEqual(t.items, []);
-    assert.equal(t.location, '');
-    assert.deepEqual(t.history.slice(0, 2).map(h => h.what), ['Came into the lot', 'Left the lot']);
+    assert.deepEqual(t.history.slice(0, 2).map(h => h.what), ['Came into the lot at UPPER LOT', 'Left the lot']);
     await p.click('#add');
     await p.selectOption('#add-company', 'Metro');
-    assert.deepEqual(await p.$$eval('#add-pick option', o => o.map(x => x.textContent)), ['', '+ New Metro unit number…'], 'a trailer in the lot is left off');
-    await p.selectOption('#add-pick', '__new');
     await p.fill('#add-number', '5307');
     await p.click('#add-go');
     await p.waitForFunction(() => /already on the list/.test(document.querySelector('#error').textContent));
     await p.click('#add-cancel');
-    results.push('Left the Lot takes a trailer off the list; it comes back with its history; the same trailer twice is refused');
+    // Left the Lot on the card still works; our trailer goes back to NOT HERE.
+    await p.click('#rows tr[data-id="fac_uniontown_T-601"] td:first-child');
+    await p.click('#left');
+    await until(async () => (await jug('fac_uniontown_T-601')).inLot === false, 'T-601 left');
+    await p.waitForFunction(() => document.querySelector('#card h2').textContent === 'United Dairy T-601' && /NOT HERE/.test(document.querySelector('#card').textContent));
+    results.push('Edit to NOT HERE (or Left the Lot) takes a trailer out; ours stays listed as NOT HERE; another supplier\'s comes back with its history; the same trailer twice is refused');
     assert.deepEqual(p.errors, []);
     await p.close();
 

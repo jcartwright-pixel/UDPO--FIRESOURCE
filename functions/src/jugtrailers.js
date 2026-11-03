@@ -11,6 +11,9 @@
  *                 op 'list' : Joe 11/1: add to or delete from the plant's lists (jugTrailerLists): trailer companies and their
  *                             unit numbers, what is on it, locations. United Dairy is protected; nothing a trailer in the lot
  *                             uses can be deleted until it leaves. Rules shared with the screen: jug-rules.js.
+ * Joe 11/3 (mock-up 2): op 'add' also takes where it is parked (location, UPPER LOT when none) and what is on it (items: a
+ * product from Suppliers & Products, how many, and what it is counted in); a trailer that comes in with something on it is
+ * Loaded. NOT HERE is not a location: a trailer that is not here has left the lot (op 'left').
  */
 'use strict';
 
@@ -28,12 +31,32 @@ const plantIds = () => (L.PLANTS || []).map(p => p.id);
 // The trailer number as the lot writes it: capitals, no spaces at the ends, inner spaces kept single.
 const trailerNumber = (v) => text(v).toUpperCase().replace(/\s+/g, ' ').slice(0, 20);
 
-const NAME_OK = /^[A-Za-z0-9][A-Za-z0-9 &.,'\/-]*$/;
+const NAME_OK = /^[A-Za-z0-9][A-Za-z0-9 &.,'\/()#-]*$/;
 function listText(v, what, max, SaveError) {
   const t = J.text(v).slice(0, max);
   if (!t) throw new SaveError('BAD_REQUEST', 'Type the ' + what + '.');
   if (!NAME_OK.test(t)) throw new SaveError('BAD_REQUEST', 'The ' + what + ' has only letters, numbers, spaces and . , & / - \'.');
   return t;
+}
+
+// What is on a trailer: each line's item, how many (kept as pallets, its name before 11/3) and what it is counted in.
+function itemLines(list, SaveError) {
+  if (!Array.isArray(list)) throw new SaveError('BAD_REQUEST', 'Send what is on the trailer as a list.');
+  const out = list.map(x => {
+    const line = { item: J.text(x && x.item).slice(0, 80), pallets: text(x && x.pallets).slice(0, 10) }, unit = J.text(x && x.unit).slice(0, 20);
+    if (unit) line.unit = unit;
+    return line;
+  }).filter(x => x.item || x.pallets);
+  if (out.length > MAX_LINES) throw new SaveError('BAD_REQUEST', 'A trailer holds at most ' + MAX_LINES + ' lines.');
+  if (out.some(x => x.pallets && !/^\d{1,5}$/.test(x.pallets))) throw new SaveError('BAD_REQUEST', 'How many is a whole number.');
+  if (out.some(x => x.item && !NAME_OK.test(x.item))) throw new SaveError('BAD_REQUEST', 'An item has only letters, numbers, spaces and . , & / - \' ( ) #.');
+  if (out.some(x => x.unit && !/^[A-Za-z ]+$/.test(x.unit))) throw new SaveError('BAD_REQUEST', 'What it is counted in has only letters.');
+  return out;
+}
+function locationOf(v, SaveError) {
+  if (!J.text(v)) return '';
+  if (J.same(v, J.NOT_HERE)) throw new SaveError('BAD_REQUEST', 'A trailer that is not here has left the lot: press Left the Lot.');
+  return listText(v, 'location', 40, SaveError);
 }
 
 function validateJugTrailer(input, SaveError) {
@@ -45,12 +68,14 @@ function validateJugTrailer(input, SaveError) {
   if (op === 'add') {
     // Joe 11/1: the Trailer Company first, then the Unit number. United Dairy's units are picked from the fleet list
     // (equipmentId); any other company's unit is picked or typed (a number typed on its own is still taken, as before 11/1).
+    out.location = input.location !== undefined ? locationOf(input.location, SaveError) : '';
+    out.items = input.items !== undefined ? itemLines(input.items, SaveError) : [];
     out.equipmentId = text(input.equipmentId).slice(0, 120);
     if (out.equipmentId) return out;
-    out.company = text(input.company) ? listText(input.company, 'trailer company', 40, SaveError) : '';
+    out.company = text(input.company) ? listText(input.company, 'supplier', 40, SaveError) : '';
     if (out.company && J.same(out.company, J.UD)) throw new SaveError('BAD_REQUEST', 'Pick the United Dairy unit number from the fleet list.');
     out.unit = trailerNumber(input.unit !== undefined ? input.unit : input.number);
-    if (!out.unit) throw new SaveError('BAD_REQUEST', out.company ? 'Pick or type the unit number.' : 'Pick the trailer company, then the unit number.');
+    if (!out.unit) throw new SaveError('BAD_REQUEST', out.company ? 'Type the unit number.' : 'Pick the supplier, then the unit number.');
     if (!/^[A-Z0-9 -]+$/.test(out.unit)) throw new SaveError('BAD_REQUEST', 'A unit number has only letters, numbers and dashes.');
     return out;
   }
@@ -60,12 +85,12 @@ function validateJugTrailer(input, SaveError) {
     if (['company', 'unit', 'item', 'location'].indexOf(out.list) < 0) throw new SaveError('BAD_REQUEST', 'Pick a list.');
     out.change = text(input.change).toLowerCase();
     if (['add', 'delete'].indexOf(out.change) < 0) throw new SaveError('BAD_REQUEST', 'Add or delete.');
-    const what = { company: 'trailer company', unit: 'unit number', item: 'item', location: 'location' }[out.list];
+    const what = { company: 'supplier', unit: 'unit number', item: 'item', location: 'location' }[out.list];
     out.value = out.list === 'unit' ? trailerNumber(input.value) : listText(input.value, what, out.list === 'item' ? 80 : 40, SaveError);
     if (out.list === 'unit') {
       if (!out.value) throw new SaveError('BAD_REQUEST', 'Type the unit number.');
       if (!/^[A-Z0-9 -]+$/.test(out.value)) throw new SaveError('BAD_REQUEST', 'A unit number has only letters, numbers and dashes.');
-      out.company = listText(input.company, 'trailer company', 40, SaveError);
+      out.company = listText(input.company, 'supplier', 40, SaveError);
     }
     if ((out.list === 'company' || out.list === 'unit') && J.same(out.list === 'company' ? out.value : out.company, J.UD)) throw new SaveError('BAD_REQUEST', 'United Dairy is protected; its unit numbers come from the fleet list.');
     return out;
@@ -79,14 +104,8 @@ function validateJugTrailer(input, SaveError) {
     out.fields.status = text(f.status).toUpperCase();
     if (STATUSES.indexOf(out.fields.status) < 0) throw new SaveError('BAD_REQUEST', 'Pick Empty, Half Full or Loaded.');
   }
-  if (f.items !== undefined) {
-    if (!Array.isArray(f.items)) throw new SaveError('BAD_REQUEST', 'Send what is on the trailer as a list.');
-    out.fields.items = f.items.map(x => ({ item: J.text(x && x.item).slice(0, 80), pallets: text(x && x.pallets).slice(0, 10) })).filter(x => x.item || x.pallets);
-    if (out.fields.items.length > MAX_LINES) throw new SaveError('BAD_REQUEST', 'A trailer holds at most ' + MAX_LINES + ' lines.');
-    if (out.fields.items.some(x => x.pallets && !/^\d{1,4}$/.test(x.pallets))) throw new SaveError('BAD_REQUEST', 'Pallets is a whole number.');
-    if (out.fields.items.some(x => x.item && !NAME_OK.test(x.item))) throw new SaveError('BAD_REQUEST', 'An item has only letters, numbers, spaces and . , & / - \'.');
-  }
-  if (f.location !== undefined) out.fields.location = J.text(f.location) ? listText(f.location, 'location', 40, SaveError) : '';
+  if (f.items !== undefined) out.fields.items = itemLines(f.items, SaveError);
+  if (f.location !== undefined) out.fields.location = locationOf(f.location, SaveError);
   if (f.notes !== undefined) out.fields.notes = text(f.notes).slice(0, 500);
   if (!Object.keys(out.fields).length) throw new SaveError('BAD_REQUEST', 'Nothing to save.');
   return out;
@@ -118,7 +137,7 @@ async function saveJugTrailer(tx, db, req, email, stamp, logRef, mode, SaveError
   const companyIn = (name) => { let c = lists.companies.find(x => J.same(x.name, name)); if (!c) { c = { name: J.companyName(name), units: [] }; lists.companies.push(c); } return c; };
   let ref = null, before = null, after = null;
   if (req.op === 'list') {
-    const one = { company: 'trailer company', unit: 'unit number', item: 'item', location: 'location' }[req.list];
+    const one = { company: 'supplier', unit: 'unit number', item: 'item', location: 'location' }[req.list];
     if (req.change === 'delete') {
       const why = J.deleteBlock(req.list, req.value, req.company, lot, names());
       if (why) throw new SaveError('CONFLICT', why);
@@ -139,11 +158,12 @@ async function saveJugTrailer(tx, db, req, email, stamp, logRef, mode, SaveError
     // A United Dairy trailer must still be on the main trailer list; its number comes from there.
     let company, unit, equipmentId = '';
     if (req.equipmentId) {
+      // Joe 11/3: our trailers are matched by number the one way (T-822 is the trailer saved as 822 before).
       const fleet = await tx.get(db.collection('equipment').doc(docId(req.equipmentId)));
       if (!fleet.exists || text(fleet.data().type).toUpperCase() !== 'TRAILER') throw new SaveError('NOT_FOUND', 'That trailer is not on the main trailer list.');
       equipmentId = fleet.id;
       company = J.UD;
-      unit = trailerNumber(fleet.data().unit);
+      unit = J.udUnit(fleet.data().unit);
     } else if (req.company) {
       const c = companyIn(req.company);
       company = c.name;
@@ -159,10 +179,12 @@ async function saveJugTrailer(tx, db, req, email, stamp, logRef, mode, SaveError
     ref = db.collection('jugTrailers').doc(docId(req.facilityId + '_' + number));
     const had = await tx.get(ref);
     before = had.exists ? had.data() : null;
+    const twin = J.same(company, J.UD) && lot.find(x => x.id !== ref.id && J.parts(x, names()).unitedDairy && J.same(J.parts(x, names()).unit, unit));
+    if (twin) throw new SaveError('CONFLICT', 'Trailer ' + unit + ' is already on the list.');
     if (before && before.inLot) throw new SaveError('CONFLICT', 'Trailer ' + (J.same(company, J.UD) ? '' : company + ' ') + unit + ' is already on the list.');
     after = Object.assign({ facilityId: req.facilityId, createdAt: stamp, createdBy: email }, before || {}, {
-      number, company, unit, equipmentId, unitedDairy: !!equipmentId || J.same(company, J.UD), inLot: true, status: 'EMPTY', items: [], notes: '', location: '', arrivedAt: stamp,
-      history: said(before && before.history, stamp, by, 'Came into the lot'), updatedAt: stamp, updatedBy: email, testEdited: true
+      number, company, unit, equipmentId, unitedDairy: !!equipmentId || J.same(company, J.UD), inLot: true, status: req.items && req.items.length ? 'LOADED' : 'EMPTY', items: req.items || [], notes: '', location: req.location || 'UPPER LOT', arrivedAt: stamp,
+      history: said(before && before.history, stamp, by, 'Came into the lot' + (req.location ? ' at ' + req.location : '')), updatedAt: stamp, updatedBy: email, testEdited: true
     });
   } else {
     ref = db.collection('jugTrailers').doc(req.trailerId);
@@ -178,8 +200,8 @@ async function saveJugTrailer(tx, db, req, email, stamp, logRef, mode, SaveError
       after.history = said(before.history, stamp, by, 'Left the lot');
     } else {
       Object.assign(after, req.fields);
-      // A new item or location typed on a trailer goes on its list for the next person.
-      (req.fields.items || []).forEach(x => addTo(lists.items, x.item));
+      // A new location typed on a trailer goes on its list for the next person. Joe 11/3: new items are added on Suppliers &
+      // Products, so what is on a trailer is not copied to the plant's own list.
       addTo(lists.locations, req.fields.location);
       if (req.fields.status && req.fields.status !== before.status) after.history = said(before.history, stamp, by, STATUS_NAME[req.fields.status]);
       else if (req.fields.items !== undefined && JSON.stringify(req.fields.items) !== JSON.stringify(p.items)) after.history = said(before.history, stamp, by, 'What is on it changed');
