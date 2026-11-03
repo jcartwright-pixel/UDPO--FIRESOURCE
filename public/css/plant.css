@@ -1857,3 +1857,44 @@ a.wp-more { color: var(--ud-blue); }
 /* Joe 11-2-26 (timing-rules.js): a load past its leaving time, yellow up to 60 minutes, red after. */
 .plant-page td.dep-caution { background: #f5c518; color: #1c2733; font-weight: 800; }
 .plant-page td.dep-late { background: #b42318; color: #fff; font-weight: 800; }
+
+/* Shift Notes (Joe 11-3-26): the top tiles are buttons that show their entries; each kind has its history under the entry boxes;
+   the entries read in bigger print; the side buttons' words take the status color. */
+.shift-page .hstats button { min-width: 86px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px; text-align: center; font: inherit; cursor: pointer; color: inherit; }
+.shift-page .hstats button:hover { border-color: var(--ud-blue); box-shadow: 0 0 0 1px var(--ud-blue) inset; }
+.shift-page .hstats button.on { background: var(--ud-blue); border-color: var(--ud-blue); }
+.plant-page.shift-page .hstats button.on b, .plant-page.shift-page .hstats button.on span { color: #fff; }
+.plant-page.shift-page .hstats .warn b { color: var(--pill-red-ink); }
+@media (max-width: 1700px) { .shift-page .hstats button { padding: 5px 8px; } }
+.shift-page .qc-lines button.k-red:not(.active) small { color: var(--pill-red-ink); }
+.shift-page .qc-lines button.k-amber:not(.active) small { color: var(--pill-amber-ink); }
+.shift-page .qc-lines button.k-green:not(.active) small { color: var(--pill-green-ink); }
+.shift-page .qc-lines button.active.k-red { box-shadow: inset 6px 0 0 #c62828; }
+.shift-page .sn-hhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.shift-page .sn-hhead h2 { margin: 0; }
+.shift-page .sn-hhead .why { color: var(--muted); font-weight: 700; }
+.shift-page .sn-hhead .qc-btn { margin-left: auto; }
+.shift-page .sn-card-head strong { font-size: 19px; }
+.shift-page .sn-facts { color: var(--muted); font-weight: 700; }
+.shift-page .sn-card p b { color: var(--ud-blue-dark); }
+.shift-page .sn-review small { display: inline; }
+.shift-page .sn-addreview { align-items: center; }
+.shift-page .sn-addreview span { font-weight: 800; color: var(--ud-blue-dark); white-space: nowrap; }
+.shift-page .sn-fixlab { display: flex; align-items: center; gap: 8px; flex: 1; font-weight: 800; }
+.shift-page .sn-fixlab input { flex: 1; }
+.shift-page .sn-past { margin-top: 22px; padding-top: 14px; border-top: 2px solid var(--line); }
+.shift-page .sn-past .sn-sec .qc-btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.shift-page .sn-tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.shift-page .sn-past-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.shift-page .sn-past-table th { position: sticky; top: 0; background: var(--band); color: var(--ud-blue-dark); text-align: left; font-weight: 900; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.shift-page .sn-past-table td { padding: 8px 10px; border-bottom: 1px solid #e3eaf1; vertical-align: top; text-align: left; background: #fff; }
+.shift-page .sn-past-table td { white-space: nowrap; }
+.shift-page .sn-past-table td.wrap { white-space: normal; min-width: 180px; }
+.shift-page .sn-past-table tbody tr:nth-child(even) td { background: #f8fafc; }
+.shift-page .sn-past-table tr.sn-r-open td:first-child { box-shadow: inset 4px 0 0 #c62828; }
+.shift-page .sn-past-table tr.sn-r-mon td:first-child { box-shadow: inset 4px 0 0 #e5891a; }
+.shift-page .sn-past-table tr.sn-r-done td:first-child { box-shadow: inset 4px 0 0 #1f9d55; }
+.shift-page .sn-past-table td small { display: block; color: var(--muted); font-weight: 600; }
+.shift-page .sn-past-table .sn-pill { white-space: nowrap; }
+.shift-page .sn-red { color: var(--pill-red-ink); }
+.shift-page .sn-none { color: #9aa8b5; }
