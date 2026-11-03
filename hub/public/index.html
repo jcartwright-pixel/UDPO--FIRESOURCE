@@ -46,7 +46,8 @@ function tile(key, url, name, note, newTab) {
     '<span class="app-icon">' + look.icon + '</span><span class="app-text"><strong>' + e(name) + '</strong><span>' + e(note) + '</span></span>' +
     '<span class="app-open">Open' + (newTab ? ' <span aria-hidden="true">&#8599;</span><span class="sr">(opens in a new tab)</span>' : ' <span aria-hidden="true">&rarr;</span>') + '</span></a>';
 }
-document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open', false).replace('data-app="people"', 'data-admin="people"');
+document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open', false).replace('data-app="people"', 'data-admin="people"') +
+  tile('roles', 'roles.html', 'Roles & Rights', 'What each role, like Manager or Supervisor, may do in Plant & Distribution', false).replace('data-app="roles"', 'data-admin="roles"');
 function showInstall() { document.getElementById('install-box').hidden = installed() || !canInstall(); }
 document.addEventListener('hub-installable', showInstall);
 document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };

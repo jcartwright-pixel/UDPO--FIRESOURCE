@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const { db, clear, localCalls, localAdmin } = require('../helpers.cjs');
+const R = require('../../../../functions/src/rights');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
@@ -45,6 +46,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await shot(p, 'hub-admin-390');
 
     assert.ok(await p.isVisible('a[data-admin="people"]'), 'an administrator sees People & Access on Home');
+    assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -119,10 +121,52 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'People & Access: no sideways scroll on a phone');
     await shot(p, 'hub-people-390');
 
+    // Roles & Rights: tick Approve vacations for Supervisor, untick it again, then add a role copied from Dispatcher.
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'roles.html');
+    await p.waitForSelector('#rows input[data-role]');
+    const box = (role, code) => '#rows input[data-role="' + role + '"][data-right="' + code + '"]';
+    assert.ok(await p.isDisabled(box('ADMINISTRATOR', 'dispatch.read')) && await p.isChecked(box('ADMINISTRATOR', 'dispatch.read')), 'Administrator is locked with everything');
+    assert.equal(await p.$$eval('#rows input[data-right^="admin."]', b => b.length), 0, 'Administrator-only rights are not offered');
+    assert.match(await p.textContent('#head th[data-role="MANAGER"]'), /1 person/);
+    const supervisorHad = await p.isChecked(box('SUPERVISOR', 'vacations.approve'));
+    await p.click(box('SUPERVISOR', 'vacations.approve'));
+    await p.waitForSelector('#msg.good');
+    assert.match(await p.textContent('#msg'), supervisorHad ? /Supervisor can no longer: Approve vacations/ : /Supervisor can now: Approve vacations/);
+    let tpl = (await db().collection('private').doc('roleTemplates').get()).data();
+    assert.equal(tpl.templates.SUPERVISOR.indexOf('vacations.approve') >= 0, !supervisorHad);
+    assert.ok(await p.isVisible('#head button[data-standard="SUPERVISOR"]'), 'a changed role can go back to standard');
+    // Two quick ticks in a row both save (each from what the last one left).
+    await p.click(box('SUPERVISOR', 'otr.read'));
+    await p.click(box('SUPERVISOR', 'gps.read'));
+    await p.waitForFunction(() => /GPS/.test(document.querySelector('#msg').textContent));
+    tpl = (await db().collection('private').doc('roleTemplates').get()).data();
+    const had = (c) => (R.DEFAULTS.SUPERVISOR || []).indexOf(c) >= 0;
+    assert.equal(tpl.templates.SUPERVISOR.indexOf('otr.read') >= 0, !had('otr.read'), 'first quick tick kept');
+    assert.equal(tpl.templates.SUPERVISOR.indexOf('gps.read') >= 0, !had('gps.read'), 'second quick tick saved');
+    await shot(p, 'hub-roles-1920');
+    await p.click('#head button[data-standard="SUPERVISOR"]');
+    await p.waitForFunction(() => /back to its standard/.test(document.querySelector('#msg').textContent));
+    tpl = (await db().collection('private').doc('roleTemplates').get()).data();
+    assert.equal(tpl.templates.SUPERVISOR, undefined, 'Use standard drops the saved list');
+    await p.click('#add');
+    await p.fill('#new-name', 'Route Planner');
+    await p.selectOption('#new-from', 'DISPATCHER');
+    await p.click('#new-save');
+    await p.waitForSelector('#head th[data-role="ROUTE_PLANNER"]');
+    assert.ok(await p.isChecked(box('ROUTE_PLANNER', 'dispatch.write')), 'the new role starts with Dispatcher\'s ticks');
+    assert.ok(await p.isHidden('#add-form'));
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'roles.html');
+    await p.waitForSelector('#rows input[data-role]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Roles & Rights: no sideways page scroll on a phone');
+    await shot(p, 'hub-roles-390');
+
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'roles.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'people.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);

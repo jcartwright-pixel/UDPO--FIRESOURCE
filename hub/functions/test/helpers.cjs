@@ -36,7 +36,7 @@ async function localCalls(ctx) {
 }
 
 /*
- * Operations' own admin call (people, savePerson, setHomeScreen) stands in here as a small copy with the same answers, so the hub's browser
+ * Operations' own admin call (people, savePerson, setHomeScreen, roleTemplates, saveRoleTemplate, addRole) stands in here as a small copy with the same answers, so the hub's browser
  * tests need no Operations server. Operations' tests cover the real one.
  */
 // The screens, jobs, rights and role defaults are Operations' own (functions/src/logic.js, rights.js), so the hub is tested
@@ -66,6 +66,31 @@ async function fakeAdmin(email, data) {
     if (data.page && !L.homeChoices(p, p.screenAccess || null).some(c => c.page === data.page)) throw Object.assign(new Error('That screen is not one this person can see.'), { status: 'INVALID_ARGUMENT' });
     await ref.set({ homeScreen: data.page, updatedAt: new Date().toISOString() }, { merge: true });
     return { ok: true, email: data.email, homeScreen: data.page };
+  }
+  // Role Templates, kept as Operations keeps them (private/roleTemplates: templates, customRoles), with its CHANGED check.
+  const tplRef = db().collection('private').doc('roleTemplates');
+  const tplOf = async () => { const d = (await tplRef.get()).data() || {}; return { templates: d.templates || {}, customRoles: d.customRoles || [] }; };
+  if (data.op === 'roleTemplates') {
+    const t = await tplOf();
+    return { catalog: R.CATALOG, roles: ROLES.concat(t.customRoles), defaults: R.DEFAULTS, templates: t.templates, meta: {} };
+  }
+  if (data.op === 'saveRoleTemplate') {
+    const t = await tplOf(), role = R.normRole(data.role);
+    if (role === 'ADMINISTRATOR') throw Object.assign(new Error('Administrator has protected full access.'), { status: 'PERMISSION_DENIED' });
+    if (JSON.stringify((data.expected || []).slice().sort()) !== JSON.stringify(R.templateFor(role, t.templates).slice().sort())) throw Object.assign(new Error('Someone changed this role since you opened it. Reload before saving.'), { status: 'ABORTED' });
+    const ordered = R.CATALOG.map(c => c.code).filter(c => (data.rights || []).indexOf(c) >= 0);
+    if (JSON.stringify(ordered) === JSON.stringify(R.CATALOG.map(c => c.code).filter(c => (R.DEFAULTS[role] || []).indexOf(c) >= 0))) delete t.templates[role];
+    else t.templates[role] = ordered;
+    await tplRef.set(t);
+    return { ok: true, message: 'Role template saved.' };
+  }
+  if (data.op === 'addRole') {
+    const t = await tplOf(), role = R.normRole(data.name).replace(/[^A-Z0-9_]/g, '');
+    if (ROLES.concat(t.customRoles).indexOf(role) >= 0) throw Object.assign(new Error('That is already a role.'), { status: 'ABORTED' });
+    t.customRoles.push(role);
+    t.templates[role] = R.CATALOG.map(c => c.code).filter(c => (data.rights || []).indexOf(c) >= 0);
+    await tplRef.set(t);
+    return { ok: true, role, message: data.name + ' added. Give it to people in People & Roles.' };
   }
   throw Object.assign(new Error('Unknown request.'), { status: 'INVALID_ARGUMENT' });
 }
