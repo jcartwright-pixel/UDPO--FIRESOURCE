@@ -51,6 +51,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="links"]'), 'and Links & Codes');
     assert.ok(await p.isVisible('a[data-admin="keys"]'), 'and Keys & Connections');
     assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
+    assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -324,6 +325,24 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('[data-plant] [data-addr]');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Email & Texts: no sideways page scroll on a phone');
     await shot(p, 'hub-email-390');
+    // Plant Setup: each set-up screen opens in Plant & Distribution on the plant picked.
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'plant-setup.html');
+    await p.waitForSelector('.lc-card[data-page="shifts.html"] a');
+    assert.equal(await p.$$eval('.lc-card', c => c.length), 7);
+    assert.match(await p.getAttribute('.lc-card[data-page="shifts.html"] a', 'href'), /\/shifts\.html$/);
+    await p.selectOption('#plant', 'fac_charleston');
+    assert.match(await p.getAttribute('.lc-card[data-page="crew.html?view=setup"] a', 'href'), /\/crew\.html\?view=setup&plant=fac_charleston$/);
+    assert.match(await p.textContent('.lc-card[data-page="uploads.html"] a'), /Open for Charleston/);
+    assert.equal(await p.getAttribute('.lc-card[data-page="uploads.html"] a', 'target'), '_blank');
+    await shot(p, 'hub-plant-setup-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'plant-setup.html');
+    await p.waitForSelector('.lc-card a');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Plant Setup: no sideways page scroll on a phone');
+    await shot(p, 'hub-plant-setup-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'plant-setup.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
+    assert.equal(await p.$$eval('.lc-card', c => c.length), 0);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'email.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);

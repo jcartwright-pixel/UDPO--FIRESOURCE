@@ -19,6 +19,7 @@ export const SCREENS = [
   { href: 'roles.html', name: 'Roles & Rights', note: 'Administrators: what each role (Manager, Supervisor, Dispatcher...) may do', admin: true },
   { href: 'links.html', name: 'Links & Codes', note: 'Administrators: the links and codes for managers, stations, tablets and drivers\' phones', admin: true },
   { href: 'email.html', name: 'Email & Texts', note: 'Administrators: who gets each email and text, and who it comes from', admin: true },
+  { href: 'plant-setup.html', name: 'Plant Setup', note: 'Administrators: each plant\'s shifts, areas, menu, schedules and new plant data', admin: true },
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];

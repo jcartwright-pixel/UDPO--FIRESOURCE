@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -148,6 +148,24 @@ screens: email.html
 !> Do not turn Sending off to stop one email. It stops every email, including the plant report and repair email.
 
 !> Do not type a customer's or a lessor's address into a plant report group. Those groups are for United Dairy people.
+
+## Plant Setup
+id: plant-setup
+screens: plant-setup.html
+
+**Plant Setup** opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
+
+1. Pick the **Plant** at the top.
+2. Press `Open for` on a screen's card. It opens in Plant & Distribution on that plant, in a new tab, so the hub stays open.
+3. Make the change there. It saves the way that screen always has.
+4. To set up another plant, come back to the hub, pick the other plant, and open the screen again.
+
+### Buttons
+- `Open for` (the plant's name): opens that set-up screen for the plant picked.
+
+> A new plant (Charleston, Martins Ferry) starts in the **Upload Center**: download the workbook, fill it in, upload it, check every row, then save.
+
+!> Do not set up one plant's screen with another plant picked. Check the plant's name on the button before you open it.
 
 ## Keys & Connections
 id: keys
