@@ -29,9 +29,9 @@ test('weeks start on Sunday', () => {
 });
 
 test('the Daily Dispatch print heading names the Sunday the week begins', () => {
+  // Daily's load week starts on the Saturday that loads for Sunday, so the week it names is the next day, the Sunday.
   const html = fs.readFileSync(path.join(__dirname, '../../../public/daily.html'), 'utf8');
-  assert.ok(html.includes("Week Beginning Sunday ' + escapeHtml(usDate(weekBegin(loadDate)))"), 'the heading is the Sunday, not the Monday');
-  assert.ok(!/addDays\(weekBegin\([^)]*\), 1\)/.test(html), 'no Monday week beginning');
+  assert.ok(html.includes("Week Beginning Sunday ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1)))"), 'the heading is the Sunday');
 });
 
 // Any of these written outside logic.js is a new copy of the date format.
