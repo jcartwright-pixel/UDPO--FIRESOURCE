@@ -48,7 +48,8 @@ function tile(key, url, name, note, newTab) {
 }
 document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open', false).replace('data-app="people"', 'data-admin="people"') +
   tile('roles', 'roles.html', 'Roles & Rights', 'What each role, like Manager or Supervisor, may do in Plant & Distribution', false).replace('data-app="roles"', 'data-admin="roles"') +
-  tile('links', 'links.html', 'Links & Codes', 'The links and codes for managers, stations, tablets and drivers\' phones', false).replace('data-app="links"', 'data-admin="links"');
+  tile('links', 'links.html', 'Links & Codes', 'The links and codes for managers, stations, tablets and drivers\' phones', false).replace('data-app="links"', 'data-admin="links"') +
+  tile('keys', 'keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each', false).replace('data-app="keys"', 'data-admin="keys"');
 function showInstall() { document.getElementById('install-box').hidden = installed() || !canInstall(); }
 document.addEventListener('hub-installable', showInstall);
 document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };

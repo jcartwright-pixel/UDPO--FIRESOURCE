@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear, localCalls, localAdmin } = require('../helpers.cjs');
+const { db, clear, localCalls, localAdmin, localKeys } = require('../helpers.cjs');
 const R = require('../../../../functions/src/rights');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
@@ -19,6 +19,7 @@ async function open(browser, email, size, page) {
   await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));
   await localCalls(ctx);
   await localAdmin(ctx);
+  await localKeys(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => { throw e; });
   await p.goto(HOSTING + '/' + (page || 'index.html') + ((page || '').indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + email);
@@ -48,6 +49,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="people"]'), 'an administrator sees People & Access on Home');
     assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
     assert.ok(await p.isVisible('a[data-admin="links"]'), 'and Links & Codes');
+    assert.ok(await p.isVisible('a[data-admin="keys"]'), 'and Keys & Connections');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -213,10 +215,49 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Links & Codes: no sideways page scroll on a phone');
     await shot(p, 'hub-links-390');
 
+    // Keys & Connections: Operations' own calls; a key is saved where it always was and never comes back to the page.
+    await db().collection('private').doc('mocreo').set({ apiKey: 'made-up-key-0000-1234', assetId: 'asset-77', savedAt: '2026-10-01T12:00:00Z', savedBy: 'pat.admin@uniteddairy.com' });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'keys.html');
+    await p.waitForSelector('.key-card[data-key="mocreo"]');
+    assert.equal(await p.$$eval('.key-card', c => c.length), 4);
+    const mocreo = await p.textContent('.key-card[data-key="mocreo"]');
+    assert.match(mocreo, /ends in 1234/);
+    assert.ok(mocreo.indexOf('made-up-key') < 0 && (await p.content()).indexOf('made-up-key') < 0, 'the saved key never reaches the page');
+    assert.match(await p.textContent('.key-card[data-key="gps"]'), /Not set up/);
+    // Save a Verizon Connect sign-in: it lands in private/gpsFleet, as Operations' GPS Setup saves it.
+    await p.click('.key-card[data-key="gps"] summary');
+    await p.fill('.key-card[data-key="gps"] [data-field="fleet"]', 'madeupfleet');
+    await p.fill('.key-card[data-key="gps"] [data-field="user"]', 'made.up.user');
+    await p.fill('.key-card[data-key="gps"] [data-field="password"]', 'made-up-password');
+    await p.click('.key-card[data-key="gps"] [data-act="save"]');
+    await p.waitForSelector('#msg.good');
+    const fleet = (await db().collection('private').doc('gpsFleet').get()).data();
+    assert.deepEqual([fleet.user, fleet.password, fleet.savedBy], ['made.up.user', 'made-up-password', 'pat.admin@uniteddairy.com']);
+    assert.ok((await p.content()).indexOf('made-up-password') < 0, 'the password box is emptied once saved');
+    // Test Connection answers in plain words (nothing reaches the outside in the tests).
+    await p.click('.key-card[data-key="mocreo"] [data-act="test"]');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /MOCREO/);
+    assert.match(await p.textContent('.key-card[data-key="mocreo"] .key-test'), /Test failed/);
+    await shot(p, 'hub-keys-1920');
+    // Remove key needs a second press.
+    await p.click('.key-card[data-key="mocreo"] [data-act="clear"]');
+    assert.ok((await db().collection('private').doc('mocreo').get()).data().apiKey, 'one press removes nothing');
+    await p.click('.key-card[data-key="mocreo"] [data-act="clear"]');
+    await p.waitForFunction(() => /key removed/.test(document.querySelector('#msg').textContent));
+    assert.equal((await db().collection('private').doc('mocreo').get()).data().apiKey, undefined);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'keys.html');
+    await p.waitForSelector('.key-card[data-key="sms"]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Keys: no sideways page scroll on a phone');
+    await shot(p, 'hub-keys-390');
+
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.equal(await p.$$eval('.key-card', c => c.length), 0, 'someone else is not shown even which keys are saved');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'links.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);
