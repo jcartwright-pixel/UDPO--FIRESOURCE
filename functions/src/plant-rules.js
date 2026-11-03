@@ -1391,7 +1391,7 @@
       var deadline = x.leaves === null ? x.shiftEnd : x.leaves, when = function (m) { return dayShort(m) + ' ' + minutesText12(((m % 1440) + 1440) % 1440); };
       var over = x.priorDay ? ' · left over from ' + leftFrom(x.loadDate) : '';
       if (x.leaves !== null && x.leaves <= f.now) lateNow.push({ id: x.id, name: name(x), area: 'CASE', lateBy: Math.max(0, x.est - x.leaves), value: 'est. ' + x.estDay + ' ' + x.estText, sub: 'Should have left ' + when(x.leaves) + over });
-      else if (x.late) miss.push({ id: x.id, name: name(x), lateBy: Math.max(0, x.est - deadline), value: spanText(x.est - deadline) + ' late', sub: (x.leaves === null ? 'Past the 6:00 AM shift end' : 'Leaves ' + when(x.leaves)) + ' · est. loaded ' + x.estDay + ' ' + x.estText + over });
+      else if (x.late) miss.push({ id: x.id, name: name(x), area: 'CASE', lateBy: Math.max(0, x.est - deadline), value: spanText(x.est - deadline) + ' late', sub: (x.leaves === null ? 'Past the 6:00 AM shift end' : 'Leaves ' + when(x.leaves)) + ' · est. loaded ' + x.estDay + ' ' + x.estText + over });
       else ok.push(x);
     });
     var last = ok.length ? Math.max.apply(null, ok.map(function (x) { return x.est; })) : null;
@@ -1406,22 +1406,30 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_AREA_BARS = false, RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
-    // How far behind is told by the trucks still to leave that will leave late (one load long overdue does not make the whole
-    // plant that far behind, Joe 11/1); only when none is still to leave, by the loads already late.
-    var worst = (t.miss.length ? t.miss : t.lateNow).reduce(function (m, x) { return Math.max(m, Number(x.lateBy) || 0); }, 0);
-    var late = t.lateNow.length + t.miss.length > 0, about = late ? Math.max(5, Math.round(worst / 5) * 5) : 0;
+    // Joe 11/3: each area (Case, Boxing, Tote, Tanker) is on time or behind on its own: a Tanker loaded on time is good
+    // even when Case is behind. How far behind is told by the area's trucks still to leave that will leave late (one load
+    // long overdue does not make the whole plant that far behind, Joe 11/1); only when none is still to leave, by the
+    // area's loads already late. Only Case has a forecast; the other areas go by their loads already late.
+    var levelOf = function (late, about) { return !late ? 'good' : about > RECAP_RED_AFTER ? 'bad' : 'warn'; };
+    var judge = function (miss, lateNow) {
+      var worst = (miss.length ? miss : lateNow).reduce(function (m, x) { return Math.max(m, Number(x.lateBy) || 0); }, 0);
+      var late = miss.length + lateNow.length > 0, about = late ? Math.max(5, Math.round(worst / 5) * 5) : 0;
+      return { late: late, behindMin: about, level: levelOf(late, about), status: late ? 'About ' + spanText(about) + ' behind' : 'On time' };
+    };
+    var inArea = function (k) { return function (x) { return (x.area || 'CASE') === k; }; };
+    var areas = (r.areas || []).filter(function (a) { return a.total > 0; }).slice().sort(function (x, y) { return RECAP_ORDER.indexOf(x.area) - RECAP_ORDER.indexOf(y.area); })
+      .map(function (a) { var j = judge(t.miss.filter(inArea(a.area)), t.lateNow.filter(inArea(a.area)));
+        return { area: a.area, name: RECAP_AREA[a.area] || a.area, total: a.total, left: a.left, late: j.late, behindMin: j.behindMin, level: j.level, status: a.left || j.late ? j.status : 'All loaded' }; });
+    var all = judge(t.miss, t.lateNow);
     var ests = (f ? f.loads : []).map(function (x) { return x.est; }).filter(function (m) { return typeof m === 'number' && isFinite(m); });
     var last = ests.length ? Math.max.apply(null, ests) : null;
-    return { loaded: total - left, left: left, total: total, late: late, behindMin: about,
-      level: !late ? 'good' : about > RECAP_RED_AFTER ? 'bad' : 'warn',
-      headline: late ? 'Running about ' + spanText(about) + ' behind' : left ? 'Everything is on time' : 'Everything is loaded',
-      status: late ? 'About ' + spanText(about) + ' behind' : left ? 'On time' : 'Everything is loaded',
-      doneBy: last === null ? '' : minutesText12(((last % 1440) + 1440) % 1440), asOf: f ? f.asOf : '',
-      areas: (r.areas || []).filter(function (a) { return a.total > 0; }).slice().sort(function (x, y) { return RECAP_ORDER.indexOf(x.area) - RECAP_ORDER.indexOf(y.area); })
-        .map(function (a) { return { area: a.area, name: RECAP_AREA[a.area] || a.area, total: a.total, left: a.left }; }) };
+    return { loaded: total - left, left: left, total: total, late: all.late, behindMin: all.behindMin, level: all.level,
+      headline: all.late ? 'Running about ' + spanText(all.behindMin) + ' behind' : left ? 'Everything is on time' : 'Everything is loaded',
+      status: all.late ? all.status : left ? 'On time' : 'Everything is loaded',
+      doneBy: last === null ? '' : minutesText12(((last % 1440) + 1440) % 1440), asOf: f ? f.asOf : '', areas: areas };
   }
   function truckCheckSummary(t) {
     return [t.lateNow.length ? t.lateNow.length + ' late now' : '', t.miss.length ? t.miss.length + (t.lateNow.length ? ' more' : '') + ' will miss ' + (t.miss.length === 1 ? 'its truck' : 'their trucks') : '',
@@ -1528,20 +1536,24 @@
     // Joe 11/3 (picture 2): the box under the banner is a short recap (shiftRecap): "19 of 38 loaded", how many are left
     // and a fill bar, then one headline (on time, or running about how far behind) and when the last load should be done.
     // No route names and no list of loads already loaded late (the routes are listed below). No cases (Joe 11/1).
+    // Joe 11/3: colors follow how far behind: green on time, yellow up to an hour, red past an hour. Each area's bar takes
+    // its own color, the big bar and the line under it take the worst area's.
+    var LEVEL = { good: { fg: GREEN, bg: '#e2f4ea', bar: GREEN }, warn: { fg: '#9a5b00', bg: '#fff4cc', bar: '#e0a800' }, bad: { fg: RED, bg: '#fde8e6', bar: RED } };
     function forecastBox() {
-      var c = shiftRecap(r), fg = c.level === 'bad' ? RED : c.level === 'warn' ? '#9a5b00' : GREEN, bg = c.level === 'bad' ? '#fde8e6' : c.level === 'warn' ? '#fff4cc' : '#e2f4ea';
-      var bar = function (done, all, h) { var pct = all ? Math.round(done / all * 100) : 0; return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + (pct ? '<td width="' + pct + '%" style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:' + GREEN + '">&nbsp;</td>' : '') + (pct < 100 ? '<td style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:#ffffff">&nbsp;</td>' : '') + '</tr></table>'; };
-      // Joe 11/3 (built-2-by-area): one line per area, how many loaded and left (Case, Boxing, Tote, Tanker).
-      var areas = c.areas;
+      var c = shiftRecap(r), L = LEVEL[c.level], fg = L.fg, bg = L.bg;
+      var bar = function (done, all, h, color) { var pct = all ? Math.round(done / all * 100) : 0; return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>' + (pct ? '<td width="' + pct + '%" style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:' + color + '">&nbsp;</td>' : '') + (pct < 100 ? '<td style="height:' + h + 'px;line-height:' + h + 'px;font-size:1px;background:#ffffff">&nbsp;</td>' : '') + '</tr></table>'; };
+      // Joe 11/3 (built-2-by-area, then bars): one block per area: how many loaded and left, its own bar, on time or behind.
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + bg + ';border-left:6px solid ' + fg + ';padding:14px 14px 16px">' +
         '<div style="font-size:28px;font-weight:800;line-height:1.15;color:' + INK + '">' + c.loaded + ' of ' + c.total + ' loaded</div>' +
         '<div style="font-size:18px;font-weight:700;margin-top:2px;color:' + GREY + '">' + (c.left ? c.left + ' left to load' : 'Nothing left to load') + '</div>' +
-        '<div style="margin-top:10px">' + bar(c.loaded, c.total, 14) + '</div>' +
-        (areas.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px">' + areas.map(function (a) {
-          if (RECAP_AREA_BARS) return '<tr><td style="' + F + 'padding:7px 0 0;font-size:17px;font-weight:800;color:' + INK + '">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:7px 0 0;font-size:16px;font-weight:700;color:' + INK + ';white-space:nowrap">' + (a.total - a.left) + ' of ' + a.total + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr><tr><td colspan="2" style="padding:4px 0 3px">' + bar(a.total - a.left, a.total, 10) + '</td></tr>';
-          return '<tr><td style="' + F + 'padding:6px 0;font-size:17px;font-weight:800;color:' + INK + ';border-bottom:1px solid #ffffff">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:6px 0;font-size:17px;font-weight:700;color:' + INK + ';white-space:nowrap;border-bottom:1px solid #ffffff">' + (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
+        '<div style="margin-top:10px">' + bar(c.loaded, c.total, 14, L.bar) + '</div>' +
+        (c.areas.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px">' + c.areas.map(function (a) {
+          var A = LEVEL[a.level];
+          return '<tr><td style="' + F + 'padding:8px 0 0;font-size:17px;font-weight:800;color:' + INK + '">' + e(a.name) + '</td><td align="right" style="' + F + 'padding:8px 0 0;font-size:16px;font-weight:700;color:' + INK + ';white-space:nowrap">' + (a.total - a.left) + ' of ' + a.total + (a.left ? '<span style="color:' + GREY + ';font-weight:600"> &middot; ' + a.left + ' left</span>' : '') + '</td></tr>' +
+            '<tr><td colspan="2" style="padding:4px 0 2px">' + bar(a.total - a.left, a.total, 10, A.bar) + '</td></tr>' +
+            '<tr><td colspan="2" style="' + F + 'padding:0 0 2px;font-size:14px;font-weight:800;color:' + A.fg + '">' + (a.late ? '&#9888; ' : '&#10003; ') + e(a.status) + '</td></tr>'; }).join('') + '</table>' : '') +
         '<div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:14px;color:' + fg + '">' + (c.late ? '&#9888; ' : '&#10003; ') + e(c.status) + '</div>' +
-        (c.doneBy && c.left ? '<div style="font-size:17px;font-weight:700;margin-top:2px;color:' + INK + '">Last load done about ' + e(c.doneBy) + '</div>' : '') +
+        (c.doneBy && c.left ? '<div style="font-size:17px;font-weight:700;margin-top:2px;color:' + INK + '">Last case load done about ' + e(c.doneBy) + '</div>' : '') +
         '<div style="font-size:13px;color:' + GREY + ';margin-top:8px">Estimated at ' + e(c.asOf) + '</div></div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
@@ -1582,7 +1594,9 @@
     if (!behind && !late) leftBehind = tc.leftOver;
     // Joe 11/1: with nothing late or behind now, a load that was loaded late still keeps the banner from saying all on time.
     var doneLate = !behind && !late && !leftBehind ? tc.loadedLate.length : 0;
-    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (behind || leftBehind ? RED : late || doneLate ? YELLOW : GREEN) + ';color:' + (late || doneLate ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL BE LATE' : 'S WILL BE LATE') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + (fc ? '' : ' &middot; ' + loadedCount + ' of ' + total + ' loaded') + '</div></td></tr>');
+    // Joe 11/3: with the recap box, the banner takes the box's color (red when the box is red), never green while it warns.
+    var bannerLevel = !fc ? (behind || leftBehind ? 'bad' : late || doneLate ? 'warn' : 'good') : (function (lv) { return lv === 'good' && (behind || leftBehind || late || doneLate) ? 'warn' : lv; })(shiftRecap(r).level);
+    H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (bannerLevel === 'bad' ? RED : bannerLevel === 'warn' ? YELLOW : GREEN) + ';color:' + (bannerLevel === 'warn' ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL BE LATE' : 'S WILL BE LATE') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + (fc ? '' : ' &middot; ' + loadedCount + ' of ' + total + ' loaded') + '</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     if (fc) H.push(forecastBox());
     // Joe 11/3: with the recap box above, the count is not said twice.

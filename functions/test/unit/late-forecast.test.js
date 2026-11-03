@@ -173,10 +173,12 @@ test('the email and the report carry the forecast', () => {
   assert.deepEqual([c.loaded, c.left, c.total, c.late, c.behindMin, c.level, c.doneBy], [7, 15, 22, true, 75, 'bad', '9:20 AM']);
   const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('Estimated at'));
   assert.match(box, />7 of 22 loaded<\/div>[^]*>15 left to load<\/div>/);
-  // Joe 11/3 (built-2-by-area): a line for each area, how many loaded and left.
-  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case', 7, 22]]);
-  assert.match(box, />Case<\/td>[^]*>7 of 22 loaded<span[^>]*> &middot; 15 left<\/span>/);
-  assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last load done about 9:20 AM/);
+  // Joe 11/3 (built-2-by-area, then colored bars): a block for each area, how many loaded and left, its own bar and status.
+  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total, a.level, a.status]), [['Case', 7, 22, 'bad', 'About 1 hr 15 min behind']]);
+  assert.match(box, />Case<\/td>[^]*>7 of 22<span[^>]*> &middot; 15 left<\/span>[^]*background:#b42318[^]*&#9888; About 1 hr 15 min behind<\/td>/);
+  assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last case load done about 9:20 AM/);
+  // The banner takes the box's color: red, as the box is red (Joe 11/3).
+  assert.match(html, /padding:16px 14px;background:#b42318[^>]*><div[^>]*>&#9888; 2 LOADS WILL BE LATE/);
   assert.doesNotMatch(box, /6304|Walmart|Will miss its truck|Every other truck|Already loaded/, 'no route names in the box');
   [html, r.text].forEach(x => assert.doesNotMatch(x, /potentially late|Due by|Cases left|\bcases\b/i));
   assert.doesNotMatch(html, /Routes<span/, 'the count is not said twice: no "of 22 loaded" on the Routes heading');
@@ -415,8 +417,12 @@ test('the banner is yellow and says how many loads will be late when the forecas
   const ld = (id, late, leaves) => ({ id, route: id, run: '', late, leaves, est: 600, estText: '10:00 AM', estDay: 'Tue', shiftEnd: 360 });
   const fc = (late, now) => ({ asOf: '11:54 PM', now: now || 0, late, loads: Array.from({ length: late }, (_, i) => ld('m' + i, true, 500)).concat([ld('ok', false, 900)]) });
   const banner = (html) => html.match(/<td style="[^"]*padding:16px 14px;background:(#[0-9a-f]+)[^>]*><div[^>]*>([^<]*)/);
+  // Joe 11/3: the banner takes the recap box's color: these loads are 1 hr 40 min late (est 10:00 AM, leaving 8:20 AM),
+  // past an hour, so red; 30 minutes late is yellow.
   const late = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(7) }), ''));
-  assert.equal(late[1], '#f5c518');
+  assert.equal(late[1], '#b42318');
+  const near = { asOf: '11:54 PM', now: 0, late: 1, loads: [Object.assign(ld('m0', true, 570), {}), ld('ok', false, 900)] };
+  assert.equal(banner(R.reportHtml(Object.assign({}, base, { forecast: near }), ''))[1], '#f5c518');
   assert.equal(late[2], '&#9888; 7 LOADS WILL BE LATE');
   assert.equal(banner(R.reportHtml(Object.assign({}, base, { forecast: fc(1) }), ''))[2], '&#9888; 1 LOAD WILL BE LATE');
   const ok = banner(R.reportHtml(Object.assign({}, base, { forecast: fc(0) }), ''));
@@ -424,7 +430,11 @@ test('the banner is yellow and says how many loads will be late when the forecas
   const gone = banner(R.reportHtml(Object.assign({}, base, { behind: [{ id: '855', route: '855', minutesUntil: -60 }], forecast: fc(7) }), ''));
   assert.deepEqual([gone[1], gone[2]], ['#b42318', '&#9888; 1 ROUTE LATE'], 'a route whose truck should have left stays red');
   const over = banner(R.reportHtml(Object.assign({}, base, { behind: [{ id: '909', route: '909', minutesUntil: 120, priorDay: true }], forecast: fc(0) }), ''));
-  assert.deepEqual([over[1], over[2]], ['#b42318', '&#9888; 1 ROUTE BEHIND'], 'left over, truck not gone yet: behind');
+  // Joe 11/3: the banner follows the recap box's color; this left-over load will still make its truck, so the box is green
+  // and the banner, which still says BEHIND, is yellow (never green while it warns). Without a forecast it stays red (below).
+  assert.deepEqual([over[1], over[2]], ['#f5c518', '&#9888; 1 ROUTE BEHIND'], 'left over, truck not gone yet: behind');
+  const overNoFc = banner(R.reportHtml(Object.assign({}, base, { behind: [{ id: '909', route: '909', minutesUntil: 120, priorDay: true }] }), ''));
+  assert.deepEqual([overNoFc[1], overNoFc[2]], ['#b42318', '&#9888; 1 ROUTE BEHIND']);
   // A forecast load whose leaving time has gone by is late now even inside the report's 45 minutes.
   const now = R.truckCheck({ behind: [], forecast: fc(1, 520) });
   assert.deepEqual([now.lateNow.length, now.miss.length, now.ok], [1, 0, 1]);
@@ -473,7 +483,7 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   // Joe 11/3: the recap box no longer lists loads already loaded late ("if it's already loaded" he does not need it there);
   // the route list still says "8:20 AM late" and the banner still says loaded late.
   assert.doesNotMatch(plain, /Already loaded, but late/);
-  assert.match(plain, /2 of 3 loaded 1 left to load [^]*On time Last load done about 10:50 AM/);
+  assert.match(plain, /2 of 3 loaded 1 left to load [^]*On time Last case load done about 10:50 AM/);
   assert.match(plain, /855 Save-A-Lot 1 8:20 AM late 8:00 AM/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
   assert.doesNotMatch(r.text, /LOADED LATE \(/);
