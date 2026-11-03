@@ -16,6 +16,7 @@ const QS = new URLSearchParams(location.search);
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'Every United Dairy app you can open' },
   { href: 'people.html', name: 'People & Access', note: 'Administrators: who signs in, their role, plants and apps', admin: true },
+  { href: 'roles.html', name: 'Roles & Rights', note: 'Administrators: what each role (Manager, Supervisor, Dispatcher...) may do', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 

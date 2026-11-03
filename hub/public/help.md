@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, and **Roles & Rights** is what each role may do.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -61,6 +61,29 @@ screens: people.html
 !> Do not disable someone to take away one app. Change their role instead; Disabled shuts them out of every app.
 
 !> The primary administrator always stays an Enabled Administrator; the hub will not let that change.
+
+## Roles & Rights
+id: roles
+screens: roles.html
+
+**Roles & Rights** says what each role (Manager, Supervisor, Dispatcher, Driver and the rest) may do in Plant & Distribution. Each column is a role and each line is one thing a person may do. It is the same list as **Role Templates** in Plant & Distribution, saved to the same place. Administrators only.
+
+1. Find the line you want, by its group (Dispatch, Drivers, Plant Operations...) or with **Find a right**.
+2. Tick the box under a role to let that role do it, or untick it to take it away. It saves at once, and a green line says what changed.
+3. The change reaches everyone with that role the next time they open a screen. The number under each role says how many Enabled people have it.
+4. To add a role, press `+ Add Role`, type its name, pick a role to copy the ticks from (or **Nothing ticked**), then press `Add Role`. Give it to people in **People & Access**.
+
+### Buttons
+- `+ Add Role`: a new role. `Cancel` closes it without adding.
+- `Use standard`: puts a role back to the rights it came with. It shows only on a role that has been changed.
+
+> To change one person without changing their whole role, open them in **People & Access** and use **Single rights** there.
+
+> **Administrator** is locked with everything ticked: an Administrator can always do everything.
+
+!> Do not untick a right from a role to stop one person. Use **Single rights** on that person instead; a role change reaches everyone with that role.
+
+!> Do not make a new role for one person. Give them the closest role and change their single rights.
 
 ## Help
 id: help
