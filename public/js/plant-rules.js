@@ -333,7 +333,7 @@
   // delivery weekday's load day offset; blank = the day before). routes = Route Master docs (runId, routeName, days).
   var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], WEEK_PREFIX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   function weekdayOf(key) { var n = dayNum(key); return n === null ? -1 : ((n % 7) + 11) % 7; }
-  function shortDay(key) { var p = String(key || '').split('-'); return p.length === 3 ? p[1] + '-' + p[2] + '-' + p[0].slice(2) : text(key); }
+  function shortDay(key) { return LR.dateText(text(key)); }
   function dayText(key) { var w = weekdayOf(key); return (w < 0 ? '' : WEEKDAYS[w] + ' ') + shortDay(key); }
   function scheduleCheck(x, routes, today) {
     x = x || {};
@@ -1238,7 +1238,7 @@
     return list;
   }
   function dayShort(m) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][((Math.floor(m / 1440) + 4) % 7 + 7) % 7]; }
-  function dateShort(key) { var p = String(key).split('-'); return Number(p[1]) + '-' + Number(p[2]) + '-' + String(p[0]).slice(2); }
+  function dateShort(key) { return LR.dateText(key); }
   // input: loads (the Loadout Center's rows for the operating day `date`), history ([{ date, loads }] for forecastNights),
   // dueBy (minutes after midnight, 5:00 AM unless changed).
   function loadForecast(input, nowMs) {
@@ -1512,7 +1512,7 @@
     // Joe 10/16: each route is one row: route number, a very short run name, when it was loaded (Done) and its dispatch time,
     // under one small heading row. Run names longer than 12 letters are cut so the row fits a phone.
     var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    function deliversLabel(day) { var n = dayNum(day); if (n === null) return 'Delivery day not set'; var p = String(day).split('-'); return 'Delivers ' + WEEKDAYS[new Date(n * 86400000).getUTCDay()] + ' ' + Number(p[1]) + '-' + Number(p[2]) + '-' + String(p[0]).slice(2); }
+    function deliversLabel(day) { var n = dayNum(day); if (n === null) return 'Delivery day not set'; return 'Delivers ' + WEEKDAYS[new Date(n * 86400000).getUTCDay()] + ' ' + LR.dateText(day); }
     // A cut that leaves under 4 letters of the last word drops that word ("Zanesville D" reads "Zanesville").
     function brief(v) { v = text(v); if (v.length <= 12) return v; v = v.replace(/\bLoad (\d+)$/, 'L$1'); if (v.length <= 12) return v;
       var cut = v.slice(0, 12), sp = cut.lastIndexOf(' '); return (sp > 0 && cut.length - sp - 1 < 4 ? cut.slice(0, sp) : cut).trim(); }

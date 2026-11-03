@@ -638,10 +638,10 @@
 
     /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
     // The printed sheet keeps its approved date style (10/8/2026); the screen uses the short 10-8-26.
-    const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8, 10)) + '/' + k.slice(0, 4);
+    const usDate = (k) => L.dateText(k);
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off && !r.already);
-      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
+      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning Sunday ' + escapeHtml(usDate(weekBegin(loadDate))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
       let group = '', loaded = '';
@@ -705,8 +705,8 @@
       if (!L.isDateKey(key) || key === loadDate) return;
       const go = () => { closeModals(); loadDate = key; watchRuns(); };
       if (weekBegin(key) === weekBegin(loadDate)) return go();
-      document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(L.addDays(weekBegin(loadDate), 1)) +
-        ' to the week beginning ' + shortDate(L.addDays(weekBegin(key), 1)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';
+      document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(weekBegin(loadDate)) +
+        ' to the week beginning ' + shortDate(weekBegin(key)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';
       document.getElementById('week-go').onclick = go;
       openModal('week-panel');
       document.getElementById('week-go').focus();

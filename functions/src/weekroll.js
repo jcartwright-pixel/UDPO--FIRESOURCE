@@ -121,7 +121,8 @@ function applyDays(tx, db, snap, run, days, stamp, email, mode, queue, requestId
   return { runDocId: snap.id, rev: (run.rev || 0) + 1 };
 }
 
-const shortDate = (k) => { const [, m, d] = String(k).split('-').map(Number); return m + '/' + d; };
+// Dates are written one way everywhere, like 10-8-26 (rules audit line 15).
+const shortDate = L.dateText;
 
 /*
  * What Publish changes, read through `tx` (a transaction, or { get: q => q.get() } for liveroll.js's look ahead): the weeks after

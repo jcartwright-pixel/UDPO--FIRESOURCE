@@ -714,7 +714,7 @@ async function serviceOrders(db, nowMs) {
       const [mine, gone] = await Promise.all([tx.get(db.collection(WORK_ORDERS).where('unit', '==', i.unit)), tx.get(db.collection(DELETED).where('source_id', '==', sid))]);
       if (gone.docs.length || mine.docs.some(d => d.data().service_key === i.key && String(d.data().status || '').toUpperCase() !== 'DONE')) return;
       const id = newOrderId(), late = i.status === 'OVERDUE';
-      const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^(\d{4})-(\d\d)-(\d\d)$/, (m, y, mo, d) => Number(mo) + '-' + Number(d) + '-' + y.slice(2));
+      const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^\d{4}-\d\d-\d\d$/, (m) => L.dateText(m));
       tx.set(db.collection(WORK_ORDERS).doc(docId(id)), newOrder({ work_order_id: id, unit: i.unit, unit_type: i.type, problem: G.SERVICES[i.key] + (late ? ' overdue' : ' due') + (when ? ' ' + when : ''),
         can_run: 'YES', source: 'SERVICE', source_from: FROM.SERVICE, source_kind: 'service', source_id: sid, service_key: i.key, due_at: String(i.dueAt), created_at: stamp,
         created_by: 'Fleet Service', updated_at: stamp, updated_by: 'Fleet Service' }));

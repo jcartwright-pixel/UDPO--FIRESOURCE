@@ -84,6 +84,25 @@
     return parts.year + '-' + parts.month + '-' + parts.day;
   }
 
+  // Rules audit lines 15 and 16 (Joe 11/3: "a centralized area where the format date is going to be exact"; "everything should
+  // start on Sunday"): the one way a date is written on every screen, email, text, printout and message, like 10-8-26
+  // (month-day-two-digit year, no zeros in front). Takes a day key (2026-10-08), a sheet date (10/08/2026) or a time (ISO
+  // text, a number or a Date, read on the plant's clock).
+  function dateText(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v).trim());
+    if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
+    if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
+    var t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
+    if (isNaN(t)) return String(v);
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t).forEach(function (p) { parts[p.type] = p.value; });
+    return parts.month + '-' + parts.day + '-' + parts.year;
+  }
+  // A week as its Sunday and Saturday, like "Sun 11-1-26 to Sat 11-7-26". weekStart() is always the Sunday.
+  function weekText(key) { var sun = weekStart(key); return 'Sun ' + dateText(sun) + ' to Sat ' + dateText(addDays(sun, 6)); }
+
   // Joe 10/13 ("No route equals no driver"): what a day marked not running gives up, so the driver and units are free that day.
   var NOT_RUNNING_CLEARS = Object.freeze({ driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' });
 
@@ -1739,7 +1758,7 @@
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
-    DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
+    dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,

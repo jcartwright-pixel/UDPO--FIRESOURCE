@@ -39,7 +39,7 @@ const nyParts = (d) => {
   const parts = {};
   new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'long', hourCycle: 'h23' })
     .formatToParts(d).forEach(p => { parts[p.type] = p.value; });
-  return { date: parts.year + '-' + parts.month + '-' + parts.day, hour: Number(parts.hour), minute: Number(parts.minute), weekday: String(parts.weekday).toUpperCase(), mdy: Number(parts.month) + '/' + Number(parts.day) + '/' + parts.year };
+  return { date: parts.year + '-' + parts.month + '-' + parts.day, hour: Number(parts.hour), minute: Number(parts.minute), weekday: String(parts.weekday).toUpperCase(), mdy: L.dateText(parts.year + '-' + parts.month + '-' + parts.day) };
 };
 // Eastern time with its offset, as the old app wrote it (2026-10-25T15:24:17-04:00). Joe 10/25: a "Repair email sent" time
 // ending in Z was written by the app before the blank-body fix (L.repairEmailSent counts it as never sent).
@@ -92,11 +92,10 @@ const kindWord = (k) => (k === 'TRAILER' ? 'Trailer' : k === 'FORK_TRUCK' ? 'For
 // When it was reported, as 10-24-26 2:28 PM (Joe's date style), not the stored 2026-10-24T18:28:46.000Z.
 function reportedText(v) {
   const s = String(v || '').trim(), day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s), d = new Date(s);
-  const mdy = (y, m, dd) => Number(m) + '-' + Number(dd) + '-' + String(y).slice(2);
-  if (day) return mdy(day[1], day[2], day[3]);
+  if (day) return L.dateText(s);
   if (!s || isNaN(d)) return s;
   const n = nyParts(d), h = n.hour % 12 || 12;
-  return mdy(n.date.slice(0, 4), n.date.slice(5, 7), n.date.slice(8, 10)) + ' ' + h + ':' + String(n.minute).padStart(2, '0') + (n.hour < 12 ? ' AM' : ' PM');
+  return L.dateText(n.date) + ' ' + h + ':' + String(n.minute).padStart(2, '0') + (n.hour < 12 ? ' AM' : ' PM');
 }
 function repairLines(r) {
   return [kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), 'Issue: ' + String(r.issue_details || '').trim(), 'Reported: ' + reportedText(r.opened_at || r.service_date), 'Driver: ' + String(r.driver || '')];

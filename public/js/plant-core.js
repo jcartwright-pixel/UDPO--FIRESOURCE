@@ -489,7 +489,7 @@ function carriedSplit(runs, date, journal, routes, plantStart) {
   });
   return { keep, skip };
 }
-const shortDay = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : d; };
+const shortDay = (d) => L.dateText(d);
 // Yesterday's cards that leave the list as "Not recorded" (see carriedSplit), each with its note.
 export function carriedNotRecorded(runs, date, journal, routes, plantStart) {
   return carriedSplit(runs, date, journal, routes, plantStart).skip;

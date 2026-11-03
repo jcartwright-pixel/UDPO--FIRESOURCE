@@ -136,7 +136,7 @@ async function saveDriverException(tx, db, req, email, stamp, logRef, mode) {
  * a driver's own other entries do not count against them. An approved entry also puts the days off on Dispatch
  * (the vsched_ exception, as udpoV7277MirrorVacationToExceptions_ does); any other status cancels that.
  */
-const usDay = (key) => { const [y, m, d] = String(key).split('-'); return Number(m) + '/' + Number(d) + '/' + y; };
+const usDay = (key) => L.dateText(key);
 const VACATION_EXCEPTION = { VACATION: ['VACATION', 'VACATION'], SICK: ['SICK DAY', 'SICK DAY'], BEREAVEMENT: ['BEREAVEMENT', 'BEREAVEMENT'], UNPAID: ['UNPAID DAY', 'UNPAID DAY'], PERSONAL: ['UNAVAILABLE', 'PERSONAL DAY'] };
 async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const driver = await requireDriver(tx, db, req.driverId);

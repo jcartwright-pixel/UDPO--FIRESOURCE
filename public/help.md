@@ -36,6 +36,10 @@ Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, truc
 
 Type a trailer any way you like (**14**, **014**, **T14** or **T 14**). Operations always writes it as **T-** and the number with no zeros in front (**T-14**), on every screen, email and printout. Truck numbers lose their front zeros too when they are matched to their GPS, so **0601** and **601** are the same truck. **TBA** and **N/A** stay as they are.
 
+### Dates and weeks
+
+Every date is written the same way everywhere: month, day and year, like **10-8-26**. That goes for screens, emails, texts, printouts and the message after Publish. Every week starts on **Sunday** and ends on **Saturday**, and a week is named by its Sunday.
+
 ### Loadout names
 
 The four loadouts have the same names everywhere: **Case**, **Tote**, **Boxing** and **Tanker** (Daily Case Loadout, Daily Tote Loadout, Daily Boxing Loadout, Daily Tanker Loadout). The Load Type list, the menus, the report email and the printouts all use these words. The counts keep their own words: Cases Out, Totes Out, Boxes Out and Gallons In.
@@ -124,7 +128,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Down Trucks / Trailers` lists every load from today on that still has a down unit, with one button to take them off.
 - `Driver Call-Off` marks a driver off for the day.
 - `+ Add Route / Run` adds an extra load for this day.
-- `Print Dispatch Sheet` prints the day's sheet.
+- `Print Dispatch Sheet` prints the day's sheet. Its heading names the Sunday the week begins.
 - `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 

@@ -38,7 +38,7 @@ const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const dayNum = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 const keyOf = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
 // 10-8-26
-const shortDate = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : text(key); };
+const shortDate = (key) => L.dateText(text(key));
 const weekdayOf = (key) => { const n = dayNum(key); return n === null ? '' : WEEKDAY[((n % 7) + 11) % 7]; };
 // Wall minutes (New York, counted from 1/1/1970) as "4:05 AM".
 function clock12(wall) {
