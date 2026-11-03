@@ -35,7 +35,6 @@ const SILENT_MS = 24 * 3600 * 1000, UNKNOWN = 'Unknown: GPS not reporting';
 // Joe 11/2: how far back to look for loads still to be delivered: a Load Day route is loaded the day before (Saturday for
 // Monday), and a load from an earlier delivery day that never left stays on as a leftover for LEFTOVER_DAYS.
 const LOOK_BACK = 3, LEFTOVER_DAYS = 2;
-const SAVE_A_LOT = /SAVE[\s-]*A[\s-]*LOT/i;
 const SAL_PLACE = /\bSAL\b|SAVE[\s-]*A[\s-]*LOT/i;
 const UNITS_KEEP_MS = 60 * 1000; // the 520 GPS units are read at most once a minute per server (the GPS itself is read every 5)
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
@@ -64,10 +63,9 @@ function whereOf(unit, spots, left) {
   return address ? 'Stopped: ' + address : 'Stopped';
 }
 
-// Joe 11/1 (mock-up 3): the status on one line: "Left 10:12 AM, 2h 12m late" (the 6 AM email keeps "2 hr 12 min").
-function shortStatus(word) {
-  return text(word).replace(/(\d+) hr (\d+) min/g, '$1h $2m').replace(/(\d+) hr\b/g, '$1h').replace(/(\d+) min\b/g, '$1m');
-}
+// Joe 11/1 (mock-up 3): the status on one line, "Left 10:12 AM, 2 hr 12 min late".
+// Joe 11-3-26 (item 5): lengths of time read the same as everywhere else ("1 hr 12 min", timing-rules.js), so the status is kept as is.
+function shortStatus(word) { return text(word); }
 
 // When the GPS last heard from the unit: "10:42 AM", with the date (10-30-26) when it was not today.
 function gpsWhen(ms, now) {
@@ -76,12 +74,9 @@ function gpsWhen(ms, now) {
   return S.clock12(wall) + (day !== Math.floor(now / 1440) ? ' ' + S.shortDate(new Date(day * 86400000).toISOString().slice(0, 10)) : '');
 }
 
-// Joe 11/1: a Save-A-Lot route (its name or stream) with Route Master's Drop and Hook tick. master: {runId: routes doc}.
-function salDropHook(run, master) {
-  const m = (master || {})[run && run.runId] || {};
-  const named = [run && run.routeName, run && run.streamId, run && run.run, m.routeName, m.streamId].some(v => SAVE_A_LOT.test(text(v)));
-  return named && !!((run && run.dropAndHook) || m.dropAndHook);
-}
+// Joe 11/1, widened 11/3 (rules audit line 18, "18 yes"): any route with Route Master's Drop and Hook tick, whatever it is called
+// (it used to need a Save-A-Lot name). The one rule is logic.js dropAndHook. master: {runId: routes doc}.
+function salDropHook(run, master) { return L.dropAndHook(run, master); }
 
 // When the trailer was dropped, as wall minutes, or null: the trip of this load is at a Save-A-Lot place in Fleet.
 function droppedAt(x, reefer) {
@@ -106,8 +101,10 @@ function movedSince(gpsDays, tag, fromDate) {
  * 901 FERRY PRODUCT for Martins Ferry). `others`: the other divisions' names.
  */
 function ownRoute(run, divisionName, others) {
-  const cov = text(run && run.coverageType).toUpperCase(), move = text(run && run.movementType).toUpperCase().replace(/\s+/g, '_');
-  if (move === 'CARRIER_LOAD' || move === 'CUSTOMER_PICKUP') return false;
+  const cov = text(run && run.coverageType).toUpperCase();
+  // An outside carrier's load or a customer pickup (the one "who hauls it" rule, logic.js hauler) is never a division's own.
+  if (L.outsideHauler({ movementType: run && run.movementType })) return false;
+  // Division rule (not who hauls it): a run another location covers is that location's, not this division's.
   if (cov && cov !== 'UNITED DAIRY' && cov !== text(divisionName).toUpperCase()) return false;
   const words = ' ' + [run.streamId, run.run, run.routeName].map(text).join(' ').toUpperCase().replace(/[^A-Z0-9]+/g, ' ') + ' ';
   if (words.includes(' TRANSFER ')) return false;
@@ -174,7 +171,7 @@ function salesScreen(input, nowMs) {
       if (drop) {
         // Dropped: the status says when; Where now follows the driver's truck (the trailer stays at the store).
         const dd = Math.floor(drop.at / 1440), when = S.clock12(drop.at) + (dd !== Math.floor(now / 1440) ? ' ' + S.weekdayOf(new Date(dd * 86400000).toISOString().slice(0, 10)) : '');
-        const leftWord = s.tone === 'late' && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
+        const leftWord = (s.tone === 'late' || s.tone === 'caution') && left && left.at !== null ? 'left ' + shortStatus(s.word).replace(/^Left [^,]+, /, '') : 'left on time';
         s = { word: 'Dropped ' + when + ', ' + leftWord, tone: s.tone };
         unit = tk; by = tk ? 'TRUCK' : '';
         where = !tk ? 'No GPS on the truck' : silent(tk) ? UNKNOWN : whereOf(tk, spots, true);
@@ -227,9 +224,8 @@ async function readInput(db, nowMs) {
   const reefer = {};
   if (trailers.length) (await db.getAll(...trailers.map(t => db.collection('gpsReefer').doc(safeIdPart(t))))).forEach((s, i) => { if (s.exists) reefer[trailers[i]] = s.data(); });
   const gpsDays = (await db.collection('gpsDays').where('date', '>=', dates[0]).where('date', '<=', L.addDays(today, 1)).get()).docs.map(x => x.data());
-  // Joe 11/1: Route Master's Drop and Hook tick, for the Save-A-Lot loads only.
-  const routes = runs.some(r => SAVE_A_LOT.test(text(r.routeName) + ' ' + text(r.streamId) + ' ' + text(r.run)))
-    ? (await db.collection('routes').get()).docs.map(x => Object.assign({ id: x.id }, x.data())) : [];
+  // Joe 11/1, widened 11/3: Route Master's Drop and Hook tick, for any route that has it.
+  const routes = runs.length ? (await db.collection('routes').get()).docs.map(x => Object.assign({ id: x.id }, x.data())) : [];
   return { runs, reefer, gpsDays, routes, units: await readUnits(db, nowMs) };
 }
 

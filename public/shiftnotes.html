@@ -10,6 +10,7 @@
   <title>Shift Notes · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/pmaint-rules.js"></script>
@@ -51,10 +52,11 @@
           <div class="sn-sec" id="new-title">New breakdown</div>
           <div class="qc-fields" id="fields"></div>
           <div class="sn-send" id="mr-send-row" hidden><span class="sn-unsent" id="mr-unsent">Not sent yet</span><button type="button" class="qc-btn primary" id="mr-send">Send to Maintenance</button></div>
+          <div class="sn-past" id="kind-history"></div>
         </section>
       </div>
       <section class="sn-history" id="pane-history" hidden>
-        <h2>Last 24 Hours</h2>
+        <div class="sn-hhead"><h2 id="history-title">Last 24 Hours</h2><span class="why" id="history-why"></span><button type="button" class="qc-btn" id="show-all" hidden>Show everything</button></div>
         <div id="history"></div>
       </section>
       <div class="foot" id="foot"></div>
@@ -62,7 +64,7 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
+    import { start, currentPlant, requireSignIn, save, escapeHtml, shortDate, shortTime, showError, dateTimeText, goLiveNote, optionTag, hoursMinutesText, maySave, watchPerson } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { fillIn, watchRound, clockOf } from './js/autosave.js';
     import { shiftsFor, shiftAt } from './js/plant-reports.js';
@@ -109,7 +111,7 @@
         }, () => {});
       });
     }
-    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, 'fac_uniontown');
+    let journal = [], person = null, app = {}, drawnFor = '', entry = null, roundStart = null, lastReport = null, shifts = shiftsFor(null, currentPlant());
     const pending = [];
     const canSave = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant');
     const CARRY_WORD = { Handoff: 'handoff note', Breakdown: 'breakdown', 'Maintenance Request': 'maintenance request', Incident: 'incident', Safety: 'safety note', Quality: 'quality note', Other: 'note' };
@@ -117,7 +119,8 @@
     const ST_CLASS = { OPEN: 'open', MONITOR: 'mon', RESOLVED: 'res' };
     const stamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? dateTimeText(t) : ''; };
     const dayStamp = (v) => { const t = Date.parse(v || ''); return isFinite(t) ? shortDate(t) + ' ' + shortTime(t) : ''; };
-    const clockNow = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+    // Joe 11-3-26 (item 5): times are typed into plain boxes and fixed to "4:30 PM" (timing-rules.js); they are saved as HH:MM.
+    const TM = window.UDTiming, clockNow = () => TM.hhmm(TM.minuteOfDay(Date.now()));
     const opt = (value, current, label) => optionTag(value, current, label || value, { loose: true });
     const shiftWord = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
     const isKind = (r, k) => String(r.type || '').toLowerCase() === k.toLowerCase();
@@ -165,28 +168,30 @@
       const f0 = document.getElementById('fields'), was = {};
       if (keep) f0.querySelectorAll('input,select,textarea').forEach(x => { was[x.className.split(' ')[0]] = x.value; });
       const types = '<label>Type<select class="sn-type">' + U.ENTRY_TYPES.map(t => opt(t, kind)).join('') + '</select></label>';
-      const equip = lay === 'N' ? '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80" placeholder="Dock 3 door, Palletizer, Truck 214…"></label>'
-        : '<label' + (m ? ' class="wide"' : '') + '>What broke<input class="sn-equip" maxlength="80" placeholder="Filler 4, a leaky valve…"></label>';
+      const equip = lay === 'N' ? '<label' + (m ? ' class="wide"' : '') + '>Equipment / area<input class="sn-equip" maxlength="80"></label>'
+        : '<label' + (m ? ' class="wide"' : '') + '>What broke<input class="sn-equip" maxlength="80"></label>';
       const shiftBox = '<label>Shift<select class="sn-shift" id="shift-now">' + shiftOptions(shift) + '</select></label>';
       const follow = '<label>Follow-up<select class="sn-follow">' + U.FOLLOW_UPS.map(f => opt(f, 'OPEN', FOLLOW[f])).join('') + '</select></label>';
-      const downAt = '<label>Down at<input class="sn-time" type="time" value="' + clockNow() + '"></label>', upAt = '<label>Back up at<input class="sn-up" type="time"></label>';
+      const downAt = '<label>Down at<input class="sn-time" type="text" data-time autocomplete="off" maxlength="10"></label>', upAt = '<label>Back up at<input class="sn-up" type="text" data-time autocomplete="off" maxlength="10"></label>';
       const urgency = '<label>Can it wait?<select class="sn-urgency">' + opt('', '', '') + U.URGENCIES.map(u => opt(u, '', u)).join('') + '</select></label>';
-      const area = (cls, label, max, ph, wide) => '<label class="' + (wide || 'wide') + '">' + label + '<textarea class="' + cls + '" maxlength="' + max + '" placeholder="' + ph + '"></textarea></label>';
+      // Joe 11-3-26: "I don't want anything in there pre-filled out": no example words in any box, and the times start empty (left
+      // empty, the time it was put on the log is used and shown in the box).
+      const area = (cls, label, max, ph, wide) => '<label class="' + (wide || 'wide') + '">' + label + '<textarea class="' + cls + '" maxlength="' + max + '"></textarea></label>';
       let html;
       if (lay === 'B') html = m
         ? types + shiftBox + equip + downAt + upAt + area('sn-entry', 'What happened?', 4000, 'What broke down, and why.') + area('sn-fix', 'What fixed it', 1000, 'Fill in when it is back up.') + follow
         : types + equip + shiftBox + downAt + area('sn-entry', 'What happened?', 4000, 'What broke down, and why.', 'half') + area('sn-fix', 'What fixed it', 1000, 'Fill in when it is back up.', 'half') +
           upAt + area('sn-notes', 'Notes / Follow-up', 1500, 'What the next shift needs to know or do', 'half') + follow;
       else if (lay === 'R') html = m
-        ? types + shiftBox + equip + urgency + area('sn-entry', 'What\'s wrong?', 4000, 'What needs fixing, and where.') + '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="Anything else maintenance should know"></textarea></label>' + follow
+        ? types + shiftBox + equip + urgency + area('sn-entry', 'What\'s wrong?', 4000, 'What needs fixing, and where.') + '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500"></textarea></label>' + follow
         : types + equip + shiftBox + urgency + area('sn-entry', 'What\'s wrong?', 4000, 'What needs fixing, and where.') +
-          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="Anything else maintenance should know"></textarea></label>' + follow;
+          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500"></textarea></label>' + follow;
       else html = m
-        ? types + shiftBox + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000" placeholder="What happened, and what has been done."></textarea></label>' +
-          '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500" placeholder="What needs attention or follow-up from the next shift?"></textarea></label>' + follow
-        : types + equip + shiftBox + '<label>Reading Time<input class="sn-time" type="time" value="' + clockNow() + '"></label>' +
-          '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000" placeholder="Enter readings, production status, outage details, quality results, or handoff information."></textarea></label>' +
-          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500" placeholder="What the next shift needs to know or do"></textarea></label>' + follow;
+        ? types + shiftBox + equip + '<label class="wide">What happened?<textarea class="sn-entry" maxlength="4000"></textarea></label>' +
+          '<label class="wide"><span>Next steps <i class="sn-opt">Optional</i></span><textarea class="sn-notes" maxlength="1500"></textarea></label>' + follow
+        : types + equip + shiftBox + '<label>Reading Time<input class="sn-time" type="text" data-time autocomplete="off" maxlength="10"></label>' +
+          '<label class="wide">Entry / Measurements<textarea class="sn-entry" maxlength="4000"></textarea></label>' +
+          '<label class="wide sn-notes-wide">Notes / Follow-up<textarea class="sn-notes" maxlength="1500"></textarea></label>' + follow;
       f0.innerHTML = html;
       if (keep) Object.keys(was).forEach(c => { const x = f0.querySelector('.' + c); if (x && !x.matches('.sn-type') && was[c] !== '') x.value = was[c]; });
       const draft = lay === 'R' && !(keep && entry && entry.mine) ? readDraft() : null;
@@ -205,28 +210,83 @@
     const formEmpty = () => !entry || (!entry.mine && ![...document.querySelectorAll('#fields .sn-entry, #fields .sn-notes, #fields .sn-equip, #fields .sn-fix')].some(x => x.value.trim()));
 
     // One entry on the list: open items carry their status drop-down and a review box, both saving as they are changed or left.
+    // Joe 11-3-26 ("it's kind of hard to read"): each entry leads with what it is about in big print, then one plain line of when,
+    // which shift and who; the words follow, each under its own name.
+    const who = (e) => String(e || '').split('@')[0];
     function card(x, ck, tag, flag) {
       const id = escapeHtml(x.entryId), saved = x.entryId && !/^pending-/.test(x.entryId), st = x.status || 'OPEN';
       const edge = st === 'RESOLVED' ? '#1f9d55' : st === 'MONITOR' ? '#e5891a' : isKind(x, 'Handoff') ? 'var(--ud-blue)' : '#c62828';
       const status = ck && saved
         ? '<select class="st ' + ST_CLASS[st] + '" data-status="' + id + '" aria-label="Follow-up status for ' + escapeHtml(x.equipment || x.type || 'this entry') + '">' + U.FOLLOW_UPS.map(f => opt(f, st, FOLLOW[f])).join('') + '</select>'
         : '<span class="sn-status s-' + st.toLowerCase() + '">' + escapeHtml(U.followLabel(st)) + '</span>';
-      return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml([stamp(x.recordedAt) || x.readingTime, tag ? '' : (x.type || 'Note'), x.equipment, x.shift].filter(Boolean).join(' · ')) + '</strong>' +
+      const title = x.equipment || x.type || 'Note';
+      const facts = [tag ? '' : (x.equipment ? x.type : ''), 'Reported ' + (stamp(x.recordedAt) || clock12(x.readingTime)), shiftWord(x.shift), who(x.recordedBy)].filter(Boolean);
+      return '<article class="sn-card" data-entry="' + id + '" style="border-left-color:' + edge + '"><div class="sn-card-head"><strong>' + escapeHtml(title) + '</strong>' +
         (tag || '') + (flag ? '<span class="tag need">STILL NEEDS REVIEW</span>' : '') + status + '</div>' +
-        (x.entry ? '<p>' + escapeHtml(x.entry) + '</p>' : '') + downLine(x, ck && saved) + requestLine(x) + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
-        x.reviews.map(r => '<div class="sn-review"><b>Review ' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + '<small>' + escapeHtml(r.recordedBy) + '</small></div>').join('') +
-        (ck && saved ? '<div class="sn-addreview"><input data-review="' + id + '" aria-label="Review note for ' + escapeHtml(x.equipment || x.type || 'this entry') + '" maxlength="500" placeholder="Add a review note (saves when you leave the box)"></div>' : '') +
-        '<small class="sn-by">' + escapeHtml(x.recordedBy) + (saved ? '' : ' · saving…') + '</small></article>';
+        '<div class="sn-facts">' + escapeHtml(facts.join(' · ')) + (saved ? '' : ' · saving…') + '</div>' +
+        (x.entry && !(isKind(x, 'Breakdown') && x.entry === 'Breakdown') ? '<p><b>' + (isKind(x, 'Breakdown') ? 'What happened' : isKind(x, 'Maintenance Request') ? 'What\'s wrong' : 'What happened') + ':</b> ' + escapeHtml(x.entry) + '</p>' : '') +
+        downLine(x, ck && saved) + requestLine(x) + (x.notes ? '<p class="sn-next"><b>Notes / Follow-up:</b> ' + escapeHtml(x.notes) + '</p>' : '') +
+        x.reviews.map(r => '<div class="sn-review"><b>' + escapeHtml(stamp(r.recordedAt)) + '</b> · ' + escapeHtml(U.followLabel(r.followUpStatus)) + ' · ' + escapeHtml(r.entry) + ' <small>' + escapeHtml(who(r.recordedBy)) + '</small></div>').join('') +
+        (ck && saved ? '<label class="sn-addreview"><span>Add a note</span><input data-review="' + id + '" aria-label="Review note for ' + escapeHtml(x.equipment || x.type || 'this entry') + '" maxlength="500"></label>' : '') +
+        '</article>';
     }
+    // A time saved as 16:30 shows as 4:30 PM (the one time rule, timing-rules.js).
+    const clock12 = (hhmm) => TM.boxText(hhmm) || String(hhmm || '');
+    // Wall-clock minutes (as UDPlant.downSpan gives them) as 11-2-26 4:30 PM.
+    const wallText = (w) => { const d = new Date(w * 60000).toISOString(), t = ((w % 1440) + 1440) % 1440; return shortDate(d.slice(0, 10)) + ' ' + clock12(Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')); };
     // A breakdown: down at, back up at, how long it was down and what fixed it; still down, the boxes to say when it was back up.
     function downLine(x, ck) {
       if (!isKind(x, 'Breakdown') || !x.readingTime) return '';
       const id = escapeHtml(x.entryId), n = U.downMinutes(x, Date.now());
-      if (x.upAt) return '<div class="sn-down up"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span><span>Back up at <b>' + escapeHtml(x.upAt) + '</b></span><span class="sn-pill green">' + hm(n) + ' down</span>' + (x.fix ? '<span>Fix: <b>' + escapeHtml(x.fix) + '</b></span>' : '') + '</div>';
+      if (x.upAt) return '<div class="sn-down up"><span>Down at <b>' + escapeHtml(clock12(x.readingTime)) + '</b></span><span>Back up at <b>' + escapeHtml(clock12(x.upAt)) + '</b></span><span class="sn-pill green">' + hm(n) + ' down</span>' + (x.fix ? '<span>Fix: <b>' + escapeHtml(x.fix) + '</b></span>' : '') + '</div>';
       // Joe 10/18: marked Resolved with no back up time, it stops counting when it was resolved; the box stays to fill the time in.
-      const pill = x.status === 'RESOLVED' ? '<span class="sn-pill amber">No back up time' + (x.resolvedAt ? ' · marked fixed ' + escapeHtml(new Date(Date.parse(x.resolvedAt)).toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })) : '') + '</span>' : '<span class="sn-pill red">Still down' + (n !== null ? ' · ' + hm(n) : '') + '</span>';
-      return '<div class="sn-down"><span>Down at <b>' + escapeHtml(x.readingTime) + '</b></span>' + pill +
-        (ck ? '<label>Back up at<input type="time" data-up="' + id + '" aria-label="Back up at"></label><input class="sn-fixbox" data-fix="' + id + '" maxlength="1000" placeholder="What fixed it (saves when you leave the box)" aria-label="What fixed it"' + (x.status === 'RESOLVED' && x.fix ? ' value="' + escapeHtml(x.fix) + '"' : '') + '>' : '') + '</div>';
+      const pill = x.status === 'RESOLVED' ? '<span class="sn-pill amber">No back up time' + (x.resolvedAt ? ' · marked fixed ' + escapeHtml(shortTime(x.resolvedAt)) : '') + '</span>' : '<span class="sn-pill red">Still down' + (n !== null ? ' · ' + hm(n) : '') + '</span>';
+      return '<div class="sn-down"><span>Down at <b>' + escapeHtml(clock12(x.readingTime)) + '</b></span>' + pill +
+        (ck ? '<label>Back up at<input type="text" data-time autocomplete="off" maxlength="10" data-up="' + id + '" aria-label="Back up at"></label><label class="sn-fixlab">What fixed it<input class="sn-fixbox" data-fix="' + id + '" maxlength="1000" aria-label="What fixed it"' + (x.status === 'RESOLVED' && x.fix ? ' value="' + escapeHtml(x.fix) + '"' : '') + '></label>' : '') + '</div>';
+    }
+    // Joe 11-3-26: under each kind, its history: every entry of the last 7 days (30 with Show 30 days), newest first, one row each.
+    // Breakdowns: what broke, when it went down, when it was reported, when it was back up, how long it was down and what fixed it.
+    let pastDays = 7;
+    function statusPill(x) {
+      const st = x.status || 'OPEN';
+      if (isKind(x, 'Breakdown') && st !== 'RESOLVED') { const s = U.downSpan(x, Date.now()); if (s && s.open) return '<span class="sn-pill red">Still down</span>'; }
+      return '<span class="sn-pill ' + (st === 'RESOLVED' ? 'green' : st === 'MONITOR' ? 'amber' : 'red') + '">' + escapeHtml(isKind(x, 'Breakdown') && st === 'RESOLVED' ? 'Back up' : U.followLabel(st)) + '</span>';
+    }
+    function pastTable(k, list) {
+      const cell = (v, cls) => '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + (v || '<span class="sn-none">—</span>') + '</td>';
+      const e = escapeHtml;
+      let head, rowOf;
+      if (k === 'Breakdown') {
+        head = ['Status', 'What broke', 'Down at', 'Reported', 'Back up at', 'Down time', 'What fixed it', 'Shift', 'By'];
+        rowOf = (x) => {
+          const s = U.downSpan(x, Date.now()), n = s ? s.end - s.start : null;
+          const up = !s ? '' : s.open ? '<b class="sn-red">Still down</b>' : s.noUpTime ? 'Not filled in' + (x.resolvedAt ? ' · marked fixed ' + e(dateTimeText(x.resolvedAt)) : '') : e(wallText(s.end));
+          return cell(statusPill(x)) + cell('<b>' + e(x.equipment || 'Not named') + '</b>' + (x.entry && x.entry !== 'Breakdown' ? '<small>' + e(x.entry) + '</small>' : ''), 'wrap') + cell(s ? e(wallText(s.start)) : e(clock12(x.readingTime))) +
+            cell(e(stamp(x.recordedAt))) + cell(up) + cell(n === null ? '' : s.open ? '<b class="sn-red">' + e(hm(n)) + ' so far</b>' : e(hm(n))) + cell(e(x.fix), 'wrap') + cell(e(shiftWord(x.shift))) + cell(e(who(x.recordedBy)));
+        };
+      } else if (k === 'Maintenance Request') {
+        head = ['Status', 'What\'s wrong', 'Reported', 'Can it wait?', 'Maintenance', 'Shift', 'By'];
+        rowOf = (x) => {
+          const wo = maint ? maint.workOrders.find(w => w.sourceEntryId === x.entryId) : null, M = window.UDPlantMaint;
+          const mt = !wo ? 'Waiting for maintenance' : 'Work order ' + e(wo.woNumber) + ' · ' + (M.isOpen(wo) ? e(M.statusWord(wo.status)) : 'Done' + (wo.completedAt ? ' ' + e(stamp(wo.completedAt)) : ''));
+          return cell(statusPill(x)) + cell('<b>' + e(x.equipment || 'Not named') + '</b>' + (x.entry ? '<small>' + e(x.entry) + '</small>' : ''), 'wrap') + cell(e(stamp(x.recordedAt))) + cell(e(x.urgency)) + cell(mt, 'wrap') + cell(e(shiftWord(x.shift))) + cell(e(who(x.recordedBy)));
+        };
+      } else {
+        head = ['Status', 'Reported', 'Shift', 'Equipment / area', 'What happened', 'Notes / Follow-up', 'By'];
+        rowOf = (x) => cell(statusPill(x)) + cell(e(stamp(x.recordedAt))) + cell(e(shiftWord(x.shift))) + cell(x.equipment ? '<b>' + e(x.equipment) + '</b>' : '', 'wrap') +
+          cell(e(x.entry) + (x.reviews.length ? '<small>Last note: ' + e(x.reviews[x.reviews.length - 1].entry) + '</small>' : ''), 'wrap') + cell(e(x.notes), 'wrap') + cell(e(who(x.recordedBy)));
+      }
+      return '<div class="sn-tablewrap"><table class="sn-past-table"><thead><tr>' + head.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' +
+        list.map(x => '<tr class="sn-r-' + (x.status === 'RESOLVED' ? 'done' : x.status === 'MONITOR' ? 'mon' : 'open') + '" data-past="' + e(x.entryId) + '">' + rowOf(x) + '</tr>').join('') + '</tbody></table></div>';
+    }
+    function drawPast(all) {
+      const box = document.getElementById('kind-history'), name = KINDS.find(x => x[0] === kind)[1];
+      const from = Date.now() - pastDays * 86400000, list = all.filter(r => isKind(r, kind) && Date.parse(r.recordedAt || '') >= from);
+      const down = kind === 'Breakdown' ? list.reduce((t, x) => { const s = U.downSpan(x, Date.now()); return t + (s ? s.end - s.start : 0); }, 0) : 0;
+      box.innerHTML = '<div class="sn-sec">' + escapeHtml(name) + ' history <span class="n">' + list.length + '</span><span class="why">last ' + pastDays + ' days, newest first' +
+        (kind === 'Breakdown' && list.length ? ' · ' + escapeHtml(hm(down)) + ' down in all' : '') + '</span>' +
+        '<button type="button" class="qc-btn" id="past-days">' + (pastDays === 7 ? 'Show 30 days' : 'Show 7 days') + '</button></div>' +
+        (list.length ? pastTable(kind, list) : '<div class="empty">No ' + escapeHtml(name.toLowerCase()) + ' in the last ' + pastDays + ' days.</div>');
     }
     // A maintenance request: how long it can wait, and what maintenance has done with it (its work order).
     function requestLine(x) {
@@ -236,15 +296,19 @@
         (M.isOpen(wo) ? '<span class="sn-pill ' + (wo.status === 'PARTS' ? 'amber' : 'green') + '">' + escapeHtml(M.statusWord(wo.status)) + '</span>' : '<span class="sn-pill green">Done' + (wo.completedAt ? ' ' + escapeHtml(stamp(wo.completedAt)) : '') + '</span>' + (wo.fixedNote ? ' Fixed: ' + escapeHtml(wo.fixedNote) : ''));
       return '<div class="sn-down req">' + state + (x.urgency ? '<span>Can wait: <b>' + escapeHtml(x.urgency.toLowerCase()) + '</b></span>' : '') + '</div>';
     }
-    const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + hoursAgo(x.recordedAt) + ' h' : '') + '</span>';
+    const tagOf = (x) => since(x.recordedAt) ? '<span class="tag new">NEW SINCE REPORT</span>' : '<span class="tag carry">CARRIED OVER' + (hoursAgo(x.recordedAt) ? ' · ' + window.UDTiming.spanText(hoursAgo(x.recordedAt) * 60) : '') + '</span>';
     const busy = (box) => box.contains(document.activeElement) && document.activeElement.matches('input') && document.activeElement.value;
 
+    // The tiles at the top (Joe 11-3-26: "I'd like to be able to actually use" them): what each counts, and the words over its list.
+    const TILES = [['all', 'Entries 24 h', '', 'everything put on the log in the last 24 hours'], ['OPEN', 'Needs attention', 'warn', 'not resolved yet, from any day'], ['MONITOR', 'Monitor', '', 'being watched, from any day'], ['RESOLVED', 'Resolved', 'good', 'resolved in the last 24 hours']];
+    let filter = '';
+    const tileList = (f, all, rows) => f === 'OPEN' || f === 'MONITOR' ? all.filter(r => r.status === f) : f === 'RESOLVED' ? rows.filter(r => r.status === 'RESOLVED') : rows;
     function render() {
       watchRequestOrders();
       if (phone.matches) pane = 'current'; // phones: the entry only, no history tab
       const all = week(), rows = day(), ck = canSave(), mineId = entry && entry.mine && entry.mine.payload.entryId;
-      document.getElementById('hstats').innerHTML = [['Entries 24 h', rows.length, ''], ['Needs attention', all.filter(r => r.status === 'OPEN').length, 'warn'], ['Monitor', all.filter(r => r.status === 'MONITOR').length, ''], ['Resolved', rows.filter(r => r.status === 'RESOLVED').length, 'good']]
-        .map(([l, n, k]) => '<div class="' + (n ? k : '') + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');
+      // Joe 11-3-26: each tile is a button that shows its entries on the 24-Hour History tab (press it again for everything).
+      document.getElementById('hstats').innerHTML = TILES.map(([f, l, k]) => { const n = tileList(f, all, rows).length; return '<button type="button" data-filter="' + f + '" class="' + (n ? k : '') + (pane === 'history' && filter === f ? ' on' : '') + '" aria-pressed="' + (pane === 'history' && filter === f) + '"><b>' + n + '</b><span>' + l + '</span></button>'; }).join('');
       document.getElementById('since').innerHTML = roundStart ? 'Since last report <b>' + escapeHtml(clockOf(roundStart)) + '</b>' : 'No report sent yet';
       document.querySelectorAll('[data-pane]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
       // Joe 10/15: anything in the last 24 hours not yet resolved puts a badge on the 24-Hour History tab.
@@ -258,10 +322,12 @@
       const tally = (k) => { const of = all.filter(r => isKind(r, k)); return { n: rows.filter(r => isKind(r, k)).length, open: of.filter(r => r.status === 'OPEN').length, mon: of.filter(r => r.status === 'MONITOR').length }; };
       document.getElementById('lines').innerHTML = KINDS.map(([k, name, sub]) => {
         const t = tally(k);
-        const words = t.open ? t.open + (k === 'Breakdown' ? ' still open' : k === 'Maintenance Request' ? ' waiting' : ' open') : t.mon ? t.mon + ' monitor' : t.n ? 'resolved' : sub || '';
+        // Joe 11-3-26: red while anything of it is still open (a breakdown still down), amber while one is watched (Monitor),
+        // green only when every one of it is resolved; the words say which.
+        const words = t.open ? t.open + (k === 'Breakdown' ? ' still open' : k === 'Maintenance Request' ? ' waiting' : ' open') : t.mon ? t.mon + ' monitor' : t.n ? (k === 'Breakdown' ? 'all back up' : 'all resolved') : sub || '';
         const dot = t.open ? 'st-down' : t.mon ? 'st-review' : t.n ? 'st-running' : '';
         const badge = t.open ? 'red' : t.mon ? 'amber' : t.n ? 'green' : '';
-        return '<button type="button" data-kind="' + k + '"' + (k === kind ? ' class="active"' : '') + '><span class="qc-dot ' + dot + '"></span><span>' + name + (words ? '<small>' + escapeHtml(words) + '</small>' : '') + '</span><b class="' + badge + '">' + t.n + '</b></button>';
+        return '<button type="button" data-kind="' + k + '" class="' + (k === kind ? 'active ' : '') + (badge ? 'k-' + badge : '') + '"><span class="qc-dot ' + dot + '"></span><span>' + name + (words ? '<small>' + escapeHtml(words) + '</small>' : '') + '</span><b class="' + badge + '">' + t.n + '</b></button>';
       }).join('');
       // Everything not resolved from before the last report, by kind ("1 breakdown and 1 handoff note").
       const old = all.filter(r => r.status !== 'RESOLVED' && !since(r.recordedAt)), carried = old.length;
@@ -285,8 +351,12 @@
         : '';
 
       // The log is not redrawn while someone is typing a review note in it.
-      const hist = document.getElementById('history');
-      if (!busy(hist)) hist.innerHTML = rows.map(r => card(r, ck, '', r.status !== 'RESOLVED')).join('') || '<div class="empty">No entries in the last 24 hours.</div>';
+      drawPast(all);
+      const hist = document.getElementById('history'), shown = tileList(filter, all, rows), tile = TILES.find(x => x[0] === filter);
+      document.getElementById('history-title').textContent = tile && filter !== 'all' ? tile[1] + ' (' + shown.length + ')' : 'Last 24 Hours';
+      document.getElementById('history-why').textContent = tile ? tile[3] : '';
+      document.getElementById('show-all').hidden = !filter || filter === 'all';
+      if (!busy(hist)) hist.innerHTML = shown.map(r => card(r, ck, '', r.status !== 'RESOLVED')).join('') || '<div class="empty">' + (tile && filter !== 'all' ? 'Nothing is marked ' + escapeHtml(tile[1]) + ' right now.' : 'No entries in the last 24 hours.') + '</div>';
       if (askEntry) { const el = document.querySelector('#open-box [data-entry="' + CSS.escape(askEntry) + '"]'); if (el) { askEntry = ''; el.classList.add('sn-asked'); el.scrollIntoView({ block: 'center' }); } }
       document.getElementById('foot').textContent = pane === 'current' ? (ck ? (formType() === 'Maintenance Request' && entry && !entry.mine ? 'A new maintenance request goes to maintenance only when you press Send to Maintenance; until then it stays here, marked Not sent yet. ' : 'Every box saves by itself when you leave it. ') + 'Send Current Report sends what is new since the last report and empties the entry boxes; anything not resolved stays here until it is.' : 'View only.') : rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' in the last 24 hours.';
       sendRow();
@@ -320,10 +390,10 @@
         if (t.matches('[data-up], [data-fix]')) {
           // Back up: the time (now when only the fix is typed) and what fixed it close the breakdown's down time.
           const id = t.dataset.up || t.dataset.fix, upBox = box.querySelector('[data-up="' + CSS.escape(id) + '"]'), fixBox = box.querySelector('[data-fix="' + CSS.escape(id) + '"]');
-          const up = (upBox && upBox.value) || (t.matches('[data-fix]') && t.value.trim() ? clockNow() : ''), fix = fixBox ? fixBox.value.trim() : '';
+          const up = (upBox && TM.hhmmOf(upBox.value)) || (t.matches('[data-fix]') && t.value.trim() ? clockNow() : ''), fix = fixBox ? fixBox.value.trim() : '';
           if (!up) return;
           if (upBox) upBox.value = ''; if (fixBox) fixBox.value = '';
-          review(id, fix || 'Back up at ' + up, 'RESOLVED', Object.assign({ UpAt: up }, fix ? { Fix: fix } : {}));
+          review(id, fix || 'Back up at ' + clock12(up), 'RESOLVED', Object.assign({ UpAt: up }, fix ? { Fix: fix } : {}));
           return;
         }
         if (t.matches('[data-status]')) {
@@ -372,9 +442,10 @@
       // Joe 10/18: a breakdown with what fixed it, or marked Resolved, is back up: the Back up at box takes the time now when empty,
       // so its down time stops (it can be changed).
       const upBox = f.querySelector('.sn-up');
-      if (upBox && !upBox.value && v('sn-type') === 'Breakdown' && (v('sn-fix') || v('sn-follow') === 'RESOLVED')) upBox.value = clockNow();
-      const values = Object.assign({ Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') }, v('sn-up') ? { UpAt: v('sn-up') } : {}, v('sn-fix') ? { Fix: v('sn-fix') } : {}, v('sn-urgency') ? { Urgency: v('sn-urgency') } : {});
-      const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: v('sn-time') || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
+      if (upBox && !upBox.value && v('sn-type') === 'Breakdown' && (v('sn-fix') || v('sn-follow') === 'RESOLVED')) upBox.value = TM.nowBoxText();
+      const values = Object.assign({ Entry: text, Type: v('sn-type') || 'Handoff', Equipment: v('sn-equip') }, TM.hhmmOf(v('sn-up')) ? { UpAt: TM.hhmmOf(v('sn-up')) } : {}, v('sn-fix') ? { Fix: v('sn-fix') } : {}, v('sn-urgency') ? { Urgency: v('sn-urgency') } : {});
+      const fields = { values, notes, shift: v('sn-shift') || shiftNow(), readingTime: TM.hhmmOf(v('sn-time')) || clockNow(), followUpStatus: v('sn-follow') || 'OPEN' };
+      { const tb = f.querySelector('.sn-time'); if (tb && !tb.value) tb.value = TM.boxText(fields.readingTime); }
       const mine = mine0 || record(values, { entryId: 'pending-' + Date.now(), shift: fields.shift });
       Object.assign(mine.payload, { values, shift: fields.shift, readingTime: fields.readingTime, notes, followUpStatus: fields.followUpStatus });
       mine.status = fields.followUpStatus;
@@ -416,9 +487,21 @@
       }
       render();
     });
+    document.getElementById('hstats').addEventListener('click', e => {
+      const b = e.target.closest('[data-filter]');
+      if (!b) return;
+      const again = pane === 'history' && filter === b.dataset.filter;
+      filter = again ? '' : b.dataset.filter;
+      pane = again ? 'current' : 'history';
+      history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
+      render();
+    });
+    document.getElementById('show-all').onclick = () => { filter = ''; render(); };
+    document.getElementById('kind-history').addEventListener('click', e => { if (e.target.closest('#past-days')) { pastDays = pastDays === 7 ? 30 : 7; render(); } });
     document.getElementById('panes').addEventListener('click', e => {
       const b = e.target.closest('[data-pane]');
       if (!b) return;
+      filter = '';
       pane = b.dataset.pane;
       history.replaceState(null, '', pane === 'history' ? '?view=history' : location.pathname);
       render();
@@ -439,7 +522,8 @@
       const watch = () => { const t = today(); if (t === day0) return; day0 = t; if (unsub) unsub(); unsub = onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SHIFT_TYPE), where('date', 'in', Array.from({ length: KEEP_DAYS }, (_, n) => L.addDays(t, -n)))), s => { journal = s.docs.map(d => d.data()); render(); }, fail('the log')); };
       watch();
       // The plant's own shifts; the drop-down follows the clock until someone picks a shift or the entry is saved.
-      onSnapshot(doc(db, 'plantShifts', 'fac_uniontown'), s => { shifts = shiftsFor(s.exists() ? s.data() : null, 'fac_uniontown'); followClock(true); }, () => {});
+      // Rules audit line 11 (Joe 11/3): this plant's own Shift Times (they always read Uniontown's before).
+      onSnapshot(doc(db, 'plantShifts', currentPlant()), s => { shifts = shiftsFor(s.exists() ? s.data() : null, currentPlant()); followClock(true); }, () => {});
       function followClock(redraw) {
         const box = document.getElementById('shift-now');
         if (!box || !entry || entry.shiftPicked || entry.mine) return;

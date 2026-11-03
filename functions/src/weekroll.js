@@ -75,9 +75,9 @@ function bookExisting(ctx, run) {
 // A day nobody may change from the masters any more: loaded (or loading) before today, changed by hand, or finished.
 function dayLocked(run, p, today) {
   const d = (run.days && run.days[p]) || {}, date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
-  const offset = d.loadDayOffset === null || d.loadDayOffset === undefined ? -1 : d.loadDayOffset;
+  const offset = L.loadDayOffset(d.loadDayOffset);
   const load = d.loadDate || L.addDays(date, offset);
-  return load < today || L.yes(d.routeOverride) || !!d.completeTime || d.loadedComplete === true;
+  return load < today || L.yes(d.routeOverride) || L.isLoaded(d);
 }
 
 // Fill-only (the Current week at Publish): a running day's blank driver, truck and trailer get the standard ones.
@@ -121,7 +121,8 @@ function applyDays(tx, db, snap, run, days, stamp, email, mode, queue, requestId
   return { runDocId: snap.id, rev: (run.rev || 0) + 1 };
 }
 
-const shortDate = (k) => { const [, m, d] = String(k).split('-').map(Number); return m + '/' + d; };
+// Dates are written one way everywhere, like 10-8-26 (rules audit line 15).
+const shortDate = L.dateText;
 
 /*
  * What Publish changes, read through `tx` (a transaction, or { get: q => q.get() } for liveroll.js's look ahead): the weeks after

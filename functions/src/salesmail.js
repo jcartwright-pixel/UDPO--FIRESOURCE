@@ -13,13 +13,15 @@
  *
  * The status (Joe 10/31: "on time if it has left ... not departed if the truck has not departed, or the trailer has not departed,
  * past its dispatch time only ... not loaded if it's not loaded", and "let's put however much time behind it is"):
- *   On time, left 4:05 AM            left by its dispatch time (green)
- *   Left 5:42 AM, 1 hr 12 min late   left after its dispatch time (red)
- *   Not departed, 35 min behind      loaded, past its dispatch time, not left (red)
- *   Not loaded, 20 min behind        not loaded (or still loading), past its dispatch time (red)
- *   Loaded / Not loaded              before its dispatch time (blue / yellow)
+ *   On time, left 4:05 AM            left within 30 minutes either side of its dispatch time (green)
+ *   Left 4:45 AM, 40 min late        left 30 to 60 minutes after it (yellow); past 60 minutes (red)
+ *   Left 3:20 AM, 40 min early       left 30 to 60 minutes before it (yellow); more than 60 minutes early (red)
+ *   Not departed, 35 min behind      loaded, more than 30 minutes past its dispatch time, not left (yellow, red past 60)
+ *   Not loaded, 35 min behind        not loaded (or still loading), more than 30 minutes past its dispatch time (yellow, red past 60)
+ *   Loaded / Not loaded              before its dispatch time, or within 30 minutes after it (blue / light yellow)
+ * Joe 11-2-26: the green, yellow and red windows are timing-rules.js's (SOURCES.sales), the same rule every screen uses.
  * The dispatch time is when the route leaves (plant-rules departWall: the route's Departure Day and the dispatch time), the same
- * time Loadout and the Late Forecast count from. The GPS is read every 5 minutes, so a leave within LATE_GRACE minutes counts on time.
+ * time Loadout and the Late Forecast count from.
  *
  * Settings: private/salesRouteEmail { on, to: [addresses] }. Nothing is sent until it is on with at least one address.
  */
@@ -27,10 +29,10 @@
 
 const L = require('./logic');
 const R = require('./plant-rules');
+const T = require('./timing-rules');
 const { trailerKey } = require('./fleetgps');
 const { safeIdPart } = require('./model');
 
-const LATE_GRACE = 5;
 const SETTINGS_DOC = 'salesRouteEmail';
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -38,36 +40,18 @@ const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const dayNum = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
 const keyOf = (n) => new Date(n * 86400000).toISOString().slice(0, 10);
 // 10-8-26
-const shortDate = (key) => { const p = String(key || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : text(key); };
+const shortDate = (key) => L.dateText(text(key));
 const weekdayOf = (key) => { const n = dayNum(key); return n === null ? '' : WEEKDAY[((n % 7) + 11) % 7]; };
-// Wall minutes (New York, counted from 1/1/1970) as "4:05 AM".
-function clock12(wall) {
-  const m = ((wall % 1440) + 1440) % 1440, h = Math.floor(m / 60), mm = m % 60;
-  return (h % 12 || 12) + ':' + (mm < 10 ? '0' : '') + mm + ' ' + (h < 12 ? 'AM' : 'PM');
-}
-// 35 min, 1 hr, 1 hr 12 min
-function howLong(minutes) {
-  const m = Math.max(0, Math.round(minutes)), h = Math.floor(m / 60), r = m % 60;
-  return h ? h + ' hr' + (r ? ' ' + r + ' min' : '') : r + ' min';
-}
-// A dispatch time as minutes of the day (the runs keep minutes; the sheet can give "4:30" or "4:30 PM"), as plant-rules reads it.
-function clockMinutes(v) {
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'number') return v >= 0 && v < 1 ? Math.round(v * 1440) : v;
-  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?$/i);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const ap = String(m[3] || '').toUpperCase();
-  if (ap) { if (h === 12) h = 0; if (ap === 'PM') h += 12; }
-  return h * 60 + Number(m[2]);
-}
+// Wall minutes (New York, counted from 1/1/1970) as "4:05 AM", a length of time as "1 hr 12 min", a stored time as minutes
+// of the day: timing-rules.js's one way for each.
+const clock12 = T.timeText;
+const howLong = T.spanText;
+const clockMinutes = T.clockMinutes;
 // Letters and digits only, the way the scorecard matches a truck to its GPS unit (sc-core scUnitKey_).
-const unitKey = (v) => text(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const unitKey = (v) => L.unitKey(v);
 
-function loaded(day) {
-  const s = text(day.loadStatus).toUpperCase();
-  return !!text(day.completeTime) || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0;
-}
+// Whether the load is loaded: the one rule in logic.js (rules audit, Joe 11/3).
+function loaded(day) { return L.isLoaded(day); }
 
 // The loads of one load date: Daily Dispatch's (shown on Daily, running that day).
 function loadsOn(runs, loadDate) {
@@ -107,11 +91,13 @@ function leftAt(x, reefer, gpsDays) {
 function statusOf(x, left, now) {
   const leaves = R.departWall({ departureDate: x.departureDate, deliveryDate: x.deliveryDate, loadDate: x.loadDate, leavesOn: x.leavesOn, dispatchTime: clockMinutes(x.dispatchTime) });
   if (left && left.at !== null) {
-    const late = leaves === null ? 0 : left.at - leaves;
     const when = clock12(left.at) + (Math.floor(left.at / 1440) !== Math.floor(now / 1440) ? ' ' + weekdayOf(keyOf(Math.floor(left.at / 1440))) : '');
-    return late > LATE_GRACE ? { word: 'Left ' + when + ', ' + howLong(late) + ' late', tone: 'late', late } : { word: 'On time, left ' + when, tone: 'ok', late: 0 };
+    const t = leaves === null ? null : T.departTiming(left.at - leaves, 'sales');
+    if (!t || t.tone === 'ok') return { word: 'On time, left ' + when, tone: 'ok', late: 0 };
+    return { word: 'Left ' + when + ', ' + t.words, tone: t.tone, late: t.late ? t.minutes : 0, early: t.early ? -t.minutes : 0 };
   }
-  if (leaves !== null && now > leaves) return { word: (x.loaded ? 'Not departed, ' : 'Not loaded, ') + howLong(now - leaves) + ' behind', tone: 'late', late: now - leaves };
+  const past = leaves === null ? null : T.departTiming(now - leaves, 'sales');
+  if (past && past.late) return { word: (x.loaded ? 'Not departed, ' : 'Not loaded, ') + howLong(now - leaves) + ' behind', tone: past.tone, late: now - leaves };
   return x.loaded ? { word: 'Loaded', tone: 'loaded', late: 0 } : { word: 'Not loaded', tone: 'waiting', late: 0 };
 }
 
@@ -138,14 +124,15 @@ function salesRows(input, nowMs) {
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const TONE = { ok: ['#1b7a3a', '#e6f4ea'], late: ['#b3261e', '#fde7e5'], loaded: ['#1d4f91', '#e5eefb'], waiting: ['#8a5a00', '#fff4d6'] };
+// Joe 11-2-26: caution = yellow (30 to 60 minutes off its dispatch time), late = red.
+const TONE = { ok: ['#1b7a3a', '#e6f4ea'], caution: ['#1c2733', '#f5c518'], late: ['#b3261e', '#fde7e5'], loaded: ['#1d4f91', '#e5eefb'], waiting: ['#8a5a00', '#fff4d6'] };
 
 /** The email itself: { subject, text, html }. */
 function salesEmail(data) {
   const day = weekdayOf(data.today) + ' ' + shortDate(data.today);
   const subject = 'Route status for ' + shortDate(data.today) + ' (6:00 AM)';
   const intro = 'Good morning. Here is where every route stands as of 6:00 AM, ' + day + '.';
-  const foot = 'The time a load left is when its trailer left the lot, from the trailer\'s GPS (or the truck\'s GPS if the trailer has none). Late and behind are counted from each route\'s dispatch time.';
+  const foot = 'The time a load left is when its trailer left the lot, from the trailer\'s GPS (or the truck\'s GPS if the trailer has none). On time is within 30 minutes either side of each route\'s dispatch time; yellow is 30 to 60 minutes early or late, red more than 60.';
   const many = data.groups.length > 1, none = !data.groups.some(g => g.rows.length);
   const head = (g) => (many ? 'Loaded ' + weekdayOf(g.loadDate) + ' ' + shortDate(g.loadDate) : '');
   const lines = [intro, ''];
@@ -242,4 +229,4 @@ async function adminTest(db, email, input, stamp, deps) {
   return { ok: out.status === 'SENT', message: out.status === 'SENT' ? 'Sent to ' + email + '.' : (out.reason || 'The test did not go out.') };
 }
 
-module.exports = { unitKey, shortDate, weekdayOf, adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, LATE_GRACE, SETTINGS_DOC };
+module.exports = { unitKey, shortDate, weekdayOf, adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, SETTINGS_DOC };

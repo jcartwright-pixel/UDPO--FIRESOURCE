@@ -10,6 +10,7 @@
   <title>Plant Distribution · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -124,7 +125,7 @@
     const dpLine = (href, label, side, kind, sub) => '<a class="dp-line' + (kind ? ' ' + kind : '') + '" href="' + href + '"><b>' + escapeHtml(String(side)) + '</b><span>' + escapeHtml(label) + (sub ? '<small>' + escapeHtml(sub) + '</small>' : '') + '</span></a>';
     // Joe 10/23: the walkthrough pictures still to go with a report, this plant's only.
     let taking = false;
-    const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
+    const myPics = () => data.pics.filter(p => L.plantOf(p) === plantFor(person, null).id);
     function picTile() {
       // The newest picture with its caption box; with more than one, the count opens the walkthrough, which lists them all.
       const pics = myPics(), SHOWN = 1;
@@ -196,7 +197,7 @@
       // Forecast rides in Case Loading, Washing and Returns in Case Unloading, tanker loads (when there are any) in Case Loading.
       const A = x.byArea, pend = x.returns.filter(z => z.pending).length;
       const loadCounts = (c) => [[c.total, 'Today'], [c.waiting, 'Waiting'], [c.loading + c.paused, 'Loading'], [c.done, 'Done', c.total && c.done === c.total ? 'good' : '']];
-      const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : '', '45+ min late'), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '', c.pickups ? 'not loaded yet' : 'none')];
+      const loadLines = (c, area) => [dpLine('loadout.html?area=' + area, 'Behind schedule', c.behind, c.behind ? 'bad' : '', window.UDTiming.SOURCES.plant.onTime + '+ min late'), dpLine('loadout.html?area=' + area, 'Pickups open', c.pickups, c.pickups ? 'bad' : '', c.pickups ? 'not loaded yet' : 'none')];
       const loadNote = (c) => c.done + ' of ' + c.total + ' loads complete';
       const fc = x.forecast.late ? dpLine('forecast.html', 'Late Forecast', x.forecast.late, 'bad', 'late · all done est. ' + x.forecast.allDoneWhen)
         : dpLine('forecast.html', 'Late Forecast', 0, 'good', x.forecast.loads.length ? 'on time · all done est. ' + x.forecast.allDoneWhen : 'nothing left to load');
@@ -204,7 +205,7 @@
       document.querySelector('[data-card="dept"]').innerHTML =
         deptCard('loadout.html?area=CASE', 'Loadout Center', 'Case Loading', P.AREA.CASE.color, loadCounts(A.CASE), A.CASE.done, A.CASE.total, loadNote(A.CASE), caseLines) +
         deptCard('loadout.html?area=TOTES', 'Loadout Center', 'Tote Loading', P.AREA.TOTES.color, loadCounts(A.TOTES), A.TOTES.done, A.TOTES.total, loadNote(A.TOTES), loadLines(A.TOTES, 'TOTES')) +
-        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Box Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
+        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Boxing Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
         deptCard('unloading.html', 'Trailers back from the routes', 'Case Unloading', '#455a64', [[x.uc.total, 'Trailers'], [x.uc.waiting, 'Waiting'], [x.uc.unloading, 'Unloading'], [x.uc.complete, 'Done', x.uc.total && x.uc.complete === x.uc.total ? 'good' : '']], x.uc.complete, x.uc.total, x.uc.complete + ' of ' + x.uc.total + ' trailers unloaded', [
           dpLine('unloading.html', 'Back, not started', x.backWaiting, x.backWaiting ? 'bad' : '', 'checked in'),
           dpLine('washing.html', 'Truck Washing', x.wash.length, x.wash.length ? 'warn' : '', 'to wash' + (x.repeat ? ' · ' + x.repeat + ' repeat' : '')),
@@ -256,14 +257,13 @@
       document.getElementById('pv-chips').innerHTML = [['Behind', r.counts.behind, r.counts.behind ? 'bad' : ''], ['To load', r.leftToLoad + ' of ' + r.totalLoads, ''], ['Pickups', r.counts.pickups, r.counts.pickups ? 'bad' : ''],
         ['Breakdowns', r.counts.down, r.counts.down ? 'bad' : ''], ['Lines down', r.counts.linesDown, r.counts.linesDown ? 'bad' : ''], ['Temps out', r.counts.tempsOut, r.counts.tempsOut ? 'bad' : '']]
         .map(([l, n, k]) => '<span class="' + k + '"><b>' + escapeHtml(String(n)) + '</b> ' + l + '</span>').join('');
-      const next = r.behind.concat(r.nextUp);
       // Joe 10/11: the card is a brief view, only what needs attention (routes behind, pickups, open breakdowns, lines down,
       // temperatures out). The full report (tap the preview) and the email still carry everything.
       const rt = (z, k, word) => '<span class="mc-rt ' + k + '"><b>' + escapeHtml(U.reportName(z)) + '</b><em>' + escapeHtml(z.depart ? 'depart ' + z.depart : '') + '</em><i>' + escapeHtml(word) + '</i></span>';
       const part = (title, n, items) => '<span class="mc-pvh bad">' + escapeHtml(title) + '<em>' + escapeHtml(String(n)) + '</em></span>' + items.join('');
       const line = (a, b, k) => '<span class="mc-pvrow ' + (k || '') + '"><b>' + escapeHtml(a) + '</b> ' + escapeHtml(b) + '</span>';
       const linesOut = r.lines.filter(l => l.flag), tempsOut = r.temperatures.filter(t => t.flag);
-      const brief = (r.behind.length ? part('Routes late or behind', r.behind.length, r.behind.map(z => rt(z, 'bad', (z.minutesUntil === null || z.minutesUntil >= 0 ? 'BEHIND' : 'LATE') + (z.late ? ' · ' + z.late : '')))) : '') +
+      const brief = (r.behind.length ? part('Routes late or behind', r.behind.length, r.behind.map(z => rt(z, z.tone === 'caution' ? 'warn' : 'bad', (z.minutesUntil === null || z.minutesUntil >= 0 ? 'BEHIND' : 'LATE') + (z.late ? ' · ' + z.late : '')))) : '') +
         (r.pickups.length ? part('Pickups open', r.pickups.length, r.pickups.map(p => line('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad'))) : '') +
         (r.down.length ? part('Plant breakdowns', r.down.length, r.down.map(d => line(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad'))) : '') +
         (linesOut.length ? part('Production lines down', linesOut.length, linesOut.map(l => line(l.line, [l.product, l.status || 'no status'].filter(Boolean).join(' · '), 'bad'))) : '') +
@@ -286,6 +286,8 @@
 
     // The full report as the email reads, one section after another.
     function drawReport() {
+      // Joe 11-2-26 (timing-rules.js): up to 60 minutes past the leaving time is yellow, past that red.
+      const toneKind = (z) => z.tone === 'caution' ? 'warn' : 'bad';
       const r = report, row = (a, b, k) => '<li class="' + (k || '') + '"><b>' + escapeHtml(a) + '</b><span>' + escapeHtml(b) + '</span></li>';
       const sect = (title, n, k, items, empty) => '<section><h3 class="' + (k || '') + '">' + escapeHtml(title) + (n == null ? '' : '<em>' + escapeHtml(String(n)) + '</em>') + '</h3>' + (items.length ? '<ul>' + items.join('') + '</ul>' : '<p>' + escapeHtml(empty) + '</p>') + '</section>';
       document.getElementById('rp-subject').textContent = r.subject;
@@ -294,24 +296,26 @@
       // Joe 11/1: the banner counts the routes late now (truck should have left, not loaded); with none, the loads that will
       // miss their truck turn it yellow, as the email.
       const tc = U.truckCheck(r), lateNow = tc.lateNow.length, late = lateNow ? 0 : tc.miss.length, leftBehind = lateNow || late ? 0 : tc.leftOver, doneLate = lateNow || late || leftBehind ? 0 : tc.loadedLate.length;
-      const loaded = r.loaded.map(z => tile(z, 'ok', z.loadedLate > 0 ? 'LATE' : '')), notLoaded = r.behind.map(z => tile(z, 'behind', z.minutesUntil === null || z.minutesUntil >= 0 ? 'BEHIND' : 'LATE')).concat(r.nextUp.map(z => tile(z, 'no')));
+      // Joe 11/1 (rules audit line 17): when the plant is behind, the loads still to load follow the truck that leaves first.
+      const still = U.inLoadingOrder(r.behind.concat(r.nextUp), r.forecast), behindSet = new Set(r.behind);
+      const loaded = r.loaded.map(z => tile(z, 'ok', z.loadedLate > 0 ? 'LATE' : '')), notLoaded = still.map(z => behindSet.has(z) ? tile(z, z.tone === 'caution' ? 'caution' : 'behind', z.minutesUntil === null || z.minutesUntil >= 0 ? 'BEHIND' : 'LATE') : tile(z, 'no'));
       document.getElementById('rp-body').innerHTML =
         '<div class="mc-banner ' + (r.forecast ? (lv => lv === 'good' && (lateNow || leftBehind || late || doneLate) ? 'warn' : lv)(U.shiftRecap(r).level) : lateNow || leftBehind ? 'bad' : late || doneLate ? 'warn' : 'good') + '"><b>' + (lateNow ? '&#9888; ' + lateNow + ' ROUTE' + (lateNow === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL BE LATE' : 'S WILL BE LATE') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</b><span>' + escapeHtml(r.dayLabel) + (r.forecast ? '' : ' · ' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded') + '</span></div>' +
         // Joe 11/3: the same short recap as the email: how many loaded and left, then on time or about how far behind and
         // when the last load should be done. No route names and no list of loads already loaded late.
         (r.forecast ? (rc => sect('Recap (estimated) at ' + rc.asOf, null, rc.level === 'good' ? '' : 'bad',
           [row(rc.loaded + ' of ' + rc.total + ' loaded', rc.left ? rc.left + ' left to load' : 'Nothing left to load'),
-            ...rc.areas.map(a => row(a.name, (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? ' · ' + a.left + ' left' : '') + ' · ' + a.status + (a.doneBy ? ' · done about ' + a.doneBy : ''), a.level === 'good' ? '' : 'bad'))], ''))(U.shiftRecap(r)) : '') +
+            ...rc.areas.map(a => row(a.name, (a.total - a.left) + ' of ' + a.total + ' loaded' + (a.left ? ' · ' + a.left + ' left' : '') + ' · ' + a.status + (a.doneBy ? ' · done about ' + a.doneBy : ''), a.level === 'good' ? '' : a.level))], ''))(U.shiftRecap(r)) : '') +
         // Joe 11/3: with the recap above, the count is not said twice.
         '<section><h3>Routes' + (r.forecast ? '' : '<em>' + (r.totalLoads - r.leftToLoad) + ' of ' + r.totalLoads + ' loaded</em>') + '</h3>' + (loaded.length ? '<h4 class="good">Loaded (' + loaded.length + ')</h4><div class="mc-routes">' + loaded.join('') + '</div>' : '') +
         (notLoaded.length ? '<h4 class="bad">Not loaded (' + notLoaded.length + ')</h4><div class="mc-routes">' + notLoaded.join('') + '</div>' : '') + (r.totalLoads ? '' : '<p>No loads on the dispatch sheet for this day.</p>') + '</section>' +
-        sect('Routes late or behind', r.behind.length, r.behind.length ? 'bad' : '', r.behind.map(z => row(U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.startedAt ? ' since ' + z.startedAt : '') + ' · ' + z.late + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : ''), 'bad')), 'No route is more than ' + r.behindMinutes + ' minutes past its depart time.') +
+        sect('Routes late or behind', r.behind.length, r.behind.length ? 'bad' : '', r.behind.map(z => row(U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.startedAt ? ' since ' + z.startedAt : '') + ' · ' + z.late + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : ''), toneKind(z))), 'No route is more than ' + r.behindMinutes + ' minutes past its depart time.') +
         sect('Pickups open', r.pickups.length, r.pickups.length ? 'bad' : '', r.pickups.map(p => row('PICKUP ' + [p.route, p.run].filter(Boolean).join(' '), [p.quantity, p.product].filter(Boolean).join(' '), 'bad')), 'None open.') +
         sect('Plant breakdowns', r.down.length, r.down.length ? 'bad' : '', r.down.map(d => row(d.equipment || 'Plant equipment', [d.entry, d.at ? 'logged ' + d.at : '', d.carried ? 'carried over' : '', U.followLabel(d.status), d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · '), d.status === 'MONITOR' ? 'warn' : 'bad')), 'None open.') +
         (r.fixed.length ? sect('Fixed since last report', r.fixed.length, '', r.fixed.map(d => row(d.equipment || 'Plant equipment', [d.review || d.entry, d.reviewAt, 'Resolved'].filter(Boolean).join(' · '))), '') : '') +
         (r.handoff.length ? sect('Shift handoff', r.handoff.length, '', r.handoff.map(d => row(d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff', [d.at, d.entry, d.notes].filter(Boolean).join(' · '))), '') : '') +
         (r.others.length ? sect('Incidents · Safety · Quality', r.others.length, '', r.others.map(d => row(d.equipment || d.type, [d.type, d.entry, U.followLabel(d.status)].filter(Boolean).join(' · '), d.status === 'RESOLVED' ? '' : 'warn')), '') : '') +
-        sect('Still to load', r.leftToLoad + ' of ' + r.totalLoads, '', r.behind.concat(r.nextUp).map((z, i) => row((i + 1) + '. ' + U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.late ? ' · ' + z.late : '') + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : '') + (z.priorDay ? ' · from yesterday' : ''), z.late ? 'bad' : '')), 'Nothing left to load.') +
+        sect('Still to load', r.leftToLoad + ' of ' + r.totalLoads, '', still.map((z, i) => row((i + 1) + '. ' + U.reportName(z), 'depart ' + (z.depart || '-') + ' · ' + U.statusWord(z.status) + (z.late ? ' · ' + z.late : '') + ((z.truck || z.trailer) ? ' · ' + [z.truck, z.trailer].filter(Boolean).join(' / ') : '') + (z.priorDay ? ' · from yesterday' : ''), z.late ? 'bad' : '')), 'Nothing left to load.') +
         sect('Production', null, '', r.lines.map(l => l.runComplete ? row(l.line, 'RUN COMPLETE ' + l.lastCheckedAt) : row(l.line, [l.product, l.lastCheckedAt ? (l.notChecked ? 'last check ' : 'quality check ') + l.lastCheckedAt + (l.qualityCheck ? ' ' + l.qualityCheck : '') : '', l.status || 'no status'].filter(Boolean).join(' · '), l.flag ? 'bad' : '')), 'No production lines set up.') +
         ((r.output || []).length ? sect('Line output' + (r.outputShift ? ' · ' + r.outputShift : ''), null, '', r.output.map(o => row(o.line, (o.product ? o.product + ' · ' : '') + U.outputText(o), o.pct !== null && o.pct < 90 ? 'bad' : '')), '') : '') +
         sect('Temperatures', null, '', r.temperatures.map(t => row(t.location, (t.reading !== '' ? t.reading + '°F · ' : '') + (t.status === 'NO CHECK' ? 'CHECK DUE' : t.status) + (t.notChecked && t.lastCheckedAt ? ' · last ' + t.lastCheckedAt : '') + (t.limit ? ' · limit ' + t.limit : '') + (t.due && t.status !== 'NO CHECK' ? ' · check due' : ''), t.flag ? 'bad' : t.due || t.notChecked ? 'warn' : '')), 'No temperature locations set up.');

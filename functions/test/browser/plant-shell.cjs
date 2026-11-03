@@ -78,7 +78,7 @@ const SCREENS = [
     assert.ok(notes[0] > walk[3] && Math.abs(notes[1] - walk[1]) <= 2, 'Shift Notes sits beside the walkthrough ' + JSON.stringify([walk, notes]));
     await side.hover('.sidemenu .side-sec-btn[title="Plant Distribution Departments"]');
     await side.waitForSelector('.side-flyouts .flyout.open');
-    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Case Loading', 'Tote Loading', 'Box Loading', 'Tanker Loading', 'Late Forecast', 'Case Unloading', 'Tote Unloading', 'Box Unloading', 'Tanker Unloading', 'Truck Washing', 'Product Returns', 'Trailer Assignments']);
+    assert.deepEqual(await side.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent.trim())), ['Plant Departments', 'Case Loading', 'Tote Loading', 'Boxing Loading', 'Tanker Loading', 'Late Forecast', 'Case Unloading', 'Tote Unloading', 'Boxing Unloading', 'Tanker Unloading', 'Truck Washing', 'Product Returns', 'Trailer Assignments']);
     await side.mouse.move(1500, 900);
     await Promise.all([side.waitForURL(/report=1/), side.click('.sidemenu a[href="manager.html?report=1"]')]);
     await side.waitForSelector('#modal:not([hidden])');

@@ -32,7 +32,7 @@ test('Publish of the Next week: Current becomes Previous, Next becomes Current, 
   for (const id of ['run_t801', 'run_t802', 'run_t810']) await db().collection('routes').doc(id).update({ displayDaily: true, displayWeekly: true });
   const out = await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT);
   assert.deepEqual([out.previousWeek, out.currentWeek, out.nextWeek], ['2026-10-04', '2026-10-11', '2026-10-18']);
-  assert.match(out.message, /^Week pushed live\. Current is now 10\/11/);
+  assert.match(out.message, /^Week pushed live\. Current is now 10-11-26/);
   assert.deepEqual((await config()).liveWeeks, { previous: '2026-10-04', current: '2026-10-11', next: '2026-10-18' });
 
   const built = await week('2026-10-18');

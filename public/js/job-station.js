@@ -30,7 +30,7 @@ export const names = (list) => list.length > 2 ? list.slice(0, -1).join(', ') + 
 const mins = (iso) => { const m = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 60000)); return isFinite(m) ? m : 0; };
 const hm = (m) => hoursMinutesText(m, { unit: 'm', pad: true });
 const clock = (iso) => { const m = mins(iso); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
-export const age = (iso) => { const m = mins(iso); if (!iso || !isFinite(Date.parse(iso))) return ''; return m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ago' : Math.floor(m / 1440) + (m < 2880 ? ' day ago' : ' days ago'); };
+export const age = (iso) => { const m = mins(iso); if (!iso || !isFinite(Date.parse(iso))) return ''; return window.UDTiming.spanText(m) + ' ago'; };
 export const first = (name) => { const p = String(name || '').split(/\s+/); return p.length > 1 && p[0] === p[0].toUpperCase() ? p.slice(1).join(' ') : p[0]; };
 export const rid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 
@@ -277,7 +277,7 @@ export function mountJobStation(cfg) {
     $('job-start').hidden = j.status === 'PARTS';
     $('job-parts').innerHTML = j.status === 'PARTS' ? 'Parts are here' : 'Need Parts';
   }
-  const when = (iso) => { const d = new Date(iso); return isFinite(d) ? (d.getMonth() + 1) + '-' + d.getDate() + '-' + String(d.getFullYear()).slice(2) : ''; };
+  const when = (iso) => (isFinite(new Date(iso)) ? window.UDLogic.dateText(iso) : '');
   // Joe 10/28: Start Work, Pause, Waiting on Parts (Parts are here once it waits) and Complete; the notes boxes; the checklist.
   function drawSimpleJob() {
     const j = open;

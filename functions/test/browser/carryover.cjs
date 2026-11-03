@@ -94,7 +94,13 @@ async function openPage(browser, url, w, h, opts) {
     await mc.waitForFunction(() => /2 routes late/i.test(document.getElementById('pv-subject').textContent), null, { timeout: 20000 });
     // Every load reaches Manager Center through runDays (a trigger on each run): wait for all nine.
     // A slow test computer can take longer than 20 seconds to run the nine triggers.
-    await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 45000 });
+    // CI once timed out here (11/3) and could not be made to fail again on a test computer: say what the screen and the
+    // database had, so the next time shows why.
+    await mc.waitForFunction(() => /9 of 9/.test(document.getElementById('pv-chips').textContent), null, { timeout: 45000 }).catch(async (e) => {
+      const days = (await d.collection('runDays').get()).docs.map(x => x.id).sort();
+      console.error('Manager Center shows "' + await mc.evaluate(() => document.getElementById('pv-chips').textContent) + '"; runDays (' + days.length + '): ' + days.join(', '));
+      throw e;
+    });
     await shot(mc, 'carryover-manager-1536');
     await mc.click('.mc-preview');
     await mc.click('#send-test');

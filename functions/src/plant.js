@@ -27,19 +27,12 @@ const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
 
 // The four loadout areas and their words (desktopV5063LoadoutTypeToArea_ and the Daily <area> Loadout titles).
 const AREAS = Object.freeze({
-  CASE: { title: 'Daily Case Loadout', label: 'Cases Out', inLabel: 'Cases In', tile: 'Cases' },
-  TOTES: { title: 'Daily Tote Loadout', label: 'Totes Out', inLabel: 'Totes In', tile: 'Totes' },
-  BOXING: { title: 'Daily Box Loadout', label: 'Boxes Out', inLabel: 'Boxes In', tile: 'Boxes' },
-  TANKER: { title: 'Daily Tanker Loadout', label: 'Quantity Out', inLabel: 'Gallons In', tile: 'Tanker' }
+  CASE: Object.assign({ label: 'Cases Out', inLabel: 'Cases In' }, L.AREA_WORDS.CASE),
+  TOTES: Object.assign({ label: 'Totes Out', inLabel: 'Totes In' }, L.AREA_WORDS.TOTES),
+  BOXING: Object.assign({ label: 'Boxes Out', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
+  TANKER: Object.assign({ label: 'Quantity Out', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 });
-function areaOf(loadType) {
-  const t = String(loadType || '').trim().toUpperCase();
-  if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
-  if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
-  if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') return 'BOXING';
-  if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
-  return '';
-}
+function areaOf(loadType) { return L.loadArea(loadType); }
 
 /* ---------- the copy ---------- */
 
@@ -236,7 +229,7 @@ const runAreaOf = (run, prefix) => {
 // A day block is loading now: started (or marked Loading), not paused, not done.
 function dayLoadingNow(day) {
   const s = text(day && day.loadStatus).toUpperCase();
-  if (!day || day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY', 'PAUSED'].indexOf(s) >= 0) return false;
+  if (!day || L.isLoaded(day) || s === 'PAUSED') return false;
   return !!day.plantStartedAt || s === 'LOADING';
 }
 // The loads of an area loading now (today's and yesterday's still open; the Scheduler's shipments on Boxing), leaving out
@@ -247,7 +240,7 @@ async function loadingNow(tx, db, area, stamp, except) {
   const runs = (await tx.get(db.collection('runs').where('weekStart', 'in', weeks))).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
   let n = 0;
   runs.forEach(run => {
-    if (text(run.routeStatus || 'ACTIVE').toUpperCase() !== 'ACTIVE' || run.active === false) return;
+    if (!L.runActive(run)) return;
     dates.forEach(d => L.loadBlocksFor(run, d).forEach(b => { if (runAreaOf(run, b.prefix) === area && run.id + '|' + b.prefix !== except && dayLoadingNow(run.days[b.prefix])) n++; }));
   });
   if (area === 'BOXING') {
@@ -320,8 +313,8 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
       if (/^T\.?B\.?A\.?$/i.test(String(f[k]).trim())) { after[k] = 'TBA'; after[idField] = ''; return; }
       const u = MAINT.resolveUnit(f[k], type, equipment);
       if (f.assign) assignCheck(f[k], u, equipment, run, req.day, stamp, SaveError);
-      // A number no unit matches is kept as typed, the same as the current app.
-      after[k] = type === 'TRAILER' && !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit;
+      // A unit no Equipment Master row matches is kept as typed; a trailer number follows the one trailer rule (T-14, never T-014).
+      after[k] = type === 'TRAILER' ? typedTrailer(u) : u.unit;
       after[idField] = u.id;
     });
   }
@@ -364,10 +357,10 @@ function markTimes(day, after, stamp, saver) {
 // more than one trailer must be typed in full, and a down trailer cannot go on a load for today or later.
 const DOWN_STATUSES = ['DOWN', 'OUT OF SERVICE', 'OOS', 'REPAIR'];
 function assignCheck(typed, u, equipment, run, prefix, stamp, SaveError) {
-  const key = text(typed).toUpperCase().replace(/^T\s*-?\s*(?=\d)/, '').replace(/^0+(?=\d)/, '');
+  const key = R.unitKey(typed);
   if (!u.resolved && /^\d{1,4}$/.test(key)) {
     const suffix = key.length < 3 ? key.padStart(3, '0') : key;
-    const many = (equipment || []).filter(e => e.type === 'TRAILER' && /^\d+$/.test(text(e.unit).replace(/^T-?/i, '')) && text(e.unit).replace(/^T-?/i, '').replace(/^0+(?=\d)/, '').slice(-suffix.length) === suffix);
+    const many = (equipment || []).filter(e => e.type === 'TRAILER' && /^\d+$/.test(R.unitKey(e.unit)) && R.unitKey(e.unit).slice(-suffix.length) === suffix);
     if (many.length > 1) throw new SaveError('BAD_REQUEST', 'Trailer ' + text(typed) + ' matches ' + many.slice(0, 6).map(e => e.unit).join(', ') + '. Type the full number.');
   }
   const e = u.resolved ? (equipment || []).find(x => x.id === u.id) : null;
@@ -895,7 +888,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     if (pick.length !== 1) throw new SaveError('CONFLICT', (req.lane === 'RECEIVING' ? 'That supplier' : 'That route / run') + ' is no longer on the list. The list was refreshed; pick again.');
     if (pick[0].route !== req.route || pick[0].run !== req.run) throw new SaveError('CONFLICT', 'Route Master changed that run. The list was refreshed; pick again.');
     let trailer = req.trailer;
-    if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit; }
+    if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = typedTrailer(u); }
     const payload = { pickupTime: req.pickupTime, loadDate: req.loadDate, trailer, scheduleType: req.scheduleType, carrier: req.scheduleType === 'CARRIER', poNumber: req.poNumber,
       cases: req.cases, product: req.product, notes: req.notes };
     // Save Load keeps what the station did on the load (its Start, End, count): changing the load's boxes does not start it over.
@@ -906,7 +899,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     else if (lines) payload.lines = [];
     if (had && had.payload && had.payload.received) payload.received = had.payload.received;
     rec = { recordId: id, type, date: req.date, status: 'SCHEDULED', routeId: req.routeId, runId: req.runId, route: req.route, run: req.run, trailer, notes: req.notes,
-      area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: (had && had.facilityId) || 'fac_uniontown' };
+      area: req.lane === 'RECEIVING' ? 'RECEIVING' : 'SCHEDULER', payload, facilityId: L.plantOf(had) };
   }
   delete rec.sheetRow; delete rec.cells;
   Object.assign(rec, { recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
@@ -1062,7 +1055,7 @@ async function saveQuality(tx, db, req, email, stamp, logRef, mode, SaveError) {
   if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'Production area is not configured for this plant.');
   const record = { operationId: req.operationId, area: d.name, product: req.product, status: req.status, remainingOutput: req.remainingOutput, qualityCheck: req.qualityCheck,
     tipTest: req.tipTest, temperature: req.temperature, cycleTime: req.cycleTime, productSize: req.productSize, annealerSpeed: req.annealerSpeed, weights: req.weights, notes: req.notes,
-    facilityId: d.facilityId || 'fac_uniontown' };
+    facilityId: L.plantOf(d) };
   if (req.undone) record.undone = true;
   const id = req.checkId || 'PRODUCTION_QUALITY_app_' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
   if (req.checkId) {
@@ -1260,7 +1253,7 @@ async function productSetupOf(tx, db, facilityId) {
   return { ref, had: d, areas: d && Array.isArray(d.areas) ? d.areas : (START_AREAS[facilityId] || []).map(n => ({ id: areaSlug(facilityId, n), name: n })),
     groups: d && Array.isArray(d.groups) ? d.groups : START_GROUPS.slice() };
 }
-const machinePlant = (d) => text(d.facilityId) || 'fac_uniontown';
+const machinePlant = (d) => L.plantOf(d);
 function validFacility(v, SaveError) {
   const facilityId = text(v);
   if (plantIds().indexOf(facilityId) < 0) throw new SaveError('BAD_REQUEST', 'Pick a plant.');
@@ -1486,6 +1479,10 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
+// A trailer as saved on a load: the Equipment Master unit when one matches, otherwise the typed number through the one trailer
+// rule (logic.js trailerNumber, rules audit line 12): 014, T014 and T-014 all save as T-14.
+function typedTrailer(u) { return u.resolved ? u.unit : L.trailerNumber(u.unit); }
+
 module.exports = { runAreaOf, dayLoadingNow, scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, ADDED_ROUTE, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
-  validateSchedule, saveSchedule, appScheduleId };
+  validateSchedule, saveSchedule, appScheduleId, typedTrailer };

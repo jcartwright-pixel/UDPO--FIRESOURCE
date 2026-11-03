@@ -10,6 +10,7 @@
   <title>MOCREO &amp; Sensors · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -225,7 +226,7 @@
         if (!r) { delete sent[l.locationId]; break; }
         saved++;
       }
-      note = saved + ' of ' + plan.changes.length + ' matches saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.';
+      note = saved + ' of ' + plan.changes.length + ' matches saved ' + window.UDTiming.clockOf(Date.now()) + '.';
       plan = null; matchBox(); render();
     });
     // A location saved with its sensor changed (the rest as it is).

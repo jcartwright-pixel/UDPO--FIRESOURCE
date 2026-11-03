@@ -13,6 +13,7 @@
   <title>Manager Walkthrough · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -87,7 +88,7 @@
     // Joe 10/23 (pictures, option 1): the 4th stop. TAKE PICTURE opens the camera; the pictures go with the next Send Current Report
     // and never again after that (kept 30 days). A picture not sent yet can be removed.
     let taking = false;
-    const myPics = () => data.pics.filter(p => (p.facilityId || 'fac_uniontown') === plantFor(person, null).id);
+    const myPics = () => data.pics.filter(p => L.plantOf(p) === plantFor(person, null).id);
     function picRow() {
       const pics = myPics();
       return '<div class="wk-row"><div class="wk-choice plain wp-choice"><span class="wk-num">4</span><span class="wk-t"><b>Pictures</b><span>Anything worth showing in the report</span></span>' +

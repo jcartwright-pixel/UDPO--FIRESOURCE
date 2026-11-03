@@ -124,7 +124,7 @@ async function seed() {
       assert.equal(row('910')[7], 'Changed on the sheet');
       assert.deepEqual([row('912')[5], row('912')[7]], ['Not recorded', 'Not recorded']);
       // Downtime before: Cases 9:00 AM to 10:30 AM idle; the tote is its own loadout (first load).
-      assert.equal(row('904')[9], '1 h 30 min');
+      assert.equal(row('904')[9], '1 hr 30 min');
       assert.equal(row('801')[9], 'first load');
       assert.equal(row('901')[9], 'first load');
       assert.equal(row('902')[9], '10 min');
@@ -133,8 +133,8 @@ async function seed() {
       assert.deepEqual(recap.map(r => r[0].split(' ').slice(0, 2).join(' ')), ['First Shift', 'Second Shift', 'Third Shift', 'Whole day']);
       assert.deepEqual(recap.map(r => r[1]), ['6', '4', '4', '14']);
       // Second Shift owns 2:30 to 10:30 PM (in an overlap the earlier shift keeps it): 2:30-2:40 PM of the gap before 906,
-      // 3:30-4:05 PM (907's Start was moved), 4:20-5:50 PM, 6:40-7:00 PM and 7:45-10:30 PM = 5 h 20 min.
-      assert.equal(recap[1][4], '5 h 20 min');
+      // 3:30-4:05 PM (907's Start was moved), 4:20-5:50 PM, 6:40-7:00 PM and 7:45-10:30 PM = 5 hr 20 min.
+      assert.equal(recap[1][4], '5 hr 20 min');
       assert.match(await pg.textContent('.rp-lead'), /Second Shift had the most downtime between loads/);
       assert.match(await pg.textContent('.rp-lead'), /First Shift: 1 time entered well after the time it says/);
       assert.match(await pg.textContent('.rp-lead'), /Third Shift: 1 changed on the sheet/);

@@ -13,14 +13,18 @@ import { shortTime, dateTimeText, hoursMinutesText, escapeHtml } from './app.js'
 
 const L = window.UDLogic;
 
-export const AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+export const AREAS = L.AREA_ORDER;
 export const AREA = {
-  CASE: { title: 'Daily Case Loadout', tile: 'Cases', label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' },
-  TOTES: { title: 'Daily Tote Loadout', tile: 'Totes', label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' },
-  BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
-  TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
+  // The area words (title, tile) are the one set in logic.js (rules audit line 13: Boxing, Tanker, Tote).
+  CASE: Object.assign({ label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' }, L.AREA_WORDS.CASE),
+  TOTES: Object.assign({ label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' }, L.AREA_WORDS.TOTES),
+  BOXING: Object.assign({ label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
+  TANKER: Object.assign({ label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 };
-export const BEHIND_MINUTES = 45;
+// Every time rule is timing-rules.js's (window.UDTiming; Joe 11-3-26). Behind = past the on-time window after the truck's
+// leaving time (30 minutes; it was 45 here), yellow up to 60 minutes, red after.
+const T = window.UDTiming;
+export const BEHIND_MINUTES = T.SOURCES.plant.onTime;
 
 export function areaOf(loadType) {
   const t = String(loadType || '').trim().toUpperCase();
@@ -52,7 +56,7 @@ export function runArea(run, prefix) {
 // WAITING / LOADING / DONE (a stored READY counts as done, Joe 7.0.272).
 export function loadState(day) {
   const s = String(day.loadStatus || '').trim().toUpperCase();
-  if (day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0) return 'DONE';
+  if (L.isLoaded(day)) return 'DONE';
   if (day.plantStartedAt || s === 'LOADING' || s === 'PAUSED') return 'LOADING';
   return 'WAITING';
 }
@@ -154,35 +158,29 @@ export function loadoutRows(runs, date, plantStart) {
   return out.sort(byLoad);
 }
 
-export function nowMinutes(now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
-  return Number(parts.hour) * 60 + Number(parts.minute);
-}
+// The minute of the day on the plant's clock.
+export function nowMinutes(now) { return T.minuteOfDay((now || new Date()).getTime()); }
 
-// Behind: a load not done more than 45 minutes after its route leaves (departure date + dispatch time, not the load day), so a
-// Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load left over from last night (still open
-// after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is behind before its dispatch time too.
-export function isBehind(row, today, now) {
-  if (row.state === 'DONE' || row.outside) return false;
+// Behind: a load not done past the on-time window after its route leaves (timing-rules.js departTiming; departure date +
+// dispatch time, not the load day), so a Saturday loadout for Monday is not behind until Monday (Joe 10/11). Joe 10/20: a load
+// left over from last night (still open after the 6 a.m. roll) that leaves before this shift ends missed its shift, so it is
+// behind before its dispatch time too. behindTone: 'caution' (yellow, up to 60 minutes past) or 'late' (red), '' when not behind.
+export function behindTone(row, today, now) {
+  if (row.state === 'DONE' || row.outside) return '';
   const leaves = departWall(row), n = wallNowMinutes(now);
-  if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return true;
-  if (leaves === null) return false;
-  return n > leaves + BEHIND_MINUTES;
+  if (row.prior && (leaves === null || leaves <= shiftEndAfter(n))) return 'late';
+  if (leaves === null) return '';
+  const t = T.departTiming(n - leaves, 'plant');
+  return t && t.late ? t.tone : '';
 }
-// Minutes since 1/1/1970 on the plant's wall clock (New York). When a load leaves (departWall) is plant-rules.js's own rule, the one
-// the Late Forecast and the report use (audit batch 1, Joe 10/22: every screen agrees); every page that loads this file loads it.
-const dayNumber = (key) => { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; };
+export function isBehind(row, today, now) { return !!behindTone(row, today, now); }
 // The end of the shift running at wall minute n: 6 a.m. after the operating day that n falls in.
-export const shiftEndAfter = (n) => (Math.floor((n - 360) / 1440) + 1) * 1440 + 360;
-export function wallNowMinutes(now) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    .formatToParts(now || new Date()).forEach(p => { parts[p.type] = p.value; });
-  return dayNumber(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
-}
+export const shiftEndAfter = T.shiftEndAfter;
+// Minutes since 1/1/1970 on the plant's wall clock (New York).
+export function wallNowMinutes(now) { return T.wallClock((now || new Date()).getTime()); }
+// When a load leaves: timing-rules.js's one leaving rule, the one the Late Forecast and the report use (audit batch 1, Joe 10/22).
 export function departWall(row) {
-  return window.UDPlant.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: row.dispatchTime });
+  return T.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: row.dispatchTime });
 }
 
 export function pickupOpen(p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(String(p.status || '').toUpperCase()) < 0; }
@@ -280,7 +278,7 @@ export function localToStamp(local) {
 // The shared rules (js/plant-rules.js, the same file the server uses).
 const U = window.UDPlant;
 export const UNLOAD_UNIT = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Gallons' };
-export const UNLOAD_TILE = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Tankers' };
+export const UNLOAD_TILE = { CASE: L.AREA_WORDS.CASE.tile, TOTES: L.AREA_WORDS.TOTES.tile, BOXING: L.AREA_WORDS.BOXING.tile, TANKER: L.AREA_WORDS.TANKER.tile };
 const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
 // A count from the sheet or the app: a whole number, or '' when blank or not a number.
 const num = (v) => { const t = txt(v).replace(/,/g, ''); return t !== '' && isFinite(Number(t)) ? Number(t) : ''; };
@@ -394,7 +392,7 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
   const master = {};
   (routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
   (runs || []).forEach(run => {
-    const m = master[run.runId] || {}, dropAndHook = !!(run.dropAndHook || m.dropAndHook);
+    const m = master[run.runId] || {}, dropAndHook = L.dropAndHook(run, master);
     const area = runArea(run, run.weekStart === week ? prefix : ''), d = run.weekStart === week && run.days && run.days[prefix];
     if (!area || !shownForPlant(run) || !d || !d.runs) return;
     const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};
@@ -488,7 +486,7 @@ function carriedSplit(runs, date, journal, routes, plantStart) {
   });
   return { keep, skip };
 }
-const shortDay = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? Number(p[1]) + '-' + Number(p[2]) + '-' + p[0].slice(2) : d; };
+const shortDay = (d) => L.dateText(d);
 // Yesterday's cards that leave the list as "Not recorded" (see carriedSplit), each with its note.
 export function carriedNotRecorded(runs, date, journal, routes, plantStart) {
   return carriedSplit(runs, date, journal, routes, plantStart).skip;

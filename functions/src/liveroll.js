@@ -264,6 +264,6 @@ async function rollLiveSheet(db, deps, live, stamp, email) {
   }
 }
 
-function shortDate(k) { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); }
+function shortDate(k) { return L.dateText(k); }
 
 module.exports = { rollLiveSheet, rollRequests, seedValue, cellData, historyRows, weekOf, usedRows, serial, RollError, HISTORY_TAB, HISTORY_HEADERS };

@@ -13,8 +13,8 @@ const R = window.UDPlant;
 const esc = escapeHtml;
 // Review item 28 (Joe 10/13): a long Returns or Washing line wraps to two lines, and the whole text shows on hover.
 const link = (href, label, side, alert, cls) => '<a class="dc-link' + (cls ? ' ' + cls : '') + '" href="' + href + '" title="' + escapeHtml(label) + '"><span>' + escapeHtml(label) + '</span>' + (side !== undefined ? '<b class="dc-side' + (alert ? ' alert' : '') + '">' + escapeHtml(side) + '</b>' : '') + '<i class="dc-arrow">&rarr;</i></a>';
-// Polish item 5 (Joe 10/11): past a day it reads "2 days 7 h" instead of "55 h 51".
-const hm = (m) => m == null ? '-' : m < 60 ? m + ' min' : m >= 1440 ? Math.floor(m / 1440) + (m < 2880 ? ' day ' : ' days ') + Math.floor((m % 1440) / 60) + ' h' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+// Polish item 5 (Joe 10/11): past a day it reads "2 days 7 hr" instead of "55 h 51". Joe 11-3-26: timing-rules.js spanText.
+const hm = (m) => m == null ? '-' : window.UDTiming.spanText(m);
 const since = (stamp) => { const t = Date.parse(stamp || ''); return isFinite(t) ? Math.max(0, Math.round((NOW.getTime() - t) / 60000)) : null; };
 const avg = (a) => a.length ? Math.round(a.reduce((t, x) => t + x, 0) / a.length) : null;
 function reason(text) {
@@ -73,7 +73,7 @@ function model() {
     oldestBack: backWaiting.length ? backWaiting[0].back : null,
     // Polish item 4 (Joe 10/11): each department counts yesterday's leftover loads too, the same as its Loadout screen.
     loadLinks: P.AREAS.map(a => { const ac = P.counts(rows.filter(r => r.area === a)); return link('loadout.html?date=' + date + '&area=' + a, P.AREA[a].title.replace('Daily ', ''), ac.done + ' / ' + ac.total); }),
-    unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, ({ CASE: 'Case', TOTES: 'Tote', BOXING: 'Box', TANKER: 'Tanker' })[a] + ' Unloading', ac.complete + ' / ' + ac.total); }),
+    unloadLinks: P.AREAS.map(a => { const ac = P.unloadCounts(urows.filter(r => r.area === a)); return link('unloading.html?date=' + date + '&area=' + a, window.UDLogic.areaName(a) + ' Unloading', ac.complete + ' / ' + ac.total); }),
     washLinks: openWash.slice(0, 3).map(w => link('washing.html?date=' + date, (w.trailer || 'Trailer') + ' · ' + w.need)), washMain: link('washing.html?date=' + date, 'Truck Washing', openWash.length + ' open', openWash.length > 0),
     retLinks: pend.slice(0, 3).map(x => link('returns.html?date=' + date, x.route + ' · ' + x.detail, 'Pending', true)), retMain: link('returns.html?date=' + date, 'Product Returns', pend.length + ' pending', pend.length > 0),
     loadNote: c.done + ' of ' + c.total + ' loads complete' + (all.prior ? '  ·  + ' + all.prior + ' from yesterday' : ''),
@@ -103,7 +103,7 @@ export function run(render) {
     watchWashRequests(db, L.weekStart(date), r => { data.appWash = r; go(); }, fail('the wash requests'));
     watchCopied(db, (when) => {
       const at = when ? new Date(when) : null;
-      document.getElementById('copied').textContent = at ? 'Last Sync: ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Waiting for the first copy';
+      document.getElementById('copied').textContent = at ? 'Last Sync: ' + window.UDTiming.clockOf(at) : 'Waiting for the first copy';
     });
     go();
     // Behind, waiting times and the hour bars move with the clock.
@@ -170,7 +170,7 @@ function A(m) {
   return card('load', head('load') + '<div class="dc-links two">' + m.loadLinks.join('') + '</div>' +
     '<div class="mid">' +
       '<div class="panel" style="display:flex;flex-direction:column"><div class="sec-t"><span>Loads by depart time</span><span>done / scheduled</span></div><div style="flex:1;min-height:0">' + hourBars(m, 62) + '</div>' + legend + '</div>' +
-      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, '30+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
+      '<div class="chips" style="grid-template-rows:repeat(3,1fr)">' + chip('Behind schedule', m.behind.length, window.UDTiming.SOURCES.plant.onTime + '+ min late', m.behind.length > 0) + chip('Pickups open', m.puOpen.length, /* review item 72 (Joe 10/13): made safe */ esc(m.puOpen.map(p => p.route).join(', ')) || 'none', m.puOpen.length > 0) + chip('Avg time per load', hm(m.avgLoad), delta(m.avgLoad, m.yAvg, true) || 'start to end') + '</div>' +
     '</div>' + metrics(m, 'load') + '<div class="dc-bar"><i style="width:' + m.loadPct + '%"></i></div><div class="dc-note">' + m.loadNote + '  ·  ' + m.tDoneByNow + ' done by now, yesterday ' + m.yDoneByNow + ' at this time</div>', 'home4') +
   card('unload', head('unload') + '<div class="dc-links two">' + m.unloadLinks.join('') + '</div>' +
     '<div class="mid">' +

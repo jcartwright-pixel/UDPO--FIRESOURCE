@@ -10,6 +10,7 @@
   <title>Driver Scorecard · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/scorecard.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/sc-core.js"></script>
 </head>
@@ -179,14 +180,14 @@
           '<p><b>Low MPG</b> ' + n('mpgLow') + ' points for a day more than ' + n('mpgBelowPct') + '% under the truck\'s own average</p>' +
           '<p><b>Target</b> ' + n('mpgTarget') + ' MPG instead of the truck\'s average (0 = use each truck\'s average)</p>' +
           '<h2>Time (dispatch and return)</h2><p class="hint">From the GPS yard leave and return. A day with no GPS yard time is not counted.</p>' +
-          '<p><b>Left too early</b> ' + n('leftEarly') + ' points when the truck leaves the yard more than ' + n('earlyMinutes') + ' minutes before the dispatch time</p>' +
-          '<p><b>Back too late</b> ' + n('backLate') + ' points when it is back more than ' + n('lateMinutes') + ' minutes after dispatch plus the route\'s expected hours</p>' +
+          '<p><b>Left too early</b> ' + n('leftEarly') + ' points when the truck leaves the yard more than ' + s.earlyMinutes + ' minutes before the dispatch time</p>' +
+          '<p><b>Back too late</b> ' + n('backLate') + ' points when it is back more than ' + s.lateMinutes + ' minutes after dispatch plus the route\'s expected hours</p>' +
           '<h2>Counts as a call-off</h2><div class="sc-reasons">' + CORE.REASONS.map(r => '<label><input type="checkbox" data-reason="' + r + '"' + (s.callOffReasons.indexOf(r) >= 0 ? ' checked' : '') + (edit ? '' : ' disabled') + '> ' + r.charAt(0) + r.slice(1).toLowerCase() + '</label>').join('') + '</div></section>' +
           '<section class="otr-card"><h2>Grades</h2><p><span class="sc g-A">A</span> ' + n('gradeA') + ' and up</p><p><span class="sc g-B">B</span> ' + n('gradeB') + ' and up</p><p><span class="sc g-C">C</span> ' + n('gradeC') + ' and up</p><p><span class="sc g-D">D</span> below</p>' +
           '<h2>Rewards</h2>' +
           '<p><b>Perfect day</b> ' + n('cleanDay') + ' points in each area for a day with no miss in it</p>' +
           '<p><b>Streak</b> ' + n('streakBonus') + ' more points for every ' + n('streakDays') + ' perfect days in a row in an area</p>' +
-          '<p><b>Back early</b> ' + n('backEarly') + ' more points when back ' + n('backEarlyMinutes') + ' minutes or more before the expected return (not when they left early)</p>' +
+          '<p><b>Back early</b> ' + n('backEarly') + ' more points when back ' + s.backEarlyMinutes + ' minutes or more before the expected return (not when they left early)</p>' +
           '<h2>Truck cleanliness</h2><p><label><input type="checkbox" id="sc-clean-on"' + (s.cleanOn ? ' checked' : '') + (edit ? '' : ' disabled') + '> <b>On</b>: rated 1 to 5 on a driver\'s details, about once a month</label></p>' +
           '<p><b>5</b> +' + n('clean5') + ' <b>4</b> +' + n('clean4') + ' <b>3</b> +' + n('clean3') + '</p><p><b>2</b> −' + n('clean2Off') + ' <b>1</b> −' + n('clean1Off') + ' points</p>' +
           '<h2>Accidents / incidents</h2><p class="hint">Entered on Driver Roster &gt; Edit. Counts only once a manager marks it Reviewed \u2013 counts.</p>' +

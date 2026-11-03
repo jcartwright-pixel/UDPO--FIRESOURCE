@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -109,7 +110,7 @@
     const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
-    const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
+    const plantOf = (d) => L.plantOf(d);
     const ownOf = (pid) => plantSetupOf(own, pid || plant);
     // The plant's areas: its machines in view order, then its own areas.
     function areas(pid) {
@@ -423,7 +424,7 @@
     const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok, bad) => { const el = document.createElement('script'); el.src = XLSX_URL; el.onload = () => ok(window.XLSX); el.onerror = () => bad(new Error('Could not load the Excel reader. Check the network and try again')); document.head.appendChild(el); });
     const plantByName = (n) => { const t = String(n || '').trim().toUpperCase(); return ALL_PLANTS.find(p => p.name.toUpperCase() === t || p.id.toUpperCase() === t) || null; };
     const SHEET_FIELDS = [['Product', 'name'], ['SKU', 'sku'], ['UPC', 'upc'], ['Type', 'mfgType'], ['Group', 'productGroup'], ['Full Speed Per Min', 'ratePerMin'], ['Target %', 'targetPct'], ['Lowest Speed', 'minSpeed'], ['Highest Speed', 'maxSpeed'], ['Shelf Life Days', 'shelfLifeDays'], ['Target Fill Weight g', 'fillGrams']];
-    const today = () => { const d = new Date(); return shortDate(d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' })); };
+    const today = () => shortDate(window.UDTiming.calendarDay());
     document.getElementById('template').addEventListener('click', async () => {
       const b = document.getElementById('template');
       b.disabled = true; showError('');

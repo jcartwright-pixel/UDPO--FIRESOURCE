@@ -3,8 +3,8 @@
  *
  * Every number comes from what the plant screens already record:
  *   - loads: the Loadout Center's rows for a load date (its runs), with their Start and End times and depart time;
- *   - On time = loaded (End time) no later than 30 minutes after the depart time, the same 30 minutes as "Behind";
- *     Late = loaded after that; Not loaded = never marked done and its depart time + 30 minutes has passed;
+ *   - On time = loaded (End time) within the on-time window after the depart time (timing-rules.js, 30 minutes, the same as
+ *     "Behind"); Late = loaded after that; Not loaded = never marked done and its depart time + 30 minutes has passed;
  *     a load marked done with no End time counts as loaded, but not in the on-time share;
  *   - a depart time before 6 AM belongs to the next calendar morning (the operating day rolls at 6 AM);
  *   - pickups (product that did not load), breakdowns (Shift Notes), temperatures out of range and quality fails of the day.
@@ -13,37 +13,24 @@
 import * as P from './plant-core.js';
 import { hoursMinutesText } from './app.js';
 
-const L = window.UDLogic, U = window.UDPlant;
-export const ON_TIME_MINUTES = P.BEHIND_MINUTES;
-export const AREA_ORDER = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
-export const AREA_NAME = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxing', TANKER: 'Tanker' };
+const L = window.UDLogic, U = window.UDPlant, T = window.UDTiming;
+// Joe 11-2-26: on time = within the plant's on-time window (timing-rules.js; it was 45 minutes here).
+export const ON_TIME_MINUTES = T.SOURCES.plant.onTime;
+export const AREA_ORDER = L.AREA_ORDER;
+export const AREA_NAME = { CASE: L.AREA_WORDS.CASE.tile, TOTES: L.AREA_WORDS.TOTES.tile, BOXING: L.AREA_WORDS.BOXING.tile, TANKER: L.AREA_WORDS.TANKER.tile };
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
-function dayNum(key) { const p = String(key || '').split('-').map(Number); return p.length === 3 && p.every(isFinite) && p[0] ? Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000) : null; }
+const dayNum = T.dayNum;
 // "9:00 PM", "21:00" or minutes of the day, as minutes of the day.
-export function departMinutes(v) {
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'number') return v >= 0 && v < 1 ? Math.round(v * 1440) : v;
-  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?$/i);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const ap = String(m[3] || '').toUpperCase();
-  if (ap) { if (h === 12) h = 0; if (ap === 'PM') h += 12; }
-  return h * 60 + Number(m[2]);
-}
+export function departMinutes(v) { return T.clockMinutes(v); }
 // The plant's wall clock (New York) as minutes counted from 1/1/1970, for now.
-export function wallNow(ms) {
-  const parts = {};
-  new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    .formatToParts(new Date(ms)).forEach(p => { parts[p.type] = p.value; });
-  return dayNum(parts.year + '-' + parts.month + '-' + parts.day) * 1440 + Number(parts.hour) % 24 * 60 + Number(parts.minute);
-}
+export function wallNow(ms) { return T.wallClock(ms); }
 // When the load leaves, on the wall clock: the route's departure moment (plant-rules departWall), not the load day.
 export function departAt(row) {
-  return U.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: departMinutes(row.dispatchTime) });
+  return T.departWall({ departureDate: row.departureDate, deliveryDate: row.deliveryDate, loadDate: row.loadDate, leavesOn: row.leavesOn, dispatchTime: departMinutes(row.dispatchTime) });
 }
-export function clockText(wall) { return wall === null || wall === undefined ? '' : L.timeText(((wall % 1440) + 1440) % 1440); }
+export function clockText(wall) { return wall === null || wall === undefined ? '' : T.timeText(wall); }
 export function minutesText(m) {
   if (m === null || m === undefined || !isFinite(m)) return '';
   return hoursMinutesText(Math.round(m), { pad: true });
@@ -58,9 +45,9 @@ export function loadOutcome(row, nowWall) {
   if (row.outside) out.result = 'OUTSIDE CARRIER';
   else if (row.state === 'DONE') {
     if (done === null || depart === null) out.result = 'LOADED';
-    else { out.late = done - depart; out.result = out.late <= ON_TIME_MINUTES ? 'ON TIME' : 'LATE'; }
-  } else if (depart !== null && nowWall > depart + ON_TIME_MINUTES) out.result = 'NOT LOADED';
-  else if (depart === null && nowWall >= (dayNum(row.loadDate) + 1) * 1440 + 360) out.result = 'NOT LOADED';
+    else { out.late = done - depart; out.result = T.pastOnTime(out.late, 'plant') ? 'LATE' : 'ON TIME'; }
+  } else if (depart !== null && T.pastOnTime(nowWall - depart, 'plant')) out.result = 'NOT LOADED';
+  else if (depart === null && nowWall >= T.dayStartWall(dayNum(row.loadDate) + 1)) out.result = 'NOT LOADED';
   else out.result = 'TO COME';
   return out;
 }
@@ -83,7 +70,7 @@ export const shiftSide = (x) => (text(x && x.side).toUpperCase() === 'PRODUCTION
 // The plant's shifts on one side (Distribution unless asked; side 'ALL' = every shift): the saved list (plantShifts/<facility>)
 // or the starting list. Loads, Shift Notes and Shift Reports go by the Distribution shifts.
 export function shiftsFor(saved, facilityId, side) {
-  const id = facilityId || 'fac_uniontown', want = side || 'DISTRIBUTION', starting = DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
+  const id = L.plantOf(facilityId), want = side || 'DISTRIBUTION', starting = DEFAULT_SHIFTS[id] || DEFAULT_SHIFTS.fac_uniontown;
   let list = saved && Array.isArray(saved.shifts) && saved.shifts.length ? saved.shifts : starting;
   if (want !== 'ALL') { list = list.filter(x => shiftSide(x) === want); if (!list.length && want === 'DISTRIBUTION') list = starting; }
   return list.map(x => ({ name: text(x.name), start: text(x.start), end: text(x.end), side: shiftSide(x), from: hhmm(x.start), to: hhmm(x.end) })).filter(x => x.name && x.from !== null && x.to !== null);
@@ -262,7 +249,7 @@ export function datesBetween(from, to) { const out = []; for (let d = from; d <=
  * Boxing, Tanker, each on its own) had nothing loading between one load ending and the next starting; it is split over the
  * shifts by the minute.
  */
-export const TYPED_LATE_MINUTES = 5;
+export const TYPED_LATE_MINUTES = T.TIMERS.typedLaterMinutes;
 export const RUNDOWN_AREAS = [['ALL', 'All loadouts']].concat(AREA_ORDER.map(a => [a, AREA_NAME[a]]));
 const wallMark = (v) => U.wallMinutes(v);
 // Where a time came from: TABLET, DESK, NONE (saved before the app kept it) or SHEET (changed outside the app).
@@ -275,7 +262,7 @@ export function timeSource(mark, value) {
   return { kind: mark.via === 'TABLET' ? 'TABLET' : 'DESK', text: mark.via === 'TABLET' ? 'Tablet · ' + (text(mark.station) || text(mark.name) || 'Plant Station') : 'Desk · ' + (text(mark.name) || text(mark.by) || 'manager'), typed: off, by: text(mark.by) };
 }
 export function loadingRundown(date, runs, shifts, nowMs, area) {
-  const from = dayNum(date) * 1440 + 360, to = from + 1440, nowWall = wallNow(nowMs === undefined ? Date.now() : nowMs);
+  const from = T.dayStartWall(dayNum(date)), to = from + 1440, nowWall = wallNow(nowMs === undefined ? Date.now() : nowMs);
   const want = area && area !== 'ALL' ? area : '';
   shifts = shifts || shiftsFor(null);
   const byId = {}, seen = {}, loads = [], noTimes = [];

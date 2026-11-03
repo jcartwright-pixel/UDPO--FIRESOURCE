@@ -3,9 +3,10 @@
  * The screen (scorecard.html) and the server (actions.js) both load this one file.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDScore = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  // Unit numbers are matched by the one rule in logic.js unitKey (rules audit line 12, Joe 11/3); times by timing-rules.js.
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'), require('./logic'));
+  else root.UDScore = factory(root.UDTiming, root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (T, LU) {
 /**
  * 7.0.279 Driver Scorecard: pure logic (no Apps Script services), so Node can test it (tools/test_driver_scorecard_core.cjs).
  * Screen DriverScorecard.html, server 225_V7279_DriverScorecardServer.gs, notes docs/DRIVER_SCORECARD.md. Joe picked screen A on 2026-10-09: one table of every driver for the month.
@@ -36,13 +37,15 @@ var SC_CORE = Object.freeze({
     speeding: 2, hardBrake: 2, hardAccel: 1, hardTurn: 1, idle: 1, gpsDayCap: 10,
     // Joe 10/13 Time grade: leaving the yard more than earlyMinutes before dispatch, or back more than lateMinutes past
     // dispatch plus the route's expected hours, costs leftEarly / backLate points. A day with no GPS yard time is not scored.
-    earlyMinutes: 15, lateMinutes: 30, leftEarly: 1, backLate: 1,
+    // Joe 11-2-26: the minutes are the Scorecard's settings in timing-rules.js (SOURCES.scorecard), not this screen's: leaving
+    // within 30 minutes of dispatch is on time everywhere (15 minutes early is green). Only the points are set here.
+    leftEarly: 1, backLate: 1,
     // Joe 10/13 rewards ("the better they do, the better the reward on everything"): every area earns cleanDay points for a
     // clean day and streakBonus for every streakDays clean days in a row; back backEarlyMinutes or more before the expected
     // return (without leaving early) earns backEarly more.
     // Joe 10/14: idling is allowed up to idleAllowMinutes a day in total; a day over it costs `idle` once (not per alert).
     idleAllowMinutes: 10,
-    cleanDay: 1, streakDays: 5, streakBonus: 2, backEarly: 1, backEarlyMinutes: 15,
+    cleanDay: 1, streakDays: 5, streakBonus: 2, backEarly: 1,
     // Joe 10/13 truck cleanliness: a manager rates the driver's truck 1 to 5 (about once a month). 5 = +2, 4 = +1, 3 = 0,
     // 2 = -1, 1 = -2 to start (the two "off" numbers are points taken off). cleanOn 1 = on, 0 = off.
     cleanOn: 1, clean5: 2, clean4: 1, clean3: 0, clean2Off: 1, clean1Off: 2,
@@ -73,7 +76,7 @@ var SC_CORE = Object.freeze({
     countFrom: '2026-10-15'
   }),
   NUMBER_SETTINGS: Object.freeze(['checkinMiss', 'casesPerPoint', 'inspectionDefect', 'inspectionMissing', 'callOff',
-    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'earlyMinutes', 'lateMinutes', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly', 'backEarlyMinutes',
+    'gradeA', 'gradeB', 'gradeC', 'monthMinDays', 'speeding', 'hardBrake', 'hardAccel', 'hardTurn', 'idle', 'gpsDayCap', 'leftEarly', 'backLate', 'cleanDay', 'streakDays', 'streakBonus', 'backEarly',
     'cleanOn', 'clean5', 'clean4', 'clean3', 'clean2Off', 'clean1Off', 'sleeperIdlePct', 'idleAllowMinutes', 'seatbelt', 'mpgTarget', 'mpgBelowPct', 'mpgLow',
     'accidentBase', 'accident1', 'accident2', 'accident3', 'accidentFade1', 'accidentFade2', 'accidentFade3', 'accidentFade4',
     'complaintMinor', 'complaintMajor', 'complaintFade1', 'complaintFade2', 'sickFade1', 'sickFade2', 'sickFade3', 'attendanceFreeDays', 'kioskReasons',
@@ -94,7 +97,7 @@ var SC_CORE = Object.freeze({
   GPS_WORDS: Object.freeze({ speeding: 'Speeding', hardBrake: 'Hard stop', hardAccel: 'Hard start', hardTurn: 'Hard turn', idle: 'Idling', seatbelt: 'Seatbelt' }),
   // A yard leave this far (minutes) from the run's dispatch time is another trip's; a return later than LATE_MAX_MINUTES past the
   // expected time is most likely the truck's next trip passing through the yard, not this run coming back.
-  YARD_NEAR_MINUTES: 240, LATE_MAX_MINUTES: 360,
+  YARD_NEAR_MINUTES: T.TIMERS.gpsNearDispatchMinutes, LATE_MAX_MINUTES: T.TIMERS.gpsReturnMaxMinutes,
   // Joe 10/16: why a manager excused a call-off (it then does not count toward the year's days).
   ATTENDANCE_EXCUSES: Object.freeze(['FMLA', 'Other']),
   NOT_A_DRIVER: /^(|open|tba|tbd|none|n\/a|na|needs driver|.*needs driver.*|vacation.*|off|.*carrier.*)$/i
@@ -131,7 +134,7 @@ function scTruthy_(v) { return v === true || /^(true|yes|y|1|x|on|runs)$/i.test(
 function scPersonKey_(v) { return String(v == null ? '' : v).trim().replace(/\s+/g, ' ').toUpperCase(); }
 function scIsDriver_(name) { return !SC_CORE.NOT_A_DRIVER.test(String(name == null ? '' : name).trim()); }
 // Fleet names a truck "223876" and a trailer "T-635"; Daily Dispatch may type "223 876" or "t635". Letters and digits only.
-function scUnitKey_(v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function scUnitKey_(v) { return LU.unitKey(v); }
 
 /** Settings saved by Joe merged over the defaults; numbers are checked so a typo cannot break the board. */
 function scSettings_(saved) {
@@ -141,6 +144,8 @@ function scSettings_(saved) {
     var n = scNum_(saved[k]);
     s[k] = n == null || n < 0 || n > 1000 ? d[k] : n;
   });
+  // Joe 11-2-26: the time grade's minutes come from timing-rules.js (the Scorecard's own settings there).
+  s.earlyMinutes = T.SOURCES.scorecard.onTime; s.lateMinutes = T.SOURCES.scorecard.backLate; s.backEarlyMinutes = T.SOURCES.scorecard.backEarly;
   var reasons = Array.isArray(saved.callOffReasons) ? saved.callOffReasons : d.callOffReasons;
   s.callOffReasons = SC_CORE.REASONS.filter(function (r) { return reasons.map(scPersonKey_).indexOf(r) >= 0; });
   // Joe 10/13: the kiosk shows each driver's overall score; areas ticked here show beside it (none to start).
@@ -260,11 +265,7 @@ function scAlertKind_(type) {
 function scNyMinutes_(iso) {
   var d = new Date(iso);
   if (!iso || isNaN(d.getTime())) return null;
-  try {
-    var p = new Intl.DateTimeFormat('en-US', {timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(d), h = 0, m = 0;
-    p.forEach(function (x) { if (x.type === 'hour') h = +x.value % 24; if (x.type === 'minute') m = +x.value; });
-    return h * 60 + m;
-  } catch (e) { return d.getHours() * 60 + d.getMinutes(); }
+  return T.minuteOfDay(d.getTime());
 }
 /** A dispatch time as minutes after midnight: 330, "5:30", "05:30 AM" or "5:30 PM" (null when there is none). */
 function scMinutesOf_(v) {

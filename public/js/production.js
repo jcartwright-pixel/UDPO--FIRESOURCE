@@ -5,7 +5,7 @@ import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import { watchProducts } from './products.js';
 
 const U = () => window.UDPlant, R = () => window.UDProduction;
-const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
+const plantOf = (d) => window.UDLogic.plantOf(d);
 
 // cb(data) each time something changes: {lines, products, counters, shifts, runs, shift}. The shift's runs are re-read when the
 // shift changes (checked each minute). nowFn lets a test set the clock.
@@ -78,7 +78,7 @@ export function lineView(data, line, nowMs) {
 }
 
 export const fmt = (n) => (n === null || n === undefined || n === '' ? '' : Number(n).toLocaleString('en-US'));
-export const clock = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
+export const clock = (iso) => { const t = Date.parse(iso || ''); return isFinite(t) ? window.UDTiming.clockOf(t) : ''; };
 const twelve = (hhmm) => { const m = /^(\d\d):(\d\d)$/.exec(hhmm || ''); if (!m) return ''; const h = Number(m[1]); return ((h + 11) % 12 + 1) + ':' + m[2] + ' ' + (h < 12 ? 'AM' : 'PM'); };
 // "First Shift 6:00 AM to 2:30 PM" from a shiftNow() result.
 export function shiftText(s) {

@@ -123,7 +123,7 @@ async function shots(page, name, w) {
     await desk.waitForSelector('#f-route');
     await desk.selectOption('#f-route', { label: '892 · GARBER · Garber Farms' });
     // Joe 10/20: the time starts as Route Master's time for Garber's Saturday.
-    assert.equal(await desk.inputValue('#f-time'), '05:15', 'the Route Master time');
+    assert.equal(await desk.inputValue('#f-time'), '5:15 AM', 'the Route Master time');
     assert.equal(await desk.textContent('#f-time-note'), 'Route Master time');
     await desk.fill('#f-time', '');
     await desk.click('#f-save');
@@ -139,14 +139,14 @@ async function shots(page, name, w) {
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');
     const box = await desk.textContent('#modal');
-    assert.match(box, /Confirm this load[\s\S]*892 · GARBER[\s\S]*United Dairy Delivery[\s\S]*Monday 10-05-26[\s\S]*Saturday 10-10-26[\s\S]*5:45 AM[\s\S]*300/, 'the box shows what will be saved');
-    assert.deepEqual(await desk.$$eval('.sched-warn', w => w.map(e => e.textContent)), ['⚠ The load date, Monday 10-05-26, has already passed.', '⚠ Garber Farms usually loads Friday 10-09-26 for a Saturday delivery.']);
+    assert.match(box, /Confirm this load[\s\S]*892 · GARBER[\s\S]*United Dairy Delivery[\s\S]*Monday 10-5-26[\s\S]*Saturday 10-10-26[\s\S]*5:45 AM[\s\S]*300/, 'the box shows what will be saved');
+    assert.deepEqual(await desk.$$eval('.sched-warn', w => w.map(e => e.textContent)), ['⚠ The load date, Monday 10-5-26, has already passed.', '⚠ Garber Farms usually loads Friday 10-9-26 for a Saturday delivery.']);
     assert.ok(await desk.$eval('.sched-confirm dd.big', e => parseFloat(getComputedStyle(e).fontSize) >= 16));
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-confirm-warn-1920.png'), scale: 'css' });
     assert.equal((await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.filter(d => d.data().run === 'GARBER' && d.data().date === saturday).length, 0, 'nothing saved before Confirm');
     await desk.click('#f-back');
     await desk.waitForSelector('#f-load');
-    assert.deepEqual([await desk.inputValue('#f-load'), await desk.inputValue('#f-time'), await desk.inputValue('#f-cases')], ['2026-10-05', '05:45', '300'], 'Go back keeps what was typed');
+    assert.deepEqual([await desk.inputValue('#f-load'), await desk.inputValue('#f-time'), await desk.inputValue('#f-cases')], ['2026-10-05', '5:45 AM', '300'], 'Go back keeps what was typed');
     await desk.fill('#f-load', '2026-10-09');
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');
@@ -193,7 +193,7 @@ async function shots(page, name, w) {
     await desk.click('.sc-who:has(strong:text-is("Garber Farms")) .sc-plus');
     await desk.waitForSelector('#f-route');
     assert.equal(await desk.$eval('#f-route', s => s.selectedOptions[0].textContent), '892 · GARBER · Garber Farms');
-    assert.deepEqual([await desk.inputValue('#f-date'), await desk.inputValue('#f-time'), await desk.textContent('#f-time-note')], ['2026-10-08', '05:30', 'From the dispatch sheet']);
+    assert.deepEqual([await desk.inputValue('#f-date'), await desk.inputValue('#f-time'), await desk.textContent('#f-time-note')], ['2026-10-08', '5:30 AM', 'From the dispatch sheet']);
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-plus-1920.png'), scale: 'css' });
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');

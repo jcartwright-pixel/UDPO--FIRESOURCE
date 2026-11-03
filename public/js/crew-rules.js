@@ -14,9 +14,9 @@
  *   - only name, employee ID, phone, area, shift, usual job, days off and hire date are kept about a person.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDCrew = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'));
+  else root.UDCrew = factory(root.UDTiming);
+})(typeof self !== 'undefined' ? self : this, function (T) {
   var TEAMS = { plant: 'Plant Vacations & Schedule', maint: 'Maintenance Schedule' };
   var SHIFTS = [1, 2, 3];
   var SHIFT_NAMES = { 1: '1st', 2: '2nd', 3: '3rd' };
@@ -37,12 +37,8 @@
   function weekStart(key) { return addDays(key, -dow(key)); }
   function weekDays(start) { var out = []; for (var i = 0; i < 7; i++) out.push(addDays(start, i)); return out; }
   function slug(v) { return text(v).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40); }
-  // 06:00 -> 6:00 AM
-  function timeText(t) {
-    if (!isTime(t)) return '';
-    var h = Number(t.slice(0, 2)), m = t.slice(3);
-    return (h % 12 || 12) + ':' + m + (h < 12 ? ' AM' : ' PM');
-  }
+  // 06:00 -> 6:00 AM (timing-rules.js, the one way a time is shown)
+  function timeText(t) { return isTime(t) ? T.boxText(t) : ''; }
   function shiftText(area, n) {
     var s = area && area.shifts && area.shifts[n];
     return s && isTime(s.start) && isTime(s.end) ? timeText(s.start) + ' - ' + timeText(s.end) : '';

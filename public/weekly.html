@@ -46,6 +46,7 @@
       body.weekly-page .head .actions.in-head { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
     }
   </style>
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -140,7 +141,7 @@
     import { printSaved } from './js/print-sheet.js';
     import { mountRowDrag } from './js/row-drag.js';
     import { start, requireSignIn, escapeHtml, shortDate, shortTime, showError, watchCopied } from './js/app.js';
-    const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);   // the approved print's style
+    const usDate = (k) => L.dateText(k);   // one date format everywhere (rules audit line 15)
     import { lists, watchLists, canSave, canReorder, pickText, cvgOptions, saveAssignment, saveRunChange, withUnsaved, saveOptimistic, saveWeekOrder, savesDone, forScreen, modeLabel } from './js/edit.js';
     forScreen('weeklyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
@@ -199,7 +200,7 @@
     }
 
     // A split route's second load (6301_2) shows as 6301, as on the current screen.
-    function routeNumber(v) { const s = String(v || ''), i = s.lastIndexOf('_'); return i > 0 && /^\d+$/.test(s.slice(i + 1)) ? s.slice(0, i) : s; }
+    function routeNumber(v) { return L.routeNumber(v); }
 
     function render() {
       if (popover) return; // the editor is open; the grid redraws when it closes
@@ -660,7 +661,7 @@
       });
       watchCopied(db, (when) => {
         const at = when ? new Date(when) : null;
-        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + window.UDTiming.clockOf(at) : 'Waiting for the first copy from the sheets';
       });
       document.getElementById('prev').onclick = () => move(-7);
       document.getElementById('next').onclick = () => move(7);

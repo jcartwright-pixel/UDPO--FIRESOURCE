@@ -144,7 +144,7 @@ async function seed() {
       assert.ok(await pg.$eval('#detail .rp-kpi:nth-child(5) b', b => b.scrollWidth <= b.clientWidth + 1 && b.getBoundingClientRect().right <= b.parentElement.getBoundingClientRect().right + 1), 'the Loadout times fit their tile at ' + w);
       assert.deepEqual(await pg.$$eval('.rp-day b', bs => bs.filter(b => b.textContent === 'No loads' && (!b.classList.contains('rp-none-day') || b.getClientRects().length > 1 || b.offsetHeight > 40)).length), 0);
       assert.equal(k[7], 'Breakdowns=1');
-      assert.match(await pg.textContent('#detail .rp-grid'), /503 MASSILLON[\s\S]*1 h 35 min[\s\S]*510 TANKER EAST[\s\S]*NOT LOADED/);
+      assert.match(await pg.textContent('#detail .rp-grid'), /503 MASSILLON[\s\S]*1 hr 35 min[\s\S]*510 TANKER EAST[\s\S]*NOT LOADED/);
       assert.match(await pg.textContent('#detail'), /Check-in: 2 cs 1\/2 GAL WHOLE short/);
       assert.equal(await pg.$eval('.rp-day[data-day="' + thu + '"] b', b => b.textContent), '60%');
       assert.ok(await pg.evaluate(() => document.scrollingElement.scrollWidth <= window.innerWidth), 'no sideways page scrolling at ' + w);
@@ -188,7 +188,7 @@ async function seed() {
     // Administration > Plant Shifts: Uniontown's three shifts to start with, and the rule the reports use.
     const ps = await openPage(browser, 1920, 1080, '/shifts.html?' + MANAGER);
     await ps.waitForSelector('#rows tr[data-i]');
-    assert.deepEqual(await ps.$$eval('#rows tr[data-i]', r => r.map(x => [...x.querySelectorAll('input')].map(i => i.value).join(' '))), ['First Shift 06:00 14:30', 'Second Shift 14:00 22:30', 'Third Shift 22:00 05:30']);
+    assert.deepEqual(await ps.$$eval('#rows tr[data-i]', r => r.map(x => [...x.querySelectorAll('input')].map(i => i.value).join(' '))), ['First Shift 6:00 AM 2:30 PM', 'Second Shift 2:00 PM 10:30 PM', 'Third Shift 10:00 PM 5:30 AM']);
     assert.match(await ps.textContent('.rp-lead'), /stays with the earlier shift/);
     // Joe 10/11: a Side column; the starting shifts are Distribution, and a Plant Production shift saves beside them.
     assert.deepEqual(await ps.$$eval('#rows select[data-k="side"]', s => s.map(x => x.value)), ['DISTRIBUTION', 'DISTRIBUTION', 'DISTRIBUTION']);

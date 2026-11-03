@@ -67,7 +67,7 @@
               <div class="gs-cats ms-machines" id="brk-machines"></div>
             </div>
             <div class="gs-card">
-              <div class="ms-times"><label class="gs-label">2. Down at<input type="time" class="gs-note" id="brk-down"></label><label class="gs-label">Back up at<input type="time" class="gs-note" id="brk-up"></label></div>
+              <div class="ms-times"><label class="gs-label">2. Down at<input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" class="gs-note" id="brk-down"></label><label class="gs-label">Back up at<input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" class="gs-note" id="brk-up"></label></div>
               <div class="gs-label">3. What happened?</div>
               <textarea class="gs-note ms-text" id="brk-cause" maxlength="1000" placeholder="Valve 14 blew a seal"></textarea>
               <div class="gs-label">4. What fixed it?</div>
@@ -80,6 +80,7 @@
     </div>
   </div>
 
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script type="module">
     import { start, escapeHtml, lockDevice, STATION_DEVICE } from './js/app.js';
@@ -103,7 +104,7 @@
     // station, and its plant, after that.
     const CODE_KEY = 'udMaintStationCode';
     const kept = (() => { try { return JSON.parse(localStorage.getItem(CODE_KEY) || 'null') || {}; } catch (e) { return {}; } })();
-    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || kept.facilityId || 'fac_uniontown';
+    const PLANT = new URLSearchParams(location.search).get('plant') || (() => { try { return sessionStorage.getItem('udPlant') || ''; } catch (e) { return ''; } })() || window.UDLogic.plantOf(kept);
     // No plant picker: the plant shows in the title (Joe 10/12).
     document.getElementById('title').textContent = 'Maintenance Station · ' + ({ fac_uniontown: 'Uniontown', fac_charleston: 'Charleston', fac_martins_ferry: 'Martins Ferry' }[PLANT] || PLANT);
     let machines = [];
@@ -164,7 +165,8 @@
       finally { S.busy = false; S.signOut(who.token); }
     }
 
-    const nowTime = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+    // Joe 11-3-26 (item 5): plain time boxes fixed to "4:30 PM" (timing-rules.js); saved as HH:MM.
+    const nowTime = () => window.UDTiming.nowBoxText();
     function drawBreakdown() { $('brk-machines').innerHTML = machineButtons(brkPick); }
     $('to-breakdown').addEventListener('click', () => { brkPick = ''; ['brk-cause', 'brk-fix', 'brk-up'].forEach(k => { $(k).value = ''; }); $('brk-down').value = nowTime(); S.message(''); drawBreakdown(); S.view('breakdown'); });
     $('brk-machines').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { brkPick = b.dataset.m; drawBreakdown(); } });
@@ -172,7 +174,7 @@
       if (!brkPick) { S.message('Tap the machine.'); return; }
       if (!$('brk-down').value) { S.message('Enter when it went down.'); return; }
       if (!$('brk-cause').value.trim()) { S.message('Type what happened.'); return; }
-      brkDraft = { machineId: brkPick, downAt: $('brk-down').value, upAt: $('brk-up').value, cause: $('brk-cause').value.trim(), fix: $('brk-fix').value.trim() };
+      brkDraft = { machineId: brkPick, downAt: window.UDTiming.hhmmOf($('brk-down').value), upAt: window.UDTiming.hhmmOf($('brk-up').value), cause: $('brk-cause').value.trim(), fix: $('brk-fix').value.trim() };
       S.ask('breakdown', null);
     });
     async function sendBreakdown(who) {

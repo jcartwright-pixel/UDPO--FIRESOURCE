@@ -119,7 +119,7 @@ function routeToLive(tx, db, mode, req, stamp, email, m, live, result) {
       }
       // Joe 10/21: a Load Day changed in the Route Editor moves the days not started yet to their new load date (today or later).
       if (req && req.days && req.days[p] && 'loadDayOffset' in req.days[p] && !day.plantStartedAt && !day.completeTime && !String(day.loadStatus || '').trim()) {
-        const off = (v) => v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? -1 : Number(v), to = off(want.loadDayOffset);
+        const off = L.loadDayOffset, to = off(want.loadDayOffset);
         if (off(day.loadDayOffset) !== to && loadDay(week, p, to) >= today) { ch.loadDayOffset = to; ch.loadDate = loadDay(week, p, to); }
       }
       const hours = hoursNumber(want.hours);

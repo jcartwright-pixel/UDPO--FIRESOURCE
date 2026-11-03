@@ -7,10 +7,10 @@ import { fmt } from './production.js';
 
 const R = () => window.UDProduction;
 const when = (x) => { const n = Date.parse(x || ''); return isFinite(n) ? n : 0; };
-const clockOf = (ms) => ms ? new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
-const hourOf = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric' });
+const clockOf = (ms) => ms ? window.UDTiming.clockOf(ms) : '';
+const hourOf = (ms) => window.UDTiming.clockOf(ms).replace(':00 ', ' ');
 const who = (email) => String(email || '').split('@')[0];
-const longFor = (min) => { min = Math.max(0, Math.round(min)); const h = Math.floor(min / 60), m = min % 60; return h ? h + ' h ' + m + ' min' : m + ' min'; };
+const longFor = window.UDTiming.spanText;
 const sg = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
 const GAP = 30 * 60000;
 const dayOf = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };

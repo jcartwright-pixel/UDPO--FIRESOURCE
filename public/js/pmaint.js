@@ -6,7 +6,8 @@ const R = () => window.UDPlantMaint, L = () => window.UDLogic, U = () => window.
 const HISTORY_DAYS = 365;
 
 // The day on the plant's clock (yyyy-mm-dd, New York), for what is due and late.
-export const todayKey = (ms) => new Date(ms || Date.now()).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+// The calendar day in New York: timing-rules.js's one way.
+export const todayKey = (ms) => window.UDTiming.calendarDay(ms || Date.now());
 
 // cb(data) each time something changes: {machines (in service), all (retired too), workOrders, tasks, breakdowns, requests, read}.
 // Joe 10/12: breakdowns are recorded on Shift Notes (fixed on the spot), requests are Shift Notes' Maintenance Requests; both are
@@ -20,7 +21,7 @@ export function watchMaint(db, facilityId, cb, fail, opts) {
   const openOnly = !!(opts && opts.openOrders), openWos = [], reqWos = {}, reqStops = {};
   const woOf = (d) => Object.assign({}, d.data(), { id: d.id });
   const normal = (w) => Object.assign(w, { status: String(w.status || 'NEW').toUpperCase() });
-  const mine = (d) => (String(d.facilityId || '').trim() || 'fac_uniontown') === facilityId;
+  const mine = (d) => window.UDLogic.plantOf(d) === facilityId;
   const mergeWos = () => {
     const byId = {};
     openWos.concat(Object.values(reqWos).filter(Boolean)).forEach(w => { byId[w.id] = w; });

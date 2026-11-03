@@ -10,6 +10,7 @@
   <title>Route Distribution · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/distribution.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/sc-core.js"></script>
 </head>
@@ -55,14 +56,14 @@
     </div>
   </div>
   <script type="module">
-    import { start, requireSignIn, showError, shortDate, shortTime, watchCopied } from './js/app.js';
+    import { start, currentPlant, requireSignIn, showError, shortDate, shortTime, watchCopied } from './js/app.js';
     import { collection, doc, query, where, limit, onSnapshot } from './js/firebase.js';
     import { unitKey, gpsIndex, truckState, yardSpots, workingToday } from './js/gps-state.js';
 
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
     const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], exceptions: [], conflicts: 0, writeBack: false, app: {}, gps: [], alerts: [], review: 0 };
-    const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    const nyDate = (d) => window.UDTiming.calendarDay(d);
 
     // Numbers update the moment anything changes in the database (no reload, no 30-second checks).
     function render() {
@@ -112,7 +113,7 @@
       const fail = (what) => (e) => showError('Could not read ' + what + ': ' + e.message);
       onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', L.weeksForLoadDate(today))), s => { data.runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the dispatch'));
       onSnapshot(collection(db, 'drivers'), s => { data.drivers = s.docs.map(d => d.data()); render(); }, fail('the drivers'));
-      onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => L.unitAtPlant(e, 'fac_uniontown', true)); render(); }, fail('the units'));
+      onSnapshot(collection(db, 'equipment'), s => { data.equipment = s.docs.map(d => d.data()).filter(e => L.unitAtPlant(e, currentPlant(), true)); render(); }, fail('the units'));
       onSnapshot(collection(db, 'routes'), s => { data.routes = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('Route Master'));
       // Joe 10/18: vacations that end this week or later (every record has an end date, the start date when it is one day) and
       // every pending one (the Pending count), not every vacation ever entered.
@@ -136,7 +137,7 @@
       });
       watchCopied(db, (when) => {
         const at = when ? new Date(when) : null;
-        const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
+        const sameDay = at && window.UDTiming.calendarDay(at) === window.UDTiming.calendarDay();
         document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + shortTime(at) : 'Waiting for the first copy';
       });
     });

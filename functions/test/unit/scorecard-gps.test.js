@@ -134,18 +134,21 @@ test('Joe 10/13: one grade per area and the overall score; each area is 100 less
   assert.equal(year[0].areas.speeding.score, 40);
 });
 
-test('Joe 10/13 Time grade: out more than 15 min before dispatch, or back more than 30 min past dispatch + route hours, costs 1 each', () => {
+// Joe 11-2-26 (timing-rules.js, the Scorecard's settings there): leaving within 30 minutes of dispatch is on time (it was 15).
+test('Joe 10/13 Time grade: out more than 30 min before dispatch, or back more than 30 min past dispatch + route hours, costs 1 each', () => {
   assert.deepEqual([S.scMinutesOf_('06:00'), S.scMinutesOf_('5:30 PM'), S.scMinutesOf_(330), S.scMinutesOf_('')], [360, 1050, 330, null]);
   assert.deepEqual([S.scHoursOf_('9:30'), S.scHoursOf_('8'), S.scHoursOf_('')], [9.5, 8, null]);
   const day = (dispatchTime, routeHours, yardOut, yardIn) => {
     const days = S.scBuildDay_(DAY, [run({ dispatchTime, routeHours })], [checkedIn('855', 'SAL'), dvir('855', 'SAL')], {});
     return S.scMatchGps_(DAY, days, [{ tag: '223893', miles: 100, yardOut, yardIn }], []).records;
   };
-  // Dispatch 6:00 AM, 8 hours: due back 2:00 PM. Out 5:30 AM (30 early), back 3:00 PM (60 late).
-  let r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0];
+  // Dispatch 6:00 AM, 8 hours: due back 2:00 PM. Out 5:20 AM (40 early), back 3:00 PM (60 late).
+  let r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:20:00Z', '2026-10-14T19:00:00Z'), [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0];
   assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.points], [1, 1, -2]);
-  assert.match(r.misses.map(m => m.what).join(' | '), /Left the yard 5:30 AM, 30 min before dispatch 6:00 AM \| Back at the yard 3:00 PM, 60 min past the expected 2:00 PM/);
-  // Out 5:50 (10 early) and back 2:20 PM (20 late): inside the grace, nothing.
+  assert.match(r.misses.map(m => m.what).join(' | '), /Left the yard 5:20 AM, 40 min before dispatch 6:00 AM \| Back at the yard 3:00 PM, 60 min past the expected 2:00 PM/);
+  // Out 5:50 (10 early) and back 2:20 PM (20 late): inside the grace, nothing. So is 5:30 (30 early, Joe 11-2-26: green).
+  assert.equal(S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:30:00Z', '2026-10-14T18:20:00Z'), [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0].leftEarly, 0, '30 minutes early is on time');
+  assert.equal(S.scSettings_({ countFrom: '2026-01-01', earlyMinutes: 15 }).earlyMinutes, 30, 'a 15 saved on the old Settings screen no longer counts');
   r = S.scScoreMonth_(day('06:00', 8, '2026-10-14T09:50:00Z', '2026-10-14T18:20:00Z'), [], S.scSettings_({ countFrom: '2026-01-01' }), {})[0];
   assert.deepEqual([r.leftEarly, r.backLate, r.areas.time.points], [0, 0, 1], 'a clean Time day earns 1');
   // No GPS yard time, or no dispatch time: not scored, not held against the driver.

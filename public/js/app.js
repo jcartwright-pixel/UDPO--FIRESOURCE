@@ -164,8 +164,8 @@ export const MENU = [
   // Joe 10/26: one pop-out for the departments, each loading and unloading by its own name (Case, Tote, Box and Tanker), so the
   // menu itself stays short: Send Report, this, Shift Notes, Yard Checks and the Scheduler.
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'],
-    ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Box Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
-    ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Box Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
+    ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Boxing Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
+    ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Boxing Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
     ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
   // Joe 10/26 (ej): the Plant Distribution Scheduler is its own department, Shipping & Receiving, with Inventory beside it.
@@ -1453,10 +1453,11 @@ export function optionTag(value, current, label, opts) {
 // Review item 76 (Joe 10/13): minutes as hours and minutes, blank for no number. Each screen keeps its own look: unit is the
 // word after the minutes ('min', or 'm'), short the word under an hour (the unit when left out), pad writes the minutes past
 // the hour with two digits (1 h 05), hoursFrom is where hours start (60 minutes when left out).
-export function hoursMinutesText(m, opts) {
-  const o = opts || {}, unit = o.unit || 'min';
-  if (m === null || m === undefined) return '';
-  return m >= (o.hoursFrom || 60) ? Math.floor(m / 60) + ' h ' + (o.pad ? String(m % 60).padStart(2, '0') : m % 60) + ' ' + unit : m + ' ' + (o.short || unit);
+// Joe 11-3-26 (item 5): every length of time is written one way now, "1 hr 12 min" (timing-rules.js spanText); opts are kept so
+// the callers stay as they were, but no longer change the look.
+export function hoursMinutesText(m, opts) { // eslint-disable-line no-unused-vars
+  if (m === null || m === undefined || m === '' || !isFinite(Number(m))) return '';
+  return window.UDTiming.spanText(m);
 }
 
 // Review item 76 (Joe 10/13): prints a page of HTML from a hidden frame, so the screen stays where it is. opts.id names the
@@ -1480,26 +1481,13 @@ export function printInFrame(html, opts) {
 
 // Joe 10/11 (polish 6): one short date everywhere, like 10-8-26 (month-day-two-digit year, no leading zeros, no time).
 // Takes a day key (2026-10-08), a time (ISO text, a number or a Date, read in plant time) or a sheet date (10/08/2026).
-export function shortDay(v) {
-  if (v == null || v === '') return '';
-  let m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v));
-  if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
-  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
-  if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
-  const t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
-  if (isNaN(t)) return String(v);
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t);
-  const g = (k) => (p.find(x => x.type === k) || {}).value;
-  return g('month') + '-' + g('day') + '-' + g('year');
-}
+// The one rule lives in logic.js (rules audit line 15).
+export function shortDay(v) { return window.UDLogic.dateText(v); }
 export function shortDate(key) { return shortDay(key); }
 // A date with its time, like 10-8-26 1:20 PM, for stamps where the time matters (when a check or a change was made).
 export function dateTimeText(v) { const d = shortDay(v instanceof Date || typeof v === 'number' ? v : new Date(v)), t = shortTime(v); return t ? d + ' ' + t : d; }
 // The time alone, like 1:20 PM, in plant time.
-export function shortTime(v) {
-  const t = v instanceof Date ? v : new Date(v);
-  return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
-}
+export function shortTime(v) { return window.UDTiming.clockOf(v); }
 
 // A cell marked .no-fit is left as it is (Joe 10/26: a machine's product names stay on one line; the table scrolls instead).
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are

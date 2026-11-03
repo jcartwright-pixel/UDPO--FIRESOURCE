@@ -23,12 +23,16 @@ test('a route leaves at its dispatch time in the operating day before its depart
 test('Send Current Report: the Monday routes are not behind on Sunday until they leave', () => {
   const loads = [load('971', 0), load('880', 120), load('844', 1080), load('845', 1260, { state: 'DONE' })];
   assert.equal(R.plantReport({ loads }, at('2026-10-11T04:27:00Z')).behind.length, 0, '12:27 AM Sunday');
-  assert.equal(R.plantReport({ loads }, at('2026-10-11T22:45:00Z')).behind.length, 0, '6:45 PM Sunday: 844 is 45 minutes past, not behind');
-  assert.deepEqual(R.plantReport({ loads }, at('2026-10-11T23:00:00Z')).behind.map(x => x.route), ['844'], '7:00 PM Sunday: the 6:00 PM leaves Sunday, so it is behind');
-  assert.equal(R.plantReport({ loads }, at('2026-10-12T04:45:00Z')).behind.map(x => x.route).join(), '844', '12:45 AM Monday: 971 is 45 minutes past, not behind (844 from Sunday is)');
-  const r = R.plantReport({ loads }, at('2026-10-12T04:46:00Z'));
-  assert.deepEqual(r.behind.map(x => x.route), ['844', '971'], '12:46 AM Monday: 844 still not loaded, 971 is 46 minutes past');
-  assert.equal(r.behind[1].late, '46 min late');
+  // Joe 11-2-26 (timing-rules.js): within 30 minutes of the leaving time is on time; it was 45 minutes.
+  assert.equal(R.plantReport({ loads }, at('2026-10-11T22:30:00Z')).behind.length, 0, '6:30 PM Sunday: 844 is 30 minutes past, still on time');
+  assert.deepEqual(R.plantReport({ loads }, at('2026-10-11T22:31:00Z')).behind.map(x => x.route), ['844'], '6:31 PM Sunday: the 6:00 PM leaves Sunday, so it is behind');
+  assert.equal(R.plantReport({ loads }, at('2026-10-11T22:31:00Z')).behind[0].tone, 'caution', '31 minutes past is yellow');
+  assert.equal(R.plantReport({ loads }, at('2026-10-11T23:01:00Z')).behind[0].tone, 'late', '61 minutes past is red');
+  assert.equal(R.plantReport({ loads }, at('2026-10-12T04:30:00Z')).behind.map(x => x.route).join(), '844', '12:30 AM Monday: 971 is 30 minutes past, not behind (844 from Sunday is)');
+  const r = R.plantReport({ loads }, at('2026-10-12T04:31:00Z'));
+  assert.deepEqual(r.behind.map(x => x.route), ['844', '971'], '12:31 AM Monday: 844 still not loaded, 971 is 31 minutes past');
+  assert.equal(r.behind[1].late, '31 min late');
+  assert.deepEqual(r.behind.map(x => x.tone), ['late', 'caution']);
 });
 
 // Joe 10/19 ("look into the route setup"): the Route Editor's Departure Day decides the day. Load Day = the delivery date plus
@@ -68,16 +72,19 @@ test('Yard Checks: a load with a Departure Day stays on the yard until it leaves
   assert.deepEqual(queue('2026-10-21T02:00:00Z', '2026-10-20'), []);
 });
 
-test('the Loadout Center and the other plant screens use the Late Forecast\'s leave rule, not a copy of their own', () => {
+// Joe 11-3-26 (item 4, "make that one rule"): the one leaving rule is timing-rules.js's; plant-rules.js hands it on.
+test('the Loadout Center and the other plant screens use the one leaving rule (timing-rules.js), not a copy of their own', () => {
   const fs = require('fs'), path = require('path'), pub = path.join(__dirname, '../../../public');
   const core = fs.readFileSync(path.join(pub, 'js/plant-core.js'), 'utf8');
-  assert.match(core, /export function departWall\(row\) \{\s*return window\.UDPlant\.departWall\(/);
+  assert.match(core, /export function departWall\(row\) \{\s*return T\.departWall\(/);
+  assert.equal(R.departWall, require('../../src/timing-rules').departWall);
   // Every page that can reach it (directly or through the plant screens' shared files) loads plant-rules.js first. Daily
   // Dispatch takes only runArea from plant-core.js.
   const users = /js\/(plant-core|plant-dept|plant-reports|station-work|forecast)\.js/;
   fs.readdirSync(pub).filter(f => f.endsWith('.html') && f !== 'daily.html').forEach(f => {
     const html = fs.readFileSync(path.join(pub, f), 'utf8');
     if (users.test(html)) assert.match(html, /<script src="js\/plant-rules\.js"><\/script>/, f + ' loads plant-rules.js');
+    if (users.test(html)) assert.match(html, /<script src="js\/timing-rules\.js"><\/script>[\s\S]*<script src="js\/plant-rules\.js"><\/script>/, f + ' loads timing-rules.js before plant-rules.js');
   });
 });
 

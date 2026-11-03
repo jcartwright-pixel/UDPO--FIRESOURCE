@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -67,12 +68,12 @@
     // Shifts), once every shift has its name, start and end; one save at a time, in order. edits counts every change,
     // so the list read back from the database never overwrites a box being typed in.
     let db = null, unsub = null, rows = [], dirty = false, edits = 0, chain = Promise.resolve();
-    const hours = (a, b) => { const m = /^(\d{2}):(\d{2})$/, x = m.exec(a), y = m.exec(b); if (!x || !y) return ''; const len = ((Number(y[1]) * 60 + Number(y[2])) - (Number(x[1]) * 60 + Number(x[2])) + 1440) % 1440; return len ? Math.floor(len / 60) + ' h' + (len % 60 ? ' ' + (len % 60) + ' min' : '') : ''; };
+    const hours = (a, b) => { const m = /^(\d{2}):(\d{2})$/, x = m.exec(a), y = m.exec(b); if (!x || !y) return ''; const len = ((Number(y[1]) * 60 + Number(y[2])) - (Number(x[1]) * 60 + Number(x[2])) + 1440) % 1440; return len ? window.UDTiming.spanText(len) : ''; };
 
     function draw() {
       document.getElementById('rows').innerHTML = rows.map((r, i) => '<tr data-i="' + i + '"><td><input data-k="name" maxlength="40" value="' + escapeHtml(r.name) + '" aria-label="Shift name"></td>' +
         '<td><select data-k="side" aria-label="Side">' + R.SHIFT_SIDES.map(([v, l]) => '<option value="' + v + '"' + (r.side === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
-        '<td><input type="time" data-k="start" value="' + escapeHtml(r.start) + '" aria-label="Starts"></td><td><input type="time" data-k="end" value="' + escapeHtml(r.end) + '" aria-label="Ends"></td>' +
+        '<td><input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" data-k="start" value="' + escapeHtml(window.UDTiming.boxText(r.start)) + '" aria-label="Starts"></td><td><input type="text" data-time autocomplete="off" maxlength="10" placeholder="4:30 PM" data-k="end" value="' + escapeHtml(window.UDTiming.boxText(r.end)) + '" aria-label="Ends"></td>' +
         '<td>' + escapeHtml(hours(r.start, r.end)) + '</td><td><button type="button" class="rp-btn sh-remove" data-remove="' + i + '">Remove</button></td></tr>').join('') ||
         '<tr><td colspan="6">No shifts. Press + Add Shift.</td></tr>';
     }
@@ -110,13 +111,13 @@
     document.getElementById('rows').addEventListener('change', e => {
       const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
       if (!tr || !k) return;
-      rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true; edits++;
+      rows[Number(tr.dataset.i)][k] = e.target.dataset.time !== undefined ? window.UDTiming.hhmmOf(e.target.value) : e.target.value; dirty = true; edits++;
       saveNow();
     });
     document.getElementById('rows').addEventListener('input', e => {
       const tr = e.target.closest('tr[data-i]'), k = e.target.dataset.k;
       if (!tr || !k) return;
-      rows[Number(tr.dataset.i)][k] = e.target.value; dirty = true; edits++;
+      rows[Number(tr.dataset.i)][k] = e.target.dataset.time !== undefined ? window.UDTiming.hhmmOf(e.target.value) : e.target.value; dirty = true; edits++;
       tr.children[4].textContent = hours(rows[Number(tr.dataset.i)].start, rows[Number(tr.dataset.i)].end);
     });
     // Remove and Starting Shifts save at once, so each asks for a second press first (as Starting List on Product Sheet).

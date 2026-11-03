@@ -44,7 +44,7 @@ function lineId(v, SaveError) {
 async function lineOf(tx, db, operationId, SaveError) {
   const s = await tx.get(db.collection('plantSetup').doc(docId(operationId))), d = s.exists ? s.data() : null;
   if (!d || d.type !== 'PRODUCTION_AREA' || d.status !== 'ACTIVE') throw new SaveError('NOT_FOUND', 'That line is not set up for this plant.');
-  return { name: text(d.name) || text(d.area) || operationId, facilityId: text(d.facilityId) || 'fac_uniontown' };
+  return { name: text(d.name) || text(d.area) || operationId, facilityId: require('./logic').plantOf(d) };
 }
 
 function validateLineEntry(input, SaveError) {
@@ -156,7 +156,7 @@ async function stopWorkOrder(tx, db, req, line, run, stop, email, stamp) {
   const all = await PM.plantMachines(tx, db, line.facilityId), m = MR.findMachine(all, line.name);
   const num = await PM.nextNumber(tx, db, line.facilityId);
   const wo = { woNumber: MR.woNumber(num.n), facilityId: line.facilityId, machineId: m ? m.id : '', machine: m ? m.name : line.name, area: m ? m.area || '' : '',
-    problem: line.name + ' stopped at ' + new Date(stop.start).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) + (run.product ? ' running ' + run.product : '') + '. Maintenance called from the line tablet.', notes: '', lineDown: stop.end ? 'NO' : 'YES',
+    problem: line.name + ' stopped at ' + require('./timing-rules').clockOf(stop.start) + (run.product ? ' running ' + run.product : '') + '. Maintenance called from the line tablet.', notes: '', lineDown: stop.end ? 'NO' : 'YES',
     type: 'Maintenance Request', urgency: stop.end ? '' : 'HIGH', source: 'LINE_TABLET', sourceRunId: P.runId(req.operationId, req.shift.key), sourceStop: req.stopIndex, sourceShift: req.shift.name || '', sourceAt: stop.start,
     sourceBy: email, status: 'NEW', labor: [], createdAt: stamp, createdBy: email, updatedAt: stamp, updatedBy: email, testEdited: true };
   num.write(stamp);

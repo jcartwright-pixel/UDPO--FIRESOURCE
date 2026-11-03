@@ -18,6 +18,7 @@
     .popover.ci-pop textarea.notes { min-height: 54px; }
     .popover.ci-pop .ci-more { color: var(--pickup); line-height: 1.3; }
     @media (max-width: 640px) { .popover.ci-pop { grid-template-columns: 1fr; left: 8px !important; right: 8px; z-index: 400; } .popover.ci-pop label, .popover.ci-pop .ci-label { margin-top: 4px; } }</style>
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
 </head>
 <body>
@@ -98,7 +99,7 @@
       const edit = canSave();
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       document.getElementById('rows').innerHTML = rows.map((r, i) => {
-        const driver = r.driver || (r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '');
+        const driver = r.driver || L.coverageName(r);
         const refused = [r.refusedReturned, r.refusedReturnedSource].filter(Boolean).join(', ');
         const at = r.checkinCompletedAt ? new Date(r.checkinCompletedAt) : null;
         return '<tr data-index="' + i + '"' + (edit ? ' class="editable" tabindex="0" title="Enter or fix the check-in for ' + escapeHtml(r.route) + '"' : '') + '>' +
@@ -110,7 +111,7 @@
           // Joe 10/19: everything the driver wrote shows here in full, the notes too (notes are not counted as a problem).
           '<td class="said ' + (r.issues.length ? 'issue' : r.checkinNotes ? '' : 'empty') + '">' + escapeHtml(r.issues.join('; ')) +
           (r.checkinNotes ? '<span class="said-notes">Notes: ' + escapeHtml(r.checkinNotes) + '</span>' : '') + '</td>' +
-          '<td class="' + (r.checkedIn ? 'ok' : 'empty') + '">' + escapeHtml(at && !isNaN(at) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : r.checkedIn ? 'Yes' : 'Not yet') + '</td></tr>';
+          '<td class="' + (r.checkedIn ? 'ok' : 'empty') + '">' + escapeHtml(at && !isNaN(at) ? window.UDTiming.clockOf(at) : r.checkedIn ? 'Yes' : 'Not yet') + '</td></tr>';
       }).join('') || (!loaded ? '<tr><td colspan="11" class="empty">Loading the check-ins&hellip;</td></tr>' : '<tr><td colspan="11" class="empty">No deliveries on this day in the copied Live weeks.</td></tr>');
       const done = rows.filter(r => r.checkedIn).length;
       document.getElementById('n-in').textContent = loaded ? done : '-';

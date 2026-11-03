@@ -43,7 +43,7 @@ function phoneE164(v) {
 function phoneText(v) { const e = phoneE164(v); return e ? e.slice(2, 5) + '-' + e.slice(5, 8) + '-' + e.slice(8) : ''; }
 
 // 10-18-26, as every date in the app.
-const dateText = (k) => { const [y, m, d] = String(k).split('-'); return Number(m) + '-' + Number(d) + '-' + String(y).slice(2); };
+const dateText = (k) => L.dateText(k);
 // The text a driver's reply is sent on as (Joe 10/31).
 // The roster's "CASEY, LEE" reads Lee Casey.
 const personName = (v) => { const t = String(v || '').trim(), m = t.split(','); const w = (m.length === 2 ? m[1] + ' ' + m[0] : t).trim().toLowerCase();
@@ -371,7 +371,7 @@ const TEST_TEXT = 'United Dairy: this is a test text from Operations. No need to
 const ASK = 'United Dairy work texts: your schedule when it is posted and when your load is done, with any pickups. Reply YES to get them. Reply STOP to stop.';
 const sampleMessage = () => doneMessage({ route: '801', run: 'UT DSD MILK', trailer: 'T-901', cases: 1200, pickupText: '2 crates chocolate milk' });
 // Loads finished longer ago than this are never texted (a load marked done late, or the switch turned back On days later).
-const DONE_WINDOW_MS = 12 * 3600 * 1000;
+const DONE_WINDOW_MS = require('./timing-rules').TIMERS.textsDoneHours * 3600 * 1000;
 
 /* The minute job: each load the plant finished today for a ticked driver gets one text. Returns what it did, or null. */
 async function loadDoneCheck(db, options) {
