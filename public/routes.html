@@ -461,7 +461,7 @@
     function shown(field, value) {
       return field === 'dispatchTime' ? L.minutesOfDay(/^\d{1,2}\s*[AaPp][Mm]$/.test(value) ? value.replace(/\s*([AaPp][Mm])$/, ':00 $1') : value)
         : ['miles', 'loadOrder', 'loadDayOffset'].indexOf(field) >= 0 ? (value === '' ? null : Number(value))
-        : field === 'trailer' ? (value && !/^T-/i.test(value) ? 'T-' + value.toUpperCase() : value.toUpperCase()) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
+        : field === 'trailer' ? L.trailerNumber(value) : ['tractor', 'forklift'].indexOf(field) >= 0 ? value.toUpperCase() : value;
     }
     const table = document.getElementById('table');
     // The up / down clicker: each click moves the time 15 minutes (past midnight wraps round); holding repeats. The box shows
