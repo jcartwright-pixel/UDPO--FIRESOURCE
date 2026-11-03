@@ -69,7 +69,7 @@ function activeTechs(docs) {
 // The garage's units (udpoV7276Units_): trucks and trailers of this plant, trailers written T-<number>; leased ones marked.
 function unitText(unit, type) {
   const u = String(unit || '').toUpperCase().replace(/\s+/g, '');
-  if (type === 'TRAILER') { const m = /^T-?(\d+)$/.exec(u) || /^(\d+)$/.exec(u); return m ? 'T-' + m[1] : u; }
+  if (type === 'TRAILER') return L.trailerNumber(u);
   return u;
 }
 function garageUnits(equipment) {
@@ -79,14 +79,16 @@ function garageUnits(equipment) {
     .map(({ e, type }) => ({ unit: unitText(e.unit, type), type, leased: L.unitLeased(e) })).filter(u => !seen[u.unit] && (seen[u.unit] = true))
     .sort((a, b) => (a.type === b.type ? 0 : a.type === 'TRUCK' ? -1 : 1) || a.unit.localeCompare(b.unit, undefined, { numeric: true }));
 }
-const alnum = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const alnum = (s) => L.unitKey(s);
 // What a technician typed on Report a Problem to one unit: exact, T + typed, or the one unit that ends that way.
 function matchUnit(units, typed) {
   const key = alnum(typed);
   if (!key) return { error: 'Type the truck or trailer number.' };
   const exact = units.filter(u => alnum(u.unit) === key || alnum(u.unit) === 'T' + key);
   if (exact.length === 1) return { unit: exact[0] };
-  const ends = key.length >= 2 ? units.filter(u => alnum(u.unit).endsWith(key)) : [];
+  // The last digits typed, as typed ("01" is the end of 900001 and T-901): front zeros only come off a whole number.
+  const tail = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), end = tail(typed);
+  const ends = end.length >= 2 ? units.filter(u => tail(u.unit).endsWith(end)) : [];
   if (ends.length === 1) return { unit: ends[0] };
   if (exact.length > 1 || ends.length > 1) return { error: text(typed, 12) + ' matches ' + (exact.length > 1 ? exact : ends).slice(0, 4).map(u => u.unit).join(', ') + '. Type the whole number.' };
   return { error: text(typed, 12) + ' is not one of our trucks or trailers.' };
@@ -714,7 +716,7 @@ async function serviceOrders(db, nowMs) {
       const [mine, gone] = await Promise.all([tx.get(db.collection(WORK_ORDERS).where('unit', '==', i.unit)), tx.get(db.collection(DELETED).where('source_id', '==', sid))]);
       if (gone.docs.length || mine.docs.some(d => d.data().service_key === i.key && String(d.data().status || '').toUpperCase() !== 'DONE')) return;
       const id = newOrderId(), late = i.status === 'OVERDUE';
-      const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^(\d{4})-(\d\d)-(\d\d)$/, (m, y, mo, d) => Number(mo) + '-' + Number(d) + '-' + y.slice(2));
+      const when = i.key === 'PM' && !i.byDays && typeof i.dueAt === 'number' ? 'at ' + Number(i.dueAt).toLocaleString('en-US') + ' miles' : String(i.dueAt).replace(/^\d{4}-\d\d-\d\d$/, (m) => L.dateText(m));
       tx.set(db.collection(WORK_ORDERS).doc(docId(id)), newOrder({ work_order_id: id, unit: i.unit, unit_type: i.type, problem: G.SERVICES[i.key] + (late ? ' overdue' : ' due') + (when ? ' ' + when : ''),
         can_run: 'YES', source: 'SERVICE', source_from: FROM.SERVICE, source_kind: 'service', source_id: sid, service_key: i.key, due_at: String(i.dueAt), created_at: stamp,
         created_by: 'Fleet Service', updated_at: stamp, updated_by: 'Fleet Service' }));

@@ -58,7 +58,7 @@ function qualityWrite(plan, line, run, weights, keys, email, stamp) {
   }
   const last = plan.last ? plan.last.data.payload || {} : {}, status = text(last.status).toUpperCase() && text(last.status).toUpperCase() !== 'FINISHED' ? text(last.status).toUpperCase() : 'RUNNING';
   const payload = { operationId: run.operationId, area: line.name, product: text(run.product) || text(last.product), status, remainingOutput: '', qualityCheck: '', tipTest: '', temperature: '',
-    cycleTime: '', productSize: text(last.productSize), annealerSpeed: '', weights, notes: '', facilityId: line.facilityId || 'fac_uniontown', fromLine: true };
+    cycleTime: '', productSize: text(last.productSize), annealerSpeed: '', weights, notes: '', facilityId: L.plantOf(line), fromLine: true };
   return { id: plan.newId, set: { recordId: 'PQ-LINE-' + plan.newId.slice(-12), type: QUALITY_TYPE, date: L.operatingDay(new Date(stamp)), status, area: line.name, temperature: '', notes: '',
     payload, recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp } };
 }
@@ -89,7 +89,7 @@ async function fillContext(get, db, line, operationId, product, nowMs) {
   const ld = (await get(db.collection('productionLines').doc(docId(operationId)))).data() || {};
   let blow = null;
   if (P.usesBlowMoldJugs(line.name)) {
-    const lines = await get(db.collection('productionLines').where('facilityId', '==', line.facilityId || 'fac_uniontown'));
+    const lines = await get(db.collection('productionLines').where('facilityId', '==', L.plantOf(line)));
     lines.docs.map(d => d.data()).forEach(d => { if (P.lineKind(d.line) === 'BLOWMOLD' && d.headsLast && (!blow || when(d.headsLast.at) > when(blow.at))) blow = d.headsLast; });
   }
   const tare = P.tareFor(line.name, Object.assign({ line: line.name }, ld), blow, nowMs);
@@ -126,7 +126,7 @@ async function planFromQuality(tx, db, d, req, checkId, stamp, email) {
   const kind = P.lineKind(d.name), w = req.weights || {}, get = (ref) => tx.get(ref);
   const heads = kind === 'BLOWMOLD' ? headsOf(w) : null, jugs = P.hasFill(d.name) && fillToQuality(d.name) ? jugsFrom(w.result) : null;
   if (!(heads && Object.keys(heads).length) && !jugs) return null;
-  const line = { name: d.name, facilityId: d.facilityId || 'fac_uniontown' }, ms = Date.parse(stamp);
+  const line = { name: d.name, facilityId: L.plantOf(d) }, ms = Date.parse(stamp);
   const shifts = await tx.get(db.collection('plantShifts').doc(docId(line.facilityId)));
   const shift = READER.plantShift(shifts.exists ? shifts.data().shifts : null, ms);
   const ref = db.collection('productionRuns').doc(docId(P.runId(req.operationId, shift.key))), had = await tx.get(ref);

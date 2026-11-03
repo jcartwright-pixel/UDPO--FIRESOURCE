@@ -308,7 +308,7 @@ async function stationRelease(db, user, input, now) {
 
 // The plant's manager release code: 'status' (is one set?) or a typed code. Also the Garage Station's (garage.js), which has no sign-in.
 async function releaseCheck(db, input, now) {
-  const fac = text(input.facilityId || 'fac_uniontown', 60);
+  const fac = text(L.plantOf(input), 60);
   const codes = (await db.collection('private').doc('releaseCodes').get()).data() || {}, c = codes[fac];
   if (input.op === 'status') return { required: !!(c && c.hash) };
   if (!c || !c.hash) return { ok: true };
@@ -338,14 +338,14 @@ async function releaseCheck(db, input, now) {
 const groupId = (fac, name) => M.safeIdPart(fac + '__' + String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'));
 
 async function reportGroups(db, input) {
-  const fac = text(input.facilityId || 'fac_uniontown', 60);
+  const fac = text(L.plantOf(input), 60);
   const [snap, mail] = await Promise.all([db.collection('reportGroups').where('facilityId', '==', fac).get(), emailSettings(db)]);
   return { facilityId: fac, locations: activePlants().map(p => ({ id: p.id, name: p.name })), sending: mail.sending,
     groups: snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(g => g.active !== false).sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
 async function saveReportGroup(db, email, input, stamp) {
-  const fac = text(input.facilityId || 'fac_uniontown', 60);
+  const fac = text(L.plantOf(input), 60);
   if (!activePlants().some(p => p.id === fac)) fail('BAD_REQUEST', 'Pick a location.');
   const name = text(input.name, 100);
   if (!name) fail('BAD_REQUEST', 'A new group needs a name and at least one address.');

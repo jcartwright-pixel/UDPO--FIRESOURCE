@@ -35,7 +35,7 @@ async function readPlant(db, plant) {
 
 /** For the drivers' phone: one route day's stops in run order, with each customer's address, keys and notes. */
 async function routeBook(db, plant, route, day) {
-  route = U.numText(String(route || '').replace(/_\d+$/, ''), U.LIMITS.route); day = U.dayOf(day);
+  route = U.numText(require('./logic').routeNumber(route || ''), U.LIMITS.route); day = U.dayOf(day);
   if (!route || !day) return { found: false };
   let s = await db.collection(ROUTE_DAYS).doc(U.routeDayId(plant, route, day)).get();
   // Dispatch may name a route with words around its number ("803 PITTSBURGH"): the number alone, then.

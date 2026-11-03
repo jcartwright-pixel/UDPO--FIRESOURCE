@@ -3,9 +3,9 @@
  * (pure JavaScript, no Apps Script). The screen (otr.html) and the server (actions.js) both load this one file.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDOtr = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./logic'));
+  else root.UDOtr = factory(root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (LO) {
 /**
  * 7.0.276 Over the Road (OTR) runs: pure logic (no Apps Script services). Server side in 222_V7276_OverTheRoadServer.gs,
  * screen OverTheRoad.html. Node tests load this file directly (tools/test_otr_core.cjs).
@@ -94,8 +94,8 @@ function otrWeekday_(key) {
 
 // Review item 17 (Joe 10/13): dates read 10-8-26, like the rest of the app.
 function otrShortDate_(key) {
-  var p = otrParseKey_(key);
-  return p.m + '-' + p.d + '-' + String(p.y).slice(-2);
+  otrParseKey_(key);
+  return LO.dateText(key);
 }
 
 /** Route Master rows -> the OTR route list. rows: [{runId, route, run, include, destination, miles:{sun..sat}}]. */

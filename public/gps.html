@@ -187,7 +187,7 @@
     // Joe 10/20: every trailer's temperature for Trucks Today, read every 15 minutes.
     const allTrailers = (s) => s.tempsError ? ' All trailers (Trucks Today): not read: ' + s.tempsError : s.tempsAt ? ' All trailers (Trucks Today): ' + s.tempsWith + ' of ' + s.tempsTrailers + ' with a temperature, read ' + stamp(s.tempsAt) + '.' : '';
     const dayRange = (days) => days && days.length ? shortDay(days[0]) + ' to ' + shortDay(days[days.length - 1]) : '';
-    const shortDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
+    const shortDay = (iso) => window.UDLogic.dateText(iso);
     // The count is kept by the read; a count from an earlier New York day means none yet today.
     const alertsToday = (s) => s.alertsDate === new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped

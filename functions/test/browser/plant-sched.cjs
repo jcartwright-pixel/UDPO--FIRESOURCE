@@ -139,8 +139,8 @@ async function shots(page, name, w) {
     await desk.click('#f-save');
     await desk.waitForSelector('#f-confirm');
     const box = await desk.textContent('#modal');
-    assert.match(box, /Confirm this load[\s\S]*892 · GARBER[\s\S]*United Dairy Delivery[\s\S]*Monday 10-05-26[\s\S]*Saturday 10-10-26[\s\S]*5:45 AM[\s\S]*300/, 'the box shows what will be saved');
-    assert.deepEqual(await desk.$$eval('.sched-warn', w => w.map(e => e.textContent)), ['⚠ The load date, Monday 10-05-26, has already passed.', '⚠ Garber Farms usually loads Friday 10-09-26 for a Saturday delivery.']);
+    assert.match(box, /Confirm this load[\s\S]*892 · GARBER[\s\S]*United Dairy Delivery[\s\S]*Monday 10-5-26[\s\S]*Saturday 10-10-26[\s\S]*5:45 AM[\s\S]*300/, 'the box shows what will be saved');
+    assert.deepEqual(await desk.$$eval('.sched-warn', w => w.map(e => e.textContent)), ['⚠ The load date, Monday 10-5-26, has already passed.', '⚠ Garber Farms usually loads Friday 10-9-26 for a Saturday delivery.']);
     assert.ok(await desk.$eval('.sched-confirm dd.big', e => parseFloat(getComputedStyle(e).fontSize) >= 16));
     if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-confirm-warn-1920.png'), scale: 'css' });
     assert.equal((await db().collection('plantJournal').where('type', '==', 'PLANT_SCHEDULE').get()).docs.filter(d => d.data().run === 'GARBER' && d.data().date === saturday).length, 0, 'nothing saved before Confirm');

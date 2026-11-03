@@ -120,7 +120,7 @@
     const params = new URLSearchParams(location.search), testEmail = params.get('testEmail');
     const today = L.operatingDay(new Date()), thisYear = Number(today.slice(0, 4)), thisMonth = Number(today.slice(5, 7));
     const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const shortDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8)) + '/' + k.slice(0, 4);
+    const shortDate = (k) => L.dateText(k);
     const wait = (ms) => new Promise(r => setTimeout(r, ms));
     const click = (w, sel) => { const b = w.document.querySelector(sel); if (!b) throw new Error('The screen has no ' + sel); b.click(); };
     const setValue = (w, sel, v) => { const e = w.document.querySelector(sel); if (!e || e.value === String(v)) return; e.value = v; e.dispatchEvent(new w.Event('change', { bubbles: true })); };
@@ -299,7 +299,7 @@
         }
         if (o.type === 'week') {
           return '<label>' + escapeHtml(o.label) + '<div class="stepper"><button type="button" data-step="-7" data-for="' + o.id + '" aria-label="Previous week">&#9664;</button><input type="date" data-opt="' + o.id + '" value="' + opts[o.id] + '"><button type="button" data-step="7" data-for="' + o.id + '" aria-label="Next week">&#9654;</button></div></label>' +
-            '<span class="pl-week">Sun ' + shortDate(opts[o.id]) + ' to Sat ' + shortDate(L.addDays(opts[o.id], 6)) + '</span>';
+            '<span class="pl-week">' + L.weekText(opts[o.id]) + '</span>';
         }
         return '<label>' + escapeHtml(o.label) + '<div class="stepper"><button type="button" data-step="-1" data-for="' + o.id + '" aria-label="Day before">&#9664;</button><input type="date" data-opt="' + o.id + '" value="' + opts[o.id] + '"><button type="button" data-step="1" data-for="' + o.id + '" aria-label="Day after">&#9654;</button></div></label>';
       }).join('');

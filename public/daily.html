@@ -151,7 +151,7 @@
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
     const coverLabel = (c) => String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '');
-    const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
+    const coverageName = (r) => L.coverageName(r);
     // Carrier or a branch (Fairmont, Martins Ferry...) in the driver column: no tractor goes, so Truck shows N/A (current app).
     const noTractor = (r) => !!coverageName(r) || (!r.driverId && !!r.driver && (/^CARRIER$/i.test(r.driver) || cvgOptions().some(o => o.text.toUpperCase() === String(r.driver).toUpperCase())));
 
@@ -372,7 +372,7 @@
     const setJack = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setJack', { jack: text }, d => { d.palletJack = text.toUpperCase(); }, render);
     // Joe 10/19 (800 Specials: "could be totes, could be cases, could be anything"): the day's load type picks the loadout it goes to
     // (Loadout Center, Manager Center and the shift report email follow it). It starts as the route's Loadout Type in the Route Editor.
-    const LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
+    const LOAD_TYPES = R.LOAD_TYPES;
     const loadTypeOf = (row) => { const run = runs.find(x => x.id === row.runDocId); return run ? runArea(run, row.day) : ''; };
     const setLoadType = (row, type) => saveRunChange(getRuns, row.runDocId, row.day, 'setLoadType', { loadType: type }, d => { d.loadType = type; d.loadTypeByHand = !!type; }, render);
 
@@ -584,7 +584,7 @@
     const allUnits = () => lists.fleetTrucks.concat(lists.fleetTrailers);
     const reasonOf = (e) => String(e.notes || '').replace(/^DOWN:?\s*/i, '');
     // Like the current app: a short number finds the unit (893 finds 223893, 956 finds T-956) when only one unit ends with it.
-    const alnum = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const alnum = (v) => L.unitKey(v);
     function findUnit(typed) {
       const all = allUnits(), t = alnum(typed);
       const exact = all.filter(e => String(e.unit).toUpperCase() === typed);
@@ -638,10 +638,10 @@
 
     /* ---------- Print: the same columns as the current dispatch sheet, with Print Layouts' saved setup (one landscape page, 3 copies) ---------- */
     // The printed sheet keeps its approved date style (10/8/2026); the screen uses the short 10-8-26.
-    const usDate = (k) => Number(k.slice(5, 7)) + '/' + Number(k.slice(8, 10)) + '/' + k.slice(0, 4);
+    const usDate = (k) => L.dateText(k);
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off && !r.already);
-      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
+      let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning Sunday ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
         ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
       let group = '', loaded = '';

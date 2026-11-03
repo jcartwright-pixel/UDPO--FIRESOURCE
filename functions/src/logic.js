@@ -84,6 +84,25 @@
     return parts.year + '-' + parts.month + '-' + parts.day;
   }
 
+  // Rules audit lines 15 and 16 (Joe 11/3: "a centralized area where the format date is going to be exact"; "everything should
+  // start on Sunday"): the one way a date is written on every screen, email, text, printout and message, like 10-8-26
+  // (month-day-two-digit year, no zeros in front). Takes a day key (2026-10-08), a sheet date (10/08/2026) or a time (ISO
+  // text, a number or a Date, read on the plant's clock).
+  function dateText(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(v).trim());
+    if (m) return Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2);
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v).trim());
+    if (m) return Number(m[1]) + '-' + Number(m[2]) + '-' + m[3].slice(-2);
+    var t = v instanceof Date ? v : new Date(typeof v === 'number' ? v : String(v));
+    if (isNaN(t)) return String(v);
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: '2-digit', month: 'numeric', day: 'numeric' }).formatToParts(t).forEach(function (p) { parts[p.type] = p.value; });
+    return parts.month + '-' + parts.day + '-' + parts.year;
+  }
+  // A week as its Sunday and Saturday, like "Sun 11-1-26 to Sat 11-7-26". weekStart() is always the Sunday.
+  function weekText(key) { var sun = weekStart(key); return 'Sun ' + dateText(sun) + ' to Sat ' + dateText(addDays(sun, 6)); }
+
   // Joe 10/13 ("No route equals no driver"): what a day marked not running gives up, so the driver and units are free that day.
   var NOT_RUNNING_CLEARS = Object.freeze({ driverId: '', driver: '', truckId: '', truck: '', trailerId: '', trailer: '' });
 
@@ -172,9 +191,7 @@
   }
 
   function routeIsShown(run, flag) {
-    var status = String(run.routeStatus || 'ACTIVE').trim().toUpperCase();
-    if (status && status !== 'ACTIVE') return false;
-    if (run.active === false) return false;
+    if (!runActive(run)) return false;
     if (run[flag] === false) return false;
     return true;
   }
@@ -185,14 +202,91 @@
   // not carry at all (an older copy without that column) stays yes, as the current app does when the column is missing.
   function masterActive(r) {
     if (!r) return false;
-    var status = String(r.routeStatus || 'ACTIVE').trim().toUpperCase();
-    if (status !== 'ACTIVE') return false;
+    if (!statusActive(r)) return false;
     return r.active === undefined ? true : r.active === true;
   }
   function masterFlag(r, field) {
     if (!r) return false;
     if (r[field] === undefined) return field === 'displayDaily' ? String(r.movementType || '').toUpperCase() !== 'CUSTOMER_PICKUP' : true;
     return r[field] === true;
+  }
+
+  /* ---------- Load rules: one place for every screen, email and the server (Joe 11/2-11/3, rules audit lines 8 to 10 and 18) ----------
+   * Joe 11/2: "if there's anything more than two calls ... we should centralize it ... it all goes through the same place". These
+   * used to be written out in nine places each and did not agree (a route marked UNIONTOWN counted as ours for late but showed an
+   * outside carrier's colour on the Scheduler; READY counted as loaded on Loadout but not on the yard list). Every copy now calls
+   * these; functions/test/unit/load-rules.test.js fails if a new copy appears somewhere else.
+   */
+
+  // Who hauls a run (Route Master coverage_type and movement_type; a Scheduler load can also be marked Carrier):
+  //   'OURS'    our own truck: blank, UNITED DAIRY or UNIONTOWN;
+  //   'BRANCH'  one of our branches (Fairmont, Marietta, Charleston, ...): Joe 11/3 "intercompany transfer should be considered
+  //             late", so a branch counts like our own truck for late, but its run is covered and needs no Uniontown driver;
+  //   'CARRIER' an outside carrier (OUTSIDE CARRIER, a carrier's own name, movement_type CARRIER_LOAD, a Scheduler load marked
+  //             Carrier);
+  //   'PICKUP'  the customer picks it up (CUSTOMER_PICKUP / CUSTOMER PICKUP).
+  var OUR_HAULERS = ['', 'UNITED DAIRY', 'UNIONTOWN'];
+  function hauler(r, scheduleType) {
+    if (String(scheduleType || '').trim().toUpperCase() === 'CARRIER') return 'CARRIER';
+    if (!r) return 'OURS';
+    var cov = String(r.coverageType || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    var move = String(r.movementType || '').trim().toUpperCase().replace(/\s+/g, '_');
+    if (move === 'CUSTOMER_PICKUP' || cov === 'CUSTOMER PICKUP' || cov === 'CUSTOMER_PICKUP') return 'PICKUP';
+    if (move === 'CARRIER_LOAD') return 'CARRIER';
+    if (cov === 'BRANCH') return 'BRANCH';
+    return OUR_HAULERS.indexOf(cov) >= 0 ? 'OURS' : 'CARRIER';
+  }
+  // Joe 11/2: an outside carrier's or a customer's own load is recorded but never late or behind.
+  function outsideHauler(r, scheduleType) { var h = hauler(r, scheduleType); return h === 'CARRIER' || h === 'PICKUP'; }
+  // The name shown in a run's driver spot when someone other than our own driver covers it (Daily, Check-Ins, the phone).
+  function coverageName(r) {
+    if (hauler(r) === 'OURS') return '';
+    var cov = String((r && r.coverageType) || '').trim().toUpperCase();
+    return cov || (hauler(r) === 'PICKUP' ? 'CUSTOMER PICKUP' : 'CARRIER');
+  }
+
+  // The four loadout areas and the one set of words for them on every screen, email and printout. Rules audit line 13 (Joe 11/3:
+  // "everything should be boxing, tanker, tote"; Case stays Case). name: the area's own word; title: its Loadout screen; tile:
+  // its tile and tab. The counts keep their own words (Cases Out, Totes Out, Boxes Out, Gallons In).
+  var AREA_ORDER = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  var AREA_WORDS = {
+    CASE: { name: 'Case', title: 'Daily Case Loadout', tile: 'Cases' },
+    TOTES: { name: 'Tote', title: 'Daily Tote Loadout', tile: 'Tote' },
+    BOXING: { name: 'Boxing', title: 'Daily Boxing Loadout', tile: 'Boxing' },
+    TANKER: { name: 'Tanker', title: 'Daily Tanker Loadout', tile: 'Tanker' }
+  };
+  // The area a Route Master / Daily load type goes to: CASE, TOTES, BOXING, TANKER or '' (desktopV5063LoadoutTypeToArea_).
+  function loadArea(t) {
+    t = String(t == null ? '' : t).trim().toUpperCase();
+    if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
+    if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
+    if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT' || t === 'BOXING LOADOUT') return 'BOXING';
+    if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
+    return '';
+  }
+  function areaName(a) { return (AREA_WORDS[a] || {}).name || ''; }
+
+  // Whether a load is loaded: a finish time, Loaded / Complete ticked, or a load status that says it is done. One list of words
+  // for every screen (READY and COMPLETED used to count on Loadout and the sales email but not on the yard list).
+  var LOADED_WORDS = ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'];
+  var YES_WORDS = ['TRUE', 'YES', 'Y', '1', 'LOADED', 'COMPLETE'];
+  function isLoaded(day) {
+    if (!day) return false;
+    if (String(day.completeTime || '').trim()) return true;
+    if (day.loadedComplete === true || YES_WORDS.indexOf(String(day.loadedComplete == null ? '' : day.loadedComplete).trim().toUpperCase()) >= 0) return true;
+    return LOADED_WORDS.indexOf(String(day.loadStatus || '').trim().toUpperCase()) >= 0;
+  }
+
+  // Whether a run is active: its route_status is ACTIVE (blank counts as ACTIVE, any capitals) and it is not switched off. Route
+  // Master's own row, where a blank active cell means NOT active, is masterActive.
+  function statusActive(r) { var s = String((r && r.routeStatus) || 'ACTIVE').trim().toUpperCase(); return s === '' || s === 'ACTIVE'; }
+  function runActive(r) { return !!r && statusActive(r) && r.active !== false; }
+
+  // Joe 11/3 (rules audit line 18: "18 yes"): a run is drop and hook when the run or its Route Master line has the Drop and Hook
+  // tick, whatever the route is called (it used to need a Save-A-Lot name in the sales app). master: {runId: route doc}.
+  function dropAndHook(run, master) {
+    var m = (master && run && master[run.runId]) || {};
+    return !!((run && run.dropAndHook) || m.dropAndHook);
   }
 
   // A driver is active unless Driver Master says INACTIVE, TERMINATED or DISABLED (udpoV7000DriverIsActive_; a blank status is active).
@@ -216,14 +310,23 @@
     if ((type === 'TRUCK' || type === 'TRACTOR') && unit.sourcePresent === false) return false;
     return true;
   }
-  // A trailer number as typed on Daily, Weekly or the route editor: TBA and N/A stay as words; a bare number or T-number becomes
-  // T-###; anything else is kept as typed (Joe 10/15: "allow numbers, also allow TBA"; TBA used to become T-BA).
+  // A trailer number as typed anywhere (Daily, Weekly, the Route Editor, Loadout, Unloading, Washing, the yard, the garage): TBA
+  // and N/A stay as words; a bare number or a T-number becomes T- and the number; anything else is kept as typed (Joe 10/15:
+  // "allow numbers, also allow TBA"). Rules audit line 12 (Joe 11/3): "it always has to be T, then a dash. There's no beginning
+  // zeros at all ... make it all completely the same", so T-014, 014 and T 14 are all T-14. The one copy; every screen calls it.
   function trailerNumber(v) {
     var c = String(v === null || v === undefined ? '' : v).trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return '';
     if (c === 'TBA' || c === 'N/A' || c === 'NA') return c === 'NA' ? 'N/A' : c;
-    var m = /^T-?(\d+)$/.exec(c) || /^(\d+)$/.exec(c);
-    return m ? 'T-' + m[1] : c;
+    var m = /^T?-?0*(\d+)$/.exec(c);
+    return m ? 'T-' + m[1] : /^T?-?0+$/.test(c) ? 'T-0' : c;
+  }
+  // The key two unit numbers are matched by (a GPS tag against a truck or trailer on a load): letters and digits only, no leading
+  // zeros, so "T-014", "T014" and "t 14" match, and "0601" matches "601". Rules audit line 12.
+  function unitKey(v) {
+    var c = String(v === null || v === undefined ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var m = /^([A-Z]*)0*(\d+)$/.exec(c);
+    return m ? m[1] + m[2] : c;
   }
 
   // Equipment Issues (the current app's Maintenance screen, udpoV740MaintenanceRowsFromTable_): the write-ups on TRUCK LIVE,
@@ -485,7 +588,7 @@
           plantLoadOff: d.plantLoadOff === true
         };
       });
-      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, weekOrder: run.weekOrder, days: days, rev: run.rev || 0,
+      return { runDocId: run.id, routeId: run.routeId, route: run.route, routeName: run.routeName, routeRunType: run.routeRunType || '', runId: run.runId, run: run.run, streamId: run.streamId || (run.cells && run.cells.stream_id) || '', coverageType: run.coverageType, movementType: run.movementType || '', weekOrder: run.weekOrder, days: days, rev: run.rev || 0,
         extraRun: run.extraRun === true, extraOf: run.extraOf || '' };
     }).sort(function (a, b) {
       var x = a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder;
@@ -527,6 +630,14 @@
     { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED', db: 'martins-ferry' }
   ];
   var HOME_PLANT = 'fac_uniontown';
+  // Rules audit line 11 (Joe 11/3 "Yes, one plant rule everywhere"): the plant a record, setting or screen belongs to. A record
+  // saved before the plants were separated has no plant and is Uniontown's. v: a plant id, or a record with facilityId /
+  // facility_id. Every "blank means Uniontown" goes through here.
+  function plantOf(v) {
+    var id = v !== null && typeof v === 'object' ? (v.facilityId || v.facility_id) : v;
+    id = String(id == null ? '' : id).trim();
+    return id || HOME_PLANT;
+  }
   // The database a plant keeps its things in; '' for a plant not on the list.
   function plantDb(id) { var p = PLANTS.filter(function (x) { return x.id === id; })[0]; return p ? p.db : ''; }
   var PRIMARY_ADMINS = ['jcartwright@uniteddairy.com'];
@@ -660,7 +771,7 @@
       [e.id, e.unit].forEach(function (k) { k = String(k || '').trim().toUpperCase(); if (k) byKey[k] = e.id; });
     });
     (routes || []).forEach(function (r) {
-      if (!r || (r.routeStatus && r.routeStatus !== 'ACTIVE') || r.active === false) return;
+      if (!runActive(r)) return;
       var label = String(r.streamId || '').trim() || String(r.route || '').trim();
       DAYS.forEach(function (p) {
         var d = r.days && r.days[p];
@@ -896,8 +1007,7 @@
 
   // A route needs a driver when it has neither a driver nor an outside carrier covering it.
   function needsDriver(row) {
-    var coverage = String(row.coverageType || '').trim().toUpperCase();
-    return !row.driver && (!coverage || coverage === 'UNITED DAIRY');
+    return !row.driver && hauler(row) === 'OURS';
   }
 
   // Joe 10/19: a driver can be over on one product and short on another. Both go in the one Live column
@@ -1115,11 +1225,8 @@
 
   /* ---------- Weekly Dispatch colours and the Driver Assignment Board ---------- */
 
-  // Same as the current Weekly: a route covered by an owner or outside carrier is locked (BRANCH routes are not).
-  function coveredRoute(row) {
-    var t = String((row && row.coverageType) || 'UNITED DAIRY').trim().toUpperCase();
-    return t !== '' && t !== 'UNITED DAIRY' && t !== 'BRANCH';
-  }
+  // Same as the current Weekly: a route an outside carrier covers, or the customer picks up, is locked (BRANCH routes are not).
+  function coveredRoute(row) { return outsideHauler(row); }
 
   // The legend colour of one Weekly cell: off, coverage, vacation-needs, conflict, needs, carrier, open, booked, relief, assigned.
   function weeklyCellClass(row, prefix, ctx) {
@@ -1190,7 +1297,7 @@
     (rows || []).forEach(function (r) {
       var m = /^(.*?)[\s-]*LOAD\s*([0-9]+)$/i.exec(String(r.run || '').trim());
       if (!r.runId || !m || !m[1].trim()) return;
-      var key = String(r.route || '').trim().replace(/_[0-9]+$/, '') + '|' + m[1].trim().toUpperCase();
+      var key = routeNumber(r.route) + '|' + m[1].trim().toUpperCase();
       if (groupOf[r.runId]) return;
       groupOf[r.runId] = key;
       (slots[key] = slots[key] || []).push({ runId: r.runId, n: Number(m[2]) });
@@ -1333,8 +1440,7 @@
    * the dispatcher set them.
    */
   function boxLoadRun(route) {
-    var t = String((route && route.loadType) || '').trim().toUpperCase();
-    return (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') && String((route && route.coverageType) || '').trim().toUpperCase() === 'BRANCH';
+    return loadArea(route && route.loadType) === 'BOXING' && hauler(route) === 'BRANCH';
   }
   function resetWeekPlan(run, route, slots, exceptions) {
     if (!route || ROUTE_OFF.indexOf(String(route.routeStatus || 'ACTIVE').toUpperCase()) >= 0 || !masterActive(route)) return null;
@@ -1641,6 +1747,7 @@
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
+    AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
@@ -1651,7 +1758,7 @@
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
-    DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
+    dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,

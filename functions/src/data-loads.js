@@ -116,7 +116,7 @@ async function loadHtstOnce(db, opts) {
     const fac = load.facilityId, targets = Object.keys(load.machines);
     // Every machine and area of the plant: its saved list, or its starting list when it has never been saved.
     const setup = await tx.get(db.collection('plantSetup'));
-    const lines = setup.docs.map(d => d.data()).filter(d => d.type === 'PRODUCTION_AREA' && d.status !== 'INACTIVE' && (String(d.facilityId || '').trim() || 'fac_uniontown') === fac);
+    const lines = setup.docs.map(d => d.data()).filter(d => d.type === 'PRODUCTION_AREA' && d.status !== 'INACTIVE' && L.plantOf(d) === fac);
     const missing = targets.filter(id => !lines.some(l => l.operationId === id));
     if (missing.length) throw new Error(missing.join(', ') + ' not set up for ' + fac + ' yet');
     const own = await PLANT.productSetupOf(tx, db, fac);
@@ -212,7 +212,7 @@ async function loadFleetStartMilesOnce(db, opts) {
     if (m.exists && m.data().status === 'DONE') return { skipped: true };
     const [equipment, gps, setup] = await Promise.all([tx.get(db.collection('equipment')), tx.get(db.collection('gpsTrucks')), tx.get(db.collection('fleetSetup'))]);
     // Fleet names a truck "223876" and a trailer "T-635"; ours are the same letters and digits (trailers T- plus number).
-    const key = (u) => String(u || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), byKey = {}, byDigits = {};
+    const key = (u) => L.unitKey(u), byKey = {}, byDigits = {};
     gps.docs.map(d => d.data()).forEach(t => { const k = key(t.tag); if (!k) return; byKey[k] = t; if (/^\d+$/.test(k)) byDigits[k] = t; });
     if (!gps.docs.some(d => Number(d.data().odometerMiles) > 0)) return { waiting: 'no GPS odometers read yet' };
     const setupBy = {}; setup.docs.forEach(d => { setupBy[String(d.data().unit || d.id).toUpperCase()] = { ref: d.ref, data: d.data() }; });
@@ -323,7 +323,7 @@ async function loadHalfGallonReadersOnce(db, opts) {
     lines.forEach((d, i) => {
       const was = had[i].exists ? had[i].data().counter || 'TABLET' : 'TABLET', name = String(d.name || d.area);
       if (was !== 'TABLET') { kept.push(name + ' ' + was); return; }
-      tx.set(refs[i], { operationId: d.operationId, line: name, facilityId: String(d.facilityId || '').trim() || 'fac_uniontown', counter: 'READER', updatedAt: stamp, updatedBy: BY }, { merge: true });
+      tx.set(refs[i], { operationId: d.operationId, line: name, facilityId: L.plantOf(d), counter: 'READER', updatedAt: stamp, updatedBy: BY }, { merge: true });
       set.push(name);
     });
     tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'Both half gallon fillers counted by their UPC label scanner (Joe 10/15, "b")', set, kept });

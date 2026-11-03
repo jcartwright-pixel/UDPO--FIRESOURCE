@@ -4,7 +4,7 @@
 // too, so driving from the dock into Uniontown Branch on the way out was read as a yard return (Praster "back 11:40 PM").
 // 10/22: the Uniontown Garage (King St) is ours too: 524995 parked there showed "still out" all evening.
 export const YARD_PLACES = ['UNIONTOWN BRANCH', 'UNIONTOWN PLANT', 'LOADING DOCK', 'UNIONTOWN GARAGE'], NO_SIGNAL_MINUTES = 30, DEAD_HOURS = 24;
-export const unitKey = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+export const unitKey = (s) => window.UDLogic.unitKey(s);
 const digits = (s) => String(s || '').replace(/\D/g, '');
 // Fleet names a truck "223876" and a trailer "T-635"; ours are the same numbers (trailers stored as T- plus number).
 export function gpsIndex(gps) {

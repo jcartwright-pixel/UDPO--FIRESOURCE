@@ -152,8 +152,9 @@
       if (x.scheduleType === 'CARRIER') return 'carrier';
       if (lane === 'RECEIVING') return 'ut';
       const r = routeDocs.find(d => d.runId === x.runId) || routeDocs.find(d => x.routeId && d.routeId === x.routeId) || {};
-      const t = String(r.coverageType || '').trim().toUpperCase();
-      return t === 'BRANCH' ? 'branch' : t && t !== 'UNITED DAIRY' ? 'carrier' : 'ut';
+      // Rules audit (Joe 11/3): the one "who hauls it" rule in logic.js; a customer pickup shows as a carrier here.
+      const h = L.hauler(r);
+      return h === 'BRANCH' ? 'branch' : h === 'OURS' ? 'ut' : 'carrier';
     }
     const byDate = (list) => { const m = {}; list.forEach(x => { (m[x.date] = m[x.date] || []).push(x); }); return m; };
 

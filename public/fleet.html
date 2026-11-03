@@ -64,7 +64,7 @@
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
     // before plants were kept (no facility) is Uniontown's.
     let plant = { id: 'fac_uniontown', name: 'Uniontown' };
-    const plantOf = (x) => String((x && (x.facilityId || x.facility_id)) || '').trim() || 'fac_uniontown';
+    const plantOf = (x) => L.plantOf(x);
     const ours = (x) => plantOf(x) === plant.id;
     const rulesDoc = () => plant.id === 'fac_uniontown' ? 'fleetRules' : 'fleetRules_' + plant.id;
     const rules = () => Object.assign({}, L.FLEET_RULES, savedRules || {});
@@ -100,7 +100,7 @@
     // then Miles / hours now and Status;
     // units that need something first. Every figure the old list showed (due at, now, left, last done) is in the box or its tip.
     const RANK = { OVERDUE: 0, AT_GARAGE: 1, DUE_SOON: 2, NO_MILES: 3, SET_UP: 4, OK: 5 };
-    const md = (k) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(k || '')); return m ? Number(m[2]) + '-' + Number(m[3]) + '-' + m[1].slice(2) : ''; };
+    const md = (k) => { const m = /^\d{4}-\d\d-\d\d/.exec(String(k || '')); return m ? L.dateText(m[0]) : ''; };
     function boxText(i) {
       if (!i) return { big: '—', small: 'Not tracked', s: 'NA' };
       const days = typeof i.left === 'string' ? parseInt(i.left, 10) : null;

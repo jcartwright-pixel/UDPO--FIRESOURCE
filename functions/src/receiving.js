@@ -76,7 +76,7 @@ async function saveReceiving(tx, db, req, email, stamp, logRef, mode, SaveError)
     const item = known.find(x => (x.barcodes || []).indexOf(key) >= 0) || null;
     const payload = delivery.payload || {};
     after = {
-      scanId: req.scanId, status: 'ACTIVE', facilityId: delivery.facilityId || 'fac_uniontown', deliveryId: req.deliveryId, date: delivery.date,
+      scanId: req.scanId, status: 'ACTIVE', facilityId: require('./logic').plantOf(delivery), deliveryId: req.deliveryId, date: delivery.date,
       supplier: text(delivery.run, 120), supplierCode: text(delivery.route, 20), po: text(payload.poNumber, 40) || text(p.po, 40),
       kind: p.kind, raw: text(p.raw, 200), barcode: key, gtin: p.gtin || p.contentGtin || '', lot: text(p.lot, 40), made: p.made || p.packed || '',
       bestBy: p.bestBy || p.useBy || p.sellBy || '', sscc: p.sscc || '', labelCount: p.count || null, count: S.scanQuantity(p),

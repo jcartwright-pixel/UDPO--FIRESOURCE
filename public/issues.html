@@ -158,7 +158,7 @@
         if (!d) { body.innerHTML = '<p>The check-in is no longer on Dispatch (the week was archived). What the driver wrote: ' + escapeHtml(r.text) + '</p>'; return; }
         const line = (label, v) => v === undefined || v === null || v === '' ? '' : '<dt>' + label + '</dt><dd>' + escapeHtml(String(v)) + '</dd>';
         const date = L.addDays(run.weekStart, L.DAYS.indexOf(day));
-        body.innerHTML = '<dl class="mail-meta">' + line('Driver', d.driver || r.driver) + line('Route', String(run.route || '').replace(/_\d+$/, '')) + line('Day', shortDate(date)) +
+        body.innerHTML = '<dl class="mail-meta">' + line('Driver', d.driver || r.driver) + line('Route', L.routeNumber(run.route || '')) + line('Day', shortDate(date)) +
           line('Checked in', d.checkinCompletedAt ? dateTimeText(d.checkinCompletedAt) : '') + line('Truck', d.checkinTruck || d.truck) + line('Trailer', d.checkinTrailer || d.trailer) +
           line('Pallet jack', d.palletJackUnit || d.palletJack) + line('Cases delivered', d.casesDelivered) + line('Cases returned', d.driverCaseReturn) + '</dl>' +
           '<pre class="mail-text">' + escapeHtml([['Truck problems', d.tractorIssues], ['Trailer problems', d.trailerIssues], ['Pallet jack problems', d.palletJackIssues], ['Notes', d.checkinNotes]]

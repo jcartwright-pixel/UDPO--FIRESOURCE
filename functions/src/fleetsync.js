@@ -29,11 +29,12 @@ const FLEET_KINDS = Object.freeze(['TRUCK', 'TRAILER']);
 const up = (v) => String(v === null || v === undefined ? '' : v).trim().toUpperCase();
 const typeOf = (asset) => { const a = up(asset); return a === 'TRACTOR' || a === 'STRAIGHT TRUCK' ? 'TRUCK' : a === 'TRAILER' ? 'TRAILER' : ''; };
 // T-95, T-095 and t 095 are one unit: letters, then the number without leading zeros.
-const unitKey = (u) => { const s = up(u).replace(/\s+/g, ''), m = s.match(/^([A-Z]+-?)?0*(\d+)$/); return m ? (m[1] || '').replace(/-?$/, m[1] ? '-' : '') + m[2] : s; };
+const unitKey = (u) => L.fleetUnitKey(u);
 const PLANT_NAMES = { fac_uniontown: 'Uniontown', fac_charleston: 'Charleston', fac_martins_ferry: 'Martins Ferry' };
 // The preview's words for the columns it shows; bookkeeping columns (times, who, version) are written but not listed.
 const FIELD_NAMES = { equipment_id: 'New row', equipment_type: 'Type', facility_id: 'Plant', location: 'Location', status: 'Status', source_present: 'On fleet list', notes: 'Fleet text' };
-const facilityOf = (loc) => { const s = up(loc); return s.indexOf('UNIONTOWN') >= 0 ? 'fac_uniontown' : s.indexOf('CHARLESTON') >= 0 ? 'fac_charleston' : s.indexOf('MARTINS FERRY') >= 0 ? 'fac_martins_ferry' : ''; };
+// The plant a fleet list location belongs to: the one rule in logic.js (rules audit line 11).
+const facilityOf = (loc) => L.plantOfLocation(loc);
 
 // The fleet list's units: [{unit, type, facilityId, location, outOfService, notes}], plus the yard trucks left out.
 function fleetUnits(values) {

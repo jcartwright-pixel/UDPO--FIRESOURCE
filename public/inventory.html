@@ -185,7 +185,7 @@
     /* ---------- Receiving Log ---------- */
     function renderLog() {
       document.getElementById('periods').innerHTML = PERIODS.map(([k, label]) => '<button type="button" data-period="' + k + '" class="' + (period === k ? 'on' : '') + '">' + label + '</button>').join('');
-      const mine = (scans || []).filter(l => l.status !== 'REMOVED' && (l.facilityId || 'fac_uniontown') === plant);
+      const mine = (scans || []).filter(l => l.status !== 'REMOVED' && L.plantOf(l) === plant);
       const sups = [...new Set(mine.map(l => l.supplier).filter(Boolean))].sort();
       const pick = document.getElementById('supplier');
       pick.innerHTML = '<option value="">All suppliers</option>' + sups.map(s => '<option' + (s === supplier ? ' selected' : '') + '>' + escapeHtml(s) + '</option>').join('');
