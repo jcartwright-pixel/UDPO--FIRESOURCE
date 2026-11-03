@@ -257,3 +257,26 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .key-acts button.armed { background: #b42318; color: #fff; border-color: #b42318; }
 .key-acts button:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 480px) { .key-cards { grid-template-columns: 1fr; } }
+
+/* Email & Texts: the same layout as Links & Codes, with boxes that save when they are left. */
+.list-msg.warn { background: var(--pill-warn-bg, #fff4d6); color: var(--pill-warn-ink, #7a5200); }
+.lc-main a { color: var(--ud-blue); font-weight: 700; }
+.lc-acts a.primary { color: #fff; }
+.em-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; padding: 10px 0; border-top: 1px solid #eef2f6; }
+.em-row > b { flex: 0 0 160px; align-self: center; }
+.em-row > label { flex: 1 1 240px; }
+.em-row > small { flex: 1 0 100%; order: 9; }
+.em-row label, .em-field { display: grid; gap: 4px; font-weight: 700; min-width: 0; }
+.em-row small, .em-field small, .lc-block > small { display: block; font-weight: 400; color: var(--muted, #5b6b7b); font-size: 13px; }
+.em-row input, .em-row select, .em-field input, .em-field select, .lc-add input { font: inherit; font-weight: 400; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; min-width: 0; width: 100%; box-sizing: border-box; }
+.em-field { max-width: 640px; }
+.em-wide { flex: 1 1 320px; }
+.em-check { display: flex; gap: 8px; align-items: center; font-weight: 700; }
+.em-check input { width: 20px; height: 20px; }
+.em-pick button[aria-pressed="true"] { background: var(--ud-blue); color: #fff; border-color: var(--ud-blue); }
+.em-scroll { overflow-x: auto; }
+.em-log { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+.em-log th { background: var(--ud-blue); color: #fff; text-align: left; padding: 8px; position: sticky; top: 0; }
+.em-log td { padding: 8px; border-top: 1px solid #eef2f6; vertical-align: top; overflow-wrap: anywhere; }
+.em-log td small { display: block; color: var(--muted, #5b6b7b); font-size: 12px; }
+@media (max-width: 560px) { .em-row > b { flex-basis: 100%; } }

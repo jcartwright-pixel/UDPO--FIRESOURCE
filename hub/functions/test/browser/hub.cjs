@@ -50,6 +50,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
     assert.ok(await p.isVisible('a[data-admin="links"]'), 'and Links & Codes');
     assert.ok(await p.isVisible('a[data-admin="keys"]'), 'and Keys & Connections');
+    assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -250,6 +251,82 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('.key-card[data-key="sms"]');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Keys: no sideways page scroll on a phone');
     await shot(p, 'hub-keys-390');
+
+    // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.
+    await db().collection('private').doc('emailSettings').set({ sending: false });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'email.html');
+    await p.waitForSelector('#part .em-log');
+    assert.equal(await p.$$eval('#parts a', a => a.length), 7);
+    assert.match(await p.textContent('#part'), /Sending is Off/);
+    assert.match(await p.textContent('#part'), /No email has been sent/);
+    // Turning Sending on needs a second press; turn it back off the same way.
+    await p.click('[data-act="sending-on"]');
+    assert.ok(!(((await db().collection('private').doc('emailSettings').get()).data() || {}).sending), 'one press changes nothing');
+    await p.click('[data-act="sending-on"]');
+    await p.waitForSelector('[data-act="sending-off"]');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().sending, true);
+    await p.click('[data-act="sending-off"]');
+    await p.click('[data-act="sending-off"]');
+    await p.waitForSelector('[data-act="sending-on"]');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().sending, false);
+    await shot(p, 'hub-email-1920');
+    // Plant Report: add a group, change it by leaving its box, then remove it (two presses).
+    await p.click('#parts a[data-part="reports"]');
+    await p.waitForSelector('#plant-pick:not([hidden]) #plant:has(option)');
+    assert.match(p.url(), /part=reports/);
+    await p.fill('#new-name', 'Plant Management');
+    await p.fill('#new-to', 'lee.example@uniteddairy.com');
+    await p.click('[data-act="group-add"]');
+    await p.waitForSelector('input[data-group="Plant Management"]');
+    await p.fill('input[data-group="Plant Management"]', 'lee.example@uniteddairy.com, kim.example@uniteddairy.com');
+    await p.press('input[data-group="Plant Management"]', 'Tab');
+    await p.waitForFunction(() => document.querySelector('#msg').textContent === 'Saved.');
+    const group = (await db().collection('reportGroups').where('name', '==', 'Plant Management').get()).docs[0].data();
+    assert.deepEqual([group.facilityId, group.recipients, group.updatedBy], ['fac_uniontown', ['lee.example@uniteddairy.com', 'kim.example@uniteddairy.com'], 'pat.admin@uniteddairy.com']);
+    await p.fill('input[data-group="Plant Management"]', 'not an address');
+    await p.press('input[data-group="Plant Management"]', 'Tab');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /Not an email address/);
+    await p.click('[data-remove="Plant Management"]');
+    await p.click('[data-remove="Plant Management"]');
+    await p.waitForFunction(() => !document.querySelector('input[data-group]'));
+    // Repair Email: an address and how often save when they are left or picked.
+    await p.click('#parts a[data-part="repairs"]');
+    await p.waitForSelector('[data-lessor="PENSKE"] [data-emails]');
+    assert.ok(await p.isHidden('#plant-pick'), 'repair email is for every plant');
+    await p.fill('[data-lessor="PENSKE"] [data-emails]', 'service@penske.example.com');
+    await p.press('[data-lessor="PENSKE"] [data-emails]', 'Tab');
+    await p.waitForFunction(() => document.querySelector('#msg').textContent === 'Saved.');
+    await p.selectOption('[data-lessor="PENSKE"] [data-mode]', 'DAILY');
+    const repairMode = async () => (((await db().collection('private').doc('repairEmail').get()).data() || {}).routes || {}).PENSKE;
+    for (let i = 0; i < 50 && ((await repairMode()) || {}).mode !== 'DAILY'; i++) await new Promise(r => setTimeout(r, 100));
+    // Who Email Comes From: a plant's address must be a United Dairy one; the red line says why.
+    await p.click('#parts a[data-part="senders"]');
+    await p.waitForSelector('[data-plant="fac_uniontown"] [data-addr]');
+    await p.fill('[data-plant="fac_uniontown"] [data-addr]', 'someone@example.com');
+    await p.press('[data-plant="fac_uniontown"] [data-addr]', 'Tab');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /not a United Dairy email address/);
+    await p.fill('[data-plant="fac_uniontown"] [data-addr]', 'uniontown.plant@uniteddairy.com');
+    await p.press('[data-plant="fac_uniontown"] [data-addr]', 'Tab');
+    await p.waitForSelector('#msg.good');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().senders.fac_uniontown.address, 'uniontown.plant@uniteddairy.com');
+    // Texts to Drivers: no Twilio account yet, so Turn On waits for one and says where to set it up.
+    await p.click('#parts a[data-part="texts"]');
+    await p.waitForSelector('[data-act="done-on"]');
+    assert.ok(await p.isDisabled('[data-act="done-on"]'));
+    assert.match(await p.textContent('#part'), /Keys & Connections/);
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'email.html?part=repairs');
+    await p.waitForSelector('[data-lessor="PENSKE"] [data-emails]');
+    assert.equal(await p.inputValue('[data-lessor="PENSKE"] [data-emails]'), 'service@penske.example.com');
+    assert.equal(await p.inputValue('[data-lessor="PENSKE"] [data-mode]'), 'DAILY');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'email.html?part=senders');
+    await p.waitForSelector('[data-plant] [data-addr]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Email & Texts: no sideways page scroll on a phone');
+    await shot(p, 'hub-email-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'email.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
 
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
