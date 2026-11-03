@@ -64,10 +64,8 @@ function clockMinutes(v) {
 // Letters and digits only, the way the scorecard matches a truck to its GPS unit (sc-core scUnitKey_).
 const unitKey = (v) => text(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-function loaded(day) {
-  const s = text(day.loadStatus).toUpperCase();
-  return !!text(day.completeTime) || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0;
-}
+// Whether the load is loaded: the one rule in logic.js (rules audit, Joe 11/3).
+function loaded(day) { return L.isLoaded(day); }
 
 // The loads of one load date: Daily Dispatch's (shown on Daily, running that day).
 function loadsOn(runs, loadDate) {

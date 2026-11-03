@@ -30,7 +30,7 @@
 
   function boardState(day) {
     var s = text(day.loadStatus).toUpperCase();
-    if (day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0) return 'LOADED';
+    if (L.isLoaded(day)) return 'LOADED';
     if (day.plantStartedAt || s === 'LOADING' || s === 'PAUSED') return 'LOADING';
     return 'WAITING';
   }

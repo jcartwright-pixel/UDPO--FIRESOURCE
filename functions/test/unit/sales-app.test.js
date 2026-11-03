@@ -110,9 +110,10 @@ test('Save-A-Lot drop and hook: dropped time, then the truck', () => {
   assert.equal(by['856'].status, 'Left 9:10 AM, 10m late');
   assert.equal(by['856'].where, 'On the road: I-80 E');
   assert.equal(by['856'].by, 'TRAILER');
-  // Only Save-A-Lot: another drop-and-hook route at the same place reads as before.
-  assert.equal(by['870'].where, 'At SAL Williamsport');
-  assert.equal(by['870'].note, '');
+  // Joe 11/3 (rules audit line 18, "18 yes"): every route with the Drop and Hook tick is treated the same, not only Save-A-Lot.
+  // 870's trailer was dropped at 9:00 AM, so Where now follows its truck (603 has no GPS).
+  assert.match(by['870'].status, /^Dropped 9:00 AM, /);
+  assert.equal(by['870'].where, 'No GPS on the truck');
   // Without the Drop and Hook tick, a Save-A-Lot route reads as before too.
   const plain = A.salesScreen({ runs, reefer, gpsDays: [], routes: [], units }, late).groups[0].rows.find(r => r.route === '855');
   assert.equal(plain.where, 'At SAL Williamsport');

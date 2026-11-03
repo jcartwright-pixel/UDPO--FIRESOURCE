@@ -52,7 +52,7 @@ export function runArea(run, prefix) {
 // WAITING / LOADING / DONE (a stored READY counts as done, Joe 7.0.272).
 export function loadState(day) {
   const s = String(day.loadStatus || '').trim().toUpperCase();
-  if (day.completeTime || day.loadedComplete === true || ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'].indexOf(s) >= 0) return 'DONE';
+  if (L.isLoaded(day)) return 'DONE';
   if (day.plantStartedAt || s === 'LOADING' || s === 'PAUSED') return 'LOADING';
   return 'WAITING';
 }
@@ -394,7 +394,7 @@ export function unloadRows(runs, date, journal, returns, loads, routes) {
   const master = {};
   (routes || []).forEach(m => { const id = m && (m.runId || m.id); if (id) master[id] = m; });
   (runs || []).forEach(run => {
-    const m = master[run.runId] || {}, dropAndHook = !!(run.dropAndHook || m.dropAndHook);
+    const m = master[run.runId] || {}, dropAndHook = L.dropAndHook(run, master);
     const area = runArea(run, run.weekStart === week ? prefix : ''), d = run.weekStart === week && run.days && run.days[prefix];
     if (!area || !shownForPlant(run) || !d || !d.runs) return;
     const key = U.unloadKey(date, run.route, run.run), u = unloads[key] || {};

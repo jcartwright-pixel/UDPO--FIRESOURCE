@@ -86,7 +86,7 @@ function loadOf(run, runDocId, p) {
 // today's dispatch but not the roster ("name:NAME"), one route picked instead of a name ("route:runDocId|day"), or Skip ("skip":
 // every route of the day, the driver picks theirs). The phone keeps it like the name.
 const nameKey = (v) => String(v === null || v === undefined ? '' : v).toUpperCase().replace(/\b(JR|SR|II|III|IV)\b/g, ' ').replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-const coverageName = (run) => { const t = String(run.coverageType || '').trim().toUpperCase(); return t && t !== 'UNITED DAIRY' ? t : ''; };
+const coverageName = (run) => L.coverageName(run);
 async function whoFor(db, raw) {
   raw = String(raw || '').slice(0, 200);
   if (raw === 'skip') return { kind: 'skip', id: '', name: '', by: 'skip', mine: () => true };

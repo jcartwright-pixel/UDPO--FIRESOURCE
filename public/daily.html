@@ -151,7 +151,7 @@
     const show = (v) => v === null || v === undefined ? '' : String(v);
     const departText = (r) => L.timeText(r.dispatchTime !== null && r.dispatchTime !== undefined ? r.dispatchTime : r.startTime);
     const coverLabel = (c) => String(c.reason || 'OFF').toUpperCase() + (c.name ? ': ' + c.name : '');
-    const coverageName = (r) => r.coverageType && r.coverageType !== 'UNITED DAIRY' ? r.coverageType : '';
+    const coverageName = (r) => L.coverageName(r);
     // Carrier or a branch (Fairmont, Martins Ferry...) in the driver column: no tractor goes, so Truck shows N/A (current app).
     const noTractor = (r) => !!coverageName(r) || (!r.driverId && !!r.driver && (/^CARRIER$/i.test(r.driver) || cvgOptions().some(o => o.text.toUpperCase() === String(r.driver).toUpperCase())));
 
