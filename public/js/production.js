@@ -5,7 +5,7 @@ import { collection, doc, query, where, onSnapshot } from './firebase.js';
 import { watchProducts } from './products.js';
 
 const U = () => window.UDPlant, R = () => window.UDProduction;
-const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
+const plantOf = (d) => window.UDLogic.plantOf(d);
 
 // cb(data) each time something changes: {lines, products, counters, shifts, runs, shift}. The shift's runs are re-read when the
 // shift changes (checked each minute). nowFn lets a test set the clock.

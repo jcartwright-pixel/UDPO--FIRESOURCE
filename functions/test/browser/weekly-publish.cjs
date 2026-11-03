@@ -47,7 +47,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '2-click-again-1920.png') });
     await page.click('#publish');
     await page.waitForFunction(() => /week=2026-10-18/.test(location.search) && /Week pushed live/.test(document.getElementById('wk-note').textContent), null, { timeout: 10000 });
-    assert.match(await page.textContent('#wk-note'), /Week pushed live\. Current is now 10\/11/);
+    assert.match(await page.textContent('#wk-note'), /Week pushed live\. Current is now 10-11-26/);
     await page.waitForFunction(() => [...document.querySelectorAll('#rows tr td:first-child')].map(td => td.textContent).join() === '802,801,810', null, { timeout: 5000 });
     assert.match(await page.textContent('#rows'), /CASEY, LEE/);
     assert.ok(await page.$('#rows td.day.editable'), 'the new Next week can be edited');

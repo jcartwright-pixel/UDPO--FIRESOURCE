@@ -34,4 +34,73 @@ async function localCalls(ctx) {
     }
   });
 }
-module.exports = { PROJECT, db, clear, localCalls };
+
+/*
+ * Operations' own admin call (people, savePerson, setHomeScreen, roleTemplates, saveRoleTemplate, addRole) stands in here as a small copy with the same answers, so the hub's browser
+ * tests need no Operations server. Operations' tests cover the real one.
+ */
+// The screens, jobs, rights and role defaults are Operations' own (functions/src/logic.js, rights.js), so the hub is tested
+// against the real lists.
+const L = require('../../../functions/src/logic');
+const R = require('../../../functions/src/rights');
+const ROLES = R.ROLES.slice();
+const PLANTS = [{ id: 'fac_uniontown', name: 'Uniontown', status: 'ACTIVE' }, { id: 'fac_charleston', name: 'Charleston', status: 'PLANNED' }, { id: 'fac_martins_ferry', name: 'Martins Ferry', status: 'PLANNED' }];
+const rev = (p) => p ? String(p.updatedAt || 'first') : 'new';
+async function fakeAdmin(email, data) {
+  const users = db().collection('users'), me = (await users.doc(email).get()).data();
+  if (!me || me.status !== 'ACTIVE' || !(me.roles || []).some(r => String(r).toUpperCase() === 'ADMINISTRATOR')) throw Object.assign(new Error('Only an administrator can use Administration'), { status: 'PERMISSION_DENIED' });
+  if (data.op === 'people') {
+    const snap = await users.get();
+    return { people: snap.docs.map(d => Object.assign({ email: d.id, grants: [], denials: [], screenAccess: null, homeScreen: '', revision: rev(d.data()), primary: d.id === 'pat.admin@uniteddairy.com' }, d.data())),
+      roles: ROLES, plants: PLANTS, newRevision: 'new', catalog: R.CATALOG, screenAreas: L.SCREEN_AREAS, screenJobs: L.SCREEN_JOBS, defaults: R.DEFAULTS, templates: {} };
+  }
+  if (data.op === 'savePerson') {
+    const ref = users.doc(data.email), before = (await ref.get()).data();
+    if (!data.isNew && rev(before) !== data.revision) throw Object.assign(new Error('Someone changed this person since you opened them. Reload this person before saving.'), { status: 'ABORTED' });
+    const keep = data.screenAccess === undefined ? (before && before.screenAccess) || null : data.screenAccess;
+    await ref.set({ name: data.name, status: data.status, roles: data.roles, facilities: data.facilities, grants: data.grants || [], denials: data.denials || [], screenAccess: keep, updatedAt: new Date().toISOString(), updatedBy: email }, { merge: true });
+    return { ok: true, message: 'Person access saved.', email: data.email };
+  }
+  if (data.op === 'setHomeScreen') {
+    const ref = users.doc(data.email), p = (await ref.get()).data();
+    if (data.page && !L.homeChoices(p, p.screenAccess || null).some(c => c.page === data.page)) throw Object.assign(new Error('That screen is not one this person can see.'), { status: 'INVALID_ARGUMENT' });
+    await ref.set({ homeScreen: data.page, updatedAt: new Date().toISOString() }, { merge: true });
+    return { ok: true, email: data.email, homeScreen: data.page };
+  }
+  // Role Templates, kept as Operations keeps them (private/roleTemplates: templates, customRoles), with its CHANGED check.
+  const tplRef = db().collection('private').doc('roleTemplates');
+  const tplOf = async () => { const d = (await tplRef.get()).data() || {}; return { templates: d.templates || {}, customRoles: d.customRoles || [] }; };
+  if (data.op === 'roleTemplates') {
+    const t = await tplOf();
+    return { catalog: R.CATALOG, roles: ROLES.concat(t.customRoles), defaults: R.DEFAULTS, templates: t.templates, meta: {} };
+  }
+  if (data.op === 'saveRoleTemplate') {
+    const t = await tplOf(), role = R.normRole(data.role);
+    if (role === 'ADMINISTRATOR') throw Object.assign(new Error('Administrator has protected full access.'), { status: 'PERMISSION_DENIED' });
+    if (JSON.stringify((data.expected || []).slice().sort()) !== JSON.stringify(R.templateFor(role, t.templates).slice().sort())) throw Object.assign(new Error('Someone changed this role since you opened it. Reload before saving.'), { status: 'ABORTED' });
+    const ordered = R.CATALOG.map(c => c.code).filter(c => (data.rights || []).indexOf(c) >= 0);
+    if (JSON.stringify(ordered) === JSON.stringify(R.CATALOG.map(c => c.code).filter(c => (R.DEFAULTS[role] || []).indexOf(c) >= 0))) delete t.templates[role];
+    else t.templates[role] = ordered;
+    await tplRef.set(t);
+    return { ok: true, message: 'Role template saved.' };
+  }
+  if (data.op === 'addRole') {
+    const t = await tplOf(), role = R.normRole(data.name).replace(/[^A-Z0-9_]/g, '');
+    if (ROLES.concat(t.customRoles).indexOf(role) >= 0) throw Object.assign(new Error('That is already a role.'), { status: 'ABORTED' });
+    t.customRoles.push(role);
+    t.templates[role] = R.CATALOG.map(c => c.code).filter(c => (data.rights || []).indexOf(c) >= 0);
+    await tplRef.set(t);
+    return { ok: true, role, message: data.name + ' added. Give it to people in People & Roles.' };
+  }
+  throw Object.assign(new Error('Unknown request.'), { status: 'INVALID_ARGUMENT' });
+}
+async function localAdmin(ctx) {
+  await ctx.route(/:5001\/[^/]+\/[^/]+\/admin$/, async (route) => {
+    const req = route.request(), data = (req.postDataJSON() || {}).data || {};
+    let token = null;
+    try { token = JSON.parse(Buffer.from(String(req.headers().authorization || '').split(' ')[1].split('.')[1], 'base64url').toString()); } catch (e) { /* no sign-in */ }
+    try { await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: await fakeAdmin(token && token.email, data) }) }); }
+    catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: e.status || 'INTERNAL', message: e.message } }) }); }
+  });
+}
+module.exports = { PROJECT, db, clear, localCalls, localAdmin };

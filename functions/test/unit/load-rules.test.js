@@ -93,3 +93,64 @@ test('the load rules live in one place: no copies in the server or the screens',
   })));
   assert.deepEqual(found, [], 'These are copies of a load rule; call the one in logic.js instead:\n' + found.join('\n'));
 });
+
+// Rules audit line 11 (Joe 11/3 "Yes, one plant rule everywhere").
+test('one plant rule: blank means Uniontown, a record or an id', () => {
+  assert.equal(L.plantOf(''), 'fac_uniontown');
+  assert.equal(L.plantOf(null), 'fac_uniontown');
+  assert.equal(L.plantOf(' fac_charleston '), 'fac_charleston');
+  assert.equal(L.plantOf({ facilityId: 'fac_martins_ferry' }), 'fac_martins_ferry');
+  assert.equal(L.plantOf({ facility_id: 'fac_charleston' }), 'fac_charleston');
+  assert.equal(L.plantOf({}), 'fac_uniontown');
+});
+
+test('the plant rule lives in one place, and screens read their own plant\'s Shift Times', () => {
+  const root = path.join(__dirname, '..', '..', '..');
+  const files = [];
+  const walk = (dir, ok) => fs.readdirSync(dir).forEach(n => { const p = path.join(dir, n); if (ok(n)) files.push(p); });
+  walk(path.join(root, 'functions', 'src'), n => n.endsWith('.js') && n !== 'logic.js');
+  walk(path.join(root, 'public', 'js'), n => n.endsWith('.js') && n !== 'logic.js');
+  walk(path.join(root, 'public'), n => n.endsWith('.html'));
+  const found = [];
+  files.forEach(f => fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+    const at = path.relative(root, f) + ':' + (i + 1);
+    if (/\|\|\s*'fac_uniontown'/.test(line)) found.push(at + ' blank means Uniontown (use L.plantOf)');
+    if (/'plantShifts',\s*'fac_uniontown'/.test(line)) found.push(at + ' reads Uniontown\'s Shift Times on every plant (use currentPlant())');
+    if (/'UNIONTOWN'\)\s*>=\s*0\s*\?\s*'fac_uniontown'/.test(line)) found.push(at + ' plant from a location (use L.plantOfLocation)');
+  }));
+  assert.deepEqual(found, [], found.join('\n'));
+});
+
+// Rules audit line 12 (Joe 11/3: "it always has to be T, then a dash. There's no beginning zeros at all ... make it all completely
+// the same").
+test('one number rule: trailers are T- and the number with no leading zeros; units match by letters and digits', () => {
+  ['T-14', 'T-014', '014', '14', 't 14', 'T014', 'T14'].forEach(v => assert.equal(L.trailerNumber(v), 'T-14', v));
+  assert.equal(L.trailerNumber('T-10211'), 'T-10211');
+  assert.equal(L.trailerNumber('T-5268'), 'T-5268');
+  assert.equal(L.trailerNumber('tba'), 'TBA');
+  assert.equal(L.trailerNumber('na'), 'N/A');
+  assert.equal(L.trailerNumber('Metro 4579'), 'METRO4579');
+  assert.equal(L.unitKey('T-014'), L.unitKey('t14'));
+  assert.equal(L.unitKey('0601'), '601');
+  assert.notEqual(L.unitKey('T-864'), L.unitKey('864'), 'a truck and a trailer with the same number stay apart');
+  assert.equal(R.unitKey('T-864'), R.unitKey('864'), 'the plant lists match a trailer by its number');
+  assert.equal(R.yardTrailer('T-096'), 'T-96');
+  assert.equal(L.routeNumber(' 852_1 '), '852');
+});
+
+test('the number rules live in one place', () => {
+  const root = path.join(__dirname, '..', '..', '..');
+  const files = [];
+  const walk = (dir, ok) => fs.readdirSync(dir).forEach(n => { const p = path.join(dir, n); if (ok(n)) files.push(p); });
+  walk(path.join(root, 'functions', 'src'), n => n.endsWith('.js') && n !== 'logic.js');
+  walk(path.join(root, 'public', 'js'), n => n.endsWith('.js') && n !== 'logic.js');
+  walk(path.join(root, 'public'), n => n.endsWith('.html'));
+  const found = [];
+  files.forEach(f => fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+    const at = path.relative(root, f) + ':' + (i + 1);
+    if (/\^T\??-\?|'T-' \+ m\[1\]/.test(line)) found.push(at + ' writes a trailer number (use L.trailerNumber)');
+    if (/_(\\d|\[0-9\])\+\$\/, ''/.test(line)) found.push(at + ' takes the _1 off a route (use L.routeNumber)');
+    if (/(unit|key|bare|alnum)[A-Za-z_]*\s*=\s*\([a-z]+\)\s*=>\s*String\([^)]*\)\.toUpperCase\(\)\.replace\(\/\[\^A-Z0-9\]\/g/.test(line)) found.push(at + ' matches unit numbers (use L.unitKey)');
+  }));
+  assert.deepEqual(found, [], found.join('\n'));
+});

@@ -87,7 +87,7 @@ async function mailReport(ref, report, deps) {
     // report went only to the sender. The group of that name, else the plant's only group, from Manager Report Recipients.
     const groupName = report.groupName || report.group || '';
     if (report.mode === 'live' && groupName) {
-      const groups = (await db.collection('reportGroups').where('facilityId', '==', report.facilityId || 'fac_uniontown').get()).docs.map(x => x.data())
+      const groups = (await db.collection('reportGroups').where('facilityId', '==', require('./logic').plantOf(report)).get()).docs.map(x => x.data())
         .filter(x => x.active !== false && x.recipients && x.recipients.length);
       const g = groups.find(x => x.name === groupName) || (groups.length === 1 ? groups[0] : null);
       if (g) { env = Object.assign({}, env, { REPORT_TO: g.recipients.join(',') }); report = Object.assign({}, report, { group: g.name }); }

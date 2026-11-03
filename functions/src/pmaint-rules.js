@@ -15,9 +15,10 @@
  *     kept on its own list beside Machinery (group EQUIPMENT); work orders and PMs work the same on both.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDPlantMaint = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  // The plant rule ("blank means Uniontown") lives once in logic.js (rules audit line 11, Joe 11/3).
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./logic'));
+  else root.UDPlantMaint = factory(root.UDLogic);
+})(typeof self !== 'undefined' ? self : this, function (LP) {
   var KINDS = ['Production line', 'Machine', 'Utility', 'Building', 'Other'];
   var EQUIP_KINDS = ['Refrigeration', 'Boiler & Steam', 'Air Compressor', 'Water & Wastewater', 'Electrical', 'Building', 'Forklift', 'Other'];
   var GROUPS = ['MACHINERY', 'EQUIPMENT'];
@@ -40,7 +41,7 @@
   // The plant's production lines (plantSetup docs) as machines.
   function lineMachines(setup, facilityId) {
     return (setup || []).filter(function (d) {
-      return upper(d.type) === 'PRODUCTION_AREA' && upper(d.status) === 'ACTIVE' && (text(d.facilityId) || 'fac_uniontown') === facilityId;
+      return upper(d.type) === 'PRODUCTION_AREA' && upper(d.status) === 'ACTIVE' && LP.plantOf(d) === facilityId;
     }).map(function (d) {
       return { id: text(d.operationId), name: text(d.name) || text(d.area) || text(d.operationId), area: '', kind: 'Production line', line: true, order: Number(d.viewSequence) || 0 };
     });

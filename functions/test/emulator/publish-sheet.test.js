@@ -43,7 +43,7 @@ test('Publish moves the Live sheet: Current over Previous, Next over Current, a 
   const before = { current: copyOf(tabs[CUR]), next: copyOf(tabs[NEXT]) };
   const out = await applyAction(db(), DISPATCHER, { action: 'publishWeek', requestId: rid(), weekStart: '2026-10-11' }, AT, deps());
   assert.deepEqual([out.previousWeek, out.currentWeek, out.nextWeek], ['2026-10-04', '2026-10-11', '2026-10-18']);
-  assert.match(out.message, /^Week pushed live\. Current is now 10\/11.*The Live sheet's weeks moved too\.$/);
+  assert.match(out.message, /^Week pushed live\. Current is now 10-11-26.*The Live sheet's weeks moved too\.$/);
   assert.deepEqual((await config()).liveWeeks, { previous: '2026-10-04', current: '2026-10-11', next: '2026-10-18' });
   assert.equal(sheets.writes.filter(w => w.requests).length, 1, 'the whole move is one request, applied all together or not at all');
 

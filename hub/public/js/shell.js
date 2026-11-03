@@ -15,6 +15,8 @@ const QS = new URLSearchParams(location.search);
 // The screens, in the menu's order.
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'Every United Dairy app you can open' },
+  { href: 'people.html', name: 'People & Access', note: 'Administrators: who signs in, their role, plants and apps', admin: true },
+  { href: 'roles.html', name: 'Roles & Rights', note: 'Administrators: what each role (Manager, Supervisor, Dispatcher...) may do', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 
@@ -80,7 +82,13 @@ export const canInstall = () => !!installPrompt;
 
 /* ---------- the header and the menu ---------- */
 const hereHref = () => HERE;
+// Administration shows at once for whoever was an administrator last time; the server checks again on every call.
+export function setAdmin(on) {
+  document.body.classList.toggle('is-admin', !!on);
+  try { localStorage.setItem('hub.admin', on ? '1' : '0'); } catch (e) { /* no storage */ }
+}
 function drawFrame() {
+  try { document.body.classList.toggle('is-admin', localStorage.getItem('hub.admin') === '1'); } catch (e) { /* no storage */ }
   const bar = document.querySelector('#screen > .topbar');
   if (bar && !bar.querySelector('.brand')) {
     const brand = document.createElement('a');
@@ -181,3 +189,6 @@ if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || QS.get('updatetest'
   window.addEventListener('online', checkForUpdate);
 }
 window.HUB_checkForUpdate = checkForUpdate;
+
+/** The signed-in person's email (lower case), or '' before sign-in. */
+export const myEmail = () => String(services && services.auth.currentUser && services.auth.currentUser.email || '').toLowerCase();

@@ -326,7 +326,7 @@
       weekKey = plant + from; weekRuns = [];
       if (stopWeek) stopWeek();
       stopWeek = onSnapshot(query(collection(db, 'productionRuns'), where('date', 'in', dates)), q => {
-        weekRuns = q.docs.map(d => d.data()).filter(v => (String(v.facilityId || '').trim() || 'fac_uniontown') === plant);
+        weekRuns = q.docs.map(d => d.data()).filter(v => L.plantOf(v) === plant);
         render();
       }, e => showError('Could not read the week (' + e.message + ').'));
     }

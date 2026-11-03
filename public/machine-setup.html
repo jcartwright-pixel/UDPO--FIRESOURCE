@@ -82,7 +82,7 @@
     const canSave = () => maySave(person, L.REORDER_ROLES, app, 'plant');
     const plants = () => { const ids = person ? L.plantsFor(person) : []; const list = ALL_PLANTS.filter(p => ids.indexOf(p.id) >= 0); return list.length ? list : ALL_PLANTS.slice(0, 1); };
     const plantName = (id) => (ALL_PLANTS.find(p => p.id === id) || { name: id }).name;
-    const plantOf = (d) => String(d.facilityId || '').trim() || 'fac_uniontown';
+    const plantOf = (d) => L.plantOf(d);
     const ownOf = () => plantSetupOf(own, plant);
     function areas() {
       const machines = U.qualityLines(setup.filter(d => plantOf(d) === plant), [], [], Date.now()).map(l => ({ id: l.operationId, name: l.name, machine: true }));

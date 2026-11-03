@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>People &amp; Access · United Dairy Hub</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/hub.css">
+</head>
+<body class="hub-page" data-help="people">
+  <div class="signin" id="signin" hidden>
+    <h1>United Dairy Hub</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub &middot; Administration</span><h1>People &amp; Access</h1></div></div>
+    <div class="people">
+      <section class="people-list">
+        <div class="people-bar">
+          <input type="search" id="find" placeholder="Find a name or email" aria-label="Find a name or email">
+          <select id="role-filter" aria-label="Role"></select>
+          <select id="show" aria-label="Show"><option value="all">Everyone</option><option value="ACTIVE" selected>Enabled</option><option value="INACTIVE">Disabled</option></select>
+          <button type="button" class="primary" id="add">+ Add Person</button>
+        </div>
+        <p class="muted small" id="count"></p>
+        <div class="list-msg" id="list-msg" role="status" hidden></div>
+        <div class="scroll-list"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+      </section>
+      <section class="people-edit" id="edit"></section>
+    </div>
+  </div>
+  <script type="module">import { requireSignIn } from './js/shell.js';
+import { start } from './js/people.js';
+requireSignIn(() => start());</script>
+</body>
+</html>

@@ -123,7 +123,7 @@ async function tripCheck(db, input, options) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date || '')) ? input.date : addDays(nyDate(at), -1);
   if (date > nyDate(at)) throw new F.FleetError('BAD_REQUEST', 'Pick today or an earlier day.');
   const trucks = (await db.collection('gpsTrucks').get()).docs.map(x => x.data());
-  const bare = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const bare = (x) => require('./logic').unitKey(x);
   let tag = String(input.tag || '').trim().slice(0, 40), unit = null;
   if (!tag) {
     // No truck typed (the GitHub run): the truck (not a T- trailer) with the most miles that day.

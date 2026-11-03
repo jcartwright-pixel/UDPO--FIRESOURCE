@@ -54,7 +54,7 @@ async function personFor(db, email) {
 function senderFor(settings, facilityId, env, fallbackName, person) {
   if (settings && settings.fromWho === 'PLANT') person = null;
   if (person && ourAddress(person.email)) return { from: ourAddress(person.email), fromName: String(person.name || ''), how: 'person' };
-  const s = ((settings && settings.senders) || {})[facilityId || 'fac_uniontown'] || {};
+  const s = ((settings && settings.senders) || {})[require('./logic').plantOf(facilityId)] || {};
   if (s.address) return { from: s.address, fromName: s.name || fallbackName || PLANT_NAME, how: 'plant' };
   return { from: String((env || {}).MAIL_FROM || '').trim(), fromName: s.name || fallbackName || PLANT_NAME, how: 'default' };
 }

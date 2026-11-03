@@ -195,7 +195,7 @@ function scheduleDays(driver, rows, exceptions, week, backups) {
     const date = L.addDays(week, i), c = board ? board.days[p] : null;
     const runs = rows.filter(r => r.days[p].runs && r.days[p].driverId === driver.id).map(r => {
       const d = r.days[p], leaves = d.dispatchTime === null || d.dispatchTime === undefined || d.dispatchTime === '' ? '' : L.timeText(Number(d.dispatchTime));
-      return { route: String(r.streamId || r.route || '').trim().replace(/_\d+$/, ''), run: r.streamId ? '' : String(r.run || '').trim(), truck: d.truck || '', trailer: d.trailer || '', leaves };
+      return { route: L.routeNumber(r.streamId || r.route || ''), run: r.streamId ? '' : String(r.run || '').trim(), truck: d.truck || '', trailer: d.trailer || '', leaves };
     });
     // Off on a day with a run (the exception wins on the board too): the run still shows, marked off.
     const off = c && (c.kind === 'vacation' || c.kind === 'unavailable' || c.kind === 'conflict') ? titleWord(L.exceptionLabel(L.exceptionOn(exceptions, driver.id, date)) || 'Off') : '';
@@ -249,7 +249,7 @@ async function phoneCall(db, input, now) {
       });
     }
     return { drivers: drivers.map(d => ({ id: d.id, name: d.name, relief: !!d.reliefDriver })).sort((a, b) => a.name.localeCompare(b.name)), dates,
-      others: Object.keys(others).map(k => others[k]).sort(), routes: routes.sort(byRoute).map(r => ({ id: r.id, name: String(r.route).replace(/_\d+$/, '') + ' · ' + r.run })) };
+      others: Object.keys(others).map(k => others[k]).sort(), routes: routes.sort(byRoute).map(r => ({ id: r.id, name: L.routeNumber(r.route) + ' · ' + r.run })) };
   }
   // View Loadout (Joe 10/10): the Driver Room board on the phone, read only, today's routes and their pickups.
   if (op === 'board') {
@@ -272,7 +272,7 @@ async function phoneCall(db, input, now) {
     const date = dates.indexOf(input.date) >= 0 ? input.date : dates[0];
     const loads = (await dayLoads(db, date)).filter(x => who.mine(x.run, x.id, x.p, x.d)).map(x => loadOf(x.run, x.id, x.p)).sort(byRoute);
     const units = await unitLists(db), odometers = await gpsOdometers(db, loads, units.trucks, Date.parse(stamp) || Date.now());
-    const label = who.kind === 'route' ? (loads[0] ? 'Route ' + String(loads[0].route).replace(/_\d+$/, '') + ' · ' + loads[0].run : 'Your route') : who.kind === 'skip' ? 'Driver not chosen' : who.name;
+    const label = who.kind === 'route' ? (loads[0] ? 'Route ' + L.routeNumber(loads[0].route) + ' · ' + loads[0].run : 'Your route') : who.kind === 'skip' ? 'Driver not chosen' : who.name;
     return { date, dates, driver: label, loads, units, gpsOdometers: Object.fromEntries(Object.entries(odometers).map(([k, v]) => [k, v.miles])) };
   }
   if (op === 'dvir') return saveDvir(db, input, who, dates, stamp);
@@ -326,8 +326,9 @@ const clean = (v, max) => String(v === null || v === undefined ? '' : v).trim().
 function dvirTrailer(v) {
   const t = clean(v, 40).toUpperCase().replace(/\s+/g, ' ');
   if (/^(N\/A|NA|TBA|NONE)$/.test(t)) return 'N/A';
-  const m = /^(?:T\s*-?\s*)+(\d+)$/.exec(t) || /^(\d+)$/.exec(t);
-  return m ? 'T-' + m[1] : t;
+  // The trailer number itself: the one rule in logic.js (rules audit line 12). "T T-101" (typed twice) is still T-101.
+  const n = t.replace(/^(?:T\s*-?\s*)+(?=\d)/, '');
+  return /^\d+$/.test(n) ? L.trailerNumber(n) : t;
 }
 function validateDvir(input) {
   const bad = (m) => { throw new SaveError('BAD_REQUEST', m); };
@@ -398,7 +399,7 @@ async function saveDvir(db, input, who, dates, stamp) {
     req.trailers.forEach((t, i) => {
       if (had[i].exists) return;
       const checks = truckChecks.concat(t.checks), defect = checks.indexOf('Defect found') >= 0 || !!req.tractorIssues || !!t.issues;
-      tx.set(refs[i], { recordId: ids[i], type: 'DVIR', date, status: 'SUBMITTED', facilityId: run.facilityId || 'fac_uniontown', route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '',
+      tx.set(refs[i], { recordId: ids[i], type: 'DVIR', date, status: 'SUBMITTED', facilityId: L.plantOf(run), route: run.route || '', run: run.run || '', routeId: run.routeId || '', runId: run.runId || '',
         runDocId: req.runDocId, day: req.day, trailer: t.trailer, notes: req.notes, recordedAt: stamp, recordedBy: by, driverId: driver.id, driver: driver.name,
         payload: { requestId: req.requestId, actor: by, route: run.route || '', run: run.run || '', inspection: req.inspection, odometer: req.odometer, truck: req.truck, tractorIssues: req.tractorIssues,
           notes: req.notes, signatureName: req.signatureName, signature: req.signature, status: 'SUBMITTED', trailer: t.trailer, checks, trailerIssues: t.issues, trailerPosition: i + 1, trailerCount: req.trailers.length },

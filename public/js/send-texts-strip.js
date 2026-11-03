@@ -6,7 +6,7 @@ import { callServer, serverText, dateTimeText } from './app.js';
 import { doc, onSnapshot } from './firebase.js';
 
 const addDays = (k, n) => { const [y, m, d] = String(k).split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); };
-const day = (k) => { const [y, m, d] = String(k).split('-').map(Number); return m + '-' + d + '-' + String(y).slice(2); };
+const day = (k) => window.UDLogic.dateText(k);
 const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
 const drivers = (n) => n + (n === 1 ? ' driver' : ' drivers');
 
