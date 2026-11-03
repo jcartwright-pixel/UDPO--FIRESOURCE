@@ -63,7 +63,7 @@ const loadRow = '#rows tr[data-row^="' + RUN + '|"]';
       const pick = daily.locator('#edit-modal select[data-field="loadType"]');
       await pick.waitFor();
       assert.equal(await pick.inputValue(), 'CASE', 'the route\'s own type is shown first');
-      assert.deepEqual(await pick.locator('option').allTextContents(), ['Case', 'Totes', 'Boxes', 'Tanker']);
+      assert.deepEqual(await pick.locator('option').allTextContents(), ['Case', 'Tote', 'Boxing', 'Tanker']);
       const size = await pick.evaluate(el => parseFloat(getComputedStyle(el).fontSize));
       assert.ok(size >= 16, 'the Load type box is at least 16px (' + size + ')');
       const box = await daily.locator('#edit-modal').boundingBox();

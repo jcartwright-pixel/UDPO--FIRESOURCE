@@ -15,8 +15,8 @@ import { hoursMinutesText } from './app.js';
 
 const L = window.UDLogic, U = window.UDPlant;
 export const ON_TIME_MINUTES = P.BEHIND_MINUTES;
-export const AREA_ORDER = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
-export const AREA_NAME = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxing', TANKER: 'Tanker' };
+export const AREA_ORDER = L.AREA_ORDER;
+export const AREA_NAME = { CASE: L.AREA_WORDS.CASE.tile, TOTES: L.AREA_WORDS.TOTES.tile, BOXING: L.AREA_WORDS.BOXING.tile, TANKER: L.AREA_WORDS.TANKER.tile };
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());

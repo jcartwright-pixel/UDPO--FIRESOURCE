@@ -13,12 +13,13 @@ import { shortTime, dateTimeText, hoursMinutesText, escapeHtml } from './app.js'
 
 const L = window.UDLogic;
 
-export const AREAS = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+export const AREAS = L.AREA_ORDER;
 export const AREA = {
-  CASE: { title: 'Daily Case Loadout', tile: 'Cases', label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' },
-  TOTES: { title: 'Daily Tote Loadout', tile: 'Totes', label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' },
-  BOXING: { title: 'Daily Box Loadout', tile: 'Boxes', label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' },
-  TANKER: { title: 'Daily Tanker Loadout', tile: 'Tanker', label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }
+  // The area words (title, tile) are the one set in logic.js (rules audit line 13: Boxing, Tanker, Tote).
+  CASE: Object.assign({ label: 'Cases Out', unit: 'cases', color: '#1976d2', inLabel: 'Cases In' }, L.AREA_WORDS.CASE),
+  TOTES: Object.assign({ label: 'Totes Out', unit: 'totes', color: '#7b35b5', inLabel: 'Totes In' }, L.AREA_WORDS.TOTES),
+  BOXING: Object.assign({ label: 'Boxes Out', unit: 'boxes', color: '#f28a00', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
+  TANKER: Object.assign({ label: 'Quantity Out', unit: 'gallons', color: '#159149', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 };
 export const BEHIND_MINUTES = 45;
 
@@ -280,7 +281,7 @@ export function localToStamp(local) {
 // The shared rules (js/plant-rules.js, the same file the server uses).
 const U = window.UDPlant;
 export const UNLOAD_UNIT = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Gallons' };
-export const UNLOAD_TILE = { CASE: 'Cases', TOTES: 'Totes', BOXING: 'Boxes', TANKER: 'Tankers' };
+export const UNLOAD_TILE = { CASE: L.AREA_WORDS.CASE.tile, TOTES: L.AREA_WORDS.TOTES.tile, BOXING: L.AREA_WORDS.BOXING.tile, TANKER: L.AREA_WORDS.TANKER.tile };
 const txt = (v) => (v === null || v === undefined ? '' : String(v).trim());
 // A count from the sheet or the app: a whole number, or '' when blank or not a number.
 const num = (v) => { const t = txt(v).replace(/,/g, ''); return t !== '' && isFinite(Number(t)) ? Number(t) : ''; };

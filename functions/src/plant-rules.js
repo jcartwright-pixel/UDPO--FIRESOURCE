@@ -232,15 +232,9 @@
      has a Load Type (Case, Totes, Boxes, Tanker), filled in from Route Master's load_type for the picked run and changeable on
      Add / Edit Load. Each Daily Loadout shows the Scheduler loads of its own type. A load saved before it had one takes its run's
      Route Master type; a run with no type there is a box load (as before). */
-  var LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
-  function loadArea(t) {
-    t = text(t).toUpperCase();
-    if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
-    if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
-    if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') return 'BOXING';
-    if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
-    return '';
-  }
+  // The area words (Case, Tote, Boxing, Tanker) and which area a load type goes to live once in logic.js (rules audit line 13).
+  var LOAD_TYPES = LR.AREA_ORDER.map(function (a) { return [a, LR.areaName(a)]; });
+  function loadArea(t) { return LR.loadArea(t); }
   // The Route Master type of a customer's run (a LOAD N run's own type, else its customer's), or Boxes.
   function routeLoadType(customers, runId) {
     var hit = '';
@@ -1394,7 +1388,7 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case Loadout', BOXING: 'Boxing Loadout', TOTES: 'Tote Loadout', TANKER: 'Tanker Loadout' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: LR.areaName('CASE') + ' Loadout', BOXING: LR.areaName('BOXING') + ' Loadout', TOTES: LR.areaName('TOTES') + ' Loadout', TANKER: LR.areaName('TANKER') + ' Loadout' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
     // Joe 11/3: each area (Case, Boxing, Tote, Tanker) is on time or behind on its own: a Tanker loaded on time is good
@@ -1551,7 +1545,7 @@
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
     // loads go out Sunday and which (Jersey) not until Monday. Late is counted from when each load leaves (departWall).
     // Joe 10/19: the loads are grouped Case, then Box, then Tote, then Tanker (each list keeps the order below).
-    var GROUP_NAME = { CASE: 'Case', BOXING: 'Box', TOTES: 'Tote', TANKER: 'Tanker' }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+    var GROUP_NAME = { CASE: LR.areaName('CASE'), BOXING: LR.areaName('BOXING'), TOTES: LR.areaName('TOTES'), TANKER: LR.areaName('TANKER') }, GROUP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
     var byGroup = function (a, b) { var x = GROUP_ORDER.indexOf(a.area), y = GROUP_ORDER.indexOf(b.area); return (x < 0 ? 9 : x) - (y < 0 ? 9 : y); };
     var dayOf = function (x) { return dayNum(x.deliveryDate); }, byDay = function (a, b) { var x = dayOf(a), y = dayOf(b); return (x === null ? 1e9 : x) - (y === null ? 1e9 : y); };
     var untilOf = function (x) { return x.minutesUntil === null || x.minutesUntil === undefined ? 1e9 : x.minutesUntil; };

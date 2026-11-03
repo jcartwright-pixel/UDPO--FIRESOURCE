@@ -27,19 +27,12 @@ const PLANT_ROLES = L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']);
 
 // The four loadout areas and their words (desktopV5063LoadoutTypeToArea_ and the Daily <area> Loadout titles).
 const AREAS = Object.freeze({
-  CASE: { title: 'Daily Case Loadout', label: 'Cases Out', inLabel: 'Cases In', tile: 'Cases' },
-  TOTES: { title: 'Daily Tote Loadout', label: 'Totes Out', inLabel: 'Totes In', tile: 'Totes' },
-  BOXING: { title: 'Daily Box Loadout', label: 'Boxes Out', inLabel: 'Boxes In', tile: 'Boxes' },
-  TANKER: { title: 'Daily Tanker Loadout', label: 'Quantity Out', inLabel: 'Gallons In', tile: 'Tanker' }
+  CASE: Object.assign({ label: 'Cases Out', inLabel: 'Cases In' }, L.AREA_WORDS.CASE),
+  TOTES: Object.assign({ label: 'Totes Out', inLabel: 'Totes In' }, L.AREA_WORDS.TOTES),
+  BOXING: Object.assign({ label: 'Boxes Out', inLabel: 'Boxes In' }, L.AREA_WORDS.BOXING),
+  TANKER: Object.assign({ label: 'Quantity Out', inLabel: 'Gallons In' }, L.AREA_WORDS.TANKER)
 });
-function areaOf(loadType) {
-  const t = String(loadType || '').trim().toUpperCase();
-  if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
-  if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
-  if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') return 'BOXING';
-  if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
-  return '';
-}
+function areaOf(loadType) { return L.loadArea(loadType); }
 
 /* ---------- the copy ---------- */
 

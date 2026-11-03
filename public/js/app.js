@@ -164,8 +164,8 @@ export const MENU = [
   // Joe 10/26: one pop-out for the departments, each loading and unloading by its own name (Case, Tote, Box and Tanker), so the
   // menu itself stays short: Send Report, this, Shift Notes, Yard Checks and the Scheduler.
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'],
-    ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Box Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
-    ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Box Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
+    ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Boxing Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
+    ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Boxing Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
     ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
   // Joe 10/26 (ej): the Plant Distribution Scheduler is its own department, Shipping & Receiving, with Inventory beside it.

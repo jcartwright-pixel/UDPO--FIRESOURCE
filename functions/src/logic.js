@@ -226,6 +226,27 @@
     return cov || (hauler(r) === 'PICKUP' ? 'CUSTOMER PICKUP' : 'CARRIER');
   }
 
+  // The four loadout areas and the one set of words for them on every screen, email and printout. Rules audit line 13 (Joe 11/3:
+  // "everything should be boxing, tanker, tote"; Case stays Case). name: the area's own word; title: its Loadout screen; tile:
+  // its tile and tab. The counts keep their own words (Cases Out, Totes Out, Boxes Out, Gallons In).
+  var AREA_ORDER = ['CASE', 'TOTES', 'BOXING', 'TANKER'];
+  var AREA_WORDS = {
+    CASE: { name: 'Case', title: 'Daily Case Loadout', tile: 'Cases' },
+    TOTES: { name: 'Tote', title: 'Daily Tote Loadout', tile: 'Tote' },
+    BOXING: { name: 'Boxing', title: 'Daily Boxing Loadout', tile: 'Boxing' },
+    TANKER: { name: 'Tanker', title: 'Daily Tanker Loadout', tile: 'Tanker' }
+  };
+  // The area a Route Master / Daily load type goes to: CASE, TOTES, BOXING, TANKER or '' (desktopV5063LoadoutTypeToArea_).
+  function loadArea(t) {
+    t = String(t == null ? '' : t).trim().toUpperCase();
+    if (t === 'CASE LOADOUT' || t === 'CASE') return 'CASE';
+    if (t === 'TOTE' || t === 'TOTES' || t === 'TOTE LOADOUT') return 'TOTES';
+    if (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT' || t === 'BOXING LOADOUT') return 'BOXING';
+    if (t === 'TANKER' || t === 'TANKER LOADOUT') return 'TANKER';
+    return '';
+  }
+  function areaName(a) { return (AREA_WORDS[a] || {}).name || ''; }
+
   // Whether a load is loaded: a finish time, Loaded / Complete ticked, or a load status that says it is done. One list of words
   // for every screen (READY and COMPLETED used to count on Loadout and the sales email but not on the yard list).
   var LOADED_WORDS = ['COMPLETE', 'COMPLETED', 'LOADED', 'READY'];
@@ -1400,8 +1421,7 @@
    * the dispatcher set them.
    */
   function boxLoadRun(route) {
-    var t = String((route && route.loadType) || '').trim().toUpperCase();
-    return (t === 'BOXING' || t === 'BOX' || t === 'BOXES' || t === 'BOX LOADOUT') && String((route && route.coverageType) || '').trim().toUpperCase() === 'BRANCH';
+    return loadArea(route && route.loadType) === 'BOXING' && hauler(route) === 'BRANCH';
   }
   function resetWeekPlan(run, route, slots, exceptions) {
     if (!route || ROUTE_OFF.indexOf(String(route.routeStatus || 'ACTIVE').toUpperCase()) >= 0 || !masterActive(route)) return null;
@@ -1708,7 +1728,7 @@
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
-    unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
+    AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,

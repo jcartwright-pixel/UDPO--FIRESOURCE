@@ -67,7 +67,7 @@
     const canLoad = () => maySave(person, L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plantLoading', allowed.savePlantLoad);
     const key = (v) => window.UDPlant.unitKey(v);
     const tText = (v) => L.trailerNumber(v);
-    const AREA_SUB = { TOTES: 'Totes', BOXING: 'Box', TANKER: 'Tanker' };
+    const AREA_SUB = { TOTES: L.areaName('TOTES'), BOXING: L.areaName('BOXING'), TANKER: L.areaName('TANKER') };
 
     function rowsNow() {
       return P.loadoutRows(runs, date).filter(r => r.state !== 'DONE').map(r => (r.id in pending ? Object.assign({}, r, { trailer: pending[r.id] }) : r));

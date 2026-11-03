@@ -372,7 +372,7 @@
     const setJack = (row, text) => saveRunChange(getRuns, row.runDocId, row.day, 'setJack', { jack: text }, d => { d.palletJack = text.toUpperCase(); }, render);
     // Joe 10/19 (800 Specials: "could be totes, could be cases, could be anything"): the day's load type picks the loadout it goes to
     // (Loadout Center, Manager Center and the shift report email follow it). It starts as the route's Loadout Type in the Route Editor.
-    const LOAD_TYPES = [['CASE', 'Case'], ['TOTES', 'Totes'], ['BOXING', 'Boxes'], ['TANKER', 'Tanker']];
+    const LOAD_TYPES = R.LOAD_TYPES;
     const loadTypeOf = (row) => { const run = runs.find(x => x.id === row.runDocId); return run ? runArea(run, row.day) : ''; };
     const setLoadType = (row, type) => saveRunChange(getRuns, row.runDocId, row.day, 'setLoadType', { loadType: type }, d => { d.loadType = type; d.loadTypeByHand = !!type; }, render);
 

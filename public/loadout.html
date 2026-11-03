@@ -662,7 +662,7 @@
       schedOptions = (x && !list.some(c => c.runId === x.runId) ? [{ routeId: x.routeId, runId: x.runId, route: x.route, run: x.run, name: '' }] : []).concat(list);
       const pick = x ? schedOptions.findIndex(c => c.runId === x.runId || (c.slots || []).some(s => s.runId === x.runId)) : -1;
       drawSchedRoutes(pick);
-      document.getElementById('sched-title').textContent = (x ? 'Edit Load · ' + R.loadNumberName(x.run || x.route, x.loadNo) : 'Add Load · Daily Box Loadout ' + shortDate(date));
+      document.getElementById('sched-title').textContent = (x ? 'Edit Load · ' + R.loadNumberName(x.run || x.route, x.loadNo) : 'Add Load · ' + P.AREA.BOXING.title + ' ' + shortDate(date));
       const put = (id, v) => { document.getElementById(id).value = v || ''; };
       // Joe 10/14: Load Type starts as the run's Route Master type and can be changed; each loadout shows its own type.
       const kind = x ? R.scheduleArea(x, list) : '';

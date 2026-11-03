@@ -36,6 +36,10 @@ Uniontown, Charleston and Martins Ferry each keep their own loads, drivers, truc
 
 Type a trailer any way you like (**14**, **014**, **T14** or **T 14**). Operations always writes it as **T-** and the number with no zeros in front (**T-14**), on every screen, email and printout. Truck numbers lose their front zeros too when they are matched to their GPS, so **0601** and **601** are the same truck. **TBA** and **N/A** stay as they are.
 
+### Loadout names
+
+The four loadouts have the same names everywhere: **Case**, **Tote**, **Boxing** and **Tanker** (Daily Case Loadout, Daily Tote Loadout, Daily Boxing Loadout, Daily Tanker Loadout). The Load Type list, the menus, the report email and the printouts all use these words. The counts keep their own words: Cases Out, Totes Out, Boxes Out and Gallons In.
+
 ### Buttons you see everywhere
 
 - `Back` goes back one step. If something is open on the screen (a window, a second tab) it closes that first.
@@ -600,7 +604,7 @@ The connection to Verizon Connect Fleet (administrators).
 id: manager
 screens: manager.html
 
-The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Box Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
+The plant's front page for managers. Each department has a small card: Case Loading, Tote Loading, Boxing Loading and Case Unloading, with how many loads are loaded, what is behind, and the Late Forecast. Below are Shift Notes, Yard Checks, the Manager Walkthrough and the Shipping schedule.
 
 - A route tile is green when it is loaded and red when it is not. Only LATE (its truck should already have left, or on a green tile: it was loaded after its dispatch time) and BEHIND (left over from the last shift, truck not gone yet) have a word.
 - Click a card to open its screen; click a line on a card to open that exact item.
@@ -646,7 +650,7 @@ One card for each department of Plant Distribution: Case, Tote, Box and Tanker l
 id: loadout
 screens: loadout.html
 
-The day's loads for one loadout: Case Loading, Tote Loading, Box Loading or Tanker Loading (the menu opens the right one). Each line is one load: route, run, trailer, cases, start and end time, total time and its status.
+The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or Tanker Loading (the menu opens the right one). Each line is one load: route, run, trailer, cases, start and end time, total time and its status.
 
 ### Pick the day
 

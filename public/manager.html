@@ -204,7 +204,7 @@
       document.querySelector('[data-card="dept"]').innerHTML =
         deptCard('loadout.html?area=CASE', 'Loadout Center', 'Case Loading', P.AREA.CASE.color, loadCounts(A.CASE), A.CASE.done, A.CASE.total, loadNote(A.CASE), caseLines) +
         deptCard('loadout.html?area=TOTES', 'Loadout Center', 'Tote Loading', P.AREA.TOTES.color, loadCounts(A.TOTES), A.TOTES.done, A.TOTES.total, loadNote(A.TOTES), loadLines(A.TOTES, 'TOTES')) +
-        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Box Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
+        deptCard('loadout.html?area=BOXING', 'Loadout Center', 'Boxing Loading', P.AREA.BOXING.color, loadCounts(A.BOXING), A.BOXING.done, A.BOXING.total, loadNote(A.BOXING), loadLines(A.BOXING, 'BOXING')) +
         deptCard('unloading.html', 'Trailers back from the routes', 'Case Unloading', '#455a64', [[x.uc.total, 'Trailers'], [x.uc.waiting, 'Waiting'], [x.uc.unloading, 'Unloading'], [x.uc.complete, 'Done', x.uc.total && x.uc.complete === x.uc.total ? 'good' : '']], x.uc.complete, x.uc.total, x.uc.complete + ' of ' + x.uc.total + ' trailers unloaded', [
           dpLine('unloading.html', 'Back, not started', x.backWaiting, x.backWaiting ? 'bad' : '', 'checked in'),
           dpLine('washing.html', 'Truck Washing', x.wash.length, x.wash.length ? 'warn' : '', 'to wash' + (x.repeat ? ' · ' + x.repeat + ' repeat' : '')),

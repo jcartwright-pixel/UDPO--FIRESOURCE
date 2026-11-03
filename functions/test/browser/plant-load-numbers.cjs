@@ -4,7 +4,7 @@
  * load ... Load one, load two, load three ... But look at today ... it's only showing one"). Three Aldi Charleston loads on one
  * delivery day, all booked on the customer (its LOAD 1 run), and Aldi's LOAD 1 also a box load that day on Live:
  *   - the Scheduler names them Load 1, 2, 3 by pickup time;
- *   - Daily Box Loadout shows LOAD 1 once (the Live line, with the Scheduler's pickup time on it), Load 2 and Load 3 as their
+ *   - Daily Boxing Loadout shows LOAD 1 once (the Live line, with the Scheduler's pickup time on it), Load 2 and Load 3 as their
  *     own lines (Load 3 marked: Aldi has only two LOAD runs on Route Master); Start, the box count and + Add Load save;
  *   - Plant Station's Boxing list shows Load 2 and Load 3 (before, all three were hidden behind the LOAD 1 box load);
  *   - each Scheduler load has a Load Type (Route Master's unless changed) and shows only on that loadout, once.
@@ -88,7 +88,7 @@ async function journal(id, ok) {
     await sk.waitForSelector('.sc-load[data-edit="SCHED-k1"]', { timeout: 15000 });
     await sk.click('.sc-load[data-edit="SCHED-k1"]');
     assert.equal(await sk.inputValue('#f-kind'), 'CASE', 'Peck Load 1 is a case load (Route Master)');
-    assert.deepEqual(await sk.$$eval('#f-kind option', o => o.map(x => x.textContent)), ['Case', 'Totes', 'Boxes', 'Tanker']);
+    assert.deepEqual(await sk.$$eval('#f-kind option', o => o.map(x => x.textContent)), ['Case', 'Tote', 'Boxing', 'Tanker']);
     assert.ok(await sk.$eval('#f-kind', e => parseFloat(getComputedStyle(e).fontSize) >= 16 && e.getBoundingClientRect().width >= 120), 'Load Type is 16px and wide enough');
     await shot(sk, 'scheduler-load-type-1536.png');
     await sk.click('#modal [data-close]');
@@ -100,7 +100,7 @@ async function journal(id, ok) {
     await sk.close();
     results.push('Scheduler: Load Type on Add / Edit Load, filled in from Route Master for the picked run and changeable');
 
-    // Daily Box Loadout, Thursday 10-08.
+    // Daily Boxing Loadout, Thursday 10-08.
     const lo = await openPage(browser, 1536, 760, '/loadout.html?date=2026-10-08&area=BOXING&' + MANAGER);
     const row = (id) => '#rows tr[data-row="' + id + '"]';
     await lo.waitForSelector(row('sch:SCHED-a3'), { timeout: 15000 });
@@ -123,9 +123,9 @@ async function journal(id, ok) {
     await lo.setViewportSize({ width: 1536, height: 760 });
     assert.equal(await lo.textContent(row('sch:SCHED-a2') + ' td:nth-child(7)'), '8:05 AM');
     assert.equal(await lo.inputValue(row('sch:SCHED-a2') + ' input[data-k="trailer"]'), 'T-962');
-    assert.equal(await lo.isVisible('#add-load'), true, '+ Add Load on Daily Box Loadout');
+    assert.equal(await lo.isVisible('#add-load'), true, '+ Add Load on Daily Boxing Loadout');
     assert.ok((await lo.$$eval('#rows .sched-tag, #rows .skip-tag, #add-load', els => els.map(e => parseFloat(getComputedStyle(e).fontSize)))).every(n => n >= 16), 'tags and the button are 16px or more');
-    assert.ok(await fits(lo), 'Daily Box Loadout fits 1536');
+    assert.ok(await fits(lo), 'Daily Boxing Loadout fits 1536');
     // Start Load 2, then type its boxes.
     await lo.click(row('sch:SCHED-a2') + ' [data-sclock]');
     await lo.waitForSelector(row('sch:SCHED-a2') + ' button.state.loading');
@@ -133,7 +133,7 @@ async function journal(id, ok) {
     await lo.fill(row('sch:SCHED-a2') + ' input[data-k="quantity"]', '300');
     await lo.press(row('sch:SCHED-a2') + ' input[data-k="quantity"]', 'Enter');
     await journal('SCHED-a2', r => r.payload.work && r.payload.work.count === '300');
-    results.push('Daily Box Loadout: Start and the box count on a Scheduler load save on the Scheduler line');
+    results.push('Daily Boxing Loadout: Start and the box count on a Scheduler load save on the Scheduler line');
     // + Add Load: the Loadout day is the load day, the next day the delivery day; it lands as Aldi's Load 4.
     await lo.click('#add-load');
     await lo.waitForSelector('#sched-modal:not([hidden])');
@@ -165,7 +165,7 @@ async function journal(id, ok) {
     assert.ok(added, 'the new load is on the Scheduler');
     assert.deepEqual([added.date, added.payload.loadDate, added.runId, added.payload.loadType], ['2026-10-09', '2026-10-08', 'run_c905_1', 'BOXING']);
     await lo.click('#areas [data-area="CASE"]');
-    assert.equal(await lo.isVisible('#add-load'), false, 'Add Load is on Daily Box Loadout only');
+    assert.equal(await lo.isVisible('#add-load'), false, 'Add Load is on Daily Boxing Loadout only');
     // Joe 10/14: Peck's Load 1 is its case run's line on Daily Case Loadout, once, with the Scheduler's PO and time on hover;
     // Load 2 (changed to Totes) is on Daily Tote Loadout; neither is on Boxes.
     await lo.waitForSelector(row('2026-10-04__run_p812|fri'));
@@ -180,7 +180,7 @@ async function journal(id, ok) {
     await lo.waitForSelector('#rows tr[data-row]');
     assert.equal(await lo.$('#rows tr[data-row^="sch:"]'), null, 'no Scheduler loads on Tanker Loadout');
     assert.deepEqual(lo.errors, []);
-    results.push('Daily Box Loadout: + Add Load saves a Scheduler load for the next day, loaded today; it shows as Load 4');
+    results.push('Daily Boxing Loadout: + Add Load saves a Scheduler load for the next day, loaded today; it shows as Load 4');
 
     // Plant Station, Boxing: Load 2, 3 and 4 show; Load 1 is worked on Aldi's box load card.
     const st = await openPage(browser, 1024, 768, '/plant-station.html?' + MANAGER + '&station=BOXING', true);
@@ -210,7 +210,7 @@ async function journal(id, ok) {
     await lo.click('#s-delete');
     await lo.waitForFunction((id) => !document.querySelector('#rows tr[data-row="' + id + '"]'), addedRow, { timeout: 3000 });
     await journal(added.recordId, r => r.status === 'DELETED');
-    results.push('Daily Box Loadout: Delete Load on a Scheduler line takes it off at once and marks it deleted on the Scheduler');
+    results.push('Daily Boxing Loadout: Delete Load on a Scheduler line takes it off at once and marks it deleted on the Scheduler');
   } finally {
     await browser.close();
   }
