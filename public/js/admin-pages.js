@@ -101,6 +101,9 @@ export async function renderPeople(box) {
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn main" id="p-add">+ Add Person</button><button type="button" class="ap-btn main" id="p-add-role">+ Add Role</button>' +
     '<button type="button" class="ap-btn" id="p-reload">Refresh</button>' +
     '<div class="ap-right"><input type="search" id="p-find" placeholder="Search name or email" aria-label="Search name or email"><select id="p-filter" aria-label="Show"><option value="all">All people</option><option value="ACTIVE">Enabled</option><option value="INACTIVE">Disabled</option></select></div></div>' +
+    // Joe 11-3-26: People & Access in the United Dairy Hub is the same list with the same saves, laid out better, and is where
+    // this moves. Practice copy only until the hub is on the live site (Deploy Hub, Run workflow, production).
+    (/sandbox/.test(location.hostname) ? '<p class="ap-note hub-link">This list is also in the United Dairy Hub, where it is moving: <a href="https://ud-distribution-sandbox-hub.web.app/people.html">Open People &amp; Access in the Hub</a></p>' : '') +
     '<div class="ap-msg" hidden></div>' +
     // Review item 53 (Joe 10/13): the three info boxes (Company sign-in, Administrator is assigned, Supplied codes are separate)
     // are gone, so the list starts right under the buttons. Review item 52: Email is wide and Plants and Status narrow, so an
