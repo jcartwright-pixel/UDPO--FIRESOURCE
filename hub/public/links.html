@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#074c84">
+  <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Links &amp; Codes · United Dairy Hub</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/hub.css">
+</head>
+<body class="hub-page" data-help="links">
+  <div class="signin" id="signin" hidden>
+    <h1>United Dairy Hub</h1>
+    <p>Sign in with your United Dairy Google account.</p>
+    <button id="signin-button" type="button">Sign in with Google</button>
+    <div class="notice error" id="signin-error" hidden></div>
+  </div>
+  <div id="screen" hidden>
+    <div class="topbar">
+      <span class="who" id="who"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+    <div class="notice error" id="error" hidden></div>
+    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub &middot; Administration</span><h1>Links &amp; Codes</h1></div></div>
+    <div class="lc">
+      <nav class="lc-nav" id="parts" aria-label="Links and codes"></nav>
+      <section class="lc-main">
+        <div class="lc-bar">
+          <label>Plant <select id="plant" aria-label="Plant"></select></label>
+          <span class="lc-key"><span class="chip blue">Blue: United Dairy sign-in</span><span class="chip orange">Orange: anyone with the code</span></span>
+        </div>
+        <div class="list-msg bad" id="practice" hidden>Practice copy: test only. Do not give these links or codes to drivers or plant staff.</div>
+        <div class="list-msg" id="msg" role="status" hidden></div>
+        <div id="part"></div>
+      </section>
+    </div>
+  </div>
+  <script src="js/vendor/qrcode.js"></script>
+  <script type="module">import { requireSignIn } from './js/shell.js';
+import { start } from './js/links.js';
+requireSignIn(() => start());</script>
+</body>
+</html>

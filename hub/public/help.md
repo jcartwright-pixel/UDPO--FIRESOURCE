@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, and **Roles & Rights** is what each role may do.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, and **Links & Codes** has every link and code for managers, stations and drivers' phones.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -84,6 +84,36 @@ screens: roles.html
 !> Do not untick a right from a role to stop one person. Use **Single rights** on that person instead; a role change reaches everyone with that role.
 
 !> Do not make a new role for one person. Give them the closest role and change their single rights.
+
+## Links & Codes
+id: links
+screens: links.html
+
+**Links & Codes** has every link and code people use to reach Plant & Distribution: the managers' links, the Plant Managers App, the Sales App, the plant, garage, maintenance and Driver Room tablets, and the drivers' phone code. It is the same list as **Links & Codes** in Plant & Distribution's Administration, saved to the same place, so every code already given out keeps working. Administrators only.
+
+1. Pick a part on the left: **Manager links**, **Plant Managers App**, **Sales App**, **Plant Stations**, **Garage & Maintenance** or **Driver Room & phones**.
+2. Pick the **Plant** at the top when there is more than one. The links and codes shown are that plant's.
+3. To send someone a link, press `Copy Link`, or `Print QR` to print a page with its QR code. `Open` opens it in a new tab.
+4. To give a station or tablet a code, press `Make a code` on its line. To change a code, press `New code`, then press it again: the tablets on the old code ask for the new one.
+5. To add a station, type its name under the list, pick its type, and press `+ Add`. To take one away, press `Remove`, then press it again.
+6. **Manager links** has each plant's **Manager release code**: a manager types it on a tablet's Release corner to move the tablet to another station.
+7. **Driver Room & phones** has the drivers' phone code: `Make a code`, `New code`, `Turn Off` (press twice) and `Turn On`.
+8. **Plant Stations** has the Plant Station with no United Dairy account: `Turn On`, or `Turn Off` (press twice) to shut every no-account tablet out at once.
+
+### Buttons
+- `Copy Link` / `Print QR` / `Open`: send, print or open a link.
+- `Make a code` / `New code`: a code for a station, tablet, the drivers' phones or a plant's release code. `New code` needs a second press.
+- `Copy Code`: copies the code shown.
+- `+ Add` / `Remove`: a station or tablet. `Remove` needs a second press.
+- `Turn On` / `Turn Off`: the drivers' phone link, or the Plant Station with no United Dairy account. `Turn Off` needs a second press.
+
+> Blue means the person signs in with their United Dairy account. Orange means anyone with the code can open it, so keep those codes to the people who need them.
+
+> On the practice copy a red line says so: its links and codes are for testing only.
+
+!> Do not press `New code` to check a code. Every tablet or phone on the old code stops until someone types the new one.
+
+!> Do not send codes in a group text or email. Read them out or hand them over in person.
 
 ## Help
 id: help
