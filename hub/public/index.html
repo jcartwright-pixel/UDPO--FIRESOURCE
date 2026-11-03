@@ -24,16 +24,29 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1></div></div>
+    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1><p class="hub-sub">Pick an app to open it. Each one opens in its own tab.</p></div></div>
     <div class="hub-home" id="tiles"></div>
+    <div class="admin-only">
+      <h2 class="hub-section">Administration</h2>
+      <div class="hub-home" id="admin-tiles"></div>
+    </div>
     <div class="hub-empty" id="empty" hidden>You are on the Users list, but no app is turned on for you yet. Ask an administrator.</div>
     <div class="hub-install" id="install-box" hidden>
       <b>Get the hub app</b>
-      <span>It opens on this computer in its own window, with its own icon, like the Operations app.</span>
+      <span>It opens on this computer in its own window, with its own icon, like your other United Dairy apps.</span>
       <button type="button" class="primary" id="install">Install the app</button>
     </div>
   </div>
-  <script type="module">import { requireSignIn, callServer, escapeHtml as e, showError, serverText, installed, installApp, canInstall } from './js/shell.js';
+  <script type="module">import { LOOK } from './js/apps.js';
+import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall } from './js/shell.js';
+// One app card: its picture in its colour, its name, what it is for, and Open.
+function tile(key, url, name, note, newTab) {
+  const look = LOOK[key] || LOOK.operations;
+  return '<a class="app-tile" href="' + e(url) + '"' + (newTab ? ' target="_blank" rel="noopener"' : '') + ' data-app="' + e(key) + '" style="--app:' + look.color + '">' +
+    '<span class="app-icon">' + look.icon + '</span><span class="app-text"><strong>' + e(name) + '</strong><span>' + e(note) + '</span></span>' +
+    '<span class="app-open">Open' + (newTab ? ' <span aria-hidden="true">&#8599;</span><span class="sr">(opens in a new tab)</span>' : ' <span aria-hidden="true">&rarr;</span>') + '</span></a>';
+}
+document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open', false).replace('data-app="people"', 'data-admin="people"');
 function showInstall() { document.getElementById('install-box').hidden = installed() || !canInstall(); }
 document.addEventListener('hub-installable', showInstall);
 document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };
@@ -41,9 +54,12 @@ showInstall();
 requireSignIn(async () => {
   try {
     const d = await callServer('hub', { op: 'home' });
-    if (d.name) document.getElementById('hello').textContent = 'Your apps, ' + d.name.split(/\s+/)[0];
+    // A first name only when the Users list has a real name (not an email address).
+    const first = String(d.name || '').split(/\s+/)[0];
+    document.getElementById('hello').textContent = first && first.indexOf('@') < 0 ? 'Your apps, ' + first : 'Your apps';
+    setAdmin(d.admin);
     // Each app opens in its own tab, so the hub stays open to go to the next one.
-    document.getElementById('tiles').innerHTML = (d.tiles || []).map(t => '<a href="' + e(t.url) + '" target="_blank" rel="noopener" data-app="' + e(t.key) + '"><strong>' + e(t.name) + '</strong>' + e(t.note) + '<small>Opens in a new tab</small></a>').join('');
+    document.getElementById('tiles').innerHTML = (d.tiles || []).map(t => tile(t.key, t.url, t.name, t.note, true)).join('');
     document.getElementById('empty').hidden = (d.tiles || []).length > 0;
   } catch (err) { showError(serverText(err, 'the hub')); }
 });</script>

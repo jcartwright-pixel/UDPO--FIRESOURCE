@@ -3,10 +3,10 @@
  * Operations, so the same United Dairy Google sign-in and the same Users list (users/<email>) decide who sees which tile.
  *
  * Each tile follows the rule its own app uses, so the hub never shows a tile the app would then refuse:
- *   Operations      every ACTIVE person on the Users list (Operations decides each screen's rights itself)
- *   Customer List   every ACTIVE person on the Users list (the same rule as customerList)
- *   Fuel            Administrators only (the same rule as fuelApp)
- *   UDMS            Administrators for now: UDMS keeps its own access list, so it checks again when it opens
+ *   Plant & Distribution (Operations)       every ACTIVE person on the Users list (Operations decides each screen itself)
+ *   Customers & Routes (Customer List)      every ACTIVE person on the Users list (the same rule as customerList)
+ *   Fuel Tracking (Fuel)                    Administrators only (the same rule as fuelApp)
+ *   Employees & Compliance (UDMS)           Administrators for now: UDMS keeps its own access list and checks again
  * Statement Center is left out until Joe says (11-2-26: "I don't want to move the statement center to this yet").
  *
  * The addresses come from the project the server runs in: the practice copy (ud-distribution-sandbox) links to the practice
@@ -29,10 +29,11 @@ const safeIdPart = (value) => String(value || '').trim().replace(/[\/\s]+/g, '_'
 function apps(project) {
   const site = (s) => 'https://' + project + (s ? '-' + s : '') + '.web.app/';
   return [
-    { key: 'operations', name: 'Operations', note: 'Dispatch, plant, fleet, schedules and reports (UDOP)', url: site(''), may: isActive },
-    { key: 'customers', name: 'Customer List', note: 'Every customer, route and day, the route book and truck load maps', url: site('customers'), may: isActive },
-    { key: 'fuel', name: 'Fuel Reporting', note: 'Monthly fuel records, prices, tank and deliveries, trip fuel', url: site('fuel'), may: isAdmin },
-    { key: 'udms', name: 'UDMS', note: 'Employees, driver qualification, accidents and hiring', url: UDMS_URL, may: isAdmin }
+    // Joe 11-2-26: "All of them need to be named for what they do" (not Operations, UDMS...).
+    { key: 'operations', name: 'Plant & Distribution', note: 'Dispatch, the plant floor, fleet, schedules and plant reports', url: site(''), may: isActive },
+    { key: 'customers', name: 'Customers & Routes', note: 'Every customer, delivery route and day, the route book and truck load maps', url: site('customers'), may: isActive },
+    { key: 'fuel', name: 'Fuel Tracking', note: 'Monthly fuel use, fuel prices, tank deliveries and trip fuel', url: site('fuel'), may: isAdmin },
+    { key: 'udms', name: 'Employees & Compliance', note: "Employee records, driver qualification, accidents, workers' comp and hiring", url: UDMS_URL, may: isAdmin }
   ];
 }
 
