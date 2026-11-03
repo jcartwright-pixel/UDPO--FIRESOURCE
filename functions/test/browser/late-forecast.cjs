@@ -100,10 +100,12 @@ async function openPage(browser, url, w, h, opts) {
     assert.equal(sent.late, 1, 'the report counts the same one late load as the tile');
     assert.equal(sent.allDoneWhen, tileDone, 'the report has the tile\'s all-done time');
     assert.deepEqual(sent.loads.filter(x => x.late).map(x => String(x.route).split('_')[0]), ['6301']);
-    // Joe 11/1: the window names the load that will miss its truck; behind, it loads first (it leaves first), so it is done tonight.
+    // Joe 11/1: behind, the late load loads first (it leaves first), so it is done tonight.
     assert.equal(sent.order, 'first to leave');
     assert.equal(String(sent.loads[0].route).split('_')[0], '6301');
-    assert.match(await mc.textContent('#rp-body'), /Will miss its truck: 6301[\s\S]*?Leaves Mon 7:30 PM · est\. loaded Mon \d+:\d\d PM/);
+    // Joe 11/3: the window shows the same short recap as the email: loaded and left, then about how far behind; no route names.
+    assert.match(await mc.textContent('#rp-body'), /LOAD WILL BE LATE[\s\S]*Recap \(estimated\) at[\s\S]*of \d+ loaded[\s\S]*About [^<]*behind/);
+    assert.doesNotMatch(await mc.textContent('#rp-body'), /Will miss its truck|Already loaded, but late/);
     assert.deepEqual(mc.errors, []);
 
     await Promise.all([mc.waitForURL(/forecast\.html/), mc.click('.dp-line[href="forecast.html"]')]);

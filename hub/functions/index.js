@@ -13,7 +13,7 @@ setGlobalOptions({ region: 'us-east4', maxInstances: 5 });
 const db = getFirestore();
 const { unitedDairyUser } = require('./src/auth');
 
-const CODES = { NOT_ALLOWED: 'permission-denied', BAD_REQUEST: 'invalid-argument' };
+const CODES = { NOT_ALLOWED: 'permission-denied', BAD_REQUEST: 'invalid-argument', NOT_FOUND: 'not-found' };
 
 exports.hub = onCall({ timeoutSeconds: 30 }, async (request) => {
   const user = unitedDairyUser(request.auth);

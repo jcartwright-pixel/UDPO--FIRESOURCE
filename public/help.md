@@ -642,14 +642,15 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 
 - `Copy` copies the report; `Print` prints it.
 - Only what was checked since the last report went out is in it; the rest says "Not checked".
-- The loads are the ones loaded today, by type (Case, Box, Tote, Tanker). Inside each type, each delivery day once: the loaded loads (green), then the ones not loaded yet.
+- The loads are the ones loaded today, by loadout (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout), with how many are loaded beside each name (for example **10 of 24**). Inside each loadout, each delivery day once: the loaded loads (green), then the ones not loaded yet.
 - **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet. **Loaded late** means the load is loaded, but it finished after its dispatch time; its Done time says "late" in red.
-- The banner at the top is red with **Routes late** when a truck should already have left (yellow when every late load is under 60 minutes late), yellow with **Will miss their trucks** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
+- The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Loads will be late** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 30 minutes after it leaves: yellow up to 60 minutes, red after that. **Loaded late** works the same way: a load done within 30 minutes of its dispatch time is on time. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
-- The forecast box answers one question: at this pace, will every truck be loaded before it leaves? It lists the loads **late now** (with when each should be loaded), the loads that **will miss their truck** (and by how much), and says every other truck is **On time**, with when the last one should be loaded. Below that, **Already loaded, but late** names each load finished after its dispatch time and by how much. It never shows cases.
+- The box under the banner is a short recap: how many loads are loaded (for example **19 of 38 loaded**), how many are left, and a bar that fills as they are loaded. Then each loadout the plant has (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout) on its own: how many are loaded and left, its own bar, and under it **On time** or about how far behind that loadout is. Case Loadout also says about when it will be done. Each bar and line is green when on time, yellow up to an hour behind and red past an hour, and the banner at the top takes the same color as the box. It names no routes (they are in the list below) and never shows cases.
+- "About how far behind" goes by the trucks still to leave that will leave late, not by one load that is already long overdue. Only Case loads have an estimate; Boxing, Tote and Tanker are behind only when one of their trucks should already have left.
 - **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are still listed in the Routes list and counted in "X of Y loaded", but never marked late, behind or loaded late, and the forecast box leaves them out. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
 
-> One late route does not make the whole plant late: the box names the trucks that will leave late and says the rest are on time.
+> One late route does not make the whole plant late: the recap goes by the trucks still to leave. Each late route is still red in the list below.
 
 !> Do not send the report twice for one shift. Use Send Test to Me to check it first.
 
@@ -1386,6 +1387,7 @@ screens: administration.html?item=people
 Everyone who can sign in. Add a person, then set their role, whether their account is active, which plants they see (All plants or each plant), the screens they may open, their Home screen, and each right (use the role's, allow or deny).
 
 - Each change saves at once and nothing on the page moves.
+- On the practice copy, a link at the top opens the same list in the United Dairy Hub (People & Access), where this page is moving. Either page saves to the same place.
 - A person with no screens ticked sees every screen, as before.
 - Once the People list is moved into Operations (Administration > Go-Live Switches), this screen is the only place to add or change a person. The old Users sheet is kept as a backup and no longer changes.
 

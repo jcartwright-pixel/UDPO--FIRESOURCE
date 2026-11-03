@@ -16,6 +16,7 @@ const QS = new URLSearchParams(location.search);
 export const SCREENS = [
   { href: 'index.html', name: 'Home', note: 'Every United Dairy app you can open' },
   { href: 'people.html', name: 'People & Access', note: 'Administrators: who signs in, their role, plants and apps', admin: true },
+  { href: 'roles.html', name: 'Roles & Rights', note: 'Administrators: what each role (Manager, Supervisor, Dispatcher...) may do', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 
@@ -188,3 +189,6 @@ if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || QS.get('updatetest'
   window.addEventListener('online', checkForUpdate);
 }
 window.HUB_checkForUpdate = checkForUpdate;
+
+/** The signed-in person's email (lower case), or '' before sign-in. */
+export const myEmail = () => String(services && services.auth.currentUser && services.auth.currentUser.email || '').toLowerCase();
