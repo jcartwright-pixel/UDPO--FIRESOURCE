@@ -1406,7 +1406,7 @@
   // and the Manager Center. How many are loaded and left, then one headline: everything on time, or running about how far
   // behind (rounded to 5 minutes), and when the last load should be done. No route names (they are in the list below) and nothing about loads already loaded.
   // Color: green on time, yellow up to an hour behind, red past an hour.
-  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case', BOXING: 'Boxing', TOTES: 'Tote', TANKER: 'Tanker' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
+  var RECAP_RED_AFTER = 60, RECAP_AREA = { CASE: 'Case Loadout', BOXING: 'Boxing Loadout', TOTES: 'Tote Loadout', TANKER: 'Tanker Loadout' }, RECAP_ORDER = ['CASE', 'BOXING', 'TOTES', 'TANKER'];
   function shiftRecap(r) {
     var t = truckCheck(r), f = r.forecast || null, total = Number(r.totalLoads) || 0, left = Number(r.leftToLoad) || 0;
     // Joe 11/3: each area (Case, Boxing, Tote, Tanker) is on time or behind on its own: a Tanker loaded on time is good
@@ -1608,13 +1608,15 @@
       var inGroup = function (x) { return g ? x.area === g : !GROUP_NAME[x.area]; }, ld = loaded.filter(inGroup), nl = notLoaded.filter(inGroup);
       if (!ld.length && !nl.length) return;
       if (g) H.push('<tr><td style="padding:' + (firstGroup ? '8px' : '18px') + ' 14px 0">' + (firstGroup ? '' : '<div style="height:3px;line-height:3px;font-size:1px;background:' + INK + '">&nbsp;</div>') +
-        '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(GROUP_NAME[g]) + ' (' + (ld.length + nl.length) + ')</div></td></tr>');
+        // Joe 11/3: the same names as the recap ("Case Loadout"), with how many of the type are loaded beside it.
+        '<div style="' + F + 'padding:10px 0 0;font-size:18px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:' + INK + '">' + e(RECAP_AREA[g] || GROUP_NAME[g]) + '<span style="float:right">' + ld.length + ' of ' + (ld.length + nl.length) + '</span></div></td></tr>');
       firstGroup = false;
       // Joe 10/26 ("It should list all the deliveries for Monday, and then all the deliveries for Tuesday"): one list per type,
       // what is left over from yesterday first, then each delivery day once; inside a day, the loaded ones (green, in the order
       // they finished) and then the ones not loaded (in load order). The heading says how many of each.
       var all = ld.concat(nl).map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return sectionOf(a.x) - sectionOf(b.x) || a.i - b.i; }).map(function (a) { return a.x; });
-      H.push(head([ld.length ? ld.length + ' loaded' : '', nl.length ? nl.length + ' not loaded' : ''].filter(Boolean).join(' · '), null, nl.some(function (x) { return x.word; }) ? RED : ld.length && !nl.length ? GREEN : GREY));
+      // Joe 11/3: "10 of 24" sits beside the heading, so the "10 loaded · 14 not loaded" line under it is not said twice.
+      H.push('<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>');
       var anyEst = nl.some(function (x) { return x.est; });
       H.push(grid(all, anyEst && !ld.length ? 'Est. Done' : '', anyEst && ld.length > 0));
     });

@@ -158,10 +158,11 @@ test('report email: loads grouped by type, Case then Box, Tote, Tanker, each wit
     L('951', 'UT SKIM TANKER', 'TANKER', 'WAITING', '12:00'),
     L('845', 'UT DSD', 'CASE', 'WAITING', '14:00')], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
   const html = R.reportHtml(r, '');
-  assert.match(html, /Case \(3\)[\s\S]*2 loaded · 1 not loaded[\s\S]*>801<[\s\S]*>827<[\s\S]*>845<[\s\S]*Box \(1\)[\s\S]*1 loaded<[\s\S]*>6301<[\s\S]*Tote \(1\)[\s\S]*1 loaded<[\s\S]*>912<[\s\S]*Tanker \(2\)[\s\S]*1 loaded · 1 not loaded[\s\S]*>950<[\s\S]*>951</,
+  // Joe 11/3: each type is headed "Case Loadout" with how many are loaded beside it ("2 of 3").
+  assert.match(html, />Case Loadout<span[^>]*>2 of 3<[\s\S]*>801<[\s\S]*>827<[\s\S]*>845<[\s\S]*>Boxing Loadout<span[^>]*>1 of 1<[\s\S]*>6301<[\s\S]*>Tote Loadout<span[^>]*>1 of 1<[\s\S]*>912<[\s\S]*>Tanker Loadout<span[^>]*>1 of 2<[\s\S]*>950<[\s\S]*>951</,
     'Case, Box, Tote, Tanker; loaded then not loaded inside each (Joe 10/26: one list); finish order kept');
   assert.equal((html.match(/"height:3px/g) || []).length, 3, 'a line between each of the four types');
-  const box = html.slice(html.indexOf('Box (1)'), html.indexOf('Tote (1)'));
+  const box = html.slice(html.indexOf('>Boxing Loadout<'), html.indexOf('>Tote Loadout<'));
   assert.doesNotMatch(box, /not loaded/i, 'a type with every load loaded says nothing about not loaded');
 });
 
@@ -179,7 +180,7 @@ test('report email: Scheduler box loads are listed under Box, with their pickup 
   assert.deepEqual(r.areas.map(a => a.area), ['CASE', 'BOXING']);
   assert.equal(r.behind.length, 0, 'Load 2 picks up at 1:00 PM, so it is not behind at 10 AM');
   const html = R.reportHtml(r, '');
-  assert.match(html, /Case \(1\)[\s\S]*>827<[\s\S]*Box \(2\)[\s\S]*1 loaded · 1 not loaded[\s\S]*>950<[\s\S]*>950<[\s\S]*1:00 PM/, 'both box loads under Box, Load 2 with its 1:00 PM pickup');
+  assert.match(html, />Case Loadout<span[^>]*>0 of 1<[\s\S]*>827<[\s\S]*>Boxing Loadout<span[^>]*>1 of 2<[\s\S]*>950<[\s\S]*>950<[\s\S]*1:00 PM/, 'both box loads under Box, Load 2 with its 1:00 PM pickup');
 });
 
 // Joe 10/25: "for the boxes… it has to include like the Charleston, Aldi's, and the Saxonburg Aldi's".
@@ -196,9 +197,9 @@ test('report email: ALDI Charleston and Fairmont-Saxonburg box loads are under B
   const r = R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
   assert.deepEqual(r.areas, [{ area: 'BOXING', left: 3, total: 4 }]);
   const html = R.reportHtml(r, '');
-  const box = html.slice(html.indexOf('Box (4)'));
-  assert.ok(html.includes('Box (4)'), 'the Box section has all four');
-  assert.match(box, /1 loaded · 3 not loaded[\s\S]*>950</);
+  const box = html.slice(html.indexOf('>Boxing Loadout<'));
+  assert.ok(/>Boxing Loadout<span[^>]*>1 of 4</.test(html), 'the Boxing Loadout section has all four, one loaded');
+  assert.match(box, />950</);
   assert.equal((box.match(/>950</g) || []).length, 2, 'two Charleston loads');
   assert.equal((box.match(/>907</g) || []).length, 2, 'two Saxonburg loads');
 });
@@ -217,7 +218,7 @@ test('report email: each delivery day is listed once, loaded and not loaded toge
     B('950', 'ALDI CHARLES', 'WAITING', '02:00', '2026-10-27', 6),
     B('847', 'PALS SHAKE', 'WAITING', '14:00', '2026-10-29', 7)], pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, now);
   const html = R.reportHtml(r, ''), plainText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  assert.match(plainText, /Box \(7\) 3 loaded · 4 not loaded Route Run Done Dispatch Delivers Monday 10-26-26 878 Darden L3 [^]*?878 Darden L2 [^]*?838 Gordon Food [^]*?878 Darden L1 [^]*?Delivers Tuesday 10-27-26 909 Marietta L1 [^]*?950 Aldi Charles [^]*?Delivers Thursday 10-29-26 847 Pals Shake /);
+  assert.match(plainText, /Boxing Loadout 3 of 7 (&nbsp; )?Route Run Done Dispatch Delivers Monday 10-26-26 878 Darden L3 [^]*?878 Darden L2 [^]*?838 Gordon Food [^]*?878 Darden L1 [^]*?Delivers Tuesday 10-27-26 909 Marietta L1 [^]*?950 Aldi Charles [^]*?Delivers Thursday 10-29-26 847 Pals Shake /);
   ['Monday', 'Tuesday', 'Thursday'].forEach(d => assert.equal((plainText.match(new RegExp('Delivers ' + d, 'g')) || []).length, 1, d + ' heading once'));
 });
 

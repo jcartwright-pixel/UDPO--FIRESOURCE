@@ -174,8 +174,8 @@ test('the email and the report carry the forecast', () => {
   const box = html.slice(html.indexOf('of 22 loaded') - 200, html.indexOf('Estimated at'));
   assert.match(box, />7 of 22 loaded<\/div>[^]*>15 left to load<\/div>/);
   // Joe 11/3 (built-2-by-area, then colored bars): a block for each area, how many loaded and left, its own bar and status.
-  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total, a.level, a.status]), [['Case', 7, 22, 'bad', 'About 1 hr 15 min behind']]);
-  assert.match(box, />Case<\/td>[^]*>7 of 22<span[^>]*> &middot; 15 left<\/span>[^]*background:#b42318[^]*&#9888; About 1 hr 15 min behind<\/td>/);
+  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total, a.level, a.status]), [['Case Loadout', 7, 22, 'bad', 'About 1 hr 15 min behind']]);
+  assert.match(box, />Case Loadout<\/td>[^]*>7 of 22<span[^>]*> &middot; 15 left<\/span>[^]*background:#b42318[^]*&#9888; About 1 hr 15 min behind<\/td>/);
   assert.match(box, /&#9888; About 1 hr 15 min behind<\/div>[^]*Last case load done about 9:20 AM/);
   // The banner takes the box's color: red, as the box is red (Joe 11/3).
   assert.match(html, /padding:16px 14px;background:#b42318[^>]*><div[^>]*>&#9888; 2 LOADS WILL BE LATE/);
@@ -496,6 +496,6 @@ test('the shift recap lists each area in order: Case, Boxing, Tote, Tanker', () 
     areas: [{ area: 'CASE', total: 24, left: 14 }, { area: 'TOTES', total: 4, left: 1 }, { area: 'BOXING', total: 8, left: 3 }, { area: 'TANKER', total: 2, left: 1 }, { area: 'OTHER', total: 0, left: 0 }],
     forecast: { asOf: '8:09 PM', now: 0, loads: [{ id: 'a', route: '801', est: 200, leaves: 300, late: false }] } };
   const c = R.shiftRecap(r);
-  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case', 10, 24], ['Boxing', 5, 8], ['Tote', 3, 4], ['Tanker', 1, 2]]);
+  assert.deepEqual(c.areas.map(a => [a.name, a.total - a.left, a.total]), [['Case Loadout', 10, 24], ['Boxing Loadout', 5, 8], ['Tote Loadout', 3, 4], ['Tanker Loadout', 1, 2]]);
   assert.deepEqual([c.loaded, c.left, c.late, c.level, c.status, c.doneBy], [19, 19, false, 'good', 'On time', '3:20 AM']);
 });
