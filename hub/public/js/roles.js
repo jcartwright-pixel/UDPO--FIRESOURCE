@@ -52,14 +52,16 @@ function queue(job) { busy = busy.then(job, job); return busy; }
 function saveRole(role, rights, done) {
   return queue(async () => {
     document.querySelectorAll('input[data-role="' + CSS.escape(role) + '"]').forEach(x => { x.disabled = true; });
+    let msg = [done, 'good'];
     try {
       await callServer('admin', { op: 'saveRoleTemplate', role, rights: rights(), expected: rightsOf(role).slice() });
-      say(done, 'good');
     } catch (err) {
-      say(prettyRole(role) + ' was not saved: ' + serverText(err, 'Plant & Distribution'), 'bad');
+      msg = [prettyRole(role) + ' was not saved: ' + serverText(err, 'Plant & Distribution'), 'bad'];
     }
     try { Object.assign(data, await callServer('admin', { op: 'roleTemplates' })); } catch (err) { /* keep what is shown */ }
+    // The line says what changed once the table shows it.
     draw();
+    say(msg[0], msg[1]);
   });
 }
 
