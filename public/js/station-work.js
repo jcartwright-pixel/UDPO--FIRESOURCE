@@ -500,7 +500,17 @@ export function mountStationWork({ db, box, person, onDraw }) {
     return panel('Returns', pend + ' pending of ' + plural(list.length, 'return'), '<div class="sw-list">' + html + '</div>');
   }
 
+  // A tap was lost when the list was redrawn between pressing and letting go: the press and the release landed on two
+  // different copies of the button, so the browser sent no click (a live update arriving mid-tap swallowed START LOADING).
+  // While a finger or mouse is down on the list, a redraw waits until it is let go and the tap has done its job.
+  var pressed = 0, redrawLater = false;
+  function letGo() {
+    if (!pressed) return;
+    clearTimeout(pressed); pressed = 0;
+    if (redrawLater) { redrawLater = false; setTimeout(render, 0); }
+  }
   function render() {
+    if (pressed) { redrawLater = true; return; }
     askRights();
     if (!station || !view) { box.innerHTML = ''; return; }
     if (FRAME[view]) { frameView(); if (onDraw) onDraw(); return; }
@@ -795,6 +805,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
   });
   // A button keeps the box being typed in from losing its words to a redraw between pressing and letting go.
   box.addEventListener('mousedown', e => { if (e.target.closest('button[data-act]') && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.k) e.preventDefault(); });
+  box.addEventListener('pointerdown', () => { clearTimeout(pressed); pressed = setTimeout(letGo, 2000); });
+  document.addEventListener('pointerup', letGo, true);
+  document.addEventListener('pointercancel', letGo, true);
   box.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]');
     if (b) { act(b); return; }
