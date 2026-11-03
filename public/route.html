@@ -177,6 +177,7 @@
     <p class="drv-msg" id="dv-msg" role="status"></p>
   </form>
 
+  <script src="js/timing-rules.js"></script>
   <script type="module">
     import { start, escapeHtml, shortDate, dateTimeText, showError, isUnitedDairy, currentPlant } from './js/app.js';
     import { httpsCallable, doc, getDoc } from './js/firebase.js';
@@ -543,7 +544,7 @@
         document.getElementById('board-pause').hidden = !rolls;
         track.style.animationDuration = Math.max(10, track.firstChild.offsetHeight / 18) + 's';
         track.classList.toggle('paused', boardPaused);
-        document.getElementById('board-updated').textContent = 'View only · Updated ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        document.getElementById('board-updated').textContent = 'View only · Updated ' + window.UDTiming.clockOf(Date.now());
       } catch (e) { showError(e.message); } finally { btn.disabled = false; }
     }
     // Joe 10/12 (as the old page): View Loadout updates the moment Dispatch or the plant changes a load. The Driver Room
@@ -555,11 +556,7 @@
     // (later pickups) never changed the board, so it is not read. Joe 10/30: last week's loads and yesterday's pickups too,
     // for yesterday's loads that stay on until they are loaded.
     let boardWatch = null, boardSoon = null, boardDay = '';
-    const opDay = () => {
-      const p = {};
-      new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
-      return new Date(Date.UTC(+p.year, +p.month - 1, +p.day - (Number(p.hour) >= 6 ? 0 : 1), 12));
-    };
+    const opDay = () => new Date(window.UDTiming.operatingDay() + 'T12:00:00Z');
     async function watchBoard() {
       if (!room) return;
       const day = opDay(), key = (n) => new Date(day.getTime() + n * 86400000).toISOString().slice(0, 10);

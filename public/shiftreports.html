@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/reports.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/board-rules.js"></script>
   <script src="js/plant-rules.js"></script>
@@ -66,7 +67,7 @@
     let reports = null, shifts = shiftsFor(null, 'fac_uniontown'), chosen = params.get('id') || '', db = null, unsub = null;
     const dateBox = document.getElementById('date'), shiftBox = document.getElementById('shift');
     dateBox.value = params.get('date') || '';
-    const minutes = (v) => { const t = new Date(v); if (isNaN(t)) return null; const p = new Intl.DateTimeFormat('en-US', { timeZone: L.TIME_ZONE, hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(t); const g = (k) => Number((p.find(x => x.type === k) || {}).value); return g('hour') * 60 + g('minute'); };
+    const minutes = (v) => { const t = new Date(v); return isNaN(t) ? null : window.UDTiming.minuteOfDay(t.getTime()); };
     const shiftOf = (r) => String(shiftAt(minutes(r.at), shifts) || '');
     const nice = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
     const who = (v) => String(v || '').split('@')[0];

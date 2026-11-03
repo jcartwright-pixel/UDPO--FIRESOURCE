@@ -10,6 +10,7 @@
   <title>Late Forecast · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -38,7 +39,7 @@
         <section class="fc-card fc-loads">
           <h2 id="loads-title">Loads still to load</h2>
           <div class="fc-scroll" id="loads"></div>
-          <div class="fc-legend"><span><i class="ok"></i>Est. loading, on time</span><span><i class="late"></i>Est. loading, late</span><span><i class="dep"></i>Dispatch</span><span><i class="now"></i>Now</span><span><i class="left"></i>Left over from last night</span></div>
+          <div class="fc-legend"><span><i class="ok"></i>Est. loading, on time</span><span><i class="late caution"></i>Est. loading, 30 to 60 min late</span><span><i class="late"></i>Est. loading, over 60 min late</span><span><i class="dep"></i>Dispatch</span><span><i class="now"></i>Now</span><span><i class="left"></i>Left over from last night</span></div>
         </section>
         <section class="fc-card fc-times">
           <h2>Loads due by each time</h2>
@@ -67,10 +68,10 @@
     const pick = document.getElementById('due-by');
     pick.innerHTML = DUE_CHOICES.map(m => '<option value="' + m + '"' + (m === dueBy ? ' selected' : '') + '>' + minutes(m) + '</option>').join('');
     pick.onchange = () => { dueBy = Number(pick.value); try { localStorage.setItem('udForecastDueBy', String(dueBy)); } catch (e) { /* this visit only */ } render(); };
-    function minutes(m) { const h = Math.floor(m / 60) % 24, mm = m % 60; return (h % 12 || 12) + ':' + String(mm).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); }
+    const minutes = window.UDTiming.timeText;
     const n = (v) => Number(v || 0).toLocaleString('en-US');
     const e = escapeHtml;
-    const span = (m) => { m = Math.max(0, Math.round(m)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+    const span = window.UDTiming.spanText;
 
     function render() {
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
@@ -92,8 +93,8 @@
       // The loads, each with its Est. Done and a bar on tonight's time line (its est. loading time against its dispatch).
       // The line runs from now to an hour after the last load is done (at least to the 6:00 AM shift end); a dispatch later than
       // that shows as an arrow at the right end.
-      const shiftEnd = f.loads.length ? Math.max(...f.loads.map(z => z.shiftEnd || 0)) : today + 360;
-      const t0 = Math.floor(Math.min(today, ...f.loads.map(z => z.start)) / 60) * 60, t1 = Math.ceil(Math.max(today + 360, shiftEnd + 60, ...f.loads.map(z => z.est + 60)) / 60) * 60;
+      const ROLL = window.UDTiming.DAY_ROLL, shiftEnd = f.loads.length ? Math.max(...f.loads.map(z => z.shiftEnd || 0)) : today + ROLL;
+      const t0 = Math.floor(Math.min(today, ...f.loads.map(z => z.start)) / 60) * 60, t1 = Math.ceil(Math.max(today + ROLL, shiftEnd + 60, ...f.loads.map(z => z.est + 60)) / 60) * 60;
       // Joe 10/22 (practice test): no more than 6 hour labels, so they never run together ("6 AM12 PM6 PM").
       const step = [120, 240, 360, 720, 1440].find(n => (t1 - t0) / n <= 6) || 1440;
       const x = (m) => (100 * (Math.min(Math.max(m, t0), t1) - t0) / (t1 - t0)).toFixed(2) + '%';
@@ -102,7 +103,7 @@
       const head = '<div class="fc-row fc-head"><span>Route</span><span>Run</span><span class="num">Cases</span><span>Depart</span><span>Est. Done</span><span class="fc-line">' +
         ticks.filter(m => m - t0 >= 30 && t1 - m >= 45).map(m => '<i style="left:' + x(m) + '">' + hour(m) + '</i>').join('') + '</span></div>';
       const rows = f.loads.map(z => {
-        const k = z.late ? 'late' : '', dep = z.leaves === null ? '–' : e(when(z.leaves, z.depart, z.departDay));
+        const k = z.late ? (z.tone === 'caution' ? 'late caution' : 'late') : '', dep = z.leaves === null ? '–' : e(when(z.leaves, z.depart, z.departDay));
         // Joe 10/20: last night's left-over loads carry straight on, first in line, marked at the left edge.
         return '<div class="fc-row ' + k + (z.status === 'LOADING' && !z.paused ? ' loading' : '') + (z.priorDay ? ' left' : '') + '"' + (z.priorDay ? ' title="Left over from last night"' : '') + '><b>' + e(U.routeNumber(z.route)) + '</b>' +
           '<span class="fc-run">' + e(U.shortRun(z) || z.run || z.routeName) + (z.status === 'LOADING' && !z.paused ? ' <em class="fc-pill">Loading</em>' : '') + (z.paused ? ' <em class="fc-pill">Paused</em>' : '') + (z.outside ? ' <em class="fc-pill">Outside carrier, not counted late</em>' : '') +
@@ -111,7 +112,7 @@
           '<span class="num">' + (z.noCases ? '–' : n(z.cases)) + '</span><span>' + dep + '</span>' +
           '<span class="fc-est">' + e(when(z.est, z.estText, z.estDay)) + (z.late ? ' &#9888;' : '') + '</span>' +
           '<span class="fc-line">' + ticks.map(m => '<s style="left:' + x(m) + '"></s>').join('') +
-          '<u class="' + (z.late ? 'late' : 'ok') + '" style="left:' + x(z.start) + ';width:calc(' + x(z.est) + ' - ' + x(z.start) + ')"></u>' +
+          '<u class="' + (z.late ? k : 'ok') + '" style="left:' + x(z.start) + ';width:calc(' + x(z.est) + ' - ' + x(z.start) + ')"></u>' +
           // Why it is late, beside its bar (before it when the bar is far right), so the row stays one line.
           (z.late ? '<b class="fc-why" style="' + (parseFloat(x(z.start)) > 100 - parseFloat(x(z.est)) ? 'right:calc(100% - ' + x(z.start) + ' + 6px);max-width:calc(' + x(z.start) + ' - 6px)' : 'left:calc(' + x(z.est) + ' + 6px);max-width:calc(100% - ' + x(z.est) + ' - 6px)') + '" data-short="' + span(z.lateBy) + ' late" title="' + span(z.lateBy) + ' late: ' + e(z.reason) + '">' + e(z.priorDay ? 'left over' : z.reason === 'misses dispatch' ? 'misses dispatch' : 'past 6 AM shift end') + ' · ' + span(z.lateBy) + '</b>' : '') +
           (z.leaves !== null && z.leaves >= t0 && z.leaves <= t1 ? '<em class="dep' + (z.late && z.reason === 'misses dispatch' ? ' late' : '') + '" style="left:' + x(z.leaves) + '"></em>' : '') +

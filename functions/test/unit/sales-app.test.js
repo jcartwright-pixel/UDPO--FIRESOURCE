@@ -38,7 +38,7 @@ test('rows: driver, status, where now from the trailer first, else the truck; de
   assert.deepEqual(yday.map(r => r.route), ['802', '811'], '820 (Ended Up Not Running) left off; 815 (delivers tomorrow) not on');
   assert.deepEqual([yday[0].status, yday[0].where, yday[0].by, yday[0].lat, yday[0].gpsAt], ['On time, left 3:32 AM', 'On the road: I-79 N, Cranberry, PA', 'TRAILER', 40.6, '10:41 AM']);
   // T-102 has no GPS unit: the truck's.
-  assert.deepEqual([yday[1].status, yday[1].where, yday[1].by], ['Left 5:42 AM, 1h 12m late', 'At Giant Eagle 44', 'TRUCK']);
+  assert.deepEqual([yday[1].status, yday[1].where, yday[1].by], ['Left 5:42 AM, 1 hr 12 min late', 'At Giant Eagle 44', 'TRUCK']);
 });
 
 test('where now in words', () => {
@@ -56,9 +56,10 @@ test('where now and status, short for two lines', () => {
   assert.equal(A.cleanAddress('US|21795|Mary Rd [MD-63]'), 'Mary Rd (MD-63), 21795');
   assert.equal(A.cleanAddress('12 Main St, Wheeling, WV'), '12 Main St, Wheeling, WV');
   assert.equal(A.whereOf({ address: 'US|21795|Mary Rd [MD-63]', speedMph: 0 }, [], true), 'Stopped: Mary Rd (MD-63), 21795');
-  assert.equal(A.shortStatus('Left 10:12 AM, 2 hr 12 min late'), 'Left 10:12 AM, 2h 12m late');
-  assert.equal(A.shortStatus('Not departed, 1 hr behind'), 'Not departed, 1h behind');
-  assert.equal(A.shortStatus('Not loaded, 35 min behind'), 'Not loaded, 35m behind');
+  // Joe 11-3-26 (item 5): lengths of time are written one way everywhere ("2 hr 12 min", timing-rules.js), so no shortening.
+  assert.equal(A.shortStatus('Left 10:12 AM, 2 hr 12 min late'), 'Left 10:12 AM, 2 hr 12 min late');
+  assert.equal(A.shortStatus('Not departed, 1 hr behind'), 'Not departed, 1 hr behind');
+  assert.equal(A.shortStatus('Not loaded, 35 min behind'), 'Not loaded, 35 min behind');
   assert.equal(A.shortStatus('On time, left 10:32 AM'), 'On time, left 10:32 AM');
 });
 
@@ -102,12 +103,13 @@ test('Save-A-Lot drop and hook: dropped time, then the truck', () => {
   const late = Date.parse('2026-11-04T01:30:00Z'); // 8:30 PM Tuesday
   const out = A.salesScreen({ runs, reefer, gpsDays: [], routes, units }, late);
   const by = {}; out.groups.find(g => !g.leftover).rows.forEach(r => { by[r.route] = r; });
-  assert.equal(by['855'].status, 'Dropped 3:05 PM, left 2h 12m late');
+  assert.equal(by['855'].status, 'Dropped 3:05 PM, left 2 hr 12 min late');
   assert.equal(by['855'].where, 'Back at the plant');
   assert.equal(by['855'].by, 'TRUCK');
   assert.equal(by['855'].lat, 39.9);
   assert.equal(by['855'].note, 'Trailer dropped at SAL Williamsport at 3:05 PM. Truck: Back at the plant.');
-  assert.equal(by['856'].status, 'Left 9:10 AM, 10m late');
+  // Joe 11-2-26 (timing-rules.js): 10 minutes after its 9:00 AM dispatch is within the 30 minutes on time.
+  assert.equal(by['856'].status, 'On time, left 9:10 AM');
   assert.equal(by['856'].where, 'On the road: I-80 E');
   assert.equal(by['856'].by, 'TRAILER');
   // Only Save-A-Lot: another drop-and-hook route at the same place reads as before.

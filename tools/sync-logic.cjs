@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SHARED_FILES = [
+  'timing-rules.js',     // every timing rule: the clock, 6 AM, leaving time, on time / late (Joe 11-3-26)
   'logic.js',            // dispatch
   'board-rules.js',      // station boards
   'otr-core.js',         // over-the-road fleet

@@ -10,6 +10,7 @@
   <title>Daily Dispatch · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/daily.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -730,7 +731,7 @@
       });
       watchCopied(db, (when) => {
         const at = when ? new Date(when) : null;
-        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + window.UDTiming.clockOf(at) : 'Waiting for the first copy from the sheets';
       });
       watchLists(user, render);
       document.getElementById('prev').onclick = () => move(-1);

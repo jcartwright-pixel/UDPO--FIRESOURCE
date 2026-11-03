@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/plant.css">
   <link rel="stylesheet" href="css/production.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/production-rules.js"></script>
@@ -84,7 +85,7 @@
     if (KINDS.some(k => k[0] === params.get('kind')) || ['BOXING', 'TOTES'].indexOf(params.get('kind')) >= 0) kindFilter = params.get('kind');
     // Joe 10/14: line efficiency is for managers only (not the tablets or the TV).
     const manager = () => !tv && !!person && L.hasRole(person, L.REORDER_ROLES);
-    const clockOf = (iso) => { const x = Date.parse(iso || ''); return isFinite(x) ? new Date(x).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
+    const clockOf = (iso) => { const x = Date.parse(iso || ''); return isFinite(x) ? window.UDTiming.clockOf(x) : ''; };
     const who = (email) => String(email || '').split('@')[0];
     const latest = (v, field) => { const c = (v.run && v.run.checks) || {}; for (const k of Object.keys(c).map(Number).sort((a, b) => b - a)) if (c[k] && String(c[k][field] || '') !== '') return { value: c[k][field], at: c[k].at }; return null; };
     // A line needs attention when it is stopped, has a stop with no reason, is off its speed, more than 10% behind, has a check due or is past its CIP hours.
@@ -109,7 +110,7 @@
       const t = now(), s = data.shift, views = data.lines.map(l => lineView(data, l, t));
       document.getElementById('tv-plant').textContent = plantName(plant).toUpperCase() + ' PRODUCTION';
       document.getElementById('tv-shift').textContent = shiftText(s) + ' · ' + shortDate(s.date);
-      document.getElementById('tv-clock').textContent = new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      document.getElementById('tv-clock').textContent = window.UDTiming.clockOf(t);
       document.getElementById('sub').textContent = plantName(plant) + ' · ' + shiftText(s) + ' · ' + shortDate(s.date);
       const running = views.filter(v => v.state === 'RUNNING').length, stopped = views.filter(v => v.state === 'STOPPED').length, flagged = views.filter(v => v.speedFlag === 'OVER' || v.speedFlag === 'UNDER').length;
       const cos = views.filter(v => v.state === 'CHANGEOVER').length, cips = views.filter(v => v.state === 'CIP').length;
@@ -212,7 +213,7 @@
       // Timeline
       const segs = R.timeline(run, t), total = segs.reduce((n, x) => n + x.minutes, 0) || 1, start = Date.parse(run.shiftStart || ''), stopAt = Date.parse(run.shiftEnd || '');
       const ticks = [];
-      if (start && stopAt) for (let a = Math.ceil(start / 3600000) * 3600000; a <= stopAt; a += 3600000) ticks.push('<span style="left:' + ((a - start) / (stopAt - start) * 100) + '%">' + new Date(a).toLocaleTimeString('en-US', { hour: 'numeric' }) + '</span>');
+      if (start && stopAt) for (let a = Math.ceil(start / 3600000) * 3600000; a <= stopAt; a += 3600000) ticks.push('<span style="left:' + ((a - start) / (stopAt - start) * 100) + '%">' + window.UDTiming.clockOf(a).replace(':00 ', ' ') + '</span>');
       const NAMES = { run: 'Running', stop: 'Stopped', co: 'Changeover', cip: 'CIP / sanitation', brk: 'Break', idle: 'Not started' };
       const tl = segs.length ? '<div class="pd-tl">' + segs.map(x => '<i class="' + x.kind + '" style="width:' + (x.minutes / total * 100) + '%" title="' + (NAMES[x.kind] || 'Still to come') + ' ' + clockOf(x.from) + ', ' + x.minutes + ' min"></i>').join('') + '</div><div class="pd-ticks">' + ticks.join('') + '</div><div class="pd-key">' + Object.keys(NAMES).map(k => '<span><i class="' + k + '"></i>' + NAMES[k] + '</span>').join('') + '</div>' : '<p class="pd-none">Nothing entered on this line this shift.</p>';
       // The fill weight checks (Joe 10/14): each check's product per jug against target, and the giveaway on every jug made.
@@ -334,7 +335,7 @@
       followWeek();
       const from = weekStartOf(), to = L.addDays(from, 6), mgr = manager();
       const W = R.weekScore(weekRuns, data.lines, id => R.targetsFor(data.products[id] || []), data.lineInfo || {}, t);
-      const hrs = (m) => m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
+      const hrs = window.UDTiming.spanText;
       const pctCell = (p) => p === null ? '–' : '<b class="' + (p >= 100 ? 'pd-good' : p >= 90 ? 'pd-due' : 'pd-bad') + '">' + p + '%</b>';
       document.getElementById('hstats').innerHTML = [['Made', fmt(W.lines.reduce((n, x) => n + x.made, 0)), ''], ['Stopped', hrs(W.lines.reduce((n, x) => n + x.downMin, 0)), ''], ['Waste', fmt(W.lines.reduce((n, x) => n + x.wasteTotal, 0)), ''], ['Changeovers', W.lines.reduce((n, x) => n + x.changeovers, 0), '']]
         .map(([l, n, k]) => '<div class="' + k + '"><b>' + n + '</b><span>' + l + '</span></div>').join('');

@@ -666,7 +666,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-pvlist .mc-rt b { overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-pvlist .mc-rt.bad, .manager-page .mc-pvlist .mc-rt.no i, .manager-page .mc-pvlist .mc-pvrow.bad { color: #c62828; }
 .manager-page .mc-pvlist .mc-rt.ok i { color: #1f7a4d; font-weight: 800; }
-.manager-page .mc-pvlist .mc-pvrow.warn { color: #9a5b00; }
+.manager-page .mc-pvlist .mc-pvrow.warn, .manager-page .mc-pvlist .mc-rt.warn { color: #9a5b00; }
 .manager-page .mc-pvlist .mc-pvrow.ok { color: #1f7a4d; }
 .manager-page .mc-pvlist .mc-pvnone { color: var(--muted); }
 /* Long card and tile names wrap instead of being cut off (Joe 10/10 at his window width). */
@@ -704,7 +704,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-report-body li b { flex: 0 0 34%; }
 .manager-page .mc-report-body li span { color: #5b6775; }
 .manager-page .mc-report-body li.bad b, .manager-page .mc-report-body li.bad span { color: #b42318; }
-.manager-page .mc-report-body li.warn span { color: #9a5b00; }
+.manager-page .mc-report-body li.warn b, .manager-page .mc-report-body li.warn span { color: #9a5b00; }
 .manager-page .mc-report-body p { margin: 0; color: #5b6775; }
 .manager-page .mc-routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .manager-page .mc-routes span { display: flex; justify-content: space-between; border-radius: 6px; padding: 7px 9px; font-weight: 800; font-size: 16px; }
@@ -712,7 +712,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-routes span { gap: 8px; }
 .manager-page .mc-routes span b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .manager-page .mc-routes span small { font-size: 16px; font-weight: 600; }
-.manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
+.manager-page .mc-routes .ok { background: #e2f4ea; color: #1f7a4d; } .manager-page .mc-routes .behind { background: #b42318; color: #fff; } .manager-page .mc-routes .caution { background: #f5c518; color: #1c2733; } .manager-page .mc-routes .no { background: #fde8e6; color: #b42318; }
 .manager-page .mc-routes .ok i { color: #b42318; }
 @media (max-width: 1500px) { .manager-page .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: auto; } .manager-page .mc-card, .manager-page .mc-tiles { min-height: auto; } .manager-page .mc-report { grid-row: 1 / span 3; min-height: 360px; }}
 @media (max-width: 760px) {
@@ -1547,6 +1547,8 @@ body.yard-page .head .badge-test { order: 6; }
 .forecast-page .fc-est { font-weight: 800; color: #1d7a3e; white-space: nowrap; }
 .forecast-page .fc-row.late { background: #fde8e8; color: #c62828; }
 .forecast-page .fc-row.late .fc-est { color: #fff; background: #c62828; border-radius: 6px; padding: 1px 6px; justify-self: start; }
+.forecast-page .fc-row.late.caution { background: #fff6d6; color: #7a5200; }
+.forecast-page .fc-row.late.caution .fc-est { color: #1c2733; background: #f5c518; }
 .forecast-page .fc-row.loading { background: #fff8e6; }
 .forecast-page .fc-row.left > b { box-shadow: inset 6px 0 0 #e8a317; padding-left: 14px; }
 .forecast-page .fc-line { position: relative; height: 26px; margin-right: 22px; }
@@ -1556,6 +1558,7 @@ body.yard-page .head .badge-test { order: 6; }
 .forecast-page .fc-line u.ok, .forecast-page .fc-legend i.ok { background: #8fb8de; }
 .forecast-page .fc-line u.late, .forecast-page .fc-legend i.late { background: #e46a6a; }
 .forecast-page .fc-line em { position: absolute; top: 1px; width: 4px; height: 24px; margin-left: -2px; border-radius: 2px; }
+.forecast-page .fc-line u.late.caution, .forecast-page .fc-legend i.late.caution { background: #f5c518; }
 .forecast-page .fc-line em.dep, .forecast-page .fc-legend i.dep { background: var(--ink); }
 .forecast-page .fc-line em.dep.late { background: #c62828; }
 .forecast-page .fc-line .fc-why { position: absolute; top: 2px; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c62828; background: #fde8e8; padding: 0 4px; font-size: 16px; font-weight: 800; }
@@ -1850,3 +1853,7 @@ a.wp-more { color: var(--ud-blue); }
 .sched-page .sc-unknown[hidden] { display: none; }
 .sched-page .sc-unknown select { min-width: 260px; height: 36px; }
 @media (max-width: 760px) { .sched-page .sc-prodsplit { grid-template-columns: 1fr; } .sched-page .sc-suppick { max-height: 200px; } }
+
+/* Joe 11-2-26 (timing-rules.js): a load past its leaving time, yellow up to 60 minutes, red after. */
+.plant-page td.dep-caution { background: #f5c518; color: #1c2733; font-weight: 800; }
+.plant-page td.dep-late { background: #b42318; color: #fff; font-weight: 800; }

@@ -46,6 +46,7 @@
       body.weekly-page .head .actions.in-head { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
     }
   </style>
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
 </head>
@@ -660,7 +661,7 @@
       });
       watchCopied(db, (when) => {
         const at = when ? new Date(when) : null;
-        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : 'Waiting for the first copy from the sheets';
+        document.getElementById('copied').textContent = at ? 'Copied from the sheets at ' + window.UDTiming.clockOf(at) : 'Waiting for the first copy from the sheets';
       });
       document.getElementById('prev').onclick = () => move(-7);
       document.getElementById('next').onclick = () => move(7);

@@ -10,6 +10,7 @@
   <title>Trucks Today · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/issues.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
 </head>
 <body class="fill issues-page trucks-page">
@@ -57,9 +58,9 @@
     // Where each unit is now: js/gps-state.js (shared with the Route Distribution home's Manager card).
     let spotsFor = null, spots = [];
     const key = unitKey, index = () => gpsIndex(gps), state = (t, u) => { if (spotsFor !== gps) { spotsFor = gps; spots = yardSpots(gps); } return truckState(t, u, spots); };
-    const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-    const clock = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
-    const ago = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return isNaN(m) ? '' : m < 1 ? 'now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago' : (m < 2880 ? '1 day ago' : Math.floor(m / 1440) + ' days ago'); };
+    const nyDate = (d) => window.UDTiming.calendarDay(d);
+    const clock = (iso) => window.UDTiming.clockOf(iso);
+    const ago = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return isNaN(m) ? '' : m < 1 ? 'now' : m < 60 ? m + ' min ago' : window.UDTiming.spanText(m) + ' ago'; };
     const timeOfDay = (min) => min === null || min === undefined || min === '' ? '' : L.timeText(min);
 
     // Fleet sends an address as "US|15401|Pennsylvania|Uniontown|Union St": shown as "Union St, Uniontown, PA 15401".
@@ -73,7 +74,7 @@
     const placeCell = (t) => { if (!t) return ''; const a = address(t.address); return escapeHtml(t.place || a) + (t.place && a ? '<small>' + escapeHtml(a) + '</small>' : ''); };
     // Today's miles and first move count from the app's first read that day; when that read came after the morning (the day
     // GPS was turned on) they say so instead of showing a first move that looks wrong.
-    const late = (d) => { if (!d || !d.since) return false; const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date(d.since))); return h >= 5; };
+    const late = (d) => { if (!d || !d.since) return false; return window.UDTiming.minuteOfDay(Date.parse(d.since)) >= 300; };
     const firstMoveCell = (d) => !d ? '' : late(d) ? (d.firstMove && Date.parse(d.firstMove) - Date.parse(d.since) > 15 * 60000 ? clock(d.firstMove) : '<small>before ' + clock(d.since) + '</small>') : d.firstMove ? clock(d.firstMove) : '';
     const milesCell = (d) => !d ? '' : (Number(d.miles) || 0).toLocaleString() + (late(d) ? '<small>since ' + clock(d.since) + '</small>' : '');
     // Joe 10/14 (mock-up B): everything Verizon sent today for the driver's truck, in time order, with the yard leave and return.
@@ -111,8 +112,7 @@
     }
     function span(trip) {
       if (!trip.out) return '';
-      const m = Math.max(0, Math.round(((trip.back ? Date.parse(trip.back) : Date.now()) - Date.parse(trip.out)) / 60000));
-      return (m >= 60 ? Math.floor(m / 60) + ' h ' : '') + (m % 60) + ' m';
+      return window.UDTiming.spanText(((trip.back ? Date.parse(trip.back) : Date.now()) - Date.parse(trip.out)) / 60000);
     }
     const tripCell = (trip, today) => !trip.out ? '<small>not out yet</small>' : span(trip) + '<small>' + (trip.back ? 'back ' + clock(trip.back)
       : nyDate(new Date(trip.out)) !== today ? 'since yesterday' : 'still out') + '</small>';

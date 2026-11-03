@@ -155,10 +155,8 @@ function utcIso(v) {
   if (isNaN(d)) d = new Date(s + ' UTC');
   return isNaN(d) ? '' : d.toISOString();
 }
-function nyDate(iso) {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
-  return p; // yyyy-mm-dd
-}
+// The New York calendar day (yyyy-mm-dd): timing-rules.js's one way.
+function nyDate(iso) { return require('./timing-rules').calendarDay(new Date(iso).getTime()); }
 const num = (v) => { const n = Number(String(v == null ? '' : v).replace(/[^0-9.-]/g, '')); return String(v).trim() !== '' && isFinite(n) ? n : null; };
 const yes = (v) => /^(true|yes|1|on)$/i.test(String(v || '').trim());
 const truckKey = (tag) => safeIdPart(String(tag || '').trim().toUpperCase().replace(/\s+/g, '')) || '';

@@ -31,7 +31,7 @@ function dayDates(run, prefix, day) {
   const i = L.DAYS.indexOf(prefix);
   if (i < 0 || !L.isDateKey(run.weekStart)) return [];
   const delivery = L.addDays(run.weekStart, i);
-  const offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : Number(day.loadDayOffset);
+  const offset = L.loadDayOffset(day.loadDayOffset);
   // Joe 10/20: Save-A-Lot's Tuesday load date read 1-1-70 on the Live sheet, so its dates started in 1970 and it was left off
   // Manager Center and the shift report. A date more than a week from the delivery is a bad cell and is left out.
   const near = (k) => k >= L.addDays(delivery, -7) && k <= L.addDays(delivery, 7);

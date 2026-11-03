@@ -10,6 +10,7 @@
   <title>Route Distribution · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/distribution.css">
+  <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/sc-core.js"></script>
 </head>
@@ -62,7 +63,7 @@
     const L = window.UDLogic;
     const today = L.operatingDay(new Date());
     const data = { runs: [], drivers: [], equipment: [], routes: [], vacations: [], exceptions: [], conflicts: 0, writeBack: false, app: {}, gps: [], alerts: [], review: 0 };
-    const nyDate = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    const nyDate = (d) => window.UDTiming.calendarDay(d);
 
     // Numbers update the moment anything changes in the database (no reload, no 30-second checks).
     function render() {
@@ -136,7 +137,7 @@
       });
       watchCopied(db, (when) => {
         const at = when ? new Date(when) : null;
-        const tz = { timeZone: 'America/New_York' }, sameDay = at && at.toLocaleDateString('en-US', tz) === new Date().toLocaleDateString('en-US', tz);
+        const sameDay = at && window.UDTiming.calendarDay(at) === window.UDTiming.calendarDay();
         document.getElementById('copied').textContent = at ? 'Last Sync: ' + (sameDay ? '' : shortDate(at) + ' ') + shortTime(at) : 'Waiting for the first copy';
       });
     });

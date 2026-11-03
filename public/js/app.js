@@ -1453,10 +1453,11 @@ export function optionTag(value, current, label, opts) {
 // Review item 76 (Joe 10/13): minutes as hours and minutes, blank for no number. Each screen keeps its own look: unit is the
 // word after the minutes ('min', or 'm'), short the word under an hour (the unit when left out), pad writes the minutes past
 // the hour with two digits (1 h 05), hoursFrom is where hours start (60 minutes when left out).
-export function hoursMinutesText(m, opts) {
-  const o = opts || {}, unit = o.unit || 'min';
-  if (m === null || m === undefined) return '';
-  return m >= (o.hoursFrom || 60) ? Math.floor(m / 60) + ' h ' + (o.pad ? String(m % 60).padStart(2, '0') : m % 60) + ' ' + unit : m + ' ' + (o.short || unit);
+// Joe 11-3-26 (item 5): every length of time is written one way now, "1 hr 12 min" (timing-rules.js spanText); opts are kept so
+// the callers stay as they were, but no longer change the look.
+export function hoursMinutesText(m, opts) { // eslint-disable-line no-unused-vars
+  if (m === null || m === undefined || m === '' || !isFinite(Number(m))) return '';
+  return window.UDTiming.spanText(m);
 }
 
 // Review item 76 (Joe 10/13): prints a page of HTML from a hidden frame, so the screen stays where it is. opts.id names the
@@ -1496,10 +1497,7 @@ export function shortDate(key) { return shortDay(key); }
 // A date with its time, like 10-8-26 1:20 PM, for stamps where the time matters (when a check or a change was made).
 export function dateTimeText(v) { const d = shortDay(v instanceof Date || typeof v === 'number' ? v : new Date(v)), t = shortTime(v); return t ? d + ' ' + t : d; }
 // The time alone, like 1:20 PM, in plant time.
-export function shortTime(v) {
-  const t = v instanceof Date ? v : new Date(v);
-  return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
-}
+export function shortTime(v) { return window.UDTiming.clockOf(v); }
 
 // A cell marked .no-fit is left as it is (Joe 10/26: a machine's product names stay on one line; the table scrolls instead).
 // Shrink to fit (Joe, 10/9): a table cell whose text is too long for it gets a little smaller print, so names and values are

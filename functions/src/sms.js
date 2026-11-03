@@ -371,7 +371,7 @@ const TEST_TEXT = 'United Dairy: this is a test text from Operations. No need to
 const ASK = 'United Dairy work texts: your schedule when it is posted and when your load is done, with any pickups. Reply YES to get them. Reply STOP to stop.';
 const sampleMessage = () => doneMessage({ route: '801', run: 'UT DSD MILK', trailer: 'T-901', cases: 1200, pickupText: '2 crates chocolate milk' });
 // Loads finished longer ago than this are never texted (a load marked done late, or the switch turned back On days later).
-const DONE_WINDOW_MS = 12 * 3600 * 1000;
+const DONE_WINDOW_MS = require('./timing-rules').TIMERS.textsDoneHours * 3600 * 1000;
 
 /* The minute job: each load the plant finished today for a ticked driver gets one text. Returns what it did, or null. */
 async function loadDoneCheck(db, options) {

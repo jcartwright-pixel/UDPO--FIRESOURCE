@@ -17,9 +17,9 @@
  *     regular route must be on Routes, a Route Days row's route too, a product's line on Lines, and so on.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDUpload = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'));
+  else root.UDUpload = factory(root.UDTiming);
+})(typeof self !== 'undefined' ? self : this, function (T) {
   var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   var YN = ['Yes', 'No'];
   var ROLES = ['Viewer', 'Employee', 'Driver', 'Driver Check-In', 'Plant Employee', 'Mechanic', 'Dispatcher', 'Supervisor', 'Manager', 'Administrator'];
@@ -279,15 +279,10 @@
     if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d || y < 1950 || y > 2100) return null;
     return y + '-' + pad(mo) + '-' + pad(d);
   }
+  // A time from a sheet as HH:MM ("4:30 PM", "16:30", "1630", a fraction of a day): timing-rules.js's one time fixer.
   function timeOf(t) {
-    var m = /^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([AaPp])\.?\s*[Mm]?\.?$/.exec(t), h, mi;
-    if (m) { h = +m[1]; mi = +(m[2] || 0); if (h < 1 || h > 12) return null; h = h % 12 + (/[Pp]/.test(m[3]) ? 12 : 0); }
-    else if ((m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(t))) { h = +m[1]; mi = +m[2]; }
-    else if ((m = /^(\d{2})(\d{2})$/.exec(t))) { h = +m[1]; mi = +m[2]; }
-    else if (/^0?\.\d+$/.test(t)) { var mins = Math.round(Number(t) * 1440); h = Math.floor(mins / 60) % 24; mi = mins % 60; }
-    else return null;
-    if (h > 23 || mi > 59) return null;
-    return pad(h) + ':' + pad(mi);
+    if (/^0?\.\d+$/.test(t)) { var m = T.clockMinutes(Number(t)); return m === null ? null : T.hhmm(m); }
+    return T.hhmmOf(t) || null;
   }
   function choiceOf(t, list) {
     var u = upper(t), hit = null;

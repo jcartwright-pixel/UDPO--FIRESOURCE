@@ -18,7 +18,7 @@ test('statuses: trailer GPS first, the truck only when the trailer has none, lat
     run('c', '809', 'Greensburg', { dispatchTime: 325, trailer: 'T-103', truck: '503', completeTime: iso('2026-11-03T04:00:00') }),
     run('d', '813', 'Cumberland', { dispatchTime: 390, trailer: 'T-104', truck: '504', completeTime: iso('2026-11-03T05:00:00') }),
     run('e', '815', 'Johnstown', { dispatchTime: 420, trailer: 'T-105', truck: '505' }),
-    run('f', '817', 'Altoona', { dispatchTime: 340, trailer: 'T-106', truck: '506', plantStartedAt: iso('2026-11-03T05:30:00') }),
+    run('f', '817', 'Altoona', { dispatchTime: 320, trailer: 'T-106', truck: '506', plantStartedAt: iso('2026-11-03T05:30:00') }),
     run('g', '820', 'Beaver Falls', { runs: false, dispatchTime: 300 }),
     run('h', '822', 'Clarksburg', { dispatchTime: 60, trailer: 'T-108', truck: '508', completeTime: iso('2026-11-02T23:00:00') })
   ];
@@ -45,13 +45,29 @@ test('statuses: trailer GPS first, the truck only when the trailer has none, lat
     811: 'Left 5:42 AM, 1 hr 12 min late',
     813: 'Loaded',
     815: 'Not loaded',
-    817: 'Not loaded, 20 min behind',
+    817: 'Not loaded, 40 min behind',
     822: 'On time, left 1:03 AM'
   });
+  // Joe 11-2-26 (timing-rules.js): 30 to 60 minutes off is yellow, past 60 red.
+  const tone = Object.fromEntries(out.groups[0].rows.map(r => [r.route, r.tone]));
+  assert.deepEqual([tone['802'], tone['809'], tone['811'], tone['817']], ['ok', 'caution', 'late', 'caution']);
   assert.deepEqual(out.groups[0].rows.map(r => r.route), ['802', '809', '811', '813', '815', '817', '822'], 'route order; 820 (Ended Up Not Running) left off');
 });
 
-test('a leave inside the 5-minute GPS read counts on time; a trailer trip for another load is not this load', () => {
+// Joe 11-2-26 ("the route can start 1/2 hour before or 1/2 hour after … cautious yellow"): within 30 minutes either side of
+// dispatch is on time, 30 to 60 minutes early or late is yellow, more than 60 is red.
+test('a leave within 30 minutes either side counts on time; early and late past that are yellow, then red', () => {
+  const runs = [run('a', '804', 'Wheeling', { dispatchTime: 240, trailer: 'T-201', truck: '601', completeTime: iso('2026-11-03T02:00:00') })];
+  const left = (hm) => S.salesRows({ runs, reefer: { 'T-201': { id: 'a|tue', unitId: 'U', out: iso('2026-11-03T' + hm + ':00') } }, gpsDays: [] }, SIX_TUE).groups[0].rows[0];
+  assert.deepEqual([left('04:30').status, left('04:30').tone], ['On time, left 4:30 AM', 'ok']);
+  assert.deepEqual([left('03:30').status, left('03:30').tone], ['On time, left 3:30 AM', 'ok']);
+  assert.deepEqual([left('04:45').status, left('04:45').tone], ['Left 4:45 AM, 45 min late', 'caution']);
+  assert.deepEqual([left('03:15').status, left('03:15').tone], ['Left 3:15 AM, 45 min early', 'caution']);
+  assert.deepEqual([left('05:01').status, left('05:01').tone], ['Left 5:01 AM, 1 hr 1 min late', 'late']);
+  assert.deepEqual([left('02:50').status, left('02:50').tone], ['Left 2:50 AM, 1 hr 10 min early', 'late']);
+});
+
+test('a leave a few minutes after dispatch counts on time; a trailer trip for another load is not this load', () => {
   const runs = [run('a', '804', 'Wheeling', { dispatchTime: 240, trailer: 'T-201', truck: '601', completeTime: iso('2026-11-03T02:00:00') })];
   let r = S.salesRows({ runs, reefer: { 'T-201': { id: 'a|tue', unitId: 'U', out: iso('2026-11-03T04:05:00') } }, gpsDays: [] }, SIX_TUE);
   assert.equal(r.groups[0].rows[0].status, 'On time, left 4:05 AM');

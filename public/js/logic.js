@@ -9,16 +9,17 @@
  * The browser copy, public/js/logic.js, is written by `npm run sync-logic`; a test fails if the two differ.
  */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.UDLogic = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./timing-rules'));
+  else root.UDLogic = factory(root.UDTiming);
+})(typeof self !== 'undefined' ? self : this, function (T) {
   'use strict';
 
   // Live week tabs run Sunday to Saturday, with these column prefixes.
   var DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  var TIME_ZONE = 'America/New_York';
-  var DAY_ROLL_HOUR = 6;
+  // The clock, the 6 AM day change and typed times live in timing-rules.js (Joe 11-3-26: one place for every timing rule).
+  var TIME_ZONE = T.TIME_ZONE;
+  var DAY_ROLL_HOUR = T.DAY_ROLL_HOUR;
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -63,14 +64,8 @@
   function weekStart(key) { return addDays(key, -dayIndex(key)); }
   function daysBetween(fromKey, toKey) { return Math.round((keyToUtcNoon(toKey) - keyToUtcNoon(fromKey)) / 86400000); }
 
-  // The plant's operating day rolls at 6:00 AM New York time: at 5:59 AM it is still yesterday.
-  function operatingDay(now) {
-    var parts = {};
-    new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
-      .formatToParts(now || new Date()).forEach(function (p) { parts[p.type] = p.value; });
-    var key = parts.year + '-' + parts.month + '-' + parts.day;
-    return Number(parts.hour) >= DAY_ROLL_HOUR ? key : addDays(key, -1);
-  }
+  // The plant's operating day rolls at 6:00 AM New York time: at 5:59 AM it is still yesterday (timing-rules.js).
+  function operatingDay(now) { return T.operatingDay(now); }
 
   // The New York calendar day of a saved time ("2026-10-11T01:30:00Z" is 10/10 at 9:30 PM), or a plain yyyy-mm-dd as it is.
   // Screens count "this week" and "this month" by this day, not by the UTC date the time is stored in.
@@ -79,9 +74,7 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     var t = Date.parse(s);
     if (!s || !isFinite(t)) return '';
-    var parts = {};
-    new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t)).forEach(function (p) { parts[p.type] = p.value; });
-    return parts.year + '-' + parts.month + '-' + parts.day;
+    return T.calendarDay(t);
   }
 
   // Joe 10/13 ("No route equals no driver"): what a day marked not running gives up, so the driver and units are free that day.
@@ -124,42 +117,18 @@
     return route && route.sleeper ? 'Load Day' : 'Delivery Day';
   }
 
-  // Times come as 4:00:00 AM, 16:30, or a fraction of a day. Returns minutes after midnight, or null.
+  // Times come as 4:00:00 AM, 16:30, or a fraction of a day. Returns minutes after midnight, or null (timing-rules.js clockMinutes;
+  // a plain number other than a fraction of a day is not a time here).
   function minutesOfDay(value) {
-    if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'number') return value > 0 && value < 1 ? Math.round(value * 1440) % 1440 : null;
-    var m = String(value).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?$/);
-    if (!m) return null;
-    var h = +m[1], min = +m[2], ampm = (m[4] || '').toUpperCase();
-    if (min > 59 || h > 23 || (ampm && (h < 1 || h > 12))) return null;
-    if (ampm === 'PM' && h < 12) h += 12;
-    if (ampm === 'AM' && h === 12) h = 0;
-    return h * 60 + min;
+    return T.clockMinutes(value);
   }
 
-  function timeText(minutes) {
-    if (minutes === null || minutes === undefined) return '';
-    var h = Math.floor(minutes / 60), m = minutes % 60, ampm = h >= 12 ? 'PM' : 'AM';
-    return ((h % 12) || 12) + ':' + pad(m) + ' ' + ampm;
-  }
+  // 4:30 PM: the one way a time is shown (timing-rules.js).
+  function timeText(minutes) { return T.timeText(minutes); }
 
-  // A time typed (or pasted) into a Route Editor box, the way people type it (Joe 10/20): 5, 530, 0530, 5:30, 5a, 5p, 5:30pm,
-  // 5:30 p.m., 17:30, 1730, 4:00:00 AM. Returns minutes after midnight, or null when it is not a time. With no AM / PM and an
-  // hour from 1 to 12 it is AM, unless the box held a PM time (wasMinutes, minutes after midnight) - then it stays PM.
-  function typedTime(text, wasMinutes) {
-    var t = String(text == null ? '' : text).trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, '');
-    var m = t.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?(a|p|am|pm)?$/) || t.match(/^(\d{1,2})(\d{2})(a|p|am|pm)?$/);
-    if (!m) return null;
-    var h = +m[1], min = m[2] === undefined ? 0 : +m[2], ap = m[3] ? m[3].charAt(0) : '';
-    if (min > 59 || h > 23) return null;
-    if (ap) {
-      if (h < 1 || h > 12) return null;
-      return (h % 12 + (ap === 'p' ? 12 : 0)) * 60 + min;
-    }
-    if (h === 0 || h > 12 || /^0\d/.test(t)) return h * 60 + min;
-    var pm = typeof wasMinutes === 'number' && wasMinutes >= 720;
-    return (h % 12 + (pm ? 12 : 0)) * 60 + min;
-  }
+  // A time typed (or pasted) the way people type it, 430p = 4:30 PM: the one time fixer (timing-rules.js typedTime).
+  function typedTime(text, wasMinutes) { return T.typedTime(text, wasMinutes); }
 
   // Daily Dispatch and the drivers' phone, as the current app reads a Live row (udpoV780VisibleBase_): the run must be ACTIVE, the
   // Live row's flag decides, a blank flag takes Route Master's, and blank in both is hidden. A run copied before Route Master's
@@ -369,7 +338,7 @@
     DAYS.forEach(function (prefix) {
       var day = run.days && run.days[prefix];
       if (!day || !day.runs) return;
-      var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
+      var offset = T.loadDayOffset(day.loadDayOffset);
       var deliveryDate = addDays(loadDate, -offset);
       if (dayPrefix(deliveryDate) !== prefix) return;
       // The delivery day must be inside the Live week this row belongs to.
@@ -1034,7 +1003,7 @@
       DAYS.forEach(function (prefix) {
         var day = run.days && run.days[prefix];
         if (!day || day.runs) return;
-        var offset = day.loadDayOffset === null || day.loadDayOffset === undefined ? -1 : day.loadDayOffset;
+        var offset = T.loadDayOffset(day.loadDayOffset);
         var deliveryDate = addDays(loadDate, -offset);
         if (dayPrefix(deliveryDate) !== prefix || weekStart(deliveryDate) !== run.weekStart) return;
         rows.push({ id: run.id + '|' + prefix, runDocId: run.id, day: prefix, route: run.route, routeName: run.routeName || '', run: run.run, routeRunType: run.routeRunType || '', deliveryDate: deliveryDate, rev: run.rev || 0 });
@@ -1399,7 +1368,7 @@
     var days = {};
     DAYS.forEach(function (p, i) {
       var rd = (route.days && route.days[p]) || {}, date = addDays(week, i), box = boxLoadRun(route);
-      var offset = rd.loadDayOffset === null || rd.loadDayOffset === undefined || rd.loadDayOffset === '' ? -1 : Number(rd.loadDayOffset);
+      var offset = T.loadDayOffset(rd.loadDayOffset);
       var day = { runs: box ? !!(ctx.plant && ctx.plant[route.id + '|' + date]) : !!rd.active, loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
         deliveryDate: date, dispatchDate: date, departureDate: date, loadDate: addDays(date, offset),
         dispatchTime: rd.dispatchTime === undefined ? null : rd.dispatchTime, startTime: rd.dispatchTime === undefined ? null : rd.dispatchTime,
@@ -1657,6 +1626,8 @@
     yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
-    weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows
+    weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows,
+    // timing-rules.js: a blank Load Day is 1 day before delivery
+    loadDayOffset: T.loadDayOffset, calendarDay: function (now) { return T.calendarDay(now); }
   };
 });

@@ -111,7 +111,7 @@ async function mailReport(ref, report, deps) {
     // Each picture in the email with its caption under it (Joe 10/23), the plain-text version listing the captions.
     const words = pics.attachments.length + ' walkthrough picture' + (pics.attachments.length === 1 ? '' : 's') + ' attached' + (pics.left ? ' (' + pics.left + ' more go with the next report)' : '') + '.';
     const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const when = (a) => { const t = Date.parse(a.takenAt); return isFinite(t) ? new Date(t).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) : ''; };
+    const when = (a) => require('./timing-rules').clockOf(a.takenAt);
     body = body + '\n\nWALKTHROUGH PICTURES\n' + pics.attachments.map((a, i) => (i + 1) + '. ' + (a.note || 'No caption') + (when(a) ? ' (' + when(a) + ')' : '')).join('\n') + '\n' + words;
     html = html.replace(/<\/body>/i, '<div style="font:16px Arial,sans-serif;color:#33475b;margin:20px 0"><h2 style="font:bold 18px Arial,sans-serif;color:#0b4f8a;margin:0 0 10px">WALKTHROUGH PICTURES (' + pics.attachments.length + ')</h2>' +
       pics.attachments.map((a, i) => '<div style="margin:0 0 18px"><img src="cid:' + esc(a.contentId) + '" alt="Picture ' + (i + 1) + '" style="display:block;max-width:100%;width:560px;height:auto;border:1px solid #c7d3de;border-radius:6px">' +
