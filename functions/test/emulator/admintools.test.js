@@ -65,11 +65,18 @@ test('Repair Email: the Lessor button emails after the save, and says why not wh
   const input = { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'PENSKE' };
   const res = await T.afterSave(db(), DISPATCHER, input, await applyAction(db(), DISPATCHER, input), mailDeps([]));
   assert.match(res.message, /Email is turned off for Penske/);
+  // Joe 11/4 (224001): the red lessor on Truck Issues keeps why it did not go.
+  let row = L.issueRows(await records(), 'TRUCK')[0];
+  assert.equal(row.emailed, false);
+  assert.match(row.emailWhy, /^Email is turned off for Penske/);
   await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'SEND' } } });
   const sent = [];
   const again = await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, 'Please call', mailDeps(sent));
   assert.equal(again.status, 'SENT');
   assert.match(sent[0].text, /Manager note:\nPlease call/);
+  row = L.issueRows(await records(), 'TRUCK')[0];
+  assert.equal(row.emailed, true);
+  assert.equal(row.emailWhy, '', 'sent after the failure: no reason shown');
 });
 
 test('Repair Email (Joe 10/25): Lessor again sends an email that never went; owned units are never emailed; each save keeps what it replaced', async () => {
@@ -409,6 +416,7 @@ test('Repair Email: when the Lessor email fails, the save still answers ok with 
   assert.equal(res.email, 'FAILED');
   assert.match(res.message, /^Saved\. The lessor email did not go: .*mail server down/);
   assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Sent to lessor PENSKE/, 'the save is kept');
+  assert.match(L.issueRows(await records(), 'TRUCK')[0].emailWhy, /mail server down/);
   // A fault while sending (here the mail step's clock throws) does not fail the save either.
   const broken = { env: { MAIL_FROM: 'joe@uniteddairy.com' }, sendMail: async () => ({ to: [] }), now: () => { throw new Error('clock fault'); } };
   const res2 = await T.afterSave(db(), DISPATCHER, input, saved, broken);

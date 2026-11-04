@@ -349,6 +349,18 @@
     while ((m = re.exec(String(notes || '')))) last = m;
     return last && !/Z$/.test(last[1]) ? last : null;
   }
+  // Joe 11/4 (224001): why the last lessor email did not go ("Repair email not sent <time>: <why>"), when nothing was sent after
+  // it, and whether it is waiting for the lessor's once-a-day email instead.
+  function repairEmailWhy(notes) {
+    var t = String(notes || ''), at = t.lastIndexOf('Repair email not sent '), sent = t.lastIndexOf('Repair email sent ');
+    if (at < 0 || sent > at) return '';
+    var m = /^Repair email not sent \S+: ([^\n]*)/.exec(t.slice(at));
+    return m ? m[1].trim() : '';
+  }
+  function repairEmailQueued(notes) {
+    var t = String(notes || ''), at = t.lastIndexOf('Repair email queued for the daily digest');
+    return at >= 0 && at > t.lastIndexOf('Repair email sent ') && at > t.lastIndexOf('Repair email not sent ');
+  }
   function issueRows(records, kind, nowMs) {
     var DAY = 86400000;
     var copies = (records || []).filter(function (r) { return r && String(r.kind || '').toUpperCase() === kind; }).map(function (r) {
@@ -364,7 +376,7 @@
       return { id: r.id || r.record_id, recordId: r.record_id, report: issueReportKey(r), unit: unit, unitKey: issueUnitKey(unit), driver: r.driver || '', route: r.route_id || '',
         reported: reported, openedMs: isFinite(opened) ? opened : 0, completedMs: isFinite(done) ? done : 0,
         text: text, status: status, needsReview: status === 'NEEDS_REVIEW' || !text, reviewed: !!reviewed, reviewedBy: reviewed ? reviewed[1] : '',
-        emailed: !!sent, emailedAt: sent ? sent[1] : '', emailBlank: !sent && /Repair email sent \S+ to/.test(notes), atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
+        emailed: !!sent, emailedAt: sent ? sent[1] : '', emailBlank: !sent && /Repair email sent \S+ to/.test(notes), emailWhy: sent ? '' : repairEmailWhy(notes), emailQueued: !sent && repairEmailQueued(notes), atGarage: !!garage, garageAt: garage ? garage[1] : '', garageBy: garage ? garage[2].trim() : '',
         toLessor: !!lessor, lessor: lessor ? lessor[1].trim() : '', lessorAt: lessor ? lessor[2] : '', lessorBy: lessor ? lessor[3].trim() : '',
         done: ISSUE_DONE.test(status), occurrences: 1,
         // Where it came from, for the View link: the answering-service email (its message id opens the stored copy in mailCopies)

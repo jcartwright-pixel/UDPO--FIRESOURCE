@@ -483,10 +483,12 @@ Driver, date reported, what's wrong, how many times it was reported, reviewed, e
 
 1. `View` reads the whole write-up (or the original email).
 2. Tick **Reviewed** once you have read it.
-3. `Garage` sends it to our garage as a work order. `Lessor` emails it to the leasing company (Idealease trucks). Under **Emailed** it shows green once the email went and red while it has not.
+3. `Garage` sends it to our garage as a work order. `Lessor` emails it to the leasing company (Idealease trucks). Under **Emailed** it shows green once the email went, amber while it waits for the lessor's once-a-day email, and red when it did not go. A red one says why underneath (for example, email turned off, or no address set for that lessor). Fix that, then press `Lessor` again.
 4. `Repaired` closes it once it is fixed. `Remove` takes off a write-up that was a mistake (press it twice).
 
 > The same problem reported 2 or 3 times shows as one line with a count. Repaired and Remove close every copy.
+
+> A red lessor that says "Outbound email is turned off" or "has no email address yet" is fixed in the Hub under Email & Texts. Any other reason: ask an administrator.
 
 !> Do not mark a write-up Repaired before the unit is really fixed. It drops off the list and off the driver's next check.
 
