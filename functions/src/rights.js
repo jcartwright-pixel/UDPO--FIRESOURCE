@@ -129,6 +129,19 @@ const ACTION_RIGHT = Object.freeze({
   saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write'
 });
 
+// Rights added after Role Templates could be saved, with when (11-4-26). A role template saved before then never saw them, so
+// it gets the role's standard for them (Managers keep editing in Customers & Routes); one saved after decides for itself.
+const NEW_RIGHTS = Object.freeze({ 'customers.edit': '2026-11-04T06:00:00.000Z', 'customers.import': '2026-11-04T06:00:00.000Z' });
+function withNewRights(templates, meta) {
+  const out = {};
+  Object.keys(templates || {}).forEach(role => {
+    const list = Array.isArray(templates[role]) ? templates[role].slice() : templates[role], at = String((meta && meta[role] && meta[role].updatedAt) || '');
+    if (Array.isArray(list)) Object.keys(NEW_RIGHTS).forEach(c => { if (at < NEW_RIGHTS[c] && (DEFAULTS[normRole(role)] || []).indexOf(c) >= 0 && list.indexOf(c) < 0) list.push(c); });
+    out[role] = list;
+  });
+  return out;
+}
+
 // templates: { ROLE: [codes] } saved in Role Templates (a role not there keeps its defaults).
 function templateFor(role, templates) {
   const r = normRole(role);
@@ -218,4 +231,4 @@ function screenSaveAllowed(person, action, exceptions, plantId) {
   return screens.some(k => mine.indexOf(k) >= 0);
 }
 
-module.exports = { CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson, ACTION_SCREENS, cleanScreenAccess, screenSaveAllowed };
+module.exports = { NEW_RIGHTS, withNewRights, CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson, ACTION_SCREENS, cleanScreenAccess, screenSaveAllowed };

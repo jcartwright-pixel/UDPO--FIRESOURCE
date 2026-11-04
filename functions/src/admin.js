@@ -59,7 +59,7 @@ async function templatesOf(db) {
   const d = (await db.collection('private').doc('roleTemplates').get()).data() || {};
   // Roles added in Administration (Add Role) live next to the standard ones.
   const custom = (d.customRoles || []).filter(r => R.ROLES.indexOf(r) < 0);
-  return { templates: d.templates || {}, meta: d.meta || {}, custom, roles: R.ROLES.concat(custom) };
+  return { templates: R.withNewRights(d.templates || {}, d.meta || {}), meta: d.meta || {}, custom, roles: R.ROLES.concat(custom) };
 }
 
 /* ---------- People & Roles ---------- */
@@ -171,7 +171,7 @@ async function saveRoleTemplate(db, email, input, stamp) {
   if (rights.some(c => R.ASSIGNABLE.indexOf(c) < 0 && c !== 'audit.read')) fail('BAD_REQUEST', 'That right cannot go in a role template (Administrator only).');
   const ref = db.collection('private').doc('roleTemplates');
   return db.runTransaction(async tx => {
-    const d = (await tx.get(ref)).data() || {}, templates = Object.assign({}, d.templates || {}), meta = Object.assign({}, d.meta || {});
+    const d = (await tx.get(ref)).data() || {}, templates = R.withNewRights(d.templates || {}, d.meta || {}), meta = Object.assign({}, d.meta || {});
     const now = R.templateFor(role, templates);
     if (JSON.stringify((input.expected || []).slice().sort()) !== JSON.stringify(now.slice().sort())) fail('CHANGED', 'Someone changed this role since you opened it. Reload before saving.');
     const ordered = R.CATALOG.map(c => c.code).filter(c => rights.indexOf(c) >= 0);
