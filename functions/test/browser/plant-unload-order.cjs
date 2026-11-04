@@ -88,6 +88,10 @@ async function openPage(browser, width, height, url, touch) {
       await p.waitForSelector('#work .sw-card.road');
       // Route Master (the Drop and Hook tick) is read on its own, after the loads: wait for the transfer card it makes.
       await p.waitForSelector('#work .sw-card .sw-chips i.tt');
+      // The cards can be drawn before stations.css has been applied under a busy emulator (the rare "big type" miss at the size
+      // check below): wait for the page's styles, so the size is read from the screen as people see it. A wrong size still fails.
+      await p.waitForFunction(() => { const t = document.querySelector('#work .sw-trailer'); return t && parseFloat(getComputedStyle(t).fontSize) >= 26; }, null, { timeout: 15000 })
+        .catch(() => {});
       const cards = await p.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => ({
         key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
         title: c.querySelector('.sw-title b').textContent, chips: c.querySelector('.sw-chips').textContent, badge: c.querySelector('.sw-head .sw-badge').textContent,

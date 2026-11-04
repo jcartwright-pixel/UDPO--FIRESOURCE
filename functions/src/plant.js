@@ -313,8 +313,8 @@ async function loadValues(tx, db, req, day, stamp, SaveError, run) {
       if (/^T\.?B\.?A\.?$/i.test(String(f[k]).trim())) { after[k] = 'TBA'; after[idField] = ''; return; }
       const u = MAINT.resolveUnit(f[k], type, equipment);
       if (f.assign) assignCheck(f[k], u, equipment, run, req.day, stamp, SaveError);
-      // A number no unit matches is kept as typed, the same as the current app.
-      after[k] = type === 'TRAILER' && !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit;
+      // A unit no Equipment Master row matches is kept as typed; a trailer number follows the one trailer rule (T-14, never T-014).
+      after[k] = type === 'TRAILER' ? typedTrailer(u) : u.unit;
       after[idField] = u.id;
     });
   }
@@ -888,7 +888,7 @@ async function saveSchedule(tx, db, req, email, stamp, logRef, mode, SaveError) 
     if (pick.length !== 1) throw new SaveError('CONFLICT', (req.lane === 'RECEIVING' ? 'That supplier' : 'That route / run') + ' is no longer on the list. The list was refreshed; pick again.');
     if (pick[0].route !== req.route || pick[0].run !== req.run) throw new SaveError('CONFLICT', 'Route Master changed that run. The list was refreshed; pick again.');
     let trailer = req.trailer;
-    if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = !u.resolved && /^\d+$/.test(u.unit) ? 'T-' + u.unit : u.unit; }
+    if (trailer) { const u = MAINT.resolveUnit(trailer, 'TRAILER', equipment); trailer = typedTrailer(u); }
     const payload = { pickupTime: req.pickupTime, loadDate: req.loadDate, trailer, scheduleType: req.scheduleType, carrier: req.scheduleType === 'CARRIER', poNumber: req.poNumber,
       cases: req.cases, product: req.product, notes: req.notes };
     // Save Load keeps what the station did on the load (its Start, End, count): changing the load's boxes does not start it over.
@@ -1479,6 +1479,11 @@ async function savePlantShifts(tx, db, req, email, stamp, logRef, mode, SaveErro
   return result;
 }
 
+// A trailer as saved on a load: the Equipment Master unit when one matches, otherwise the typed number, both through the one
+// trailer rule (logic.js trailerNumber, rules audit line 12): 014, T014 and T-014 all save as T-14, even when Equipment Master
+// spells the unit "T-014" (6.84 practice re-test).
+function typedTrailer(u) { return L.trailerNumber(u.unit); }
+
 module.exports = { runAreaOf, dayLoadingNow, scheduledForRun, followRun, productSetupOf, validatePlantShifts, savePlantShifts, validateMachineProducts, saveMachineProducts, validateProductSetup, saveProductSetup, validateProductUpload, saveProductUpload, validateProductSheet, saveProductSheet, validateReport, sendReport, validateTemperature, saveTemperature, validateShiftNote, saveShiftNote, validateQuality, saveQuality, parseSetup, parseLineStatus, validateYard, saveYard, PLANT_ROLES, AREAS, areaOf, JOURNAL_TYPES, PICKUP_HEADERS, PLANT_LISTS, SETUP_LISTS, parseJournal, parsePickups, parseQueueTab, readPlant,
   validateLoad, loadValues, validatePickup, savePickup, validateUnload, saveUnload, ADDED_ROUTE, validateReturn, saveReturn, UNKNOWN_ROUTE, validateWash, saveWash, checkinReturnId, appUnloadId,
-  validateSchedule, saveSchedule, appScheduleId };
+  validateSchedule, saveSchedule, appScheduleId, typedTrailer };

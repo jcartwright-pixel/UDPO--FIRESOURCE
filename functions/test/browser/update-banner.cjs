@@ -118,8 +118,15 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
       });
       if (phone) {
         assert.match(look.text, /^Last refreshed \d{1,2}-\d{1,2}-\d\d \d{1,2}:\d\d [AP]M$/, name + ': a phone shows only when the screen last refreshed (' + look.text + ')');
-        // A fresh answer from the server moves the time on.
-        await p.evaluate(() => { window.UDReads.freshAt = Date.now() + 3 * 60000; window.dispatchEvent(new CustomEvent('ud-refreshed')); });
+        // A fresh answer from the server moves the time on. The screen's own reads keep answering meanwhile, and each one
+        // sets the time to now (js/firebase.js markRefreshed): set once, a read landing in the header's 250ms wait put it
+        // back and the check timed out. So the later time stays the latest whatever the reads write.
+        await p.evaluate(() => {
+          const reads = window.UDReads, later = Date.now() + 3 * 60000;
+          let at = reads.freshAt || 0;
+          Object.defineProperty(reads, 'freshAt', { configurable: true, get: () => Math.max(at, later), set: (v) => { at = v; } });
+          window.dispatchEvent(new CustomEvent('ud-refreshed'));
+        });
         await p.waitForFunction((was) => [...document.querySelectorAll('.hdr-version .hv-fresh')].find(e => e.offsetWidth).textContent !== was, look.text, { timeout: 5000 });
       } else assert.equal(look.text, 'Version 6.48 Updated 10-22-26 1:30 PM', name + ': the header names the version and when it was updated');
       assert.ok(look.fonts.every(f => f >= 16), name + ': 16px words ' + look.fonts);
