@@ -1349,7 +1349,7 @@ body.yard-page .head .badge-test { order: 6; }
 .manager-page .mc-card[data-card="notes"] .mc-tile.bad span, .manager-page .mc-card[data-card="notes"] .mc-tile.bad i { color: #b42318; font-weight: 800; }
 .manager-page .mc-card.mc-alert { --accent: #b42318; background: #fff6f6; box-shadow: 0 0 0 3px #f3b4b4; }
 .manager-page .mc-pill { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 12px; background: #b42318; color: #fff; font-size: 16px; font-weight: 900; vertical-align: middle; white-space: nowrap; animation: mc-pill-pulse 1.6s ease-in-out infinite; }
-@keyframes mc-pill-pulse { 50% { background: #e5891a; } }
+@keyframes mc-pill-pulse { 50% { box-shadow: 0 0 0 4px var(--red-bg); } }
 @media (prefers-reduced-motion: reduce) { .manager-page .mc-pill { animation: none; } }
 .manager-page .mc-waits { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .manager-page .mc-wait { display: block; padding: 3px 8px; border-left: 4px solid #b42318; background: #fff; border-radius: 6px; font-size: 16px; font-weight: 700; text-decoration: none; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
