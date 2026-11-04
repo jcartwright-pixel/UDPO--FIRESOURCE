@@ -125,7 +125,8 @@ function controller() {
     await lt.waitForFunction(() => !!document.querySelector('#controller [data-c="roomSensor"] option[value="blow-room"]'));
     await lt.selectOption('#controller [data-c="roomSensor"]', 'blow-room');
     await until('room sensor saved', async () => ((await lineDoc()).controller || {}).roomSensor === 'blow-room');
-    // The Blow Mold's jug weight range (Joe 10/14: six heads, in grams), with the changeover and CIP boxes.
+    // The Blow Mold's jug weight range (Joe 10/14: six heads, in grams). No changeover or CIP boxes: it has neither (Joe 11/3).
+    assert.equal(await lt.$$eval('#setup-co, #setup-cip', es => es.length), 0, 'no changeover or CIP box for the Blow Mold');
     for (const [k, v] of [['jugWeightTarget', '57'], ['jugWeightLow', '55'], ['jugWeightHigh', '59']]) {
       await lt.fill('#setup-' + k, v);
       await lt.press('#setup-' + k, 'Tab');

@@ -578,7 +578,7 @@ table.pm-t tr.pm-sum td { border-top: 2px solid var(--line); background: #f7fafc
 #status .lb-timer { font-size: 46px; font-weight: 900; font-variant-numeric: tabular-nums; background: rgba(0, 0, 0, .18); border-radius: 10px; padding: 0 14px; }
 #status .lb-timer[hidden] { display: none; }
 #status .lb-what { flex: 1; font-size: 20px; line-height: 1.25; min-width: 0; } #status .lb-what b { font-size: 23px; }
-.lb-sbtns { display: flex; gap: 8px; }
+.lb-sbtns { display: flex; gap: 8px; } .lb-sbtns button[hidden] { display: none; }
 #status .lb-sbtns button { min-height: 62px; min-width: 150px; padding: 0 16px; font-size: 21px; touch-action: manipulation; }
 .lb-sbtns .r { background: #1c7c4a; } .lb-sbtns .c { background: #0b4f8a; } .lb-sbtns .d { background: #c62828; }
 #status .lb-sbtns button.cur { outline: 4px solid #ffd54f; outline-offset: -8px; opacity: .55; }

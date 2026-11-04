@@ -240,7 +240,8 @@ async function pickFirstProduct(tb) {
     // The Blow Mold tablet (mock-up H).
     const bm = await openPage(browser, 1024, 768, '/line.html?line=' + BLOW + '&' + ADMIN);
     await bm.waitForFunction(() => document.getElementById('line-name').textContent === 'BLOW MOLD');
-    assert.deepEqual(await acts(bm), ['Line', 'Mold Change', 'Resin Lot', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes']);
+    assert.deepEqual(await acts(bm), ['Line', 'Resin Lot', 'Waste / Rejects', 'Quality Check', 'Crew', 'Shift Notes'], 'no Mold Change or CIP button (Joe 11/3)');
+    assert.equal(await bm.$eval('#go-co', e => e.hidden), true, 'no CHANGEOVER button by Running and Down (Joe 11/3)');
     // Joe 10/24: mock-up 2's screen shows before any sensor is wired, each sensor saying WAITING FOR SENSOR.
     const eyebrows = (sel) => bm.$$eval(sel + ' .lb-card > .eyebrow', es => es.map(e => e.textContent));
     assert.deepEqual(await eyebrows('#kind-cards'), ['Making now', 'Jugs molded', 'Jugs on the Alpine', 'Tester kick-outs']);

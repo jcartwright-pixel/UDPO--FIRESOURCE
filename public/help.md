@@ -1164,6 +1164,7 @@ Every production line this week: what each line made against its target, how lon
 
 - `Last Week`, `This Week` and `Next Week` pick the week. `All Machines` shows every line; the number shows how many need attention.
 - Click a line for its own page, live from the machine: running or stopped, speed, label check and sensors.
+- The Blow Mold's page has no **Changeovers** or **CIP washes** boxes: the Blow Mold has neither.
 - **Biggest losses this week** shows the top reasons lines were stopped.
 - `TV Display` shows the board full screen for the production TV.
 
@@ -1182,11 +1183,11 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 5. Tap `DOWN` when the line stops (the bar turns red and its clock starts), then tap why in the row under it. Tap `RUNNING` when it runs again.
 6. Do each check when it is due. **Quality Check** is a list: tap `OK` or `Not OK` on each line and type the temperature. Each tap saves right away; tap it again to take it back.
 7. Type kick-outs and waste with `Waste / Rejects` (or `Enter Kick-outs` on the Blow Mold).
-8. For a product change, tap `CHANGEOVER` on the bar: pick the product it changes to and tap `START CHANGEOVER`. The bar turns blue with its clock and the standard minutes. Tap `RUNNING` when the new product runs; the changeover's minutes are kept.
-9. `CIP / Sanitation` starts and finishes a wash (Boxing has no CIP).
+8. For a product change, tap `CHANGEOVER` on the bar: pick the product it changes to and tap `START CHANGEOVER`. The bar turns blue with its clock and the standard minutes. Tap `RUNNING` when the new product runs; the changeover's minutes are kept. The Blow Mold has no changeovers, so its bar has only `RUNNING` and `DOWN`.
+9. `CIP / Sanitation` starts and finishes a wash (Boxing and the Blow Mold have no CIP).
 
 - **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
-- The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes.
+- The buttons across the top: `Line` (this screen), `Changeover`, `CIP / Sanitation`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`. The one open is dark blue; one that is due flashes. The Blow Mold's are `Line`, `Resin Lot`, `Waste / Rejects`, `Quality Check`, `Crew` and `Shift Notes`.
 - Tiles show the speed (TOO FAST, TOO SLOW, IN RANGE) and what was made. **Running now** says since when the product has run and how long the last changeover took.
 - **Down this shift** adds up the minutes down and in changeover, and lists each one with its minutes, newest first; the one going on now says "now".
 - **Fill weight** (the fillers, and the Raypak and bag fillers with bags), beside Up next: it counts down to the next weight and says NOW, flashing, when one is due. Weigh one filled jug, type its weight in grams in the box and press Enter. The box empties and the countdown starts again; under it is the last weight and whether it was over or under target. How often is set on Line Targets. Boxing has no fill weight check: its product was weighed before it gets there.
@@ -1211,7 +1212,7 @@ The tablet at a production line. The operator signs on and keeps the line's coun
 id: linetargets
 screens: linetargets.html
 
-Each line's setup: its products' speeds and targets (full speed, target %, lowest and highest speed, target per hour and per shift), how it is counted (typed, sensor, label reader or machine), its sensors and their ranges, changeover and CIP wash standards, and which fillers feed a packing line.
+Each line's setup: its products' speeds and targets (full speed, target %, lowest and highest speed, target per hour and per shift), how it is counted (typed, sensor, label reader or machine), its sensors and their ranges, changeover and CIP wash standards (not on the Blow Mold, which has neither; it has its jug weight range instead), and which fillers feed a packing line.
 
 - `Fill Empty Speeds from RedZone` and `Refresh from RedZone` copy speeds from RedZone.
 - `Start Test Feed (1 hour)` sends made-up counts to a line to test the screens; `Stop Test Feed` stops it.

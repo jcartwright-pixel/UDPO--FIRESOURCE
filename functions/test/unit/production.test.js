@@ -69,8 +69,8 @@ test('Joe 10/26: Boxing and Totes each have their own card on the Plant Producti
 test('Joe 10/14: each line has a kind that picks its waste reasons, checklist and quality check', () => {
   assert.deepEqual(['HTST #1', 'HTST #2', 'BLOW MOLD', 'Boxing', 'RAYPAK', 'Totes', 'GALLON FILLER', 'Old 1/2 Gallon'].map(P.lineKind), ['HTST', 'HTST', 'BLOWMOLD', 'PACK', 'PACK', 'PACK', 'FILLER', 'FILLER']);
   ['FILLER', 'PACK', 'HTST', 'BLOWMOLD'].forEach(k => {
-    assert.ok(P.WASTE_REASONS[k].length && P.CHANGEOVER_CHECKS[k].length && P.CHECK_FIELDS[k].length && P.CHECK_EVERY[k], k);
-    P.CHANGEOVER_CHECKS[k].forEach(c => assert.match(c[0], /^[a-z]+$/, 'the server takes only lower-case checklist keys'));
+    assert.ok(P.WASTE_REASONS[k].length && (k === 'BLOWMOLD' || P.CHANGEOVER_CHECKS[k].length) && P.CHECK_FIELDS[k].length && P.CHECK_EVERY[k], k);
+    (P.CHANGEOVER_CHECKS[k] || []).forEach(c => assert.match(c[0], /^[a-z]+$/, 'the server takes only lower-case checklist keys'));
     P.CHECK_FIELDS[k].forEach(f => assert.match(f[0], /^[A-Za-z0-9]+$/));
   });
   assert.equal(P.CHECK_EVERY.HTST, 1, 'the HTST chart check is every hour');
@@ -375,6 +375,10 @@ test('Blow Mold (Joe 10/23, mock-up 2): shots x 6 = jugs molded, the tester coun
 // Joe 10/26: Boxing has no CIP; the product running counts down from how many to run.
 test('Boxing has no CIP button; Left to run counts down from how many to run of the product running now', () => {
   assert.deepEqual(['BOXING', 'RAYPAK', 'GALLON FILLER', 'HTST #1'].map(P.hasCip), [false, true, true, true]);
+  // Joe 11/3: the Blow Mold has no CIP washes and no changeovers.
+  assert.deepEqual(['BLOW MOLD', 'Blow Mold'].map(P.hasCip), [false, false]);
+  assert.deepEqual(['BLOW MOLD', 'BOXING', 'RAYPAK', 'GALLON FILLER', 'HTST #1'].map(P.hasChangeover), [false, true, true, true, true]);
+  assert.equal(P.CHANGEOVER_CHECKS.BLOWMOLD, undefined, 'no changeover checklist for the Blow Mold');
   assert.equal(P.runLeft({ runs: [{ product: 'A', from: '2026-10-26T18:00:00Z' }] }, 0), null, 'no amount typed: no countdown');
   const run = { count: 260, counts: [{ at: '2026-10-26T18:30:00Z', count: 100 }, { at: '2026-10-26T19:30:00Z', count: 160 }, { at: '2026-10-26T20:30:00Z', count: 260 }],
     runs: [{ product: 'A', from: '2026-10-26T18:00:00Z', qty: 500 }, { product: 'B', from: '2026-10-26T19:00:00Z', qty: 300 }] };
