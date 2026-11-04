@@ -26,8 +26,8 @@
 .plant-page .strip > span b { color: var(--ink); font-size: 16px; }
 .plant-page .strip .bar { width: 160px; height: 8px; border-radius: 4px; background: #e6edf4; overflow: hidden; }
 .plant-page .strip .bar i { display: block; height: 100%; background: var(--runs-ink); }
-.plant-page .strip .amber { background: #fff4d6; border-color: #f0d38a; color: #8a5a00; }
-.plant-page .strip .amber b { color: #8a5a00; }
+.plant-page .strip .amber { background: #fff4d6; border-color: #f0d38a; color: var(--amber); }
+.plant-page .strip .amber b { color: var(--amber); }
 .plant-page .strip .red { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
 .plant-page .strip .red b { color: var(--pickup); }
 /* Case counters (Joe 10/23): what the counter counted beside Cases Out / Cases In, and its line on the top strip. */
@@ -57,12 +57,12 @@
 .plant-page tr.loading > td { background: #fffaeb !important; }
 .plant-page button.state { min-width: 96px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: #eef2f5; color: #516273; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.state.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
-.plant-page button.state.loading { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page button.state.loading { background: #fff3d6; color: var(--amber); border-color: #f0d38a; }
 .plant-page button.state.paused { background: #ede7f6; color: #4a2c82; border-color: #c5b3e6; }
 .plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
 .plant-page .tick { color: var(--runs-ink); font-weight: 800; }
-.plant-page .running { color: #8a5a00; }
+.plant-page .running { color: var(--amber); }
 .plant-page .running::after { content: ' \25CF'; color: #e5891a; }
 .plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.pu.open { background: #fde5e3; border-color: #f2b8b2; color: var(--pickup); }
@@ -74,7 +74,7 @@
 .plant-page .picker-pop { position: fixed; z-index: 30; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px #0003; padding: 6px; display: grid; gap: 4px; }
 .plant-page .picker-pop button { min-width: 140px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page .picker-pop button.done { color: var(--runs-ink); }
-.plant-page .picker-pop button.loading { color: #8a5a00; }
+.plant-page .picker-pop button.loading { color: var(--amber); }
 .plant-page .pu-list { display: grid; gap: 6px; margin-bottom: 12px; }
 .plant-page .pu-item { display: flex; align-items: center; gap: 10px; border: 1px solid #f2b8b2; background: #fff6f5; border-radius: 9px; padding: 8px 10px; }
 .plant-page .pu-item.done { border-color: #a8dcb8; background: #f1faf4; }
@@ -152,7 +152,7 @@
 .plant-page .chk.ok { color: var(--runs-ink); }
 .plant-page .chk.na { color: #9aa8b6; font-weight: 700; }
 .plant-page .pill { display: inline-block; min-width: 92px; padding: 5px 10px; border-radius: 14px; font-weight: 800; border: 1px solid var(--line); background: var(--pill-gray-bg); color: #516273; }
-.plant-page .pill.run { background: #fff3d6; color: #8a5a00; border-color: #f0d38a; }
+.plant-page .pill.run { background: #fff3d6; color: var(--amber); border-color: #f0d38a; }
 /* Joe 10/28 (gz): who is unloading, under the status on Unloading. */
 .plant-page table.unload small.who { display: block; margin-top: 4px; font-size: 16px; font-weight: 800; color: #0b2f55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plant-page .pill.done { background: #e6f6ec; color: var(--runs-ink); border-color: #a8dcb8; }
@@ -996,9 +996,9 @@ body.yard-page .head .badge-test { order: 6; }
 /* Where the tablet's font runs wider, Skip drops under Start instead of running past the cell. */
 .plant-page .clock-cell { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; align-items: center; max-width: 100%; }
 .plant-page .clock-cell button.clock { min-width: 56px; padding: 0 8px; }
-.plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid #bd7a00; background: #fff6df; color: #855400; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.plant-page button.skip { min-width: 48px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--amber); background: #fff6df; color: var(--amber); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
 .plant-page button.skip.off { border-color: #9aa3ad; background: #eef0f3; color: #4b5560; }
-.plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: #8d5d00; font-size: 16px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
+.plant-page .skip-tag { display: block; width: fit-content; margin: 3px auto 0; padding: 2px 8px; border-radius: 6px; background: #fff0d2; color: var(--amber); font-size: 16px; font-weight: 800; letter-spacing: .03em; line-height: 1.25; }
 .plant-page tr.skipped > td { background: #fffaf0 !important; }
 /* Joe 10/15: a load dragged out of the sheet's order has a green MOVED (or SKIPPED) tag beside the run, Done or not.
    Joe 10/19: only the tag is green; the line itself is not shaded, and the tag stays one word on one line (who on hover). */
@@ -1217,7 +1217,7 @@ body.yard-page .head .badge-test { order: 6; }
 /* Joe 10/15: a new maintenance request is sent by its own button, marked Not sent yet until then. */
 .shift-page .sn-send { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
 .shift-page .sn-send[hidden], .shift-page .sn-unsent[hidden] { display: none; }
-.shift-page .sn-unsent { font-size: 16px; font-weight: 800; color: #8d5d00; background: #fff0d2; border: 1px solid #f0c66b; border-radius: 20px; padding: 6px 14px; }
+.shift-page .sn-unsent { font-size: 16px; font-weight: 800; color: var(--amber); background: #fff0d2; border: 1px solid #f0c66b; border-radius: 20px; padding: 6px 14px; }
 .shift-page .sn-send .qc-btn { min-width: 240px; height: 48px; font-size: 18px; }
 
 /* Review item 38 (Joe 10/13): Loadout's Edit Load box saves each box as it is left; the time of the last save shows beside Close. */

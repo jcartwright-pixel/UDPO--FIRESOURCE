@@ -23,8 +23,8 @@ table.old-issues .count.repeat { background: #fdebd3; color: #b45f00; }
 .work-acts .seg { display: inline-flex; }
 .work-acts .seg button { border-radius: 0; }
 .work-acts .seg .seg-l { background: #1f5f9e; color: #fff; border-color: #1f5f9e; border-radius: 9px 0 0 9px; }
-.work-acts .seg .seg-g { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
-.work-acts .to-garage { background: #fff7e6; color: #8a5a00; border-color: #f0d6a0; }
+.work-acts .seg .seg-g { background: #fff7e6; color: var(--amber); border-color: #f0d6a0; border-radius: 0 9px 9px 0; }
+.work-acts .to-garage { background: #fff7e6; color: var(--amber); border-color: #f0d6a0; }
 .work-acts .done { background: #eaf7ee; color: #1f7a4d; border-color: #a9d8b8; }
 .work-acts .remove { color: #b42318; border-color: #f0b8b8; font-size: 20px; }
 tr.issue-more p { margin: 6px 0; font-size: 16px; white-space: pre-wrap; }
@@ -57,7 +57,7 @@ table.old-issues th { padding-left: 4px; padding-right: 4px; }
 .trucks-page .tt-road { background: #e3f4e8; color: #1f7a4d; }
 .trucks-page .tt-stopped { background: #e7eef7; color: #1d4f86; }
 .trucks-page .tt-yard { background: #eef2f5; color: #4b5b6b; }
-.trucks-page .tt-nosignal { background: #fdecc4; color: #8a5a00; }
+.trucks-page .tt-nosignal { background: #fdecc4; color: var(--amber); }
 .trucks-page .tt-nogps { background: #fde3df; color: #a8321f; }
 .trucks-page .kpis:has(> div:nth-child(7)) { grid-template-columns: repeat(7, 1fr); }
 .trucks-page .tt-notruck { background: #e8ecf1; color: #44546a; }

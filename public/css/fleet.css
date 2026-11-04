@@ -3,7 +3,7 @@
 /* Fleet Service */
 .fleet-page .tabs b { margin-left: 6px; color: #b42318; }
 .fleet-page .tabs button[aria-selected="true"] b { color: #ffd7d7; }
-.fleet-page .pill.soon { background: #fff4d6; color: #8a5a00; border-color: #f0d38a; }
+.fleet-page .pill.soon { background: #fff4d6; color: var(--amber); border-color: #f0d38a; }
 .fleet-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .fleet-split.wide-left { grid-template-columns: 3fr 1fr; }
 .fleet-split h2 { margin: 6px 4px 8px; font-size: 17px; color: var(--ud-blue); }
