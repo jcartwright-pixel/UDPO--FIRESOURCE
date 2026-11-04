@@ -540,3 +540,20 @@ test('one loading order: the lists follow the forecast once it loads the first t
   assert.deepEqual(R.inLoadingOrder(loads, { order: 'load order', loads: forecast.loads.slice().reverse() }), loads);
   assert.deepEqual(R.inLoadingOrder(loads, null), loads);
 });
+
+test('the DOWNTIME line under the recap: each breakdown in red with how long it was down, or NO DOWNTIME in green', () => {
+  // Joe 11-4-26: a short line per breakdown (what was wrong, how long down, back up or still down); none reads green.
+  const now = Date.parse('2026-11-04T23:00:00Z');
+  const rec = (id, at, v, st) => ({ type: 'SHIFT_REPORT', recordId: id, recordedAt: at, payload: { entryId: id, followUpStatus: st, readingTime: v.down, values: Object.assign({ Type: 'Breakdown' }, v) } });
+  const log = R.shiftLog([rec('B1', '2026-11-04T20:20:00Z', { down: '15:10', Equipment: 'Gallon filler', Entry: 'Seal bar jammed', UpAt: '17:25' }, 'RESOLVED'),
+    rec('B2', '2026-11-04T22:20:00Z', { down: '17:05', Equipment: 'Case stacker', Entry: 'Belt broke' }, 'OPEN')], now, 24);
+  const r = R.plantReport({ loads: [], shiftLog: log, roundStart: '2026-11-04T19:00:00Z' }, now);
+  assert.deepEqual(R.downtimeLines(JSON.parse(JSON.stringify(r))).map(x => [x.text, x.state]), [
+    ['DOWN 55 MIN SO FAR: CASE STACKER, BELT BROKE', 'STILL DOWN SINCE 5:05 PM'], ['DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED', 'BACK UP 5:25 PM']]);
+  const html = R.reportHtml(JSON.parse(JSON.stringify(r)), '');
+  assert.match(html, /color:#b42318">DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED/);
+  assert.match(r.text, /DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED \(BACK UP 5:25 PM\)/);
+  const none = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads: [] }, now))), '');
+  assert.match(none, /color:#1f7a4d">&#10003; NO DOWNTIME/);
+  assert.match(none, /&#10003; NONE OPEN/);
+});

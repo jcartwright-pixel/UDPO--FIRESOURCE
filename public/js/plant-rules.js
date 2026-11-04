@@ -813,12 +813,15 @@
   // Shift Notes option A (Joe 10/10) in the report: open breakdowns every time until resolved (carried over when logged before
   // the last report), the breakdowns fixed since the last report, the shift handoff and the other entries since then.
   var OTHER_TYPES = ['MAINTENANCE REQUEST', 'INCIDENT', 'SAFETY', 'QUALITY', 'OTHER'];
-  function shiftReport(log, roundStart) {
+  // Joe 11-4-26: with nowMs, each breakdown also says how long the plant was down (downMinutes: so far, while still down), when
+  // it went down and when it was back up, for the DOWNTIME line at the top of the shift report email.
+  function shiftReport(log, roundStart, nowMs) {
     var since = when(roundStart) || 0, fresh = function (at) { return !since || when(at) > since; };
     var kind = function (r) { return text(r.type).toUpperCase(); };
     var lastReview = function (r) { var v = r.reviews || []; return v.length ? v[v.length - 1] : null; };
     var item = function (r) { var rv = lastReview(r); return { equipment: r.equipment, type: r.type, entry: r.entry, notes: r.notes, shift: r.shift, status: r.status || 'OPEN', at: r.recordedAt ? clockOf(r.recordedAt) : '',
-      carried: !fresh(r.recordedAt), review: rv ? rv.entry : '', reviewAt: rv && rv.recordedAt ? clockOf(rv.recordedAt) : '' }; };
+      carried: !fresh(r.recordedAt), review: rv ? rv.entry : '', reviewAt: rv && rv.recordedAt ? clockOf(rv.recordedAt) : '',
+      downAt: T.timeText(minutesOfDay(r.readingTime)), upAt: T.timeText(minutesOfDay(r.upAt)), downMinutes: kind(r) === 'BREAKDOWN' ? downMinutes(r, nowMs) : null }; };
     var all = log || [];
     return {
       down: all.filter(function (r) { return kind(r) === 'BREAKDOWN' && r.status !== 'RESOLVED'; }).map(item),
@@ -1089,7 +1092,7 @@
     out.behind.sort(byDepart);
     out.nextUp.sort(function (a, b) { return Number(a.priorDay) - Number(b.priorDay) || a.loadSequence - b.loadSequence || byDepart(a, b); });
     out.loaded.sort(function (a, b) { return byDepart(b, a); });
-    var shift = shiftReport(input.shiftLog, input.roundStart), down = shift.down;
+    var shift = shiftReport(input.shiftLog, input.roundStart, nowMs), down = shift.down;
     var pickups = (input.pickups || []).filter(function (p) { return ['COMPLETE', 'COMPLETED', 'CLOSED'].indexOf(text(p.status).toUpperCase()) < 0; })
       .map(function (p) { return { route: text(p.route), run: text(p.run), product: text(p.item || p.product), quantity: text(p.quantity) }; });
     // Joe 10/10: a report takes only what was checked since the last report was sent (input.roundStart); anything older is
@@ -1437,6 +1440,16 @@
     w = w.filter(function (t) { return t !== 'MILK'; });
     return w.slice(0, /^\d+$/.test(w[2] || '') ? 3 : 2).map(function (t) { return t === 'SAVEALOT' ? 'Save-A-Lot' : t.length <= 2 || /\d/.test(t) || !/[AEIOUY]/.test(t) || ACRONYMS.indexOf(t) >= 0 ? t : t.charAt(0) + t.slice(1).toLowerCase(); }).join(' ');
   }
+  // Joe 11-4-26: one short DOWNTIME line per breakdown in this report (still down, or fixed since the last report): what broke,
+  // what was wrong and how long the plant was down, and BACK UP or STILL DOWN. NO DOWNTIME when there were none.
+  function downtimeLines(r) {
+    return (r.down || []).map(function (d) { return [d, true]; }).concat((r.fixed || []).map(function (d) { return [d, false]; })).map(function (x) {
+      // A breakdown on Monitor is running again but being watched: with no back up time its downtime is not counted on.
+      var d = x[0], watch = x[1] && d.status === 'MONITOR', open = x[1] && !watch, m = watch && !d.upAt ? null : d.downMinutes, what = [d.equipment, d.entry].filter(Boolean).join(', ') || 'Plant equipment';
+      return { open: open, watch: watch, text: ('DOWN' + (m === null || m === undefined ? '' : ' ' + T.spanText(m) + (open ? ' SO FAR' : '')) + ': ' + what).toUpperCase(),
+        state: watch ? 'RUNNING, BEING WATCHED' : open ? 'STILL DOWN' + (d.downAt ? ' SINCE ' + d.downAt : '') : 'BACK UP' + (d.upAt ? ' ' + d.upAt : d.reviewAt ? ' ' + d.reviewAt : '') };
+    });
+  }
   function reportText(r) {
     var L = [], f = r.forecast;
     L.push('ROUTES LATE OR BEHIND (' + r.behind.length + ')' + (r.behind.length ? '' : ': no route is more than ' + r.behindMinutes + ' minutes past its depart time'));
@@ -1449,6 +1462,10 @@
       L.push('  ' + c.loaded + ' loaded · ' + c.left + ' left to load');
       L.push('');
     }
+    var dt = downtimeLines(r);
+    if (!dt.length) L.push('NO DOWNTIME');
+    dt.forEach(function (x) { L.push(x.text + ' (' + x.state + ')'); });
+    L.push('');
     L.push('PLANT BREAKDOWNS (' + r.down.length + ')' + (r.down.length ? '' : ': none open in Shift Notes'));
     r.down.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + (d.at ? '  logged ' + d.at : '') + (d.shift ? ' ' + d.shift.toLowerCase() : '') + '  ' + d.status + (d.carried ? '  (carried over)' : '') + (d.review ? '  review ' + d.reviewAt + ': ' + d.review : '')); });
     if ((r.fixed || []).length) { L.push(''); L.push('FIXED SINCE LAST REPORT (' + r.fixed.length + ')'); r.fixed.forEach(function (d) { L.push('  ' + (d.equipment || 'Plant equipment') + '  ' + (d.entry || '') + '  RESOLVED' + (d.reviewAt ? ' ' + d.reviewAt : '') + (d.review ? ': ' + d.review : '')); }); }
@@ -1495,7 +1512,8 @@
     // Joe 10/15: one column on a phone. Each item is one full-width row: its name on the left and its one status on the right,
     // with any detail on a full-width line under it (never a narrow second column).
     function rows(list) { return '<tr><td style="padding:0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">' + list.map(function (x) {
-      var line = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="' + F + 'font-size:16px;font-weight:700;color:' + INK + '">' + e(x[0]) + '</td><td align="right" style="' + F + 'font-size:14px;color:' + GREY + ';white-space:nowrap">' + (x[1] || '') + '</td></tr></table>';
+      var red = x[0] && x[0].red !== undefined, name = red ? x[0].red : x[0];
+      var line = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="' + F + 'font-size:16px;font-weight:700;color:' + (red ? RED : INK) + '">' + e(name) + '</td><td align="right" style="' + F + 'font-size:14px;color:' + GREY + ';white-space:nowrap">' + (x[1] || '') + '</td></tr></table>';
       return '<tr><td style="' + F + 'padding:8px 0;border-bottom:1px solid #edf0f3">' + line + (x[2] ? '<div style="' + F + 'font-size:14px;color:' + GREY + ';margin-top:3px">' + x[2] + '</div>' : '') + '</td></tr>'; }).join('') + '</table></td></tr>'; }
     function plain(t) { return '<tr><td style="' + F + 'padding:0 14px 4px;font-size:15px;color:' + GREY + '">' + e(t) + '</td></tr>'; }
     // Joe 10/16: each route is one row: route number, a very short run name, when it was loaded (Done) and its dispatch time,
@@ -1587,6 +1605,13 @@
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (bannerLevel === 'bad' ? RED : bannerLevel === 'warn' ? YELLOW : GREEN) + ';color:' + (bannerLevel === 'warn' ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL BE LATE' : 'S WILL BE LATE') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + (fc ? '' : ' &middot; ' + loadedCount + ' of ' + total + ' loaded') + '</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     if (fc) H.push(forecastBox());
+    // Joe 11-4-26: right under the loadout status, one short line per breakdown in red (what was wrong, how long down, back up or
+    // still down), or NO DOWNTIME in green, so a reader sees at a glance why the plant may be behind.
+    var dtl = downtimeLines(r);
+    H.push('<tr><td style="padding:12px 14px 0">' + (dtl.length ? dtl.map(function (x) {
+      return '<div style="' + F + 'background:#fde8e6;border-left:4px solid ' + RED + ';padding:8px 10px;margin-bottom:6px;font-size:16px;font-weight:800;color:' + RED + '">' + e(x.text) +
+        '<div style="font-size:13px;margin-top:2px;color:' + (x.open ? RED : x.watch ? '#9a5b00' : GREEN) + '">' + e(x.state) + '</div></div>'; }).join('') :
+      '<div style="' + F + 'background:#e2f4ea;border-left:4px solid ' + GREEN + ';padding:8px 10px;font-size:16px;font-weight:800;color:' + GREEN + '">&#10003; NO DOWNTIME</div>') + '</td></tr>');
     // Joe 11/3: with the recap box above, the count is not said twice.
     H.push(head('Routes', fc ? null : loadedCount + ' of ' + total + ' loaded'));
     // Joe 10/19: one group per load type (Case, Box, Tote, Tanker), each with its own Loaded then Not loaded list and a dark
@@ -1614,8 +1639,9 @@
     if (!pickups.length) H.push(plain('None open.'));
     pickups.forEach(function (p) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid ' + RED + ';background:#fff6f5;padding:7px 10px;font-size:15px;color:' + INK + '"><b style="color:' + RED + '">PICKUP ' + e([p.route, p.run].filter(Boolean).join(' ')) + '</b> ' + e([p.quantity, p.product].filter(Boolean).join(' ')) + '</div></td></tr>'); });
     H.push(head('Plant breakdowns', down.length, down.length ? RED : null));
-    if (!down.length) H.push(plain('None open.'));
-    else H.push(rows(down.map(function (d) { return [d.equipment || 'Plant equipment', pill(followWord(d.status), d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'MONITOR' ? '#9a5b00' : RED), e([d.entry, d.at ? 'logged ' + d.at : '', d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · ')) + (d.carried ? ' ' + pill('CARRIED OVER', '#fff1d6', '#9a5b00') : '')]; })));
+    // Joe 11-4-26: none open reads green at a glance; an open breakdown's name is red.
+    if (!down.length) H.push('<tr><td style="padding:0 14px 4px"><div style="' + F + 'background:#e2f4ea;border-left:4px solid ' + GREEN + ';padding:7px 10px;font-size:15px;font-weight:800;color:' + GREEN + '">&#10003; NONE OPEN</div></td></tr>');
+    else H.push(rows(down.map(function (d) { return [{ red: d.equipment || 'Plant equipment' }, pill(followWord(d.status), d.status === 'MONITOR' ? '#fff1d6' : '#fde8e6', d.status === 'MONITOR' ? '#9a5b00' : RED), e([d.entry, d.at ? 'logged ' + d.at : '', d.review ? 'review ' + d.reviewAt + ': ' + d.review : ''].filter(Boolean).join(' · ')) + (d.carried ? ' ' + pill('CARRIED OVER', '#fff1d6', '#9a5b00') : '')]; })));
     var fixed = r.fixed || [], handoff = r.handoff || [], others = r.others || [];
     if (fixed.length) { H.push(head('Fixed since last report', fixed.length, GREEN)); H.push(rows(fixed.map(function (d) { return [d.equipment || 'Plant equipment', pill('RESOLVED', '#e2f4ea', GREEN), e([d.review || d.entry, d.reviewAt].filter(Boolean).join(' · '))]; }))); }
     if (handoff.length) { H.push(head('Shift handoff')); handoff.forEach(function (d) { H.push('<tr><td style="padding:0 14px 6px"><div style="' + F + 'border-left:4px solid #0b4f8a;background:#f0f5fb;padding:8px 10px;font-size:15px;color:' + INK + '"><b>' + e((d.shift ? d.shift.charAt(0) + d.shift.slice(1).toLowerCase() : 'Handoff') + (d.at ? ' (' + d.at + ')' : '')) + ':</b> ' + e([d.entry, d.notes].filter(Boolean).join(' · ')) + '</div></td></tr>'); }); }
@@ -1670,5 +1696,5 @@
     SHIFT_TYPE: SHIFT_TYPE, SHIFTS: SHIFTS, ENTRY_TYPES: ENTRY_TYPES, URGENCIES: URGENCIES, downMinutes: downMinutes, downSpan: downSpan, downToday: downToday, FOLLOW_UPS: FOLLOW_UPS, shiftAt: shiftAt, lineDone: lineDone, opDayAt: opDayAt, followLabel: followLabel, shiftLog: shiftLog,
     TEMP_TYPE: TEMP_TYPE, TEMP_LOCK_MINUTES: TEMP_LOCK_MINUTES, tempLocations: tempLocations, withTempLocations: withTempLocations, tempStatus: tempStatus, tempReadings: tempReadings, tempLockLeft: tempLockLeft, tempRows: tempRows, tempChecked: tempChecked, tempHistory: tempHistory, matchSensors: matchSensors, placeWords: placeWords,
     weekOf: weekOf, managerSchedule: managerSchedule, managerQuality: managerQuality, tempAlert: tempAlert, managerTemps: managerTemps, managerNotes: managerNotes, WALK_LATE_MINUTES: WALK_LATE_MINUTES, managerWalk: managerWalk,
-    truckCheck: truckCheck, truckCheckSummary: truckCheckSummary, shiftRecap: shiftRecap, outsideCarrier: outsideCarrier, scheduleOutside: scheduleOutside, REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml };
+    truckCheck: truckCheck, truckCheckSummary: truckCheckSummary, shiftRecap: shiftRecap, outsideCarrier: outsideCarrier, scheduleOutside: scheduleOutside, REPORT_BEHIND: REPORT_BEHIND, leavesOnOf: leavesOnOf, plantReport: plantReport, lineOutput: lineOutput, outputText: outputText, statusWord: statusWord, reportName: reportName, shortRun: shortRun, routeNumber: routeNumber, reportText: reportText, reportHtml: reportHtml, downtimeLines: downtimeLines };
 });
