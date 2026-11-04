@@ -68,7 +68,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
       await ship.hover('.sidemenu .side-sec-btn[title="Receiving"]');
       await ship.waitForSelector('.side-flyouts .flyout.open a[href="scheduler.html?lane=receiving&view=products"]');
       await ship.waitForTimeout(500);
-      await Promise.all([ship.waitForURL(/scheduler\.html\?lane=receiving$/), ship.click('.sidemenu .side-sec-btn[title="Receiving"]')]);
+      await Promise.all([ship.waitForURL(u => /scheduler\.html$/.test(u.pathname) && u.searchParams.get('lane') === 'receiving' && !u.searchParams.has('view', 'products')), ship.click('.sidemenu .side-sec-btn[title="Receiving"]')]);
       await ship.waitForSelector('#rtabs:not([hidden]) [data-rtab="calendar"][aria-selected="true"]');
       assert.deepEqual(ship.errors, []);
       await ship.close();
