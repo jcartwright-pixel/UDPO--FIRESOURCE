@@ -292,7 +292,7 @@
       const taken = new Set(drivers.filter(d => !L.driverDeleted(d)).map(d => idKey(d.employeeId)).filter(Boolean));
       const draw = () => {
         const q = box.value.trim().toUpperCase();
-        const found = employees.filter(e => e.active && !taken.has(e.idKey) && (!q || e.name.indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);
+        const found = employees.filter(e => e.active && e.idKey && !taken.has(e.idKey) && (!q || e.name.indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);
         list.innerHTML = found.map(e => '<button type="button" data-emp="' + escapeHtml(e.idKey) + '"><b>' + escapeHtml(e.name) + '</b> \u00b7 ' + escapeHtml(e.employeeId) +
           '<small>' + escapeHtml(e.position || 'No position') + (e.hireDate ? ' \u00b7 Hired ' + shortDate(e.hireDate) : '') + '</small></button>').join('') +
           '<p>' + (found.length ? 'Only employees who are not drivers yet' : 'No employee matches. Everyone on the Employees list who is not a driver yet shows here.') + '</p>';

@@ -36,18 +36,24 @@ const isoDay = (v) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(k || '') ? k : '';
 };
 
-// One UDMS record -> the employee line, or null (no Employee ID, or no name). Only the safe fields are read.
-function pick(rec) {
+// An employee ID holds a number; a name typed into the ID box (Joe 11-4-26: RAMSEY KEYSHAWN) is no ID at all.
+const realId = (v) => (/\d/.test(text(v)) ? text(v) : '');
+
+// One UDMS record -> the employee line, or null (no name). Only the safe fields are read.
+// Joe 11-4-26: someone with no employee ID in UDMS is still on the list (they were left off, so a search never found them);
+// their line is keyed by the UDMS record (udmsId) until UDMS gives them an ID.
+function pick(rec, udmsId) {
   const r = rec || {}, cur = r.current || {};
-  const employeeId = text(cur.employeeId);
+  const employeeId = realId(cur.employeeId);
   const last = text(r.lastName), first = text(r.preferredName) || text(r.firstName);
-  if (!employeeId || !(last || first)) return null;
+  if (!(last || first) || (!employeeId && !text(udmsId))) return null;
   const status = text(cur.workStatus) || 'Active';
   const active = cur.active === undefined ? /^active$/i.test(status) : cur.active === true;
   return {
     employeeId, name: (last && first ? last + (text(r.suffix) ? ' ' + text(r.suffix) : '') + ', ' + first : last || first).toUpperCase().slice(0, 60),
     position: text(cur.jobTitle).slice(0, 60), hireDate: isoDay(cur.hireDate), phone: SMS.phoneText(r.phone) || '',
-    branch: text(cur.location).slice(0, 60), active, status: active ? 'ACTIVE' : 'LEFT', leftDate: active ? '' : isoDay(cur.termDate)
+    branch: text(cur.location).slice(0, 60), active, status: active ? 'ACTIVE' : 'LEFT', leftDate: active ? '' : isoDay(cur.termDate),
+    udmsId: employeeId ? '' : text(udmsId).slice(0, 80)
   };
 }
 
@@ -64,10 +70,12 @@ const UDMS_LIST = 'people';
 // Reads UDMS (safe fields only). udmsDb is a Firestore for the UDMS project (tests pass their own).
 async function readUdms(udmsDb) {
   const snap = await outsideDb(udmsDb).collection(UDMS_LIST).select(...UDMS_FIELDS).get();
-  return snap.docs.map(d => pick(d.data())).filter(Boolean);
+  return snap.docs.map(d => pick(d.data(), d.id)).filter(Boolean);
 }
 
-const SAME = ['name', 'position', 'hireDate', 'phone', 'branch', 'active', 'status', 'leftDate'];
+const SAME = ['name', 'position', 'hireDate', 'phone', 'branch', 'active', 'status', 'leftDate', 'employeeId'];
+// The list key: the employee ID (leading zeros ignored), or the UDMS record for someone with no ID yet.
+const keyOf = (e) => (e.employeeId ? idKey(e.employeeId) : 'UDMS_' + idKey(e.udmsId));
 const changed = (a, b, keys) => keys.some(k => (a || {})[k] !== (b || {})[k]);
 
 /*
@@ -81,32 +89,32 @@ async function syncPlant(db, facilityId, list, stamp) {
   const had = {};
   (await db.collection('employees').get()).docs.forEach(d => { had[d.id] = d.data(); });
   const byKey = {};
-  mine.forEach(e => { const k = idKey(e.employeeId); if (!byKey[k] || (e.active && !byKey[k].active)) byKey[k] = e; });
+  mine.forEach(e => { const k = keyOf(e); if (!byKey[k] || (e.active && !byKey[k].active)) byKey[k] = e; });
   const writes = [], log = { added: 0, changed: 0, left: 0, linked: 0 };
   Object.keys(byKey).forEach(k => {
     const e = byKey[k], id = docId(k), was = had[id];
     if (was && !changed(was, e, SAME)) return;
     if (!was) log.added++; else if (was.active && !e.active) log.left++; else log.changed++;
-    writes.push([db.collection('employees').doc(id), Object.assign({ facilityId, source: 'UDMS', createdAt: (was && was.createdAt) || stamp }, e, { idKey: k, updatedAt: stamp })]);
+    writes.push([db.collection('employees').doc(id), Object.assign({ facilityId, source: 'UDMS', createdAt: (was && was.createdAt) || stamp }, e, { idKey: e.employeeId ? k : '', key: k, updatedAt: stamp })]);
   });
   // Someone taken off UDMS altogether (not just marked as left) is kept, marked as no longer in UDMS.
   Object.keys(had).forEach(id => {
     const w = had[id];
-    if (w.facilityId === facilityId && !byKey[w.idKey] && w.status !== 'GONE') { writes.push([db.collection('employees').doc(id), Object.assign({}, w, { active: false, status: 'GONE', updatedAt: stamp })]); log.left++; }
+    if (w.facilityId === facilityId && !byKey[w.key || w.idKey] && w.status !== 'GONE') { writes.push([db.collection('employees').doc(id), Object.assign({}, w, { active: false, status: 'GONE', updatedAt: stamp })]); log.left++; }
   });
   // People and drivers who carry an employee's ID follow UDMS.
   const [crew, drivers] = await Promise.all([db.collection('crewPeople').where('facilityId', '==', facilityId).get(), db.collection('drivers').get()]);
   crew.docs.forEach(d => {
-    const p = d.data(), e = byKey[idKey(p.employeeId)];
-    if (!p.employeeId || !e) return;
+    const p = d.data(), e = realId(p.employeeId) ? byKey[idKey(p.employeeId)] : null;
+    if (!e) return;
     const want = { name: e.name, phone: e.phone, hireDate: e.hireDate };
     if (!changed(p, want, ['name', 'phone', 'hireDate'])) return;
     log.linked++;
     writes.push([d.ref, Object.assign({}, p, want, { updatedAt: stamp, updatedBy: 'UDMS' })]);
   });
   drivers.docs.forEach(d => {
-    const p = d.data(), e = byKey[idKey(p.employeeId)];
-    if (!p.employeeId || !e || (p.facilityId && p.facilityId !== facilityId)) return;
+    const p = d.data(), e = realId(p.employeeId) ? byKey[idKey(p.employeeId)] : null;
+    if (!e || (p.facilityId && p.facilityId !== facilityId)) return;
     const want = { name: e.name, hireDate: e.hireDate };
     if (!changed(p, want, ['name', 'hireDate'])) return;
     log.linked++;
@@ -151,10 +159,11 @@ async function runEmployeeSync({ udmsDb, plantDbs, now }) {
 
 // The picked employee, from the plant's own list (a save never trusts the screen's copy of the name or hire date).
 async function employeeFor(tx, db, employeeId, facilityId) {
+  if (!realId(employeeId)) return null;
   const snap = await tx.get(db.collection('employees').doc(docId(employeeId)));
   const e = snap.exists ? snap.data() : null;
   if (!e || (facilityId && e.facilityId !== facilityId)) return null;
   return e;
 }
 
-module.exports = { UDMS_FIELDS, PRIVATE, UDMS_PROJECT, udmsDatabase, pick, plantOfBranch, readUdms, syncPlant, runEmployeeSync, employeeFor, idKey, docId };
+module.exports = { realId, keyOf, UDMS_FIELDS, PRIVATE, UDMS_PROJECT, udmsDatabase, pick, plantOfBranch, readUdms, syncPlant, runEmployeeSync, employeeFor, idKey, docId };

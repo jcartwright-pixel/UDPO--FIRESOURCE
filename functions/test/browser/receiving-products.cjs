@@ -198,6 +198,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
       const inv = await openPage(browser, w, h, '/inventory.html?' + ADMIN);
       await inv.waitForFunction(() => (document.getElementById('oh-rows').textContent.match(/Silgan Closures/g) || []).length === 2);
+      // The words are read as shown (ALL CAPS comes from the page's style), so wait until the screen is showing and drawn.
+      await inv.waitForFunction(() => !document.getElementById('screen').hidden && !document.body.classList.contains('ud-drawing'));
       const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
       // 1536 first (before the Count), then 1920 (after it: the count is the new starting point).
       // Joe 11-3-26: ALL CAPS on screens (Inventory shows its words in capitals).
