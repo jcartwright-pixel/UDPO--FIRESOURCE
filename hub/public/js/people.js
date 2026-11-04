@@ -57,7 +57,7 @@ function drawList() {
   $('#rows').innerHTML = rows.map(p => {
     const mine = appsOf(p);
     return '<tr class="pick' + (picked === p.email ? ' on' : '') + (p.status === 'ACTIVE' ? '' : ' inactive') + '" data-email="' + e(p.email) + '">' +
-      '<td class="l who"><span class="avatar' + (isAdminRole(p.roles) ? ' admin' : '') + '" aria-hidden="true">' + e(initials(p)) + '</span><span><b>' + e(p.name || '(no name)') + '</b><small>' + e(p.email) + '</small></span></td>' +
+      '<td class="l who"><div class="who-in"><span class="avatar' + (isAdminRole(p.roles) ? ' admin' : '') + '" aria-hidden="true">' + e(initials(p)) + '</span><span><b>' + e(p.name || '(no name)') + '</b><small>' + e(p.email).replace('@', '@<wbr>') + '</small></span></div></td>' +
       '<td class="l c-role"><span class="role-tag' + (isAdminRole(p.roles) ? ' admin' : '') + '">' + e((p.roles || []).map(prettyRole).join(' + ') || 'None') + '</span></td>' +
       '<td class="l c-plants">' + e(plantsText(p)) + '</td>' +
       APPS.map(a => '<td class="c-app">' + appTick(p, a.key, mine.indexOf(a.key) >= 0, 'data-app') + '</td>').join('') +

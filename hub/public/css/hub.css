@@ -119,8 +119,16 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .people-list .app-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #fff; color: var(--app); }
 .people-list tbody tr:nth-child(even) td { background: #f8fafc; }
 .people-list tbody td { vertical-align: middle; }
-.people-list td.who { display: flex; align-items: center; gap: 10px; min-width: 220px; }
-.people-list td.who > span:last-child { min-width: 0; }
+/* Joe 11/4: the columns size to what is in them (emails ran under the Role badges and the roles over Plants). The Person cell
+   stays a table cell; its picture and words sit side by side inside it. */
+.people-list table { table-layout: auto; }
+.people-list td.who { min-width: 220px; }
+.people-list td.who .who-in { display: flex; align-items: center; gap: 10px; }
+.people-list td.who .who-in > span:last-child { min-width: 0; }
+.people-list td.c-role { min-width: 130px; }
+.people-list td.c-plants { min-width: 90px; }
+.people-list td.c-role .role-tag { white-space: normal; }
+.people-list td, .people-list th { vertical-align: middle; }
 .people-list .avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #dbe7f3; color: var(--ud-blue-dark); font-weight: 800; font-size: 14px; }
 .people-list .avatar.admin { background: var(--ud-blue); color: #fff; }
 .role-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #eef3f8; color: var(--ud-blue-dark); font-size: 14px; font-weight: 700; white-space: nowrap; }

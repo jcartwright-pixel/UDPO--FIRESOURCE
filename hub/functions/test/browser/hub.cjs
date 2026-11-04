@@ -121,6 +121,22 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.click('#f-save');
     await p.waitForSelector('#f-msg.good');
     assert.equal((await db().collection('users').doc('robin.driver@uniteddairy.com').get()).data().roles[0], 'DRIVER');
+    // Joe 11/4: nothing overlaps: a long email stays left of the Role badge, and "Manager + Administrator" left of Plants.
+    await db().collection('users').doc('jordan.longaddress-sample@uniteddairy.com').set({ status: 'ACTIVE', roles: ['Manager', 'Administrator'], name: '' });
+    for (const width of [1920, 1366, 1100]) {
+      p = await open(browser, 'pat.admin@uniteddairy.com', { width, height: 950 }, 'people.html');
+      await p.waitForSelector('#rows tr[data-email="jordan.longaddress-sample@uniteddairy.com"]');
+      const bad = await p.$$eval('#rows tr[data-email]', rows => rows.flatMap(tr => {
+        const r = (sel) => tr.querySelector(sel).getBoundingClientRect(), who = r('td.who .who-in'), roleTd = r('td.c-role'), tag = r('td.c-role .role-tag'), plants = r('td.c-plants');
+        const out = [];
+        if (who.right > roleTd.left + 1) out.push(tr.dataset.email + ': name or email runs into Role');
+        if (tag.right > plants.left + 1 || tag.left < roleTd.left - 1) out.push(tr.dataset.email + ': role runs out of its column');
+        return out;
+      }));
+      assert.deepEqual(bad, [], 'People & Access at ' + width + ': nothing overlaps');
+      if (width === 1366) await shot(p, 'hub-people-1366');
+    }
+    await db().collection('users').doc('jordan.longaddress-sample@uniteddairy.com').delete();
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'people.html');
     await p.waitForSelector('#rows tr[data-email]');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'People & Access: no sideways scroll on a phone');
