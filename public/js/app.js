@@ -192,7 +192,7 @@ export const MENU = [
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
   // Joe 11/1 ("a nice little module for the inventory"): On Hand, what the plant should have of each product, first.
-  ['Inventory', [['On Hand', 'inventory.html', 'day'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
+  ['Inventory', [['On Hand', 'inventory.html', 'day'], ['Milk Products', 'inventory.html?type=milk', 'day'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
   // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
   ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
@@ -216,9 +216,9 @@ export const SIDES = [
   // Joe 10/31: Plant Maintenance is its own card on the Home screen (out of Plant Operations), with its own menu.
   { key: 'pmaint', quick: [['Work Orders', 'pmworkorders.html'], ['PM Schedule', 'pmschedule.html']], name: 'Plant Maintenance', home: 'pmaint.html', pic: 'plant-maintenance-construction-560.webp', note: 'Plant equipment, repairs and preventive maintenance', sections: ['Plant Maintenance', 'Maintenance Schedule', 'Shift Notes'], openSections: ['Shift Notes'], flatFirst: true, building: true, bannerInPic: true },
   // Joe 10/26 (ej): Shipping & Receiving, its own department: outgoing product loads, receiving and inventory (the old Plant
-  // Distribution Scheduler and the Inventory card). Inventory is still being built, so it opens only for administrators (buildingSections).
+  // Distribution Scheduler and the Inventory card). Joe 11-4-26 (mock-up E): Inventory is open to everyone in the plant.
   // Joe 10/31: on the Home screen only, Shipping & Receiving is its own card (homeCard); everywhere else it stays in Plant Operations.
-  { key: 'shipping', group: 'plantops', homeCard: true, name: 'Shipping & Receiving', home: 'scheduler.html', icon: 'dock', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'], buildingSections: ['Inventory'],
+  { key: 'shipping', group: 'plantops', homeCard: true, name: 'Shipping & Receiving', home: 'scheduler.html', icon: 'dock', note: 'Outgoing product loads, receiving and inventory', sections: ['Shipping', 'Receiving', 'Inventory', 'Shift Notes'],
     // Joe 10/31: Plant Material Trailers sits in Inventory but is already in use, so it stays open to everyone (openPages).
     openPages: ['jug-trailers.html'],
     // Joe 10/31 (Inventory picture 2): on its Home card, Inventory is a dark blue line ('main') with the places stock is kept under it:

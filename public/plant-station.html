@@ -106,7 +106,7 @@
       { id: 'TOTES', label: 'Tote Loadout', what: 'Tote loading, tote unloading and trailer washing', area: 'TOTES', views: ['loading', 'unloading', 'washing'] },
       // Joe 10/12: Boxing loads its box loads and every carrier and branch shipment on one list (Shipping / Loadout), and
       // receives the suppliers' deliveries (Receiving); it does not unload.
-      { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loads, carrier and branch shipments, and receiving', area: 'BOXING', views: ['loading', 'receiving'] },
+      { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loads, carrier and branch shipments, receiving and taking stock out', area: 'BOXING', views: ['loading', 'receiving', 'takeout'] },
       // Joe 10/12: Yard Services walks the yard for the trailer on each route and checks the trailers' temperatures, on the
       // screens the plant already has (Trailer Assignments and Yard Checks), unchanged.
       { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Trailer assignments and yard temperature checks', area: '', views: ['trailers', 'yardchecks'] }
@@ -119,6 +119,8 @@
       washing: { label: 'Washing', what: 'Assigned trailer washing', accent: '#0b8da5', tone: '#e7f8fb', pic: 'truck-washing-v1-560.webp' },
       returns: { label: 'Returns', what: 'Return product to the cooler', accent: '#bd7400', tone: '#fff4db', pic: 'returns-to-cooler-v1-560.webp' },
       receiving: { label: 'Receiving', what: 'Suppliers delivering today', accent: '#168a55', tone: '#e8f8ef', pic: 'case-unloading-v1-560.webp' },
+      // Joe 11-4-26 (Inventory mock-up B): what the plant uses, scanned out of Inventory as it is taken.
+      takeout: { label: 'Take Out', what: 'Scan what you use from Inventory', accent: '#6a3d9a', tone: '#f3ecfb', pic: 'box-v1.webp' },
       // Joe 10/12: Yard Services has two action buttons on top, Assign Trailer and Check Temperatures (phone first).
       trailers: { label: 'Assign Trailer', what: 'Trailer Assignments', accent: '#1976d2', tone: '#e8f3ff', pic: 'yard-checks.webp', action: true },
       yardchecks: { label: 'Check Temperatures', what: 'Yard Checks', accent: '#168a55', tone: '#e8f8ef', pic: 'temperatures.webp', action: true }

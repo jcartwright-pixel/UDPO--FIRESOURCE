@@ -79,6 +79,7 @@ const TOOLS = require('./src/admintools');
 const READER = require('./src/reader');
 const L = require('./src/logic');
 const RUNDAYS = require('./src/rundays');
+const INV = require('./src/inventory');
 const PLANTS = require('./src/plants');
 
 admin.initializeApp();
@@ -527,12 +528,17 @@ if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
 if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   exports.runDaysOnRunWrite = onDocumentWritten({ document: 'runs/{runId}', timeoutSeconds: 60 }, (event) => RUNDAYS.syncRun(db, event.params.runId));
 }
+// Joe 11-4-26 (Inventory mock-up C, milk products): what the Production Lines make goes into Inventory by itself (src/inventory.js).
+if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
+  exports.inventoryOnRunWrite = onDocumentWritten({ document: 'productionRuns/{runId}', timeoutSeconds: 60 }, (event) => INV.bookProduction(db, event.params.runId));
+}
 // Joe 10/26: the same two for each other plant, in its own database, once the deploy has made it (a trigger needs its database).
 if (process.env.UD_LOCAL_NO_TRIGGERS !== '1') {
   L.PLANTS.filter(p => p.db !== '(default)' && plantReady(p)).forEach(p => {
     const name = p.id.replace(/^fac_/, '').replace(/_(.)/g, (m, c) => c.toUpperCase()).replace(/^./, c => c.toUpperCase()), pdb = PLANTS.dbFor(p.id, db);
     exports['mailPlantReport' + name] = onDocumentCreated({ document: 'plantReports/{id}', database: p.db, timeoutSeconds: 60 }, (event) => (event.data ? mailReport(event.data.ref, event.data.data()) : null));
     exports['runDaysOnRunWrite' + name] = onDocumentWritten({ document: 'runs/{runId}', database: p.db, timeoutSeconds: 60 }, (event) => RUNDAYS.syncRun(pdb, event.params.runId));
+    exports['inventoryOnRunWrite' + name] = onDocumentWritten({ document: 'productionRuns/{runId}', database: p.db, timeoutSeconds: 60 }, (event) => INV.bookProduction(pdb, event.params.runId));
   });
 }
 exports.writeBackEveryMinute = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 120, maxInstances: 1 }, () => writeBackIfOn('both'));

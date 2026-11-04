@@ -23,9 +23,14 @@ const R = require('./plant-rules');
 const S = require('./scan-rules');
 
 const text = (v, max) => String(v === null || v === undefined ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 120);
-const PRODUCT_OPS = ['addProduct', 'editProduct', 'removeProduct', 'linkBarcode', 'count'];
+// Joe 11-4-26 (mock-ups A to F, "a mix of everything"): use takes stock out (by hand on Inventory, or a scan on the plant tablet's
+// TAKE OUT tab); setLow sets a product's LOW AT; setUses keeps what one of our milk products uses; label gives a product its own
+// barcode for the Zebra labels; addMilkProducts brings the plant's milk products (its Products list) into Inventory.
+const STOCK_OPS = ['use', 'setLow', 'setUses', 'label', 'addMilkProducts'];
+const PRODUCT_OPS = ['addProduct', 'editProduct', 'removeProduct', 'linkBarcode', 'count'].concat(STOCK_OPS);
 const OPS = PRODUCT_OPS.concat(['receive']);
 const MAX_QTY = 9999999;
+const MAX_MILK_ADD = 450;
 
 function whole(v, label, SaveError, blankOk) {
   const t = text(v, 20).replace(/,/g, '');
@@ -65,7 +70,34 @@ function validate(input, out, SaveError) {
     });
     return out;
   }
+  if (out.op === 'addMilkProducts') return out;
   if (out.op !== 'addProduct') { out.itemId = text(input.itemId, 80); if (!out.itemId) throw new SaveError('BAD_REQUEST', 'Pick the product.'); }
+  if (out.op === 'use') {
+    const t = text(input.qty, 20).replace(/,/g, ''), n = Number(t);
+    if (!t) throw new SaveError('BAD_REQUEST', 'Type how many were used.');
+    if (!Number.isInteger(n) || n === 0 || Math.abs(n) > MAX_QTY) throw new SaveError('BAD_REQUEST', 'How many used must be a whole number.');
+    out.qty = n;
+    out.forWhat = text(input.forWhat, 60);
+    out.station = text(input.station, 60);
+    out.how = input.how === 'SCAN' ? 'SCAN' : 'HAND';
+    return out;
+  }
+  if (out.op === 'setLow') { out.low = whole(input.low, 'the low mark', SaveError, true); return out; }
+  if (out.op === 'label') return out;
+  if (out.op === 'setUses') {
+    if (!Array.isArray(input.uses) || input.uses.length > R.MAX_USES) throw new SaveError('BAD_REQUEST', 'A product can use up to ' + R.MAX_USES + ' things.');
+    const seen = new Set();
+    out.uses = input.uses.map(u => {
+      const itemId = text(u && u.itemId, 80), q = Number(text(u && u.qty, 12).replace(/,/g, ''));
+      if (!itemId) throw new SaveError('BAD_REQUEST', 'Pick what it uses on each line, or remove the line.');
+      if (itemId === out.itemId) throw new SaveError('BAD_REQUEST', 'A product cannot use itself.');
+      if (seen.has(itemId)) throw new SaveError('BAD_REQUEST', 'A product is on the list twice. Put its amount on one line.');
+      seen.add(itemId);
+      if (!isFinite(q) || q <= 0 || q > 10000 || Math.round(q * 1000) / 1000 !== q) throw new SaveError('BAD_REQUEST', 'How many must be a number above 0 (up to 3 places after the point).');
+      return { itemId, qty: q };
+    });
+    return out;
+  }
   if (out.op === 'removeProduct') return out;
   if (out.op === 'count') { out.qty = whole(input.qty, 'the count', SaveError); return out; }
   if (out.op === 'linkBarcode') {
@@ -77,7 +109,7 @@ function validate(input, out, SaveError) {
   if (!out.name) throw new SaveError('BAD_REQUEST', 'Type the product name.');
   out.supplierId = text(input.supplierId, 60);
   out.kind = text(input.kind, 20);
-  if (out.kind && R.INVENTORY_KINDS.indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'Kind must be ' + R.INVENTORY_KINDS.join(', '));
+  if (out.kind && R.INVENTORY_KINDS.concat([R.MILK_KIND]).indexOf(out.kind) < 0) throw new SaveError('BAD_REQUEST', 'Kind must be ' + R.INVENTORY_KINDS.join(', '));
   out.unit = text(input.unit, 20);
   if (out.unit && R.INVENTORY_UNITS.indexOf(out.unit) < 0) throw new SaveError('BAD_REQUEST', 'Counted in must be ' + R.INVENTORY_UNITS.join(', '));
   out.low = whole(input.low, 'the low mark', SaveError, true);
@@ -92,6 +124,7 @@ function writeMove(tx, db, id, move) { tx.set(db.collection('inventoryMoves').do
 async function saveProduct(tx, db, req, email, stamp, logRef, mode, SaveError) {
   const items = db.collection('receivingItems'), journal = db.collection('plantJournal');
   const all = (await tx.get(items.where('status', '==', 'ACTIVE'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+  if (STOCK_OPS.indexOf(req.op) >= 0) return stockOp(tx, db, items, all, req, email, stamp, logRef, mode, SaveError);
   const had = req.itemId ? all.find(x => x.id === req.itemId) : null;
   if (req.itemId && !had) throw new SaveError('NOT_FOUND', 'That product is no longer on the list. The list was refreshed.');
   let supplier = null;
@@ -126,7 +159,7 @@ async function saveProduct(tx, db, req, email, stamp, logRef, mode, SaveError) {
   } else {
     // count: what is really there becomes the new starting point.
     const before = R.shouldHave(was);
-    after = Object.assign({}, was, { countQty: req.qty, countAt: stamp, countBy: email, receivedSince: 0, usedSince: 0, editedAt: stamp, editedBy: email });
+    after = Object.assign({}, was, { countQty: req.qty, countAt: stamp, countBy: email, receivedSince: 0, madeSince: 0, usedSince: 0, editedAt: stamp, editedBy: email });
     move = { itemId: id, itemName: was.name, kind: 'COUNT', qty: req.qty, change: req.qty - before, before, after: req.qty, date: L.operatingDay(new Date(stamp)), at: stamp, by: email,
       loadId: '', poNumber: '', supplierId: was.supplierId || '', unit: was.unit || '' };
     writeMove(tx, db, moveId(req, 0), move);
@@ -134,6 +167,80 @@ async function saveProduct(tx, db, req, email, stamp, logRef, mode, SaveError) {
   tx.set(items.doc(id), after);
   const result = { ok: true, requestId: req.requestId, itemId: id, status: after.status, name: after.name, shouldHave: R.shouldHave(after) };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, itemId: id, before: was, after, move, result });
+  return result;
+}
+
+// A short code of our own for a product's label (letters and digits, starting UD so it never reads as a supplier's item code).
+function newLabelCode(seed, taken) {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  for (let tries = 0; tries < 5000; tries++) {
+    let code = 'UD', x = (h + tries * 7919) >>> 0;
+    for (let i = 0; i < 6; i++) { code += A[x % A.length]; x = (Math.floor(x / A.length) ^ Math.imul(x, 31)) >>> 0; }
+    if (!taken.has(code)) return code;
+  }
+  throw new Error('No label code is free.');
+}
+
+async function stockOp(tx, db, items, all, req, email, stamp, logRef, mode, SaveError) {
+  let result, log = {};
+  if (req.op === 'addMilkProducts') {
+    // The plant's Products list (what its lines make), by name; one Inventory product each, once.
+    const lines = (await tx.get(db.collection('plantProducts'))).docs.map(d => d.data());
+    // All reads are done.
+    const have = new Set(all.map(x => String(x.name || '').toUpperCase())), add = [];
+    lines.forEach(l => (Array.isArray(l.products) ? l.products : []).forEach(p => {
+      const name = text(p && p.name, 120), key = name.toUpperCase();
+      if (!name || have.has(key) || /^RAW MILK$/i.test(name)) return;
+      have.add(key);
+      add.push({ name, sku: text(p.sku, 40) });
+    }));
+    if (!add.length) throw new SaveError('CONFLICT', all.some(R.isMilk) ? 'Every milk product on the Products list is already in Inventory.' : 'The Products list has no milk products yet. Add them on Line Targets first.');
+    add.slice(0, MAX_MILK_ADD).forEach((p, i) => {
+      tx.set(items.doc('MILK-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 20) + '-' + i), { name: p.name, sku: p.sku, supplierId: '', kind: R.MILK_KIND, unit: 'Cases', low: null,
+        barcodes: [], uses: [], status: 'ACTIVE', countQty: null, countAt: '', countBy: '', receivedSince: 0, madeSince: 0, usedSince: 0, createdAt: stamp, createdBy: email, editedAt: stamp, editedBy: email });
+    });
+    result = { ok: true, requestId: req.requestId, added: Math.min(add.length, MAX_MILK_ADD), more: Math.max(0, add.length - MAX_MILK_ADD) };
+    log = { added: add.slice(0, MAX_MILK_ADD).map(p => p.name) };
+  } else {
+    const was = all.find(x => x.id === req.itemId);
+    if (!was) throw new SaveError('NOT_FOUND', 'That product is no longer on the list. The list was refreshed.');
+    const before = Object.assign({}, was); delete before.id;
+    let after, move = null;
+    if (req.op === 'use') {
+      after = Object.assign({}, before, { usedSince: (Number(was.usedSince) || 0) + req.qty, editedAt: stamp, editedBy: email });
+      move = { itemId: req.itemId, itemName: was.name, kind: 'USED', qty: req.qty, change: -req.qty, before: R.shouldHave(was), after: R.shouldHave(after), date: L.operatingDay(new Date(stamp)), at: stamp, by: email,
+        how: req.how, forWhat: req.forWhat, station: req.station, loadId: '', poNumber: '', supplierId: was.supplierId || '', unit: was.unit || '' };
+      writeMove(tx, db, moveId(req, 0), move);
+    } else if (req.op === 'setLow') {
+      after = Object.assign({}, before, { low: req.low, editedAt: stamp, editedBy: email });
+    } else if (req.op === 'setUses') {
+      if (!R.isMilk(was)) throw new SaveError('BAD_REQUEST', 'Only our milk products have a list of what they use.');
+      const uses = req.uses.map(u => {
+        const it = all.find(x => x.id === u.itemId);
+        if (!it) throw new SaveError('CONFLICT', 'Something on the list is no longer a product. Pick again.');
+        if (R.isMilk(it)) throw new SaveError('BAD_REQUEST', it.name + ' is one of our milk products. Pick what it is made with.');
+        return { itemId: u.itemId, name: it.name, unit: text(it.unit, 20), qty: u.qty };
+      });
+      after = Object.assign({}, before, { uses, editedAt: stamp, editedBy: email });
+    } else {
+      // label: the product's own code, kept on it and known as one of its barcodes, so a scan of the label finds it.
+      let code = text(was.labelCode, 20);
+      after = Object.assign({}, before);
+      if (!code) {
+        const taken = new Set(); all.forEach(x => { if (x.labelCode) taken.add(x.labelCode); (x.barcodes || []).forEach(b => taken.add(String(b).replace(/^TEXT:/, ''))); });
+        code = newLabelCode(req.requestId + req.itemId, taken);
+        const key = S.barcodeKey(S.parseScan(code, new Date(stamp))), barcodes = (was.barcodes || []).slice();
+        if (key && barcodes.indexOf(key) < 0) barcodes.push(key);
+        Object.assign(after, { labelCode: code, barcodes, editedAt: stamp, editedBy: email });
+      }
+    }
+    tx.set(items.doc(req.itemId), after);
+    result = { ok: true, requestId: req.requestId, itemId: req.itemId, name: after.name, shouldHave: R.shouldHave(after), labelCode: after.labelCode || '' };
+    log = { itemId: req.itemId, before, after, move };
+  }
+  tx.set(logRef, Object.assign({ action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, result }, log));
   return result;
 }
 
@@ -182,8 +289,87 @@ async function receive(tx, db, req, had, type, email, stamp, logRef, mode, SaveE
   return result;
 }
 
+// Joe 11-4-26 (mock-up D): RECEIVED on the Boxing tablet puts what was scanned on that delivery into Inventory, once, the same as
+// Mark Received on Receiving. Reads first (a transaction reads before it writes): the delivery's scans and their products.
+async function tabletReceivePlan(tx, db, deliveryId) {
+  const scans = (await tx.get(db.collection('receivingScans').where('deliveryId', '==', deliveryId))).docs.map(d => d.data())
+    .filter(x => x && x.status !== 'REMOVED' && (Number(x.count) || 0) > 0);
+  const byItem = {}, unnamed = scans.filter(x => !x.itemId).length;
+  scans.filter(x => x.itemId).forEach(x => { byItem[x.itemId] = (byItem[x.itemId] || 0) + (Number(x.count) || 0); });
+  const ids = Object.keys(byItem), refs = ids.map(id => db.collection('receivingItems').doc(id));
+  const snaps = refs.length ? await tx.getAll(...refs) : [];
+  return { ids, refs, snaps, byItem, unnamed };
+}
+// The writes: each product's received count, one History line each, and the delivery's lines and received mark (on payload).
+function applyTabletReceive(tx, db, plan, had, payload, req, email, stamp) {
+  const p = had.payload || {}, hadLines = R.loadLines(p), lines = [], moves = [];
+  plan.ids.forEach((id, i) => {
+    const it = plan.snaps[i] && plan.snaps[i].exists ? plan.snaps[i].data() : null, qty = plan.byItem[id], old = hadLines.find(h => h.itemId === id);
+    if (!it || !activeItem(it)) return;
+    lines.push({ itemId: id, name: it.name, unit: text(it.unit, 20), ordered: old ? old.ordered : null, received: qty });
+    const next = Object.assign({}, it, { receivedSince: (Number(it.receivedSince) || 0) + qty, editedAt: stamp, editedBy: email });
+    tx.set(plan.refs[i], next);
+    const move = { itemId: id, itemName: it.name, kind: 'RECEIVED', qty, change: qty, before: R.shouldHave(it), after: R.shouldHave(next), date: had.date, at: stamp, by: email, how: 'TABLET',
+      loadId: req.id, poNumber: text(p.poNumber, 40), supplierId: had.routeId || '', supplier: text(had.run, 120), unit: text(it.unit, 20) };
+    writeMove(tx, db, moveId(req, i), move);
+    moves.push(move);
+  });
+  // Products ordered on the load that were not scanned came in as 0.
+  hadLines.filter(h => !lines.some(l => l.itemId === h.itemId)).forEach(h => lines.push(Object.assign({}, h, { received: 0 })));
+  const total = lines.reduce((n, l) => n + (l.received || 0), 0);
+  Object.assign(payload, { lines, received: { at: stamp, by: email, from: 'TABLET', unnamed: plan.unnamed }, cases: String(total) });
+  if (lines.length) payload.product = linesText(lines);
+  return { moves: moves.length, total, unnamed: plan.unnamed };
+}
+
+// Joe 11-4-26 (mock-up C, and "internal inventory on all my milk products"): what the Production Lines make goes into Inventory by
+// itself. Each shift's record (productionRuns) is read after every change; what each product made since the last look goes in as
+// MADE on that milk product, and what it uses (its uses list) comes out of the supplies as USED. inventoryProduction/{run} keeps
+// what was already put in, so a run is never counted twice, and a lower count (a typing fix) takes the difference back out.
+async function bookProduction(db, runDocId, nowIso) {
+  return db.runTransaction(async (tx) => {
+    const runRef = db.collection('productionRuns').doc(runDocId), bookRef = db.collection('inventoryProduction').doc(runDocId);
+    const [rs, bs] = await tx.getAll(runRef, bookRef);
+    if (!rs.exists) return null;
+    const run = rs.data(), made = R.madeByProduct(run), booked = (bs.exists && bs.data().made) || {};
+    const keys = [...new Set(Object.keys(made).concat(Object.keys(booked)))].filter(k => (made[k] || 0) !== (booked[k] || 0));
+    if (!keys.length) return null;
+    const all = (await tx.get(db.collection('receivingItems').where('status', '==', 'ACTIVE'))).docs.map(d => Object.assign({ id: d.id }, d.data()));
+    // All reads are done.
+    const stamp = nowIso || new Date().toISOString(), date = run.date || L.operatingDay(new Date(stamp)), next = {}, moves = [];
+    const keep = {};   // what is in Inventory now for each product (a product not in Inventory yet is left for later)
+    Object.keys(booked).forEach(k => { keep[k] = booked[k]; });
+    const change = (it, field, qty, move) => {
+      const cur = next[it.id] || Object.assign({}, it);
+      const before = R.shouldHave(cur);
+      cur[field] = Math.round(((Number(cur[field]) || 0) + qty) * 1000) / 1000;
+      next[it.id] = cur;
+      moves.push(Object.assign({ itemId: it.id, itemName: it.name, qty, before, after: R.shouldHave(cur), date, at: stamp, by: 'production',
+        line: text(run.line, 60), shift: text(run.shiftName, 40), runId: runDocId, loadId: '', poNumber: '', supplierId: it.supplierId || '', unit: text(it.unit, 20) }, move));
+    };
+    keys.forEach(k => {
+      const diff = (made[k] || 0) - (booked[k] || 0);
+      const milk = all.find(x => R.isMilk(x) && String(x.name || '').toUpperCase() === k);
+      if (!milk) return;
+      keep[k] = made[k] || 0;
+      change(milk, 'madeSince', diff, { kind: 'MADE', change: diff, how: 'PRODUCTION', product: milk.name });
+      (Array.isArray(milk.uses) ? milk.uses : []).forEach(u => {
+        const it = all.find(x => x.id === u.itemId);
+        if (!it) return;
+        const qty = Math.round(diff * (Number(u.qty) || 0) * 1000) / 1000;
+        if (qty) change(it, 'usedSince', qty, { kind: 'USED', change: -qty, how: 'PRODUCTION', forWhat: milk.name, product: milk.name });
+      });
+    });
+    Object.keys(next).forEach(id => { const d = Object.assign({}, next[id]); delete d.id; tx.set(db.collection('receivingItems').doc(id), Object.assign(d, { editedAt: stamp, editedBy: 'production' })); });
+    moves.forEach((m, i) => writeMove(tx, db, 'MOVE-PROD-' + String(runDocId).replace(/[^A-Za-z0-9_]/g, '').slice(0, 60) + '-' + Date.parse(stamp) + '-' + i, m));
+    tx.set(bookRef, { runId: runDocId, line: text(run.line, 60), date, made: keep, at: stamp });
+    return { moves: moves.length };
+  });
+}
+
 // The words a load's products read as on the calendar and in print (and in the older Product and Cases boxes).
 function linesText(lines) { return lines.map(l => l.name).filter(Boolean).join(', ').slice(0, 80); }
 function linesTotal(lines) { return lines.some(l => l.ordered !== null) ? String(lines.reduce((n, l) => n + (l.ordered || 0), 0)) : ''; }
 
-module.exports = { OPS, PRODUCT_OPS, validate, validateLines, saveProduct, linesForSave, receive, linesText, linesTotal };
+module.exports = {
+  newLabelCode, OPS, PRODUCT_OPS, STOCK_OPS, validate, tabletReceivePlan, applyTabletReceive, bookProduction, validateLines, saveProduct, linesForSave, receive, linesText, linesTotal };
