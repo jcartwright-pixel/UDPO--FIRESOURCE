@@ -12,9 +12,12 @@
   <link rel="stylesheet" href="css/employees.css">
   <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
+  <script src="js/departments.js"></script>
 </head>
 <!-- Joe 10/31 (mock-up 1): each plant's employees, brought over from UDMS every 15 minutes by the server (functions/src/employees.js).
-     Read only: name, employee ID, position, hire date and phone; where each person is used in Operations; who has left. -->
+     Read only: name, employee ID, position, hire date and phone; where each person is used in Operations; who has left.
+     Joe 11-4-26: each employee's DEPARTMENT, a drop-down of the one list (js/departments.js). It starts with the department the
+     UDMS job title points to (blank when it points to none); a manager's pick is kept from then on, whatever UDMS says. -->
 <body class="fill employees-page">
   <div class="signin" id="signin" hidden>
     <h1>Employees</h1>
@@ -33,6 +36,7 @@
       <div class="actions in-head">
         <span id="sync"></span>
         <input type="search" id="search" placeholder="Search name or ID..." aria-label="Search name or employee ID" autocomplete="off">
+        <select id="dept" aria-label="Department"><option value="">DEPARTMENT: ALL</option></select>
         <select id="status" aria-label="Status"><option value="ACTIVE">Status: Active</option><option value="LEFT">Status: Left</option><option value="ALL">Status: All</option></select>
       </div>
     </div>
@@ -40,16 +44,16 @@
     <div class="view emp-view">
       <div class="sheet scroll-list">
         <table>
-          <thead><tr><th class="left">Name</th><th>Employee ID</th><th>Position</th><th>Hire Date</th><th>Phone</th><th>Used On</th><th>Status</th></tr></thead>
-          <tbody id="rows"><tr><td colspan="7" class="empty">Reading…</td></tr></tbody>
+          <thead><tr><th class="left">Name</th><th>Employee ID</th><th>Position</th><th>DEPARTMENT</th><th>Hire Date</th><th>Phone</th><th>Used On</th><th>Status</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="8" class="empty">Reading…</td></tr></tbody>
         </table>
       </div>
-      <div class="foot" id="foot">Brought over from UDMS by itself every 15 minutes: new hires, position and phone changes, and people who leave. Change a person in UDMS, not here. Nothing private comes across.</div>
+      <div class="foot" id="foot">Brought over from UDMS by itself every 15 minutes: new hires, position and phone changes, and people who leave. Change a person in UDMS, not here. Nothing private comes across. The DEPARTMENT is kept here: pick it from the list and it stays.</div>
     </div>
   </div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText, save, allowedSaves, serverText } from './js/app.js';
     import { collection, doc, onSnapshot } from './js/firebase.js';
 
     const L = window.UDLogic;
@@ -61,7 +65,16 @@
     })();
     document.getElementById('plant-name').textContent = (PLANTS.find(p => p.id === plant) || { name: plant }).name;
     const idKey = (v) => String(v == null ? '' : v).trim().replace(/^0+(?=.)/, '').toUpperCase();
-    let employees = null, drivers = [], crew = [], sync = null;
+    let employees = null, drivers = [], crew = [], sync = null, mayPick = false;
+    const DEPTS = window.UDDepartments.DEPARTMENTS, NO_DEPT = 'NO DEPARTMENT';
+    document.getElementById('dept').innerHTML += DEPTS.concat([NO_DEPT]).map(d => '<option value="' + escapeHtml(d) + '">DEPARTMENT: ' + escapeHtml(d) + '</option>').join('');
+    // The DEPARTMENT box: a drop-down (starts blank) for a manager or administrator, the plain name for everyone else.
+    function deptCell(e) {
+      const d = e.department || '';
+      if (!mayPick) return d ? '<b class="dept">' + escapeHtml(d) + '</b>' : '<span class="none">None</span>';
+      return '<select class="dept-pick' + (d ? '' : ' blank') + '" data-emp="' + escapeHtml(e.key || e.employeeId) + '" aria-label="Department of ' + escapeHtml(e.name) + '">' +
+        '<option value=""></option>' + DEPTS.map(x => '<option value="' + escapeHtml(x) + '"' + (x === d ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
+    }
 
     // Where each employee is used: the Driver Roster, the plant schedule, the Maintenance Schedule.
     function usedOn(e) {
@@ -79,20 +92,30 @@
       line.className = s && s.ok === false ? 'bad' : 'good';
       line.textContent = !s ? 'Waiting for the first copy from UDMS' : s.ok === false ? s.problem + ' Last tried ' + dateTimeText(s.checkedAt) + '.' : 'Up to date with UDMS · last checked ' + dateTimeText(s.checkedAt);
       if (!employees) return;
-      const q = document.getElementById('search').value.trim().toUpperCase(), st = document.getElementById('status').value;
+      const q = document.getElementById('search').value.trim().toUpperCase(), st = document.getElementById('status').value, dp = document.getElementById('dept').value;
       const shown = employees.filter(e => e.facilityId === plant && (st === 'ALL' || (st === 'ACTIVE') === !!e.active) &&
+        (!dp || (dp === NO_DEPT ? !e.department : e.department === dp)) &&
         (!q || String(e.name).indexOf(q) >= 0 || (e.idKey && e.idKey.indexOf(idKey(q)) === 0)));
       document.getElementById('rows').innerHTML = shown.map(e => {
         const used = usedOn(e);
-        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + (escapeHtml(e.employeeId) || '<span class="none">No ID in UDMS</span>') + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td>' +
+        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + (escapeHtml(e.employeeId) || '<span class="none">No ID in UDMS</span>') + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td><td>' + deptCell(e) + '</td>' +
           '<td>' + (e.hireDate ? shortDate(e.hireDate) : '<span class="none">None</span>') + '</td><td>' + (escapeHtml(e.phone) || '<span class="none">No phone in UDMS</span>') + '</td>' +
           '<td>' + (used.length ? used.map(escapeHtml).join('<br>') : '<span class="none">Not used yet</span>') + '</td>' +
           '<td>' + (e.active ? '<span class="st-on">Active</span>' : '<span class="st-left">' + (e.status === 'GONE' ? 'Not in UDMS' : 'Left' + (e.leftDate ? ' ' + shortDate(e.leftDate) : '')) + '</span>') + '</td></tr>';
-      }).join('') || '<tr><td colspan="7" class="empty">' + (employees.some(e => e.facilityId === plant) ? 'No employee matches.' : 'No employees yet. They come over from UDMS by themselves once UDMS lets Operations read them.') + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">' + (employees.some(e => e.facilityId === plant) ? 'No employee matches.' : 'No employees yet. They come over from UDMS by themselves once UDMS lets Operations read them.') + '</td></tr>';
     }
-    ['search', 'status'].forEach(id => { document.getElementById(id).oninput = render; });
+    ['search', 'status', 'dept'].forEach(id => { document.getElementById(id).oninput = render; });
+    // A pick saves at once (no Save button, no message); the list then shows it from the database.
+    document.getElementById('rows').addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (!t.classList || !t.classList.contains('dept-pick')) return;
+      t.classList.toggle('blank', !t.value);
+      save('setEmployeeDepartment', { facilityId: plant, employeeId: t.dataset.emp, department: t.value })
+        .catch(e => { showError(serverText(e, 'the server') + ' The department was not saved.'); render(); });
+    });
     requireSignIn(async () => {
       const { db } = await start();
+      allowedSaves(['setEmployeeDepartment']).then(a => { mayPick = !!a.setEmployeeDepartment; render(); });
       const fail = (what) => (e) => showError('Could not read the ' + what + ' (' + e.message + '). Check the network and reload the page.');
       onSnapshot(collection(db, 'employees'), s => { employees = s.docs.map(d => d.data()).sort((a, b) => String(a.name).localeCompare(String(b.name))); render(); }, fail('Employees list'));
       onSnapshot(doc(db, 'config', 'employees'), s => { sync = s.exists() ? s.data() : null; render(); }, () => {});

@@ -16,10 +16,13 @@
 .employees-page tr.left-row td { background: #fdecec; }
 .employees-page .st-on { color: #1a7f3c; font-weight: 800; }
 .employees-page .st-left { color: #b42318; font-weight: 800; }
+.employees-page select.dept-pick { font: inherit; font-size: 16px; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; background: #fff; width: 100%; max-width: 230px; box-sizing: border-box; }
+.employees-page select.dept-pick.blank { border-color: #b42318; }
+.employees-page .dept { font-weight: 700; }
 .employees-page .foot { color: var(--muted); font-size: 16px; }
 @media (max-width: 760px) {
   .employees-page .head { flex-wrap: wrap; }
   .employees-page .actions.in-head { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .employees-page .actions input[type=search] { flex: 1 1 180px; width: auto; }
-  .employees-page table { min-width: 760px; }
+  .employees-page table { min-width: 900px; }
 }

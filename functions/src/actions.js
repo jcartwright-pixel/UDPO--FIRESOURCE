@@ -46,6 +46,7 @@ const SAVE_ROLES = L.SAVE_ROLES;
 const REORDER_ROLES = L.REORDER_ROLES;
 const DRIVER_ROLES = L.DRIVER_ROLES;
 const SMS = require('./sms');
+const EMP = require('./employees');
 
 const ACTIONS = Object.freeze({
   assignDriver: { roles: SAVE_ROLES, screen: 'dailyDispatch' },
@@ -158,6 +159,8 @@ const ACTIONS = Object.freeze({
   saveCrewSetup: { roles: REORDER_ROLES, screen: 'plant' },
   // Joe 10/25 (mock-up 7): Administration > Menu Setup, Administrators only.
   saveMenuSetup: { roles: L.ADMIN_ROLES, screen: 'plant' },
+  // Joe 11-4-26: Administration > Employees, each employee's DEPARTMENT from the one list (employees.js, departments.js).
+  setEmployeeDepartment: { roles: REORDER_ROLES, screen: 'plant' },
   // Fleet Service's Send to Garage: a PM, reefer service or DOT inspection becomes a Garage Station job (garage.js).
   sendToGarage: { roles: REORDER_ROLES, screen: 'checkIns' },
   // Fleet Service's Work Orders: Delete takes a job off the Garage Station (garage.js deleteGarageJob, Joe 10/14).
@@ -567,6 +570,7 @@ function validate(input) {
   if (action === 'saveLabelRoom') return Object.assign(out, LABEL.validateLabelRoom(input, SaveError));
   if (action === 'saveCrewSetup') return Object.assign(out, CREW.validateSetup(input, SaveError));
   if (action === 'saveMenuSetup') return Object.assign(out, MENUS.validateMenu(input, SaveError));
+  if (action === 'setEmployeeDepartment') return Object.assign(out, EMP.validateDepartment(input, SaveError));
   if (action === 'saveCrewDay') return Object.assign(out, CREW.validateDay(input, SaveError));
   if (action === 'saveCrewVacation') return Object.assign(out, CREW.validateVacation(input, SaveError));
   if (action === 'makeWorkOrder') return Object.assign(out, PMAINT.validateSend(input, SaveError));
@@ -947,6 +951,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveJugTrailer') return JUG.saveJugTrailer(tx, db, Object.assign({}, req, { saverName: (person && person.name) || '' }), email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveCrewSetup') return CREW.saveSetup(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveMenuSetup') return MENUS.saveMenu(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setEmployeeDepartment') return EMP.setDepartment(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveCrewDay') return CREW.saveDay(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'saveCrewVacation') return CREW.saveVacation(tx, db, req, email, stamp, logRef, mode, SaveError);
     if (req.action === 'makeWorkOrder') return PMAINT.makeWorkOrder(tx, db, req, email, stamp, logRef, mode, SaveError);

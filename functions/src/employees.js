@@ -9,12 +9,16 @@
  *                    schedule people and drivers who carry the same employee ID (their name, hire date and, on the schedules,
  *                    phone follow UDMS). Writes config/employees: when it last checked, and any problem in plain words.
  *   employeeFor      a save (Add Driver, + Add Person) reads the picked employee from the plant's own list.
+ *   departmentOf     the department an employee line keeps (Joe 11-4-26): one picked by hand on Administration > Employees
+ *                    stays; otherwise the one the UDMS job title points to (departments.js guess), or none.
+ *   setDepartment    the save behind the Employees list's DEPARTMENT drop-down.
  */
 'use strict';
 
 const L = require('./logic');
 const SMS = require('./sms');
 const { outsideDb } = require('./list-guard');
+const DEPT = require('./departments');
 
 // The only fields read from a UDMS employee record. Never add a private field (dob, address, ssn, masterRow, emergency...).
 const UDMS_FIELDS = Object.freeze(['firstName', 'lastName', 'preferredName', 'suffix', 'phone',
@@ -73,7 +77,14 @@ async function readUdms(udmsDb) {
   return snap.docs.map(d => pick(d.data(), d.id)).filter(Boolean);
 }
 
-const SAME = ['name', 'position', 'hireDate', 'phone', 'branch', 'active', 'status', 'leftDate', 'employeeId'];
+const SAME = ['name', 'position', 'hireDate', 'phone', 'branch', 'active', 'status', 'leftDate', 'employeeId', 'department'];
+
+// The department an employee keeps: picked by hand (departmentBy HAND) stays, else the job title's (departments.js), else ''.
+function departmentOf(was, position) {
+  if (was && was.departmentBy === 'HAND' && (was.department === '' || DEPT.isDepartment(was.department))) return { department: was.department, departmentBy: 'HAND', departmentAt: was.departmentAt || '', departmentByEmail: was.departmentByEmail || '' };
+  const d = DEPT.guess(position);
+  return { department: d, departmentBy: d ? 'JOB TITLE' : '' };
+}
 // The list key: the employee ID (leading zeros ignored), or the UDMS record for someone with no ID yet.
 const keyOf = (e) => (e.employeeId ? idKey(e.employeeId) : 'UDMS_' + idKey(e.udmsId));
 const changed = (a, b, keys) => keys.some(k => (a || {})[k] !== (b || {})[k]);
@@ -92,8 +103,8 @@ async function syncPlant(db, facilityId, list, stamp) {
   mine.forEach(e => { const k = keyOf(e); if (!byKey[k] || (e.active && !byKey[k].active)) byKey[k] = e; });
   const writes = [], log = { added: 0, changed: 0, left: 0, linked: 0 };
   Object.keys(byKey).forEach(k => {
-    const e = byKey[k], id = docId(k), was = had[id];
-    if (was && !changed(was, e, SAME)) return;
+    const id = docId(k), was = had[id], e = Object.assign({}, byKey[k], departmentOf(was, byKey[k].position));
+    if (was && !changed(was, e, SAME.concat(['departmentBy']))) return;
     if (!was) log.added++; else if (was.active && !e.active) log.left++; else log.changed++;
     writes.push([db.collection('employees').doc(id), Object.assign({ facilityId, source: 'UDMS', createdAt: (was && was.createdAt) || stamp }, e, { idKey: e.employeeId ? k : '', key: k, updatedAt: stamp })]);
   });
@@ -166,4 +177,24 @@ async function employeeFor(tx, db, employeeId, facilityId) {
   return e;
 }
 
-module.exports = { realId, keyOf, UDMS_FIELDS, PRIVATE, UDMS_PROJECT, udmsDatabase, pick, plantOfBranch, readUdms, syncPlant, runEmployeeSync, employeeFor, idKey, docId };
+// Administration > Employees, the DEPARTMENT drop-down: one of the list (departments.js), or blank. Kept from then on,
+// whatever UDMS's job title says. Logged in actions like every save.
+function validateDepartment(input, SaveError) {
+  const employeeId = text(input.employeeId).slice(0, 40), department = text(input.department).slice(0, 40);
+  if (!employeeId) throw new SaveError('BAD_REQUEST', 'Pick the employee first.'); // the line's key: its employee ID, or UDMS_<record> with no ID
+  if (department && !DEPT.isDepartment(department)) throw new SaveError('BAD_REQUEST', department + ' is not one of the departments. Pick one from the list.');
+  return { employeeId, department };
+}
+async function setDepartment(tx, db, req, email, stamp, logRef, mode, SaveError) {
+  const ref = db.collection('employees').doc(docId(req.employeeId));
+  const snap = await tx.get(ref);
+  if (!snap.exists) throw new SaveError('NOT_FOUND', 'That employee is not on this plant\'s Employees list. Reload the page.');
+  const was = snap.data();
+  const after = { department: req.department, departmentBy: 'HAND', departmentAt: stamp, departmentByEmail: email };
+  tx.set(ref, after, { merge: true });
+  const result = { ok: true, requestId: req.requestId, employeeId: was.employeeId, department: req.department };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode && mode.mode, facilityId: was.facilityId || '', employeeId: was.employeeId, before: { department: was.department || '' }, after: { department: req.department }, result });
+  return result;
+}
+
+module.exports = { realId, keyOf, departmentOf, validateDepartment, setDepartment, UDMS_FIELDS, PRIVATE, UDMS_PROJECT, udmsDatabase, pick, plantOfBranch, readUdms, syncPlant, runEmployeeSync, employeeFor, idKey, docId };

@@ -126,7 +126,8 @@ const ACTION_RIGHT = Object.freeze({
   saveSafetyWalk: 'plant.write', saveSafetyIssue: 'plant.write', saveExtinguisherCheck: 'plant.write', saveExtinguisher: 'plant.settings.write', saveFireSystemCheck: 'plant.write', saveFireSystem: 'plant.settings.write', saveSafetyChecklist: 'plant.settings.write', saveLocationAreas: 'plant.settings.write', saveMenuSetup: 'plant.settings.write',
   saveReceivingScan: 'operations.write', saveReceivingItem: 'plant.settings.write',
   saveJugTrailer: 'plant.write', saveLabelRoom: 'plant.write',
-  saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write'
+  saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write',
+  setEmployeeDepartment: 'plant.settings.write'
 });
 
 // Rights added after Role Templates could be saved, with when (11-4-26). A role template saved before then never saw them, so
@@ -206,7 +207,8 @@ const ACTION_SCREENS = Object.freeze({
   sendToGarage: ['fleetService', 'rFleetService'], deleteGarageJob: ['fleetService', 'rFleetService'], saveFleetRules: ['fleetService'], saveFleetUnit: ['fleetService'],
   saveGarageTech: ['fleetService'],
   saveCrewDay: ['crewBoard', 'pmCrew'], saveCrewVacation: ['crewVacations', 'pmCrew'], saveCrewSetup: ['crewSetup', 'pmCrew'],
-  saveProductSetup: [], saveProductUpload: [], saveProductSheet: [], savePlantShifts: [], saveLocationAreas: [], saveMenuSetup: [], saveReceivingScan: []
+  saveProductSetup: [], saveProductUpload: [], saveProductSheet: [], savePlantShifts: [], saveLocationAreas: [], saveMenuSetup: [], saveReceivingScan: [],
+  setEmployeeDepartment: []
 });
 
 // The ticks a People & Roles save may hold: {plantId: [screen keys]} with known plants and screens, or null (every screen).
