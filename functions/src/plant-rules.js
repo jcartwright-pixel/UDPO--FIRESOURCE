@@ -156,9 +156,35 @@
       return { itemId: text(l.itemId), name: text(l.name), unit: text(l.unit), ordered: wholeOrNull(l.ordered), received: wholeOrNull(l.received) };
     });
   }
+  // Joe 11-4-26 ("a mix of everything ... internal inventory on all my milk products ... a separate type"): our own milk products
+  // are products too (kind MILK_KIND, no supplier), made on the Production Lines (madeSince) instead of received. Stock comes out
+  // by hand (TAKE OUT), by a scan on the plant tablet, or by itself from what each milk product uses (uses) as the lines make it.
+  var MILK_KIND = 'Milk Product';
+  var MAX_USES = 30;
+  function isMilk(item) { return text(item && item.kind) === MILK_KIND; }
   function shouldHave(item) {
     item = item || {};
-    return (Number(item.countQty) || 0) + (Number(item.receivedSince) || 0) - (Number(item.usedSince) || 0);
+    return round3((Number(item.countQty) || 0) + (Number(item.receivedSince) || 0) + (Number(item.madeSince) || 0) - (Number(item.usedSince) || 0));
+  }
+  function round3(n) { return Math.round(n * 1000) / 1000; }
+  // What each product a line made this shift: the shift's count (a running total) between one product's start and the next's.
+  // { 'GALLON WHOLE MILK': 1200, ... } by the product's name in capitals.
+  function madeByProduct(run) {
+    run = run || {};
+    var counts = (Array.isArray(run.counts) ? run.counts : []).map(function (c) { return { t: Date.parse(c && c.at), n: Number(c && c.count) || 0 }; })
+      .filter(function (c) { return isFinite(c.t); }).sort(function (a, b) { return a.t - b.t; });
+    var last = Number(run.count) || (counts.length ? counts[counts.length - 1].n : 0);
+    function at(t) { if (t === Infinity) return last; var n = 0; counts.forEach(function (c) { if (c.t <= t) n = c.n; }); return n; }
+    var runs = (Array.isArray(run.runs) ? run.runs : []).filter(function (r) { return r && text(r.product) && isFinite(Date.parse(r.from)); })
+      .slice().sort(function (a, b) { return Date.parse(a.from) - Date.parse(b.from); });
+    if (!runs.length && text(run.product)) runs = [{ product: run.product, from: run.createdAt || '1970-01-01T00:00:00Z' }];
+    var out = {};
+    runs.forEach(function (r, i) {
+      var from = Date.parse(r.from), to = i + 1 < runs.length ? Date.parse(runs[i + 1].from) : Infinity;
+      var made = Math.max(0, at(to) - (i === 0 ? 0 : at(from))), key = text(r.product).toUpperCase();
+      if (made) out[key] = (out[key] || 0) + made;
+    });
+    return out;
   }
   function inventoryLow(item) {
     var low = wholeOrNull(item && item.low);
@@ -1635,7 +1661,7 @@
 
   return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
+    INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MILK_KIND: MILK_KIND, MAX_USES: MAX_USES, isMilk: isMilk, madeByProduct: madeByProduct, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
     leaveFirst: leaveFirst, inLoadingOrder: inLoadingOrder, scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,

@@ -32,7 +32,7 @@
       <!-- Joe 11/1 ("a nice little module for the inventory"): the one place every stock change goes through. Receiving's Mark
            Received puts stock in; Count is the manual override; Used (for example 500 dispenser bags) comes later. -->
       <div class="title"><span class="eyebrow">Inventory · <span id="plant-name"></span></span><h1 id="page-title">Inventory</h1></div>
-      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Received on Receiving, counted here</span></div>
+      <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Received, made, taken out and counted</span></div>
       <div class="actions in-head">
         <a class="button" id="products-open" href="scheduler.html?lane=receiving&amp;view=products">Edit products</a>
         <button type="button" id="print">Print</button>
@@ -43,20 +43,27 @@
       <div class="tabs seg inv-tabs" id="tabs" role="tablist" aria-label="Inventory"><button type="button" data-tab="onhand">On Hand</button><button type="button" data-tab="log">Receiving Log</button><button type="button" data-tab="history">History</button></div>
 
       <section id="tab-onhand" class="inv-tab" hidden>
+        <!-- Joe 11-4-26 ("a mix of everything ... internal inventory on all my milk products ... a separate type"): Supplies (what
+             suppliers send) and Milk Products (what our lines make) are two types; each product can be taken out (TAKE OUT), counted,
+             given a LOW AT mark, and a label printed on the Zebra; a milk product also keeps what each one made uses (USES). -->
         <div class="actions inv-filters">
+          <div class="tabs seg inv-types" id="types" role="tablist" aria-label="Type"><button type="button" data-type="supplies">Supplies</button><button type="button" data-type="milk">Milk Products</button></div>
           <input type="search" id="oh-search" placeholder="Find a product" aria-label="Find a product">
           <span class="spacer"></span>
+          <button type="button" id="oh-low" class="inv-low" aria-pressed="false">Low only</button>
           <select id="oh-kind" aria-label="Kind"></select>
           <select id="oh-supplier" aria-label="Supplier"></select>
+          <button type="button" id="milk-add" class="inv-add" hidden>Bring in our milk products</button>
         </div>
         <div class="notice error inv-err" id="oh-error" hidden></div>
-        <div class="sheet scroll-list">
+        <div class="sheet scroll-list" id="oh-sheet">
           <table class="issues inv-log inv-onhand">
-            <colgroup><col style="width:18%"><col style="width:14%"><col style="width:9%"><col style="width:11%"><col style="width:10%"><col style="width:8%"><col style="width:10%"><col style="width:20%"></colgroup>
-            <thead><tr><th>Product</th><th>Supplier</th><th>Counted in</th><th class="num">Last count</th><th class="num">Received since</th><th class="num">Used since</th><th class="num">Should have</th><th></th></tr></thead>
+            <colgroup><col style="width:17%"><col style="width:13%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:7%"><col style="width:21%"></colgroup>
+            <thead><tr><th>Product</th><th id="oh-col2">Supplier</th><th>Counted in</th><th class="num">Last count</th><th class="num" id="oh-col5">Received</th><th class="num">Used</th><th class="num">Should have</th><th class="num">Low at</th><th></th></tr></thead>
             <tbody id="oh-rows"></tbody>
           </table>
         </div>
+        <div class="inv-panel" id="oh-panel" hidden></div>
         <div class="foot" id="oh-foot"></div>
       </section>
 
@@ -85,7 +92,7 @@
         <div class="sheet scroll-list">
           <table class="issues inv-log inv-history">
             <colgroup><col style="width:9%"><col style="width:8%"><col style="width:20%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:20%"><col style="width:14%"></colgroup>
-            <thead><tr><th>Date</th><th>Time</th><th>Product</th><th>What</th><th class="num">Change</th><th class="num">Should have</th><th>Load</th><th>By</th></tr></thead>
+            <thead><tr><th>Date</th><th>Time</th><th>Product</th><th>What</th><th class="num">Change</th><th class="num">Should have</th><th>Load or for</th><th>By</th></tr></thead>
             <tbody id="h-rows"></tbody>
           </table>
         </div>
@@ -93,6 +100,10 @@
       </section>
     </div>
   </div>
+
+  <!-- Joe 11-4-26 (mock-up F): the Zebra labels, printed one to a 4 x 6 inch label (only while printing labels). -->
+  <div id="labels" class="inv-labels" aria-hidden="true"></div>
+  <script src="js/code128.js"></script>
 
   <script type="module">
     import { start, requireSignIn, escapeHtml, shortDate, showError, goLiveNote, save, maySave } from './js/app.js';
@@ -108,7 +119,8 @@
     const TABS = ['onhand', 'log', 'history'];
     let tab = TABS.indexOf(params.get('tab')) >= 0 ? params.get('tab') : 'onhand';
     let plant = params.get('plant') || '', period = '30', search = '', supplier = '', person = null, app = {}, db = null;
-    let ohSearch = '', ohKind = '', ohSupplier = '', counting = '', hProduct = params.get('product') || '';
+    let ohSearch = '', ohKind = '', ohSupplier = '', ohLow = false, editing = null, panel = null, hProduct = params.get('product') || '';
+    let ohType = params.get('type') === 'milk' ? 'milk' : 'supplies', lineNames = [];
     let scans = null, items = null, moves = null, deliveries = {}, supplierDocs = [], stops = [];
     const today = () => L.operatingDay(new Date());
     const timeOf = (iso) => window.UDTiming.clockOf(iso);
@@ -134,52 +146,168 @@
     }
 
     /* ---------- On Hand ---------- */
+    // One row is being worked on at a time (editing = { id, what: use | count | low }); USES and LABEL open in the page in
+    // place of the list (panel = { id, what: uses | label }), never over it.
+    const typeOf = (i) => (U.isMilk(i) ? 'milk' : 'supplies');
+    const unitWord = (i) => String(i.unit || '').toUpperCase();
+    function rowActs(i, ck) {
+      if (!ck) return '<button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
+      return '<button type="button" data-use="' + escapeHtml(i.id) + '">Take out</button><button type="button" data-count="' + escapeHtml(i.id) + '">Count</button>' +
+        (U.isMilk(i) ? '<button type="button" data-uses="' + escapeHtml(i.id) + '">Uses</button>' : '') +
+        '<button type="button" data-label="' + escapeHtml(i.id) + '">Label</button><button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
+    }
+    function editRow(i) {
+      const w = editing.what, id = escapeHtml(i.id);
+      let form;
+      if (w === 'use') {
+        form = '<label>How many used <input id="ed-qty" inputmode="numeric" maxlength="7" aria-label="How many used"></label>' +
+          '<label>For <select id="ed-for" aria-label="What it was for"><option value=""></option>' + lineNames.map(n => '<option>' + escapeHtml(n) + '</option>').join('') + '<option>OTHER</option></select></label>' +
+          '<button type="button" class="primary" id="ed-save">Save take out</button>';
+      } else if (w === 'count') {
+        form = '<label>On the shelf now <input id="ed-qty" inputmode="numeric" maxlength="8" aria-label="What is on the shelf now"></label><button type="button" class="primary" id="ed-save">Save count</button>';
+      } else {
+        form = '<label>Low at <input id="ed-qty" inputmode="numeric" maxlength="8" aria-label="Low at" value="' + escapeHtml(i.low === null || i.low === undefined ? '' : i.low) + '"></label>' +
+          '<button type="button" class="primary" id="ed-save">Save low at</button><small>Leave it blank for no low mark.</small>';
+      }
+      return '<tr class="counting" data-row="' + id + '"><td class="strong">' + escapeHtml(i.name) + '</td><td>' + escapeHtml(col2(i)) + '</td><td>' + escapeHtml(unitWord(i) || '—') + '</td>' +
+        '<td colspan="6"><div class="inv-acts inv-edit">' + form + '<button type="button" id="ed-cancel">Cancel</button></div></td></tr>';
+    }
+    const col2 = (i) => (U.isMilk(i) ? (i.uses && i.uses.length ? i.uses.length + ' thing' + (i.uses.length === 1 ? '' : 's') : 'Not set') : supplierName(i.supplierId) || '—');
     function renderOnHand() {
-      // Not while a count is being typed (a save elsewhere would redraw the box away).
+      // Not while a number is being typed (a save elsewhere would redraw the box away).
       const a = document.activeElement;
-      if (a && a.id === 'count-qty' && counting) return;
+      if (a && (a.id === 'ed-qty' || a.id === 'ed-for') && editing) return;
+      if (panel && document.getElementById('oh-panel').contains(a) && a.tagName !== 'BUTTON') return;
+      const milk = ohType === 'milk', ck = canCount();
+      document.querySelectorAll('[data-type]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.type === ohType)));
+      document.getElementById('oh-kind').hidden = milk;
+      document.getElementById('oh-supplier').hidden = milk;
+      document.getElementById('milk-add').hidden = !milk || !ck;
+      document.getElementById('oh-col2').textContent = milk ? 'Uses' : 'Supplier';
+      document.getElementById('oh-col5').textContent = milk ? 'Made' : 'Received';
+      const lowBtn = document.getElementById('oh-low');
+      lowBtn.setAttribute('aria-pressed', String(ohLow));
       const sups = suppliers(), kinds = U.INVENTORY_KINDS;
       document.getElementById('oh-kind').innerHTML = '<option value="">All kinds</option>' + kinds.map(k => '<option' + (k === ohKind ? ' selected' : '') + '>' + k + '</option>').join('');
       document.getElementById('oh-supplier').innerHTML = '<option value="">All suppliers</option>' + sups.map(r => '<option value="' + escapeHtml(r.routeId) + '"' + (r.routeId === ohSupplier ? ' selected' : '') + '>' + escapeHtml(r.name || r.run) + '</option>').join('');
-      const q = ohSearch.toUpperCase(), ck = canCount();
-      const list = (items || []).filter(i => (!ohKind || i.kind === ohKind) && (!ohSupplier || i.supplierId === ohSupplier) && (!q || [i.name, supplierName(i.supplierId)].join(' ').toUpperCase().indexOf(q) >= 0))
-        .sort((a, b) => supplierName(a.supplierId).localeCompare(supplierName(b.supplierId)) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+      const q = ohSearch.toUpperCase();
+      const mine = (items || []).filter(i => typeOf(i) === ohType);
+      const lowCount = mine.filter(U.inventoryLow).length;
+      lowBtn.textContent = 'Low only' + (lowCount ? ' (' + lowCount + ')' : '');
+      const list = mine.filter(i => (milk || !ohKind || i.kind === ohKind) && (milk || !ohSupplier || i.supplierId === ohSupplier) && (!ohLow || U.inventoryLow(i)) &&
+        (!q || [i.name, supplierName(i.supplierId)].join(' ').toUpperCase().indexOf(q) >= 0))
+        .sort((a, b) => (milk ? 0 : supplierName(a.supplierId).localeCompare(supplierName(b.supplierId))) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+      document.getElementById('oh-sheet').hidden = !!panel;
+      document.getElementById('oh-panel').hidden = !panel;
+      if (panel) { renderPanel(); }
       document.getElementById('oh-rows').innerHTML = list.map(i => {
-        const counted = i.countQty !== null && i.countQty !== undefined && i.countQty !== '', low = U.inventoryLow(i);
-        const acts = counting === i.id ? '<input id="count-qty" inputmode="numeric" maxlength="8" aria-label="What is on the shelf now" placeholder="On the shelf"><button type="button" class="primary" id="count-save">Save count</button><button type="button" id="count-cancel">Cancel</button>'
-          : (ck ? '<button type="button" data-count="' + escapeHtml(i.id) + '">Count</button>' : '') + '<button type="button" data-history="' + escapeHtml(i.id) + '">History</button>';
-        return '<tr class="' + (low ? 'low' : '') + (counting === i.id ? ' counting' : '') + '"><td class="strong">' + escapeHtml(i.name) + (low ? '<small>Below its low mark (' + num(i.low) + ')</small>' : '') + '</td><td>' + escapeHtml(supplierName(i.supplierId) || '—') + '</td>' +
-          '<td>' + escapeHtml(i.unit || '—') + '</td><td class="num">' + (counted ? num(i.countQty) + ' <small>on ' + escapeHtml(dayOf(i.countAt)) + '</small>' : 'Not counted yet') + '</td>' +
-          '<td class="num">' + (Number(i.receivedSince) ? '+' + num(i.receivedSince) : '0') + '</td><td class="num">' + (Number(i.usedSince) ? '−' + num(i.usedSince) : '0') + '</td>' +
-          '<td class="num strong big">' + num(U.shouldHave(i)) + '</td><td><div class="inv-acts">' + acts + '</div></td></tr>';
-      }).join('') || '<tr><td colspan="8" class="empty">' + (!items ? 'Loading Inventory&hellip;' : items.length ? 'No products match.' : 'No products yet. Add them on Receiving > Suppliers &amp; Products.') + '</td></tr>';
-      const lows = list.filter(U.inventoryLow).length;
-      document.getElementById('oh-foot').textContent = list.length + ' product' + (list.length === 1 ? '' : 's') + (lows ? ' · ' + lows + ' below the low mark (red)' : '') + '. Should have = last count + received since − used since.';
-      const box = document.getElementById('count-qty');
+        if (editing && editing.id === i.id) return editRow(i);
+        const counted = i.countQty !== null && i.countQty !== undefined && i.countQty !== '', low = U.inventoryLow(i), inQty = milk ? i.madeSince : i.receivedSince;
+        const lowCell = ck ? '<button type="button" class="inv-lowat" data-low="' + escapeHtml(i.id) + '" aria-label="Low at">' + (i.low === null || i.low === undefined ? 'Set' : num(i.low)) + '</button>' : (i.low === null || i.low === undefined ? '—' : num(i.low));
+        return '<tr class="' + (low ? 'low' : '') + '" data-row="' + escapeHtml(i.id) + '"><td class="strong">' + escapeHtml(i.name) + (low ? '<small>Low</small>' : '') + '</td><td>' + escapeHtml(col2(i)) + '</td>' +
+          '<td>' + escapeHtml(unitWord(i) || '—') + '</td><td class="num">' + (counted ? num(i.countQty) + ' <small>on ' + escapeHtml(dayOf(i.countAt)) + '</small>' : 'Not counted yet') + '</td>' +
+          '<td class="num">' + (Number(inQty) ? (inQty > 0 ? '+' : '−') + num(Math.abs(inQty)) : '0') + '</td><td class="num">' + (Number(i.usedSince) ? (i.usedSince > 0 ? '−' : '+') + num(Math.abs(i.usedSince)) : '0') + '</td>' +
+          '<td class="num strong big">' + num(U.shouldHave(i)) + '</td><td class="num">' + lowCell + '</td><td><div class="inv-acts">' + rowActs(i, ck) + '</div></td></tr>';
+      }).join('') || '<tr><td colspan="9" class="empty">' + (!items ? 'Loading Inventory&hellip;' : mine.length ? 'No products match.' :
+        milk ? 'No milk products yet. Press Bring in our milk products to add every product on the Products list.' : 'No products yet. Add them on Receiving > Suppliers &amp; Products.') + '</td></tr>';
+      document.getElementById('oh-foot').textContent = list.length + ' product' + (list.length === 1 ? '' : 's') + (lowCount ? ' · ' + lowCount + ' low (red)' : '') + '. Should have is the last count, plus what was ' + (milk ? 'made' : 'received') + ' since, minus what was taken out.';
+      const box = document.getElementById('ed-qty');
       if (box && !box.dataset.focused) { box.dataset.focused = '1'; box.focus(); }
     }
     function ohError(t) { const b = document.getElementById('oh-error'); b.textContent = t; b.hidden = !t; }
-    async function saveCount() {
-      const box = document.getElementById('count-qty'), t = box.value.replace(/,/g, '').trim();
-      if (!/^[0-9]{1,7}$/.test(t)) return ohError('Type what is on the shelf now, as a whole number.');
-      const btn = document.getElementById('count-save');
+    async function saveEdit() {
+      const box = document.getElementById('ed-qty'), t = box.value.replace(/,/g, '').trim(), w = editing.what;
+      if (w === 'low' ? !/^[0-9]{0,7}$/.test(t) : !/^[0-9]{1,7}$/.test(t)) return ohError(w === 'use' ? 'Type how many were used, as a whole number.' : w === 'low' ? 'Type the low mark as a whole number, or leave it blank.' : 'Type what is on the shelf now, as a whole number.');
+      if (w === 'use' && Number(t) < 1) return ohError('Type how many were used, as a whole number.');
+      const btn = document.getElementById('ed-save'), label = btn.textContent;
       btn.disabled = true; btn.textContent = 'Saving…';
-      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'count', itemId: counting, qty: t }); ohError(''); counting = ''; render(); }
-      catch (e) { btn.disabled = false; btn.textContent = 'Save count'; ohError('Not saved (' + (e.message || e) + ').'); }
+      const body = w === 'use' ? { op: 'use', itemId: editing.id, qty: t, forWhat: document.getElementById('ed-for').value, how: 'HAND' } : w === 'low' ? { op: 'setLow', itemId: editing.id, low: t } : { op: 'count', itemId: editing.id, qty: t };
+      try { await save('savePlantSchedule', Object.assign({ lane: 'RECEIVING' }, body)); ohError(''); editing = null; render(); }
+      catch (e) { btn.disabled = false; btn.textContent = label; ohError('Not saved (' + (e.message || e) + ').'); }
+    }
+    async function addMilk() {
+      const btn = document.getElementById('milk-add');
+      btn.disabled = true;
+      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'addMilkProducts' }); ohError(''); }
+      catch (e) { ohError('Not added (' + (e.message || e) + ').'); }
+      btn.disabled = false;
+    }
+
+    /* ---------- USES and LABEL (in the page, in place of the list) ---------- */
+    function renderPanel() {
+      const box = document.getElementById('oh-panel'), it = (items || []).find(i => i.id === panel.id);
+      if (!it) { panel = null; box.hidden = true; document.getElementById('oh-sheet').hidden = false; return; }
+      if (panel.what === 'uses') {
+        const supplies = (items || []).filter(i => !U.isMilk(i)).sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+        const rows = panel.rows.map((r, n) => '<tr><td><select data-urow="' + n + '" data-uf="itemId" aria-label="What it uses"><option value=""></option>' +
+          supplies.map(x => '<option value="' + escapeHtml(x.id) + '"' + (x.id === r.itemId ? ' selected' : '') + '>' + escapeHtml(x.name) + '</option>').join('') + '</select></td>' +
+          '<td><input data-urow="' + n + '" data-uf="qty" inputmode="decimal" maxlength="9" aria-label="How many" value="' + escapeHtml(r.qty) + '"></td>' +
+          '<td>' + escapeHtml(String(((supplies.find(x => x.id === r.itemId) || {}).unit) || '').toUpperCase() || '—') + '</td>' +
+          '<td><button type="button" data-uremove="' + n + '">Remove</button></td></tr>').join('');
+        box.innerHTML = '<div class="inv-panel-head"><h2>' + escapeHtml(it.name) + ' · each one made uses</h2><span class="spacer"></span><button type="button" id="u-add">＋ Add</button></div>' +
+          '<p class="inv-help">Each one counted on the Production Lines takes these out of Inventory by itself. Use a part for a share, for example 0.25 of a crate.</p>' +
+          '<table class="issues inv-log inv-uses"><thead><tr><th>Product</th><th class="num">How many</th><th>Counted in</th><th></th></tr></thead><tbody>' +
+          (rows || '<tr><td colspan="4" class="empty">Nothing yet. Press ＋ Add for each thing it is made with.</td></tr>') + '</tbody></table>' +
+          '<div class="inv-panel-foot"><button type="button" class="primary" id="u-save">Save uses</button><button type="button" id="p-back">Back</button></div>';
+      } else {
+        box.innerHTML = '<div class="inv-panel-head"><h2>Print labels · ' + escapeHtml(it.name) + '</h2></div>' +
+          '<div class="inv-label-form"><label>How many labels <input id="l-count" inputmode="numeric" maxlength="3" value="' + escapeHtml(panel.count) + '"></label>' +
+          '<label>Lot <input id="l-lot" maxlength="30" value="' + escapeHtml(panel.lot) + '" placeholder="Optional"></label>' +
+          '<div class="inv-panel-foot"><button type="button" class="primary" id="l-print">Print labels</button><button type="button" id="p-back">Back</button></div>' +
+          '<p class="inv-help">Pick the Zebra printer when the print window opens. Each label is 4 x 6 inches, with our own barcode: a scan of it on the plant tablet\'s TAKE OUT tab knows the product.</p></div>' +
+          '<div class="inv-label-show">' + labelHtml(it, panel.lot, 1, Math.max(1, Number(panel.count) || 1), it.labelCode || 'UD······') + '</div>';
+      }
+    }
+    function labelHtml(it, lot, n, of, code) {
+      const bars = window.UDCode128 && /^UD[A-Z0-9]{6}$/.test(code) ? window.UDCode128.svg(code, { height: 110 }) : '<div class="lbl-wait">BARCODE PRINTS HERE</div>';
+      return '<div class="lbl"><b class="lbl-name">' + escapeHtml(it.name) + '</b><span>' + escapeHtml(U.isMilk(it) ? 'United Dairy' : supplierName(it.supplierId) || '') + (lot ? ' · LOT ' + escapeHtml(lot) : '') + '</span>' +
+        '<span>' + escapeHtml(shortDate(today())) + (it.unit ? ' · ' + escapeHtml(unitWord(it)) : '') + '</span><div class="lbl-bars">' + bars + '</div><span class="lbl-code">' + escapeHtml(code) + '</span>' +
+        '<b class="lbl-n">' + n + ' of ' + of + '</b></div>';
+    }
+    async function printLabels() {
+      const it = (items || []).find(i => i.id === panel.id), count = Number(document.getElementById('l-count').value.trim());
+      if (!Number.isInteger(count) || count < 1 || count > 200) return ohError('Type how many labels, from 1 to 200.');
+      panel.count = String(count); panel.lot = document.getElementById('l-lot').value.trim().toUpperCase().slice(0, 30);
+      let code = it.labelCode;
+      if (!code) {
+        try { code = (await save('savePlantSchedule', { lane: 'RECEIVING', op: 'label', itemId: it.id })).labelCode; }
+        catch (e) { return ohError('Labels not printed (' + (e.message || e) + ').'); }
+      }
+      ohError('');
+      const out = document.getElementById('labels');
+      out.innerHTML = Array.from({ length: count }, (x, n) => labelHtml(it, panel.lot, n + 1, count, code)).join('');
+      const page = document.createElement('style');
+      page.id = 'label-page';
+      page.textContent = '@page { size: 4in 6in; margin: 0; }';
+      document.head.appendChild(page);
+      document.body.classList.add('printing-labels');
+      const done = () => { document.body.classList.remove('printing-labels'); page.remove(); out.innerHTML = ''; window.removeEventListener('afterprint', done); };
+      window.addEventListener('afterprint', done);
+      window.print();
+    }
+    async function saveUses() {
+      const it = (items || []).find(i => i.id === panel.id), rows = panel.rows.filter(r => r.itemId || String(r.qty).trim());
+      if (rows.some(r => !r.itemId)) return ohError('Pick what it uses on each line, or remove the line.');
+      if (rows.some(r => !(Number(r.qty) > 0))) return ohError('Type how many it uses on each line, as a number above 0.');
+      const btn = document.getElementById('u-save');
+      btn.disabled = true;
+      try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'setUses', itemId: it.id, uses: rows.map(r => ({ itemId: r.itemId, qty: String(r.qty) })) }); ohError(''); panel = null; render(); }
+      catch (e) { btn.disabled = false; ohError('Not saved (' + (e.message || e) + ').'); }
     }
 
     /* ---------- History ---------- */
-    const WHAT = { RECEIVED: 'Received', COUNT: 'Counted', USED: 'Used' };
+    const WHAT = { RECEIVED: 'Received', COUNT: 'Counted', USED: 'Used', MADE: 'Made' };
+    const HOW = { TABLET: 'on the Boxing tablet', SCAN: 'scanned on the plant tablet', HAND: 'typed in', PRODUCTION: 'by the Production Lines' };
     function renderHistory() {
       const pick = document.getElementById('h-product');
       pick.innerHTML = '<option value="">All products</option>' + (items || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).map(i => '<option value="' + escapeHtml(i.id) + '"' + (i.id === hProduct ? ' selected' : '') + '>' + escapeHtml(i.name) + '</option>').join('');
       const list = (moves || []).filter(m => !hProduct || m.itemId === hProduct);
       document.getElementById('h-rows').innerHTML = list.map(m => {
-        const change = m.kind === 'COUNT' ? (m.change ? (m.change > 0 ? '+' : '−') + num(Math.abs(m.change)) : '0') : (m.kind === 'USED' ? '−' : '+') + num(m.qty);
+        const ch = Number(m.change) || 0, change = ch ? (ch > 0 ? '+' : '−') + num(Math.abs(ch)) : '0';
         return '<tr class="mv-' + escapeHtml(String(m.kind).toLowerCase()) + '"><td>' + escapeHtml(dayOf(m.at)) + '</td><td>' + escapeHtml(timeOf(m.at)) + '</td><td class="strong">' + escapeHtml(itemName(m)) + '</td>' +
-          '<td>' + escapeHtml(WHAT[m.kind] || m.kind) + (m.kind === 'COUNT' ? '<small>' + num(m.qty) + ' on the shelf</small>' : '') + '</td><td class="num strong">' + change + '</td><td class="num">' + num(m.after) + '</td>' +
-          '<td>' + escapeHtml([m.supplier, m.poNumber ? (/^PO\b/i.test(m.poNumber) ? m.poNumber : 'PO ' + m.poNumber) : ''].filter(Boolean).join(' · ') || '—') + '</td><td>' + escapeHtml(who(m)) + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" class="empty">' + (!moves ? 'Loading the history&hellip;' : 'Nothing yet. A load marked received on Receiving, or a Count here, shows up here.') + '</td></tr>';
+          '<td>' + escapeHtml(m.kind === 'USED' && ch > 0 ? 'Put back' : WHAT[m.kind] || m.kind) + (m.kind === 'COUNT' ? '<small>' + num(m.qty) + ' on the shelf</small>' : HOW[m.how] ? '<small>' + escapeHtml(HOW[m.how]) + '</small>' : '') + '</td><td class="num strong">' + change + '</td><td class="num">' + num(m.after) + '</td>' +
+          '<td>' + escapeHtml([m.supplier, m.poNumber ? (/^PO\b/i.test(m.poNumber) ? m.poNumber : 'PO ' + m.poNumber) : '', m.forWhat ? 'For ' + m.forWhat : '', m.line && m.kind === 'MADE' ? m.line : ''].filter(Boolean).join(' · ') || '—') + '</td><td>' + escapeHtml(who(m)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">' + (!moves ? 'Loading the history&hellip;' : 'Nothing yet. A load received, a count, a take out or what the lines made shows up here.') + '</td></tr>';
       document.getElementById('h-foot').textContent = list.length + ' change' + (list.length === 1 ? '' : 's') + (moves && moves.length >= 500 ? ' (the newest 500)' : '') + '.';
     }
 
@@ -205,32 +333,57 @@
       document.getElementById('foot').textContent = list.length + ' scan' + (list.length === 1 ? '' : 's') + ' · ' + cases + ' case' + (cases === 1 ? '' : 's') + '. Shaded rows: a barcode not named yet.';
     }
 
-    function setTab(t) { tab = t; counting = ''; const u = new URL(location.href); u.searchParams.set('tab', t); if (t === 'history' && hProduct) u.searchParams.set('product', hProduct); else u.searchParams.delete('product'); history.replaceState(null, '', u); render(); }
+    function setTab(t) { tab = t; editing = null; panel = null; const u = new URL(location.href); u.searchParams.set('tab', t); if (t === 'history' && hProduct) u.searchParams.set('product', hProduct); else u.searchParams.delete('product'); history.replaceState(null, '', u); render(); }
+    function setType(t) { ohType = t; editing = null; panel = null; ohKind = ohSupplier = ''; const u = new URL(location.href); if (t === 'milk') u.searchParams.set('type', t); else u.searchParams.delete('type'); history.replaceState(null, '', u); ohError(''); render(); }
     document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+    document.getElementById('types').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (b) setType(b.dataset.type); });
     document.getElementById('periods').addEventListener('click', e => { const b = e.target.closest('[data-period]'); if (b && b.dataset.period !== period) { period = b.dataset.period; follow(); } });
     document.getElementById('search').addEventListener('input', e => { search = e.target.value.trim(); render(); });
     document.getElementById('supplier').addEventListener('change', e => { supplier = e.target.value; render(); });
     document.getElementById('oh-search').addEventListener('input', e => { ohSearch = e.target.value.trim(); render(); });
     document.getElementById('oh-kind').addEventListener('change', e => { ohKind = e.target.value; render(); });
     document.getElementById('oh-supplier').addEventListener('change', e => { ohSupplier = e.target.value; render(); });
+    document.getElementById('oh-low').addEventListener('click', () => { ohLow = !ohLow; render(); });
+    document.getElementById('milk-add').addEventListener('click', addMilk);
     document.getElementById('h-product').addEventListener('change', e => { hProduct = e.target.value; setTab('history'); });
     document.getElementById('print').addEventListener('click', () => window.print());
+    const cancelEdit = () => { editing = null; ohError(''); render(); };
     document.getElementById('oh-rows').addEventListener('click', e => {
-      const c = e.target.closest('[data-count]'), h = e.target.closest('[data-history]');
-      if (c) { counting = c.dataset.count; ohError(''); render(); return; }
-      if (h) { hProduct = h.dataset.history; setTab('history'); return; }
-      if (e.target.id === 'count-save') return saveCount();
-      if (e.target.id === 'count-cancel') { counting = ''; ohError(''); render(); }
+      const b = e.target.closest('button');
+      if (!b) return;
+      const d = b.dataset;
+      if (d.use || d.count || d.low) { editing = { id: d.use || d.count || d.low, what: d.use ? 'use' : d.count ? 'count' : 'low' }; panel = null; ohError(''); render(); return; }
+      if (d.uses) { const it = items.find(i => i.id === d.uses); editing = null; panel = { id: d.uses, what: 'uses', rows: ((it && it.uses) || []).map(u => ({ itemId: u.itemId, qty: String(u.qty) })) }; ohError(''); render(); return; }
+      if (d.label) { editing = null; panel = { id: d.label, what: 'label', count: '1', lot: '' }; ohError(''); render(); return; }
+      if (d.history) { hProduct = d.history; setTab('history'); return; }
+      if (b.id === 'ed-save') return saveEdit();
+      if (b.id === 'ed-cancel') cancelEdit();
     });
     document.getElementById('oh-rows').addEventListener('keydown', e => {
-      if (e.target.id !== 'count-qty') return;
-      if (e.key === 'Enter') { e.preventDefault(); saveCount(); }
-      if (e.key === 'Escape') { counting = ''; ohError(''); render(); }
+      if (e.target.id !== 'ed-qty') return;
+      if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+      if (e.key === 'Escape') cancelEdit();
     });
+    const pbox = document.getElementById('oh-panel');
+    pbox.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.id === 'p-back') { panel = null; ohError(''); render(); return; }
+      if (b.id === 'u-add') { panel.rows.push({ itemId: '', qty: '' }); renderPanel(); const sel = pbox.querySelector('[data-urow="' + (panel.rows.length - 1) + '"][data-uf="itemId"]'); if (sel) sel.focus(); return; }
+      if (b.dataset.uremove !== undefined) { panel.rows.splice(Number(b.dataset.uremove), 1); renderPanel(); return; }
+      if (b.id === 'u-save') return saveUses();
+      if (b.id === 'l-print') return printLabels();
+    });
+    pbox.addEventListener('input', e => {
+      const el = e.target.closest('[data-urow]');
+      if (el && panel && panel.rows[el.dataset.urow]) panel.rows[el.dataset.urow][el.dataset.uf] = el.value;
+      if (e.target.id === 'l-count' || e.target.id === 'l-lot') { panel[e.target.id === 'l-count' ? 'count' : 'lot'] = e.target.value; }
+    });
+    pbox.addEventListener('change', e => { const el = e.target.closest('[data-uf="itemId"]'); if (el) renderPanel(); });
     window.udBack = () => {
-      if (counting) { counting = ''; render(); return true; }
+      if (editing || panel) { editing = null; panel = null; render(); return true; }
       if (tab === 'history' && hProduct) { hProduct = ''; setTab('onhand'); return true; }
-      if (search || supplier || ohSearch || ohKind || ohSupplier) { search = supplier = ohSearch = ohKind = ohSupplier = ''; ['search', 'oh-search'].forEach(id => { document.getElementById(id).value = ''; }); render(); return true; }
+      if (search || supplier || ohSearch || ohKind || ohSupplier || ohLow) { search = supplier = ohSearch = ohKind = ohSupplier = ''; ohLow = false; ['search', 'oh-search'].forEach(id => { document.getElementById(id).value = ''; }); render(); return true; }
       return false;
     };
 
@@ -258,6 +411,8 @@
       onSnapshot(query(collection(db, 'receivingItems'), where('status', '==', 'ACTIVE')), s => { items = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, fail('the products'));
       onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); render(); }, fail('the suppliers'));
       onSnapshot(query(collection(db, 'inventoryMoves'), orderBy('at', 'desc'), limit(500)), s => { moves = s.docs.map(d => d.data()); render(); }, fail('the Inventory history'));
+      // What a take out was for: the plant's Production Lines (Line Targets).
+      onSnapshot(collection(db, 'productionLines'), s => { lineNames = [...new Set(s.docs.map(d => String(d.data().name || d.data().line || '').trim()).filter(Boolean))].sort(); }, () => { lineNames = []; });
     });
   </script>
 </body>

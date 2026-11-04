@@ -57,7 +57,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // "Administrators only", and clicking one stays on the plant home; the menu links are locked; typing the address is refused.
     assert.deepEqual(await sup.$$eval('.hq-card.building', c => c.map(x => x.dataset.cardSide + ':' + x.querySelector('.uc-admin-only').innerText + ':' + getComputedStyle(x.querySelector('.open-text')).display)),
       ['pmaint:Administrators only while it is being built:none']);
-    assert.deepEqual(await sup.$$eval('.hq-main.building', c => c.map(x => x.dataset.side)), ['production', 'debag', 'shipping', 'safety']);
+    assert.deepEqual(await sup.$$eval('.hq-main.building', c => c.map(x => x.dataset.side)), ['production', 'debag', 'safety'], 'Inventory is open to everyone in the plant (Joe 11-4-26, mock-up E)');
     await sup.click('.hq-main[data-side="production"]');
     await sup.waitForTimeout(600);
     assert.match(sup.url(), /index\.html/, 'a supervisor clicking Plant Production stays on the plant home');
@@ -72,7 +72,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Plant Production's first page is its Production Lines board (Joe 10/11); Plant Maintenance's is its Maintenance Center (Joe 10/12),
     // and every Plant Maintenance screen stays closed to a supervisor while it is being built.
     for (const [page, name, inside] of [['production.html?', 'Plant Production', '#tiles'], ['pmaint.html?', 'Plant Maintenance', '#cols'], ['machinery.html?', 'Plant Maintenance', '#rows'],
-      ['pmschedule.html?', 'Plant Maintenance', '#rows'], ['pmworkorders.html?', 'Plant Maintenance', '#rows'], ['inventory.html?', 'Shipping & Receiving', '#rows']]) {
+      ['pmschedule.html?', 'Plant Maintenance', '#rows'], ['pmworkorders.html?', 'Plant Maintenance', '#rows']]) {
       await sup.goto(HOSTING + '/' + page + 'testEmail=super.test@uniteddairy.com');
       await sup.waitForSelector('#uc-refused');
       assert.equal(await sup.textContent('#uc-refused h1'), name + ' is under construction');
@@ -81,6 +81,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
       assert.equal(await sup.isVisible('#go-home'), true, 'the header and its Home button stay');
       assert.equal(await sup.isVisible('#signin'), false, 'the supervisor stays signed in');
     }
+    // Joe 11-4-26 (Inventory mock-up E): Inventory is open to everyone in the plant, a supervisor too.
+    await sup.goto(HOSTING + '/inventory.html?testEmail=super.test@uniteddairy.com');
+    await sup.waitForSelector('#oh-rows');
+    await sup.waitForFunction(() => !document.getElementById('screen').hidden);
+    assert.equal(await sup.$('#uc-refused'), null, 'Inventory is not under construction');
     // Any other being-built screen still opens for everyone.
     await sup.goto(HOSTING + '/soon.html?what=trucks-today&testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('#screen:not([hidden]) .soon-card');

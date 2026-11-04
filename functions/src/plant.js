@@ -774,6 +774,8 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   const kept = was.state === 'WORKING' || was.state === 'PAUSED' ? was.state : 'WAITING';
   const state = req.step === 'complete' ? 'COMPLETE' : req.step === 'pause' ? 'PAUSED' : req.step === 'save' ? kept : 'WORKING';
   if (req.lane === 'SHIPPING' && state === 'WORKING' && was.state !== 'WORKING') overLimit('BOXING', await loadingNow(tx, db, 'BOXING', stamp, req.id), SaveError);
+  // Joe 11-4-26 (mock-up D): RECEIVED on the tablet puts the delivery's scans into Inventory, unless Mark Received already did.
+  const recvPlan = req.lane === 'RECEIVING' && state === 'COMPLETE' && !(had.payload && had.payload.received && had.payload.received.at) ? await INV.tabletReceivePlan(tx, db, req.id) : null;
   const work = Object.assign({}, was, req.work, { state });
   // Joe 10/22: paused minutes are not loading time (plant-rules pauseMark).
   work.pauseMark = R.nextPauseMark({ startedAt: text(was.startedAt), notes: text(was.notes), paused: was.state === 'PAUSED', pauseMark: was.pauseMark || null }, state === 'PAUSED', state === 'WAITING', stamp);
@@ -785,11 +787,12 @@ async function progressSchedule(tx, db, req, had, type, email, stamp, logRef, mo
   if (req.step === 'complete') Object.assign(work, { completedAt: stamp, completedBy: email });
   const payload = Object.assign({}, had.payload || {}, { work });
   if (req.work.trailer !== undefined) payload.trailer = req.work.trailer;
+  const inventory = recvPlan ? INV.applyTabletReceive(tx, db, recvPlan, had, payload, req, email, stamp) : null;
   const rec = Object.assign({}, had, { payload, trailer: payload.trailer || had.trailer || '', recordedAt: stamp, recordedBy: email, createdInApp: true, testEdited: true, editedAt: stamp });
   delete rec.sheetRow; delete rec.cells;
   tx.set(db.collection('plantJournal').doc(appScheduleId(type, req.id)), rec);
   const after = R.scheduleEntries([rec], req.lane)[0];
-  const result = { ok: true, requestId: req.requestId, id: req.id, state: work.state, date: rec.date };
+  const result = Object.assign({ ok: true, requestId: req.requestId, id: req.id, state: work.state, date: rec.date }, inventory ? { inventory } : {});
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, lane: req.lane, op: req.op, step: req.step, scheduleId: req.id, before, after, result });
   return result;
 }

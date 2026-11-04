@@ -200,24 +200,25 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
       await inv.waitForFunction(() => (document.getElementById('oh-rows').textContent.match(/Silgan Closures/g) || []).length === 2);
       const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
       // 1536 first (before the Count), then 1920 (after it: the count is the new starting point).
-      assert.ok(rows.includes(w === 1536 ? '38mm white caps | Silgan Closures | Cases | Not counted yet | +40 | 0 | 40' : '38mm white caps | Silgan Closures | Cases | 38 on ' + countDay + ' | 0 | 0 | 38'), rows.join('\n'));
-      assert.ok(rows.includes('38mm red caps | Silgan Closures | Cases | Not counted yet | +10 | 0 | 10'), rows.join('\n'));
+      // Joe 11-3-26: ALL CAPS on screens (Inventory shows its words in capitals).
+      assert.ok(rows.includes(w === 1536 ? '38MM WHITE CAPS | SILGAN CLOSURES | CASES | NOT COUNTED YET | +40 | 0 | 40' : '38MM WHITE CAPS | SILGAN CLOSURES | CASES | 38 ON ' + countDay + ' | 0 | 0 | 38'), rows.join('\n'));
+      assert.ok(rows.includes('38MM RED CAPS | SILGAN CLOSURES | CASES | NOT COUNTED YET | +10 | 0 | 10'), rows.join('\n'));
       assert.ok(await smallest(inv, '#tab-onhand *, .inv-tabs *') >= 16, 'text 16px and up');
       assert.ok(await fits(inv), 'no sideways scroll at ' + w);
       await shot(inv, '5-inventory-on-hand-' + w + '.png');
       if (w === 1536) {
         const whiteNow = await itemNamed('38mm white caps');
         await inv.click('[data-count="' + whiteNow.id + '"]');
-        await inv.fill('#count-qty', '38');
+        await inv.fill('#ed-qty', '38');
         await shot(inv, '6-inventory-count-1536.png');
-        await inv.press('#count-qty', 'Enter');
+        await inv.press('#ed-qty', 'Enter');
         const counted = await until(async () => { const i = await itemNamed('38mm white caps'); return i.countQty === 38 && i; }, 'the count');
         countDay = require('../../src/logic').operatingDay(new Date(counted.countAt)).replace(/^20(\d\d)-0?(\d+)-0?(\d+)$/, '$2-$3-$1');
         await inv.waitForFunction(() => [...document.querySelectorAll('#oh-rows tr')].some(r => /38mm white caps/.test(r.textContent) && r.cells[6].textContent === '38'));
         await inv.click('[data-history="' + whiteNow.id + '"]');
         await inv.waitForFunction(() => document.querySelectorAll('#h-rows tr').length === 2 && !document.querySelector('#h-rows .empty'));
         const hist = await inv.$$eval('#h-rows tr', r => r.map(x => [2, 3, 4, 5, 6].map(i => x.cells[i].innerText.replace(/\n/g, ' ')).join(' | ')));
-        assert.deepEqual(hist, ['38mm white caps | Counted 38 on the shelf | −2 | 38 | —', '38mm white caps | Received | +40 | 40 | SILGAN CLOSURES · PO 55120']);
+        assert.deepEqual(hist, ['38MM WHITE CAPS | COUNTED 38 ON THE SHELF | −2 | 38 | —', '38MM WHITE CAPS | RECEIVED | +40 | 40 | SILGAN CLOSURES · PO 55120']);
         await shot(inv, '7-inventory-history-1536.png');
         await inv.click('[data-tab="log"]');
         await inv.waitForSelector('#tab-log:not([hidden]) #rows tr');

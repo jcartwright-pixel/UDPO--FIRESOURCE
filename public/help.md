@@ -858,6 +858,8 @@ The calendar of loads coming in, and where you check a load in when its trailer 
 
 > Type 0 for a product that did not come. `Mark Received` needs a count for every product on the load.
 
+- A delivery scanned on the Boxing tablet goes into Inventory when the tablet presses `RECEIVED`. Do not press `Mark Received` for it too.
+
 !> Do not press `Mark Received` until everything is counted. It puts the counts into Inventory once; to fix a count afterwards, use `Count` on Inventory.
 
 ## Suppliers & Products
@@ -881,18 +883,69 @@ The plant's own list of suppliers and everything they send: ingredients, packagi
 id: inventory
 screens: inventory.html
 
-What the plant should have of every product it receives. Every change goes through here: a load marked received on Receiving adds to it, and a count typed here sets it.
+What the plant should have of everything it keeps: the supplies it receives (jugs, caps, bags, ingredients) and its own milk products. Everyone in the plant can open it. Two types at the top: **Supplies** and **Milk Products**. Every change goes through here, and each one is a line in **History**.
 
-- **On Hand** lists each product: its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, and **Should have** (last count + received since − used since).
-- `Count` is for when you count the shelf: type what is really there and press `Save count` (or Enter). That becomes the new starting point.
-- `History` shows every change to that product: each load received (with its supplier and PO) and each count, with who did it.
+- **On Hand** lists each product: its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
+- **Should have** is the last count, plus what was received since, minus what was taken out since.
+- Stock comes **in** when a load is marked received on Receiving, or when the Boxing tablet presses `RECEIVED` on a delivery it scanned.
+- Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Milk Products).
+
+### Take stock out by hand
+
+1. Press `Take out` on the product's line.
+2. Type **How many used** and pick what it was **For** (a production line, or OTHER).
+3. Press `Save take out` (or Enter). Used goes up and Should have goes down.
+
+### Count the shelf
+
+1. Press `Count` on the product's line.
+2. Type what is really on the shelf and press `Save count` (or Enter). That becomes the new starting point.
+
+### Low stock
+
+1. Press the **Low at** box on a product (it says `Set` when there is none).
+2. Type the number where it should turn red and press Enter. Leave it empty to take the mark off.
+
+- A product below its Low at number is red. `Low only` shows just the red ones, with how many there are.
+
+### Zebra labels
+
+1. Press `Label` on a product.
+2. Type **How many labels** and a **Lot** if you want one on the label.
+3. Press `Print labels`. The print window opens: pick the Zebra printer and print. Each label is 4 x 6 inches, one per page, with the product, its supplier, the date, the lot and the product's own barcode.
+
+- The barcode is the product's own code (it starts with UD). A scan of it on the Boxing tablet's **Take Out** tab takes one of that product out.
+
+### The other buttons
+
+- `History` on a line shows every change to that product: each load received, each take out, what was made, each count, with who did it and what it was for.
 - Pick a **kind** or a **supplier** on the right to narrow the list; type in **Find a product** to search.
 - `Edit products` opens Receiving's Suppliers & Products. `Print` prints the list.
-- A product below its low mark is red.
 
-> **Used since** is ready for later, when using a product (for example 500 dispenser bags) takes it off Inventory by itself.
+> Count a product in what you take it out in. If the tablet scans one case at a time, count that product in cases.
 
 !> Do not type a count you did not take. A count replaces what the plant should have.
+
+!> Do not take stock out twice: what the tablet scanned out is already off Inventory.
+
+## Milk Products
+id: inventory-milk
+screens: inventory.html?type=milk
+
+The plant's own milk products, kept as their own type on Inventory. The Production Lines put them in, and they take out what each one uses by themselves.
+
+1. The first time, press `Bring in our milk products`. Every product on the plant's Products list comes in once, counted in cases (Raw Milk stays out). Press it again after a new product is added to the Products list.
+2. Press `Uses` on a milk product and list what one of it uses: for example 1 gallon jug, 1 cap and 1 label. A part works for a share, like 0.25 of a crate. Press `Save uses`.
+3. From then on, each case counted on the Production Lines goes in as **Made**, and takes its uses out of the Supplies by itself.
+4. Press `Count` to set what is really in the cooler; that becomes the new starting point.
+
+- **Made** shows in place of Received. **Should have** is the last count, plus what was made since, minus what was taken out.
+- When a line's count is fixed (typed lower), the difference comes back off Made, and its uses go back into the Supplies.
+- `Take out`, `Low at`, `Label` and `History` work the same as on Supplies.
+
+> Set the Uses once for each product; it is all the app needs to take the jugs, caps and labels out by itself.
+
+!> Do not take jugs or caps out by hand for a milk product that has Uses: the Production Lines already took them out.
 
 ## Receiving Log
 id: receiving-log
@@ -1745,6 +1798,30 @@ The Case Unloading tablet does two jobs. It opens on a choice of two big buttons
 1. Press `Case Unloading` for unloading, trailer washing and product returns, or `Trailer Assignments` for the trailer on each route.
 2. Do the work.
 3. Press `‹ Back` at the top to come back to the choice and pick the other one.
+
+### Boxing tablet: Receiving and Take Out
+
+The Boxing tablet has three tabs: **Shipping / Loadout**, **Receiving** and **Take Out**.
+
+**Receiving** (suppliers delivering today):
+
+1. Press `START RECEIVING` on the delivery.
+2. Scan each case or pallet label. A barcode the tablet has never seen asks which product it is, once.
+3. Press `RECEIVED`. What was scanned goes into Inventory, once, and the delivery says **IN INVENTORY**.
+
+**Take Out** (what the plant uses comes out of Inventory as it is taken):
+
+1. Pick what it is **For** (a production line, or OTHER). It stays picked for the next scans.
+2. Scan each case or bag as you take it out. Each scan takes one out; a pallet label takes its whole count.
+3. A barcode the tablet has never seen asks **Which product is it?** Pick it once, and that scan counts.
+4. No barcode? Pick the product under **OR PICK IT**, type **How many** and press `TAKE OUT`.
+
+- The list shows what was taken out today, by product and what it was for. `−` puts one back.
+- Our own Zebra labels (printed from Inventory's `Label`) scan here too.
+
+> The scanner types into the tablet by itself; nothing needs tapping before a scan.
+
+!> Do not scan a case you are not taking. Press `−` to put back one scanned by mistake.
 
 ### Release and the code screen
 

@@ -162,7 +162,7 @@ async function wasp(page, parts) {
     await tall.close();
     results.push('Boxing Receiving at 800 wide: the scan list fits, text 16px and up');
 
-    // The plant home: Inventory (Under Construction: administrators only while it is built).
+    // The plant home: Inventory (Joe 11-4-26, mock-up E: open to everyone in the plant).
     // Joe 10/26 (ej): Inventory sits inside Shipping & Receiving: a light blue button under it on the home's Plant Operations card,
     // and an item in the Shipping & Receiving menu; no sideways scroll. Joe 10/31: Shipping & Receiving is its own Home card, with
     // Inventory as a dark blue line with its places under it: Receiving Log, Plant Material Trailers (open to everyone, it is in use),
@@ -171,10 +171,10 @@ async function wasp(page, parts) {
       const home = await openPage(browser, w, h, '/index.html' + ADMIN);
       await home.evaluate(() => sessionStorage.setItem('udPlant', 'fac_uniontown'));
       await home.goto(HOSTING + '/index.html' + ADMIN);
-      await home.waitForSelector('.hq-sub[data-side="shipping"][href="inventory.html?tab=log"].building');
+      await home.waitForSelector('.hq-sub[data-side="shipping"][href="inventory.html?tab=log"]');
       await home.waitForTimeout(400);
-      assert.deepEqual(await home.$$eval('.hq-sub[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.classList.contains('building'))), ['Shipping:false', 'Receiving:false', 'Receiving Log:true', 'Plant Material Trailers:false', 'Off-site Inventory:true', 'Inventory Room:true']);
-      assert.deepEqual(await home.$$eval('.hq-main[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.getAttribute('href') + ':' + x.classList.contains('building'))), ['Inventory:inventory.html:true']);
+      assert.deepEqual(await home.$$eval('.hq-sub[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.classList.contains('building'))), ['Shipping:false', 'Receiving:false', 'Receiving Log:false', 'Plant Material Trailers:false', 'Off-site Inventory:true', 'Inventory Room:true']);
+      assert.deepEqual(await home.$$eval('.hq-main[data-side="shipping"]', a => a.map(x => x.textContent + ':' + x.getAttribute('href') + ':' + x.classList.contains('building'))), ['Inventory:inventory.html:false']);
       assert.ok(await fits(home), 'home fits at ' + w);
       await shot(home, '0-home-inventory-card-' + w + '.png');
       await home.close();
@@ -186,7 +186,7 @@ async function wasp(page, parts) {
       await log.waitForSelector('#rows tr td.strong');
       assert.equal(await log.$$eval('#rows tr', r => r.length), 4);
       const rows = await log.$$eval('#rows tr', r => r.map(x => [...x.cells].map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
-      assert.ok(rows.some(r => /Half-gallon cartons, Whole \| C2610A \| — \| 4-1-27 \| 13 \| /.test(r)), rows.join('\n'));
+      assert.ok(rows.some(r => /HALF-GALLON CARTONS, WHOLE \| C2610A \| — \| 4-1-27 \| 13 \| /.test(r)), rows.join('\n'));
       assert.ok(rows.every(r => /^10-8-26 \| /.test(r)), 'dates as 10-8-26');
       assert.ok(await smallest(log, '#rows *, thead th, .inv-filters *') >= 16, 'text 16px and up');
       assert.ok(await fits(log), 'no sideways scroll at ' + w);

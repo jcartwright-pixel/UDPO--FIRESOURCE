@@ -56,7 +56,7 @@
 .inv-page table.inv-log .num { text-align: right; }
 .inv-page .foot { font-size: 16px; }
 /* Joe 11/1: Inventory's On Hand, Receiving Log and History tabs; Count typed in the row (no pop-up). */
-.inv-page .inv-tabs { display: inline-flex; align-self: flex-start; width: auto; margin: 0 0 10px; }
+.inv-page .inv-tabs { flex: none; display: inline-flex; align-self: flex-start; width: auto; margin: 0 0 10px; }
 .inv-page table.inv-onhand th { white-space: normal; }
 .inv-page .inv-tabs button { min-height: 40px; padding: 0 18px; font-size: 16px; font-weight: 800; }
 .inv-page .inv-tabs button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
@@ -85,3 +85,78 @@
   .inv-page .inv-filters, .inv-page .head .actions, .inv-page .topbar, .inv-page .inv-tabs, .inv-page .inv-acts { display: none !important; }
   .inv-page table.inv-log th, .inv-page table.inv-log td { font-size: 11px; padding: 3px 5px; }
 }
+
+/* Boxing's TAKE OUT tab (Joe 11-4-26, Inventory mock-up B): what the plant uses, scanned out of Inventory. */
+.to-panel { text-transform: uppercase; }
+.to-panel button { text-transform: inherit; }
+.to-panel input, .to-panel select, .to-panel option { text-transform: none; }
+.to-panel .rv-scan { margin: 12px 0; }
+.to-for { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 0; font-size: 18px; font-weight: 800; color: #12263a; }
+.to-for label { display: flex; align-items: center; gap: 10px; }
+.to-for small { font-size: 16px; font-weight: 600; color: #5a6b7d; }
+.to-for select, .to-hand select, .to-name select { min-height: 48px; min-width: 240px; padding: 0 12px; border: 1px solid #b7cadb; border-radius: 9px; background: #fff; font: inherit; font-size: 18px; color: #0b2f55; }
+.to-hand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 16px; font-weight: 800; color: #33475b; }
+.to-hand select { flex: 1 1 260px; }
+.to-hand input { width: 130px; min-height: 48px; padding: 0 12px; border: 1px solid #b7cadb; border-radius: 9px; font: inherit; font-size: 18px; text-align: right; }
+.to-hand .sw-btn { min-height: 48px; }
+.to-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 12px 14px; border: 2px solid #c77700; border-radius: 12px; background: #fff8ec; font-size: 18px; }
+.to-name b { color: #9a4b00; }
+.to-name span { flex: 1 1 100%; font-size: 16px; font-weight: 700; color: #5a3b00; }
+.to-table tr.to-last td { background: #eaf6ee; }
+
+/* Inventory (Joe 11-4-26, mock-ups A, C, E, F): ALL CAPS, Supplies | Milk Products, Low only, the row being worked on, USES and
+   LABEL in the page in place of the list, and the 4 x 6 inch Zebra labels. */
+.inv-page #screen { text-transform: uppercase; }
+.inv-page #screen button, .inv-page #oh-panel button { text-transform: inherit; }
+.inv-page #screen .topbar { text-transform: none; }
+.inv-page #oh-search { min-height: 44px; font-size: 16px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.inv-page #screen input, .inv-page #screen select, .inv-page #screen option, .inv-page #screen textarea { text-transform: none; }
+.inv-page .inv-types { display: inline-flex; width: auto; flex: none; }
+.inv-page .inv-types button { min-height: 44px; padding: 0 16px; font-size: 16px; font-weight: 800; }
+.inv-page .inv-types button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-filters select[hidden], .inv-page .inv-filters button[hidden] { display: none; }
+.inv-page .inv-low, .inv-page .inv-add { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.inv-page .inv-low[aria-pressed="true"] { background: #b42318; border-color: #b42318; color: #fff; }
+.inv-page .inv-add { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-add:disabled { opacity: .6; }
+.inv-page .inv-lowat { min-height: 36px; min-width: 56px; padding: 0 10px; border-radius: 8px; border: 1px dashed #9fb3c8; background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.inv-page .inv-edit { align-items: center; }
+.inv-page .inv-edit label { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.inv-page .inv-edit select { min-height: 36px; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 16px; padding: 0 8px; }
+.inv-page .inv-edit small { display: inline; font-size: 16px; color: var(--muted); }
+.inv-page .inv-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow: auto; flex: 1 1 auto; min-height: 0; }
+.inv-page .inv-panel[hidden], .inv-page #oh-sheet[hidden] { display: none; }
+.inv-page .inv-panel-head { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; }
+.inv-page .inv-panel-head h2 { margin: 0; font-size: 22px; color: var(--ud-blue); }
+.inv-page .inv-panel-head .spacer { flex: 1; }
+.inv-page .inv-panel button { min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.inv-page .inv-panel button.primary { background: #1f7a3a; border-color: #1f7a3a; color: #fff; }
+.inv-page .inv-panel .inv-help { font-size: 16px; color: var(--muted); margin: 0 0 10px; }
+.inv-page .inv-panel-foot { display: flex; gap: 10px; margin: 14px 0 0; }
+.inv-page table.inv-uses { max-width: 900px; }
+.inv-page table.inv-uses select, .inv-page table.inv-uses input, .inv-page .inv-label-form input { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 16px; padding: 0 10px; }
+.inv-page table.inv-uses select { width: 100%; }
+.inv-page table.inv-uses input { width: 120px; text-align: right; }
+.inv-page #oh-panel:not([hidden]) { display: grid; grid-template-columns: 1fr; }
+.inv-page .inv-label-form { display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
+.inv-page .inv-label-form label { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 16px; }
+.inv-page .inv-label-form input { width: 200px; }
+.inv-page .inv-label-show { margin: 16px 0 0; }
+.inv-page .inv-label-show .lbl { width: 4in; height: 4.4in; border: 2px solid #222; border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .15); }
+.lbl { box-sizing: border-box; width: 4in; height: 6in; padding: .2in; display: flex; flex-direction: column; gap: .08in; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; text-transform: uppercase; overflow: hidden; }
+.lbl .lbl-name { font-size: 26px; line-height: 1.15; }
+.lbl span { font-size: 17px; font-weight: 700; }
+.lbl .lbl-bars { height: 1.3in; margin-top: .1in; }
+.lbl .lbl-bars svg { width: 100%; height: 100%; display: block; }
+.lbl .lbl-wait { height: 100%; display: flex; align-items: center; justify-content: center; border: 2px dashed #999; font-size: 16px; font-weight: 800; color: #555; }
+.lbl .lbl-code { text-align: center; font-size: 18px; letter-spacing: .1em; }
+.lbl .lbl-n { margin-top: auto; font-size: 24px; }
+.inv-labels { display: none; }
+@media print {
+  body.printing-labels > *:not(#labels) { display: none !important; }
+  body.printing-labels #labels { display: block; }
+  body.printing-labels #labels .lbl { page-break-after: always; break-after: page; }
+  body.printing-labels #labels .lbl:last-child { page-break-after: auto; break-after: auto; }
+}
+.rv-inv { margin: 10px 2px 0; padding: 8px 12px; border-radius: 10px; background: #eaf6ee; color: #14532d; font-size: 18px; font-weight: 800; }
+.rv-note { margin: 8px 2px 0; font-size: 16px; font-weight: 700; color: #5a6b7d; }

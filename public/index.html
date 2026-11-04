@@ -40,7 +40,7 @@
     const bld = (s) => s.building ? ' building' : '';
     // Joe 10/31: a quick line marked 'main' is a dark blue line inside the card (Inventory on Shipping & Receiving); a screen still being
     // built (Inventory's Receiving Log, or one that opens the being-built page) is marked so only administrators open it.
-    const sub = (s, [label, href, kind]) => '<a class="' + (kind === 'main' ? 'hq-main' : 'hq-sub') + bld(s) + (s.buildingSections && /inventory\.html|soon\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
+    const sub = (s, [label, href, kind]) => '<a class="' + (kind === 'main' ? 'hq-main' : 'hq-sub') + bld(s) + ((s.buildingSections && /inventory\.html/.test(href)) || /^soon\.html/.test(href) ? ' building' : '') + '" data-side="' + s.key + '" href="' + href + '">' + escapeHtml(label) + '</a>';
     const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
       (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
     // Joe 10/28: departments with no screens of their own under them sit two to a row, so the card still fits.

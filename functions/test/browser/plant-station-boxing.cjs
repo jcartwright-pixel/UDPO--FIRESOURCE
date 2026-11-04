@@ -130,7 +130,7 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     await page.waitForSelector('[data-station="BOXING"]');
     await page.click('[data-station="BOXING"]');
     await page.waitForSelector('#work .sw-card');
-    assert.deepEqual(await tabs(page), ['Shipping / Loadout', 'Receiving']);
+    assert.deepEqual(await tabs(page), ['Shipping / Loadout', 'Receiving', 'Take Out'], 'Joe 11-4-26 (Inventory mock-up B): a Take Out tab');
     // Shipping / Loadout: the box loads and the Scheduler's shipments for today on one list. Sun Valley (849) is a box load
     // and on the Scheduler as a carrier pickup: one card, purple. Aldi (Route Master BRANCH) is a scheduled shipment: green.
     // Fairmont 907_1 (BRANCH) is a box load: green.
@@ -141,7 +141,7 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     assert.equal(await page.textContent('#work .sw-card.by-carrier .route'), '849');
     assert.deepEqual(await page.$$eval('.sw-legend span', s => s.map(x => x.textContent)), ['Uniontown truck', 'Branch', 'Carrier']);
     assert.ok((await sizes(page, '.sw-legend span, .sw-who, .ps-count')).every(n => n >= 16), 'legend, labels and counts are 16px or more');
-    assert.deepEqual(await page.$$eval('.ps-count', c => c.map(x => x.textContent)), ['3 remaining of 3 loads', '1 remaining of 1 delivery']);
+    assert.deepEqual(await page.$$eval('.ps-count:not([hidden])', c => c.map(x => x.textContent)), ['3 remaining of 3 loads', '1 remaining of 1 delivery']);
     assert.ok(await fits(page), 'Shipping / Loadout fits a 1024 tablet');
     await shot(page, 'boxing-shipping-1024.png');
     // Load the Aldi shipment: start, type the boxes and the temperature, complete.

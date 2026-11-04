@@ -11,6 +11,7 @@ import { watchWashRequests } from './recent-records.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
 import { listenForScans, scanWithCamera, cameraReads, beep } from './scan-input.js';
+import { mountTakeOut } from './station-takeout.js';
 
 const L = window.UDLogic, U = window.UDPlant, S = window.UDScan;
 const today = () => L.operatingDay(new Date());
@@ -47,7 +48,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   const scanRid = () => 'rs-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2)).replace(/[^A-Za-z0-9_-]/g, '');
 
   // The role, or what Administration > People & Roles allows this person (asked of the server once per person).
-  const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn', receiving: 'savePlantSchedule' };
+  const VIEW_SAVE = { loading: 'savePlantLoad', unloading: 'saveUnloading', washing: 'completeWash', returns: 'addReturn', receiving: 'savePlantSchedule', takeout: 'savePlantSchedule' };
   let allowed = {}, askedFor = null;
   const askRights = () => {
     const p = person(), key = p ? (p.email || p.name || '') + '|' + (p.roles || []).join(',') : null;
@@ -55,7 +56,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     askedFor = key;
     allowedSaves(Object.values(VIEW_SAVE).concat(['addPickup', 'completePickup', 'savePlantSchedule'])).then(a => { allowed = a; render(); });
   };
-  const canSave = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, view === 'receiving' ? 'plant' : 'plantLoading', allowed[VIEW_SAVE[view] || 'savePlantLoad']);
+  const canSave = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, view === 'receiving' || view === 'takeout' ? 'plant' : 'plantLoading', allowed[VIEW_SAVE[view] || 'savePlantLoad']);
   // A scheduled load saves through the Scheduler's save, which follows the Plant Operations switch (not Plant Loading).
   const canSched = () => maySave(person(), L.SAVE_ROLES.concat(['PLANT_EMPLOYEE']), app, 'plant', allowed.savePlantSchedule);
   const myName = () => (station && station.name) || '';
@@ -269,7 +270,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const name = recv ? x.run || x.route || 'Plant pickup' : U.loadNumberName((x.slot && x.slot.run) || x.run || x.route || 'Plant pickup', x.loadNo), status = done ? badge(recv ? 'RECEIVED' : 'COMPLETE', 'done') : paused ? badge('PAUSED', 'paused') : going ? badge(recv ? 'RECEIVING' : 'LOADING', 'going') : badge('WAITING');
     const startLabel = recv ? 'START RECEIVING' : 'START LOADING';
     const quick = ck && !isOpen && (st === 'WAITING' || paused) ? '<span class="sw-quick">' + btn(paused ? 'RESUME' : startLabel, 'sstart', id, 'primary') + '</span>' : '';
-    const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : ''].filter(Boolean).join(' · ');
+    const detail = [x.pickupTime ? clock(x.pickupTime) : '', x.poNumber ? 'PO ' + x.poNumber : '', x.trailer || 'Trailer not typed yet', x.product, x.cases ? x.cases + ' cases' : '', recv && done && x.received ? 'IN INVENTORY' : ''].filter(Boolean).join(' · ');
     let html = '<article class="sw-card sched ' + (done ? 'done' : paused ? 'paused' : going ? 'run' : '') + (isOpen ? ' open' : '') + (by ? ' by-' + by : '') + '" data-sw="' + escapeHtml(id) + '">';
     html += recv ? '<div class="sw-head tall" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><span class="sw-title"><b>' + escapeHtml(x.route + ' · ' + name) + '</b><small>' + escapeHtml(detail) + '</small></span>'
       : '<div class="sw-head" data-toggle="' + escapeHtml(id) + '" role="button" tabindex="0" aria-expanded="' + isOpen + '"><b class="route">' + escapeHtml(L.routeNumber((x.slot && x.slot.route) || x.route || '')) + '</b><b class="run">' + escapeHtml(name) + who(by) + '</b><span class="truck">' + escapeHtml(clock(x.pickupTime) || '—') + '</span><span class="trailer">' + escapeHtml(x.trailer || '—') + '</span>';
@@ -332,6 +333,9 @@ export function mountStationWork({ db, box, person, onDraw }) {
       });
       html += '</tbody></table><p class="rv-sum">' + plural(total, 'case') + ' · ' + plural(kinds, 'item') + (live ? ' · each scan saves itself' : '') + '</p>';
     }
+    // Joe 11-4-26 (Inventory mock-up D): RECEIVED puts what was scanned into Inventory, once.
+    if (done && x.received) html += '<p class="rv-inv">IN INVENTORY · ' + escapeHtml(window.UDTiming.clockOf(x.received.at)) + '</p>';
+    else if (live) html += '<p class="rv-note">RECEIVED puts what was scanned into Inventory.</p>';
     return html + '</div>';
   }
   // A line's change goes on the tablet at once and to the server in order (a quick − + − keeps its order).
@@ -523,7 +527,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
     const p = person() || {}, who = (p.email || (p.cells && p.cells.email) || '') + (p.name ? ' (' + p.name + ')' : '') || 'This account';
     const why = s.why || (!s.open ? '' : who + ' is not allowed to save this. In Administration > People & Roles give it the Plant Employee role or allow this work, or sign this tablet in with its station code');
     const note = person() && !canSave() ? '<p class="sw-note">View only' + (why ? ': ' + escapeHtml(why) : '') + '.</p>' : '';
-    box.innerHTML = note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : view === 'receiving' ? receivingView() : returnsView());
+    box.innerHTML = view === 'takeout' ? (takeout ? takeout.html() : '') : note + (view === 'loading' ? loadingView() : view === 'unloading' ? unloadingView() : view === 'washing' ? washingView() : view === 'receiving' ? receivingView() : returnsView());
     held.forEach(h => {
       const card = h.id && box.querySelector('[data-sw="' + CSS.escape(h.id) + '"]'), at = card && (card.querySelector('.sw-head .sw-state') || card.querySelector('.sw-head .sw-title'));
       if (at && !at.querySelector('.sw-flag.wait')) at.insertAdjacentHTML('beforeend', '<i class="sw-flag wait">WAITING TO SEND</i>');
@@ -862,8 +866,12 @@ export function mountStationWork({ db, box, person, onDraw }) {
   // stop(): the tablet is leaving (turned off, new code, signed out). Every read ends, and a read refused in flight says
   // nothing, so the code screen's own message is the one left showing.
   let stopped = false, always = [], tick = null, schedUnsubs = [];
+  // Joe 11-4-26 (Inventory mock-up B): Boxing's TAKE OUT tab, what the plant uses scanned out of Inventory (station-takeout.js).
+  let takeout = null;
   function watchSched() {
     const want = boxing() && !stopped;
+    if (want && !takeout) takeout = mountTakeOut({ db, box, stationName: myName, canSave: canSched, onChange: () => { if (view === 'takeout') render(); } });
+    if (!want && takeout) { takeout.stop(); takeout = null; }
     if (want === !!schedUnsubs.length) return;
     schedUnsubs.forEach(u => u()); schedUnsubs = [];
     if (!want) return;
@@ -909,10 +917,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (view === 'returns') render();
   }, () => {})];
   watch();
-  const stopScans = listenForScans({ onScan: raw => { if (!stopped && boxing()) onRecvScan(raw); } });
+  const stopScans = listenForScans({ onScan: raw => { if (stopped || !boxing()) return; if (view === 'takeout' && takeout) takeout.onScan(raw); else onRecvScan(raw); } });
   // The day rolls at 6 AM; a running load's state is drawn again each minute (not while someone is typing).
   tick = setInterval(() => {
     if (today() !== date) { Object.keys(drafts).forEach(k => delete drafts[k]); watch(); }
+    if (takeout) takeout.dayChanged();
     const a = document.activeElement;
     if (!(a && box.contains(a) && a.dataset && a.dataset.k)) render();
   }, 60000);
@@ -927,6 +936,6 @@ export function mountStationWork({ db, box, person, onDraw }) {
       if (v === 'receiving') { const d = deliveries(); return { total: d.length, left: d.filter(x => x.work.state !== 'COMPLETE').length }; }
       return null;
     },
-    stop() { stopScans(); stopped = true; unsubs.concat(always, schedUnsubs).forEach(u => u()); unsubs = []; always = []; schedUnsubs = []; clearInterval(tick); }
+    stop() { stopScans(); stopped = true; if (takeout) { takeout.stop(); takeout = null; } unsubs.concat(always, schedUnsubs).forEach(u => u()); unsubs = []; always = []; schedUnsubs = []; clearInterval(tick); }
   };
 }
