@@ -2,7 +2,7 @@
 .emp-view { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 10px; min-height: 0; flex: 1; }
 .employees-page #sync { font-size: 16px; font-weight: 700; margin-right: auto; }
 .employees-page #sync.good { color: #1a7f3c; }
-.employees-page #sync.bad { color: #b3261e; }
+.employees-page #sync.bad { color: #b42318; }
 .employees-page .actions.in-head { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
 .employees-page .actions input[type=search] { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; width: 240px; }
 .employees-page .actions select { font: inherit; font-size: 16px; min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; }
@@ -15,7 +15,7 @@
 .employees-page .none { color: var(--muted); }
 .employees-page tr.left-row td { background: #fdecec; }
 .employees-page .st-on { color: #1a7f3c; font-weight: 800; }
-.employees-page .st-left { color: #b3261e; font-weight: 800; }
+.employees-page .st-left { color: #b42318; font-weight: 800; }
 .employees-page .foot { color: var(--muted); font-size: 16px; }
 @media (max-width: 760px) {
   .employees-page .head { flex-wrap: wrap; }

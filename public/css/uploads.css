@@ -1,5 +1,5 @@
 /* Upload Center (Joe 10/18): one workbook for a new plant, then a check screen before anything is saved. Words 16px and up. */
-.uploads-page .notice.ok:not([hidden]) { display: block; margin: 0 16px 8px; background: #e7f6ec; color: #1d7a3e; border-radius: 8px; padding: 8px 12px; font-weight: 800; }
+.uploads-page .notice.ok:not([hidden]) { display: block; margin: 0 16px 8px; background: #e7f6ec; color: #1f7a4d; border-radius: 8px; padding: 8px 12px; font-weight: 800; }
 .up-head { display: flex; align-items: center; gap: 16px; padding: 12px 18px; }
 .up-title { flex: 1; min-width: 0; }
 .up-title h1 { margin: 0; font-size: 24px; color: #0b3d6b; overflow-wrap: anywhere; }

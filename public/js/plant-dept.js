@@ -122,7 +122,7 @@ const D = {
   load: { accent: '#1976d2', small: 'Loadout Center', title: 'Loading', href: 'loadout.html', open: 'Open Loadout Center' },
   unload: { accent: '#526d82', small: 'Trailers back from the routes', title: 'Unloading', href: 'unloading.html', open: 'Open Unloading & Washing' },
   wash: { accent: '#0093b5', small: 'Trailer washing', title: 'Washing', href: 'washing.html', open: 'Open Truck Washing' },
-  ret: { accent: '#b42332', small: 'Product returns (RTA)', title: 'Returns', href: 'returns.html', open: 'Open Product Returns' }
+  ret: { accent: '#b42318', small: 'Product returns (RTA)', title: 'Returns', href: 'returns.html', open: 'Open Product Returns' }
 };
 // The whole card opens its screen's default view (data-card, app.js); a line inside opens that particular screen.
 function card(k, inner, cls) {
@@ -163,7 +163,7 @@ function washList(m, n) {
 }
 function reasonBars(m) {
   const max = Math.max(1, ...m.reasons.map(r => r.n));
-  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42332"></i></div><b>' + r.n + ' ' + (r.n === 1 ? 'return' : 'returns') + (r.cases ? ' · ' + r.cases + ' ' + (r.cases == 1 ? 'case' : 'cases') : '') + '</b></div>').join('');
+  return m.reasons.map(r => '<div class="hb"><span>' + esc(r.k) + '</span><div class="track"><i style="width:' + Math.round(r.n * 100 / max) + '%;background:#b42318"></i></div><b>' + r.n + ' ' + (r.n === 1 ? 'return' : 'returns') + (r.cases ? ' · ' + r.cases + ' ' + (r.cases == 1 ? 'case' : 'cases') : '') + '</b></div>').join('');
 }
 /* ---------------- A: same four cards, the empty middle filled ---------------- */
 function A(m) {

@@ -17,10 +17,10 @@
 .help-text li { margin: 4px 0; }
 .help-text a { color: var(--ud-blue); font-weight: 700; }
 .help-key { display: inline-block; background: #eef4fa; border: 1px solid #b9c7d3; border-radius: 6px; padding: 0 7px; font-weight: 800; color: var(--ud-blue-dark); white-space: nowrap; }
-.help-tip { background: #e7f6ec; border-left: 5px solid #1d7a3e; border-radius: 6px; padding: 8px 12px; }
-.help-tip::before { content: 'Tip: '; font-weight: 800; color: #1d7a3e; }
-.help-dont { background: var(--error-bg); border-left: 5px solid #c62828; border-radius: 6px; padding: 8px 12px; }
-.help-dont::before { content: 'Do not: '; font-weight: 800; color: #9b1c1c; }
+.help-tip { background: #e7f6ec; border-left: 5px solid #1f7a4d; border-radius: 6px; padding: 8px 12px; }
+.help-tip::before { content: 'Tip: '; font-weight: 800; color: #1f7a4d; }
+.help-dont { background: var(--error-bg); border-left: 5px solid #b42318; border-radius: 6px; padding: 8px 12px; }
+.help-dont::before { content: 'Do not: '; font-weight: 800; color: #b42318; }
 @media (max-width: 900px) {
   .help-body { flex-direction: column !important; overflow: auto; }
   .help-nav { flex: none; max-height: 240px; }

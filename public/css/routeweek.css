@@ -4,7 +4,7 @@
 .routeweek-page .rw-grid { margin: 0; min-height: 0; overflow: auto; }
 .routeweek-page table.rw th small { display: block; font-size: 16px; font-weight: 600; opacity: .8; }
 .routeweek-page .rw-day { width: 94%; border: 0; border-radius: 13px; background: #e3f5ee; color: #0f7b5f; font: inherit; font-weight: 900; white-space: nowrap; cursor: pointer; }
-.routeweek-page .rw-day.off { background: #fde8e6; color: #c0392b; }
+.routeweek-page .rw-day.off { background: #fde8e6; color: #b42318; }
 .routeweek-page .rw-day.over { background: repeating-linear-gradient(135deg, #fff3dc 0 6px, #ffe6b3 6px 12px); color: #8a5a00; box-shadow: inset 0 0 0 2px #f2b632; }
 .routeweek-page .rw-day:disabled { cursor: default; }
 .routeweek-page .rw-side { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -23,7 +23,7 @@
 .routeweek-page .rw-list > div { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; padding: 6px 8px; border-radius: 8px; background: #fbfcfd; border: 1px solid #edf1f5; }
 .routeweek-page .rw-list em { font-style: normal; font-weight: 900; }
 .routeweek-page .rw-list em.on { color: #0f7b5f; }
-.routeweek-page .rw-list em.off { color: #c0392b; }
+.routeweek-page .rw-list em.off { color: #b42318; }
 .routeweek-page .rw-list .empty { color: var(--muted); text-align: center; padding: 18px 0; border: 0; background: none; }
 @media (max-width: 1500px) {
   .routeweek-page .rw-shell { grid-template-columns: minmax(0, 1fr) 290px; }
@@ -45,7 +45,7 @@
 .routeweek-page table.rw th.hol small { opacity: 1; }
 .routeweek-page table.rw th .hol-word { display: block; font-size: 16px; font-weight: 900; text-transform: uppercase; }
 .routeweek-page table.rw td.hol-col { background: #fff4d6; }
-.routeweek-page .rw-day.hol-need { background: #fff; color: #c0392b; box-shadow: inset 0 0 0 3px #c0392b; }
+.routeweek-page .rw-day.hol-need { background: #fff; color: #b42318; box-shadow: inset 0 0 0 3px #b42318; }
 .routeweek-page tr.hol-need td:nth-child(1), .routeweek-page tr.hol-need td:nth-child(2) { background: #fde8e6; color: #8a1f12; }
 @media (max-width: 1100px) {
   .routeweek-page table.rw th.hol { padding-left: 0; padding-right: 0; }

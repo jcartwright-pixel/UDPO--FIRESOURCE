@@ -7,7 +7,7 @@
 .pm-page .pm-kpis div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 14px; min-width: 130px; }
 .pm-page .pm-kpis b { display: block; font-size: 28px; line-height: 1.15; color: var(--ud-blue); }
 .pm-page .pm-kpis span { font-size: 16px; font-weight: 700; color: var(--muted); }
-.pm-page .pm-kpis .red b { color: #c62828; } .pm-page .pm-kpis .amber b { color: #b45f00; } .pm-page .pm-kpis .green b { color: #1d7a3e; } .pm-page .pm-kpis .zero b { color: #9aa8b5; }
+.pm-page .pm-kpis .red b { color: #b42318; } .pm-page .pm-kpis .amber b { color: #b45f00; } .pm-page .pm-kpis .green b { color: #1f7a4d; } .pm-page .pm-kpis .zero b { color: #9aa8b5; }
 .pm-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 900; letter-spacing: .03em; white-space: nowrap; text-transform: uppercase; }
 .pm-pill.red { background: var(--pill-red-bg); color: var(--pill-red-ink); } .pm-pill.amber { background: var(--pill-amber-bg); color: var(--pill-amber-ink); } .pm-pill.green { background: var(--pill-green-bg); color: var(--pill-green-ink); } .pm-pill.blue { background: var(--pill-blue-bg); color: var(--pill-blue-ink); } .pm-pill.gray { background: var(--pill-gray-bg); color: var(--muted); }
 .pm-page .pm-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
@@ -52,12 +52,12 @@
 .mach-page h3 { margin: 14px 0 6px; font-size: 18px; color: var(--ud-blue-dark); display: flex; align-items: center; gap: 10px; }
 .mach-page h3 small { font-size: 16px; color: var(--muted); font-weight: 600; }
 .mach-page .mach-saved { font-size: 16px; font-weight: 700; color: var(--muted); margin-left: auto; }
-.mach-page .mach-saved.done { color: #1d7a3e; } .mach-page .mach-saved.bad { color: #b42318; }
+.mach-page .mach-saved.done { color: #1f7a4d; } .mach-page .mach-saved.bad { color: #b42318; }
 
 /* Maintenance Center (mock-up A): from the plant floor, open work orders, PMs due. */
 .pmc-page .pmc-cols { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 16px; }
 .pmc-page .pmc-item { padding: 9px 14px; border-bottom: 1px solid #e3eaf1; border-left: 6px solid transparent; }
-.pmc-page .pmc-item.red { border-left-color: #c62828; } .pmc-page .pmc-item.amber { border-left-color: #d98a12; }
+.pmc-page .pmc-item.red { border-left-color: #b42318; } .pmc-page .pmc-item.amber { border-left-color: #d98a12; }
 .pmc-page .pmc-item b { font-size: 17px; color: var(--ud-blue-dark); }
 .pmc-page .pmc-item p { margin: 3px 0 0; font-size: 16px; font-weight: 600; }
 .pmc-page .pmc-item small { display: block; margin-top: 3px; font-size: 16px; color: var(--muted); }

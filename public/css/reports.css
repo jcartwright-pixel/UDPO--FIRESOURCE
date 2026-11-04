@@ -21,7 +21,7 @@
 .rp-kpi i { font-style: normal; font-size: 16px; color: var(--muted); }
 .rp-kpi.good { border-top-color: #16813b; } .rp-kpi.good b { color: #16813b; }
 .rp-kpi.warn { border-top-color: #d27b00; } .rp-kpi.warn b { color: #b36200; }
-.rp-kpi.bad { border-top-color: #c62828; } .rp-kpi.bad b { color: #c62828; }
+.rp-kpi.bad { border-top-color: #b42318; } .rp-kpi.bad b { color: #b42318; }
 .rp-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start; }
 .rp-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .rp-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
@@ -33,19 +33,19 @@
 .rp-card table { table-layout: auto; font-size: 16px; }
 .rp-card thead th { position: sticky; top: 0; z-index: 1; text-align: left; padding: 0 10px; font-size: 16px; }
 .rp-card tbody td { text-align: left; padding: 0 10px; height: 38px; font-size: 16px; }
-.rp-card td.bad, .rp-card span.bad { color: #c62828; font-weight: 800; }
+.rp-card td.bad, .rp-card span.bad { color: #b42318; font-weight: 800; }
 .rp-card td.warn { color: #b36200; font-weight: 800; }
 .rp-pct { white-space: nowrap; }
 .rp-bar { display: inline-block; width: 140px; height: 12px; background: #e3eaf1; border-radius: 6px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
 .rp-bar s { display: block; height: 100%; background: #16813b; }
-.rp-bar.warn s { background: #d27b00; } .rp-bar.bad s { background: #c62828; }
+.rp-bar.warn s { background: #d27b00; } .rp-bar.bad s { background: #b42318; }
 tr[data-day] { cursor: pointer; }
 tr[data-day]:hover td { background: var(--band) !important; }
 tr.rp-future td { color: var(--muted); }
 tr.rp-total td { background: var(--band) !important; font-weight: 800; }
 tr.rp-flag td { background: #fde8e8 !important; }
 .rp-lead { background: #fff; border: 1px solid var(--line); border-left: 8px solid #16813b; border-radius: 10px; padding: 14px 18px; font-size: 18px; line-height: 1.4; }
-.rp-lead.bad { border-left-color: #c62828; } .rp-lead.bad b { color: #c62828; }
+.rp-lead.bad { border-left-color: #b42318; } .rp-lead.bad b { color: #b42318; }
 .rp-foot { margin: 0; color: var(--muted); font-size: 16px; }
 @media (max-width: 1500px) { .rp-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .rp-grid { grid-template-columns: 1fr; } .rp-ctrl { flex-wrap: wrap; } }
@@ -64,7 +64,7 @@ tr.rp-flag td { background: #fde8e8 !important; }
 .sh-table input[data-k="name"] { width: 260px; }
 .sh-table td { height: 54px !important; }
 .sh-remove { min-width: 0; height: 38px; }
-.notice.ok:not([hidden]) { display: block; margin: 0 16px 8px; background: #e7f6ec; color: #1d7a3e; border-radius: 8px; padding: 8px 12px; }
+.notice.ok:not([hidden]) { display: block; margin: 0 16px 8px; background: #e7f6ec; color: #1f7a4d; border-radius: 8px; padding: 8px 12px; }
 /* Look B: the week as seven day cards and the week's card; the picked one is outlined. */
 .rp-days { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
 .rp-day { text-align: left; background: #fff; border: 1px solid var(--line); border-top: 8px solid #9fb3c8; border-radius: 10px; padding: 10px 12px; font: inherit; color: var(--ink); cursor: pointer; min-width: 0; }
@@ -72,16 +72,16 @@ tr.rp-flag td { background: #fde8e8 !important; }
 .rp-day b { display: block; font-size: 34px; line-height: 1.1; color: var(--muted); }
 .rp-day span { display: block; font-size: 16px; color: var(--muted); margin-bottom: 4px; }
 .rp-day i { display: block; font-style: normal; font-size: 16px; color: var(--muted); }
-.rp-day i.bad { color: #c62828; font-weight: 800; }
+.rp-day i.bad { color: #b42318; font-weight: 800; }
 .rp-day.good { border-top-color: #16813b; } .rp-day.good b { color: #16813b; }
 .rp-day.warn { border-top-color: #d27b00; } .rp-day.warn b { color: #b36200; }
-.rp-day.bad { border-top-color: #c62828; } .rp-day.bad b { color: #c62828; }
+.rp-day.bad { border-top-color: #b42318; } .rp-day.bad b { color: #b42318; }
 .rp-day.week { background: var(--band); }
 .rp-day.on { outline: 3px solid var(--ud-blue); outline-offset: -1px; }
 .rp-day:hover { background: #f8fbfd; }
 .rp-dayhead { margin: 4px 0 0; font-size: 22px; color: var(--ud-blue-dark); }
 .rp-card td small { color: var(--muted); font-weight: 600; font-size: 16px; }
-.rp-good { color: #16813b; font-weight: 800; } .rp-warn { color: #b36200; font-weight: 800; } .rp-bad { color: #c62828; font-weight: 800; }
+.rp-good { color: #16813b; font-weight: 800; } .rp-warn { color: #b36200; font-weight: 800; } .rp-bad { color: #b42318; font-weight: 800; }
 @media (max-width: 1500px) { .rp-days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 /* Shift Reports (Joe 10/11): every sent report on the left, the one picked on the right as it was emailed. */

@@ -40,6 +40,10 @@ Type a trailer any way you like (**14**, **014**, **T14** or **T 14**). Operatio
 
 Every date is written the same way everywhere: month, day and year, like **10-8-26**. That goes for screens, emails, texts, printouts and the message after Publish. Every week starts on **Sunday** and ends on **Saturday**, and a week is named by its Sunday.
 
+### Colors
+
+The colors mean the same thing on every screen and email: **green** is on time or done, **yellow** is getting close (watch it), **red** is late or needs fixing now. Blue is for buttons and headings, gray for things that are off or not started.
+
 ### Loadout names
 
 The four loadouts have the same names everywhere: **Case**, **Tote**, **Boxing** and **Tanker** (Daily Case Loadout, Daily Tote Loadout, Daily Boxing Loadout, Daily Tanker Loadout). The Load Type list, the menus, the report email and the printouts all use these words. The counts keep their own words: Cases Out, Totes Out, Boxes Out and Gallons In.

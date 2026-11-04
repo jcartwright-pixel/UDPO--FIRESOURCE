@@ -232,7 +232,7 @@ function injectStyle() {
     '.cell-pop [data-i]{display:flex;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid #edf2f6;cursor:pointer;white-space:nowrap}',
     '.cell-pop [data-i].active,.cell-pop [data-i]:hover{background:#dcecff}',
     '.cell-pop [data-i].off{color:#8a97a3;cursor:not-allowed;background:#f4f6f8}',
-    '.cell-pop em{margin-left:auto;font-style:normal;font-size:16px;color:#b3261e}',
+    '.cell-pop em{margin-left:auto;font-style:normal;font-size:16px;color:#b42318}',
     '.cell-pop em.note{color:#60798f;font-weight:700}',
     '.cell-pop h6{margin:0;padding:6px 12px;background:#eef4fa;color:#0e3a62;font-size:16px;letter-spacing:.06em;position:sticky;top:0}',
     '.cell-pop h6.off{color:#8a5a00;background:#fff4e0}',

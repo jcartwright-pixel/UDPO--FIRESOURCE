@@ -28,7 +28,7 @@
 }
 .co-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 78px; padding: 10px 10px; border-radius: 10px; background: #f3f8ff; text-align: center; }
 .co-cell.good b { color: #0c9a4b; }
-.co-cell.bad b { color: #b3261e; }
+.co-cell.bad b { color: #b42318; }
 .co-cell.warn b { color: #b86b00; }
 .co-recent { padding: 6px 16px 10px; }
 .co-recent h3 { margin: 6px 0; font-size: 16px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #4a6b8d; }

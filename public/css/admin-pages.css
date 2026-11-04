@@ -33,7 +33,7 @@
 .adm-table td { text-align: center; padding: 8px 10px; border-bottom: 1px solid #e6ecf2; }
 .adm-table td.strong { font-weight: 800; color: #0b3d6b; }
 .adm-table .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; }
-.adm-table .pill.good { background: #e3f3e8; color: #1c6b3a; }
+.adm-table .pill.good { background: #e3f3e8; color: #1f7a4d; }
 .adm-table .pill.muted { background: #f1f3f5; color: #6a7885; }
 .adm-loading { color: #5a6b7d; }
 .adm-soon { margin: 30px auto; max-width: 620px; text-align: center; padding: 28px; border: 1px dashed #c9d5e1; border-radius: 14px; background: #f9fbfd; }
@@ -67,7 +67,7 @@
 .ap label.ap-field small, .ap .ap-help { font-weight: 600; color: #5a6b7d; font-size: 16px; }
 .ap-msg { flex: none; padding: 8px 12px; border-radius: 8px; background: #eef5fc; color: #0b3d6b; font-weight: 700; }
 .ap-msg.bad { background: #fdecea; color: #b42318; }
-.ap-msg.good { background: #e3f3e8; color: #1c6b3a; }
+.ap-msg.good { background: #e3f3e8; color: #1f7a4d; }
 .ap-msg.warn { background: #fff4d6; color: #7a4b00; }
 .ap input.es-unsaved { border-color: #d99a00; background: #fffaeb; }
 .ap-t td .ap-chip[data-unsaved] { display: inline-block; margin-bottom: 4px; }
@@ -94,7 +94,7 @@
 .rr2-t .ap-chip { white-space: normal; max-width: 100%; }
 .rr2-t td:nth-child(3) select + select { margin-top: 4px; }
 .ap-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 16px; font-weight: 800; background: #f1f3f5; color: #6a7885; white-space: nowrap; }
-.ap-chip.good { background: #e3f3e8; color: #1c6b3a; }
+.ap-chip.good { background: #e3f3e8; color: #1f7a4d; }
 .ap-chip.bad { background: #fdecea; color: #b42318; }
 .ap-chip.warn { background: #fff4e5; color: #9a4b00; }
 .ap-chip.blue { background: #e8f0fb; color: #1f4f86; }
@@ -146,12 +146,12 @@
 .ap-modal-box .ap-card { flex: 1; min-height: 0; border: 0; padding: 0; background: #fff; }
 /* Go-Live Switches (Joe 10/12, mock-up A). */
 .gl { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
-.ap button.ap-btn.gl-all { min-height: 48px; padding: 0 22px; background: #1c6b3a; border-color: #1c6b3a; color: #fff; font-size: 17px; font-weight: 900; white-space: nowrap; }
-.ap button.ap-btn.gl-all:disabled { background: #e3f3e8; border-color: #9fd3ae; color: #1c6b3a; }
+.ap button.ap-btn.gl-all { min-height: 48px; padding: 0 22px; background: #1f7a4d; border-color: #1f7a4d; color: #fff; font-size: 17px; font-weight: 900; white-space: nowrap; }
+.ap button.ap-btn.gl-all:disabled { background: #e3f3e8; border-color: #9fd3ae; color: #1f7a4d; }
 .ap button.ap-btn.gl-all.armed { background: var(--ud-gold, #ffd200); border-color: var(--ud-gold, #ffd200); color: #3b2a00; }
 .gl-sum { font-size: 16px; color: #33495f; white-space: nowrap; }
 .gl-sum b { color: #0b3d6b; }
-.gl-wb { white-space: nowrap; padding: 6px 12px; border: 1px solid #9fd3ae; background: #e3f3e8; border-radius: 10px; color: #1c6b3a; font-size: 16px; font-weight: 800; }
+.gl-wb { white-space: nowrap; padding: 6px 12px; border: 1px solid #9fd3ae; background: #e3f3e8; border-radius: 10px; color: #1f7a4d; font-size: 16px; font-weight: 800; }
 .gl-wb.off { border-color: #d5dde6; background: #eef2f6; color: #5a6b7d; }
 .gl-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e6ecf2; border-radius: 10px; }
 table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
@@ -165,7 +165,7 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 .gl-chip.old { background: #eef2f6; color: #5a6b7d; border: 1px solid #d5dde6; }
 .gl-chip.new { background: #e3f4e8; color: #1d6b35; border: 1px solid #9fd3ae; }
 .gl-chip.live { background: #0b3d6b; color: #fff; }
-.gl-chip.ready { background: #e3f3e8; color: #1c6b3a; }
+.gl-chip.ready { background: #e3f3e8; color: #1f7a4d; }
 .gl-chip.not { background: #fff4e5; color: #9a4b00; }
 .gl-acts { display: flex; gap: 8px; justify-content: flex-end; }
 .gl-acts .ap-btn { white-space: nowrap; font-size: 16px; }

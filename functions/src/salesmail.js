@@ -124,8 +124,9 @@ function salesRows(input, nowMs) {
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// Joe 11-2-26: caution = yellow (30 to 60 minutes off its dispatch time), late = red.
-const TONE = { ok: ['#1b7a3a', '#e6f4ea'], caution: ['#1c2733', '#f5c518'], late: ['#b3261e', '#fde7e5'], loaded: ['#1d4f91', '#e5eefb'], waiting: ['#8a5a00', '#fff4d6'] };
+// Joe 11-2-26: caution = yellow (30 to 60 minutes off its dispatch time), late = red. One color set (rules audit line 14).
+const C = L.COLORS;
+const TONE = { ok: [C.green, C.greenBg], caution: [C.yellowInk, C.yellow], late: [C.red, C.redBg], loaded: ['#1d4f91', '#e5eefb'], waiting: ['#8a5a00', '#fff4d6'] };
 
 /** The email itself: { subject, text, html }. */
 function salesEmail(data) {

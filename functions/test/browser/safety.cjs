@@ -179,9 +179,9 @@ async function cameraShot(page, color) {
     // Joe 10/12: photos on any item from the camera: a Good item and a Not good item.
     assert.equal(await wk.$$eval('#list tr[data-row]', r => r.filter(x => !x.querySelector('button[data-cam]')).length), 0, 'every row has + Photo');
     assert.equal(await wk.getAttribute('#camera', 'capture'), 'environment', '+ Photo opens the back camera');
-    await takePhoto(wk, 'exit_routes', '#1d7a3e');
+    await takePhoto(wk, 'exit_routes', '#1f7a4d');
     await wk.waitForSelector(row('exit_routes') + ' .sw-thumbs img');
-    await takePhoto(wk, 'panel_labels', '#c62828');
+    await takePhoto(wk, 'panel_labels', '#b42318');
     await wk.waitForSelector(row('panel_labels') + ' .sw-thumbs img');
     await wk.check('#list input[data-maint="panel_labels"]');
     await wk.click('#list section[data-sec="issues"] tr[data-issue-row="old_issue"] .sw-btn.open');

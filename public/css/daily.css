@@ -26,10 +26,10 @@ body.daily-look table.daily tbody tr:not(.group) td:last-child { border-right: 1
 body.daily-look table.daily tbody tr:not(.group):hover td { background: #f3f8ff; }
 body.daily-look table.daily td.route { font-weight: 900; color: #0b4fb3; font-size: calc(var(--font) + 2px); }
 body.daily-look table.daily tbody tr.group td { background: linear-gradient(90deg, #1f6feb, #6aa8ff) !important; color: #fff !important; font-weight: 900; letter-spacing: .1em; border-radius: 10px; text-align: left; padding-left: 14px; }
-body.daily-look table.daily td.missing { background: #fff1f0; color: #b3261e; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
+body.daily-look table.daily td.missing { background: #fff1f0; color: #b42318; box-shadow: inset 0 0 0 2px #f3b8b3; border-radius: 6px; }
 body.daily-look table.daily button.toggle.on { background: #16a34a; color: #fff; border-radius: 999px; border: 0; font-weight: 900; }
 body.daily-look table.daily button.edit { border-radius: 999px; background: #0f2747; color: #fff; border: 0; }
-body.daily-look table.daily td.pickup { color: #b3261e; font-weight: 900; }
+body.daily-look table.daily td.pickup { color: #b42318; font-weight: 900; }
 /* Joe 10/11 (review item 1): Daily Dispatch on a phone. The top boxes wrap onto more lines, and the table keeps every
    column at readable 16px text: it scrolls sideways with the Route column pinned, and a long day scrolls under a
    sticky heading. Phones only; laptops and desk screens keep their one-line layout. */
@@ -63,9 +63,9 @@ body.daily-look table.daily tbody tr.group.loaded.already td { background: linea
 body.daily-look table.daily tbody tr.group.loaded.already td .gtext, body.daily-look table.daily tbody tr.group.loaded.already td { color: #fff !important; }
 body.daily-look table.daily tbody tr.already:not(.group) td { background: #f6f8fb; }
 body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border-left-color: #94a3b8; }
-.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #9b1c1c; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.notice.warning.down-loads { margin: 0 16px 8px; background: #fde8e8; color: #b42318; border: 2px solid #ee3e3e; border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .notice.warning.down-loads[hidden] { display: none; }
-.notice.warning.down-loads button { background: #b3261e; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.notice.warning.down-loads button { background: #b42318; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
 /* Review item 1 (Joe 10/13): Daily's top buttons sit on the title line with the date boxes on the right (laptops and desk
    screens; a phone keeps its wrapped layout). */
 @media (min-width: 701px) {

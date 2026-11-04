@@ -64,7 +64,7 @@
 .inv-page .inv-tab { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1 1 auto; }
 .inv-page table.inv-onhand td.big { font-size: 18px; }
 .inv-page table.inv-onhand tr.low td { background: #fdecec; }
-.inv-page table.inv-onhand tr.low td:first-child { box-shadow: inset 6px 0 0 #c62828; }
+.inv-page table.inv-onhand tr.low td:first-child { box-shadow: inset 6px 0 0 #b42318; }
 .inv-page table.inv-onhand tr.low td small { color: #b42318; }
 .inv-page table.inv-onhand tr.counting td { background: #fffbe8; }
 .inv-page .inv-acts { display: flex; flex-wrap: wrap; gap: 6px; }

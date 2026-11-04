@@ -18,17 +18,17 @@
 .crew-board td.pick:hover { outline: 2px solid var(--ud-gold); outline-offset: -2px; }
 .crew-board td.changed { box-shadow: inset 4px 0 0 var(--ud-blue); }
 .crew-board td.c-edit select { width: 100%; font: inherit; min-height: 34px; }
-.crew-board tr.open-row td { color: #b3261e; font-weight: 800; background: #fff6f5; }
+.crew-board tr.open-row td { color: #b42318; font-weight: 800; background: #fff6f5; }
 .c-off { background: #ffe2bd; color: #7a3f00; }
 .c-vac { background: #e4d8fb; color: #4b2a91; }
 .c-relief { background: #fff4cc; color: #7a5600; }
 .crew-legend { display: flex; gap: 10px; flex-wrap: wrap; }
 .crew-legend span { border-radius: 999px; padding: 2px 12px; font-size: 16px; font-weight: 800; }
-.crew-legend .open-key { background: #fff6f5; color: #b3261e; }
+.crew-legend .open-key { background: #fff6f5; color: #b42318; }
 .crew-legend .changed-key { background: #fff; box-shadow: inset 4px 0 0 var(--ud-blue); border: 1px solid var(--line); }
 .crew-type { display: inline-block; border-radius: 999px; padding: 1px 10px; background: #dcecff; color: #0b4f8a; font-size: 16px; }
 .crew-pill { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 16px; font-weight: 800; }
-.crew-pill.approved { background: #e7f6ec; color: #1d7a3e; }
+.crew-pill.approved { background: #e7f6ec; color: #1f7a4d; }
 .crew-pill.pending { background: #fff1dc; color: #a35b00; }
 .crew-pill.denied, .crew-pill.cancelled { background: #e6e9ee; color: #3b4652; }
 .crew-page button.link { border: 1px solid var(--line); background: #fff; color: var(--ud-blue); border-radius: 6px; padding: 2px 12px; font: inherit; font-weight: 700; cursor: pointer; }
