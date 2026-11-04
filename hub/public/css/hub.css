@@ -291,3 +291,32 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 
 /* Plant Setup: a card per set-up screen, opened on the plant picked. */
 .ps { display: grid; gap: 18px; }
+
+/* Joe 11-4-26: a person opens on the whole page (not the side panel): who they are and their apps, what they see in Plant &
+   Distribution, and single rights side by side; Save and Cancel stay at the bottom of the window. */
+.people.full { grid-template-columns: 1fr; }
+.people.full .people-list { display: none; }
+.people:not(.full) .people-edit .pe-head .back { display: none; }
+.people-edit .pe-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.people-edit .pe-head .back { font-size: 16px; padding: 0; }
+.people-edit .pe-grid, .people-edit .pe-col { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.people-edit .pe-col h3 { margin: 0; color: var(--ud-blue-dark); font-size: 17px; }
+.people.full .people-edit { position: static; padding: 20px 24px; }
+.people.full .people-edit .pe-grid { grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.3fr) minmax(340px, 1.3fr); gap: 24px; align-items: start; }
+.people.full .people-edit .pe-col + .pe-col { border-left: 1px solid var(--line); padding-left: 24px; }
+.people.full .people-edit .pe-col > .pblock { border-top: 0; padding-top: 0; }
+.people.full .people-edit .pe-foot { position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--line); padding: 12px 0 4px; display: grid; gap: 8px; }
+@media (max-width: 1200px) {
+  .people.full .people-edit .pe-grid { grid-template-columns: 1fr 1fr; }
+  .people.full .people-edit .pe-col:last-child { grid-column: 1 / -1; border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+}
+@media (max-width: 760px) {
+  .people.full .people-edit { padding: 12px; }
+  .people.full .people-edit .pe-grid { grid-template-columns: 1fr; }
+  .people.full .people-edit .pe-col + .pe-col { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+}
+.people-edit .papps { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; }
+.people-edit .papps h4 { margin: 6px 0 0; font-size: 15px; color: var(--ud-blue-dark); }
+.people-edit .papps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.people-edit .papps li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.people-edit .papps p { margin: 0; }
