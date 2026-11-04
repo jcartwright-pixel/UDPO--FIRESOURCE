@@ -43,13 +43,14 @@
     <div class="view">
       <!-- Joe 10/28 (mock-up 2): how many trailers are in the lot and how full; the list on the left, the trailer picked on the right.
            Joe 11/1 (mock-up 2): Trailer Company and Unit first; Location; Edit Lists.
-           Joe 11/3 (mock-up 2): Supplier; every United Dairy trailer always listed; Edit on each line for its location. -->
+           Joe 11/3 (mock-up 2): Supplier; every United Dairy trailer always listed; Edit on each line for its location.
+           Joe 11/4: the list looks like Inventory (blue heading bar) with its heading names: Product, How Many, Counted In. -->
       <div class="jt-sum" id="sum"></div>
       <div class="mach-split">
         <section class="pm-panel" aria-label="Trailers in the lot">
           <div class="pm-scroll">
             <table class="pm-table">
-              <thead><tr><th>Supplier</th><th>Unit</th><th>Status</th><th>What Is on It</th><th>Location</th><th></th></tr></thead>
+              <thead><tr><th>Supplier</th><th>Unit</th><th>Status</th><th>Product</th><th class="num">How Many</th><th>Counted In</th><th>Location</th><th></th></tr></thead>
               <tbody id="rows"></tbody>
             </table>
           </div>

@@ -50,7 +50,23 @@
 .jt-page select.jt-loc { min-width: 150px; height: 36px; min-height: 36px; }
 .jt-page .jt-editcell { text-align: right; }
 .jt-page.mach-page #rows td:nth-child(4) { white-space: normal; min-width: 140px; }
+/* Joe 11/4: the list looks like Inventory: a blue heading bar with white words, lines between the columns. */
+.jt-page.pm-page table.pm-table th { background: var(--ud-blue); color: #fff; border-bottom: 0; height: 44px; }
+.jt-page.pm-page table.pm-table td { border-right: 1px solid #e3eaf1; }
+.jt-page.pm-page table.pm-table td:last-child { border-right: 0; }
+.jt-page.pm-page table.pm-table .num { text-align: right; }
+.jt-page.mach-page #rows td { line-height: 1.35; }
 .jt-page #products { align-self: stretch; }
+/* Wide screens (Joe's 1536 window too): the list gets more of the width and the headings wrap, so Location and Edit always show. */
+@media (min-width: 1201px) {
+  .jt-page .mach-split { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
+  .jt-page.pm-page table.pm-table th { white-space: normal; line-height: 1.15; }
+  .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding-left: 7px; padding-right: 7px; }
+  .jt-page.mach-page #rows td:nth-child(4) { min-width: 110px; }
+  .jt-page select.jt-loc { min-width: 128px; }
+  .jt-page .jt-edit { padding: 3px 8px; }
+  .jt-page .jt-lines { grid-template-columns: minmax(0, 1fr) 84px 104px; }
+}
 .jt-page .jt-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 10px; }
 .jt-page .jt-pair label, .jt-page .jt-prod label { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 800; color: var(--muted); }
 .jt-page .jt-bignum { font-size: 20px; font-weight: 900; color: var(--ud-blue); }
@@ -59,18 +75,39 @@
 .jt-page .jt-matchbtn.on { background: var(--ud-blue); color: #fff; }
 .jt-page .jt-prod { display: grid; grid-template-columns: minmax(0, 1fr) 170px auto; gap: 12px; align-items: end; margin-top: 12px; }
 .jt-page .jt-prod .pm-btn { min-height: 40px; }
+/* The list never runs wider than its box: set widths for the short columns; supplier, product and counted in share
+   the rest and wrap. (Fonts differ a little between computers, so the widths cannot be left to the words.) */
+.jt-page.pm-page table.pm-table td { overflow-wrap: anywhere; }
+.jt-page.pm-page table.pm-table td .jt-edit { overflow-wrap: normal; white-space: nowrap; }
+@media (min-width: 861px) {
+  .jt-page.pm-page table.pm-table { table-layout: fixed; }
+  .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding-left: 7px; padding-right: 7px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(2) { width: 78px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 134px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(5) { width: 78px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(7) { width: 140px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(8) { width: 76px; }
+  .jt-page.mach-page #rows td:nth-child(4) { min-width: 0; }
+  .jt-page select.jt-loc { min-width: 0; width: 100%; }
+}
+/* Under 1200 wide the trailer card goes under the list, so every column of the list still shows. */
+@media (max-width: 1200px) {
+  .jt-page .mach-split { display: block; }
+  .jt-page .mach-split > .pm-panel { margin-bottom: 12px; }
+  .jt-page .mach-split .pm-scroll { max-height: 60vh; }
+}
 @media (max-width: 900px) {
-  .jt-page .mach-split { grid-template-columns: 1fr; }
   .jt-page .jt-big button { font-size: 18px; }
 }
-@media (max-width: 600px) {
+@media (max-width: 860px) {
   .jt-page.pm-page table.pm-table th { white-space: normal; }
   .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding: 7px 6px; }
   .jt-page .jt-big { gap: 6px; }
   /* On a phone the status sits under the trailer number, so what is on it has the room. */
   /* Joe 11/1: on a phone the company sits over the unit number, so what is on it has the room. */
   /* Joe 11/3: the location and Edit stay on a phone; the supplier and status sit under the unit number. */
-  .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(1), .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(3), .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(4) { display: none; }
+  .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(1), .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(3), .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(4),
+  .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(5), .jt-page.pm-page table.pm-table tr:not(.jt-grp) > :nth-child(6) { display: none; }
   .jt-page.mach-page #rows td { white-space: normal; }
   .jt-page.mach-page #rows tr.jt-grp td { font-size: 16px; }
   /* The list gets room of its own on a phone; the trailer card follows under it. */
@@ -79,7 +116,10 @@
   .jt-page .mach-split .pm-scroll { max-height: 60vh; }
   .jt-page .jt-phone-what { display: block !important; font-size: 16px; font-weight: 600; margin-top: 4px; }
   .jt-page .jt-pair, .jt-page .jt-prod { grid-template-columns: 1fr; }
-  .jt-page select.jt-loc { min-width: 0; width: 120px; }
+  .jt-page select.jt-loc { min-width: 0; width: 100%; }
+  .jt-page select.jt-loc { max-width: 112px; }
+  .jt-page.pm-page table.pm-table th { letter-spacing: 0; }
+  .jt-page .jt-edit { padding: 3px 8px; }
   .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
   .jt-page .head .actions.in-head { flex-wrap: wrap; justify-content: flex-start; }
   .jt-page .jt-co { grid-template-columns: 1fr; }
