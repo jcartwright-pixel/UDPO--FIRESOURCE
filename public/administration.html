@@ -45,7 +45,7 @@
 
   <script type="module">
     import { requireSignIn, start, escapeHtml, ICON, callServer, watchPerson } from './js/app.js';
-    import { ADMIN_GROUPS, adminItem } from './js/admin-items.js';
+    import { ADMIN_GROUPS, adminItem, hubUrl } from './js/admin-items.js';
     import { PAGES } from './js/admin-pages.js';
     import { TOOL_PAGES } from './js/admin-tools.js';
     import { renderGoLive } from './js/admin-golive.js';
@@ -90,7 +90,7 @@
           const st = state(it);
           // Review item 51 (Joe 10/13): menus are words only, so the side menu has no icons (the open item's title keeps its picture).
           return '<button type="button" class="adm-item ' + st + (it.key === current ? ' on' : '') + '" data-key="' + it.key + '"' + (it.key === current ? ' aria-current="true"' : '') + '>' +
-            '<span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : '') + '</button>';
+            '<span class="adm-name">' + escapeHtml(it.title) + '</span>' + (PILL[st] ? '<em>' + PILL[st] + '</em>' : it.hub ? '<em class="hub">In the Hub</em>' : '') + '</button>';
         }).join('') + '</div></div>';
       }).join('') || '<p class="adm-none">Nothing matches. Try another word.</p>';
     }
@@ -99,10 +99,14 @@
       const panel = document.getElementById('panel'), it = adminItem(current), st = state(it);
       const head = '<header class="adm-panel-head"><span class="adm-ic big">' + icon(it.icon) + '</span><div><h2>' + escapeHtml(it.title) + '</h2><small>' + escapeHtml(it.group) + ' &middot; ' + escapeHtml(it.what) + '</small></div>' +
         '<div class="adm-actions">' + (st === 'ready' ? '<a class="button" id="full" href="' + withTest(it.page) + '">Open full screen</a>' : st === 'soon' ? '<span class="adm-state soon">' + PILL[st] + '</span>' : '') + '</div></header>';
+      // Joe 11-4: what the United Dairy Hub now changes says so at the top, with the way there. It still works here until
+      // everyone has moved to the hub; both save to the same place.
+      const hub = it.hub ? '<div class="adm-hubnote" role="note"><span><b>This is changed in the United Dairy Hub now.</b> It is the same list and the same settings, so a change in either place is the same change.</span>' +
+        '<a class="button" id="to-hub" href="' + hubUrl(it.hub) + '">Change this in the Hub</a></div>' : '';
       if (st === 'ready') {
-        panel.innerHTML = head + '<iframe class="adm-frame" id="frame" title="' + escapeHtml(it.title) + '" src="' + withTest(it.page) + '"></iframe>';
+        panel.innerHTML = head + hub + '<iframe class="adm-frame" id="frame" title="' + escapeHtml(it.title) + '" src="' + withTest(it.page) + '"></iframe>';
       } else if (st === 'inline') {
-        panel.innerHTML = head + '<div class="adm-view" id="view"><p class="adm-loading">Loading&hellip;</p></div>';
+        panel.innerHTML = head + hub + '<div class="adm-view" id="view"><p class="adm-loading">Loading&hellip;</p></div>';
         PANELS[it.key](document.getElementById('view'), CTX);
       } else {
         panel.innerHTML = head + '<div class="adm-view"><div class="adm-soon"><h3>Being built in Operations</h3><p>' + escapeHtml(it.what) + '</p>' +

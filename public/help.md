@@ -625,6 +625,8 @@ The connection to Verizon Connect Fleet (administrators).
 
 > Fuel used and MPG only show for trucks whose GPS box is plugged into the engine. Trailers never send fuel.
 
+> The same Verizon login is also in the United Dairy Hub, Keys & Connections. It is one login: a change in either place is the same change.
+
 !> Do not remove the login unless Verizon changed it. Trucks Today and the Scorecard stop getting GPS.
 
 # Plant Distribution
@@ -1388,6 +1390,7 @@ Everything administrators set up, in a menu down the left. Each **red bar** is a
 
 - Type in **Find a setting** to find any item. Every group with a match opens, including items that moved onto Dispatch Administration.
 - `Open full screen` opens the item on its own page.
+- An item marked **In the Hub** is changed in the United Dairy Hub now: People & Roles, Role Templates, the Links & Codes items and the email items. A blue line at its top has `Change this in the Hub`. It still works here for now; both save to the same place.
 - Administration is for administrators only; the button in the top bar shows only to them.
 
 > Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup and GPS Setup are under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
@@ -1415,12 +1418,13 @@ Everyone who works at the plant, brought over from UDMS by itself every 15 minut
 id: admin-people
 screens: administration.html?item=people
 
-Everyone who can sign in. Add a person, then set their role, whether their account is active, which plants they see (All plants or each plant), the screens they may open, their Home screen, and each right (use the role's, allow or deny).
+Everyone who can sign in: their role, whether their account is active, which plants they see, the screens they may open, their Home screen, and each right.
 
-- Each change saves at once and nothing on the page moves.
-- On the practice copy, a link at the top opens the same list in the United Dairy Hub (People & Access), where this page is moving. Either page saves to the same place.
-- A person with no screens ticked sees every screen, as before.
-- Once the People list is moved into Operations (Administration > Go-Live Switches), this screen is the only place to add or change a person. The old Users sheet is kept as a backup and no longer changes.
+It is changed in the **United Dairy Hub** now, the one place for every United Dairy app. A blue line at the top says so: press `Change this in the Hub` and the hub opens on the same screen (Back brings you here again). It is the same list and the same settings, so a change in either place is the same change. It still works here for now, while everyone moves to the hub.
+
+1. Press `Change this in the Hub`.
+2. In the hub's **People & Access**, find the person, or press `+ Add Person`.
+3. Make the change there. It reaches Plant & Distribution at once.
 
 !> Do not set someone Inactive to hide a screen from them. Untick the screen instead.
 
@@ -1428,7 +1432,10 @@ Everyone who can sign in. Add a person, then set their role, whether their accou
 id: admin-roles
 screens: administration.html?item=role-templates
 
-Pick a role and tick the rights it gets. Everyone with that role gets them. The Administrator role is protected and has every right.
+What each role may do. It is changed in the **United Dairy Hub** now, the one place for every United Dairy app. A blue line at the top says so: press `Change this in the Hub` and the hub opens on the same screen (Back brings you here again). It is the same list and the same settings, so a change in either place is the same change. It still works here for now, while everyone moves to the hub.
+
+1. Press `Change this in the Hub`.
+2. In the hub's **Roles & Rights**, tick or untick a right for a role. Everyone with that role gets the change.
 
 ## Access & QR Codes
 id: admin-access
@@ -1440,16 +1447,14 @@ A phone link and QR code for each employee. `Generate` makes one; `Regenerate` (
 id: admin-links
 screens: administration.html?item=app-links, administration.html?item=station-codes, administration.html?item=garage-codes, administration.html?item=driver-codes, administration.html?item=manager-app-codes, administration.html?item=sales-app
 
-Every link and code people use to reach the app:
+Every link and code people use to reach the app: Manager Links, the Plant Managers App, the Sales App, and the Plant, Garage and Driver Station codes. It is changed in the **United Dairy Hub** now, the one place for every United Dairy app. A blue line at the top says so: press `Change this in the Hub` and the hub opens on the same screen (Back brings you here again). It is the same list and the same settings, so a change in either place is the same change. It still works here for now, while everyone moves to the hub.
 
-- **Manager Links:** the full app, the phone link, the Plant Managers App and personal phone links (copy, print a QR, `Launch`), and each plant's manager release code to move a tablet or leave a kiosk.
-- **Plant Station Codes:** the one Plant Station link, then each station's code (typed on the tablet to open that station). `+ Add Station`, `New code`, `Remove`. Under them, the **Line Tablet** link and the **Line Tablets** code.
-- **Garage Station Codes:** the Garage Station and Maintenance Station links, each garage station's code, and the **Maintenance Station** code.
-- A tablet or TV opened with its code opens only its own screen. `Release` (manager release code) takes it back to its code screen, never into the app.
-- An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good: it forgets its station and opens Operations.
-- **Driver Station Codes:** the Driver Station link for the TV and the Driver Room tablet, each station's code, and the drivers' phone link with its Route Distribution code.
-- **Plant Managers App:** the link for managers' phones and tablets, and each plant's Plant Managers code.
-- **Sales App:** the link for the salespeople's phones (copy, print a QR, `Launch`). Anyone with a United Dairy account can open it; there is no code. Under it, **Customer list** says where the app's customers come from: the **Customer List** app. Every change to a customer, a route or a day is made there (`Open the Customer List`), never here, and the Sales app shows it by itself.
+1. Press `Change this in the Hub`.
+2. In the hub's **Links & Codes**, pick the part and the plant, then copy a link, print a QR, or make a new code.
+
+- Every code already given out keeps working.
+- A tablet or TV opened with its code opens only its own screen. `Release` (the manager release code) takes it back to its code screen, never into the app.
+- An Administrator is never locked. On any code screen, `Administrator sign-in` with an Administrator's own account frees that tablet or TV for good.
 
 !> Do not make a new code while a station is in use. The tablet or TV must type the new code.
 
@@ -1457,13 +1462,10 @@ Every link and code people use to reach the app:
 id: admin-email
 screens: administration.html?item=repair-email, administration.html?item=email-senders, administration.html?item=report-recipients, administration.html?item=sent-log, administration.html?item=checkin-email
 
-Where email goes and who it comes from:
+Where email goes and who it comes from: Repair Email, Email Senders, Manager Report Recipients, the Sent Email Log (with the Sending switch) and Driver Check-In Email. It is changed in the **United Dairy Hub** now, the one place for every United Dairy app. A blue line at the top says so: press `Change this in the Hub` and the hub opens on the same screen (Back brings you here again). It is the same list and the same settings, so a change in either place is the same change. It still works here for now, while everyone moves to the hub.
 
-- **Repair Email:** where repair email goes (Idealease, Penske, owned units), on or off, how often for each lessor, the digest hour, and `Send now`.
-- **Email Senders:** email comes from the person who presses Send, and each plant's own address for automatic email.
-- **Manager Report Recipients:** who gets the plant report at each plant. Remove is pressed twice.
-- **Sent Email Log:** every email the app sent, newest first.
-- **Driver Check-In Email:** the mailbox check for driver check-in email: on or off, sender, recipient, subject, and `Check now`. Pick the plant with `Location`; each plant keeps its own mailbox settings and its own check-ins.
+1. Press `Change this in the Hub`.
+2. In the hub's **Email & Texts**, pick the part on the left. A box saves when you leave it.
 
 ## Sales Route Email
 id: admin-sales-email
@@ -1482,14 +1484,13 @@ What the status says:
 
 The time a load left comes from its trailer's GPS. When the trailer has no GPS, the truck's GPS is used.
 
-1. Type the salespeople's addresses in **Addresses**, separated by commas. They save when you leave the box.
+Who gets it, and On or Off, are changed in the **United Dairy Hub** now (Email & Texts, Sales Route Email): press `Change this in the Hub` on the blue line at the top. It still works here for now; both are the same setting.
+
+1. Type the salespeople's addresses. They save when you leave the box.
 2. Press `Send a test to me` to see this morning's email in your own inbox.
-3. Press `Turn on`, then press it again. From then on it goes out at 6:00 AM.
+3. Press `Turn On`, then press it again. From then on it goes out at 6:00 AM.
 
-- `Turn off` stops it. Nothing goes out while it is off.
-- Email sending in **Sent Email Log** must also be on.
-
-> Every email it sends is listed in Sent Email Log.
+> Every email it sends is listed in the hub's Sent Email part.
 
 !> Do not turn it on before the addresses are in. With no one on it, nothing goes out.
 
@@ -1577,6 +1578,8 @@ The MOCREO temperature sensors' key. The thermometers themselves are in [Machine
 4. `Match to MOCREO Names` pairs your location names with the sensor names on the MOCREO website. Check the pairs, then `Save Matches`.
 
 > A sensor already on another cooler says which, so one sensor is not picked twice.
+
+> The same MOCREO key is also in the United Dairy Hub, Keys & Connections. It is one key: a change in either place is the same change.
 
 ## Menu Setup
 id: menu-setup
