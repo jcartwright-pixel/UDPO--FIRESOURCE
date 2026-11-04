@@ -29,9 +29,9 @@ const SHOTS = process.env.SHOTS || '';
 const CLOCK = '2026-10-08T14:00:00Z';
 const CAP_BARCODE = '4006381333931';
 
-async function openPage(browser, width, height, url) {
+async function openPage(browser, width, height, url, realClock) {
   const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
-  await page.clock.setFixedTime(new Date(CLOCK));
+  if (!realClock) await page.clock.setFixedTime(new Date(CLOCK));
   await localCalls(page);
   await page.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => {
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) });
@@ -62,7 +62,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
   try {
     // ---------- Joe 11/4: Receiving in the left menu opens Receiving (it only showed its fly-out before) ----------
     {
-      const ship = await openPage(browser, 1536, 790, '/scheduler.html?view=month&date=2026-10-08&' + MANAGER);
+      // The real clock: the menu tells a hover from a click by the time between them, which a stopped clock never moves.
+      const ship = await openPage(browser, 1536, 790, '/scheduler.html?view=month&date=2026-10-08&' + MANAGER, true);
       await ship.waitForSelector('.sidemenu .side-sec-btn[title="Receiving"]');
       await ship.hover('.sidemenu');
       await ship.hover('.sidemenu .side-sec-btn[title="Receiving"]');
