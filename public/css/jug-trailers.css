@@ -57,8 +57,8 @@
 .jt-page.pm-page table.pm-table .num { text-align: right; }
 .jt-page.mach-page #rows td { line-height: 1.35; }
 .jt-page #products { align-self: stretch; }
-/* Joe's 1536-wide window: the list gets more of the width and the headings wrap, so Location and Edit always show. */
-@media (max-width: 1800px) and (min-width: 1201px) {
+/* Wide screens (Joe's 1536 window too): the list gets more of the width and the headings wrap, so Location and Edit always show. */
+@media (min-width: 1201px) {
   .jt-page .mach-split { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
   .jt-page.pm-page table.pm-table th { white-space: normal; line-height: 1.15; }
   .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding-left: 7px; padding-right: 7px; }
@@ -75,6 +75,19 @@
 .jt-page .jt-matchbtn.on { background: var(--ud-blue); color: #fff; }
 .jt-page .jt-prod { display: grid; grid-template-columns: minmax(0, 1fr) 170px auto; gap: 12px; align-items: end; margin-top: 12px; }
 .jt-page .jt-prod .pm-btn { min-height: 40px; }
+/* The list never runs wider than its box: set widths for the short columns; supplier, product and counted in share
+   the rest and wrap. (Fonts differ a little between computers, so the widths cannot be left to the words.) */
+@media (min-width: 861px) {
+  .jt-page.pm-page table.pm-table { table-layout: fixed; }
+  .jt-page.pm-page table.pm-table td { overflow-wrap: anywhere; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(2) { width: 78px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 126px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(5) { width: 78px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(7) { width: 140px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(8) { width: 76px; }
+  .jt-page.mach-page #rows td:nth-child(4) { min-width: 0; }
+  .jt-page select.jt-loc { min-width: 0; width: 100%; }
+}
 /* Under 1200 wide the trailer card goes under the list, so every column of the list still shows. */
 @media (max-width: 1200px) {
   .jt-page .mach-split { display: block; }
