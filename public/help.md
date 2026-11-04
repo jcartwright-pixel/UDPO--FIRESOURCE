@@ -1460,16 +1460,23 @@ screens: employees.html, administration.html?item=employees
 
 Everyone who works at the plant, brought over from UDMS by itself every 15 minutes: name, employee ID, position, hire date and phone. **Used On** says where each person is in Operations (Driver Roster, Plant Schedule, Maintenance Schedule). Nothing private comes over from UDMS.
 
+Each person also has a **DEPARTMENT**, picked from one list that is the same everywhere: DRIVER, DOCK, LOADOUT, DISPATCH, GARAGE, PRODUCTION, DEBAG / LABELING, SANITATION, QUALITY / LAB, PLANT MAINTENANCE, SHIPPING & RECEIVING, OFFICE, SALES and MANAGEMENT. The department is kept here in Operations, not in UDMS.
+
 1. Add or change the person in UDMS (a new hire, a new position or phone, someone who left).
 2. Within 15 minutes the change shows here, and on the Driver Roster and the schedules for anyone already on them.
-3. To put the person to work in Operations, pick them on the Driver Roster (`+ Add Driver`) or on Plant Schedule Setup (`+ Add Person`).
+3. Check the person's **DEPARTMENT**. It starts with the one their UDMS position points to (a Dock Worker starts on DOCK). If it is wrong or blank, pick the right one from the drop-down. It saves by itself and stays, even when UDMS changes the position.
+4. To put the person to work in Operations, pick them on the Driver Roster (`+ Add Driver`) or on Plant Schedule Setup (`+ Add Person`). Their department shows next to their name there.
 
 - The line under the title says when UDMS was last checked. A red line means the last check did not work, and it tries again by itself.
 - Use **Search** for a name or employee ID, and the **Status** drop-down for Active, Left or All. Someone who left shows in red with the day they left.
+- Use the **DEPARTMENT** drop-down at the top right to see one department only, or NO DEPARTMENT to find the people still to be given one. A blank department box has a red edge.
+- Only a manager or administrator can change a department. Everyone else sees the name only.
 
 > Gray boxes on the Driver Roster and the schedules come from this list. They change by themselves when UDMS changes.
 
 !> Do not type a person's name, ID or hire date into Operations to fix it. Fix it in UDMS and it follows here.
+
+!> Do not put dock workers under DRIVER. Dock workers are DOCK, even when their UDMS position says Driver.
 
 ## People & Roles
 id: admin-people

@@ -185,7 +185,7 @@ function pickerHtml() {
   const on = new Set(data.people.filter(R.active).map(p => idKey(p.employeeId)).filter(Boolean)), q = pickQ.trim().toUpperCase();
   const found = data.employees.filter(e => e.active && e.facilityId === plant && !on.has(e.idKey) && (!q || String(e.name).indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0)).slice(0, 8);
   return '<div class="crew-picker"><input id="emp-q" value="' + esc(pickQ) + '" placeholder="Pick an employee: type a name or ID" aria-label="Pick an employee" autocomplete="off">' +
-    found.map(e => '<button type="button" data-emp="' + esc(e.idKey) + '"><b>' + esc(e.name) + '</b> · ' + esc(e.employeeId) + ' · <span>' + (esc(e.position) || 'No position') + '</span></button>').join('') +
+    found.map(e => '<button type="button" data-emp="' + esc(e.idKey) + '"><b>' + esc(e.name) + '</b> · ' + esc(e.employeeId) + ' · <span>' + (esc(e.position) || 'No position') + (e.department ? ' · ' + esc(e.department) : '') + '</span></button>').join('') +
     '<p>' + (found.length ? 'Employees not on this schedule yet' : 'No employee matches.') + ' <button type="button" class="link" id="emp-type">Type a name instead</button> <button type="button" class="link" id="emp-close">Close</button></p></div>';
 }
 

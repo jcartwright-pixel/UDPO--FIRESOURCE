@@ -28,3 +28,27 @@ test('a UDMS branch belongs to its plant', () => {
   assert.equal(EMP.udmsDatabase('ud-distribution'), '(default)');
   assert.equal(EMP.udmsDatabase('ud-distribution-sandbox'), 'sandbox');
 });
+
+// Joe 11-4-26: one list of departments; DOCK is its own department (dock workers are not drivers).
+const DEPT = require('../../src/departments');
+test('the department list has DOCK apart from DRIVER, all in capitals, no doubles', () => {
+  assert.ok(DEPT.DEPARTMENTS.indexOf('DOCK') >= 0 && DEPT.DEPARTMENTS.indexOf('DRIVER') >= 0);
+  DEPT.DEPARTMENTS.forEach(d => assert.equal(d, d.toUpperCase()));
+  assert.equal(new Set(DEPT.DEPARTMENTS).size, DEPT.DEPARTMENTS.length);
+});
+test('a job title or a typed department lands on the list', () => {
+  [['Dock Worker', 'DOCK'], ['dock driver', 'DOCK'], ['Driver', 'DRIVER'], ['CDL Route Driver', 'DRIVER'], ['drivers', 'DRIVER'], ['Loader', 'LOADOUT'],
+    ['Filler Operator', 'PRODUCTION'], ['Mechanic', 'PLANT MAINTENANCE'], ['Garage Mechanic', 'GARAGE'], ['Dispatcher', 'DISPATCH'], ['Shipping Clerk', 'SHIPPING & RECEIVING'],
+    ['Lab Technician', 'QUALITY / LAB'], ['Sanitation', 'SANITATION'], ['Plant Manager', 'MANAGEMENT'], ['shipping and receiving', 'SHIPPING & RECEIVING'], ['quality', 'QUALITY / LAB'],
+    ['', ''], ['Something Else', '']].forEach(([job, want]) => assert.equal(DEPT.guess(job), want, job));
+});
+test('the department follows the job title until someone picks one; a pick is kept', () => {
+  assert.deepEqual(EMP.departmentOf(null, 'Dock Worker'), { department: 'DOCK', departmentBy: 'JOB TITLE' });
+  assert.deepEqual(EMP.departmentOf(null, 'Something Else'), { department: '', departmentBy: '' });
+  assert.equal(EMP.departmentOf({ department: 'DOCK', departmentBy: 'HAND' }, 'Driver').department, 'DOCK', 'a pick by hand wins over UDMS');
+  assert.equal(EMP.departmentOf({ department: 'DRIVER', departmentBy: 'JOB TITLE' }, 'Dock Worker').department, 'DOCK', 'a guess follows the new job title');
+  const E = class extends Error { constructor(code, msg) { super(msg); this.code = code; } };
+  assert.throws(() => EMP.validateDepartment({ employeeId: '1', department: 'DOCK WORKERS' }, E), /not one of the departments/);
+  assert.deepEqual(EMP.validateDepartment({ employeeId: '1', department: 'DOCK' }, E), { employeeId: '1', department: 'DOCK' });
+  assert.deepEqual(EMP.validateDepartment({ employeeId: '1', department: '' }, E), { employeeId: '1', department: '' });
+});

@@ -19,6 +19,7 @@ const SHARED_FILES = [
   'scan-rules.js',       // barcode scans (audit 10/29: it was copied by hand)
   'lists.js',           // the one index of every database list (Joe 10/30)
   'jug-rules.js',       // Plant Material Trailers companies, units and lists (Joe 11/1)
+  'departments.js',     // the one list of departments a person can be in (Joe 11-4-26)
 ];
 const SRC = path.join(__dirname, '..', 'functions', 'src');
 const DEST = path.join(__dirname, '..', 'public', 'js');

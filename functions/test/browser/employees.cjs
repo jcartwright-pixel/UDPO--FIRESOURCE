@@ -49,7 +49,9 @@ const PEOPLE = [
   ['10412', 'Pat', 'Adams', 'Driver', '2010-03-01'], ['10744', 'Jamie', 'Farrell', 'Loader', '2019-04-02'],
   ['10802', 'Morgan', 'Grant', 'Filler Operator', '2021-08-20', ''], ['10815', 'Taylor', 'Hollis', 'Mechanic', '2017-01-09'],
   ['10877', 'Riley', 'Kemp', 'Driver', '2026-10-20'], ['10881', 'Casey', 'Lane', 'Loader', '2026-10-27', ''],
-  ['10522', 'Avery', 'Nolan', 'Loader', '2020-05-11', '330-555-0111', '2026-10-29']
+  ['10522', 'Avery', 'Nolan', 'Loader', '2020-05-11', '330-555-0111', '2026-10-29'],
+  // Joe 11-4-26: a dock worker whose UDMS job title says Driver; picked DOCK by hand on the Employees list.
+  ['10893', 'Jordan', 'Price', 'Driver', '2024-02-05'], ['10894', 'Drew', 'Quinlan', 'Dock Worker', '2025-06-16']
 ];
 
 (async () => {
@@ -72,10 +74,10 @@ const PEOPLE = [
     // 1. The Employees list.
     for (const [w, h] of [[1536, 790], [1920, 1080], [390, 844]]) {
       const p = await openPage(browser, w, h, '/employees.html?' + MANAGER);
-      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 6);
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 8);
       assert.match(await p.textContent('#sync'), /Up to date with UDMS/);
       const names = await p.$$eval('#rows tr td:first-child', t => t.map(x => x.textContent));
-      assert.deepEqual(names, ['ADAMS, PAT', 'FARRELL, JAMIE', 'GRANT, MORGAN', 'HOLLIS, TAYLOR', 'KEMP, RILEY', 'LANE, CASEY'], 'Active people, A to Z; Nolan left');
+      assert.deepEqual(names, ['ADAMS, PAT', 'FARRELL, JAMIE', 'GRANT, MORGAN', 'HOLLIS, TAYLOR', 'KEMP, RILEY', 'LANE, CASEY', 'PRICE, JORDAN', 'QUINLAN, DREW'], 'Active people, A to Z; Nolan left');
       const text = await p.textContent('body');
       ['1980', '123-45', 'Made Up Lane'].forEach(x => assert.ok(text.indexOf(x) < 0, x + ' never shows'));
       assert.match(await p.textContent('#rows tr:first-child'), /Driver Roster/);
@@ -89,6 +91,44 @@ const PEOPLE = [
       await p.close();
     }
     results.push('Employees list: active people A to Z, where each is used, no phone said plainly, who left in red with the day; nothing private shows');
+
+    // Joe 11-4-26: DEPARTMENT, a drop-down of the one list, starting from the job title; a pick is kept, whatever UDMS says.
+    const D = require('../../src/departments');
+    for (const [w, h] of [[1536, 790], [1920, 1080], [390, 844]]) {
+      const p = await openPage(browser, w, h, '/employees.html?' + MANAGER);
+      await p.waitForSelector('#rows select.dept-pick');
+      const opts = await p.$eval('select.dept-pick[data-emp="10894"]', s => [...s.options].map(o => o.value));
+      assert.deepEqual(opts, [''].concat(D.DEPARTMENTS), 'the one list, blank first');
+      assert.equal(await p.inputValue('select.dept-pick[data-emp="10894"]'), 'DOCK', 'Dock Worker in UDMS starts on DOCK');
+      assert.equal(await p.inputValue('select.dept-pick[data-emp="10744"]'), 'LOADOUT');
+      if (w === 1536) {
+        assert.equal(await p.inputValue('select.dept-pick[data-emp="10893"]'), 'DRIVER', 'UDMS says Driver');
+        await p.selectOption('select.dept-pick[data-emp="10893"]', 'DOCK');
+        let price = null;
+        for (let i = 0; i < 75; i++) { price = (await db().collection('employees').doc(EMP.docId('10893')).get()).data(); if (price.department === 'DOCK') break; await new Promise(r => setTimeout(r, 200)); }
+        assert.equal(price.department, 'DOCK');
+        assert.equal(price.departmentBy, 'HAND');
+        // The next copy from UDMS (still Driver there) keeps the pick.
+        await EMP.runEmployeeSync({ udmsDb: udms, plantDbs: { fac_uniontown: db() }, now: () => new Date('2026-11-04T15:00:00Z') });
+        assert.equal((await db().collection('employees').doc(EMP.docId('10893')).get()).data().department, 'DOCK', 'kept after UDMS copies again');
+        await p.selectOption('#dept', 'DOCK');
+        await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 2);
+        assert.deepEqual(await p.$$eval('#rows tr td:first-child', t => t.map(x => x.textContent)), ['PRICE, JORDAN', 'QUINLAN, DREW']);
+        await shot(p, '5-department-dock-' + w + '.png');
+        await p.selectOption('#dept', '');
+      }
+      if (w !== 390) assert.ok(await noSideScroll(p), 'no side scrolling at ' + w);
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 8);
+      await shot(p, '5-department-' + w + '.png');
+      assert.deepEqual(p.errors, []);
+      await p.close();
+    }
+    // Someone who may not set it sees the name only.
+    const v = await openPage(browser, 1536, 790, '/employees.html?' + MANAGER.replace('manager', 'viewer'));
+    await v.waitForFunction(() => /DOCK/.test((document.getElementById('rows') || {}).textContent || ''));
+    assert.equal(await v.$$eval('select.dept-pick', s => s.length), 0, 'no drop-down without the right');
+    await v.close();
+    results.push('DEPARTMENT: one list with DOCK, starts from the UDMS job title, a manager picks DOCK for a dock worker UDMS calls Driver, it is kept when UDMS copies again, the filter shows only DOCK, a viewer sees the name only');
 
     // Administration opens it.
     const a = await openPage(browser, 1536, 790, '/administration.html?item=employees&' + MANAGER.replace('manager', 'admin'));
