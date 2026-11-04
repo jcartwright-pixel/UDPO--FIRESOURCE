@@ -108,21 +108,27 @@
         const sent = r.atGarage || r.toLessor, who = truck ? L.unitLessor(lists.fleetTrucks, r.unit, ownership) : null;
         // Joe 10/25: a write-up marked for the lessor whose email never went can be emailed again with Lessor.
         const again = truck && r.toLessor && !r.emailed && !r.atGarage;
-        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || (sent && !again) || !(again ? r.lessor : who.lessor) ? ' disabled' : '') + ' title="' + escapeHtml(again ? 'The email to ' + r.lessor + (r.emailBlank ? ' went out blank' : ' did not go') + '. Press to email it again.' : who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
+        const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || (sent && !again) || !(again ? r.lessor : who.lessor) ? ' disabled' : '') + ' title="' + escapeHtml(again ? (r.emailQueued ? 'Waiting for ' + r.lessor + '\'s once-a-day email. Press to send it now.' : 'The email to ' + r.lessor + (r.emailBlank ? ' went out blank' : ' did not go') + '. Press to email it again.') : who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
+        // Joe 11/4 ("why is some of this grayed out"): a pale button says why under the buttons, in words.
+        const offWhy = !edit ? '' : r.atGarage ? 'Already sent to the garage.'
+          : truck && r.emailed ? 'Already emailed to ' + r.lessor + '.'
+          : truck && r.toLessor ? 'Leased: ' + r.lessor + ' fixes it, so Garage is off.'
+          : truck && who && !who.lessor ? (who.why || 'Not leased') + ', so Lessor is off.' : '';
         // Review item 57 (Joe 10/13): the work buttons are words only (View, Repaired), no envelope or tick.
         const actions = removeFor === r.id
           ? '<span class="down-box"><input data-why maxlength="200" placeholder="Why remove it?"><button type="button" class="warn" data-remove-save>Remove</button><button type="button" data-remove-cancel>Cancel</button></span>'
           : '<span class="work-acts"><button type="button" class="see" data-open title="See the whole write-up" aria-label="See the whole write-up">View</button>' +
             (truck ? '<span class="seg">' + lessorBtn + garageBtn + '</span>' : garageBtn) +
             '<button type="button" class="done" data-step="repaired" title="Mark Repaired"' + d + '>Repaired</button>' +
-            '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>';
+            '<button type="button" class="ic remove" data-remove title="Remove: not a real unit, or not a write-up. The sheet keeps the row marked Removed." aria-label="Remove"' + d + '>&#10005;</button></span>' +
+            (offWhy ? '<small class="acts-why">' + escapeHtml(offWhy) + '</small>' : '');
         const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
         // Joe 10/25: a write-up sent to the lessor shows the lessor under Emailed (green once the email went, red while it has not);
         // Garage is only for our own garage.
         const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : dash;
         // Joe 11/4 (224001): a red lessor says why its email did not go; one waiting for the lessor's once-a-day email is amber.
-        const emailed = r.toLessor ? '<span class="pill ' + (r.emailed ? 'yes' : r.emailQueued ? 'warn' : 'bad') + '" title="' + escapeHtml(r.emailed ? 'Emailed to ' + r.lessor + ' ' + localWhen(r.emailedAt) + ' (sent by ' + r.lessorBy + ')' : r.emailBlank ? 'The email to ' + r.lessor + ' went out blank. Press Lessor to send it again.' : r.emailQueued ? 'Waiting for ' + r.lessor + '\'s once-a-day repair email (Administration > Repair Email).' : 'Marked for ' + r.lessor + ' ' + localWhen(r.lessorAt) + ' by ' + r.lessorBy + ', but the email has not gone' + (r.emailWhy ? ': ' + r.emailWhy.replace(/\.$/, '') + '.' : '.') + ' Press Lessor to send it again.') + '">' + escapeHtml(r.lessor) + '</span>' + (!r.emailed && !r.emailQueued && r.emailWhy ? '<small class="why">' + escapeHtml(r.emailWhy) + '</small>' : '')
+        const emailed = r.toLessor ? '<span class="pill ' + (r.emailed ? 'yes' : r.emailQueued ? 'warn' : 'bad') + '" title="' + escapeHtml(r.emailed ? 'Emailed to ' + r.lessor + ' ' + localWhen(r.emailedAt) + ' (sent by ' + r.lessorBy + ')' : r.emailBlank ? 'The email to ' + r.lessor + ' went out blank. Press Lessor to send it again.' : r.emailQueued ? 'Waiting for ' + r.lessor + '\'s once-a-day repair email. Press Lessor to send it now.' : 'Marked for ' + r.lessor + ' ' + localWhen(r.lessorAt) + ' by ' + r.lessorBy + ', but the email has not gone' + (r.emailWhy ? ': ' + r.emailWhy.replace(/\.$/, '') + '.' : '.') + ' Press Lessor to send it again.') + '">' + escapeHtml(r.lessor) + '</span>' + (!r.emailed && !r.emailQueued && r.emailWhy ? '<small class="why">' + escapeHtml(r.emailWhy) + '</small>' : '')
           : r.emailed ? tick('Emailed ' + r.emailedAt) : dash;
         const more = openFor === r.id ? '<tr class="issue-more"><td colspan="' + cols + '"><b>' + escapeHtml(KINDS[i][2].replace(' #', '') + ' ' + (r.unit || '?')) + '</b>' + (r.driver ? ' · ' + escapeHtml(r.driver) : '') + (routeText(r) ? ' · route ' + escapeHtml(routeText(r)) : '') +
           ' · reported ' + dateText(r.reported) + ' (' + daysAgo(r.openedMs) + ' days ago)<p>' + escapeHtml(r.text) + '</p>' + (truck && who ? '<small>' + escapeHtml(who.lessor ? 'Leased from ' + who.lessor : who.why) + '</small>' : '') + '</td></tr>' : '';
@@ -191,11 +197,14 @@
       };
       return saveOptimistic('updateIssue', { recordId: doc.record_id, step: name, note: note || '' }, apply, () => { Object.keys(doc).forEach(k => delete doc[k]); Object.assign(doc, before); }, render).then(res => {
         if (name !== 'lessor' || !res || !res.message) return;
-        const info = document.getElementById('info');
-        info.textContent = res.message;
+        // Joe 11/4: what happened to the lessor email shows at the top: green when it went, red (and it stays) when it did not.
+        // The red lessor under Emailed keeps the reason and Lessor stays pressable, so it can be sent again.
+        const info = document.getElementById('info'), went = res.email === 'SENT' || /^Already sent/.test(res.message);
+        info.textContent = went ? res.message : res.message + (res.email === 'GARAGE' ? '' : ' Press Lessor to try again.');
+        info.className = 'notice ' + (went ? 'done' : 'error');
         info.hidden = false;
         clearTimeout(step.timer);
-        step.timer = setTimeout(() => { info.hidden = true; }, 15000);
+        if (went) step.timer = setTimeout(() => { info.hidden = true; }, 15000);
       });
     }
 

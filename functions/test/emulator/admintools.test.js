@@ -126,27 +126,30 @@ test('Email Senders: automatic repair emails (no one pressed Send) come from the
   assert.equal(auto[0].from, 'uniontown.operations@uniteddairy.com');
 });
 
-test('Repair Email: the Lessor button follows the setting; Once a day puts an older write-up into that lessor\'s daily email (review item 32)', async () => {
-  // Reported before Once a day was switched on, so only the Lessor button brings it in.
+test('Repair Email: pressing Lessor emails right away even when the lessor is set to Once a day; the daily email then leaves it out (Joe 11/4)', async () => {
   await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'mon', tractorIssues: 'Oil leak' });
   await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'DAILY' } }, digestHour: 15 });
   const truck = L.issueRows(await records(), 'TRUCK')[0];
   const input = { action: 'updateIssue', requestId: rid(), recordId: truck.recordId, step: 'lessor', note: 'PENSKE' };
   const sent = [];
   const res = await T.afterSave(db(), DISPATCHER, input, await applyAction(db(), DISPATCHER, input), mailDeps(sent));
-  assert.equal(res.email, 'QUEUED');
-  assert.match(res.message, /Added to Penske's daily repair email, sent at 3 PM/);
-  assert.equal(sent.length, 0, 'nothing goes out until the daily email');
-  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Repair email queued for the daily digest/);
-  const out = await T.repairSweep(db(), { force: true, by: ADMIN.email, mailDeps: mailDeps(sent) });
-  assert.match(out.message, /Sent 1 repair in 1 digest/);
+  assert.equal(res.email, 'SENT');
+  assert.match(res.message, /Emailed to Penske/);
+  assert.equal(sent.length, 1, 'it goes now, not at 3 PM');
   assert.match(sent[0].text, /Oil leak/);
-  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Repair email sent .* \(daily digest\)/);
-  assert.equal((await call({ op: 'sentLog' })).emails[0].status, 'SENT');
-  // Immediately: the Lessor button sends it right away.
-  await call({ op: 'saveRepairEmail', routes: { PENSKE: { emails: 'repairs@penske.com', mode: 'IMMEDIATE' } } });
-  const now = await T.sendOneRepair(db(), truck.recordId, DISPATCHER.email, '', mailDeps(sent));
-  assert.equal(now.status, 'SENT');
+  assert.match((await records()).find(r => r.kind === 'TRUCK').notes, /Repair email sent /);
+  assert.equal(L.issueRows(await records(), 'TRUCK')[0].emailed, true);
+  const out = await T.repairSweep(db(), { force: true, by: ADMIN.email, mailDeps: mailDeps(sent) });
+  assert.match(out.message, /Sent 0 repairs/);
+  assert.equal(sent.length, 1, 'the daily email does not send it twice');
+  // One already waiting for the daily email (from before this change) still goes in the daily email when nobody presses Lessor.
+  await applyAction(db(), DISPATCHER, { action: 'saveCheckIn', requestId: rid(), runDocId: RUN, day: 'tue', tractorIssues: 'Brake light out' });
+  const waiting = (await db().collection('maintenance').get()).docs.find(d => /Brake light/.test(d.data().issue_details || ''));
+  assert.ok(waiting, 'the second write-up was made');
+  await waiting.ref.update({ status: 'OPEN', truck_number: truck.unit, notes: 'Sent to lessor PENSKE 2026-10-09T12:00:00.000Z by ' + DISPATCHER.email + '\nRepair email queued for the daily digest 2026-10-09T12:00:00.000Z (Penske)' });
+  const digest = await T.repairSweep(db(), { force: true, by: ADMIN.email, mailDeps: mailDeps(sent) });
+  assert.match(digest.message, /Sent 1 repair in 1 digest/);
+  assert.match(sent[1].text, /Brake light out/);
 });
 
 test('Driver Check-In Email: the answering-service email becomes records once; a write-up with no truck or trailer word needs review', async () => {

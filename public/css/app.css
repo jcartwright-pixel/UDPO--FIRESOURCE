@@ -525,6 +525,9 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .issues-page .pill.no { background: var(--pill-gray-bg); color: var(--pill-gray-ink); }
 .issues-page .pill.warn { background: var(--pill-warn-bg); color: var(--pill-warn-ink); }
 .issues-page .pill.bad { background: var(--pill-red-bg); color: var(--pill-red-ink); }
+.issues-page .notice.done:not([hidden]) { display: block; margin: 0 16px 8px; background: var(--pill-green-bg); color: var(--pill-green-ink); border-radius: 8px; padding: 8px 12px; font-size: 16px; font-weight: 700; }
+.issues-page .notice.error:not([hidden]) { font-size: 16px; font-weight: 700; }
+.issues-page table.issues td small.acts-why { display: block; margin-top: 4px; font-size: 16px; color: var(--muted); white-space: normal; line-height: 1.2; }
 .issues-page .count { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border-radius: 14px; background: #eef2f5; font-weight: 800; }
 .issues-page .count.repeat { background: #fde3df; color: #a8321f; }
 .issues-page .work { display: inline-flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }

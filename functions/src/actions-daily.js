@@ -150,8 +150,8 @@ async function updateIssue(tx, db, req, email, stamp, logRef, mode) {
     if (!lessor) throw new SaveError('BAD_REQUEST', 'Say which lessor');
     // Joe 10/25 ("the 876 email didn't get sent ... How can I send it now?"): pressing Lessor again on one whose email never
     // went sends the email again (afterSave); once the email went, it is already sent. One sent with a blank body (before the
-    // 6.62 fix, L.repairEmailSent) counts as never sent.
-    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: L.repairEmailSent(notes) || /Repair email queued/.test(notes) ? 'Already sent to the lessor.' : 'Emailing the lessor again.' };
+    // 6.62 fix, L.repairEmailSent) counts as never sent, and so does one waiting for the once-a-day email (Joe 11/4: it goes now).
+    if (notes.indexOf('Sent to lessor') >= 0) return { ok: true, requestId: req.requestId, runs: [], message: L.repairEmailSent(notes) ? 'Already sent to the lessor.' : 'Emailing the lessor again.' };
     change = { notes: add('Sent to lessor ' + lessor + ' ' + stamp + ' by ' + email) };
   } else {
     if (String(r.status || '').toUpperCase() !== 'NEEDS_REVIEW') throw new SaveError('NOT_ALLOWED', 'Only a write-up that needs review can be marked reviewed');

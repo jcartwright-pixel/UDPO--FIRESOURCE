@@ -121,6 +121,12 @@ async function buttonsFit(p, label) {
       assert.equal(await p.locator('tr[data-id="' + appId + '"] [data-step="lessor"]').isDisabled(), false, 'the Idealease truck can go to the lessor');
       assert.match(await p.getAttribute('tr[data-id="' + appId + '"] [data-step="lessor"]', 'title'), /Send to Idealease/);
       assert.equal(await p.locator('tr[data-id="MAIL_m13_tractor"] [data-step="lessor"]').isDisabled(), true, 'an owned truck goes to our garage');
+      // Joe 11/4 ("why is some of this grayed out"): a pale button says why in words under the buttons.
+      assert.equal((await p.textContent('tr[data-id="MAIL_m13_tractor"] .acts-why')).trim(), 'Owned truck: our garage fixes it, so Lessor is off.');
+      assert.equal((await p.textContent('tr[data-id="MAIL_m14_tractor"] .acts-why')).trim(), 'Already emailed to Idealease.');
+      assert.equal((await p.textContent('tr[data-id="MAIL_m15_tractor"] .acts-why')).trim(), 'Leased: Idealease fixes it, so Garage is off.');
+      assert.equal(await p.locator('tr[data-id="MAIL_m15_tractor"] [data-step="lessor"]').isDisabled(), false, 'an email that has not gone can be sent again');
+      assert.equal(await p.locator('tr[data-id="' + appId + '"] .acts-why').count(), 0, 'nothing pale, nothing to explain');
       // Sent to the lessor: the lessor shows whole under Emailed (green once emailed, red while not), and Garage stays a dash.
       const sentCells = await p.$$eval('tr[data-id="MAIL_m14_tractor"], tr[data-id="MAIL_m15_tractor"]', trs => trs.map(tr => {
         const td = tr.children, pill = td[6].querySelector('.pill'), box = td[6].getBoundingClientRect(), r = pill ? pill.getBoundingClientRect() : null;
@@ -190,6 +196,7 @@ async function buttonsFit(p, label) {
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('A write-up sent to Idealease shows Idealease whole under Emailed (green once emailed, red while not) and a dash under Garage, at 1536 and 1920');
+    results.push('A pale Lessor or Garage button says why under the buttons: owned truck, already emailed, or leased; one whose email has not gone stays pressable');
     results.push('A truck the fleet list has as Idealease can go to the lessor and says Leased from Idealease; an owned one cannot; the open write-up shows route 802, not its code');
     results.push('What\'s Wrong starts with one View link: the email for an answering-service write-up, the check-in for an app one');
   } finally {
