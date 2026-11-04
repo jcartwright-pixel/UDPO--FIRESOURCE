@@ -1,0 +1,62 @@
+name: Verizon driver usernames (one-off, read only)
+
+# Joe 11/4: every current driver's Verizon username for Employees & Compliance's Accounts set up box. Runs
+# tools/verizon-drivers.cjs with the PRACTICE copy's saved Verizon Fleet login (same Verizon account). Read only in Verizon.
+# Driver names and usernames never show in this public run: the list is encrypted to a key only Claude's session holds
+# before it is kept as the run's download (1 day). Runs only on its own branch, which is deleted afterwards (never merged).
+on:
+  push:
+    branches:
+      - claude/verizon-drivers
+    paths:
+      - tools/verizon-drivers.cjs
+      - .github/workflows/verizon-drivers.yml
+
+permissions:
+  contents: read
+
+jobs:
+  drivers:
+    runs-on: ubuntu-24.04
+    environment: distribution-sandbox
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Key
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
+          node -e "if (require('$RUNNER_TEMP/practice.json').project_id !== 'ud-distribution-sandbox') process.exit(1)"
+      - run: npm ci
+      - name: Read drivers from Verizon (read only)
+        env:
+          KEY: ${{ runner.temp }}/practice.json
+          OUT: ${{ runner.temp }}/vd
+        run: node ../tools/verizon-drivers.cjs
+      - name: Encrypt
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/practice.json"
+          mkdir -p "$RUNNER_TEMP/enc"
+          [ -d "$RUNNER_TEMP/vd" ] || exit 0
+          tar -C "$RUNNER_TEMP/vd" -czf "$RUNNER_TEMP/vd.tgz" .
+          openssl rand -hex 32 > "$RUNNER_TEMP/k"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in "$RUNNER_TEMP/vd.tgz" -out "$RUNNER_TEMP/enc/data.enc" -pass file:"$RUNNER_TEMP/k"
+          openssl pkeyutl -encrypt -pubin -inkey ../tools/verizon-drivers.pub.pem -pkeyopt rsa_padding_mode:oaep -in "$RUNNER_TEMP/k" -out "$RUNNER_TEMP/enc/key.enc"
+          rm -rf "$RUNNER_TEMP/vd" "$RUNNER_TEMP/vd.tgz" "$RUNNER_TEMP/k"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verizon-drivers-encrypted
+          path: ${{ runner.temp }}/enc
+          if-no-files-found: ignore
+          retention-days: 1
