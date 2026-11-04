@@ -4,13 +4,10 @@ name: GPS Trip check on the practice copy
 # run once on the PRACTICE copy, for one truck and one day, with the practice copy's saved Verizon Fleet login.
 # Read only: nothing is deployed, nothing is written to the sheets, and the practice copy keeps no answer. The answer is in
 # this run's summary and its "gps-trip-check" download.
-# - Run workflow (truck and day), or a push to the Trip check branch with [trip check] in the commit message
-#   (truck: the one with the most miles yesterday).
-# - Joe 11/2: first and last day filled in (or [trip month] in the commit message: all of October 2026) reads EVERY truck's
-#   trips over those days instead, into trips-all-trucks.csv and trucks-summary.csv.
+# - Run workflow (truck and day). It no longer starts on a push (11-4-26: that left a skipped run per save).
+# - Joe 11/2: first and last day filled in reads EVERY truck's trips over those days instead, into trips-all-trucks.csv
+#   and trucks-summary.csv.
 on:
-  push:
-    branches: [claude/project-thread-g66yeh]
   workflow_dispatch:
     inputs:
       tag:
@@ -31,7 +28,6 @@ permissions:
 
 jobs:
   trip-check:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[trip check]') || contains(github.event.head_commit.message, '[trip month]') || contains(github.event.head_commit.message, '[trip logs]') || contains(github.event.head_commit.message, '[trip save]')
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 180
@@ -103,7 +99,7 @@ jobs:
       # A whole span is too big to read in the run's summary: it is put on this branch (gps-trip-results/) for Claude to
       # pick up, and taken off again before the pull request is merged.
       - name: Keep a span's spreadsheets on the branch
-        if: always() && env.FROM_SET == '1'
+        if: always() && env.FROM_SET == '1' && github.ref_name != 'main'
         run: |
           set -euo pipefail
           [ -f "$RUNNER_TEMP/gps-trip-check/trips-all-trucks.csv" ] || { echo "No results"; exit 0; }

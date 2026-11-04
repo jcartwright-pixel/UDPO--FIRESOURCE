@@ -9,11 +9,8 @@ name: Deploy distribution app (Firebase)
 # Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
 # (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
 # Without them it stops with a notice and deploys nothing. It never changes the current Apps Script app.
-# Until this file is on main (where GitHub lists it for "Run workflow"), a push to the work branch whose commit
-# message contains [deploy sandbox] also deploys, to the SANDBOX only.
+# It no longer starts on a push (that left a "skipped" run in Actions for every save on the old work branch).
 on:
-  push:
-    branches: [claude/project-thread-ell22c]
   workflow_dispatch:
     inputs:
       target:
@@ -37,7 +34,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[deploy sandbox]')
     runs-on: ubuntu-24.04
     environment: distribution-${{ inputs.target || 'sandbox' }}
     defaults:
