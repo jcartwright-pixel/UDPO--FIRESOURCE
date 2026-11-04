@@ -84,11 +84,12 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     // (our number typed, 014 is T-14) and what is on it is a product from Suppliers & Products with how many. No All trailers.
     const p = await openPage(browser, 1536, 790, '/jug-trailers.html?testEmail=' + SAM);
     await p.waitForFunction(() => /United Dairy trailers · 0 here · 3 not here/.test(document.querySelector('#rows').textContent));
-    assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Supplier', 'Unit', 'Status', 'What Is on It', 'Location', '']);
+    assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Supplier', 'Unit', 'Status', 'Product', 'How Many', 'Counted In', 'Location', ''], 'Joe 11/4: the heading names Inventory uses');
+    assert.equal(await p.$eval('.pm-table th', th => getComputedStyle(th).color), 'rgb(255, 255, 255)', 'white words on the blue heading bar, like Inventory');
     assert.equal(await p.$('#show'), null, 'the All trailers drop-down is gone');
     assert.match(await p.$eval('#products', a => a.getAttribute('href')), /^scheduler\.html\?lane=receiving&view=products/);
     assert.equal(await p.$eval('.head h1', h => getComputedStyle(h).textTransform), 'uppercase', 'everything in capitals');
-    const rowsText = () => p.$$eval('#rows tr[data-id]', rs => rs.map(r => r.cells[1].querySelector('b').textContent + ':' + r.cells[4].textContent));
+    const rowsText = () => p.$$eval('#rows tr[data-id]', rs => rs.map(r => r.cells[1].querySelector('b').textContent + ':' + r.cells[6].textContent));
     assert.deepEqual(await rowsText(), ['T-601:NOT HERE', 'T-980:NOT HERE', 'T-985:NOT HERE'], 'our dry box trailers here only (not the refrigerated one, not another plant\'s)');
     await p.click('#add');
     await p.waitForSelector('#add-company');
@@ -120,7 +121,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.equal(t.history[0].what, 'Came into the lot at UPPER LOT');
     assert.equal(t.history[0].by, 'Sam Ortiz');
     assert.equal(await db().collection('equipment').doc('veh_trailer_t_985').get().then(d => Object.keys(d.data()).length), 6, 'the main trailer list is not changed');
-    await p.waitForFunction(() => /WHITE 1\/2 GAL JUG, 22 Bundles/.test(document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]').textContent));
+    await p.waitForFunction(() => { const r = document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]'); return r && [3, 4, 5].map(i => r.cells[i].textContent).join('|') === 'WHITE 1/2 GAL JUG|22|Bundles'; });
     results.push('Every United Dairy dry box trailer is listed (NOT HERE until it comes in); + Add Trailer: Supplier and Unit side by side, our number typed with matches to tap, a product from Suppliers & Products and how many');
 
     // Edit on a NOT HERE line brings the trailer in; Edit to NOT HERE takes it out.
@@ -183,7 +184,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await until(async () => (await jug('fac_uniontown_METRO_5307')).location === 'LOWER LOT', 'location saved');
     assert.equal((await jug('fac_uniontown_METRO_5307')).history[0].what, 'Moved to LOWER LOT');
     assert.equal(await p.evaluate(() => scrollY), before, 'saving never moves the page');
-    await p.waitForFunction(() => /WHITE 1\/2 GAL JUG, 30 Bundles; Clear Qt/.test(document.querySelector('#rows').textContent) && /LOWER LOT/.test(document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]').textContent));
+    await p.waitForFunction(() => (() => { const r = document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]'); return r && [3, 4, 5].map(i => r.cells[i].innerHTML).join('|') === 'WHITE 1/2 GAL JUG<br>Clear Qt|30<br>|Bundles<br>'; })() && /LOWER LOT/.test(document.querySelector('#rows tr[data-id="fac_uniontown_METRO_5307"]').textContent));
     await p.click('#rows tr[data-id="fac_uniontown_T-601"] td:first-child');
     await p.click('#card button[data-status="HALF"]');
     await until(async () => (await jug('fac_uniontown_T-601')).status === 'HALF', 'Half Full saved');
@@ -201,7 +202,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await db().collection('jugTrailers').doc('fac_uniontown_CKS_4737').set({ facilityId: 'fac_uniontown', number: 'CKS 4737', status: 'HALF', inLot: true, unitedDairy: false, items: [{ item: 'White Qt IN DOCK', pallets: '' }], notes: '', history: [] });
     await db().collection('jugTrailers').doc('fac_uniontown_822').set({ facilityId: 'fac_uniontown', number: '822', status: 'EMPTY', inLot: true, unitedDairy: true, items: [{ item: 'Ferry White 1/2', pallets: '' }], location: 'In the Lot', notes: '', history: [] });
     await p.waitForSelector('#rows tr[data-id="fac_uniontown_CKS_4737"]');
-    assert.deepEqual(await p.$eval('#rows tr[data-id="fac_uniontown_CKS_4737"]', r => [...r.cells].map(c => c.textContent)), ['CKS', 'CKS4737Half FullWhite Qt', 'Half Full', 'White Qt', 'In Dock', 'Edit']);
+    assert.deepEqual(await p.$eval('#rows tr[data-id="fac_uniontown_CKS_4737"]', r => [...r.cells].map(c => c.textContent)), ['CKS', 'CKS4737Half FullWhite Qt', 'Half Full', 'White Qt', '', '', 'In Dock', 'Edit']);
     await p.waitForSelector('#rows tr[data-id="fac_uniontown_822"]');
     assert.equal(await p.$eval('#rows tr[data-id="fac_uniontown_822"] td:nth-child(2) b', b => b.textContent), 'T-822');
     results.push('Trailers saved before: "CKS 4737" reads as CKS / 4737 with IN DOCK as the Location; our "822" reads as T-822');
@@ -272,7 +273,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.close();
 
     // Each window size: nothing cut off, no sideways scroll.
-    for (const [w, h] of [[1920, 1080], [1024, 768], [390, 844]]) {
+    for (const [w, h] of [[1920, 1080], [1536, 790], [1024, 768], [768, 1024], [390, 844]]) {
       const v = await openPage(browser, w, h, '/jug-trailers.html?testEmail=' + SAM);
       await v.waitForSelector('#rows tr[data-id]');
       await v.waitForSelector('#card h2');
@@ -280,11 +281,15 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
       await v.waitForSelector('#card h2');
       await v.waitForTimeout(800);
       assert.ok(await v.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no sideways scroll at ' + w);
+      // The list itself shows every column (Location and Edit included) without sliding sideways.
+      const fit = await v.evaluate(() => { const s = document.querySelector('#rows').closest('.pm-scroll'); return [s.scrollWidth, s.clientWidth]; });
+      console.log('list width at ' + w + ': ' + fit.join(' in '));
+      assert.ok(fit[0] <= fit[1] + 1, 'the list fits at ' + w + ' (' + fit.join(' > ') + ')');
       await shot(v, '4-jug-trailers-' + w + '.png');
       assert.deepEqual(v.errors, []);
       await v.close();
     }
-    results.push('Fits at 1920, 1024 and 390 wide');
+    results.push('Fits at 1920, 1536, 1024, 768 and 390 wide, with every column of the list showing');
   } finally {
     await browser.close();
   }

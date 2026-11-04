@@ -906,7 +906,7 @@ Part of **Inventory**, under Shipping & Receiving (on the Home screen it is unde
 
 Everything on this screen is in capitals.
 
-The list has two parts. **United Dairy trailers** is every one of our dry box trailers at this plant, always on the list: the ones in the lot first, then the ones that are **NOT HERE** (in grey, at the bottom). **Other suppliers** is the other suppliers' trailers in the lot. Each line shows the **Supplier**, the **Unit** number, how full it is, what is on it and its **Location**, with an `Edit` button.
+The list has two parts. **United Dairy trailers** is every one of our dry box trailers at this plant, always on the list: the ones in the lot first, then the ones that are **NOT HERE** (in grey, at the bottom). **Other suppliers** is the other suppliers' trailers in the lot. The list looks like **Inventory**: a blue heading bar with the same names. Each line shows the **Supplier**, the **Unit** number, the **Status** (how full it is), the **Product** on it, **How Many** and what they are **Counted In** (one line for each product), and its **Location**, with an `Edit` button.
 
 1. One of our trailers pulls in: press `Edit` on its line, pick where it is parked (**UPPER LOT**, **LOWER LOT**, **DEBAG** or **HOLD**) and press `Save`. It goes in as Empty. You do not need `+ Add Trailer` for our trailers.
 2. A trailer moves: press `Edit` on its line, pick the new place and press `Save`.

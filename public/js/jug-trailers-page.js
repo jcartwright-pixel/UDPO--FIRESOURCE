@@ -121,14 +121,17 @@ function drawList() {
     '<td class="nowrap' + (r.p.unitedDairy ? ' jt-ud' : '') + '"><b>' + escapeHtml(r.p.company) + '</b></td>' +
     '<td class="nowrap"><span class="jt-phone jt-phone-co">' + escapeHtml(r.p.company) + '</span><b>' + escapeHtml(r.p.unit) + '</b>' + (r.t ? '<span class="pm-pill jt-' + escapeHtml(r.t.status) + ' jt-phone">' + escapeHtml(statusName(r.t.status)) + '</span>' + (whatOn(r.p) ? '<span class="jt-phone jt-phone-what">' + escapeHtml(whatOn(r.p)) + '</span>' : '') : '') + '</td>' +
     '<td class="nowrap">' + (r.t ? '<span class="pm-pill jt-' + escapeHtml(r.t.status) + '">' + escapeHtml(statusName(r.t.status)) + '</span>' : '') + '</td>' +
-    '<td>' + (!r.t ? '' : whatOn(r.p) ? escapeHtml(whatOn(r.p)) : '<span class="jt-none">Nothing on it</span>') + '</td>' +
+    // Joe 11/4: Product, How Many and Counted In in their own columns, as on Inventory; one line each for what is on it.
+    (() => { const xs = r.t ? r.p.items.filter(x => x.item) : [], col = (f) => xs.map(x => escapeHtml(f(x))).join('<br>');
+      return '<td>' + (!r.t ? '' : xs.length ? col(x => x.item) : '<span class="jt-none">Nothing on it</span>') + '</td>' +
+        '<td class="num">' + col(x => x.pallets) + '</td><td>' + col(x => x.pallets ? lineUnit(x) : (countedIn(x.item) || '')) + '</td>'; })() +
     '<td class="nowrap">' + where(r) + '</td>' +
     '<td class="nowrap jt-editcell">' + (r.key === editing ? '<button type="button" class="jt-edit save" data-save="' + escapeHtml(r.key) + '"' + dis + '>Save</button>' : '<button type="button" class="jt-edit" data-edit="' + escapeHtml(r.key) + '"' + dis + '>Edit</button>') + '</td></tr>';
   let h = '';
-  if (m.ud.length) h += '<tr class="jt-grp"><td colspan="6">United Dairy trailers · ' + m.ud.filter(r => r.here).length + ' here · ' + away + ' not here</td></tr>' + m.ud.map(line).join('');
-  if (m.other.length) h += '<tr class="jt-grp"><td colspan="6">Other suppliers · ' + m.other.length + ' in the lot</td></tr>' + m.other.map(line).join('');
+  if (m.ud.length) h += '<tr class="jt-grp"><td colspan="8">United Dairy trailers · ' + m.ud.filter(r => r.here).length + ' here · ' + away + ' not here</td></tr>' + m.ud.map(line).join('');
+  if (m.other.length) h += '<tr class="jt-grp"><td colspan="8">Other suppliers · ' + m.other.length + ' in the lot</td></tr>' + m.other.map(line).join('');
   document.getElementById('rows').innerHTML = h ||
-    '<tr><td colspan="6" class="empty">' + (!trailers ? 'Reading the trailers in the lot…' : 'No trailers in the lot yet. + Add Trailer puts the first one on the list.') + '</td></tr>';
+    '<tr><td colspan="8" class="empty">' + (!trailers ? 'Reading the trailers in the lot…' : 'No trailers in the lot yet. + Add Trailer puts the first one on the list.') + '</td></tr>';
 }
 
 // Our dry box trailers that are not in the lot and whose number starts with what was typed (98 finds T-980, T-985...).
