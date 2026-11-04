@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           printf '%s' "$SA" > "$RUNNER_TEMP/k.json"
           node -e "if (require('$RUNNER_TEMP/k.json').project_id !== 'ud-distribution') process.exit(1)"
-          KEY="$RUNNER_TEMP/k.json" node ../tools/repair-email-check.cjs
+          KEY="$RUNNER_TEMP/k.json" NODE_PATH="$PWD/node_modules" node ../tools/repair-email-check.cjs
           gcloud auth activate-service-account --key-file="$RUNNER_TEMP/k.json" >/dev/null 2>&1 || true
           gcloud logging read 'severity>=WARNING AND (textPayload:"Lessor" OR textPayload:"mail" OR jsonPayload.message:"Lessor" OR jsonPayload.message:"mail")' --project ud-distribution --freshness=2d --limit 30 --format='value(timestamp,severity,textPayload,jsonPayload.message)' 2>&1 | sed -E 's/[A-Za-z0-9._%+-]+@/***@/g' || true
           rm -f "$RUNNER_TEMP/k.json"
