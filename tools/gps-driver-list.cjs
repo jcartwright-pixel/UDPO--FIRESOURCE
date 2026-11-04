@@ -77,6 +77,13 @@ function nameKey(s) {
     console.log(table + ': ' + got[table].rows.length + ' rows, ' + got[table].cols.length + ' fields');
   }
 
+  // The names of the groups, teams and home places the IDs above point to (which plant a driver belongs to).
+  const names = [];
+  for (const t of Object.values(tables).filter(n => /^(hierarchynode|team|depot)[-_ ]?\d/i.test(n))) {
+    try { await quiet('UDPO_ListNames', t, ['Id = Input.Id', 'Name = Input.Name'], r => names.push([t, r.Id, r.Name])); } catch (e) { if (!(e instanceof FleetError)) throw e; notes.push(t + ' names could not be read.'); }
+  }
+  fs.writeFileSync(path.join(out, 'group-names.csv'), csv([['Table', 'Id', 'Name']].concat(names)));
+
   // Every table as Fleet sent it.
   Object.keys(got).forEach(t => {
     const g = got[t];
