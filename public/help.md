@@ -1466,6 +1466,7 @@ Everyone who works at the plant, brought over from UDMS by itself every 15 minut
 
 - The line under the title says when UDMS was last checked. A red line means the last check did not work, and it tries again by itself.
 - Use **Search** for a name or employee ID, and the **Status** drop-down for Active, Left or All. Someone who left shows in red with the day they left.
+- Someone with no employee ID in UDMS is still on the list (it says **No ID in UDMS**), and a search by name finds them. Give them their ID in UDMS before adding them to the Driver Roster or a schedule; until then they are not offered there.
 
 > Gray boxes on the Driver Roster and the schedules come from this list. They change by themselves when UDMS changes.
 

@@ -66,6 +66,7 @@
     // Where each employee is used: the Driver Roster, the plant schedule, the Maintenance Schedule.
     function usedOn(e) {
       const out = [];
+      if (!e.idKey) return out; // no employee ID in UDMS: nothing in Operations can carry it yet
       if (drivers.some(d => idKey(d.employeeId) === e.idKey && ['INACTIVE', 'DELETED'].indexOf(String(d.status || '').toUpperCase()) < 0)) out.push('Driver Roster');
       const on = crew.filter(p => idKey(p.employeeId) === e.idKey && String(p.status || '').toUpperCase() !== 'RETIRED');
       if (on.some(p => p.team !== 'maint')) out.push('Plant Schedule');
@@ -80,10 +81,10 @@
       if (!employees) return;
       const q = document.getElementById('search').value.trim().toUpperCase(), st = document.getElementById('status').value;
       const shown = employees.filter(e => e.facilityId === plant && (st === 'ALL' || (st === 'ACTIVE') === !!e.active) &&
-        (!q || String(e.name).indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0));
+        (!q || String(e.name).indexOf(q) >= 0 || (e.idKey && e.idKey.indexOf(idKey(q)) === 0)));
       document.getElementById('rows').innerHTML = shown.map(e => {
         const used = usedOn(e);
-        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + escapeHtml(e.employeeId) + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td>' +
+        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + (escapeHtml(e.employeeId) || '<span class="none">No ID in UDMS</span>') + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td>' +
           '<td>' + (e.hireDate ? shortDate(e.hireDate) : '<span class="none">None</span>') + '</td><td>' + (escapeHtml(e.phone) || '<span class="none">No phone in UDMS</span>') + '</td>' +
           '<td>' + (used.length ? used.map(escapeHtml).join('<br>') : '<span class="none">Not used yet</span>') + '</td>' +
           '<td>' + (e.active ? '<span class="st-on">Active</span>' : '<span class="st-left">' + (e.status === 'GONE' ? 'Not in UDMS' : 'Left' + (e.leftDate ? ' ' + shortDate(e.leftDate) : '')) + '</span>') + '</td></tr>';
