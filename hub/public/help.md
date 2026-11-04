@@ -180,11 +180,13 @@ screens: keys.html
 3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
 4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
 5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
+6. To get the list of drivers Verizon Connect has, press `Download Verizon drivers` on the Verizon Connect GPS card. After a minute a file named like `verizon-drivers-2026-11-04.csv` lands in your Downloads, with each driver's name, user name, driver number, the date they were added and whether they are active. Nothing else about the drivers is read.
 
 ### Buttons
 - `Test Connection`: checks the saved sign-in with that company.
 - `Replace` / `Set up` and `Save`: saves a new key, user name or password.
 - `Send test text`: one test text through Twilio.
+- `Download Verizon drivers`: saves the list of Verizon Connect drivers and their user names as a file (Verizon Connect GPS only).
 - `Remove key`: takes the sign-in away (press twice).
 
 > A saved key is never shown again, only its last few letters, so nobody can copy it from this screen.

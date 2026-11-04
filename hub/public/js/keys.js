@@ -48,7 +48,21 @@ function card(k) {
     '<div class="key-acts"><button type="button" class="primary" data-act="save">Save</button></div></details>' +
     '<div class="key-acts">' + (k.key === 'sms' ? '<label class="inline">Send a test text to<input data-field="phone" type="tel" placeholder="330-555-0100"></label><button type="button" data-act="test">Send test text</button>'
       : '<button type="button" data-act="test"' + (saved ? '' : ' disabled') + '>Test Connection</button>') +
+    (k.key === 'gps' && saved ? '<button type="button" data-act="drivers">Download Verizon drivers</button>' : '') +
     (saved ? '<button type="button" class="warn" data-act="clear" data-twice="Press again to remove the key">Remove key</button>' : '') + '</div></article>';
+}
+
+// Joe 11-4-26 (UDMS's Accounts set up box, a one-time pull): every Verizon driver's name and login as a file, made here in
+// the browser and kept nowhere. Only names, logins, driver numbers, created dates and active flags come back (fleetgps.js).
+const cell = (v) => { const t = String(v == null ? '' : v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+export function driversCsv(rows) {
+  return [['Name', 'Username', 'Driver number', 'Created', 'Active', 'Deleted']].concat((rows || []).map(r => [r.name, r.username, r.number, r.created, r.active, r.deleted]))
+    .map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+function saveFile(name, body) {
+  const url = URL.createObjectURL(new Blob([body], { type: 'text/csv' })), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function draw() { $('#cards').innerHTML = KEYS.map(card).join(''); }
@@ -73,6 +87,12 @@ async function act(b) {
       got[k.key] = out;
       const r = out.result || (out.test ? { ok: out.test.status === 'SENT', message: 'Test text to ' + out.test.to + ': ' + (out.test.status === 'SENT' ? 'sent.' : out.test.reason || out.test.status) } : { ok: false, message: 'No answer.' });
       msg = [k.name + ': ' + r.message, r.ok ? 'good' : 'bad'];
+    }
+    if (a === 'drivers') {
+      say('Reading every driver from Verizon Connect. This can take a minute.');
+      const list = (await ask(k, { op: 'drivers' })).drivers || { rows: [] };
+      saveFile('verizon-drivers-' + new Date().toISOString().slice(0, 10) + '.csv', driversCsv(list.rows));
+      msg = ['Downloaded ' + list.rows.length + ' Verizon drivers.', list.rows.length ? 'good' : 'bad'];
     }
   } catch (err) { msg = [k.name + ': ' + serverText(err, k.name), 'bad']; }
   draw();

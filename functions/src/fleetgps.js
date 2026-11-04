@@ -935,6 +935,47 @@ async function probe(db, d, o, email, tagIn) {
   return save({ at, by: email, tag, steps });
 }
 
+/*
+ * Joe 11-4-26 (for UDMS's Accounts set up box: "just have an action button to pull that information ... Once."): every
+ * driver Fleet keeps, with the name and the login Fleet has for them, for the hub's "Download Verizon drivers" button.
+ * Read only: it saves its own UDPO_Drivers* reports in Fleet (Intent = Retrieve, like Ask Verizon). Only names, logins,
+ * driver numbers, created dates and active flags are asked for; never phones, addresses, licenses or passwords. Fleet's
+ * own field list picks the columns, so a name Verizon spells differently is still found. Administrators only (gps.js).
+ */
+const DRIVER_COLS = /^(id|name|nickname|firstname|lastname|tag|username|login|loginname|userid|user|employeeid|employeenumber|drivernumber|driverid|number|code|created|createdon|createddate|creationtime|datecreated|isactive|active|deleted|isdeleted|enabled|isenabled)$/i;
+const DRIVER_NEVER = /password|pin|phone|mobile|address|licen|birth|ssn|social|email/i;
+async function driverList(d, o) {
+  if (!d.fleet || !d.user || !d.password) throw new FleetError('LOGIN', 'Save the Fleet login first.');
+  const ref = o.ref, token = await key(ref, d, o, false);
+  const run = (name) => execute(d, o, token, name, {}, { maxPolls: 25 });
+  const tables = {};
+  await saveProbeTemplate(d, o, token, 'UDPO_ProbeTables', 'Table-1.0', [], [], ['Id = Input.Id', 'Name = Input.Name']);
+  (await run('UDPO_ProbeTables')).forEach(r => { tables[r.Id] = r.Name; });
+  await saveProbeTemplate(d, o, token, 'UDPO_DriversColumns', 'Column-1.0', [], [], ['TableId = Input.TableId', 'Name = Input.Name', 'IsReadable = Input.IsReadable']);
+  const cols = (await run('UDPO_DriversColumns')).map(r => ({ table: String(tables[r.TableId] || r.TableId).toLowerCase(), name: String(r.Name || ''), readable: !/^false$/i.test(r.IsReadable || '') }));
+  const colsOf = (t) => cols.filter(c => c.table === t && c.readable && /^[A-Za-z][A-Za-z0-9]*$/.test(c.name) && DRIVER_COLS.test(c.name) && !DRIVER_NEVER.test(c.name)).map(c => c.name);
+  const read = async (t) => {
+    const names = colsOf(t.toLowerCase());
+    if (!names.length) return { columns: [], rows: [] };
+    await saveProbeTemplate(d, o, token, 'UDPO_Drivers' + t, t + '-1.0', [], [], names.map(n => 'F_' + n + ' = Input.' + n));
+    const rows = (await run('UDPO_Drivers' + t)).map(r => Object.fromEntries(names.map(n => [n, String(r['F_' + n] == null ? '' : r['F_' + n]).trim()])));
+    return { columns: names, rows };
+  };
+  const drivers = await read('Driver');
+  let users = { columns: [], rows: [] };
+  try { users = await read('User'); } catch (e) { if (!(e instanceof FleetError)) throw e; users = { columns: [], rows: [], error: e.message }; }
+  const pick = (r, re) => { const k = Object.keys(r).find(x => re.test(x)); return k ? r[k] : ''; };
+  const byId = new Map(users.rows.map(u => [pick(u, /^id$/i), u]));
+  const rows = drivers.rows.map(r => {
+    const u = byId.get(pick(r, /^userid$/i)) || null;
+    const name = pick(r, /^name$/i) || [pick(r, /^firstname$/i), pick(r, /^lastname$/i)].filter(Boolean).join(' ');
+    return { name, username: pick(r, /^(username|login|loginname|user)$/i) || (u ? pick(u, /^(username|login|loginname|name)$/i) : ''),
+      number: pick(r, /^(tag|employeeid|employeenumber|drivernumber|number|code)$/i), created: pick(r, /^(created|createdon|createddate|creationtime|datecreated)$/i),
+      active: pick(r, /^(isactive|active|enabled|isenabled)$/i), deleted: pick(r, /^(deleted|isdeleted)$/i) };
+  }).filter(r => r.name || r.username);
+  return { at: o.now().toISOString(), count: rows.length, driverColumns: drivers.columns, userColumns: users.columns, rows };
+}
+
 /* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag} | trips {tag, date}. The caller has
  * already checked the person is a manager or administrator. */
 async function fleetCall(db, email, input, options) {
@@ -1001,10 +1042,12 @@ async function fleetCall(db, email, input, options) {
     const fresh = (await ref.get()).data() || {};
     return Object.assign(status(fresh, await hist()), { pulled: r, coverage: await coverage(db, o.now()) });
   }
+  // Joe 11-4-26: every driver's name and Fleet login, for the hub's Download Verizon drivers button. Nothing is kept.
+  if (op === 'drivers') return { drivers: await driverList(d, Object.assign({}, o, { ref })) };
   throw new FleetError('BAD_REQUEST', 'Unknown Fleet GPS step ' + op.slice(0, 30));
 }
 
 // Shared with fleettrips.js (Joe 11/1: the read-only Trip check).
 const internals = { key, execute, saveProbeTemplate, utcIso, nyDate, nyMidnight, addDays, num, yes, milesApart, fleetTime, withDefaults, short, YARD_MILES };
 
-module.exports = { internals, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { internals, driverList, DRIVER_COLS, DRIVER_NEVER, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
