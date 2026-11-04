@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear, localCalls, localAdmin } = require('../helpers.cjs');
+const { db, clear, localCalls, localAdmin, localKeys } = require('../helpers.cjs');
 const R = require('../../../../functions/src/rights');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
@@ -19,9 +19,10 @@ async function open(browser, email, size, page) {
   await ctx.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, r.request().url().split('/').pop())) }));
   await localCalls(ctx);
   await localAdmin(ctx);
+  await localKeys(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => { throw e; });
-  await p.goto(HOSTING + '/' + (page || 'index.html') + '?testEmail=' + email);
+  await p.goto(HOSTING + '/' + (page || 'index.html') + ((page || '').indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + email);
   return p;
 }
 const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.join(SHOTS, name + '.png'), fullPage: true }); };
@@ -47,6 +48,10 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
 
     assert.ok(await p.isVisible('a[data-admin="people"]'), 'an administrator sees People & Access on Home');
     assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
+    assert.ok(await p.isVisible('a[data-admin="links"]'), 'and Links & Codes');
+    assert.ok(await p.isVisible('a[data-admin="keys"]'), 'and Keys & Connections');
+    assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
+    assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -160,10 +165,198 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Roles & Rights: no sideways page scroll on a phone');
     await shot(p, 'hub-roles-390');
 
+    // Links & Codes: Operations' own calls. A release code, the drivers' phone code, a Driver Room station, the no-account switch.
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'links.html');
+    await p.waitForSelector('#part .lc-card');
+    assert.equal(await p.$$eval('#parts a', a => a.length), 6);
+    assert.equal(await p.textContent('#part h2'), 'Manager links');
+    assert.ok(await p.isVisible('#practice'), 'the practice copy says so');
+    assert.match(await p.textContent('.lc-card[data-link="company"] .lc-url'), /\/index\.html$/);
+    await p.click('button[data-release="fac_uniontown"]');
+    await p.waitForSelector('#msg.good');
+    const first = await p.textContent('.lc-block code');
+    assert.match(first, /^[A-Z0-9]{4,}$/);
+    assert.ok((await db().collection('private').doc('releaseCodes').get()).data().fac_uniontown.hash, 'saved where Operations keeps it');
+    await p.click('button[data-release="fac_uniontown"]');
+    assert.match(await p.textContent('button[data-release="fac_uniontown"]'), /Press again to replace/);
+    assert.equal(await p.textContent('.lc-block code'), first, 'one press changes nothing');
+    await p.click('button[data-release="fac_uniontown"]');
+    await p.waitForFunction((c) => document.querySelector('.lc-block code') && document.querySelector('.lc-block code').textContent !== c, first);
+    await shot(p, 'hub-links-1920');
+    // The Driver Room and the drivers' phones.
+    await p.click('#parts a[data-part="drivers"]');
+    await p.waitForFunction(() => document.querySelector('#part h2').textContent === 'Driver Room & phones');
+    assert.match(p.url(), /part=drivers/);
+    assert.match(await p.textContent('#part [data-kind="KIOSK"]'), /Driver Room Check-In Station/);
+    await p.click('button[data-route="new"]');
+    await p.waitForSelector('.lc-card[data-link="route"] .pill.good');
+    assert.equal((await db().collection('config').doc('routePhone').get()).data().enabled, true);
+    await p.click('button[data-route="off"]');
+    await p.click('button[data-route="off"]');
+    await p.waitForSelector('.lc-card[data-link="route"] .pill.bad');
+    assert.equal((await db().collection('config').doc('routePhone').get()).data().enabled, false);
+    await p.fill('[data-kind="KIOSK"] [data-new-name]', 'Driver Room TV 2');
+    await p.selectOption('[data-kind="KIOSK"] [data-new-type]', 'TV');
+    await p.click('button[data-add="KIOSK"]');
+    await p.waitForFunction(() => /Driver Room TV 2/.test(document.querySelector('[data-kind="KIOSK"]').textContent));
+    const tv = await p.$$eval('[data-kind="KIOSK"] .lc-row', rows => rows.find(r => /Driver Room TV 2/.test(r.textContent)).querySelector('button[data-code]').dataset.code);
+    await p.click('button[data-code="' + tv + '"]');
+    await p.waitForFunction((k) => /New code for Driver Room TV 2/.test(document.querySelector('#msg').textContent), tv);
+    await shot(p, 'hub-links-drivers-1920');
+    await p.click('button[data-remove="' + tv + '"]');
+    await p.click('button[data-remove="' + tv + '"]');
+    await p.waitForFunction(() => !/Driver Room TV 2/.test(document.querySelector('[data-kind="KIOSK"]').textContent));
+    // The Plant Station with no United Dairy account: Off until turned On.
+    await p.click('#parts a[data-part="plant"]');
+    await p.waitForSelector('.lc-card[data-link="public"] .pill.bad');
+    await p.click('button[data-noaccount="on"]');
+    await p.waitForSelector('.lc-card[data-link="public"] .pill.good');
+    assert.equal((await db().collection('private').doc('stations').get()).data().noAccount.fac_uniontown, true);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'links.html?part=garage');
+    await p.waitForSelector('#part [data-kind="GARAGE"]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Links & Codes: no sideways page scroll on a phone');
+    await shot(p, 'hub-links-390');
+
+    // Keys & Connections: Operations' own calls; a key is saved where it always was and never comes back to the page.
+    await db().collection('private').doc('mocreo').set({ apiKey: 'made-up-key-0000-1234', assetId: 'asset-77', savedAt: '2026-10-01T12:00:00Z', savedBy: 'pat.admin@uniteddairy.com' });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'keys.html');
+    await p.waitForSelector('.key-card[data-key="mocreo"]');
+    assert.equal(await p.$$eval('.key-card', c => c.length), 4);
+    const mocreo = await p.textContent('.key-card[data-key="mocreo"]');
+    assert.match(mocreo, /ends in 1234/);
+    assert.ok(mocreo.indexOf('made-up-key') < 0 && (await p.content()).indexOf('made-up-key') < 0, 'the saved key never reaches the page');
+    assert.match(await p.textContent('.key-card[data-key="gps"]'), /Not set up/);
+    // Save a Verizon Connect sign-in: it lands in private/gpsFleet, as Operations' GPS Setup saves it.
+    await p.click('.key-card[data-key="gps"] summary');
+    await p.fill('.key-card[data-key="gps"] [data-field="fleet"]', 'madeupfleet');
+    await p.fill('.key-card[data-key="gps"] [data-field="user"]', 'made.up.user');
+    await p.fill('.key-card[data-key="gps"] [data-field="password"]', 'made-up-password');
+    await p.click('.key-card[data-key="gps"] [data-act="save"]');
+    await p.waitForSelector('#msg.good');
+    const fleet = (await db().collection('private').doc('gpsFleet').get()).data();
+    assert.deepEqual([fleet.user, fleet.password, fleet.savedBy], ['made.up.user', 'made-up-password', 'pat.admin@uniteddairy.com']);
+    assert.ok((await p.content()).indexOf('made-up-password') < 0, 'the password box is emptied once saved');
+    // Test Connection answers in plain words (nothing reaches the outside in the tests).
+    await p.click('.key-card[data-key="mocreo"] [data-act="test"]');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /MOCREO/);
+    assert.match(await p.textContent('.key-card[data-key="mocreo"] .key-test'), /Test failed/);
+    await shot(p, 'hub-keys-1920');
+    // Remove key needs a second press.
+    await p.click('.key-card[data-key="mocreo"] [data-act="clear"]');
+    assert.ok((await db().collection('private').doc('mocreo').get()).data().apiKey, 'one press removes nothing');
+    await p.click('.key-card[data-key="mocreo"] [data-act="clear"]');
+    await p.waitForFunction(() => /key removed/.test(document.querySelector('#msg').textContent));
+    assert.equal((await db().collection('private').doc('mocreo').get()).data().apiKey, undefined);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'keys.html');
+    await p.waitForSelector('.key-card[data-key="sms"]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Keys: no sideways page scroll on a phone');
+    await shot(p, 'hub-keys-390');
+
+    // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.
+    await db().collection('private').doc('emailSettings').set({ sending: false });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'email.html');
+    await p.waitForSelector('#part .em-log');
+    assert.equal(await p.$$eval('#parts a', a => a.length), 7);
+    assert.match(await p.textContent('#part'), /Sending is Off/);
+    assert.match(await p.textContent('#part'), /No email has been sent/);
+    // Turning Sending on needs a second press; turn it back off the same way.
+    await p.click('[data-act="sending-on"]');
+    assert.ok(!(((await db().collection('private').doc('emailSettings').get()).data() || {}).sending), 'one press changes nothing');
+    await p.click('[data-act="sending-on"]');
+    await p.waitForSelector('[data-act="sending-off"]');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().sending, true);
+    await p.click('[data-act="sending-off"]');
+    await p.click('[data-act="sending-off"]');
+    await p.waitForSelector('[data-act="sending-on"]');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().sending, false);
+    await shot(p, 'hub-email-1920');
+    // Plant Report: add a group, change it by leaving its box, then remove it (two presses).
+    await p.click('#parts a[data-part="reports"]');
+    await p.waitForSelector('#plant-pick:not([hidden]) #plant:has(option)');
+    assert.match(p.url(), /part=reports/);
+    await p.fill('#new-name', 'Plant Management');
+    await p.fill('#new-to', 'lee.example@uniteddairy.com');
+    await p.click('[data-act="group-add"]');
+    await p.waitForSelector('input[data-group="Plant Management"]');
+    await p.fill('input[data-group="Plant Management"]', 'lee.example@uniteddairy.com, kim.example@uniteddairy.com');
+    await p.press('input[data-group="Plant Management"]', 'Tab');
+    await p.waitForFunction(() => document.querySelector('#msg').textContent === 'Saved.');
+    const group = (await db().collection('reportGroups').where('name', '==', 'Plant Management').get()).docs[0].data();
+    assert.deepEqual([group.facilityId, group.recipients, group.updatedBy], ['fac_uniontown', ['lee.example@uniteddairy.com', 'kim.example@uniteddairy.com'], 'pat.admin@uniteddairy.com']);
+    await p.fill('input[data-group="Plant Management"]', 'not an address');
+    await p.press('input[data-group="Plant Management"]', 'Tab');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /Not an email address/);
+    await p.click('[data-remove="Plant Management"]');
+    await p.click('[data-remove="Plant Management"]');
+    await p.waitForFunction(() => !document.querySelector('input[data-group]'));
+    // Repair Email: an address and how often save when they are left or picked.
+    await p.click('#parts a[data-part="repairs"]');
+    await p.waitForSelector('[data-lessor="PENSKE"] [data-emails]');
+    assert.ok(await p.isHidden('#plant-pick'), 'repair email is for every plant');
+    await p.fill('[data-lessor="PENSKE"] [data-emails]', 'service@penske.example.com');
+    await p.press('[data-lessor="PENSKE"] [data-emails]', 'Tab');
+    await p.waitForFunction(() => document.querySelector('#msg').textContent === 'Saved.');
+    await p.selectOption('[data-lessor="PENSKE"] [data-mode]', 'DAILY');
+    const repairMode = async () => (((await db().collection('private').doc('repairEmail').get()).data() || {}).routes || {}).PENSKE;
+    for (let i = 0; i < 50 && ((await repairMode()) || {}).mode !== 'DAILY'; i++) await new Promise(r => setTimeout(r, 100));
+    // Who Email Comes From: a plant's address must be a United Dairy one; the red line says why.
+    await p.click('#parts a[data-part="senders"]');
+    await p.waitForSelector('[data-plant="fac_uniontown"] [data-addr]');
+    await p.fill('[data-plant="fac_uniontown"] [data-addr]', 'someone@example.com');
+    await p.press('[data-plant="fac_uniontown"] [data-addr]', 'Tab');
+    await p.waitForSelector('#msg.bad');
+    assert.match(await p.textContent('#msg'), /not a United Dairy email address/);
+    await p.fill('[data-plant="fac_uniontown"] [data-addr]', 'uniontown.plant@uniteddairy.com');
+    await p.press('[data-plant="fac_uniontown"] [data-addr]', 'Tab');
+    await p.waitForSelector('#msg.good');
+    assert.equal((await db().collection('private').doc('emailSettings').get()).data().senders.fac_uniontown.address, 'uniontown.plant@uniteddairy.com');
+    // Texts to Drivers: no Twilio account yet, so Turn On waits for one and says where to set it up.
+    await p.click('#parts a[data-part="texts"]');
+    await p.waitForSelector('[data-act="done-on"]');
+    assert.ok(await p.isDisabled('[data-act="done-on"]'));
+    assert.match(await p.textContent('#part'), /Keys & Connections/);
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'email.html?part=repairs');
+    await p.waitForSelector('[data-lessor="PENSKE"] [data-emails]');
+    assert.equal(await p.inputValue('[data-lessor="PENSKE"] [data-emails]'), 'service@penske.example.com');
+    assert.equal(await p.inputValue('[data-lessor="PENSKE"] [data-mode]'), 'DAILY');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'email.html?part=senders');
+    await p.waitForSelector('[data-plant] [data-addr]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Email & Texts: no sideways page scroll on a phone');
+    await shot(p, 'hub-email-390');
+    // Plant Setup: each set-up screen opens in Plant & Distribution on the plant picked.
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'plant-setup.html');
+    await p.waitForSelector('.lc-card[data-page="shifts.html"] a');
+    assert.equal(await p.$$eval('.lc-card', c => c.length), 7);
+    assert.match(await p.getAttribute('.lc-card[data-page="shifts.html"] a', 'href'), /\/shifts\.html$/);
+    await p.selectOption('#plant', 'fac_charleston');
+    assert.match(await p.getAttribute('.lc-card[data-page="crew.html?view=setup"] a', 'href'), /\/crew\.html\?view=setup&plant=fac_charleston$/);
+    assert.match(await p.textContent('.lc-card[data-page="uploads.html"] a'), /Open for Charleston/);
+    assert.equal(await p.getAttribute('.lc-card[data-page="uploads.html"] a', 'target'), '_blank');
+    await shot(p, 'hub-plant-setup-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'plant-setup.html');
+    await p.waitForSelector('.lc-card a');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Plant Setup: no sideways page scroll on a phone');
+    await shot(p, 'hub-plant-setup-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'plant-setup.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
+    assert.equal(await p.$$eval('.lc-card', c => c.length), 0);
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'email.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
+
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.equal(await p.$$eval('.key-card', c => c.length), 0, 'someone else is not shown even which keys are saved');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'links.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'roles.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);

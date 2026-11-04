@@ -36,7 +36,7 @@ async function localCalls(ctx) {
 }
 
 /*
- * Operations' own admin call (people, savePerson, setHomeScreen, roleTemplates, saveRoleTemplate, addRole) stands in here as a small copy with the same answers, so the hub's browser
+ * Operations' own admin call (people, savePerson, setHomeScreen, roleTemplates, saveRoleTemplate, addRole; the Links & Codes calls are the real ones) stands in here as a small copy with the same answers, so the hub's browser
  * tests need no Operations server. Operations' tests cover the real one.
  */
 // The screens, jobs, rights and role defaults are Operations' own (functions/src/logic.js, rights.js), so the hub is tested
@@ -92,7 +92,27 @@ async function fakeAdmin(email, data) {
     await tplRef.set(t);
     return { ok: true, role, message: data.name + ' added. Give it to people in People & Roles.' };
   }
+  // Links & Codes: Operations' real calls (functions/src/admin.js OPS) on the emulator, so the hub is tested against them.
+  if (LINK_OPS.indexOf(data.op) >= 0 || EMAIL_OPS.indexOf(data.op) >= 0) {
+    const fn = opsAdmin().OPS[data.op] || opsModule('admintools').OPS[data.op];
+    try { return await fn(db(), email, data, new Date().toISOString(), { env: {}, mailDeps: { env: {} } }); }
+    catch (e) { throw Object.assign(new Error(e.message), { status: CODES[e.code] || 'INTERNAL' }); }
+  }
   throw Object.assign(new Error('Unknown request.'), { status: 'INVALID_ARGUMENT' });
+}
+// Email & Texts: Operations' real email settings calls. Sending is Off on the emulator, so nothing is ever emailed.
+const EMAIL_OPS = ['sentLog', 'setSending', 'setForecastEmail', 'reportGroups', 'saveReportGroup', 'salesEmail', 'saveSalesEmail', 'emailSenders', 'saveEmailSenders', 'repairEmail', 'saveRepairEmail', 'checkinEmail', 'saveCheckinEmail'];
+const LINK_OPS = ['appLinks', 'routeCodeNew', 'routeCodeOnOff', 'releaseCodes', 'releaseCodeNew', 'stations', 'stationAdd', 'stationCode', 'stationRemove', 'noAccountSet'];
+// Operations' functions/node_modules may not be installed (the hub's own tests install only hub/functions), so its packages
+// are found in the hub's node_modules when they are not there.
+let ops = null;
+function opsAdmin() {
+  if (ops) return ops;
+  const Module = require('module');
+  process.env.NODE_PATH = [require('path').join(__dirname, '..', 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(require('path').delimiter);
+  Module._initPaths();
+  ops = require('../../../functions/src/admin');
+  return ops;
 }
 async function localAdmin(ctx) {
   await ctx.route(/:5001\/[^/]+\/[^/]+\/admin$/, async (route) => {
@@ -103,4 +123,22 @@ async function localAdmin(ctx) {
     catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: e.status || 'INTERNAL', message: e.message } }) }); }
   });
 }
-module.exports = { PROJECT, db, clear, localCalls, localAdmin };
+/*
+ * Keys & Connections: Operations' real gps, redzone, mocreo and sms calls on the emulator. Nothing reaches the outside: every
+ * outside request fails here, so a test shows the plain "could not reach" answer.
+ */
+const KEY_CALLS = {
+  gps: () => opsModule('gps').gpsCall, redzone: () => opsModule('redzone').redzoneCall, mocreo: () => opsModule('mocreo').mocreoCall, sms: () => opsModule('sms').smsCall
+};
+function opsModule(name) { opsAdmin(); return require('../../../functions/src/' + name); }
+const offline = { fetch: async () => { throw new Error('no outside network in the hub tests'); }, env: {}, project: 'demo-ud-distribution' };
+async function localKeys(ctx) {
+  await ctx.route(/:5001\/[^/]+\/[^/]+\/(gps|redzone|mocreo|sms)$/, async (route) => {
+    const req = route.request(), data = (req.postDataJSON() || {}).data || {}, name = req.url().split('/').pop();
+    let token = null;
+    try { token = JSON.parse(Buffer.from(String(req.headers().authorization || '').split(' ')[1].split('.')[1], 'base64url').toString()); } catch (e) { /* no sign-in */ }
+    try { await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: await KEY_CALLS[name]()(db(), { email: token && token.email }, data, offline) }) }); }
+    catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: CODES[e.code] || 'INTERNAL', message: e.message } }) }); }
+  });
+}
+module.exports = { PROJECT, db, clear, localCalls, localAdmin, localKeys };

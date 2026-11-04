@@ -22,7 +22,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, and **Roles & Rights** is what each role may do.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -84,6 +84,112 @@ screens: roles.html
 !> Do not untick a right from a role to stop one person. Use **Single rights** on that person instead; a role change reaches everyone with that role.
 
 !> Do not make a new role for one person. Give them the closest role and change their single rights.
+
+## Links & Codes
+id: links
+screens: links.html
+
+**Links & Codes** has every link and code people use to reach Plant & Distribution: the managers' links, the Plant Managers App, the Sales App, the plant, garage, maintenance and Driver Room tablets, and the drivers' phone code. It is the same list as **Links & Codes** in Plant & Distribution's Administration, saved to the same place, so every code already given out keeps working. Administrators only.
+
+1. Pick a part on the left: **Manager links**, **Plant Managers App**, **Sales App**, **Plant Stations**, **Garage & Maintenance** or **Driver Room & phones**.
+2. Pick the **Plant** at the top when there is more than one. The links and codes shown are that plant's.
+3. To send someone a link, press `Copy Link`, or `Print QR` to print a page with its QR code. `Open` opens it in a new tab.
+4. To give a station or tablet a code, press `Make a code` on its line. To change a code, press `New code`, then press it again: the tablets on the old code ask for the new one.
+5. To add a station, type its name under the list, pick its type, and press `+ Add`. To take one away, press `Remove`, then press it again.
+6. **Manager links** has each plant's **Manager release code**: a manager types it on a tablet's Release corner to move the tablet to another station.
+7. **Driver Room & phones** has the drivers' phone code: `Make a code`, `New code`, `Turn Off` (press twice) and `Turn On`.
+8. **Plant Stations** has the Plant Station with no United Dairy account: `Turn On`, or `Turn Off` (press twice) to shut every no-account tablet out at once.
+
+### Buttons
+- `Copy Link` / `Print QR` / `Open`: send, print or open a link.
+- `Make a code` / `New code`: a code for a station, tablet, the drivers' phones or a plant's release code. `New code` needs a second press.
+- `Copy Code`: copies the code shown.
+- `+ Add` / `Remove`: a station or tablet. `Remove` needs a second press.
+- `Turn On` / `Turn Off`: the drivers' phone link, or the Plant Station with no United Dairy account. `Turn Off` needs a second press.
+
+> Blue means the person signs in with their United Dairy account. Orange means anyone with the code can open it, so keep those codes to the people who need them.
+
+> On the practice copy a red line says so: its links and codes are for testing only.
+
+!> Do not press `New code` to check a code. Every tablet or phone on the old code stops until someone types the new one.
+
+!> Do not send codes in a group text or email. Read them out or hand them over in person.
+
+## Email & Texts
+id: email
+screens: email.html
+
+**Email & Texts** is where Plant & Distribution's email and texts go and who gets them. It is the same set of settings as **Email & Texts** in Plant & Distribution's Administration, saved to the same place, so nothing has to be set up again. Administrators only.
+
+1. Pick a part on the left: **Sending & Sent Email**, **Plant Report**, **Sales Route Email**, **Who Email Comes From**, **Repair Email**, **Driver Check-In Email** or **Texts to Drivers**.
+2. For **Plant Report** and **Driver Check-In Email**, pick the **Plant** at the top. Each plant has its own.
+3. Type in a box and leave it (press Tab or click somewhere else). It saves then; there is no Save button. A list saves as soon as you pick from it.
+4. A green line says it saved. A red line says what was wrong, and what you typed stays in the box so you can fix it.
+5. **Sending & Sent Email** has the one switch for all email. When it is Off nothing is emailed, and every try is listed as stopped. Below it is every email sent, newest first.
+6. **Plant Report**: type the addresses for each group with commas between them. To add a group, type its name and addresses at the bottom and press `+ Add Group`.
+7. **Sales Route Email**: who gets the 6:00 AM route email, `Turn On` / `Turn Off`, and `Send a test to me`.
+8. **Who Email Comes From**: whether email someone sends comes from their own United Dairy email or the plant's, and each plant's address for automatic email.
+9. **Repair Email**: the addresses for Idealease and Penske, how often each is emailed, and the once-a-day time. `Send now` sends what is waiting.
+10. **Driver Check-In Email**: the mailbox the drivers' check-ins are read from. `Check now` reads it right away.
+11. **Texts to Drivers**: load done texts On or Off, and the cell phone driver replies are sent on to. The week's schedule texts are still sent from **Texts** in Plant & Distribution (`Open Texts in Plant & Distribution`).
+
+### Buttons
+- `Turn On` / `Turn Off`: all email (Sending), the sales email, or load done texts. Turning Sending on or off, and turning the sales email on, need a second press.
+- `Only me` / `Everyone`: who sees the forecast in the plant report email.
+- `+ Add Group` / `Remove`: a plant report group. `Remove` needs a second press.
+- `Send a test to me`: the sales email, to you only.
+- `Send now`: repair email that is waiting.
+- `Check now` / `Use the standard addresses`: the driver check-in mailbox.
+
+> The Twilio account for texts is in **Keys & Connections**. Who gets texts is ticked on the Driver Roster in Plant & Distribution.
+
+> On the practice copy email goes only to the person who pressed the button, and texts are never sent.
+
+!> Do not turn Sending off to stop one email. It stops every email, including the plant report and repair email.
+
+!> Do not type a customer's or a lessor's address into a plant report group. Those groups are for United Dairy people.
+
+## Plant Setup
+id: plant-setup
+screens: plant-setup.html
+
+**Plant Setup** opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
+
+1. Pick the **Plant** at the top.
+2. Press `Open for` on a screen's card. It opens in Plant & Distribution on that plant, in a new tab, so the hub stays open.
+3. Make the change there. It saves the way that screen always has.
+4. To set up another plant, come back to the hub, pick the other plant, and open the screen again.
+
+### Buttons
+- `Open for` (the plant's name): opens that set-up screen for the plant picked.
+
+> A new plant (Charleston, Martins Ferry) starts in the **Upload Center**: download the workbook, fill it in, upload it, check every row, then save.
+
+!> Do not set up one plant's screen with another plant picked. Check the plant's name on the button before you open it.
+
+## Keys & Connections
+id: keys
+screens: keys.html
+
+**Keys & Connections** holds the sign-ins Plant & Distribution uses to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts**. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
+
+1. Each card says what the sign-in is for, what is saved, and how its last test went.
+2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong.
+3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
+4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
+5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
+
+### Buttons
+- `Test Connection`: checks the saved sign-in with that company.
+- `Replace` / `Set up` and `Save`: saves a new key, user name or password.
+- `Send test text`: one test text through Twilio.
+- `Remove key`: takes the sign-in away (press twice).
+
+> A saved key is never shown again, only its last few letters, so nobody can copy it from this screen.
+
+!> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
+
+!> Do not press `Remove key` to test something. The trucks, products, thermometers or texts stop until the key is saved again.
 
 ## Help
 id: help
