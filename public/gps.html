@@ -76,7 +76,13 @@
         <div id="trips-out"></div>
       </section>
       <section class="gps-card wide">
-        <h2>6. What the app reads from Fleet</h2>
+        <h2>6. Driver usernames</h2>
+        <p class="hint">Press Download driver usernames to get a spreadsheet of every driver in Verizon with their Verizon username, employee number and hire and leave dates. It is for the Accounts set up box in Employees &amp; Compliance. Downloading only reads from Verizon and takes up to a minute.</p>
+        <div class="gps-buttons"><button type="button" class="primary" id="drivers">Download driver usernames</button></div>
+        <p class="hint" id="drivers-when"></p>
+      </section>
+      <section class="gps-card wide">
+        <h2>7. What the app reads from Fleet</h2>
         <ol class="gps-steps">
           <li>Where each truck is now: last report time, place, speed, ignition on or off, and the driver Fleet shows.</li>
           <li>Each truck's odometer and engine hours, and the miles it drove today with its first and last movement.</li>
@@ -193,12 +199,12 @@
     const alertsToday = (s) => s.alertsDate === window.UDTiming.calendarDay() ? s.alertsToday : 0;
     // Joe 10/13: Pull now said "Could not reach the GPS settings. Check the network" when the server itself had stopped
     // part way. A server that stopped says so, names the step, and the line under the buttons is read again.
-    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read', probe: 'asking Verizon', trips: 'the trip check' };
+    const STEP = { save: 'saving the login', clear: 'removing the login', test: 'the connection test', pull: 'the GPS read', probe: 'asking Verizon', trips: 'the trip check', drivers: 'the driver download' };
     async function call(fields, button) {
       showError('');
       if (button) button.disabled = true;
       // 6.80 practice test: a trip check that asks Verizon takes about 2 minutes; the usual 70-second wait gave up first.
-      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields), fields.op === 'trips' || fields.op === 'probe' ? { timeout: 190000 } : undefined); render(); return s; }
+      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields), fields.op === 'trips' || fields.op === 'probe' || fields.op === 'drivers' ? { timeout: 190000 } : undefined); render(); return s; }
       catch (e) {
         const code = String(e && e.code || '').replace(/^functions\//, '');
         if (fields.op !== 'status' && /^(internal|unknown|deadline-exceeded)$/.test(code)) {
@@ -263,6 +269,23 @@
       const r = await call({ op: 'trips', tag: $('t-tag').value, date: $('t-date').value }, $('trips'));
       $('trips-when').textContent = '';
       renderTrips(r && r.trips);
+    };
+    // Joe 11/4: every driver's Verizon username as a spreadsheet (CSV), for Employees & Compliance's Accounts set up box.
+    $('drivers').onclick = async () => {
+      $('drivers-when').textContent = 'Asking Verizon for the drivers. This can take up to a minute...';
+      const r = await call({ op: 'drivers' }, $('drivers'));
+      const l = r && r.driverList;
+      if (!l) { $('drivers-when').textContent = ''; return; }
+      const cell = (v) => { const t = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+      const head = ['Employee number', 'Last name', 'First name', 'Middle name', 'Nickname', 'Depot', 'Verizon username', 'Login name', 'Login disabled', 'Last login', 'Hire date', 'Leave date'];
+      const rows = l.drivers.map(x => [x.employeeNo, x.lastName, x.firstName, x.middleName, x.nickname, x.depot, x.username, x.loginName, x.loginDisabled ? 'Yes' : '', x.lastLogin, x.hireDate, x.leaveDate]);
+      const text = '\ufeff' + [head].concat(rows).map(r => r.map(cell).join(',')).join('\r\n') + '\r\n';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+      a.download = 'verizon-driver-usernames-' + l.at.slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      $('drivers-when').textContent = 'Downloaded ' + l.count + ' drivers, ' + l.withUsername + ' with a Verizon username.';
     };
     $('t-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('trips').click(); } });
     $('p-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('probe').click(); } });
