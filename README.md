@@ -146,8 +146,7 @@ After changing a shared rule file in `functions/src` (logic, board-rules, otr-co
 production-rules, safety-rules) run `npm run sync-logic`; a test fails if a screens copy differs.
 
 Deploy: `.github/workflows/deploy.yml`, run by hand, sandbox first. Production only after Joe's
-release words for the new app; what production needs, who makes it and the safety stops are in `PRODUCTION.md`. Until the workflow is on `main`, a commit on the work branch whose message contains
-`[deploy sandbox]` deploys to the sandbox. The sandbox is https://ud-distribution-sandbox.web.app. It shows the made-up
+release words for the new app; what production needs, who makes it and the safety stops are in `PRODUCTION.md`. It starts only from "Run workflow" (a push no longer starts it). The sandbox is https://ud-distribution-sandbox.web.app. It shows the made-up
 sheets (`DEMO_DATA=1`, Joe as administrator) until `sandbox-sources.json` names its sheet copies, and the copy never
 reads the real sheets unless `READ_UNIONTOWN_SHEETS=1` is set. One-time setup in the Firebase console: Firestore
 database `(default)` in nam5 (United States), a registered Web app (Project settings > Your apps), and Google sign-in enabled.
