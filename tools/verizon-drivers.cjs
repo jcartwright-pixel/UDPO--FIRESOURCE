@@ -21,7 +21,7 @@ if (sa.project_id !== 'ud-distribution-sandbox') { console.error('Practice copy 
 const db = getFirestore(admin.initializeApp({ credential: admin.credential.cert(sa) }));
 const out = process.env.OUT || 'verizon-drivers';
 fs.mkdirSync(out, { recursive: true });
-const WANT = /^(Id|Tag|Nickname|Name|FirstName|LastName|MiddleName|FullName|DisplayName|Login|LoginName|UserName|Username|UserId|DriverId|User|EmployeeId|EmployeeNumber|EmployeeCode|DriverCode|DriverNumber|Code|Number|IsActive|Active|IsDeleted|Deleted|IsDisabled|Disabled|Status|Created|CreatedTime|Modified|LastModified|LastLogin|LastLoginTime|PersonnelId|ExternalId)$/i;
+const WANT = /^(Id|Surname|EmployeeNo|HireDate|LeaveDate|Depot|Tag|Nickname|Name|FirstName|LastName|MiddleName|FullName|DisplayName|Login|LoginName|UserName|Username|UserId|DriverId|User|EmployeeId|EmployeeNumber|EmployeeCode|DriverCode|DriverNumber|Code|Number|IsActive|Active|IsDeleted|Deleted|IsDisabled|Disabled|Status|Created|CreatedTime|Modified|LastModified|LastLogin|LastLoginTime|PersonnelId|ExternalId)$/i;
 
 (async () => {
   const o = withDefaults();
@@ -48,7 +48,7 @@ const WANT = /^(Id|Tag|Nickname|Name|FirstName|LastName|MiddleName|FullName|Disp
     const tableId = /-\d/.test(tableName) ? tableName : tableName + '-1.0';
     const tpl = 'UDPO_Accounts_' + bare(tableName).replace(/[^A-Za-z]/g, '');
     let rows = null, err = '';
-    const small = use.filter(c => /^(Id|Name|Nickname|FirstName|LastName|Login|LoginName|UserName|Username|UserId|DriverId|Tag)$/i.test(c.Name));
+    const small = use.filter(c => /^(Id|Surname|EmployeeNo|Name|Nickname|FirstName|LastName|Login|LoginName|UserName|Username|UserId|DriverId|Tag)$/i.test(c.Name));
     for (const set of [use, small]) {
       if (!set.length) continue;
       try {
