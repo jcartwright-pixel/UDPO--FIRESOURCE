@@ -20,7 +20,7 @@ test.beforeEach(async () => {
 
 test('each kind starts with the current app\'s stations, none with a code', async () => {
   const plant = await admin({ op: 'stations', kind: 'PLANT' });
-  assert.deepEqual(plant.stations.map(s => s.name), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services']);
+  assert.deepEqual(plant.stations.map(s => s.name), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services', 'Case Loadout & Yard Services']);
   assert.ok(plant.stations.every(s => !s.set && s.plant === 'Uniontown'));
   assert.deepEqual((await admin({ op: 'stations', kind: 'GARAGE' })).stations.map(s => s.name), ['Garage']);
   assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.typeName), ['Driver Room Check-In Station', "Driver's Kiosk Station"]);
@@ -39,6 +39,22 @@ test('the Driver Room stations show Joe\'s names, also in a list saved under the
   };
   await db().collection('private').doc('stations').set({ list });
   assert.deepEqual((await admin({ op: 'stations', kind: 'KIOSK' })).stations.map(s => s.name), ['Driver Room Check-In Station', "Driver's Kiosk Station", 'Break Room TV']);
+});
+
+// Joe 11-4-26: one more plant tablet, Case Loadout & Yard Services. A plant whose list was saved before it gets it once; a
+// manager who removes it does not see it come back.
+test('Case Loadout & Yard Services joins a saved list once, and Remove keeps it gone', async () => {
+  const list = { a: { key: 'a', kind: 'PLANT', type: 'CASE', name: 'Case Loadout', facilityId: 'fac_uniontown', order: 0 } };
+  await db().collection('private').doc('stations').set({ list });
+  const plant = (await admin({ op: 'stations', kind: 'PLANT' })).stations.filter(s => s.plant === 'Uniontown');
+  assert.deepEqual(plant.map(s => s.name), ['Case Loadout', 'Case Loadout & Yard Services']);
+  const both = plant.find(s => s.type === 'CASE_YARD');
+  assert.equal(both.typeName, 'Case Loadout & Yard Services');
+  const { code } = await admin({ op: 'stationCode', key: both.key });
+  const got = await tablet({ op: 'enter', kind: 'PLANT', code });
+  assert.deepEqual([got.ok, got.station.type], [true, 'CASE_YARD']);
+  await admin({ op: 'stationRemove', key: both.key });
+  assert.ok(!(await admin({ op: 'stations', kind: 'PLANT' })).stations.some(s => s.type === 'CASE_YARD' && s.plant === 'Uniontown'));
 });
 
 test('add a station, give it a code, the tablet types it and opens that station', async () => {

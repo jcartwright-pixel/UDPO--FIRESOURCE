@@ -115,7 +115,7 @@ async function pressAll(page, home) {
   return pressed;
 }
 
-const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], ['TOTES', 'Tote Loadout'], ['BOXING', 'Boxing Loadout'], ['YARD_SERVICES', 'Yard Services']];
+const PLANT = [['CASE', 'Case Loadout'], ['CASE_UNLOADING', 'Case Unloading'], ['TOTES', 'Tote Loadout'], ['BOXING', 'Boxing Loadout'], ['YARD_SERVICES', 'Yard Services'], ['CASE_YARD', 'Case Loadout & Yard Services']];
 
 /*
  * Joe 10/28 "you need to block that exact same way": the Garage Station, the Maintenance Station, a line tablet, the Driver Room
@@ -179,6 +179,25 @@ const OTHERS = [
           await p.click('#ps-back');
           await p.waitForSelector('#tabs [data-part]');
         }
+        // Joe 11-4-26: the Case Loadout & Yard Services tablet opens on the choice of the two; Back comes back to the choice.
+        if (type === 'CASE_YARD') {
+          assert.deepEqual(await p.$$eval('#tabs [data-part] b', b => b.map(x => x.textContent)), ['Case Loadout', 'Yard Services']);
+          assert.equal(await p.isVisible('#ps-back'), false, 'no Back on the choice itself');
+          if (how === 'ud') await shot(p, 'tablet-lock-case-yard-choice-1024');
+          await p.click('[data-part="yard"]');
+          await p.waitForSelector('#tabs [data-view="trailers"]');
+          assert.deepEqual(await p.$$eval('#tabs [data-view]', b => b.map(x => x.dataset.view)), ['trailers', 'yardchecks']);
+          await p.waitForSelector('#work iframe.sw-frame');
+          assert.equal(await p.textContent('#title'), 'Yard Services');
+          assert.ok(await p.isVisible('#ps-back'));
+          await p.click('#ps-back');
+          await p.waitForSelector('#tabs [data-part]');
+          await p.click('[data-part="case"]');
+          await p.waitForSelector('#tabs [data-view="loading"]', { state: 'attached' });
+          assert.equal(await p.textContent('#title'), 'Case Loadout');
+          await p.click('#ps-back');
+          await p.waitForSelector('#tabs [data-part]');
+        }
         for (const gone of ['#go-back', '#go-home', '#signout', '#go-admin', '#go-help', '.sidemenu']) assert.equal(await p.isVisible(gone), false, what + ': ' + gone + ' is not on a station');
         // The station's lists (and a Yard Services frame) read in before the buttons are pressed.
         await p.waitForTimeout(3000);
@@ -204,7 +223,7 @@ const OTHERS = [
         const after = await typedAll(p, ['index.html', 'company.html', 'administration.html', 'manager.html', 'loadout.html'], 'plant-station.html');
         assert.deepEqual(after, [], what + ': after Release, typed screens that did not go back to the code screen');
         assert.deepEqual(p.errors.filter(e => !/Missing or insufficient permissions/.test(e)), [], what + ': no errors or new windows');
-        audit.push('## ' + what, '', '- Opens: the ' + name + ' station only' + (type === 'CASE_UNLOADING' ? ' (a choice of Case Unloading or Trailer Assignments, with Back to the choice)' : '') + '.',
+        audit.push('## ' + what, '', '- Opens: the ' + name + ' station only' + (type === 'CASE_UNLOADING' ? ' (a choice of Case Unloading or Trailer Assignments, with Back to the choice)' : type === 'CASE_YARD' ? ' (a choice of Case Loadout or Yard Services, with Back to the choice)' : '') + '.',
           '- Pressed ' + pressed.length + ' buttons, tabs and links (' + [...new Set(pressed)].join(', ') + '): all stayed on the station.', '- Typed ' + typed.length + ' other screens into the address bar: every one came back to the station.',
           '- Release (manager release code): back to the code screen; nothing else opens after it.', '');
         results.push(what + ': ' + pressed.length + ' buttons pressed and ' + typed.length + ' screens typed in, all stayed on the station; Release went back to the code screen');

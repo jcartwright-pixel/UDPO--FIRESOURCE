@@ -44,7 +44,7 @@
     <!-- Joe 10/10: the Plant Station is a tablet screen, like the drivers' phone page: a slim header, no desktop menu. -->
     <header class="topbar" id="ps-top">
       <!-- Joe 10/27: a plant tablet goes nowhere but its station: no Back or Home into the app, ever. A station with two
-           parts (Case Unloading and Trailer Assignments) has its own Back to the choice of the two. -->
+           parts (Case Unloading and Trailer Assignments, or Case Loadout and Yard Services) has its own Back to the choice of the two. -->
       <span class="brand ps-brand"><img src="img/ud-logo.webp" alt="United Dairy"><strong>Plant Station</strong></span>
       <button type="button" id="ps-back" title="Back to the choice of work" hidden>&#8249; Back</button>
       <span class="ps-pill" id="pill" hidden>Uniontown</span>
@@ -109,7 +109,12 @@
       { id: 'BOXING', label: 'Boxing Loadout', what: 'Box loads, carrier and branch shipments, receiving and taking stock out', area: 'BOXING', views: ['loading', 'receiving', 'takeout'] },
       // Joe 10/12: Yard Services walks the yard for the trailer on each route and checks the trailers' temperatures, on the
       // screens the plant already has (Trailer Assignments and Yard Checks), unchanged.
-      { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Trailer assignments and yard temperature checks', area: '', views: ['trailers', 'yardchecks'] }
+      { id: 'YARD_SERVICES', label: 'Yard Services', what: 'Trailer assignments and yard temperature checks', area: '', views: ['trailers', 'yardchecks'] },
+      // Joe 11-4-26 ("one more link for the plant ... yard services and the case loadout"): one tablet that does both. It opens
+      // on the choice of the two, like the Case Unloading tablet; Back goes back to the choice.
+      { id: 'CASE_YARD', label: 'Case Loadout & Yard Services', what: 'Case loading, trailer assignments and yard temperature checks', area: 'CASE', views: ['loading', 'trailers', 'yardchecks'],
+        parts: [{ id: 'case', label: 'Case Loadout', what: 'Case loading', views: ['loading'], pic: 'case-v1.webp', accent: '#1976d2', tone: '#e8f3ff' },
+          { id: 'yard', label: 'Yard Services', what: 'Assign Trailer and Check Temperatures', views: ['trailers', 'yardchecks'], pic: 'yard-checks.webp', accent: '#168a55', tone: '#e8f8ef' }] }
     ];
     const VIEWS = {
       loading: { label: 'Loading', what: 'Assigned loadout work', accent: '#1976d2', tone: '#e8f3ff', pic: { CASE: 'case-v1.webp', TOTES: 'tote-v1.webp', BOXING: 'box-v1.webp' } },

@@ -1792,7 +1792,7 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 id: plant-station
 screens: plant-station.html
 
-The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns or Yard Services (Assign Trailer and Check Temperatures).
+The plant floor tablets. Each one is opened once with its **Station code** (`OPEN STATION`) and then shows only that station's work: Case, Tote, Boxing and Tanker loading and unloading, Truck Washing, Product Returns, Yard Services (Assign Trailer and Check Temperatures), or Case Loadout & Yard Services (both on one tablet).
 
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
@@ -1806,6 +1806,18 @@ The Case Unloading tablet does two jobs. It opens on a choice of two big buttons
 1. Press `Case Unloading` for unloading, trailer washing and product returns, or `Trailer Assignments` for the trailer on each route.
 2. Do the work.
 3. Press `‹ Back` at the top to come back to the choice and pick the other one.
+
+### Case Loadout & Yard Services tablet
+
+One tablet for a person who loads cases and also walks the yard. It opens on a choice of two big buttons:
+
+1. Press `Case Loadout` to load the case loads, or `Yard Services` for `Assign Trailer` and `Check Temperatures`.
+2. Do the work. It works the same as the Case Loadout tablet and the Yard Services tablet.
+3. Press `‹ Back` at the top to come back to the choice and pick the other one.
+
+- To set one up, give the plant's **Case Loadout & Yard Services** station a code (Links & Codes, Plant Station Codes), or add one more with `+ Add Station` and the Type **Case Loadout & Yard Services**.
+
+!> Do not use it as a second Case Loadout tablet on a busy day. The plant still loads at most 2 case loads at the same time, on all the case tablets together.
 
 ### Boxing tablet: Receiving and Take Out
 

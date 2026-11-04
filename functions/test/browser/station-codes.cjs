@@ -95,7 +95,7 @@ async function codeFitsPhones(p, name) {
     assert.deepEqual(await p.$$eval('#lt-list .ap-item b', b => b.map(x => x.textContent)), ['Line Tablet']);
     // Joe 10/12: the no-account link is built now (it was "Being built"), with its On / Off.
     assert.match(await p.textContent('.ap-link[data-link="public"]'), /Code, no account/);
-    assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services']);
+    assert.deepEqual(await p.$$eval('#st-list .ap-item b', b => b.map(x => x.textContent)), ['Case Loadout', 'Case Unloading', 'Tote Loadout', 'Boxing Loadout', 'Yard Services', 'Case Loadout & Yard Services']);
     await p.fill('#st-name', 'Case Loadout dock 2');
     await p.selectOption('#st-type', 'CASE');
     await p.click('#st-add');
