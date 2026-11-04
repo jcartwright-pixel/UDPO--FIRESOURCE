@@ -234,9 +234,8 @@ async function saveRepairEmail(db, email, input, stamp) {
 
 // A manager's Lessor button on a truck write-up (mode "Only when I press Send"): after the save, the email itself.
 const QUEUED = /Repair email queued for the daily digest/;
-// What the Lessor button's email can end in without going out (each is written on the write-up; QUEUED and GARAGE are not failures).
+// What the Lessor button's email can end in without going out (each is written on the write-up; GARAGE is not a failure).
 const NOT_SENT = ['FAILED', 'BLOCKED', 'HELD', 'OFF', 'NO_ADDRESS', 'NOT_FOUND'];
-const hourText = (h) => (h % 12 || 12) + ' ' + (h < 12 ? 'AM' : 'PM');
 
 async function sendOneRepair(db, recordId, by, note, mailDeps) {
   const r = await read(db.collection(C.maintenance).doc(MAINT.docId(recordId)));
@@ -248,13 +247,11 @@ async function sendOneRepair(db, recordId, by, note, mailDeps) {
   if (dest.route === 'OWNED') return { status: 'GARAGE', message: unitOf(r) + ' is ours: press Garage to make its work order. No email is sent.' };
   if (route.mode === 'NONE') return { status: 'OFF', message: 'Email is turned off for ' + ROUTE_LABEL[dest.route] + ' in Administration > Repair Email.' };
   if (!route.emails.length) return { status: 'NO_ADDRESS', message: ROUTE_LABEL[dest.route] + ' has no email address yet (Administration > Repair Email).' };
-  // Review item 32 (Joe 10/11): "Once a day" puts it in that lessor's daily email instead of sending it now.
-  if (route.mode === 'DAILY') {
-    if (!QUEUED.test(String(r.notes || ''))) await addNote(db, r.record_id, 'Repair email queued for the daily digest ' + at + ' (' + ROUTE_LABEL[dest.route] + ')', by, at);
-    return { status: 'QUEUED', message: 'Added to ' + ROUTE_LABEL[dest.route] + '\'s daily repair email, sent at ' + hourText(s.digestHour) + '.' };
-  }
+  // Joe 11/4 ("why the check-in did not send the email to Ideal Lease whenever I pressed it"): a person pressing Lessor means
+  // send it now, whatever the lessor's setting. "Once a day" (review item 32) now only gathers the automatic ones, and a
+  // write-up already waiting for the daily email goes now when Lessor is pressed (the daily email then leaves it out).
   const msg = repairMessage(r, note);
-  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · ' + (route.mode === 'IMMEDIATE' ? 'immediate' : 'send') + ' · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, mailDeps);
+  const res = await appMail(db, { kind: 'Repair email', label: kindWord(String(r.kind).toUpperCase()) + ' ' + unitOf(r), detail: ROUTE_LABEL[dest.route] + ' · Lessor button · ' + by, by, to: route.emails, subject: msg.subject, text: msg.text, fromName: 'United Dairy Plant Operations', facilityId: r.facility_id }, mailDeps);
   if (res.status === 'SENT') {
     await addNote(db, r.record_id, 'Repair email sent ' + nyIso(new Date(at)) + ' to ' + route.emails.join('; ') + (res.testCopy ? '; test copy to ' + res.sentTo.join('; ') : ''), by, at);
     return { status: 'SENT', message: 'Emailed to ' + ROUTE_LABEL[dest.route] + (res.testCopy ? ' (test copy to ' + res.sentTo.join(', ') + ' only)' : '') + '.' };

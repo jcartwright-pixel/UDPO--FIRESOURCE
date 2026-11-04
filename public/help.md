@@ -483,10 +483,12 @@ Driver, date reported, what's wrong, how many times it was reported, reviewed, e
 
 1. `View` reads the whole write-up (or the original email).
 2. Tick **Reviewed** once you have read it.
-3. `Garage` sends it to our garage as a work order. `Lessor` emails it to the leasing company (Idealease trucks). Under **Emailed** it shows green once the email went, amber while it waits for the lessor's once-a-day email, and red when it did not go. A red one says why underneath (for example, email turned off, or no address set for that lessor). Fix that, then press `Lessor` again.
+3. `Garage` sends it to our garage as a work order. `Lessor` emails it to the leasing company (Idealease trucks) right away. A green box at the top says it went; a red box says it did not go and why. Under **Emailed** it shows green once the email went, amber while it waits for the lessor's once-a-day email, and red when it did not go. A red one says why underneath (for example, email turned off, or no address set for that lessor). Fix that, then press `Lessor` again. An amber one goes right away when you press `Lessor`.
 4. `Repaired` closes it once it is fixed. `Remove` takes off a write-up that was a mistake (press it twice).
 
 > The same problem reported 2 or 3 times shows as one line with a count. Repaired and Remove close every copy.
+
+> A pale button cannot be pressed, and the words under the buttons say why: already emailed to the lessor, already at the garage, a leased truck (the lessor fixes it, so `Garage` is off), or a truck we own or that is not on the fleet list (so `Lessor` is off). `Lessor` stays pressable until the email really goes.
 
 > A red lessor that says "Outbound email is turned off" or "has no email address yet" is fixed in the Hub under Email & Texts. Any other reason: ask an administrator.
 
