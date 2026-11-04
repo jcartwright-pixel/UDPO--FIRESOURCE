@@ -102,7 +102,24 @@ export const ADMIN_GROUPS = [
 const LIVE = typeof location !== 'undefined' && /^ud-distribution\.(web\.app|firebaseapp\.com)$/.test(location.hostname);
 if (LIVE) ADMIN_GROUPS.forEach(g => { g[2] = g[2].filter(it => it[5] !== 'practice'); });
 
+// Joe 11-4 (the United Dairy Hub is live): what the hub now changes. Each of these items says so at the top, with Change this
+// in the Hub on the hub's matching screen; both save to the same place. They come off here once everyone uses the hub.
+// GPS Setup and MOCREO Key stay here: their pages do more than the key (Trip check, Pull now, the thermometers).
+export const IN_HUB = {
+  people: 'people', 'role-templates': 'roles',
+  'app-links': 'links?part=managers', 'manager-app-codes': 'links?part=plant-managers', 'sales-app': 'links?part=sales',
+  'station-codes': 'links?part=plant', 'garage-codes': 'links?part=garage', 'driver-codes': 'links?part=drivers',
+  'sent-log': 'email?part=sending', 'report-recipients': 'email?part=reports', 'sales-email': 'email?part=sales',
+  'email-senders': 'email?part=senders', 'repair-email': 'email?part=repairs', 'checkin-email': 'email?part=checkin'
+};
+// The hub's own site: this app's address with -hub (ud-distribution.web.app -> ud-distribution-hub.web.app). Off Firebase
+// (the local test server) it is the practice hub. The screens above are the hub's (people -> people.html on the hub).
+export function hubUrl(path, loc) {
+  const l = loc || location, m = /^(.+)\.(web\.app|firebaseapp\.com)$/.exec(l.hostname);
+  return (m ? 'https://' + m[1] + '-hub.' + m[2] : 'https://ud-distribution-sandbox-hub.web.app') + '/' + path.replace(/^([a-z-]+)/, '$1.html');
+}
+
 export function adminItem(key) {
-  for (const [group, , items] of ADMIN_GROUPS) for (const it of items) if (it[0] === key) return { group, key: it[0], title: it[1], what: it[2], page: it[3], icon: it[4], moved: it[5] === 'moved' };
+  for (const [group, , items] of ADMIN_GROUPS) for (const it of items) if (it[0] === key) return { group, key: it[0], title: it[1], what: it[2], page: it[3], icon: it[4], moved: it[5] === 'moved', hub: IN_HUB[it[0]] || '' };
   return null;
 }

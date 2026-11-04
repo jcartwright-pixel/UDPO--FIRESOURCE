@@ -58,7 +58,11 @@ async function until(check, what) {
     const p = await openPage(browser, 1920, 1080, '/administration.html' + ADMIN);
     await p.waitForSelector('.adm-item.on[data-key="people"]');
     await p.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
-    const pills = await p.$$eval('.adm-item', s => s.filter(x => x.querySelector('em')).map(x => x.dataset.key));
+    const pills = await p.$$eval('.adm-item', s => s.filter(x => x.querySelector('em:not(.hub)')).map(x => x.dataset.key));
+    // Joe 11-4: what the United Dairy Hub changes now is marked In the Hub, with a note at the top that goes there.
+    assert.deepEqual(await p.$$eval('.adm-item em.hub', s => s.map(x => x.closest('.adm-item').dataset.key)).then(k => k.indexOf('people') >= 0), true);
+    assert.match(await p.getAttribute('#to-hub', 'href'), /^https:\/\/ud-distribution-sandbox-hub\.web\.app\/people\.html$/);
+    assert.match(await p.textContent('.adm-hubnote'), /changed in the United Dairy Hub now/);
     assert.deepEqual(pills, [], 'nothing in Administration says Being built or View only: ' + pills.join(', '));
     assert.equal(await p.$('.adm-state'), null);
     assert.equal(/Users sheet; editing here is being built/.test(await p.textContent('#view')), false);
