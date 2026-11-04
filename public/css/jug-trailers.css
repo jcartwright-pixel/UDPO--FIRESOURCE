@@ -77,9 +77,10 @@
 .jt-page .jt-prod .pm-btn { min-height: 40px; }
 /* The list never runs wider than its box: set widths for the short columns; supplier, product and counted in share
    the rest and wrap. (Fonts differ a little between computers, so the widths cannot be left to the words.) */
+.jt-page.pm-page table.pm-table td { overflow-wrap: anywhere; }
+.jt-page.pm-page table.pm-table td .jt-edit { overflow-wrap: normal; white-space: nowrap; }
 @media (min-width: 861px) {
   .jt-page.pm-page table.pm-table { table-layout: fixed; }
-  .jt-page.pm-page table.pm-table td { overflow-wrap: anywhere; }
   .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding-left: 7px; padding-right: 7px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(2) { width: 78px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 134px; }
@@ -115,7 +116,8 @@
   .jt-page .mach-split .pm-scroll { max-height: 60vh; }
   .jt-page .jt-phone-what { display: block !important; font-size: 16px; font-weight: 600; margin-top: 4px; }
   .jt-page .jt-pair, .jt-page .jt-prod { grid-template-columns: 1fr; }
-  .jt-page select.jt-loc { min-width: 0; width: 120px; }
+  .jt-page select.jt-loc { min-width: 0; width: 100%; }
+  .jt-page select.jt-loc { max-width: 112px; }
   .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
   .jt-page .head .actions.in-head { flex-wrap: wrap; justify-content: flex-start; }
   .jt-page .jt-co { grid-template-columns: 1fr; }
