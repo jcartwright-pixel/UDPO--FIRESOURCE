@@ -72,13 +72,14 @@
     function deptCell(e) {
       const d = e.department || '';
       if (!mayPick) return d ? '<b class="dept">' + escapeHtml(d) + '</b>' : '<span class="none">None</span>';
-      return '<select class="dept-pick' + (d ? '' : ' blank') + '" data-emp="' + escapeHtml(e.employeeId) + '" aria-label="Department of ' + escapeHtml(e.name) + '">' +
+      return '<select class="dept-pick' + (d ? '' : ' blank') + '" data-emp="' + escapeHtml(e.key || e.employeeId) + '" aria-label="Department of ' + escapeHtml(e.name) + '">' +
         '<option value=""></option>' + DEPTS.map(x => '<option value="' + escapeHtml(x) + '"' + (x === d ? ' selected' : '') + '>' + escapeHtml(x) + '</option>').join('') + '</select>';
     }
 
     // Where each employee is used: the Driver Roster, the plant schedule, the Maintenance Schedule.
     function usedOn(e) {
       const out = [];
+      if (!e.idKey) return out; // no employee ID in UDMS: nothing in Operations can carry it yet
       if (drivers.some(d => idKey(d.employeeId) === e.idKey && ['INACTIVE', 'DELETED'].indexOf(String(d.status || '').toUpperCase()) < 0)) out.push('Driver Roster');
       const on = crew.filter(p => idKey(p.employeeId) === e.idKey && String(p.status || '').toUpperCase() !== 'RETIRED');
       if (on.some(p => p.team !== 'maint')) out.push('Plant Schedule');
@@ -94,10 +95,10 @@
       const q = document.getElementById('search').value.trim().toUpperCase(), st = document.getElementById('status').value, dp = document.getElementById('dept').value;
       const shown = employees.filter(e => e.facilityId === plant && (st === 'ALL' || (st === 'ACTIVE') === !!e.active) &&
         (!dp || (dp === NO_DEPT ? !e.department : e.department === dp)) &&
-        (!q || String(e.name).indexOf(q) >= 0 || e.idKey.indexOf(idKey(q)) === 0));
+        (!q || String(e.name).indexOf(q) >= 0 || (e.idKey && e.idKey.indexOf(idKey(q)) === 0)));
       document.getElementById('rows').innerHTML = shown.map(e => {
         const used = usedOn(e);
-        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + escapeHtml(e.employeeId) + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td><td>' + deptCell(e) + '</td>' +
+        return '<tr class="' + (e.active ? '' : 'left-row') + '"><td class="left"><b>' + escapeHtml(e.name) + '</b></td><td>' + (escapeHtml(e.employeeId) || '<span class="none">No ID in UDMS</span>') + '</td><td>' + (escapeHtml(e.position) || '<span class="none">No position</span>') + '</td><td>' + deptCell(e) + '</td>' +
           '<td>' + (e.hireDate ? shortDate(e.hireDate) : '<span class="none">None</span>') + '</td><td>' + (escapeHtml(e.phone) || '<span class="none">No phone in UDMS</span>') + '</td>' +
           '<td>' + (used.length ? used.map(escapeHtml).join('<br>') : '<span class="none">Not used yet</span>') + '</td>' +
           '<td>' + (e.active ? '<span class="st-on">Active</span>' : '<span class="st-left">' + (e.status === 'GONE' ? 'Not in UDMS' : 'Left' + (e.leftDate ? ' ' + shortDate(e.leftDate) : '')) + '</span>') + '</td></tr>';

@@ -12,10 +12,20 @@ test('the UDMS read asks for no private field', () => {
 test('pick keeps name, employee ID, position, hire date, phone, branch and status only', () => {
   const e = EMP.pick({ firstName: 'Riley', lastName: 'Kemp', phone: '3305550199', dob: '1980-01-01', ssn: 'x', address: { line1: 'y' },
     current: { employeeId: '010877', jobTitle: 'Driver', hireDate: '2026-10-20', location: 'Uniontown PA Branch', workStatus: 'Active', active: true } });
-  assert.deepEqual(Object.keys(e).sort(), ['active', 'branch', 'employeeId', 'hireDate', 'leftDate', 'name', 'phone', 'position', 'status']);
+  assert.deepEqual(Object.keys(e).sort(), ['active', 'branch', 'employeeId', 'hireDate', 'leftDate', 'name', 'phone', 'position', 'status', 'udmsId']);
   assert.equal(e.name, 'KEMP, RILEY');
   assert.equal(e.phone, '330-555-0199');
-  assert.equal(EMP.pick({ firstName: 'No', lastName: 'Id', current: {} }), null, 'no Employee ID, not on the list');
+  assert.equal(EMP.pick({ firstName: 'No', lastName: 'Id', current: {} }), null, 'no Employee ID and no UDMS record, nothing to key it by');
+  // Joe 11-4-26: someone with no employee ID in UDMS is still on the list, keyed by their UDMS record.
+  const noId = EMP.pick({ firstName: 'No', lastName: 'Id', current: { workStatus: 'Active' } }, 'udmsRec1');
+  assert.equal(noId.employeeId, '');
+  assert.equal(noId.udmsId, 'udmsRec1');
+  assert.equal(noId.active, true);
+  assert.equal(EMP.keyOf(noId), 'UDMS_UDMSREC1');
+  // A name typed into the ID box is no ID.
+  assert.equal(EMP.pick({ firstName: 'Sam', lastName: 'Made', current: { employeeId: 'MADE SAM' } }, 'r2').employeeId, '');
+  assert.equal(EMP.realId('MADE SAM'), '');
+  assert.equal(EMP.realId('010877'), '010877');
   assert.equal(EMP.pick({ lastName: 'Gone', current: { employeeId: '5', workStatus: 'Terminated', termDate: '2026-10-30' } }).status, 'LEFT');
 });
 

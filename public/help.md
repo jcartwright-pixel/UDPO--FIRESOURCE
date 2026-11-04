@@ -1471,6 +1471,7 @@ Each person also has a **DEPARTMENT**, picked from one list that is the same eve
 - Use **Search** for a name or employee ID, and the **Status** drop-down for Active, Left or All. Someone who left shows in red with the day they left.
 - Use the **DEPARTMENT** drop-down at the top right to see one department only, or NO DEPARTMENT to find the people still to be given one. A blank department box has a red edge.
 - Only a manager or administrator can change a department. Everyone else sees the name only.
+- Someone with no employee ID in UDMS is still on the list (it says **No ID in UDMS**), and a search by name finds them. Give them their ID in UDMS before adding them to the Driver Roster or a schedule; until then they are not offered there.
 
 > Gray boxes on the Driver Roster and the schedules come from this list. They change by themselves when UDMS changes.
 

@@ -51,7 +51,9 @@ const PEOPLE = [
   ['10877', 'Riley', 'Kemp', 'Driver', '2026-10-20'], ['10881', 'Casey', 'Lane', 'Loader', '2026-10-27', ''],
   ['10522', 'Avery', 'Nolan', 'Loader', '2020-05-11', '330-555-0111', '2026-10-29'],
   // Joe 11-4-26: a dock worker whose UDMS job title says Driver; picked DOCK by hand on the Employees list.
-  ['10893', 'Jordan', 'Price', 'Driver', '2024-02-05'], ['10894', 'Drew', 'Quinlan', 'Dock Worker', '2025-06-16']
+  ['10893', 'Jordan', 'Price', 'Driver', '2024-02-05'], ['10894', 'Drew', 'Quinlan', 'Dock Worker', '2025-06-16'],
+  // Joe 11-4-26: no employee ID in UDMS yet, and a name typed into the ID box; both still show as Active.
+  ['', 'Robin', 'Moss', 'Loader', '2026-11-02'], ['MOSS ROBIN', 'Robin', 'Mossman', 'Loader', '2026-11-03']
 ];
 
 (async () => {
@@ -60,7 +62,7 @@ const PEOPLE = [
   await fetch('http://' + process.env.FIRESTORE_EMULATOR_HOST + '/emulator/v1/projects/demo-ud-distribution/databases/' + UDMS_DB + '/documents', { method: 'DELETE' });
   const udms = require('../../src/list-guard').outsideDb(require('firebase-admin/firestore').getFirestore(UDMS_DB));
   for (const [id, first, last, job, hired, phone, left] of PEOPLE) {
-    await udms.collection('people').doc('p' + id).set({ firstName: first, lastName: last, phone: phone === undefined ? '330555' + id.slice(1) : phone, dob: '1980-01-01', ssn: '123-45-6789', address: { line1: '1 Made Up Lane' },
+    await udms.collection('people').doc('p' + (id || last).replace(/\W/g, '')).set({ firstName: first, lastName: last, phone: phone === undefined ? (/\d/.test(id) ? '330555' + id.slice(1) : '') : phone, dob: '1980-01-01', ssn: '123-45-6789', address: { line1: '1 Made Up Lane' },
       current: { employeeId: id, jobTitle: job, hireDate: hired, location: 'Uniontown PA Branch', workStatus: left ? 'Terminated' : 'Active', active: !left, termDate: left || null } });
   }
   // Adams is already a driver (the made-up Driver Master has no employee IDs, so give him his).
@@ -74,10 +76,17 @@ const PEOPLE = [
     // 1. The Employees list.
     for (const [w, h] of [[1536, 790], [1920, 1080], [390, 844]]) {
       const p = await openPage(browser, w, h, '/employees.html?' + MANAGER);
-      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 8);
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 10);
       assert.match(await p.textContent('#sync'), /Up to date with UDMS/);
       const names = await p.$$eval('#rows tr td:first-child', t => t.map(x => x.textContent));
-      assert.deepEqual(names, ['ADAMS, PAT', 'FARRELL, JAMIE', 'GRANT, MORGAN', 'HOLLIS, TAYLOR', 'KEMP, RILEY', 'LANE, CASEY', 'PRICE, JORDAN', 'QUINLAN, DREW'], 'Active people, A to Z; Nolan left');
+      assert.deepEqual(names, ['ADAMS, PAT', 'FARRELL, JAMIE', 'GRANT, MORGAN', 'HOLLIS, TAYLOR', 'KEMP, RILEY', 'LANE, CASEY', 'MOSS, ROBIN', 'MOSSMAN, ROBIN', 'PRICE, JORDAN', 'QUINLAN, DREW'], 'Active people, A to Z (no ID too); Nolan left');
+      assert.match(await p.textContent('#rows tr:nth-child(7)'), /No ID in UDMS/);
+      assert.match(await p.textContent('#rows tr:nth-child(7)'), /Not used yet/);
+      await p.fill('#search', 'moss');
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 2);
+      assert.match(await p.textContent('#rows'), /MOSS, ROBIN/, 'a search finds someone with no ID under Active');
+      await p.fill('#search', '');
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 10);
       const text = await p.textContent('body');
       ['1980', '123-45', 'Made Up Lane'].forEach(x => assert.ok(text.indexOf(x) < 0, x + ' never shows'));
       assert.match(await p.textContent('#rows tr:first-child'), /Driver Roster/);
@@ -90,7 +99,7 @@ const PEOPLE = [
       assert.deepEqual(p.errors, []);
       await p.close();
     }
-    results.push('Employees list: active people A to Z, where each is used, no phone said plainly, who left in red with the day; nothing private shows');
+    results.push('Employees list (no employee ID still shows and is found by a search): active people A to Z, where each is used, no phone said plainly, who left in red with the day; nothing private shows');
 
     // Joe 11-4-26: DEPARTMENT, a drop-down of the one list, starting from the job title; a pick is kept, whatever UDMS says.
     const D = require('../../src/departments');
@@ -118,7 +127,7 @@ const PEOPLE = [
         await p.selectOption('#dept', '');
       }
       if (w !== 390) assert.ok(await noSideScroll(p), 'no side scrolling at ' + w);
-      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 8);
+      await p.waitForFunction(() => document.querySelectorAll('#rows tr').length === 10);
       await shot(p, '5-department-' + w + '.png');
       assert.deepEqual(p.errors, []);
       await p.close();

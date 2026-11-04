@@ -40,10 +40,11 @@ function cellsOf(row, index) {
 /* ---------- master lists ---------- */
 
 const MASTER_KINDS = Object.freeze({
+  // Joe 11-4-26: an employee_id with no number in it (a name typed into the ID box) is read as no ID, so it never matches anyone.
   drivers: {
     collection: C.drivers, idColumn: 'driver_id',
     build: (get) => ({
-      name: get('name'), employeeId: get('employee_id'), status: get('status').toUpperCase(),
+      name: get('name'), employeeId: /\d/.test(get('employee_id')) ? get('employee_id') : '', status: get('status').toUpperCase(),
       employmentStatus: get('employment_status'), reliefDriver: L.yes(get('relief_driver')),
       positionOrder: L.number(get('position_order')), defaultTruckId: get('default_tractor_id'),
       defaultTrailerId: get('default_trailer_id'), facilityId: get('facility_id'),
