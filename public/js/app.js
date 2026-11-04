@@ -471,7 +471,8 @@ function addSideMenu() {
   // Schedule) under them.
   const side = sideFor(here), groups = side ? side.sections.map(g => MENU.find(([m]) => m === g)).filter(Boolean) : [];
   const section = ([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
-      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
+      // Joe 11/4: clicking a section's name (Receiving) opens its first screen, like a plant's name does; it used to only fold.
+      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '" data-home="' + items[0][1] + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(headed).join('') + '</div></div>';
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
@@ -543,7 +544,7 @@ function addSideMenu() {
       e.stopPropagation();
       if (sec.classList.contains('open') && Date.now() - hoverAt > 400) {
         if (!sec.dataset.home) { close(); return; }
-        try { sessionStorage.setItem('udPlant', sec.dataset.plant); } catch (x) { /* no storage */ }
+        if (sec.dataset.plant) try { sessionStorage.setItem('udPlant', sec.dataset.plant); } catch (x) { /* no storage */ }
         location.href = sec.dataset.home;
       } else openSec(sec);
     });
