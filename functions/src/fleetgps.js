@@ -935,7 +935,38 @@ async function probe(db, d, o, email, tagIn) {
   return save({ at, by: email, tag, steps });
 }
 
-/* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag} | trips {tag, date}. The caller has
+/*
+ * Joe 11/4 ("Add a Download button for me"): GPS Setup's Download driver usernames, for the Accounts set up box in
+ * Employees & Compliance (UDMS), which cannot reach Verizon. Read only: it saves two reports (Intent = Retrieve) in Fleet,
+ * as Test does, runs them, and joins each driver to their Fleet login. Nothing is kept here; the screen turns the answer
+ * into a spreadsheet file.
+ */
+const DRIVER_TEMPLATES = Object.freeze({
+  drivers: { name: 'UDPO_DriverList', table: 'Driver-1.0', out: ['Id', 'EmployeeNo', 'Surname', 'FirstName', 'MiddleName', 'Nickname', 'Depot', 'UserId', 'HireDate', 'LeaveDate'] },
+  users: { name: 'UDPO_UserLogins', table: 'User-1.0', out: ['Id', 'Username', 'FullName', 'Disabled', 'LastLogin', 'DriverId'] },
+});
+async function driverList(d, o) {
+  if (!d.fleet || !d.user || !d.password) throw new FleetError('LOGIN', 'Save the Fleet login first.');
+  const token = await key(o.ref, d, o, false);
+  const rows = {};
+  for (const k of Object.keys(DRIVER_TEMPLATES)) {
+    const t = DRIVER_TEMPLATES[k];
+    await saveProbeTemplate(d, o, token, t.name, t.table, [], [], t.out.map(c => c + ' = Input.' + c));
+    rows[k] = await execute(d, o, token, t.name, {}, { maxPolls: 10 });
+  }
+  const byId = {}, byDriver = {};
+  rows.users.forEach(u => { if (u.Id) byId[u.Id] = u; if (u.DriverId) byDriver[u.DriverId] = u; });
+  const day = (v) => { const iso = utcIso(v); return iso ? iso.slice(0, 10) : ''; };
+  const drivers = rows.drivers.map(r => {
+    const u = (r.UserId && byId[r.UserId]) || byDriver[r.Id] || {};
+    return { employeeNo: r.EmployeeNo || '', lastName: r.Surname || '', firstName: r.FirstName || '', middleName: r.MiddleName || '', nickname: r.Nickname || '',
+      depot: r.Depot || '', username: cleanUser(u.Username || '', d.fleet), loginName: u.FullName || '', loginDisabled: yes(u.Disabled), lastLogin: utcIso(u.LastLogin),
+      hireDate: day(r.HireDate), leaveDate: day(r.LeaveDate) };
+  }).sort((a, b) => (a.lastName + ' ' + a.firstName).localeCompare(b.lastName + ' ' + b.firstName));
+  return { at: o.now().toISOString(), count: drivers.length, withUsername: drivers.filter(x => x.username).length, drivers };
+}
+
+/* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag} | trips {tag, date} | drivers (every driver and their Fleet login, read only, nothing kept). The caller has
  * already checked the person is a manager or administrator. */
 async function fleetCall(db, email, input, options) {
   const o = withDefaults(options);
@@ -996,6 +1027,7 @@ async function fleetCall(db, email, input, options) {
     const trips = await require('./fleettrips').tripCheck(db, { tag: input.tag, date: input.date }, options);
     return Object.assign(status((await ref.get()).data() || {}, await hist()), { coverage: await coverage(db, o.now()), probe: (await db.collection('private').doc('gpsProbe').get()).data() || null, trips });
   }
+  if (op === 'drivers') return Object.assign(status(d, await hist()), { driverList: await driverList(d, Object.assign({}, o, { ref })) });
   if (op === 'pull') {
     const r = await pull(db, options);
     const fresh = (await ref.get()).data() || {};
@@ -1007,4 +1039,4 @@ async function fleetCall(db, email, input, options) {
 // Shared with fleettrips.js (Joe 11/1: the read-only Trip check).
 const internals = { key, execute, saveProbeTemplate, utcIso, nyDate, nyMidnight, addDays, num, yes, milesApart, fleetTime, withDefaults, short, YARD_MILES };
 
-module.exports = { internals, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES };
+module.exports = { internals, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES, DRIVER_TEMPLATES };
