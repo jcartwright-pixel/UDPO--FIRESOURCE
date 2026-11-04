@@ -13,9 +13,22 @@ name: Practice copy test (live data copy + full browser test)
 #   practice copy's servers take to answer a button's call, idle first and then straight after (functions/test/browser/
 #   click-wait.cjs; nothing is saved), and its request log for the last 14 days.
 # Neither one deploys anything or changes the live app.
+# Started only from "Run workflow", picking the test (11-4-26: starting on every push left a skipped run per save).
+# The words above are now the choices in the "test" box. Results are kept as a download on the run; on a branch other
+# than main they are also saved on that branch.
 on:
-  push:
-    branches: [claude/project-thread-wsuoyf, claude/project-thread-ivjfyh, claude/project-thread-cwzf6i]
+  workflow_dispatch:
+    inputs:
+      test:
+        description: Which test to run
+        required: true
+        type: choice
+        options: [audit, clicks, click wait, copy live]
+      reads_only:
+        description: Full browser test only, save nothing in the practice copy
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,7 +39,7 @@ concurrency:
 
 jobs:
   copy-live:
-    if: contains(github.event.head_commit.message, '[copy live]')
+    if: inputs.test == 'copy live'
     runs-on: ubuntu-24.04
     environment: distribution-production
     defaults:
@@ -77,7 +90,7 @@ jobs:
           if-no-files-found: ignore
 
   audit:
-    if: contains(github.event.head_commit.message, '[audit]') || contains(github.event.head_commit.message, '[clicks]')
+    if: inputs.test == 'audit' || inputs.test == 'clicks'
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 90
@@ -102,8 +115,8 @@ jobs:
         continue-on-error: true
         env:
           KEY: ${{ runner.temp }}/practice.json
-          NO_WRITES: ${{ contains(github.event.head_commit.message, '[reads only]') && '1' || '' }}
-          CLICKS_ONLY: ${{ contains(github.event.head_commit.message, '[clicks]') && '1' || '' }}
+          NO_WRITES: ${{ inputs.reads_only && '1' || '' }}
+          CLICKS_ONLY: ${{ inputs.test == 'clicks' && '1' || '' }}
         run: |
           out="../practice-audit/$(date -u +%Y%m%d-%H%M)"
           echo "OUT=$out" >> "$GITHUB_ENV"
@@ -117,12 +130,23 @@ jobs:
           node test/browser/practice-data-check.cjs "$out/data-check-before.json" || true
           node test/browser/practice-audit.cjs https://ud-distribution-sandbox.web.app "$out" 2>&1 | tee "$RUNNER_TEMP/audit.log"
           node test/browser/practice-data-check.cjs "$out/data-check-after.json" || true
-      - name: Keep the results on the branch
+      - name: Gather the results
         if: always()
+        run: |
+          [ -n "${OUT:-}" ] && [ -d "$OUT" ] && cp "$RUNNER_TEMP/audit.log" "$OUT/console.log" || true
+      - name: Keep the results as a download
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-copy-test-results
+          path: practice-audit
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: Keep the results on the branch
+        if: always() && github.ref_name != 'main'
         run: |
           set -euo pipefail
           [ -n "${OUT:-}" ] && [ -d "$OUT" ] || { echo "No results"; exit 0; }
-          cp "$RUNNER_TEMP/audit.log" "$OUT/console.log" || true
           cd ..
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -131,7 +155,7 @@ jobs:
           for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
 
   click-wait:
-    if: contains(github.event.head_commit.message, '[click wait]')
+    if: inputs.test == 'click wait'
     runs-on: ubuntu-24.04
     environment: distribution-sandbox
     timeout-minutes: 40
@@ -161,8 +185,16 @@ jobs:
           echo "OUT=$out" >> "$GITHUB_ENV"
           mkdir -p "$out"
           node test/browser/click-wait.cjs "$out/click-wait.json" 2>&1 | tee "$out/console.log"
-      - name: Keep the results on the branch
+      - name: Keep the results as a download
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: click-wait-results
+          path: practice-audit
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: Keep the results on the branch
+        if: always() && github.ref_name != 'main'
         run: |
           set -euo pipefail
           [ -n "${OUT:-}" ] && [ -d "$OUT" ] || { echo "No results"; exit 0; }

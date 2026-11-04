@@ -4,7 +4,7 @@
  * has to start the server again) and straight after (warm). Nothing is saved: the calls only ask (which saves the person
  * may make), or are refused before anything is read.
  *
- *   KEY=<practice deploy key> node test/browser/click-wait.cjs <out.json>      (GitHub Actions, sandbox-audit.yml [click wait])
+ *   KEY=<practice deploy key> node test/browser/click-wait.cjs <out.json>      (GitHub Actions, sandbox-audit.yml, Run workflow, test "click wait")
  *   IDLE_MIN=16  minutes to wait idle before the second cold try (0 = skip)
  *
  * It also reads the practice copy's own request log for the last 14 days (every press anyone made there), when the deploy key
