@@ -118,6 +118,8 @@
   .jt-page .jt-pair, .jt-page .jt-prod { grid-template-columns: 1fr; }
   .jt-page select.jt-loc { min-width: 0; width: 100%; }
   .jt-page select.jt-loc { max-width: 112px; }
+  .jt-page.pm-page table.pm-table th { letter-spacing: 0; }
+  .jt-page .jt-edit { padding: 3px 8px; }
   .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
   .jt-page .head .actions.in-head { flex-wrap: wrap; justify-content: flex-start; }
   .jt-page .jt-co { grid-template-columns: 1fr; }
