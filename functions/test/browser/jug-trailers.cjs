@@ -5,7 +5,7 @@
  * the plant's own list; Empty / Half Full / Loaded, what is on it and notes save on their own; Left the Lot takes it off and
  * a trailer coming back keeps its history. Pictures go to SHOTS_DIR.
  * Joe 11/1 (mock-up 2): Trailer Company then Unit; What is on it and Location drop-downs; Edit Lists with United Dairy protected.
- * Joe 11/3 (mock-up 2): Supplier; every United Dairy dry box trailer listed (NOT HERE); Edit for the location; our number typed;
+ * Joe 11/3 (mock-up 2): Supplier; United Dairy trailers listed once added (Joe 11/4: not loaded from the fleet list); Edit for the location; our number typed;
  * products from Suppliers & Products with how many; no All trailers; capitals.
  */
 const assert = require('node:assert/strict');
@@ -79,18 +79,20 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await g.close();
     results.push('Plant Material Trailers is under Inventory on the Home screen\'s Shipping & Receiving card; Debag / Labeling Room is a Plant Operations department being built that opens the Labeling Room');
 
-    // Joe 11/3 (mock-up 2): every United Dairy dry box trailer here is always on the list (NOT HERE when it is not in the lot),
+    // Joe 11/3 (mock-up 2): a United Dairy trailer stays on the list once added (NOT HERE when it is not in the lot),
     // the company is the Supplier, Edit on each line changes where it is, + Add Trailer has the Supplier and Unit side by side
     // (our number typed, 014 is T-14) and what is on it is a product from Suppliers & Products with how many. No All trailers.
     const p = await openPage(browser, 1536, 790, '/jug-trailers.html?testEmail=' + SAM);
-    await p.waitForFunction(() => /United Dairy trailers · 0 here · 3 not here/.test(document.querySelector('#rows').textContent));
+    // Joe 11/4: our trailers are not loaded from the fleet list; only ones put on with + Add Trailer show, and no heading line over them.
+    await p.waitForFunction(() => /No trailers in the lot yet/.test(document.querySelector('#rows').textContent));
     assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Supplier', 'Unit', 'Status', 'Product', 'How Many', 'Counted In', 'Location', ''], 'Joe 11/4: the heading names Inventory uses');
     assert.equal(await p.$eval('.pm-table th', th => getComputedStyle(th).color), 'rgb(255, 255, 255)', 'white words on the blue heading bar, like Inventory');
     assert.equal(await p.$('#show'), null, 'the All trailers drop-down is gone');
     assert.match(await p.$eval('#products', a => a.getAttribute('href')), /^scheduler\.html\?lane=receiving&view=products/);
     assert.equal(await p.$eval('.head h1', h => getComputedStyle(h).textTransform), 'uppercase', 'everything in capitals');
     const rowsText = () => p.$$eval('#rows tr[data-id]', rs => rs.map(r => r.cells[1].querySelector('b').textContent + ':' + r.cells[6].textContent));
-    assert.deepEqual(await rowsText(), ['T-601:NOT HERE', 'T-980:NOT HERE', 'T-985:NOT HERE'], 'our dry box trailers here only (not the refrigerated one, not another plant\'s)');
+    assert.deepEqual(await rowsText(), [], 'no United Dairy trailer is listed until someone adds it');
+    assert.doesNotMatch(await p.$eval('#sum', e => e.textContent), /not here/i, 'no United Dairy Not Here box');
     await p.click('#add');
     await p.waitForSelector('#add-company');
     assert.equal(await p.$eval('#add-company', s => s.value), '', 'the supplier drop-down starts blank');
@@ -98,6 +100,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.ok(await p.$eval('.jt-pair', d => { const [a, b] = d.querySelectorAll('label'); return a.getBoundingClientRect().top === b.getBoundingClientRect().top; }), 'Supplier and Unit side by side');
     await p.selectOption('#add-company', 'United Dairy');
     await p.type('#add-number', '98');
+    // Only our dry box trailers at this plant come up (not the refrigerated one, not another plant's).
     await p.waitForFunction(() => [...document.querySelectorAll('#add-match button')].map(b => b.textContent).join(',') === 'T-980,T-985');
     await shot(p, '2-add-trailer-1536.png');
     await p.fill('#add-number', '0985');
@@ -122,20 +125,28 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.equal(t.history[0].by, 'Sam Ortiz');
     assert.equal(await db().collection('equipment').doc('veh_trailer_t_985').get().then(d => Object.keys(d.data()).length), 6, 'the main trailer list is not changed');
     await p.waitForFunction(() => { const r = document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]'); return r && [3, 4, 5].map(i => r.cells[i].textContent).join('|') === 'WHITE 1/2 GAL JUG|22|Bundles'; });
-    results.push('Every United Dairy dry box trailer is listed (NOT HERE until it comes in); + Add Trailer: Supplier and Unit side by side, our number typed with matches to tap, a product from Suppliers & Products and how many');
+    assert.doesNotMatch(await p.$eval('#rows', e => e.textContent), /United Dairy trailers ·/, 'no heading line over our trailers');
+    results.push('Only the United Dairy trailers someone added are listed; + Add Trailer: Supplier and Unit side by side, our number typed with matches to tap, a product from Suppliers & Products and how many');
 
-    // Edit on a NOT HERE line brings the trailer in; Edit to NOT HERE takes it out.
-    await p.click('#rows tr[data-id="fleet_veh_trailer_t_601"] button[data-edit]');
+    // Another of ours added with nothing on it; Edit on its line moves it.
+    await p.click('#add');
+    await p.selectOption('#add-company', 'United Dairy');
+    await p.fill('#add-number', '601');
+    await p.waitForFunction(() => [...document.querySelectorAll('#add-match button')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join(',') === 'T-601*');
+    await p.click('#add-go');
+    await until(async () => { const x = await jug('fac_uniontown_T-601'); return x && x.inLot; }, 'T-601 added');
+    assert.equal((await jug('fac_uniontown_T-601')).status, 'EMPTY');
+    await p.waitForSelector('#rows tr[data-id="fac_uniontown_T-601"]');
+    await p.click('#rows tr[data-id="fac_uniontown_T-601"] button[data-edit]');
     await p.waitForSelector('#rows select[data-loc]');
     assert.deepEqual(await p.$$eval('#rows select[data-loc] option', o => o.map(x => x.textContent)), ['UPPER LOT', 'LOWER LOT', 'DEBAG', 'HOLD', 'NOT HERE']);
     await p.selectOption('#rows select[data-loc]', 'DEBAG');
     await shot(p, '3-edit-location-1536.png');
     await p.click('#rows button[data-save]');
-    await until(async () => { const x = await jug('fac_uniontown_T-601'); return x && x.inLot && x.location === 'DEBAG'; }, 'T-601 in at Debag');
-    assert.equal((await jug('fac_uniontown_T-601')).status, 'EMPTY');
-    await p.waitForFunction(() => /United Dairy trailers · 2 here · 1 not here/.test(document.querySelector('#rows').textContent));
-    assert.deepEqual(await rowsText(), ['T-601:DEBAG', 'T-985:UPPER LOT', 'T-980:NOT HERE'], 'here first, NOT HERE at the bottom');
-    results.push('Edit on a line: a NOT HERE trailer comes into the lot at the place picked');
+    await until(async () => { const x = await jug('fac_uniontown_T-601'); return x && x.inLot && x.location === 'DEBAG'; }, 'T-601 moved to Debag');
+    await p.waitForFunction(() => /DEBAG/i.test(document.querySelector('#rows tr[data-id="fac_uniontown_T-601"]').textContent));
+    assert.deepEqual(await rowsText(), ['T-601:DEBAG', 'T-985:UPPER LOT'], 'only the two we added; T-980 is not listed');
+    results.push('Edit on a line: a trailer moves to the place picked');
 
     // Another supplier's trailer: Metro, typed.
     await p.click('#add');
@@ -188,7 +199,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.click('#rows tr[data-id="fac_uniontown_T-601"] td:first-child');
     await p.click('#card button[data-status="HALF"]');
     await until(async () => (await jug('fac_uniontown_T-601')).status === 'HALF', 'Half Full saved');
-    await p.waitForFunction(() => /4\s*trailers in the lot/.test(document.querySelector('#sum').textContent) && /2\s*Loaded/.test(document.querySelector('#sum').textContent) && /1\s*Half Full/.test(document.querySelector('#sum').textContent) && /1\s*United Dairy not here/.test(document.querySelector('#sum').textContent));
+    await p.waitForFunction(() => /4\s*trailers in the lot/.test(document.querySelector('#sum').textContent) && /2\s*Loaded/.test(document.querySelector('#sum').textContent) && /1\s*Half Full/.test(document.querySelector('#sum').textContent) && !/not here/i.test(document.querySelector('#sum').textContent));
     await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] td:first-child');
     await p.waitForTimeout(600);
     assert.equal(await p.$eval('.notice.error', n => n.hidden), true, 'no error');
@@ -241,7 +252,13 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.selectOption('#rows select[data-loc]', 'NOT HERE');
     await p.click('#rows button[data-save]');
     await until(async () => (await jug('fac_uniontown_T-985')).inLot === false, 'T-985 left');
-    await p.waitForFunction(() => /NOT HERE/.test(document.querySelector('#rows tr[data-id="fleet_veh_trailer_t_985"]') ? document.querySelector('#rows tr[data-id="fleet_veh_trailer_t_985"]').textContent : ''));
+    // Once added, ours stays on the list as NOT HERE; Edit on its line brings it back in.
+    await p.waitForFunction(() => /NOT HERE/.test(document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]') ? document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]').textContent : ''));
+    await p.click('#rows tr[data-id="fac_uniontown_T-985"] button[data-edit]');
+    await p.selectOption('#rows select[data-loc]', 'HOLD');
+    await p.click('#rows button[data-save]');
+    await until(async () => { const x = await jug('fac_uniontown_T-985'); return x.inLot && x.location === 'HOLD'; }, 'T-985 back at Hold');
+    await p.waitForFunction(() => /HOLD/.test(document.querySelector('#rows tr[data-id="fac_uniontown_T-985"]').textContent));
     await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] button[data-edit]');
     await p.selectOption('#rows select[data-loc]', 'NOT HERE');
     await p.press('#rows select[data-loc]', 'Enter');

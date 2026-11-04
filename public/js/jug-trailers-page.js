@@ -20,12 +20,11 @@ const R = window.UDPlant;
 const J = window.UDJug;
 const STATUS = [['EMPTY', 'Empty'], ['HALF', 'Half Full'], ['LOADED', 'Loaded']];
 const NEW = '__new';
-const FLEET = 'fleet_';
 const PRODUCTS_URL = 'scheduler.html?lane=receiving&view=products';
 const statusName = (s) => (STATUS.find(x => x[0] === s) || [s, s])[1];
 const params = new URLSearchParams(location.search);
 let plant = params.get('plant') || '', chosen = params.get('trailer') || '', person = null, app = {}, db = null;
-let trailers = null, units = [], savedLists = null, supplierDocs = [], products = [], mode = '', stops = [];
+let trailers = null, gone = [], units = [], savedLists = null, supplierDocs = [], products = [], mode = '', stops = [];
 // What is being typed on + Add Trailer, kept while the screen redraws; the line whose location is being changed (Edit);
 // a Location being typed new on the trailer card.
 const NO_ADD = () => ({ company: '', companyNew: '', number: '', equipmentId: '', item: '', count: '' });
@@ -77,16 +76,15 @@ const whatOn = (p) => p.items.filter(x => x.item).map(x => x.item + (x.pallets ?
 function fleetHere() {
   return units.filter(u => u.status !== 'INACTIVE' && (L.plantOfLocation(u.location) || u.facilityId) === plant && u.unit).sort((a, b) => byNumber(a.unit, b.unit));
 }
-// The list: every United Dairy dry box trailer here (in the lot or NOT HERE), then the other suppliers' trailers in the lot.
+// The list: our trailers someone put on it with + Add Trailer (in the lot, or NOT HERE once they left; Joe 11/4: they
+// stay on the list, but the fleet list is not loaded onto it), then the other suppliers' trailers in the lot.
 function model() {
-  const lot = sorted(trailers || []), ud = [], used = new Set();
-  const inLot = lot.filter(x => x.p.unitedDairy);
-  fleetHere().filter(J.dryBox).forEach(eq => {
-    const key = J.udUnit(eq.unit), hit = inLot.find(x => J.same(x.p.unit, key));
-    if (hit) { used.add(hit.t.id); ud.push({ key: hit.t.id, t: hit.t, p: hit.p, eq, here: true }); }
-    else if (!ud.some(r => J.same(r.p.unit, key))) ud.push({ key: FLEET + eq.id, t: null, p: { company: J.UD, unit: key, items: [], location: J.NOT_HERE, unitedDairy: true }, eq, here: false });
+  const lot = sorted(trailers || []), ud = lot.filter(x => x.p.unitedDairy).map(x => ({ key: x.t.id, t: x.t, p: x.p, eq: null, here: true }));
+  sorted((gone || []).filter(t => t.unitedDairy)).forEach(x => {
+    if (ud.some(r => J.same(r.p.unit, x.p.unit))) return;
+    const eq = units.find(u => u.id === x.t.equipmentId) || fleetHere().find(u => J.same(J.udUnit(u.unit), x.p.unit)) || null;
+    ud.push({ key: x.t.id, t: null, left: x.t, p: Object.assign({}, x.p, { items: [], location: J.NOT_HERE }), eq, here: false });
   });
-  inLot.filter(x => !used.has(x.t.id)).forEach(x => ud.push({ key: x.t.id, t: x.t, p: x.p, eq: null, here: true }));
   ud.sort((a, b) => (a.here ? 0 : 1) - (b.here ? 0 : 1) || byNumber(a.p.unit, b.p.unit));
   const other = lot.filter(x => !x.p.unitedDairy).map(x => ({ key: x.t.id, t: x.t, p: x.p, eq: null, here: true }));
   return { ud, other };
@@ -108,9 +106,8 @@ function drawTop() {
 
 function drawList() {
   const all = trailers || [], n = (s) => all.filter(t => t.status === s).length;
-  const m = model(), away = m.ud.filter(r => !r.here).length, dis = canSave() ? '' : ' disabled';
-  document.getElementById('sum').innerHTML = '<span><b>' + all.length + '</b>trailer' + (all.length === 1 ? '' : 's') + ' in the lot</span>' + STATUS.slice().reverse().map(([k, w]) => '<span><b>' + n(k) + '</b>' + w + '</span>').join('') +
-    (away ? '<span><b>' + away + '</b>United Dairy not here</span>' : '');
+  const m = model(), dis = canSave() ? '' : ' disabled';
+  document.getElementById('sum').innerHTML = '<span><b>' + all.length + '</b>trailer' + (all.length === 1 ? '' : 's') + ' in the lot</span>' + STATUS.slice().reverse().map(([k, w]) => '<span><b>' + n(k) + '</b>' + w + '</span>').join('');
   const where = (r) => {
     if (r.key !== editing) return escapeHtml(r.here ? r.p.location : J.NOT_HERE);
     const cur = editValue || (r.here ? r.p.location : J.NOT_HERE), locs = lists().locations;
@@ -128,7 +125,8 @@ function drawList() {
     '<td class="nowrap">' + where(r) + '</td>' +
     '<td class="nowrap jt-editcell">' + (r.key === editing ? '<button type="button" class="jt-edit save" data-save="' + escapeHtml(r.key) + '"' + dis + '>Save</button>' : '<button type="button" class="jt-edit" data-edit="' + escapeHtml(r.key) + '"' + dis + '>Edit</button>') + '</td></tr>';
   let h = '';
-  if (m.ud.length) h += '<tr class="jt-grp"><td colspan="8">United Dairy trailers · ' + m.ud.filter(r => r.here).length + ' here · ' + away + ' not here</td></tr>' + m.ud.map(line).join('');
+  // Joe 11/4: no heading line over our trailers.
+  h += m.ud.map(line).join('');
   if (m.other.length) h += '<tr class="jt-grp"><td colspan="8">Other suppliers · ' + m.other.length + ' in the lot</td></tr>' + m.other.map(line).join('');
   document.getElementById('rows').innerHTML = h ||
     '<tr><td colspan="8" class="empty">' + (!trailers ? 'Reading the trailers in the lot…' : 'No trailers in the lot yet. + Add Trailer puts the first one on the list.') + '</td></tr>';
@@ -138,7 +136,8 @@ function drawList() {
 function matches(typed) {
   const t = J.udUnit(typed), digits = t.indexOf('T-') === 0 ? t.slice(2) : '';
   if (!digits) return [];
-  return model().ud.filter(r => !r.here && r.eq && r.p.unit.slice(2).startsWith(digits)).map(r => r.eq);
+  const inLot = model().ud.filter(r => r.here);
+  return fleetHere().filter(J.dryBox).filter(u => { const k = J.udUnit(u.unit); return k.slice(2).startsWith(digits) && !inLot.some(r => J.same(r.p.unit, k)); });
 }
 // The trailer typed: the one picked, else the one whose number is exactly what was typed.
 function addTrailer() {
@@ -266,13 +265,14 @@ function placeRow(r, value) {
   if (!r || !value) { render(true); return; }
   if (!r.t) {
     if (J.same(value, J.NOT_HERE)) { render(true); return; }
-    send({ op: 'add', equipmentId: r.eq.id, location: value }, nameOf(r.p)).then(done => { if (done && done.trailerId) { chosen = done.trailerId; setUrl(); } render(true); });
+    const equipmentId = (r.left && r.left.equipmentId) || (r.eq && r.eq.id);
+    if (!equipmentId) { showError(nameOf(r.p) + ' is not on the fleet list any more.'); render(true); return; }
+    send({ op: 'add', equipmentId, location: value }, nameOf(r.p)).then(done => { if (done && done.trailerId) { chosen = done.trailerId; setUrl(); } render(true); });
     render(true);
     return;
   }
   if (J.same(value, J.NOT_HERE)) {
     send({ op: 'left', trailerId: r.t.id }, nameOf(r.p)).then(() => render(true));
-    if (r.p.unitedDairy && r.eq) { chosen = FLEET + r.eq.id; setUrl(); }
   } else if (!J.same(value, r.p.location)) {
     r.t.location = value;
     send({ op: 'edit', trailerId: r.t.id, fields: { location: value } }, nameOf(r.p)).then(() => render(true));
@@ -330,7 +330,7 @@ card.addEventListener('click', e => {
   }
   if (b.id === 'left') {
     const r = rowOf(chosen);
-    send({ op: 'left', trailerId: t.id }, nameOf(parts(t))).then(done => { if (done) { chosen = r && r.eq ? FLEET + r.eq.id : ''; setUrl(); render(true); } });
+    send({ op: 'left', trailerId: t.id }, nameOf(parts(t))).then(done => { if (done) { chosen = r && r.p.unitedDairy ? t.id : ''; setUrl(); render(true); } });
   }
 });
 card.addEventListener('input', e => {
@@ -410,6 +410,7 @@ window.udBack = () => { if (editing) { editing = ''; editValue = ''; render(true
 function follow() {
   stops.forEach(u => u());
   trailers = null;
+  gone = [];
   savedLists = null;
   render(true);
   const fail = (e) => showError('Could not read the trailers in the lot (' + e.message + '). Check the network and reload the page.');
@@ -421,6 +422,8 @@ function follow() {
       if (!mode && (!chosen || !rowOf(chosen)) && trailers.length && !params.get('trailer')) { chosen = sorted(trailers)[0].t.id; setUrl(); }
       redraw();
     }, fail),
+    // Our trailers that left the lot stay on the list as NOT HERE.
+    onSnapshot(query(collection(db, 'jugTrailers'), where('facilityId', '==', plant), where('inLot', '==', false)), s => { gone = s.docs.map(d => Object.assign({ id: d.id }, d.data())); redraw(); }, () => {}),
     onSnapshot(query(collection(db, 'equipment'), where('type', '==', 'TRAILER')), s => { units = s.docs.map(d => Object.assign({ id: d.id }, d.data())); redraw(); }, () => {}),
     onSnapshot(doc(db, 'jugTrailerLists', plant), s => { savedLists = s.exists() ? s.data() : null; redraw(); }, () => {}),
     onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', R.SUPPLIER_TYPE)), s => { supplierDocs = s.docs.map(d => d.data()); redraw(); }, () => {}),
