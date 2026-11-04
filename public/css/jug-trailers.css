@@ -80,8 +80,9 @@
 @media (min-width: 861px) {
   .jt-page.pm-page table.pm-table { table-layout: fixed; }
   .jt-page.pm-page table.pm-table td { overflow-wrap: anywhere; }
+  .jt-page.pm-page table.pm-table td, .jt-page.pm-page table.pm-table th { padding-left: 7px; padding-right: 7px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(2) { width: 78px; }
-  .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 126px; }
+  .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 134px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(5) { width: 78px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(7) { width: 140px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(8) { width: 76px; }
