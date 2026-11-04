@@ -58,7 +58,7 @@ html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Robo
 .sa-pill.late { background: #fbe3e3; color: #b42318; }
 >>>>>>> 0055f79 (One color set: one red, one green, one yellow everywhere (rules audit line 14))
 .sa-pill.loaded { background: #e1edfb; color: #174ea6; }
-.sa-pill.waiting { background: #fff3d4; color: #8a5a00; }
+.sa-pill.waiting { background: #fff3d4; color: #9a5b00; } /* the one amber (app.css --amber, logic.js COLORS.amber); this page has no app.css */
 .sa-empty { margin: 0; padding: 16px; }
 .sa-foot { margin: 0; padding: 10px 16px; color: #4b5563; font-size: 16px; }
 @media (min-width: 700px) { .sa-map-box { height: 300px; } }

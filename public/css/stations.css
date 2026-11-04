@@ -367,7 +367,7 @@ body.ds-tv .ds-weather { overflow: hidden; justify-content: safe center; }
 .ta-page .ta-row.blank { background: #fff4f2; border-left-color: #b42318; }
 .ta-page .ta-row.blank .tr small { color: #a81916; font-weight: 700; }
 .ta-page .ta-row.dup { background: #fffaf0; border-left-color: #d4a121; }
-.ta-page .ta-row.dup .tr small { color: #8a5a00; font-weight: 700; }
+.ta-page .ta-row.dup .tr small { color: var(--amber); font-weight: 700; }
 .ta-page .ta-row.sel { background: #dcebfb; border-left: 5px solid #2f7de1; }
 .ta-page .ta-yard { background: #fff; border: 1px solid #d5dfea; border-radius: 8px; max-height: calc(100dvh - 210px); overflow: auto; }
 .ta-page .ta-yard h3 { margin: 12px 0 6px; text-transform: uppercase; color: #33475b; }
@@ -581,7 +581,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sw-badge { display: inline-block; padding: 5px 12px; border-radius: 999px; background: #e7f1f9; color: #1c587e; font-size: 16px; font-weight: 800; letter-spacing: .03em; white-space: nowrap; }
 .sw-badge.done { background: #d5f0de; color: var(--green); }
-.sw-badge.going { background: #fff0d2; color: #8d5d00; }
+.sw-badge.going { background: #fff0d2; color: var(--amber); }
 .sw-badge.ret { background: #fde8e7; color: #b42318; }
 .sw-badge.wash { background: #e0f5f9; color: #0b6b80; }
 .sw-flag { font-style: normal; font-size: 16px; font-weight: 800; padding: 3px 9px; border-radius: 8px; white-space: nowrap; }
@@ -608,7 +608,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw .sw-btn { min-height: 52px; padding: 0 18px; border-radius: 10px; border: 1px solid #9fbad0; background: #fff; color: #0b2f55; font: inherit; font-size: 18px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .sw .sw-btn.primary { background: #0b6eaa; border-color: #0b6eaa; color: #fff; }
 .sw .sw-btn.good { background: var(--green); border-color: var(--green); color: #fff; }
-.sw .sw-btn.warn { background: #fff6df; border-color: #bd7a00; color: #855400; }
+.sw .sw-btn.warn { background: #fff6df; border-color: var(--amber); color: var(--amber); }
 .sw .sw-btn.warn.off { background: #eef0f3; border-color: #9aa3ad; color: #4b5560; }
 .sw .sw-btn.danger { background: #b42318; border-color: #b42318; color: #fff; }
 .sw .sw-btn.pick { border: 2px solid #b42318; color: #b42318; }
@@ -793,13 +793,13 @@ body.ta-page.in-station .ta-row { grid-template-columns: 100px minmax(0, 1fr) mi
 .sw-trailer { font-size: 28px; font-weight: 900; letter-spacing: .01em; }
 .sw-chips i.back { background: #e3f4e8; color: #1f7a4d; border: 1px solid #9fd3ae; border-radius: 999px; }
 .sw-chips i.road { background: #eef2f6; color: #5a6b7d; border: 1px solid #d3dce5; border-radius: 999px; }
-.sw-chips i.tt { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; }
+.sw-chips i.tt { background: #fff4d6; color: var(--amber); border: 1px solid #f0d38a; }
 .sw-card.road { opacity: .6; border-left-color: #9fb3c8; }
-.sw-panel-head i.sw-need { font-style: normal; display: inline-block; margin-right: 6px; padding: 3px 10px; border-radius: 8px; background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; font-weight: 800; }
+.sw-panel-head i.sw-need { font-style: normal; display: inline-block; margin-right: 6px; padding: 3px 10px; border-radius: 8px; background: #fff4d6; color: var(--amber); border: 1px solid #f0d38a; font-weight: 800; }
 /* Joe 10/27 (hd): yesterday's trailers in red, ones added by hand, and the "A trailer that is not on the list" box. */
 .sw-panel-head i.sw-need.from { background: #fde8e7; color: #b42318; border-color: #f2b8b2; }
 .sw-chips i.from { background: #fde8e7; color: #b42318; }
-.sw-chips i.add { background: #fff4d6; color: #8a5a00; border: 1px solid #f0d38a; }
+.sw-chips i.add { background: #fff4d6; color: var(--amber); border: 1px solid #f0d38a; }
 .sw-card.prior { border-left-color: #b42318; box-shadow: 0 0 0 2px #f2b8b2; }
 .sw-add.unl { grid-template-columns: minmax(0, 1fr) auto auto; margin-bottom: 12px; }
 .sw .sw-btn.wash { background: #0b8da5; border-color: #0b8da5; color: #fff; }
@@ -836,4 +836,4 @@ body.ds-tv .ds-weather .ds-sc-title b { font-size: 19px; letter-spacing: .05em; 
 .ds-sc tr:nth-child(even) { background: #eef5fa; }
 .ds-sc td { padding: 9px 8px; font-weight: 700; text-align: left; border: 0; white-space: normal; overflow: visible; } .ds-sc td.rk { width: 1%; min-width: 64px; padding-left: 18px; padding-right: 12px; white-space: nowrap; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-sc td.ov { text-align: right; padding-right: 16px; white-space: nowrap; } .ds-sc td.ar { width: 40px; text-align: center; }
 .ds-sc .g { display: inline-block; min-width: 32px; padding: 2px 8px; border-radius: 6px; font-weight: 800; text-align: center; }
-.ds-sc .g-A { background: #d9f2e1; color: #156b34; } .ds-sc .g-B { background: #e3effa; color: #1a5490; } .ds-sc .g-C { background: #fff1cc; color: #8a5a00; } .ds-sc .g-D { background: #fde0de; color: #a32019; } .ds-sc .g-none { color: #6b7d8f; }
+.ds-sc .g-A { background: #d9f2e1; color: #156b34; } .ds-sc .g-B { background: #e3effa; color: #1a5490; } .ds-sc .g-C { background: #fff1cc; color: var(--amber); } .ds-sc .g-D { background: #fde0de; color: #a32019; } .ds-sc .g-none { color: #6b7d8f; }

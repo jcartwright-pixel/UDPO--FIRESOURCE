@@ -2,7 +2,7 @@
    app.css, so they still come after every shared rule. */
 .sc.g-A { background: #e3f3e8; color: #1f7a4d; }
 .sc.g-B { background: #e6f0fb; color: #1d5b91; }
-.sc.g-C { background: #fff4d6; color: #8a5a00; }
+.sc.g-C { background: #fff4d6; color: var(--amber); }
 .sc.g-D { background: var(--pill-red-bg); color: var(--pill-red-ink); }
 .sc-board td small, .sc-board th small { display: block; font-size: 16px; font-weight: 600; }
 .sc-board tr[data-key] { cursor: pointer; }
@@ -29,7 +29,7 @@
 .sc-lost h2 { color: #b42318; font-size: 18px; margin: 0 0 4px; }
 .sc-lost .hint { margin: 0 0 8px; }
 .sc-lost td.sc-lost-list { text-align: left; line-height: 1.4; padding: 6px 10px; }
-#gps-note { color: #8a5a00; font-weight: 600; }
+#gps-note { color: var(--amber); font-weight: 600; }
 /* Eight boxes on one line, so the board keeps its rows at 1536. */
 .score-page .kpis { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
 .score-page .kpis div { padding: 6px 8px; }
@@ -46,7 +46,7 @@
 .sc-cats button { flex: 0 0 auto; height: 38px; padding: 0 5px; border: 1px solid #b7c9d8; border-radius: 8px; background: #fff; color: #12385f; font: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .sc-cats button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .sc-board.sc-area td.sc-detail, .sc-board.sc-incidents td.sc-detail { text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; padding: 4px 8px; }
-.sc-board .sc-pending, .sc-board tr.sc-pending td { color: #8a5a00; }
+.sc-board .sc-pending, .sc-board tr.sc-pending td { color: var(--amber); }
 .sc-board tr.sc-pending td { background: #fff6e0; }
 .sc-review { display: inline-block; padding: 0 6px; border-radius: 6px; background: #ffe7a8; color: #7a4d00; font-weight: 800; }
 .sc-board .sc-excused .sc-what, .sc-board .sc-excused .sc-pts { text-decoration: line-through; color: #7a8a99; }

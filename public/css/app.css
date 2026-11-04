@@ -100,7 +100,7 @@ button.check { background: var(--ud-blue); color: #fff; border: 0; border-radius
 .dlive { display: flex; background: #fff; border: 1px solid #d4e0ec; border-radius: 13px; overflow: hidden; box-shadow: 0 7px 22px rgba(16,56,92,.08); }
 .dlive span { padding: 11px 15px; border-right: 1px solid #dce5ee; font-weight: 700; color: #0e416f; white-space: nowrap; }
 .dlive span:last-child { border-right: 0; }
-.dlive #mode-text { color: #8a5a00; background: var(--test-bg); }
+.dlive #mode-text { color: var(--amber); background: var(--test-bg); }
 .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 16px 14px; max-width: 1720px; width: 100%; margin: 0 auto; flex: 1; min-height: 0; }
 #screen.home-screen:not([hidden]) { display: flex; flex-direction: column; height: 100vh; }
 .home-screen .dtitle { width: 100%; }
@@ -433,7 +433,7 @@ body.weekly-page { background: #eef3f7; }
 .dc-link span:first-child { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; line-height: 1.15; }
 .card.home4:hover { box-shadow: 0 7px 18px rgba(13,52,87,.075); }
 .card.home4 .dc-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.card .owner.ext { background: #fff4d9; color: #8a5a00; border-color: #f0d48a; }
+.card .owner.ext { background: #fff4d9; color: var(--amber); border-color: #f0d48a; }
 
 
 /* Left menu (Joe, 10/9): the same on every screen; the header keeps the logo, the user and Sign out. */
@@ -1134,7 +1134,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
   --pill-green-bg: #e3f4e8; --pill-green-ink: #1f7a4d;
   --pill-good-bg: var(--runs-bg); --pill-good-ink: var(--runs-ink);
   --pill-amber-bg: #fff1dc; --pill-amber-ink: #8a5200;
-  --pill-warn-bg: #fdecc4; --pill-warn-ink: #8a5a00;
+  --pill-warn-bg: #fdecc4; --pill-warn-ink: var(--amber);
   --pill-red-bg: #fde8e8; --pill-red-ink: #b42318;
   --pill-blue-bg: var(--band); --pill-blue-ink: var(--ud-blue);
   --pill-gray-bg: #eef2f5; --pill-gray-ink: #6b7c8c;
@@ -1204,7 +1204,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 /* Texts (Joe 10/26): a part per kind of text, its switch and text on the left, who gets it on the right; the example text. */
 .texts-page .texts-kind-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; }
 .texts-page .texts-kind h3 { font-size: 18px; margin: 0 0 6px; }
-.texts-page .texts-mode { font-weight: 700; color: #8a5a00; margin: 0 0 8px; }
+.texts-page .texts-mode { font-weight: 700; color: var(--amber); margin: 0 0 8px; }
 @media (max-width: 800px) { .texts-page .texts-kind-grid { grid-template-columns: 1fr; } }
 .texts-page .texts-test { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
 .texts-page .texts-test label { display: flex; flex-direction: column; gap: 4px; font-size: 16px; font-weight: 700; }
