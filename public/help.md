@@ -25,7 +25,7 @@ Operations is United Dairy's app for dispatch, the plant floor, fleet and mainte
 
 - **The blue bar across the top.** The United Dairy logo with the plant you are in written in yellow (Uniontown, Charleston or Martins Ferry), then `Back` and `Home`. On the right: the version, `? Help`, `Administration` (administrators only), your initials and `Sign out`.
 - **On a phone, and on the phone and tablet apps** (the driver phone, Plant Managers, the Plant, Garage, Maintenance and Driver Stations and the Line Tablet), the top bar shows **Last refreshed** with the date and time instead of the version, like "Last refreshed 10-8-26 9:26 AM". It is the last time the screen got fresh information. If it stays old, the phone or tablet has no signal: pull down or reopen the app to refresh it.
-- **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in.
+- **The menu on the left.** It rests as a thin strip. Rest the mouse on it (or tap it on a tablet) and it opens; move away and it folds again. The button at its top keeps it open. It lists only the screens of the part of the plant you are in. A name with more screens under it (like **Receiving**) shows them beside it; click the name itself to open its first screen.
 - **The screen.** Filters and the date sit on the right. Lists have headings that stay put when you scroll.
 
 ### Each plant is separate
@@ -818,7 +818,7 @@ Which trailer goes on which load: route, run, driver, truck, trailer and depart 
 id: scheduler
 screens: scheduler.html
 
-The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**).
+The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**). Clicking **Receiving** opens the Receiving Schedule; its **Suppliers & Products** shows beside it.
 
 - Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
 - Each load is colored by who delivers it: Uniontown truck, Branch or Carrier (an outside carrier, or a customer picking it up). It follows who covers the route on Route Master (United Dairy, a branch, an outside carrier or a customer pickup), the same rule every screen and the late count use. Holidays are marked.

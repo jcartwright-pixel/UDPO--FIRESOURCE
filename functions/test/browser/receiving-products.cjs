@@ -60,6 +60,21 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
   const browser = await chromium.launch();
   const results = [];
   try {
+    // ---------- Joe 11/4: Receiving in the left menu opens Receiving (it only showed its fly-out before) ----------
+    {
+      const ship = await openPage(browser, 1536, 790, '/scheduler.html?view=month&date=2026-10-08&' + MANAGER);
+      await ship.waitForSelector('.sidemenu .side-sec-btn[title="Receiving"]');
+      await ship.hover('.sidemenu');
+      await ship.hover('.sidemenu .side-sec-btn[title="Receiving"]');
+      await ship.waitForSelector('.side-flyouts .flyout.open a[href="scheduler.html?lane=receiving&view=products"]');
+      await ship.waitForTimeout(500);
+      await Promise.all([ship.waitForURL(/scheduler\.html\?lane=receiving$/), ship.click('.sidemenu .side-sec-btn[title="Receiving"]')]);
+      await ship.waitForSelector('#rtabs:not([hidden]) [data-rtab="calendar"][aria-selected="true"]');
+      assert.deepEqual(ship.errors, []);
+      await ship.close();
+    }
+    results.push('Menu: clicking Receiving opens the Receiving Schedule');
+
     // ---------- Receiving: no switch; Calendar | Suppliers & Products ----------
     const page = await openPage(browser, 1536, 790, '/scheduler.html?lane=receiving&view=month&date=2026-10-08&' + MANAGER);
     await page.waitForFunction(() => /Valley Farms/i.test(document.getElementById('body').textContent));
