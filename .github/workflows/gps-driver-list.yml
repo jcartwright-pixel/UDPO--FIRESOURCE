@@ -1,0 +1,74 @@
+name: Verizon driver list from the practice copy
+
+# Joe 11/4 ("pull a complete list of drivers in there and their usernames because I want to be able to match up"): every
+# driver and login in Verizon Connect Fleet, with user names and IDs, next to the app's Driver Roster (tools/gps-driver-list.cjs).
+# Read only, practice copy's saved Fleet login. The answer holds names and phone numbers, so it is locked with a key only
+# Claude's session holds before it is put on this branch (driver-list-results/), and taken off before any merge.
+on:
+  push:
+    branches: [claude/project-thread-epcqha]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  driver-list:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[driver list]')
+    runs-on: ubuntu-24.04
+    environment: distribution-sandbox
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Key
+        env:
+          SA_SANDBOX: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SANDBOX }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SA_SANDBOX" > "$RUNNER_TEMP/practice.json"
+          node -e "if (require('$RUNNER_TEMP/practice.json').project_id !== 'ud-distribution-sandbox') process.exit(1)"
+      - name: Install
+        run: npm ci
+      - name: Driver list (read only)
+        env:
+          KEY: ${{ runner.temp }}/practice.json
+          OUT: ${{ runner.temp }}/driver-list
+        run: node ../tools/gps-driver-list.cjs
+      - name: Lock the answer and keep it on the branch
+        if: always()
+        env:
+          PUB: |
+            -----BEGIN PUBLIC KEY-----
+            MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA2pDD6cIewejGl7TR9gnL
+            /IKTfB56HPqoyFTWh15FfKrL92ByLF8obebrhvgadSB5Blwz7Ezb9duy1eUZxxyw
+            LU2T4PpkJi2oNM64MGPKb5FfNV/Qk4Zi9VB+5itW63MiSZlGkvfubnL/rTDd0eMa
+            wRx1DK0HYF/yvKvis9I2eIgAoOHmc0NK1pIy84nkmas6bvsQul7/tuVBOWY98QzV
+            1A4d+lmp4V2XC8jXoReBPNH+gl6TCypUKemuuo7oWlmrz3utApHWM7tHNjTSzSW+
+            8jW8wodFczSkLoVEk8goHlAGNXFesyLkl46HPUg/k2Zu7XgETV6makdIXKjE5b6j
+            MgNf3VIeEqVWiUGleFSB1IP4XgizitxGt2Gx1r0MlqiFNKaKsAgVurCEQ+LEowMY
+            lXmDUljb0h7i0bqysccpGJ6wtjTKDgDoTDGaqYn+44lA92IYma+j91wFqWnF7gHl
+            Poiwg/NKMikLalZzqBgEfla+F/FetYw/BbkSVprDdne9AgMBAAE=
+            -----END PUBLIC KEY-----
+        run: |
+          set -euo pipefail
+          [ -d "$RUNNER_TEMP/driver-list" ] || { echo "No results"; exit 0; }
+          cd "$RUNNER_TEMP"
+          printf '%s\n' "$PUB" > pub.pem
+          tar czf list.tgz -C driver-list .
+          openssl rand -hex 32 > pass.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in list.tgz -out list.enc -pass file:pass.txt
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -pkeyopt rsa_padding_mode:oaep -in pass.txt -out pass.enc
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p driver-list-results
+          cp "$RUNNER_TEMP/list.enc" "$RUNNER_TEMP/pass.enc" driver-list-results/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add driver-list-results
+          git commit -q -m "Verizon driver list, locked (take off before merge)"
+          for i in 1 2 3; do git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
