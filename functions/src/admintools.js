@@ -234,6 +234,8 @@ async function saveRepairEmail(db, email, input, stamp) {
 
 // A manager's Lessor button on a truck write-up (mode "Only when I press Send"): after the save, the email itself.
 const QUEUED = /Repair email queued for the daily digest/;
+// What the Lessor button's email can end in without going out (each is written on the write-up; QUEUED and GARAGE are not failures).
+const NOT_SENT = ['FAILED', 'BLOCKED', 'HELD', 'OFF', 'NO_ADDRESS', 'NOT_FOUND'];
 const hourText = (h) => (h % 12 || 12) + ' ' + (h < 12 ? 'AM' : 'PM');
 
 async function sendOneRepair(db, recordId, by, note, mailDeps) {
@@ -274,6 +276,13 @@ async function afterSave(db, user, input, result, mailDeps) {
     console.error('Lessor email failed after the save', input.recordId, reason);
     await db.collection('sentEmails').add({ at: new Date().toISOString(), kind: 'Repair email', label: String(input.recordId || '').slice(0, 60), detail: 'Lessor button · ' + by, by, sentTo: [], status: 'FAILED', reason }).catch(() => {});
     mail = { status: 'FAILED', reason };
+  }
+  // Joe 11/4 (224001 showed a red Idealease with no reason): an email that did not go writes why on the write-up, so the red
+  // lessor on Truck Issues keeps the reason after the message at the top is gone.
+  if (NOT_SENT.indexOf(mail.status) >= 0) {
+    const why = String(mail.reason || mail.message || 'unknown reason').replace(/^Not emailed: /, '').replace(/\s+/g, ' ').replace(/\.+$/, '').slice(0, 160);
+    const at = new Date();
+    await addNote(db, String(input.recordId || ''), 'Repair email not sent ' + nyIso(at) + ': ' + why, by, at.toISOString()).catch(e => console.error('Could not note why the lessor email did not go', input.recordId, String(e && e.message || e)));
   }
   if (mail.status === 'FAILED' || mail.status === 'BLOCKED') return Object.assign({}, result, { ok: true, message: 'Saved. The lessor email did not go: ' + String(mail.reason || 'unknown reason').replace(/\.+$/, '') + '.', email: mail.status });
   return Object.assign({}, result, { message: mail.message, email: mail.status });
