@@ -67,6 +67,10 @@ const CATALOG = Object.freeze([
   ['otr.write', 'Edit over-the-road routes and monthly figures', 'Operations'],
   ['gps.read', 'View Trucks Today (GPS)', 'Operations'],
   ['gps.write', 'Set up Trucks Today rules, truck names and report imports', 'Operations'],
+  // Joe 11-4-26 ("if we're missing any provisions ... add that"): what someone may change in the Customers & Routes app
+  // (united-dairy-customer-list reads these). Opening it is the app's tick on People & Access.
+  ['customers.edit', 'Edit customers and route days', 'Customers & Routes app'],
+  ['customers.import', 'Import customer lists; set customers Active or Inactive', 'Customers & Routes app'],
   ['admin.users', 'Manage users / rights', 'Administration'],
   ['admin.uploads', 'Upload / import data', 'Administration'],
   ['admin.locations', 'Add / edit locations', 'Administration'],
@@ -79,7 +83,8 @@ const CATALOG = Object.freeze([
 const RESTRICTED = (code) => code === '*' || /^admin\./.test(code) || code === 'audit.full';
 const ASSIGNABLE = CATALOG.filter(r => !RESTRICTED(r.code)).map(r => r.code);
 
-const ROLES = Object.freeze(['VIEWER', 'EMPLOYEE', 'DRIVER', 'DRIVER_CHECKIN', 'PLANT_EMPLOYEE', 'MECHANIC', 'DISPATCHER', 'SUPERVISOR', 'MANAGER', 'ADMINISTRATOR']);
+// SALES (Joe 11-4-26): a salesperson. Sees routes and customer pickups; the Sales app itself is open to any United Dairy account.
+const ROLES = Object.freeze(['VIEWER', 'EMPLOYEE', 'SALES', 'DRIVER', 'DRIVER_CHECKIN', 'PLANT_EMPLOYEE', 'MECHANIC', 'DISPATCHER', 'SUPERVISOR', 'MANAGER', 'ADMINISTRATOR']);
 const ALIAS = { ADMIN: 'ADMINISTRATOR', MAINTENANCE: 'MECHANIC' };
 const normRole = (r) => { const k = String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_'); return ALIAS[k] || k; };
 
@@ -92,6 +97,7 @@ const BOSS = ['dashboard.read', 'self.assignment.read', 'self.schedule.read', 'd
 const DEFAULTS = Object.freeze({
   VIEWER: ['dashboard.read', 'dispatch.read', 'drivers.read', 'fleet.read', 'routes.read', 'vacations.read', 'issues.read', 'plant.read', 'operations.read', 'customerPickup.read'],
   EMPLOYEE,
+  SALES: ['dashboard.read', 'routes.read', 'customerPickup.read', 'operations.read'],
   DRIVER: EMPLOYEE.concat(['self.vehicle.read', 'self.checkin.write', 'dispatch.own.read', 'fleet.read', 'issues.vehicle.read']),
   DRIVER_CHECKIN: ['dashboard.read', 'self.checkin.write', 'dispatch.own.read', 'checkin.any.driver', 'fleet.read', 'issues.vehicle.read'],
   PLANT_EMPLOYEE: EMPLOYEE.concat(['plant.read', 'plant.write', 'plant.loading.read', 'plant.loading.write', 'plant.unloading.read', 'plant.unloading.write', 'plant.washing.read',
@@ -102,7 +108,8 @@ const DEFAULTS = Object.freeze({
     'fleet.status.write', 'routes.read', 'vacations.read', 'issues.read', 'operations.read', 'operations.write', 'customerPickup.read', 'customerPickup.write', 'plant.read',
     'otr.read', 'gps.read'],
   SUPERVISOR: BOSS,
-  MANAGER: BOSS
+  // Customers & Routes: a Manager edits customers and route days, as that app allowed before these rights (Joe 11-2).
+  MANAGER: BOSS.concat(['customers.edit'])
 });
 
 // The right each save needs (actions.js action name -> right).
@@ -121,6 +128,19 @@ const ACTION_RIGHT = Object.freeze({
   saveJugTrailer: 'plant.write', saveLabelRoom: 'plant.write',
   saveCrewDay: 'plant.write', saveCrewVacation: 'plant.write', saveCrewSetup: 'plant.settings.write'
 });
+
+// Rights added after Role Templates could be saved, with when (11-4-26). A role template saved before then never saw them, so
+// it gets the role's standard for them (Managers keep editing in Customers & Routes); one saved after decides for itself.
+const NEW_RIGHTS = Object.freeze({ 'customers.edit': '2026-11-04T06:00:00.000Z', 'customers.import': '2026-11-04T06:00:00.000Z' });
+function withNewRights(templates, meta) {
+  const out = {};
+  Object.keys(templates || {}).forEach(role => {
+    const list = Array.isArray(templates[role]) ? templates[role].slice() : templates[role], at = String((meta && meta[role] && meta[role].updatedAt) || '');
+    if (Array.isArray(list)) Object.keys(NEW_RIGHTS).forEach(c => { if (at < NEW_RIGHTS[c] && (DEFAULTS[normRole(role)] || []).indexOf(c) >= 0 && list.indexOf(c) < 0) list.push(c); });
+    out[role] = list;
+  });
+  return out;
+}
 
 // templates: { ROLE: [codes] } saved in Role Templates (a role not there keeps its defaults).
 function templateFor(role, templates) {
@@ -211,4 +231,4 @@ function screenSaveAllowed(person, action, exceptions, plantId) {
   return screens.some(k => mine.indexOf(k) >= 0);
 }
 
-module.exports = { CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson, ACTION_SCREENS, cleanScreenAccess, screenSaveAllowed };
+module.exports = { NEW_RIGHTS, withNewRights, CATALOG, RESTRICTED, ASSIGNABLE, ROLES, DEFAULTS, ACTION_RIGHT, normRole, templateFor, effectiveRights, saveAllowed, isAdminPerson, ACTION_SCREENS, cleanScreenAccess, screenSaveAllowed };

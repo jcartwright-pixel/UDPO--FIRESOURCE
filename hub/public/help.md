@@ -30,15 +30,15 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 id: people
 screens: people.html
 
-**People & Access** is the one list of who can sign in to the United Dairy apps: their role, their plants, and which apps they can open. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
+**People & Access** is the one place for who can sign in to the United Dairy apps and what they can see and do in each: their role, their plants, which apps they can open, their screens and their single rights. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
 2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
-3. Press a person's name to open their details on the right.
+3. Press a person's name. Their page opens on the whole screen, in three columns: **Who they are** (with their apps and **What they can do in each app**), **What they see in Plant & Distribution**, and **Single rights**. `← Everyone` (or the browser's Back) returns to the list.
 4. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**. **Apps they can open** has the same tick boxes, saved with `Save`.
 5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
 6. Pick their **Home screen**: the page they land on when they open Plant & Distribution.
-7. To change one right for this person only, open **Single rights** and pick `Allow` or `Deny` (or `Use role`). The last column shows what they will get.
+7. To change one right for this person only, pick `Allow` or `Deny` (or `Use role`) under **Single rights**. The last column shows what they will get. The **Customers & Routes app** group is what they may change in Customers & Routes (edit customers and route days; import lists).
 8. Press `Save`.
 9. To add someone, press `+ Add Person`, type their name and United Dairy email, pick a role and plants, then press `Add Person`. Open them again to pick their screens and Home screen.
 
@@ -46,11 +46,13 @@ screens: people.html
 - `+ Add Person`: a new person on the Users list.
 - `Show screens` / `Hide screens`: the single screens of one area.
 - `Save`: saves the person for every app.
-- `Cancel`: closes the person without saving.
+- `Cancel` / `← Everyone`: back to the list without saving.
 
 > Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
 > Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
+
+> **Sales** is the role for salespeople: they see routes and customer pickups. The Sales app on their phone opens for any United Dairy account, so there is nothing to tick for it.
 
 > Plant & Distribution is always ticked for everyone Enabled. To keep someone off part of it, untick screens under **What they see in Plant & Distribution**. Employees & Compliance still checks its own list too, so its tick only shows or hides the card on their Home.
 
@@ -66,7 +68,7 @@ screens: people.html
 id: roles
 screens: roles.html
 
-**Roles & Rights** says what each role (Manager, Supervisor, Dispatcher, Driver and the rest) may do in Plant & Distribution. Each column is a role and each line is one thing a person may do. It is the same list as **Role Templates** in Plant & Distribution, saved to the same place. Administrators only.
+**Roles & Rights** says what each role (Manager, Supervisor, Dispatcher, Sales, Driver and the rest) may do in Plant & Distribution and Customers & Routes. Each column is a role and each line is one thing a person may do. It is the same list as **Role Templates** in Plant & Distribution, saved to the same place. Administrators only.
 
 1. Find the line you want, by its group (Dispatch, Drivers, Plant Operations...) or with **Find a right**.
 2. Tick the box under a role to let that role do it, or untick it to take it away. It saves at once, and a green line says what changed.

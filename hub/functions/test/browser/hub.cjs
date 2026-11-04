@@ -76,6 +76,12 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => window.scrollY > 0), 'People & Access scrolls');
     await p.setViewportSize({ width: 1920, height: 1080 });
     await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"]');
+    // Joe 11-4-26: the person opens on the whole page; the list is out of the way and the address names them.
+    await p.waitForSelector('.people.full #f-role');
+    assert.ok(await p.isHidden('#rows'), 'the list steps aside while a person is open');
+    assert.match(p.url(), /people\.html\?person=sam\.sales%40uniteddairy\.com/);
+    assert.ok(await p.$$eval('#f-role option', o => o.some(x => x.value === 'SALES' && x.textContent === 'Sales')), 'Sales is a role');
+    assert.match(await p.textContent('.papps'), /Customers & Routes.*Edit customers and route days/s);
     await p.selectOption('#f-role', 'ADMINISTRATOR');
     assert.equal(await p.isChecked('#f-apps input[data-dapp="udms"]'), false, 'Sam\'s own ticks are saved, so a role change keeps them');
     await p.check('#f-apps input[data-dapp="udms"]');
@@ -97,7 +103,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.match(await p.textContent('.pblock'), /Not saved yet/);
     assert.ok(await p.isVisible('input[data-keys="conflicts"]'), 'the job opens the areas it ticks');
     await p.uncheck('input[data-keys="conflicts"]');
-    await p.click('#f-rights summary');
+    assert.ok(await p.isVisible('select[data-right="dispatch.publish"]'), 'single rights are open on the person page');
+    assert.ok(await p.isVisible('select[data-right="customers.edit"]'), 'Customers & Routes rights are on the person page');
     await p.selectOption('select[data-right="dispatch.publish"]', 'deny');
     assert.match(await p.textContent('#f-rights summary'), /1 changed/);
     await shot(p, 'hub-people-screens-1920');
@@ -113,7 +120,15 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     samNow = (await db().collection('users').doc('sam.sales@uniteddairy.com').get()).data();
     assert.equal(samNow.homeScreen, 'daily.html');
     assert.equal(await p.inputValue('#f-home'), 'daily.html');
-    // Add a person.
+    // Back to everyone (the browser's Back does the same), then add a person.
+    await p.click('#f-back');
+    await p.waitForSelector('#rows tr[data-email]');
+    assert.ok(!/person=/.test(p.url()), 'Back returns to the list');
+    await p.goForward();
+    await p.waitForSelector('.people.full #f-role');
+    assert.equal(await p.textContent('#edit h2'), 'Sam Sales', 'the browser Forward opens Sam again');
+    await p.click('#f-back');
+    await p.waitForSelector('#rows tr[data-email]');
     await p.click('#add');
     await p.fill('#f-name', 'Robin Driver');
     await p.fill('#f-email', 'robin.driver@uniteddairy.com');

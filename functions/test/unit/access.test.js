@@ -44,3 +44,17 @@ test('Administration lists every item of the current app\'s Administration', () 
     'Refresh Home Summary Now', 'Start Plant Fresh From Today', 'Date Inventory', 'Date Column Dry Run / Convert', 'Remaining Repair Items',
     'Dispatch Administration', 'Operational Assignments', 'Print Layouts', 'Dispatch Settings'].forEach(t => assert.ok(text.indexOf("'" + t + "'") >= 0, t));
 });
+
+test('Sales role and Customers & Routes rights (Joe 11-4-26); a Manager template saved before them keeps Edit', () => {
+  const R = require('../../src/rights');
+  assert.ok(R.ROLES.indexOf('SALES') >= 0);
+  assert.ok(R.CATALOG.some(c => c.code === 'customers.edit') && R.CATALOG.some(c => c.code === 'customers.import'));
+  const mgr = { status: 'ACTIVE', roles: ['Manager'] };
+  assert.ok(R.effectiveRights(mgr, {}, null).indexOf('customers.edit') >= 0, 'Managers edit by default');
+  assert.equal(R.effectiveRights(mgr, {}, null).indexOf('customers.import'), -1, 'import is for Administrators');
+  const old = R.withNewRights({ MANAGER: ['dashboard.read'] }, { MANAGER: { updatedAt: '2026-10-20T12:00:00.000Z' } });
+  assert.ok(R.effectiveRights(mgr, old, null).indexOf('customers.edit') >= 0, 'an older saved template gets the new right');
+  const later = R.withNewRights({ MANAGER: ['dashboard.read'] }, { MANAGER: { updatedAt: '2026-11-05T12:00:00.000Z' } });
+  assert.equal(R.effectiveRights(mgr, later, null).indexOf('customers.edit'), -1, 'a template saved after decides for itself');
+  assert.equal(R.effectiveRights({ status: 'ACTIVE', roles: ['Sales'] }, {}, { denials: [] }).indexOf('routes.read') >= 0, true);
+});

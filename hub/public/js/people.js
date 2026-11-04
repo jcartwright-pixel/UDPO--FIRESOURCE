@@ -7,6 +7,9 @@
  * Home screen there, and single rights (use the role's, allow, deny), so People & Roles can become a link to this page.
  * Joe 11-3-26: each app is a tick box on every person's line, ticked for what they can open now; a tick saves at once (the
  * hub's own call, setApps). Plant & Distribution stays ticked for everyone Enabled; nobody can untick their own apps.
+ * Joe 11-4-26 ("whenever I click on the name, I'd like it to open up in a full-size window ... so it's not all jumbled
+ * together"): a person opens on the whole page (people.html?person=<email>), in three columns: who they are and their apps,
+ * what they see in Plant & Distribution, and single rights. Back (or the browser's Back) returns to everyone.
  */
 import { callServer, escapeHtml as e, showError, serverText, shortDate, setAdmin, myEmail } from './shell.js';
 import { APPS, LOOK, appKeysFor, isAdminRole, roleKey } from './apps.js';
@@ -146,7 +149,9 @@ function drawEdit() {
   const primary = !draft.isNew && (data.people.find(p => p.email === draft.email) || {}).primary;
   const plants = (data.plants || []).filter(p => p.status !== 'RETIRED');
   const all = draft.facilities.indexOf('*') >= 0, admin = isAdminRole(draft.roles);
-  box.innerHTML = '<h2>' + (draft.isNew ? 'Add Person' : e(draft.name || draft.email)) + '</h2>' +
+  box.innerHTML = '<div class="pe-head"><button type="button" class="link back" id="f-back">&larr; Everyone</button><h2>' + (draft.isNew ? 'Add Person' : e(draft.name || draft.email)) + '</h2>' +
+    (draft.isNew ? '' : '<span class="muted">' + e(draft.email) + '</span>') + '</div>' +
+    '<div class="pe-grid"><div class="pe-col pe-who"><h3>Who they are</h3>' +
     '<label class="pfield">Name<input id="f-name" maxlength="120" value="' + e(draft.name) + '"></label>' +
     '<label class="pfield">United Dairy email<input id="f-email" type="email" maxlength="254" value="' + e(draft.email) + '"' + (draft.isNew ? '' : ' disabled') + '></label>' +
     '<label class="pfield">Role<select id="f-role"' + (primary ? ' disabled' : '') + '>' + data.roles.map(r => '<option value="' + r + '"' + (draft.roles[0] === r ? ' selected' : '') + '>' + e(prettyRole(r)) + '</option>').join('') + '</select></label>' +
@@ -157,14 +162,49 @@ function drawEdit() {
     '<div class="pfield"><span>Apps they can open' + (draft.appsChanged ? ' <span class="pill warn">Not saved yet</span>' : '') + '</span><div id="f-apps" class="app-ticks">' +
       APPS.map(a => '<span class="app-pick">' + appTick(Object.assign({}, draft, { email: draft.isNew ? '' : draft.email }), a.key, draftApps().indexOf(a.key) >= 0, 'data-dapp') + '<span>' + e(a.name) + '</span></span>').join('') + '</div></div>' +
     (primary ? '<p class="note">The primary administrator always stays an Enabled Administrator.</p>' : '') +
-    '<section class="pblock" aria-label="Plant and Distribution screens"><h3>What they see in Plant &amp; Distribution</h3>' + screensBlock(admin) + (draft.isNew ? '' : homeBlock()) + '</section>' +
-    rightsBlock(admin) +
-    '<div class="msg" id="f-msg" hidden></div>' +
+    appsBlock(admin) + '</div>' +
+    '<div class="pe-col"><section class="pblock" aria-label="Plant and Distribution screens"><h3>What they see in Plant &amp; Distribution</h3>' + screensBlock(admin) + (draft.isNew ? '' : homeBlock()) + '</section></div>' +
+    '<div class="pe-col">' + rightsBlock(admin) + '</div></div>' +
+    '<div class="pe-foot"><div class="msg" id="f-msg" hidden></div>' +
     '<div class="actions"><button type="button" class="primary" id="f-save">' + (draft.isNew ? 'Add Person' : 'Save') + '</button><button type="button" id="f-cancel">Cancel</button></div>' +
-    (draft.updatedAt ? '<p class="muted small">Last changed ' + e(shortDate(draft.updatedAt)) + (draft.updatedBy ? ' by ' + e(draft.updatedBy) : '') + '</p>' : '');
+    (draft.updatedAt ? '<p class="muted small">Last changed ' + e(shortDate(draft.updatedAt)) + (draft.updatedBy ? ' by ' + e(draft.updatedBy) : '') + '</p>' : '') + '</div>';
   box.querySelectorAll('input[data-part]').forEach(x => { x.indeterminate = true; });
   $('#f-save').onclick = save;
-  $('#f-cancel').onclick = () => { picked = null; draft = null; drawList(); drawEdit(); };
+  $('#f-cancel').onclick = backToList;
+  $('#f-back').onclick = backToList;
+}
+
+// What they may do in each app besides Plant & Distribution (Joe 11-4-26: everyone's access to everything, on this page).
+function appsBlock(admin) {
+  const apps = draftApps(), has = (k) => apps.indexOf(k) >= 0;
+  const right = (code) => admin || rightAllowed(draft, code, data.templates, data.defaults);
+  const pill = (ok, yes, no) => '<span class="pill ' + (ok ? 'good' : 'muted') + '">' + (ok ? yes || 'Yes' : no || 'No') + '</span>';
+  const line = (label, ok, yes, no) => '<li><span>' + label + '</span>' + pill(ok, yes, no) + '</li>';
+  return '<section class="papps" aria-label="What they can do in each app"><h3>What they can do in each app</h3>' +
+    '<h4>Customers &amp; Routes</h4><ul>' + line('Open it', has('customers')) + line('Edit customers and route days', has('customers') && right('customers.edit')) +
+      line('Import lists; set customers Active or Inactive', has('customers') && right('customers.import')) + '</ul>' +
+      '<p class="muted small">Change Edit and Import under Single rights, in the Customers &amp; Routes app group.</p>' +
+    '<h4>Fuel Tracking</h4><ul>' + line('Open it and see every fuel report', has('fuel')) + '</ul>' +
+    '<h4>Employees &amp; Compliance</h4><ul>' + line('Card on their Hub home', has('udms')) + '</ul>' +
+      '<p class="muted small">Employees &amp; Compliance also keeps its own sign-in list (its Users screen), because it holds private employee records.</p>' +
+    '<h4>Sales app (phones)</h4><p class="muted small">Any United Dairy account can open it. Nothing to tick.</p></section>';
+}
+
+// Back to everyone: the browser's Back when the person was opened here, so Back and this button do the same.
+function backToList() {
+  if (history.state && history.state.person) { history.back(); return; }
+  closePerson();
+}
+function closePerson() {
+  picked = null; draft = null;
+  document.querySelector('.people').classList.remove('full');
+  drawList(); drawEdit();
+}
+function showPerson(key) {
+  document.querySelector('.people').classList.add('full');
+  const want = '?person=' + encodeURIComponent(key);
+  if (location.search !== want) history.pushState({ person: key }, '', want + location.hash);
+  window.scrollTo(0, 0);
 }
 
 // Every change is kept in the draft and the panel drawn again, so what it shows always matches what Save sends.
@@ -240,10 +280,25 @@ function pick(email) {
   const screens = p.screenAccess ? JSON.parse(JSON.stringify(p.screenAccess)) : null;
   draft = { isNew: false, email: p.email, name: p.name, roles: (p.roles || []).slice(0, 1).map(r => String(r).toUpperCase()), facilities: (p.facilities || []).slice(), status: p.status,
     grants: (p.grants || []).slice(), denials: (p.denials || []).slice(), revision: p.revision, updatedAt: p.updatedAt, updatedBy: p.updatedBy,
-    screens, screensChanged: false, apps: null, appsChanged: false, homeScreen: p.homeScreen || '', home: p.homeScreen || '', plantTab: '', rightsOpen: false,
+    screens, screensChanged: false, apps: null, appsChanged: false, homeScreen: p.homeScreen || '', home: p.homeScreen || '', plantTab: '', rightsOpen: true,
     // Areas with only some screens ticked start open, so what is limited shows.
     openAreas: screens ? areas().filter(a => Object.keys(screens).some(pl => { const n = a.screens.filter(s => (screens[pl] || []).indexOf(s[0]) >= 0).length; return n && n < a.screens.length; })).map(a => a.key) : [] };
+  showPerson(email);
   drawList(); drawEdit();
+}
+function addPerson() {
+  picked = null;
+  draft = { isNew: true, email: '', name: '', roles: ['EMPLOYEE'], facilities: ['fac_uniontown'], status: 'ACTIVE', grants: [], denials: [], revision: data.newRevision,
+    screens: null, screensChanged: false, apps: null, appsChanged: false, homeScreen: '', home: '', plantTab: '', openAreas: [], rightsOpen: true };
+  showPerson('new');
+  drawList(); drawEdit(); $('#f-name').focus();
+}
+// The person in the address (people.html?person=<email>, or new), so a person's page can be reloaded or linked.
+function fromAddress() {
+  const want = new URLSearchParams(location.search).get('person');
+  if (want === 'new') { if (!draft || !draft.isNew) addPerson(); return; }
+  if (want && data.people.some(p => p.email === want)) { if (picked !== want) pick(want); return; }
+  if (draft) closePerson();
 }
 
 export async function load() {
@@ -252,7 +307,7 @@ export async function load() {
   setAdmin(true);
   $('#role-filter').innerHTML = '<option value="">Every role</option>' + data.roles.map(r => '<option value="' + r + '">' + e(prettyRole(r)) + '</option>').join('');
   drawList();
-  if (picked && data.people.some(p => p.email === picked)) pick(picked); else drawEdit();
+  if (picked && data.people.some(p => p.email === picked)) pick(picked); else if (!draft) fromAddress(); else drawEdit();
 }
 
 export function start() {
@@ -267,11 +322,7 @@ export function start() {
     if (i >= 0) draft.openAreas.splice(i, 1); else draft.openAreas.push(k);
     redraw(b);
   });
-  $('#add').onclick = () => {
-    picked = null;
-    draft = { isNew: true, email: '', name: '', roles: ['EMPLOYEE'], facilities: ['fac_uniontown'], status: 'ACTIVE', grants: [], denials: [], revision: data.newRevision,
-      screens: null, screensChanged: false, apps: null, appsChanged: false, homeScreen: '', home: '', plantTab: '', openAreas: [], rightsOpen: false };
-    drawList(); drawEdit(); $('#f-name').focus();
-  };
+  $('#add').onclick = addPerson;
+  window.addEventListener('popstate', () => { if (data) fromAddress(); });
   return load().catch(err => showError(serverText(err, 'the Users list')));
 }
