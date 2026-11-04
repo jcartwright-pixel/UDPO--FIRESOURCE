@@ -618,7 +618,7 @@
     let puRow = null;
     // Who added and completed each pickup (Joe 10/11, review item 42, as the old app): the person's name, or on a Plant Station
     // tablet the station's name (the station plant-station.html remembers on this tablet).
-    const STATION_NAMES = { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' };
+    const STATION_NAMES = { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services', CASE_YARD: 'Case Loadout & Yard Services' };
     const station = () => { try { return STATION_NAMES[localStorage.getItem('udPlantStation') || ''] || ''; } catch (e) { return ''; } };
     const myName = () => station() || (person && person.name) || '';
     const whoText = (name, email) => String(name || '').trim() || String(email || '').split('@')[0];

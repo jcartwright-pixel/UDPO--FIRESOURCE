@@ -35,7 +35,9 @@ const F = require('./fails');
 const DOC = (db) => db.collection('private').doc('stations');
 const FAILS = (db) => db.collection('private').doc('stationFails');
 const KINDS = Object.freeze({
-  PLANT: { label: 'Plant Station', types: { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services' } },
+  PLANT: { label: 'Plant Station', types: { CASE: 'Case Loadout', CASE_UNLOADING: 'Case Unloading', TOTES: 'Tote Loadout', BOXING: 'Boxing Loadout', YARD_SERVICES: 'Yard Services',
+    // Joe 11-4-26: one more plant tablet that does both Case Loadout and Yard Services.
+    CASE_YARD: 'Case Loadout & Yard Services' } },
   GARAGE: { label: 'Garage Station', types: { GARAGE: 'Garage' } },
   // Joe 10/12: "Driver Room Check-In Station" (the drivers' tablet) and "Driver's Kiosk Station" (the TV: rolling loadout,
   // dispatch and weather).
@@ -51,11 +53,16 @@ const KINDS = Object.freeze({
 const STARTERS = [
   ['PLANT', 'CASE', 'Case Loadout'], ['PLANT', 'CASE_UNLOADING', 'Case Unloading'], ['PLANT', 'TOTES', 'Tote Loadout'], ['PLANT', 'BOXING', 'Boxing Loadout'],
   ['PLANT', 'YARD_SERVICES', 'Yard Services'], ['GARAGE', 'GARAGE', 'Garage'], ['KIOSK', 'DRIVER', 'Driver Room Check-In Station'], ['KIOSK', 'TV', "Driver's Kiosk Station"],
-  ['MANAGER', 'MANAGERS', 'Plant Managers'], ['MAINT', 'MAINT', 'Maintenance Station'], ['LINE', 'LINE', 'Line Tablet']
+  ['MANAGER', 'MANAGERS', 'Plant Managers'], ['MAINT', 'MAINT', 'Maintenance Station'], ['LINE', 'LINE', 'Line Tablet'],
+  ['PLANT', 'CASE_YARD', 'Case Loadout & Yard Services']
 ];
 // Kinds added after a plant's list was first saved: each plant gets its starter until the list has one of that kind
 // (Remove takes the code off, so the starter coming back has no code and the app opens as before).
 const LATER_KINDS = ['MANAGER', 'MAINT', 'LINE'];
+// Joe 11-4-26: station types added after a plant's list was first saved. Each plant gets the starter once (seeded remembers it),
+// so a manager who removes it does not see it come back.
+const LATER_TYPES = ['CASE_YARD'];
+const seedKey = (facilityId, type) => facilityId + '|' + type;
 const MAX_FAILS_PER_MINUTE = 30;
 // The saves a Plant Station signed in by its code alone may make: loading, pickups, the loading order, unloading, washing,
 // returns and yard checks (the screens the Plant Station opens). Nothing else.
@@ -82,6 +89,11 @@ function listOf(d) {
     plants().forEach(p => STARTERS.filter(([kind]) => LATER_KINDS.indexOf(kind) >= 0).forEach(([kind, type, name]) => {
       const key = (p.id + '_' + kind + '_' + type).toLowerCase();
       if (!Object.values(d.list).some(s => s.kind === kind && s.facilityId === p.id)) d.list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(d.list).length };
+    }));
+    const seeded = d.seeded || {};
+    plants().forEach(p => STARTERS.filter(([, type]) => LATER_TYPES.indexOf(type) >= 0).forEach(([kind, type, name]) => {
+      const key = (p.id + '_' + kind + '_' + type).toLowerCase();
+      if (!seeded[seedKey(p.id, type)] && !Object.values(d.list).some(s => s.kind === kind && s.type === type && s.facilityId === p.id)) d.list[key] = { key, kind, type, name, facilityId: p.id, order: Object.keys(d.list).length };
     }));
     return d.list;
   }
@@ -127,7 +139,10 @@ async function change(db, fn) {
   return db.runTransaction(async tx => {
     const snap = await tx.get(DOC(db)), d = snap.exists ? snap.data() : {}, list = Object.assign({}, listOf(d)), noAccount = Object.assign({}, d.noAccount || {});
     const out = fn(list, noAccount);
-    tx.set(DOC(db), Object.assign({}, d, { list, noAccount }));
+    // Every later type's starter has been offered once it is saved: removing it keeps it gone.
+    const seeded = Object.assign({}, d.seeded || {});
+    plants().forEach(p => LATER_TYPES.forEach(type => { seeded[seedKey(p.id, type)] = true; }));
+    tx.set(DOC(db), Object.assign({}, d, { list, noAccount, seeded }));
     plants().forEach(p => tx.set(ACCESS(db, p.id), access(list, noAccount, p.id)));
     tx.set(TV_ACCESS(db), tvAccess(list));
     return out;

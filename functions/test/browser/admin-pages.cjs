@@ -176,7 +176,7 @@ async function until(check, what) {
     // Garage Station has its own page, and Driver Station Codes lists the kiosks (station-codes.cjs types the codes).
     await open('station-codes', '#st-list .ap-item');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public', 'line']);
-    assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 5);
+    assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 6); // Joe 11-4-26: + Case Loadout & Yard Services
     // The release codes moved to Manager Links: one line here points there.
     assert.equal(await p.$('#sc-list'), null);
     await shot(p, 'plant-station-codes-1920.png');
