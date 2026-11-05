@@ -347,6 +347,7 @@ Drivers' time off: vacation, personal, sick, bereavement and unpaid days. At mos
 
 - **Time Off** lists every day off. **Calendar** shows the month. **Eligibility** shows each driver's tenure and vacation weeks.
 - `+ Add Vacation`: pick the driver, the first and last day, the type and the status (Approved, Pending, Denied or Cancelled). Add a note and an email to tell, then `Save Vacation`.
+- On the Calendar, `+ Add Vacation` (on the right, beside Print) opens the same boxes right above the month, so you can type in vacations while you look at the calendar. The first day starts on the month you are looking at. Each one shows on the calendar as soon as you press `Save Vacation`.
 - On the Calendar, click a day to see who is off and to add a day off.
 - `Edit` and `Remove` on a line change or take off a day off.
 - `Print` prints one driver or every driver, one page each.
