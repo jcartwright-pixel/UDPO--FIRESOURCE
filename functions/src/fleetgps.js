@@ -939,10 +939,11 @@ async function probe(db, d, o, email, tagIn) {
  * Joe 11/4 ("Add a Download button for me"): GPS Setup's Download driver usernames, for the Accounts set up box in
  * Employees & Compliance (UDMS), which cannot reach Verizon. Read only: it saves two reports (Intent = Retrieve) in Fleet,
  * as Test does, runs them, and joins each driver to their Fleet login. Nothing is kept here; the screen turns the answer
- * into a spreadsheet file.
+ * into a spreadsheet file. Joe 11-5-26 ("a driver's license, that will be a true identity"): the license number and state
+ * come too, so Employees & Compliance can match a driver whose name Verizon spells differently.
  */
 const DRIVER_TEMPLATES = Object.freeze({
-  drivers: { name: 'UDPO_DriverList', table: 'Driver-1.0', out: ['Id', 'EmployeeNo', 'Surname', 'FirstName', 'MiddleName', 'Nickname', 'Depot', 'UserId', 'HireDate', 'LeaveDate'] },
+  drivers: { name: 'UDPO_DriverList', table: 'Driver-1.0', out: ['Id', 'EmployeeNo', 'Surname', 'FirstName', 'MiddleName', 'Nickname', 'Depot', 'UserId', 'HireDate', 'LeaveDate', 'LicenseNo', 'LicenseState'] },
   users: { name: 'UDPO_UserLogins', table: 'User-1.0', out: ['Id', 'Username', 'FullName', 'Disabled', 'LastLogin', 'DriverId'] },
 });
 async function driverList(d, o) {
@@ -961,7 +962,7 @@ async function driverList(d, o) {
     const u = (r.UserId && byId[r.UserId]) || byDriver[r.Id] || {};
     return { id: r.Id || '', employeeNo: r.EmployeeNo || '', lastName: r.Surname || '', firstName: r.FirstName || '', middleName: r.MiddleName || '', nickname: r.Nickname || '',
       depot: r.Depot || '', username: cleanUser(u.Username || '', d.fleet), loginName: u.FullName || '', loginDisabled: yes(u.Disabled), lastLogin: utcIso(u.LastLogin),
-      hireDate: day(r.HireDate), leaveDate: day(r.LeaveDate) };
+      hireDate: day(r.HireDate), leaveDate: day(r.LeaveDate), licenseNo: r.LicenseNo || '', licenseState: r.LicenseState || '' };
   }).sort((a, b) => (a.lastName + ' ' + a.firstName).localeCompare(b.lastName + ' ' + b.firstName));
   return { at: o.now().toISOString(), count: drivers.length, withUsername: drivers.filter(x => x.username).length, drivers };
 }
