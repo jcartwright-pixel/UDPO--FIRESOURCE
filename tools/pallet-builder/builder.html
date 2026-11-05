@@ -82,6 +82,7 @@ td.r,th.r{text-align:right}
 .warns{display:flex;flex-direction:column;gap:6px}
 .warn{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:7px 10px;font-size:.88rem}
 /* trailer */
+.side{text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .trailer{border:2px solid var(--ink);border-radius:6px 6px 2px 2px;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;position:relative}
 .end{grid-column:1/-1;text-align:center;font-family:var(--f-display);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .pal{border:1px solid var(--line);border-radius:5px;padding:7px 8px;display:flex;flex-direction:column;gap:3px;background:var(--panel);min-width:0}
@@ -129,7 +130,7 @@ details summary{cursor:pointer;font-weight:600}
   <header class="top">
     <div>
       <h1>United Dairy Pallet Builder</h1>
-      <p>Enter each order's products in units, stop by stop in delivery order. Each order adds its units up by size and rounds up to full cases, so a route gets a true case count. Pallets hold 54 cases for crates, pints and half pints, 45 for dispensers and boxes, and one spot per tote. Each load sequence gets its own pallets: when a sequence is done, its last pallet stops there, even if it isn't full, and the next sequence starts a new pallet. The last stop loads at the nose.</p>
+      <p>Enter each order's products in units, stop by stop in delivery order. Each order adds its units up by size and rounds up to full cases, so a route gets a true case count. Pallets hold 54 cases for crates, pints and half pints, 45 for dispensers and boxes, and one spot per tote. Each load sequence gets its own pallets: when a sequence is done, its last pallet stops there, even if it isn't full, and the next sequence starts a new pallet. Order 1 loads first, at the nose, and the rest follow toward the doors. Odd pallets go on the left side, even on the right.</p>
     </div>
     <div class="controls">
       <label class="f" for="routePick">Saved routes<select id="routePick"></select></label>
@@ -356,7 +357,7 @@ function plan(){
   // even if partial, and the next sequence starts a new pallet. Orders with no sequence (or sub-rt 00) count as their own.
   const seqKey = i => { const n = stopSeq(S.stops[i]); return n ? 'q' + n : 'o' + i; };
   let lastSeq = null;
-  for (let i = S.stops.length - 1; i >= 0; i--) {            // last delivery loads first, at the nose
+  for (let i = 0; i < S.stops.length; i++) {                 // Joe: order/sequence 1 loads first, at the nose; odd pallets left, even right
     const sk = seqKey(i);
     if (sk !== lastSeq && cur) cur = null;
     lastSeq = sk;
@@ -414,11 +415,11 @@ function render(){
       <div class="bar"><i style="width:${Math.min(100,Math.round(pl.fill*100))}%"></i></div>
       <div class="st">Order ${stops.map(s=>s+1).join(', ')}</div></div>`;
   }).join('');
-  $('trailer').innerHTML = `<div class="end">Nose · loaded first</div>${cells || '<p class="hint" style="grid-column:1/-1">Add products to an order to see pallets.</p>'}<div class="end">Doors · first delivery</div>`;
+  $('trailer').innerHTML = `<div class="end">Nose · loaded first</div><div class="side">Left · odd pallets</div><div class="side">Right · even pallets</div>${cells || '<p class="hint" style="grid-column:1/-1">Add products to an order to see pallets.</p>'}<div class="end">Doors · loaded last</div>`;
 
   $('detail').innerHTML = R.pallets.length ? `<h3>Pallet by pallet</h3>` + R.pallets.map((pl,k)=>{
     const rows = pl.items.map(it=>`<tr><td class="num">${it.stop+1}</td><td class="desc">${esc(it.x.label)}<small>${esc(it.x.products.map(q=>q.p.desc).join(', '))}</small></td><td><span class="chip ${it.x.special||it.x.type}">${it.x.special||it.x.type}</span></td><td class="r num">${pl.tote?'1 tote':it.cases}</td></tr>`).join('');
-    return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
+    return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1} · ${k%2?'right':'left'}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
       <div class="tbl"><table><thead><tr><th>Order</th><th>Size</th><th>Type</th><th class="r">Cases</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('') : '';
   save(); window._R = R; renderDay(); renderSeqs();
@@ -441,7 +442,7 @@ function planText(){
   const R = window._R; const name = i => S.stops[i].name || `Order ${i+1}`;
   let t = `${S.route || 'Route'}: ${fmt(R.stats.reduce((a,s)=>a+s.cases,0))} cases on ${R.pallets.length} pallets${S.spots?` (${S.spots} spots)`:''}\n${$('outRow').textContent.trim()}\n`;
   R.orders.forEach((o,i)=>{ const c=o.groups.filter(x=>!x.special).reduce((a,x)=>a+x.cases,0); t += `\nOrder ${i+1} ${name(i)}: ${c} cases\n`; o.groups.forEach(x=>{ if(x.special==='Tanker'||x.special==='Bulk') return; t += `  ${x.label}: ${x.units} ${x.special==='Tote'?'totes':'units'} = ${x.cases} ${x.special==='Tote'?'spots':'cases'}\n`; }); });
-  t += `\nPallet 1 is at the nose; the last pallet is at the doors.\n`;
+  t += `\nOrder 1 loads first at the nose; the last pallet is at the doors. Odd pallets go on the left, even on the right.\n`;
   R.pallets.forEach((pl,k)=>{ t += `Pallet ${k+1} (${Math.round(pl.fill*100)}% full): ` + pl.items.map(it=>`order ${it.stop+1} ${it.x.label} x${pl.tote?1:it.cases}`).join('; ') + `\n`; });
   return t;
 }

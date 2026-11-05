@@ -765,7 +765,7 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 1. On Home, press **Pallet Builder** on the **Plant Operations** card, right under **Debag / Labeling Room**. It is in the menu in the same place.
 2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
 3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
-4. Read **Route totals and load plan**: the cases by size, the cases and pallets for each stop, and the trailer plan from the nose to the doors.
+4. Read **Route totals and load plan**: the cases by size, the cases and pallets for each stop, and the trailer plan. Sequence 1 loads first, at the nose, and the rest follow toward the doors, which are loaded last. Odd pallets go on the left and even pallets on the right.
 5. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
 
 ### Buttons
