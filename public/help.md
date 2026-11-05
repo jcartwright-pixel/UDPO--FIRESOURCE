@@ -625,7 +625,7 @@ The connection to Verizon Connect Fleet (administrators).
 - `Pull now` reads Verizon at once instead of waiting.
 - `Ask Verizon` asks for every field Verizon offers, to see what is there.
 - **Trip check:** type one truck, pick a day and press `Check trips`. It lists each trip that day: when the truck left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. A day the app has already saved shows at once; a day not saved yet (like today) asks Verizon and can take up to 2 minutes. Checking only reads.
-- **Driver usernames:** `Download driver usernames` saves a spreadsheet of every driver in Verizon with their Verizon username, employee number and hire and leave dates, for the Accounts set up box in Employees & Compliance. It only reads from Verizon and takes up to a minute.
+- **Driver usernames:** `Download driver usernames` saves a spreadsheet of every driver in Verizon with their Verizon username, employee number, license number and state, and hire and leave dates, for the Accounts set up box in Employees & Compliance (Load Verizon list matches drivers by license number too). It only reads from Verizon and takes up to a minute.
 - **Remove drivers from Verizon** (administrators only): for drivers who no longer work here.
   1. Type or paste their Verizon usernames, one per line.
   2. Press `Check`. The app lists which Verizon drivers they are. Nothing changes yet.
