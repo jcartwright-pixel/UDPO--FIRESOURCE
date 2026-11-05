@@ -745,6 +745,27 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 > **About … behind** counts the work still to do. A load that has already missed its time (left over from last night, or past its dispatch) counts only the time from now until it is loaded, not every hour since it should have left. Its own line still shows how late it is.
 
+## Pallet Builder
+id: pallet-builder
+screens: pallet-builder.html
+
+Turns a route's orders into its true case count, its pallets and a trailer plan. Orders are entered in units. Each order adds its units up by size and rounds up to full cases, then the route adds up every order.
+
+1. Open **Pallet Builder** from **Plant Distribution Departments** in the menu.
+2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
+3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
+4. Read **Route totals and load plan**: the cases by size, the cases and pallets for each stop, and the trailer plan from the nose to the doors.
+5. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
+
+### Buttons
+- `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
+- **New pallet for each stop**: tick it so no pallet mixes two stops.
+- `Clear route`: removes every order on the open route (it asks first).
+- `Load sample route`: fills in a made-up route to try the builder.
+
+> Crates go 54 cases to a pallet, boxes and dispensers 45, and a tote takes a pallet spot of its own.
+
+!> Do not count on another computer seeing your routes: the builder keeps saved routes on the computer and browser you made them on. Press `Copy plan` to share one.
 ## Unloading (Case, Tote, Boxing and Tanker)
 id: unloading
 screens: unloading.html

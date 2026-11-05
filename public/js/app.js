@@ -165,6 +165,8 @@ export const MENU = [
   // menu itself stays short: Send Report, this, Shift Notes, Yard Checks and the Scheduler.
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'],
     ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Boxing Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
+    // Joe 11-4-26: the Pallet Builder in Operations (not the hub): a route's orders into full cases, pallets and a trailer plan.
+    ['Pallet Builder', 'pallet-builder.html', 'load'],
     ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Boxing Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
     ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
@@ -688,7 +690,7 @@ const PAGE_ICON = {
   'gps.html': 'pin', 'trucks.html': 'pin', 'scorecard.html': 'star', 'reportcenter.html': 'chart',
   'equipment.html': 'truck', 'maint.html': 'wrench', 'issues.html': 'issue',
   'garage.html': 'wrench', 'fleet.html': 'truck',
-  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'redzone.html': 'production.webp', 'machine-setup.html': 'production.webp', 'production.html': 'production.webp', 'production-home.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star', 'forecast.html': 'week',
+  'plant.html': 'factory', 'loadout.html': 'case-v1.webp', 'pallet-builder.html': 'load', 'unloading.html': 'case-unloading-v1-560.webp', 'returns.html': 'returns-to-cooler-v1-560.webp', 'washing.html': 'wash', 'scheduler.html': 'week', 'yard.html': 'yard-checks.webp', 'quality.html': 'production.webp', 'products.html': 'production.webp', 'redzone.html': 'production.webp', 'machine-setup.html': 'production.webp', 'production.html': 'production.webp', 'production-home.html': 'production.webp', 'linetargets.html': 'production.webp', 'mocreo.html': 'temperatures.webp', 'shiftnotes.html': 'alert', 'shiftreports.html': 'day', 'temps.html': 'temperatures.webp', 'manager.html': 'star', 'forecast.html': 'week',
   'garage-station.html': 'wrench', 'driver-station.html': 'truck', 'trailers.html': 'truck', 'plant-station.html': 'factory', 'phone-screens.html': 'people',
   'safety.html': 'safety', 'safety-issues.html': 'alert', 'extinguishers.html': 'safety', 'safety-fire.html': 'safety', 'safety-walks.html': 'day', 'safety-setup.html': 'gear', 'location-areas.html': 'map',
   // Joe 10/31: Plant Material Trailers' own icon (boxes, a bag and a bottle on a pallet).

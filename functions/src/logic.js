@@ -1580,7 +1580,7 @@
   // overview, Administration, the stations) is not decided by these ticks.
   var SCREEN_AREAS = [
     { key: 'plant', name: 'Plant Distribution', home: 'manager.html', screens: [
-      ['manager', 'Manager Center', ['manager.html', 'forecast.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']],
+      ['manager', 'Manager Center', ['manager.html', 'forecast.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']], ['palletBuilder', 'Pallet Builder', ['pallet-builder.html']],
       ['unloading', 'Unloading & Washing', ['unloading.html']], ['returns', 'Product Returns', ['returns.html']], ['washing', 'Truck Washing', ['washing.html']],
       ['trailers', 'Trailer Assignments', ['trailers.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
       ['yard', 'Yard Checks', ['yard.html']]] },
