@@ -82,7 +82,15 @@
         <p class="hint" id="drivers-when"></p>
       </section>
       <section class="gps-card wide">
-        <h2>7. What the app reads from Fleet</h2>
+        <h2>7. Remove drivers from Verizon</h2>
+        <p class="hint">For drivers who no longer work here (administrators only). Type or paste their Verizon usernames, one per line, and press Check: the app shows which Verizon drivers they are and changes nothing. Then press Delete from Verizon twice. Verizon cannot switch a driver off, only delete them, and a deleted driver cannot be brought back.</p>
+        <div class="gps-ask"><label>Verizon usernames<textarea id="r-names" rows="4" autocomplete="off" spellcheck="false"></textarea></label>
+          <div class="gps-buttons"><button type="button" class="primary" id="r-check">Check</button><button type="button" class="warn" id="r-delete" disabled>Delete from Verizon</button></div></div>
+        <p class="hint" id="r-when"></p>
+        <div id="r-out"></div>
+      </section>
+      <section class="gps-card wide">
+        <h2>8. What the app reads from Fleet</h2>
         <ol class="gps-steps">
           <li>Where each truck is now: last report time, place, speed, ignition on or off, and the driver Fleet shows.</li>
           <li>Each truck's odometer and engine hours, and the miles it drove today with its first and last movement.</li>
@@ -204,7 +212,7 @@
       showError('');
       if (button) button.disabled = true;
       // 6.80 practice test: a trip check that asks Verizon takes about 2 minutes; the usual 70-second wait gave up first.
-      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields), fields.op === 'trips' || fields.op === 'probe' || fields.op === 'drivers' ? { timeout: 190000 } : undefined); render(); return s; }
+      try { s = await callServer('gps', Object.assign({ kind: 'fleet' }, fields), fields.op === 'trips' || fields.op === 'probe' || fields.op === 'drivers' || fields.op === 'removeDrivers' ? { timeout: 190000 } : undefined); render(); return s; }
       catch (e) {
         const code = String(e && e.code || '').replace(/^functions\//, '');
         if (fields.op !== 'status' && /^(internal|unknown|deadline-exceeded)$/.test(code)) {
@@ -286,6 +294,36 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 10000);
       $('drivers-when').textContent = 'Downloaded ' + l.count + ' drivers, ' + l.withUsername + ' with a Verizon username.';
+    };
+    // Joe 11-5-26: delete drivers who left from Verizon. Check first (nothing changes), then Delete, pressed twice.
+    let checked = '';
+    const rTable = (title, rows) => rows.length ? '<p><b>' + escapeHtml(title) + '</b></p><div class="gps-probe-rows"><table><thead><tr><th>Name</th><th>Employee number</th><th>Verizon username</th></tr></thead><tbody>' +
+      rows.map(m => '<tr><td>' + escapeHtml(m.name || '') + '</td><td>' + escapeHtml(m.employeeNo || '') + '</td><td>' + escapeHtml(m.username || '') + '</td></tr>').join('') + '</tbody></table></div>' : '';
+    const rOthers = (x) => (x.notFound.length ? '<p class="hint">Not a driver in Verizon (left alone): ' + escapeHtml(x.notFound.join(', ')) + '</p>' : '') +
+      (x.several.length ? '<p class="hint">More than one Verizon driver has this username, so it was left alone: ' + escapeHtml(x.several.map(v => v.username).join(', ')) + '</p>' : '');
+    const rReset = () => { checked = ''; $('r-delete').disabled = true; $('r-delete').textContent = 'Delete from Verizon'; $('r-delete').classList.remove('armed'); };
+    $('r-names').addEventListener('input', rReset);
+    $('r-check').onclick = async () => {
+      rReset();
+      $('r-when').textContent = 'Asking Verizon for its drivers. This can take up to a minute...';
+      const r = await call({ op: 'removeDrivers', usernames: $('r-names').value, confirm: false }, $('r-check'));
+      const x = r && r.removed;
+      $('r-when').textContent = '';
+      if (!x) return;
+      $('r-out').innerHTML = rTable(x.matched.length + ' Verizon driver' + (x.matched.length === 1 ? '' : 's') + ' to delete', x.matched) + rOthers(x);
+      if (x.matched.length) { checked = $('r-names').value; $('r-delete').disabled = false; }
+    };
+    $('r-delete').onclick = async () => {
+      const b = $('r-delete');
+      if ($('r-names').value !== checked) { rReset(); showError('Press Check again first.'); return; }
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Press again to delete them for good'; return; }
+      $('r-when').textContent = 'Deleting from Verizon, then checking they are gone. This can take up to 2 minutes...';
+      const r = await call({ op: 'removeDrivers', usernames: checked, confirm: true }, b);
+      rReset();
+      const x = r && r.removed;
+      $('r-when').textContent = x ? 'Done ' + stamp(x.at) + '.' : '';
+      if (!x) return;
+      $('r-out').innerHTML = rTable('Deleted from Verizon: ' + x.deleted.length, x.deleted) + rTable('Still in Verizon (not deleted): ' + x.notDeleted.length, x.notDeleted) + rOthers(x);
     };
     $('t-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('trips').click(); } });
     $('p-tag').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('probe').click(); } });

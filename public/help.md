@@ -626,6 +626,11 @@ The connection to Verizon Connect Fleet (administrators).
 - `Ask Verizon` asks for every field Verizon offers, to see what is there.
 - **Trip check:** type one truck, pick a day and press `Check trips`. It lists each trip that day: when the truck left the yard and where from, when it came back and where to, the miles, the fuel counter at both ends, the fuel used and the MPG. A day the app has already saved shows at once; a day not saved yet (like today) asks Verizon and can take up to 2 minutes. Checking only reads.
 - **Driver usernames:** `Download driver usernames` saves a spreadsheet of every driver in Verizon with their Verizon username, employee number and hire and leave dates, for the Accounts set up box in Employees & Compliance. It only reads from Verizon and takes up to a minute.
+- **Remove drivers from Verizon** (administrators only): for drivers who no longer work here.
+  1. Type or paste their Verizon usernames, one per line.
+  2. Press `Check`. The app lists which Verizon drivers they are. Nothing changes yet.
+  3. Press `Delete from Verizon`, then press it again. The app deletes them and checks they are gone.
+  A username that is not in Verizon, or that two Verizon drivers share, is left alone and listed under the table.
 - **Saved trips:** the line under Trip check says how far the app has got saving every truck's trips by itself (it does this every 30 minutes, from 10-1-26 on, and keeps six months). "Saved through" yesterday means it is up to date. If it says saving failed, it tries again on its own; check the Verizon login above.
 
 > Fuel used and MPG only show for trucks whose GPS box is plugged into the engine. Trailers never send fuel.
@@ -633,6 +638,8 @@ The connection to Verizon Connect Fleet (administrators).
 > The same Verizon login is also in the United Dairy Hub, Keys & Connections. It is one login: a change in either place is the same change.
 
 !> Do not remove the login unless Verizon changed it. Trucks Today and the Scorecard stop getting GPS.
+
+!> Do not delete a driver who still works here. Verizon cannot switch a driver off, and a deleted driver cannot be brought back.
 
 # Plant Distribution
 

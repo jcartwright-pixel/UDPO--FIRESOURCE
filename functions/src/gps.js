@@ -29,12 +29,12 @@ function checkBase(url, local) {
   throw new GpsError('BAD_REQUEST', 'The Fleetmatics address must look like ' + DEFAULT_BASE);
 }
 
-async function adminOnly(db, user) {
+async function adminOnly(db, user, roles) {
   const email = String(user && user.email || '').toLowerCase();
   // The one Users list (Uniontown's database), whichever plant this is for.
   const snap = await require('./plants').companyDb(db).collection(C.users).doc(safeIdPart(email)).get();
   const person = snap.exists ? snap.data() : null;
-  if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, ROLES)) throw new GpsError('NOT_ALLOWED', 'Only a manager or administrator can set up or test the GPS login');
+  if (!person || person.status !== 'ACTIVE' || !L.hasRole(person, roles || ROLES)) throw new GpsError('NOT_ALLOWED', roles ? 'Only an administrator can remove drivers from Verizon' : 'Only a manager or administrator can set up or test the GPS login');
   return email;
 }
 
@@ -75,7 +75,8 @@ async function test(d, vehicle, fetchFn) {
 async function gpsCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ fetch: (...a) => fetch(...a), now: () => new Date(), local: false }, options || {});
-  const email = await adminOnly(db, user);
+  // Joe 11-5-26: deleting drivers from Verizon cannot be undone, so only administrators (not managers) may.
+  const email = await adminOnly(db, user, input.kind === 'fleet' && input.op === 'removeDrivers' ? ['ADMINISTRATOR', 'ADMIN'] : null);
   // Verizon Connect Fleet (the old Telogis, which United Dairy is on): src/fleetgps.js.
   if (input.kind === 'fleet') {
     try { return await FLEET.fleetCall(db, email, input, options); } catch (e) { throw e instanceof FLEET.FleetError ? new GpsError(e.code === 'BAD_REQUEST' ? 'BAD_REQUEST' : 'FAILED', e.message) : e; }

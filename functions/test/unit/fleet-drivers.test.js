@@ -45,3 +45,63 @@ test('Download driver usernames: each driver with their Fleet login, sorted by n
 test('Download driver usernames needs the Fleet login saved first', async () => {
   await assert.rejects(fleetCall(fakeDb({}), 'a@b', { op: 'drivers' }, { fetch: async () => reply(500, ''), base: BASE }), /Save the Fleet login first/);
 });
+
+// Joe 11-5-26: GPS Setup's Remove drivers from Verizon. Check changes nothing; Delete removes only exact matches. Made-up names.
+const { removeNames, removeMatch } = require('../../src/fleetgps');
+function removeFleet(docs) {
+  const log = [], deleted = new Set();
+  const fetch = async (url, init) => {
+    log.push({ method: init.method, url: url.replace(BASE, ''), body: init.body });
+    if (url === BASE + '/rest/login') return reply(200, JSON.stringify({ token: 'k1' }));
+    if (url.startsWith(BASE + '/templates')) return reply(200, init.method === 'POST' ? '{}' : '[]');
+    if (/template=UDPO_DriverRemove/.test(url)) { String(init.body).split(/\r\n/).slice(1).filter(Boolean).forEach(id => deleted.add(id)); return reply(200, JSON.stringify({ Failed: 0, Created: 0, Deleted: deleted.size, Updated: 0 })); }
+    if (/template=UDPO_DriverList/.test(url)) return reply(200, 'Id,EmployeeNo,Surname,FirstName,MiddleName,Nickname,Depot,UserId,HireDate,LeaveDate\r\n'
+      + [['D1', '1001', 'Able', 'Bob', 'U1'], ['D2', '1002', 'Zee', 'Amy', 'U2'], ['D3', '', 'Twin', 'Al', 'U3'], ['D4', '', 'Twin', 'Ann', 'U4']].filter(r => !deleted.has(r[0])).map(r => [r[0], r[1], r[2], r[3], '', '', '', r[4], '', ''].join(',')).join('\r\n') + '\r\n');
+    if (/template=UDPO_UserLogins/.test(url)) return reply(200, 'Id,Username,FullName,Disabled,LastLogin,DriverId\r\nU1,united-dairy:bable,,False,,\r\nU2,azee,,False,,\r\nU3,atwin,,False,,\r\nU4,atwin,,False,,\r\n');
+    return reply(404, '');
+  };
+  return { log, deleted, opts: { fetch, base: BASE, now: () => new Date('2026-11-05T15:00:00Z') } };
+}
+
+test('Remove drivers: usernames are cleaned, deduplicated and capped', () => {
+  assert.deepEqual(removeNames(' BAble\nunited-dairy:azee, bable '), ['bable', 'azee']);
+  assert.throws(() => removeNames('  '), /Type the Verizon usernames/);
+  assert.throws(() => removeNames(Array.from({ length: 151 }, (_, i) => 'u' + i)), /At most 150/);
+  const m = removeMatch(['bable', 'nobody'], [{ id: 'D1', username: 'bable', firstName: 'Bob', lastName: 'Able' }]);
+  assert.deepEqual(m.matched.map(x => x.id), ['D1']);
+  assert.deepEqual(m.notFound, ['nobody']);
+});
+
+test('Remove drivers: Check changes nothing in Verizon or the app', async () => {
+  const docs = { 'private/gpsFleet': { fleet: 'united-dairy', user: 'app', password: 'pw' } }, f = removeFleet(docs);
+  const r = (await fleetCall(fakeDb(docs), 'admin.test@uniteddairy.com', { op: 'removeDrivers', usernames: 'bable\natwin\nghost' }, f.opts)).removed;
+  assert.equal(r.done, false);
+  assert.deepEqual(r.matched.map(x => [x.username, x.id, x.name, x.employeeNo]), [['bable', 'D1', 'Bob Able', '1001']]);
+  assert.deepEqual(r.several, [{ username: 'atwin', count: 2 }]);
+  assert.deepEqual(r.notFound, ['ghost']);
+  assert.ok(!f.log.some(x => /UDPO_DriverRemove/.test(x.url)));
+  assert.equal(f.deleted.size, 0);
+  assert.ok(!docs['private/gpsDriverRemovals']);
+});
+
+test('Remove drivers: Delete removes only the exact matches by Fleet Id, checks they are gone and keeps a record', async () => {
+  const docs = { 'private/gpsFleet': { fleet: 'united-dairy', user: 'app', password: 'pw' } }, f = removeFleet(docs);
+  const r = (await fleetCall(fakeDb(docs), 'admin.test@uniteddairy.com', { op: 'removeDrivers', usernames: 'bable\nazee\natwin\nghost', confirm: true }, f.opts)).removed;
+  assert.equal(r.done, true);
+  assert.deepEqual([...f.deleted].sort(), ['D1', 'D2']);
+  assert.deepEqual(r.deleted.map(x => x.username), ['bable', 'azee']);
+  assert.deepEqual(r.notDeleted, []);
+  const saved = f.log.find(x => x.method === 'POST' && x.url.startsWith('/templates') && /UDPO_DriverRemove/.test(x.body)).body;
+  assert.match(saved, /TableID = Driver-1\.0/);
+  assert.match(saved, /Intent = Delete/);
+  assert.match(saved, /Id = Input\.Id/);
+  assert.equal(f.log.find(x => /template=UDPO_DriverRemove/.test(x.url)).body, 'Id\r\nD1\r\nD2\r\n');
+  assert.deepEqual(docs['private/gpsDriverRemovals'].last.deleted.map(x => x.id), ['D1', 'D2']);
+  assert.equal(docs['private/gpsDriverRemovals'].last.by, 'admin.test@uniteddairy.com');
+});
+
+test('Remove drivers: nothing matched deletes nothing', async () => {
+  const docs = { 'private/gpsFleet': { fleet: 'united-dairy', user: 'app', password: 'pw' } }, f = removeFleet(docs);
+  await assert.rejects(fleetCall(fakeDb(docs), 'a@b', { op: 'removeDrivers', usernames: 'ghost', confirm: true }, f.opts), /nothing was deleted/);
+  assert.equal(f.deleted.size, 0);
+});
