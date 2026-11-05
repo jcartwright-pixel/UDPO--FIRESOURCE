@@ -1830,7 +1830,8 @@ The plant floor tablets. Each one is opened once with its **Station code** (`OPE
 - The station's screens work the same as the office screens of the same name. See [Loading](#loadout) and [Unloading](#unloading).
 - `SKIP` on a load moves it down one place. One load can be skipped only 2 times in a row; then `SKIP` is grey and tapping it says to load it next.
 - A station has no Home, Sign out or menu. Nothing on it opens any other screen of the app, and an address typed into the tablet comes straight back to the station.
-- **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the tablet has no signal.
+- **Last refreshed** at the top says the last time this screen heard from the server (date and time). The tablet checks every minute by itself, so it moves every minute; nothing needs pressing. If it stays old, the tablet has no signal.
+- **NO CASE LOADS TODAY** shows only once the tablet has heard from the server. Until then the list says **Reading today's loads**, and after half a minute a red **STILL WAITING FOR TODAY'S LOADS** line. The tablet keeps trying by itself; if the red line stays, check the tablet's internet.
 
 ### Case Unloading tablet
 
