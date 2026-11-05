@@ -822,8 +822,8 @@ const status = (d, h) => ({ history: h ? { done: h.done || 0, total: h.total || 
  */
 const PROBE_WORDS = /temp|reefer|cargo|therm|refrig|sensor|probe|zone|setpoint|set point/i, PROBE_PLAIN_MINUTES = 10, PROBE_TEMP_MINUTES = 15, PROBE_BUDGET_MS = 105000, PROBE_ROWS = 25, PROBE_BATCH = 40, PROBE_BATCH_STOP_MS = 80000, PROBE_RESUME_MINUTES = 60;
 const PROBE_FALLBACK = ['RefrigerationTemp', 'RefrigerationTemp2', 'CargoAirTemp'];
-async function saveProbeTemplate(d, o, token, name, table, user, filter, output) {
-  const base = baseOf(d, o), lines = ['[Template]', 'TemplateVersion = 1.0', 'TableID = ' + table, 'TemplateName = ' + name, 'Intent = Retrieve', ''];
+async function saveProbeTemplate(d, o, token, name, table, user, filter, output, intent) {
+  const base = baseOf(d, o), lines = ['[Template]', 'TemplateVersion = 1.0', 'TableID = ' + table, 'TemplateName = ' + name, 'Intent = ' + (intent || 'Retrieve'), ''];
   if (user.length) lines.push('[User]', ...user, '');
   if (filter.length) lines.push('[Filter]', ...filter, '');
   lines.push('[Output]', ...output, '');
@@ -959,11 +959,65 @@ async function driverList(d, o) {
   const day = (v) => { const iso = utcIso(v); return iso ? iso.slice(0, 10) : ''; };
   const drivers = rows.drivers.map(r => {
     const u = (r.UserId && byId[r.UserId]) || byDriver[r.Id] || {};
-    return { employeeNo: r.EmployeeNo || '', lastName: r.Surname || '', firstName: r.FirstName || '', middleName: r.MiddleName || '', nickname: r.Nickname || '',
+    return { id: r.Id || '', employeeNo: r.EmployeeNo || '', lastName: r.Surname || '', firstName: r.FirstName || '', middleName: r.MiddleName || '', nickname: r.Nickname || '',
       depot: r.Depot || '', username: cleanUser(u.Username || '', d.fleet), loginName: u.FullName || '', loginDisabled: yes(u.Disabled), lastLogin: utcIso(u.LastLogin),
       hireDate: day(r.HireDate), leaveDate: day(r.LeaveDate) };
   }).sort((a, b) => (a.lastName + ' ' + a.firstName).localeCompare(b.lastName + ' ' + b.firstName));
   return { at: o.now().toISOString(), count: drivers.length, withUsername: drivers.filter(x => x.username).length, drivers };
+}
+
+/*
+ * Joe 11-5-26 ("let's delete them from Verizon"): GPS Setup's Remove drivers from Verizon. Fleet's API cannot switch a driver
+ * off, only delete them, and Verizon says a deleted driver cannot be brought back, so it takes two presses:
+ *   Check  (confirm false): which Fleet drivers the typed usernames are. Nothing changes.
+ *   Delete (confirm true):  deletes exactly those drivers (Driver table, Intent = Delete, by Fleet's own driver Id), then
+ *                           reads the drivers again to show which are gone.
+ * A username that fits no driver, or more than one, is never deleted. What was deleted, when and by whom is kept in
+ * private/gpsDriverRemovals (no screen can read it) so there is a record.
+ */
+const REMOVE_MAX = 150;
+const REMOVE_TEMPLATE = 'UDPO_DriverRemove';
+function removeNames(list) {
+  const out = [];
+  (Array.isArray(list) ? list : String(list || '').split(/[\s,;]+/)).forEach(v => {
+    const u = String(v || '').trim().toLowerCase().replace(/^[^:\s]+:/, '').slice(0, 80);
+    if (u && out.indexOf(u) < 0) out.push(u);
+  });
+  if (!out.length) throw new FleetError('BAD_REQUEST', 'Type the Verizon usernames to remove first.');
+  if (out.length > REMOVE_MAX) throw new FleetError('BAD_REQUEST', 'At most ' + REMOVE_MAX + ' usernames at a time.');
+  return out;
+}
+function removeMatch(names, drivers) {
+  const low = (v) => String(v || '').trim().toLowerCase();
+  const matched = [], notFound = [], several = [];
+  names.forEach(u => {
+    let hits = drivers.filter(x => x.id && low(x.username) === u);
+    if (!hits.length) hits = drivers.filter(x => x.id && !x.username && low(x.nickname) === u);
+    if (!hits.length) notFound.push(u);
+    else if (hits.length > 1) several.push({ username: u, count: hits.length });
+    else { const x = hits[0]; matched.push({ username: u, id: x.id, name: [x.firstName, x.lastName].filter(Boolean).join(' ') || x.nickname || u, employeeNo: x.employeeNo }); }
+  });
+  return { matched, notFound, several };
+}
+async function removeDrivers(db, d, o, email, input) {
+  const names = removeNames(input.usernames);
+  const ref = o.ref, list = await driverList(d, o);
+  const check = removeMatch(names, list.drivers);
+  if (input.confirm !== true) return Object.assign({ at: o.now().toISOString(), done: false }, check);
+  if (!check.matched.length) throw new FleetError('BAD_REQUEST', 'None of those usernames is a driver in Verizon; nothing was deleted.');
+  const token = await key(ref, d, o, false), base = baseOf(d, o);
+  await saveProbeTemplate(d, o, token, REMOVE_TEMPLATE, 'Driver-1.0', [], [], ['Id = Input.Id'], 'Delete');
+  const body = ['Id'].concat(check.matched.map(m => m.id)).join('\r\n') + '\r\n';
+  const res = await o.fetch(base + '/execute?template=' + REMOVE_TEMPLATE + '&auth=' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'text/csv', Accept: 'application/json, text/plain' }, body });
+  const answer = await text(res);
+  if (res.status >= 300) throw new FleetError('RUN', 'Verizon Fleet answered ' + res.status + ' to the delete; check below which drivers are still there. ' + short(answer));
+  let counts = {};
+  try { const j = JSON.parse(answer); counts = { deleted: j.Deleted != null ? j.Deleted : j.deleted, failed: j.Failed != null ? j.Failed : j.failed }; } catch (e) { counts = {}; }
+  const after = await driverList(d, o), still = new Set(after.drivers.map(x => String(x.id)));
+  const gone = check.matched.filter(m => !still.has(String(m.id))), left = check.matched.filter(m => still.has(String(m.id)));
+  const at = o.now().toISOString();
+  await db.collection('private').doc('gpsDriverRemovals').set({ last: { at, by: email, deleted: gone, notDeleted: left, notFound: check.notFound, several: check.several, verizon: counts } }, { merge: true });
+  return { at, done: true, deleted: gone, notDeleted: left, notFound: check.notFound, several: check.several, verizon: counts, answer: short(answer) };
 }
 
 /* The GPS Setup screen's Fleet box. input.op: status | save {fleet, user, password} | clear | test | pull | probe {tag} | trips {tag, date} | drivers (every driver and their Fleet login, read only, nothing kept). The caller has
@@ -1027,6 +1081,7 @@ async function fleetCall(db, email, input, options) {
     const trips = await require('./fleettrips').tripCheck(db, { tag: input.tag, date: input.date }, options);
     return Object.assign(status((await ref.get()).data() || {}, await hist()), { coverage: await coverage(db, o.now()), probe: (await db.collection('private').doc('gpsProbe').get()).data() || null, trips });
   }
+  if (op === 'removeDrivers') return Object.assign(status(d, await hist()), { removed: await removeDrivers(db, d, Object.assign({}, o, { ref }), email, input) });
   if (op === 'drivers') return Object.assign(status(d, await hist()), { driverList: await driverList(d, Object.assign({}, o, { ref })) });
   if (op === 'pull') {
     const r = await pull(db, options);
@@ -1039,4 +1094,4 @@ async function fleetCall(db, email, input, options) {
 // Shared with fleettrips.js (Joe 11/1: the read-only Trip check).
 const internals = { key, execute, saveProbeTemplate, utcIso, nyDate, nyMidnight, addDays, num, yes, milesApart, fleetTime, withDefaults, short, YARD_MILES };
 
-module.exports = { internals, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES, DRIVER_TEMPLATES };
+module.exports = { internals, removeDrivers, removeNames, removeMatch, atYardPlace, yardSpots, inYard, fleetCall, pull, history, reeferTrips, trailerUnits, runTrucks, purgeReefer, trailerKey, REEFER_MAX_DAYS, REEFER_KEEP_DAYS, REEFER_MOVING_MPH, dtc, daySummary, weekDays, parseCsv, advanceDays, alertType, utcIso, cleanUser, FleetError, TEMPLATES, DRIVER_TEMPLATES };
