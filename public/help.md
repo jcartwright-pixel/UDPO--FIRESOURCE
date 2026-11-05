@@ -776,6 +776,8 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > Crates go 54 cases to a pallet, boxes and dispensers 45, and a tote takes a pallet spot of its own.
 
+> A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
+
 !> Do not count on another computer seeing your routes: the builder keeps saved routes on the computer and browser you made them on. Press `Copy plan` to share one.
 ## Unloading (Case, Tote, Boxing and Tanker)
 id: unloading
