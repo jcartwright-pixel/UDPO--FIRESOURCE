@@ -766,11 +766,12 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
 3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
 4. Read **Route totals and load plan**: the cases by size and the cases and pallets for each stop.
-5. Look at the **Truck load map** below **Load sequences on this route**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence. Load sequence 1 loads first, at the front, and the rest follow toward the back door. Odd pallets go on the left and even pallets on the right. The table under it lists each stop's run sequence, load sequence, customer, cases and a note. A note you type is kept with that stop.
+5. Look at the **Truck load map** below **Load sequences on this route**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence, with a label under each pallet such as **Pallet 1 · Seq 3 · 40 cs**. Sequence 0 (or a stop with no sequence) goes side to side across the front and loads first. Then odd load sequences fill the left side and even ones the right side, each from the front toward the back door. The table under it lists each stop's run sequence, load sequence, customer, cases and a note. A note you type is kept with that stop.
 6. To change the run order, drag a stop's row up or down in the table.
-7. To change a stop's load sequence, type a new number in its **Load seq** box. Stops with the same load sequence are merged and share pallets.
-8. To merge stops, tick them and press `Merge checked stops`. `Load seq = run order` gives every stop the load sequence of its place in the run, and `Back to BOL load seq` puts back the sequences from the bill of lading.
-9. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
+7. To change a stop's load sequence, type a new number in its **Load seq** box. Stops with the same load sequence are merged and share pallets. You can type 0 to put a stop across the front.
+8. To move a stop to the other side, pick **Left**, **Right** or **Across front** in its **Side** box. **Auto** puts it back on its odd or even side.
+9. To merge stops, tick them and press `Merge checked stops`. `Load seq = run order` gives every stop the load sequence of its place in the run, and `Back to BOL load seq` puts back the sequences from the bill of lading.
+10. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).

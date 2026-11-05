@@ -130,6 +130,7 @@ details summary{cursor:pointer;font-weight:600}
 #lmTable input.lseq{width:4em;text-align:center;font-weight:700;color:#14232f;border:0}
 #lmTable input.lnote{width:100%;min-width:8em}
 #lmTable td.cn{font-weight:600}
+.truck .plab{color:#e6edf3;font-size:.72rem;text-align:center;font-family:var(--f-display);letter-spacing:.03em;padding:1px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 details.items{display:flex;flex-direction:column;gap:8px}
 details.items>summary,#palDetail>summary,#sizeWrap>summary{font-weight:500;color:var(--muted);font-size:.9rem;padding:2px 0}
@@ -185,7 +186,7 @@ details.items[open]>summary{margin-bottom:8px}
   </section>
 
   <section class="panel day" aria-label="Truck load map">
-    <div class="panel-head"><h2>Truck load map</h2><span class="hint">Drag a customer up or down to change the run sequence. Type a load sequence in its box; give two stops the same number to merge them onto the same pallets. Each spot is one stack.</span></div>
+    <div class="panel-head"><h2>Truck load map</h2><span class="hint">Drag a customer up or down to change the run sequence. Type a load sequence in its box; give two stops the same number to merge them onto the same pallets. Odd sequences load on the left and even on the right; sequence 0 goes side to side across the front. Use Side to move one. Each spot is one stack.</span></div>
     <div class="lm">
       <div class="lm-left"><div class="truck" id="truck"></div><div class="lm-legend" id="lmLegend"></div></div>
       <div class="lm-right">
@@ -249,7 +250,7 @@ function routeKey(r){
   const day = WD[new Date(y, +d[1]-1, +d[2]).getDay()], key = m[1] + '|' + day;
   return {route:m[1], day, key, list:SEQS[key] || []};
 }
-const stopSeq = st => { if (st.seq != null && st.seq !== '') return +st.seq || null; const m = /\(sub-rt (\d+)\)/i.exec(st.name || ''); return m ? +m[1] : null; }; // st.seq is set from the load map; otherwise the BOL sub-rt
+const stopSeq = st => { if (st.seq != null && st.seq !== '' && !isNaN(+st.seq)) return +st.seq; const m = /\(sub-rt (\d+)\)/i.exec(st.name || ''); return m ? +m[1] : null; }; // st.seq is set from the load map; otherwise the BOL sub-rt
 const stopCases = st => orderCases(st).groups.filter(x => !x.special).reduce((a,x)=>a+x.cases,0);
 let PICK = new Set();
 function seqLine(st, rk){
@@ -344,29 +345,52 @@ const SEQ_COLORS = ['#9fd3a8','#f4a3c4','#d9a6e6','#f7b38f','#86d0c8','#e9ef9e',
 const seqColor = n => SEQ_COLORS[(Math.abs(+n || 0)) % SEQ_COLORS.length];
 const lmLabel = i => { const n = stopSeq(S.stops[i]); return n ? String(n) : '#' + (i + 1); };
 let DRAG = null; const LMPICK = new Set();
+function palFirst(pl){ return [...pl.stops].sort((a, c) => a - c)[0]; }
+// Joe's truck layout: sequence 0 (sub-rt 00, or no sequence) goes side to side across the front first.
+// Then odd load sequences fill the left side and even ones the right, each front to back. A stop's Side setting overrides that.
+function palLayout(R){
+  const out = R.pallets.map(pl => { const st = S.stops[palFirst(pl)], n = stopSeq(st), ov = st.side;
+    return {lane: ov === 'L' || ov === 'R' || ov === 'F' ? ov : (n == null || n === 0 ? 'F' : (n % 2 ? 'L' : 'R'))}; });
+  let f = 0; out.forEach(o => { if (o.lane === 'F') { o.side = f % 2 ? 'R' : 'L'; o.row = Math.floor(f / 2); f++; } });
+  const base = Math.ceil(f / 2), used = {L: 0, R: 0};
+  out.forEach(o => { if (o.lane !== 'F') { o.side = o.lane; o.row = base + used[o.lane]++; } });
+  return out;
+}
 function renderMap(R){
   const t = $('truck'); if (!t) return;
-  const blocks = Math.max(4, Math.ceil(R.pallets.length / 2));
-  const cells = Array.from({length: blocks * 3}, () => [null, null, null, 'gap', null, null, null]);
-  R.pallets.forEach((pl, k) => {
-    const side = k % 2, b = Math.floor(k / 2), first = [...pl.stops].sort((a, c) => a - c)[0];
+  const lay = R.lay || palLayout(R);
+  const blocks = Math.max(4, ...lay.map(o => o.row + 1));
+  const grid = Array.from({length: blocks}, () => ({L: null, R: null}));
+  R.pallets.forEach((pl, k) => { grid[lay[k].row][lay[k].side] = k; });
+  const block = (k) => {
+    if (k == null) return {cells: Array(9).fill('<i class="e"></i>'), label: ''};
+    const pl = R.pallets[k], first = palFirst(pl), n = stopSeq(S.stops[first]);
     const lab = pl.tote ? 'T' : lmLabel(first), used = pl.tote ? 9 : Math.max(1, Math.min(9, Math.ceil(pl.fill * 9 - 1e-9)));
-    for (let j = 0; j < 9; j++) { const r = b * 3 + Math.floor(j / 3), c = side * 4 + (j % 3); cells[r][c] = j < used ? {lab, n: stopSeq(S.stops[first]) || first + 1, k} : {empty: true, k}; }
+    const cases = pl.items.reduce((a, it) => a + it.cases, 0), col = seqColor(n ? n : 5 + first);
+    return {cells: Array.from({length: 9}, (_, j) => j < used ? `<i style="background:${col}" title="Pallet ${k + 1} · load seq ${esc(lab)}">${esc(lab)}</i>` : `<i class="e" title="Pallet ${k + 1}"></i>`),
+      label: `Pallet ${k + 1} · Seq ${n == null ? '–' : esc(String(n))} · ${pl.tote ? 'tote' : cases + ' cs'}`};
+  };
+  let html = '<div class="tend">Front</div>';
+  grid.forEach(r => {
+    const a = block(r.L), b = block(r.R);
+    for (let row = 0; row < 3; row++) html += a.cells.slice(row * 3, row * 3 + 3).join('') + '<span class="gap"></span>' + b.cells.slice(row * 3, row * 3 + 3).join('');
+    html += `<span class="plab" style="grid-column:1/4">${a.label}</span><span class="plab" style="grid-column:5/8">${b.label}</span>`;
   });
-  t.innerHTML = '<div class="tend">Front</div>' + cells.map(row => row.map(c => c === 'gap' ? '<span class="gap"></span>'
-    : !c || c.empty ? `<i class="e"${c ? ` title="Pallet ${c.k + 1}"` : ''}></i>` : `<i style="background:${seqColor(c.n)}" title="Pallet ${c.k + 1} · load seq ${esc(c.lab)}">${esc(c.lab)}</i>`).join('')).join('') + '<div class="tend">Back door</div>';
+  t.innerHTML = html + '<div class="tend">Back door</div>';
   const seen = new Map();
-  S.stops.forEach((st, i) => { const lab = lmLabel(i); if (!seen.has(lab)) seen.set(lab, {lab, n: stopSeq(st) || i + 1, cases: 0, pals: 0}); seen.get(lab).cases += R.stats[i].cases; });
-  R.pallets.forEach(pl => { const f = [...pl.stops].sort((a, c) => a - c)[0]; const s = seen.get(pl.tote ? null : lmLabel(f)); if (s) s.pals++; });
-  $('lmLegend').innerHTML = [...seen.values()].sort((a, b) => a.n - b.n).map(s => `<span style="background:${seqColor(s.n)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
-  $('lmTable').innerHTML = `<thead><tr><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
+  S.stops.forEach((st, i) => { const lab = lmLabel(i); if (!seen.has(lab)) seen.set(lab, {lab, n: stopSeq(st) || 5 + i, o: stopSeq(st) || -1, cases: 0, pals: 0}); seen.get(lab).cases += R.stats[i].cases; });
+  R.pallets.forEach(pl => { const s = seen.get(pl.tote ? null : lmLabel(palFirst(pl))); if (s) s.pals++; });
+  $('lmLegend').innerHTML = [...seen.values()].sort((a, b) => a.o - b.o || a.n - b.n).map(s => `<span style="background:${seqColor(s.n)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
+  const SIDES = [['', 'Auto'], ['L', 'Left'], ['R', 'Right'], ['F', 'Across front']];
+  $('lmTable').innerHTML = `<thead><tr><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
     const n = stopSeq(st);
     return `<tr draggable="true" data-i="${i}"><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
       <td><input type="checkbox" class="lmPick" data-i="${i}" ${LMPICK.has(st.id) ? 'checked' : ''} aria-label="Pick ${esc(st.name || 'order ' + (i + 1))} to merge"></td>
       <td><span class="rs num">${i + 1}</span></td>
-      <td><input class="lseq num" type="number" min="1" step="1" value="${n || ''}" data-i="${i}" style="background:${seqColor(n || i + 1)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
+      <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
       <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}</td>
       <td class="r num">${fmt(R.stats[i].cases)}</td>
+      <td><select class="lside" data-i="${i}" aria-label="Truck side">${SIDES.map(([v, l]) => `<option value="${v}" ${(st.side || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td><input class="lnote" type="text" value="${esc(st.note || '')}" data-i="${i}" placeholder="Note" aria-label="Note"></td></tr>`;
   }).join('')}</tbody>`;
 }
@@ -438,7 +462,7 @@ function plan(){
   const seqKey = i => { const n = stopSeq(S.stops[i]); return n ? 'q' + n : 'o' + i; };
   let lastSeq = null;
   // Load order: lowest load sequence first, at the nose (stops with the same sequence load together, by run order); odd pallets left, even right.
-  const loadOrder = S.stops.map((st, i) => ({i, n: stopSeq(st)})).sort((a, b) => ((a.n || 100000 + a.i) - (b.n || 100000 + b.i)) || a.i - b.i).map(x => x.i);
+  const loadOrder = S.stops.map((st, i) => ({i, n: stopSeq(st)})).sort((a, b) => ((a.n || -1) - (b.n || -1)) || a.i - b.i).map(x => x.i);
   for (const i of loadOrder) {
     const sk = seqKey(i);
     if (sk !== lastSeq && cur) cur = null;
@@ -459,7 +483,7 @@ function plan(){
       }
     }
   }
-  return {pallets, warns, tankers, loose, stats, orders};
+  const res = {pallets, warns, tankers, loose, stats, orders}; res.lay = palLayout(res); return res;
 }
 
 function render(){
@@ -505,7 +529,7 @@ function render(){
 
   $('detail').innerHTML = R.pallets.length ? `<details id="palDetail" ${OPEN_PAL?'open':''}><summary>Pallet by pallet · show items</summary>` + R.pallets.map((pl,k)=>{
     const rows = pl.items.map(it=>`<tr><td class="num">${it.stop+1}</td><td class="desc">${esc(it.x.label)}<small>${esc(it.x.products.map(q=>q.p.desc).join(', '))}</small></td><td><span class="chip ${it.x.special||it.x.type}">${it.x.special||it.x.type}</span></td><td class="r num">${pl.tote?'1 tote':it.cases}</td></tr>`).join('');
-    return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1} · ${k%2?'right':'left'}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
+    return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1} · ${({L:'left',R:'right'})[R.lay[k].side]}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
       <div class="tbl"><table><thead><tr><th>Order</th><th>Size</th><th>Type</th><th class="r">Cases</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('') + '</details>' : '';
   save(); window._R = R; renderDay(); renderSeqs(); renderMap(R);
@@ -578,7 +602,8 @@ document.addEventListener('change', e => {
   if (t.id==='split'){ S.split=t.checked; render(); }
   else if (t.id==='routePick'){ useRoute(+t.value); }
   else if (t.classList.contains('qty')){ refreshSizes(); }
-  else if (t.classList.contains('lseq')){ const st=S.stops[+t.dataset.i]; const v=parseInt(t.value); st.seq = v>0 ? v : null; S.sample=false; all(); }
+  else if (t.classList.contains('lseq')){ const st=S.stops[+t.dataset.i]; const v=parseInt(t.value); st.seq = v>=0 ? v : null; S.sample=false; all(); }
+  else if (t.classList.contains('lside')){ const st=S.stops[+t.dataset.i]; st.side = t.value || undefined; if (!st.side) delete st.side; all(); }
   else if (t.classList.contains('lmPick')){ const st=S.stops[+t.dataset.i]; if (t.checked) LMPICK.add(st.id); else LMPICK.delete(st.id); }
   else if (t.classList.contains('seqPick')){ const n=+t.dataset.n; if (t.checked) PICK.add(n); else PICK.delete(n); renderSeqs(); }
 });
