@@ -2,7 +2,8 @@
  * Keys & Connections in the hub (Joe: "move that code that has the secrets in it ... I don't want to have to redo everything").
  * The sign-ins Plant & Distribution already uses, kept exactly where they are (Firestore private/gpsFleet, private/redzone,
  * private/mocreo, private/sms) and changed through Operations' own server calls (gps with kind fleet, redzone, mocreo, sms:
- * status, save, clear, test). Nothing is moved, copied or set up again. A saved key never comes back to the browser: the calls
+ * status, save, clear, test). The PC Miler key (Joe 11-5-26) is kept in private/pcmiler and changed through the Route
+ * Estimator's own call (routeEstimator with area key: status, save, clear, test), in the same way. Nothing is moved, copied or set up again. A saved key never comes back to the browser: the calls
  * answer only whether it is saved (and, for some, its last four letters), and a box left empty keeps what is saved.
  */
 import { callServer, escapeHtml as e, showError, serverText, shortDate, setAdmin } from './shell.js';
@@ -23,7 +24,10 @@ export const KEYS = [
     saved: (s) => [['API key', s.hasKey && (s.keyEnds ? 'ends in ' + s.keyEnds : true)], ['Asset ID', s.hasAsset && (s.assetEnds ? 'ends in ' + s.assetEnds : true)]] },
   { key: 'sms', call: 'sms', name: 'Twilio texts', what: 'The drivers\' schedule and load done texts go out through this Twilio account.',
     fields: [['accountSid', 'Account SID (starts with AC)', false], ['authToken', 'Auth token', true], ['fromNumber', 'Twilio phone number', false]],
-    saved: (s) => [['Account SID', s.hasSid], ['Auth token', s.hasToken], ['Phone number', s.from || '']] }
+    saved: (s) => [['Account SID', s.hasSid], ['Auth token', s.hasToken], ['Phone number', s.from || '']] },
+  { key: 'pcmiler', call: 'routeEstimator', extra: { area: 'key' }, name: 'PC Miler (Trimble)', what: 'Route & Trip Costs gets truck miles, drive time, tolls and address suggestions from PC Miler with this key. Test Connection looks up the Uniontown plant and routes a truck to Martins Ferry.',
+    fields: [['apiKey', 'API key', true]],
+    saved: (s) => [['API key', s.hasKey && (s.keyEnds ? 'ends in ' + s.keyEnds : true)]] }
 ];
 let got = {};
 
