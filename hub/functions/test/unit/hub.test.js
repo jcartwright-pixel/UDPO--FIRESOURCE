@@ -16,20 +16,23 @@ const db = fakeDb({
 });
 const keys = (r) => r.tiles.map(t => t.key);
 
-test('an administrator sees all four apps, live addresses on the live project', async () => {
+test('an administrator sees all five apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms']);
+  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms', 'routes']);
   assert.equal(r.admin, true);
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/');
   assert.equal(r.tiles[1].url, 'https://ud-distribution-customers.web.app/');
   assert.equal(r.tiles[2].url, 'https://ud-distribution-fuel.web.app/');
   assert.equal(r.tiles[3].url, 'https://udms-bfccd.web.app/');
+  assert.equal(r.tiles[4].url, 'https://ud-distribution-routes.web.app/');
+  assert.equal(r.tiles[4].name, 'Route & Trip Costs');
 });
 
 test('the practice copy links to the practice copies', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, {}, { project: 'ud-distribution-sandbox' });
   assert.equal(r.tiles[0].url, 'https://ud-distribution-sandbox.web.app/');
   assert.equal(r.tiles[2].url, 'https://ud-distribution-sandbox-fuel.web.app/');
+  assert.equal(r.tiles[4].url, 'https://ud-distribution-sandbox-routes.web.app/');
 });
 
 test('someone who is not an administrator sees Operations and the Customer List only', async () => {
@@ -69,7 +72,7 @@ test('People & Access shows the same apps as the tiles', async () => {
   for (const p of people) {
     const tiles = H.apps('ud-distribution').filter(a => a.may(p)).map(a => a.name);
     assert.deepEqual(appsFor(p), tiles, JSON.stringify(p));
-    for (const ticks of [null, [], ['fuel'], ['customers', 'udms'], ['operations', 'customers', 'fuel', 'udms']]) {
+    for (const ticks of [null, [], ['fuel'], ['customers', 'udms'], ['routes'], ['operations', 'customers', 'fuel', 'udms', 'routes']]) {
       assert.deepEqual(appsFor(p, ticks), H.appsOf(p, ticks).map(k => names[k]), JSON.stringify([p, ticks]));
     }
   }

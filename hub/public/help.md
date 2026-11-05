@@ -17,12 +17,13 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Customers & Routes** (the Customer List): every customer, delivery route and day, the route book and truck load maps.
 - **Fuel Tracking** (the Fuel app): monthly fuel use, fuel prices, tank deliveries and trip fuel.
 - **Employees & Compliance** (UDMS): employee records, driver qualification, accidents, workers' comp and hiring.
+- **Route & Trip Costs** (the Route Estimator): the round-trip cost of a delivery or plant transfer, with PC Miler truck miles and tolls.
 
 ### Which cards you see
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
-- **Fuel Tracking** and **Employees & Compliance**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
+- **Fuel Tracking**, **Employees & Compliance** and **Route & Trip Costs**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO and Twilio.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -33,7 +34,7 @@ screens: people.html
 **People & Access** is the one place for who can sign in to the United Dairy apps and what they can see and do in each: their role, their plants, which apps they can open, their screens and their single rights. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
-2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
+2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance, Route & Trip Costs), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
 3. Press a person's name. Their page opens on the whole screen, in three columns: **Who they are** (with their apps and **What they can do in each app**), **What they see in Plant & Distribution**, and **Single rights**. `← Everyone` (or the browser's Back) returns to the list.
 4. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**. **Apps they can open** has the same tick boxes, saved with `Save`.
 5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
@@ -50,7 +51,7 @@ screens: people.html
 
 > Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
-> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking and Employees & Compliance.
+> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking, Employees & Compliance and Route & Trip Costs.
 
 > **Sales** is the role for salespeople: they see routes and customer pickups. The Sales app on their phone opens for any United Dairy account, so there is nothing to tick for it.
 
@@ -173,10 +174,10 @@ screens: plant-setup.html
 id: keys
 screens: keys.html
 
-**Keys & Connections** holds the sign-ins Plant & Distribution uses to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts**. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
+**Keys & Connections** holds the sign-ins the apps use to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts** for Plant & Distribution, and **PC Miler (Trimble)** for Route & Trip Costs. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
 
 1. Each card says what the sign-in is for, what is saved, and how its last test went.
-2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong.
+2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong. For PC Miler, the test looks up the Uniontown plant and routes a truck to Martins Ferry.
 3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
 4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
 5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
@@ -191,7 +192,7 @@ screens: keys.html
 
 !> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
 
-!> Do not press `Remove key` to test something. The trucks, products, thermometers or texts stop until the key is saved again.
+!> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or PC Miler miles and tolls stop until the key is saved again.
 
 ## Help
 id: help
