@@ -92,6 +92,11 @@ td.r,th.r{text-align:right}
 .bar i{display:block;height:100%;background:var(--accent)}
 .pal .st{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pal.tote{background:var(--accent-soft)}
+.stk{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.stk i{font-style:normal;display:flex;align-items:center;justify-content:center;aspect-ratio:1.6/1;border:1px dashed var(--line);border-radius:3px;font-family:var(--f-display);font-weight:700;font-size:1.05rem;color:var(--muted)}
+.stk i.on{border:1px solid var(--ink);background:var(--accent-soft);color:var(--ink)}
+.pal.tote .stk i.on{background:var(--panel)}
+.trailer{column-gap:18px}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.8rem;color:var(--muted)}
 .detail{display:flex;flex-direction:column;gap:10px}
 .pd{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
@@ -107,6 +112,11 @@ details summary{cursor:pointer;font-weight:600}
 .sizes .row b{font-family:var(--f-mono);font-weight:500}
 .sizes .tot{border-top:1px solid var(--line);padding-top:4px;font-weight:600}
 .part{color:var(--muted);font-size:.78rem}
+details.items{display:flex;flex-direction:column;gap:8px}
+details.items>summary,#palDetail>summary,#sizeWrap>summary{font-weight:500;color:var(--muted);font-size:.9rem;padding:2px 0}
+details.items[open]>summary{margin-bottom:8px}
+#palDetail{display:flex;flex-direction:column;gap:10px}
+#palDetail[open]>summary{margin-bottom:10px}
 .day{margin-bottom:16px}
 .dayscroll{max-height:420px;overflow:auto}
 #dayTable tr.cur td{background:var(--bg);font-weight:600}
@@ -182,7 +192,7 @@ details summary{cursor:pointer;font-weight:600}
       <div class="tiles" id="tiles"></div>
       <div class="outrow" id="outRow"></div>
       <div class="warns" id="warns"></div>
-      <div class="tbl"><table id="sizeTable"></table></div>
+      <details id="sizeWrap"><summary>Cases by size for the whole route</summary><div class="tbl"><table id="sizeTable"></table></div></details>
       <div class="tbl"><table id="stopTable"></table></div>
       <div class="legend"><span><span class="chip Crate">Crate</span> 54 per pallet</span><span><span class="chip Box">Box</span> 45</span><span><span class="chip Dispenser">Dispenser</span> 45</span><span><span class="chip Tote">Tote</span> 1 spot</span></div>
       <div class="trailer" id="trailer"></div>
@@ -299,6 +309,8 @@ function orderCases(st){
   return {groups, other};
 }
 
+const OPEN = new Set(); let OPEN_PAL = false, OPEN_SIZE = false; // item breakdowns start hidden (Joe)
+document.addEventListener('toggle', e => { const d = e.target; if (!(d instanceof HTMLDetailsElement)) return; if (d.dataset.open) { if (d.open) OPEN.add(d.dataset.open); else OPEN.delete(d.dataset.open); } else if (d.id === 'palDetail') OPEN_PAL = d.open; else if (d.id === 'sizeWrap') OPEN_SIZE = d.open; }, true);
 function renderStops(){
   $('sampleTag').hidden = !S.sample;
   $('route').value = S.route; $('spots').value = S.spots || ''; $('split').checked = !!S.split;
@@ -322,12 +334,14 @@ function renderStops(){
         <button class="ghost down" data-s="${i}" ${i===S.stops.length-1?'disabled':''} aria-label="Move order later">Later</button>
         <button class="ghost rmstop" data-s="${i}">Delete order</button></div>
       ${seqLine(st, rk)}
+      <details class="items" data-open="${st.id}" ${OPEN.has(st.id) || !st.lines.length ? 'open' : ''}><summary>${st.lines.length ? `<b class="num">${fmt(totCases)}</b> cases · ${st.lines.length} product${st.lines.length===1?'':'s'} · show items` : 'Add products'}</summary>
       ${st.lines.length ? `<div class="tbl"><table><thead><tr><th>ID</th><th>Product</th><th>Type</th><th class="r">Units</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="hint">No products yet. Pick one below or paste the order.</p>`}
       <div class="addline"><input class="prod" list="plist" placeholder="Product ID or name" data-s="${i}" id="prod-${st.id}" aria-label="Product for order ${i+1}">
         <input type="number" min="1" step="1" value="1" class="addqty" data-s="${i}" id="qty-${st.id}" aria-label="Amount">
         <select class="addunit" id="unit-${st.id}" aria-label="Units or full cases"><option value="u">units</option><option value="c">full cases</option></select>
         <button class="addp" data-s="${i}">Add</button></div>
       ${sizeRows ? `<div class="sizes">${sizeRows}<div class="row tot"><span>Order ${i+1} case count</span><span><b>${fmt(totCases)}</b> cases</span></div></div>` : ''}
+      </details>
     </div>`;
   }).join('');
   $('pasteStop').innerHTML = `<option value="route">A new route, split into orders</option>` + S.stops.map((st, i) => `<option value="${i}">Order ${i+1}: ${esc(st.name || 'unnamed')}</option>`).join('');
@@ -411,17 +425,21 @@ function render(){
 
   const cells = R.pallets.map((pl, k) => {
     const stops = [...pl.stops].sort((a,b)=>a-b); const cases = pl.items.reduce((a,it)=>a+it.cases,0);
-    return `<div class="pal ${pl.tote?'tote':''}"><div class="ph"><span>P${k+1}</span><span class="num">${pl.tote?'Tote':cases+' cs'}</span></div>
-      <div class="bar"><i style="width:${Math.min(100,Math.round(pl.fill*100))}%"></i></div>
+    // Route book style: each pallet is a 3 x 3 block of stacks, and each stack shows its load sequence number.
+    const sq = stopSeq(S.stops[stops[0]]); const lab = pl.tote ? 'T' : (sq ? String(sq) : '#' + (stops[0] + 1));
+    const used = pl.tote ? 9 : Math.max(1, Math.min(9, Math.ceil(pl.fill * 9 - 1e-9)));
+    const stk = Array.from({length:9}, (_, j) => `<i class="${j < used ? 'on' : ''}">${j < used ? lab : ''}</i>`).join('');
+    return `<div class="pal ${pl.tote?'tote':''}" title="Pallet ${k+1}: ${pl.tote?'tote':cases+' cases'}, order ${stops.map(s=>s+1).join(', ')}"><div class="stk">${stk}</div>
+      <div class="ph"><span>P${k+1}${sq ? ` · seq ${sq}` : ''}</span><span class="num">${pl.tote?'Tote':cases+' cs'}</span></div>
       <div class="st">Order ${stops.map(s=>s+1).join(', ')}</div></div>`;
   }).join('');
-  $('trailer').innerHTML = `<div class="end">Nose · loaded first</div><div class="side">Left · odd pallets</div><div class="side">Right · even pallets</div>${cells || '<p class="hint" style="grid-column:1/-1">Add products to an order to see pallets.</p>'}<div class="end">Doors · loaded last</div>`;
+  $('trailer').innerHTML = `<div class="end">Front · nose · loaded first</div><div class="side">Left · odd pallets</div><div class="side">Right · even pallets</div>${cells || '<p class="hint" style="grid-column:1/-1">Add products to an order to see pallets.</p>'}<div class="end">Doors · loaded last</div>`;
 
-  $('detail').innerHTML = R.pallets.length ? `<h3>Pallet by pallet</h3>` + R.pallets.map((pl,k)=>{
+  $('detail').innerHTML = R.pallets.length ? `<details id="palDetail" ${OPEN_PAL?'open':''}><summary>Pallet by pallet · show items</summary>` + R.pallets.map((pl,k)=>{
     const rows = pl.items.map(it=>`<tr><td class="num">${it.stop+1}</td><td class="desc">${esc(it.x.label)}<small>${esc(it.x.products.map(q=>q.p.desc).join(', '))}</small></td><td><span class="chip ${it.x.special||it.x.type}">${it.x.special||it.x.type}</span></td><td class="r num">${pl.tote?'1 tote':it.cases}</td></tr>`).join('');
     return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1} · ${k%2?'right':'left'}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
       <div class="tbl"><table><thead><tr><th>Order</th><th>Size</th><th>Type</th><th class="r">Cases</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-  }).join('') : '';
+  }).join('') + '</details>' : '';
   save(); window._R = R; renderDay(); renderSeqs();
 }
 
