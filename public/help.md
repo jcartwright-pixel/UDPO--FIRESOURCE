@@ -672,12 +672,16 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Loads will be late** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 30 minutes after it leaves: yellow up to 60 minutes, red after that. **Loaded late** works the same way: a load done within 30 minutes of its dispatch time is on time. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
 - The box under the banner is a short recap: how many loads are loaded (for example **19 of 38 loaded**), how many are left, and a bar that fills as they are loaded. Then each loadout the plant has (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout) on its own: how many are loaded and left, its own bar, and under it **On time** or about how far behind that loadout is. Case Loadout also says about when it will be done. Each bar and line is green when on time, yellow up to an hour behind and red past an hour, and the banner at the top takes the same color as the box. It names no routes (they are in the list below) and never shows cases.
+- Right under the recap box is the **Downtime** line. With no breakdowns it says **NO DOWNTIME** in green. Each breakdown still open, or fixed since the last report, gets one short line in red: how long the plant was down, what broke and what was wrong (for example **DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED**), then **BACK UP** with the time, **STILL DOWN SINCE** the time it went down, or **RUNNING, BEING WATCHED** for one on Monitor. The times come from **Down at** and **Back up at** on Shift Notes.
+- Lower down, **Plant breakdowns** lists the ones still open with their names in red, or **NONE OPEN** in green.
 - "About how far behind" goes by the trucks still to leave that will leave late, not by one load that is already long overdue. Only Case loads have an estimate; Boxing, Tote and Tanker are behind only when one of their trucks should already have left.
 - **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are still listed in the Routes list and counted in "X of Y loaded", but never marked late, behind or loaded late, and the forecast box leaves them out. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
 
 > One late route does not make the whole plant late: the recap goes by the trucks still to leave. Each late route is still red in the list below.
 
 !> Do not send the report twice for one shift. Use Send Test to Me to check it first.
+
+!> Do not leave **Back up at** empty on Shift Notes once a machine runs again, or the report keeps counting the downtime.
 
 ## Plant Departments
 id: plant
