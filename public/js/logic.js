@@ -1580,7 +1580,7 @@
   // overview, Administration, the stations) is not decided by these ticks.
   var SCREEN_AREAS = [
     { key: 'plant', name: 'Plant Distribution', home: 'manager.html', screens: [
-      ['manager', 'Manager Center', ['manager.html', 'forecast.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']], ['palletBuilder', 'Pallet Builder', ['pallet-builder.html']],
+      ['manager', 'Manager Center', ['manager.html', 'forecast.html']], ['plantDepts', 'Plant Departments', ['plant.html']], ['loadout', 'Loadout Center', ['loadout.html']],
       ['unloading', 'Unloading & Washing', ['unloading.html']], ['returns', 'Product Returns', ['returns.html']], ['washing', 'Truck Washing', ['washing.html']],
       ['trailers', 'Trailer Assignments', ['trailers.html']], ['shiftNotes', 'Shift Notes', ['shiftnotes.html']],
       ['yard', 'Yard Checks', ['yard.html']]] },
@@ -1601,6 +1601,8 @@
       ['jugTrailers', 'Inventory (Plant Material Trailers)', ['jug-trailers.html']]] },
     // Joe 10/31: Debag / Labeling Room, its own Home card (Under Construction, administrators only): the Labeling Room.
     { key: 'debag', name: 'Debag / Labeling Room', home: 'labeling.html', screens: [['labelRoom', 'Labeling Room', ['labeling.html']]] },
+    // Joe 11-5-26: the Pallet Builder, its own card and menu option (was a Plant Distribution screen; same key, so ticks hold).
+    { key: 'pallets', name: 'Pallet Builder', home: 'pallet-builder.html', screens: [['palletBuilder', 'Pallet Builder', ['pallet-builder.html']]] },
     { key: 'pmaint', name: 'Plant Maintenance', home: 'pmaint.html', screens: [
       ['pmCenter', 'Maintenance Center', ['pmaint.html']], ['machinery', 'Machinery', ['machinery.html']], ['pmEquipment', 'Equipment', ['plant-equipment.html']], ['pmWorkOrders', 'Work Orders', ['pmworkorders.html']],
       ['pmSchedule', 'PM Schedule', ['pmschedule.html']], ['maintStation', 'Maintenance Station', ['maint-station.html']],

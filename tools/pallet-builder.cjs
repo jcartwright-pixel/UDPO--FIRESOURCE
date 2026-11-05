@@ -46,7 +46,7 @@ const HEAD = `<!doctype html>
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><span class="eyebrow">Plant Distribution</span><h1>Pallet Builder</h1></div>
+      <div class="title"><span class="eyebrow">Plant Operations</span><h1>Pallet Builder</h1></div>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="view">

@@ -44,7 +44,8 @@
     const dept = (s) => '<a class="hq-main' + bld(s) + '" data-side="' + s.key + '" href="' + s.home + '">' + escapeHtml(s.name) + '</a>' + (s.quick || []).map(q => sub(s, q)).join('') +
       (s.key === 'fleet' || s.key === 'garage' ? '<span class="hq-note" data-note="' + s.key + '" hidden></span>' : '');
     // Joe 10/28: departments with no screens of their own under them sit two to a row, so the card still fits.
-    const solo = (s) => !!s && !(s.quick || []).length && s.key !== 'fleet' && s.key !== 'garage';
+    // Joe 11-5-26: the Pallet Builder sits on its own line under Debag / Labeling Room, not beside it.
+    const solo = (s) => !!s && !(s.quick || []).length && s.key !== 'fleet' && s.key !== 'garage' && s.key !== 'pallets';
     const pairUp = (list) => {
       let html = '';
       for (let i = 0; i < list.length; i++) {

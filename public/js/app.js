@@ -165,8 +165,6 @@ export const MENU = [
   // menu itself stays short: Send Report, this, Shift Notes, Yard Checks and the Scheduler.
   ['Plant Distribution Departments', [['Plant Departments', 'plant.html', 'factory'],
     ['Case Loading', 'loadout.html?area=CASE', 'load', 'Loading'], ['Tote Loading', 'loadout.html?area=TOTES', 'load'], ['Boxing Loading', 'loadout.html?area=BOXING', 'load'], ['Tanker Loading', 'loadout.html?area=TANKER', 'load'], ['Late Forecast', 'forecast.html', 'week'],
-    // Joe 11-4-26: the Pallet Builder in Operations (not the hub): a route's orders into full cases, pallets and a trailer plan.
-    ['Pallet Builder', 'pallet-builder.html', 'load'],
     ['Case Unloading', 'unloading.html?area=CASE', 'unload', 'Unloading'], ['Tote Unloading', 'unloading.html?area=TOTES', 'unload'], ['Boxing Unloading', 'unloading.html?area=BOXING', 'unload'], ['Tanker Unloading', 'unloading.html?area=TANKER', 'unload'],
     ['Truck Washing', 'washing.html', 'wash', 'Washing & Returns'], ['Product Returns', 'returns.html', 'returns'], ['Trailer Assignments', 'trailers.html', 'load']]],
   // Joe 10/25: renamed Plant Distribution Scheduler (the shipping and receiving load calendar).
@@ -197,6 +195,8 @@ export const MENU = [
   ['Inventory', [['On Hand', 'inventory.html', 'day'], ['Milk Products', 'inventory.html?type=milk', 'day'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
   // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
   ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
+  // Joe 11-5-26: the Pallet Builder is its own menu option, under Debag / Labeling Room (it was in Plant Distribution Departments).
+  ['Pallet Builder', [['Pallet Builder', 'pallet-builder.html', 'load']]],
   ['Plant Maintenance', [['Maintenance Center', 'pmaint.html', 'wrench'], ['Equipment', 'plant-equipment.html', 'gear'], ['Machinery', 'machinery.html', 'gear'], ['Work Orders', 'pmworkorders.html', 'wrench'], ['PM Schedule', 'pmschedule.html', 'day'], ['Maintenance Station', 'maint-station.html', 'wrench']]],
   // Joe 10/25 (mock-ups 1 and 3): the plant's crew (loadout and production on one schedule) and, apart, maintenance's mechanics.
   ['Plant Vacations & Schedule', [['Schedule Board', 'crew.html', 'week'], ['Vacations', 'crew.html?view=vacations', 'vacation'], ['Setup', 'crew.html?view=setup', 'gear']]],
@@ -233,6 +233,10 @@ export const SIDES = [
   // way to the fillers) stays in Plant Operations. Plant Material Trailers moved to Inventory, so it has no screens yet: Under
   // Construction, administrators only.
   { key: 'debag', group: 'plantops', name: 'Debag / Labeling Room', home: 'labeling.html', pic: 'box-v1.webp', note: 'Taking the bottles out of their bags and labeling them for the fillers', sections: ['Debag / Labeling Room'], building: true },
+  // Joe 11-5-26 ("in the home screen ... its own menu option, underneath the Debag / Labeling Room"): the Pallet Builder, a route's
+  // orders into full cases, pallets and a trailer plan. Its own line on Home's Plant Operations card and its own menu option, both
+  // right under Debag / Labeling Room; open to everyone.
+  { key: 'pallets', group: 'plantops', name: 'Pallet Builder', home: 'pallet-builder.html', icon: 'load', note: "A route's orders into full cases, pallets and a trailer load plan", sections: ['Pallet Builder'] },
   // Joe 10/25: a line in the menu between the plant's own sides above and Route Distribution and the rest below (sepBefore).
   { key: 'distribution', group: 'routeops', quick: [['Daily Dispatch', 'daily.html'], ['Weekly Dispatch Template', 'weekly.html']], sepBefore: true, name: 'Route Distribution', home: 'distribution.html', pic: 'distribution-truck-v1-560.webp', note: 'Dispatch, weekly schedule, drivers, reports and administration', sections: ['Dispatch', 'Drivers', 'Manager Reports', 'Overall', 'Administration'] },
   { key: 'fleet', group: 'routeops', quick: [['Tractors & Trucks', 'equipment.html?filter=TRUCK'], ['Trailers', 'equipment.html?filter=TRAILER']], name: 'Fleet & Maintenance', home: 'maint.html', pic: 'maintenance-tractor-v1-560.webp', note: 'Equipment, issues, garage work orders and fleet service', sections: ['Equipment'] },

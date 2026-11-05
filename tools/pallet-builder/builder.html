@@ -129,7 +129,7 @@ details summary{cursor:pointer;font-weight:600}
   <header class="top">
     <div>
       <h1>United Dairy Pallet Builder</h1>
-      <p>Enter each order's products in units, stop by stop in delivery order. Each order adds its units up by size and rounds up to full cases, so a route gets a true case count. Pallets hold 54 cases for crates, pints and half pints, 45 for dispensers and boxes, and one spot per tote. The last stop loads at the nose.</p>
+      <p>Enter each order's products in units, stop by stop in delivery order. Each order adds its units up by size and rounds up to full cases, so a route gets a true case count. Pallets hold 54 cases for crates, pints and half pints, 45 for dispensers and boxes, and one spot per tote. Each load sequence gets its own pallets: when a sequence is done, its last pallet stops there, even if it isn't full, and the next sequence starts a new pallet. The last stop loads at the nose.</p>
     </div>
     <div class="controls">
       <label class="f" for="routePick">Saved routes<select id="routePick"></select></label>
@@ -352,7 +352,14 @@ function plan(){
       s.cases += x.cases; s.units += x.units; s.wt += x.wt; s.share += x.cases / x.cpp;
     });
   });
+  // Joe's rule: a load sequence never shares a pallet with the next one. When a sequence is done its pallet stops,
+  // even if partial, and the next sequence starts a new pallet. Orders with no sequence (or sub-rt 00) count as their own.
+  const seqKey = i => { const n = stopSeq(S.stops[i]); return n ? 'q' + n : 'o' + i; };
+  let lastSeq = null;
   for (let i = S.stops.length - 1; i >= 0; i--) {            // last delivery loads first, at the nose
+    const sk = seqKey(i);
+    if (sk !== lastSeq && cur) cur = null;
+    lastSeq = sk;
     if (S.split && cur && cur.fill > 0) cur = null;
     for (const x of orders[i].groups) {
       if (x.special === 'Tote') { for (let k = 0; k < x.units; k++) pallets.push({items:[{stop:i, x, cases:1}], fill:1, wt:0, stops:new Set([i]), tote:true}); cur = null; continue; }
