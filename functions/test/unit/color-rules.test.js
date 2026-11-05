@@ -18,7 +18,7 @@ test('the color set matches the timing rule', () => {
     assert.ok(css.includes(v + ': ' + L.COLORS[k] + ';'), v + ' is ' + L.COLORS[k]));
 });
 
-const OLD = /#(c62828|b3261e|c0392b|b42332|9b1c1c|1d7a3e|1c7c4a|1c6b3a|1d6b37|1b7a3a|16813b|2e8a5a|177242|b36200|d27b00|8a5a00|8d5d00|855400|bd7a00)\b/i;
+const OLD = /#(c62828|b3261e|c0392b|b42332|9b1c1c|1d7a3e|1c7c4a|1c6b3a|1d6b37|1b7a3a|16813b|2e8a5a|177242|b36200|d27b00|8a5a00|8d5d00|855400|bd7a00|e0a100)\b/i;
 test('no old reds or greens anywhere', () => {
   const root = path.join(__dirname, '../../..'), found = [];
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach(e => {
