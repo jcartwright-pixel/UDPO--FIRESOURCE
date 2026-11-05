@@ -37,7 +37,18 @@ async function openPage(ctx, url) {
   const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   try {
     const ctx = await browser.newContext({ viewport: { width: 1536, height: 860 }, serviceWorkers: 'block' });
-    let p = await openPage(ctx, '/pallet-builder.html?testEmail=manager.test@uniteddairy.com');
+    // Joe 11-5-26: its own card on Home and its own menu option, right under Debag / Labeling Room.
+    let p = await openPage(ctx, '/index.html?testEmail=manager.test@uniteddairy.com');
+    await p.waitForSelector('#screen:not([hidden]) .hq-main[data-side="pallets"]');
+    const lines = await p.$$eval('.hq-main', c => c.map(x => x.dataset.side));
+    assert.equal(lines.indexOf('pallets'), lines.indexOf('debag') + 1, 'Home: right under Debag / Labeling Room ' + JSON.stringify(lines));
+    assert.ok(!(await p.$eval('.hq-main[data-side="pallets"]', x => x.classList.contains('building'))), 'open to everyone, not Under Construction');
+    const [deb, pal] = await Promise.all(['debag', 'pallets'].map(k => p.$eval('.hq-main[data-side="' + k + '"]', x => { const r = x.getBoundingClientRect(); return [r.left, r.top, r.bottom]; })));
+    assert.ok(pal[1] >= deb[2] - 1 && Math.abs(pal[0] - deb[0]) <= 2, 'on its own line under Debag / Labeling Room ' + JSON.stringify([deb, pal]));
+    await p.waitForTimeout(800);
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-home-1536.png') });
+    await p.close();
+    p = await openPage(ctx, '/pallet-builder.html?testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('#screen:not([hidden]) #builder');
     const frame = () => p.frameLocator('#builder');
     await frame().locator('#dayTable tr').first().waitFor();

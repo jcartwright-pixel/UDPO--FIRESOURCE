@@ -16,8 +16,11 @@ test('the Pallet Builder screen is made from builder.html, unchanged', () => {
   assert.ok(!/\b(alert|confirm|prompt)\(/.test(src), 'no pop-ups');
 });
 
-test('the Pallet Builder is a Plant Distribution screen, so People & Roles can tick it', () => {
-  const plant = L.SCREEN_AREAS.find(a => a.key === 'plant');
-  assert.ok(plant.screens.some(s => s[0] === 'palletBuilder' && s[2].indexOf('pallet-builder.html') >= 0));
+test('the Pallet Builder is its own area (Joe 11-5-26), so People & Roles can tick it', () => {
+  const area = L.SCREEN_AREAS.find(a => a.key === 'pallets');
+  assert.ok(area && area.screens.some(s => s[0] === 'palletBuilder' && s[2].indexOf('pallet-builder.html') >= 0));
+  assert.ok(!L.SCREEN_AREAS.find(a => a.key === 'plant').screens.some(s => s[0] === 'palletBuilder'), 'no longer in Plant Distribution');
+  const keys = L.SCREEN_AREAS.map(a => a.key);
+  assert.equal(keys.indexOf('pallets'), keys.indexOf('debag') + 1, 'right under Debag / Labeling Room');
   assert.equal(L.pageGated('pallet-builder.html'), true);
 });

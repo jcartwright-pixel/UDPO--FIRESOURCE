@@ -49,7 +49,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/26 (1E): four cards (Plant Operations, Route Distribution, Reports, Safety Walkthrough), each department a dark blue button
     // on its group's card with its main screens under it in light blue (Inventory is now inside Shipping & Receiving).
     assert.deepEqual(await sup.$$eval('.hq-card > strong', c => c.map(x => x.textContent)), ['Plant Operations', 'Plant Maintenance', 'Shipping & Receiving', 'Route Distribution', 'Reports & Safety']);
-    assert.deepEqual(await sup.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'debag', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety']);
+    assert.deepEqual(await sup.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'debag', 'pallets', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety']);
     assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
@@ -133,7 +133,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForSelector('.hq-card[data-card-side="reports"]');
     // Joe 10/26 (1E): the four home cards; the departments' own cards (with their pictures) are on the Plant Operations and Route
     // Distribution pages, which the group cards open.
-    assert.deepEqual(await adm.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'debag', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety']);
+    assert.deepEqual(await adm.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'debag', 'pallets', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety']);
     assert.deepEqual(await adm.$$eval('.hq-card[data-card-side] .uc-banner', b => b.map(x => x.closest('.hq-card').dataset.cardSide)), []);
     const fits = await adm.evaluate(() => ({ bottom: Math.max(...[...document.querySelectorAll('.hq-card')].map(c => c.getBoundingClientRect().bottom)), inner: innerHeight }));
     assert.ok(fits.bottom <= fits.inner, 'the four cards fit a 1920x1080 screen: ' + JSON.stringify(fits));
