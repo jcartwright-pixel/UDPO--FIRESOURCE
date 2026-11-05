@@ -268,14 +268,17 @@ function renderSeqs(){
   const rk = routeKey(S);
   if (!rk) { $('seqHint').textContent = 'Name the route with its number and delivery date, like RT 805 · 11/05, to see who is in each load sequence.'; $('seqTable').innerHTML = ''; $('seqCombo').hidden = true; return; }
   const seqs = new Map(); const row = n => { if (!seqs.has(n)) seqs.set(n, {n, cust:[], stops:[]}); return seqs.get(n); };
-  rk.list.forEach(x => row(x[0]).cust.push(x));
+  // Match each route-list customer to its BOL order by name first, so a customer whose load seq was changed
+  // (typed, merged or dragged) shows once, in the seq it now loads in, with the route-list seq noted.
+  rk.list.forEach(x => { const m = S.stops.find(st => !st.sub && sameCust(x[2], st.name)); const n = m ? stopSeq(m) : null;
+    if (m && n != null && n !== x[0]) row(n).cust.push([n, x[1], x[2], x[0]]); else row(x[0]).cust.push(x); });
   S.stops.forEach((st, i) => { if (st.sub) return; const n = stopSeq(st); if (n != null) row(n).stops.push({i, st, cases:stopCases(st)}); });
   const rows = [...seqs.values()].sort((a,b) => (a.n||999) - (b.n||999));
   [...PICK].forEach(n => { if (!seqs.has(n)) PICK.delete(n); });
   $('seqHint').textContent = rk.list.length ? `Route ${rk.route}, ${WDN[rk.day]}: ${rk.list.length} customers on the route list. The BOL prints one customer per sequence; everyone sharing it is listed here. Tick sequences to see them combined.` : `Route ${rk.route} has no customers on the ${WDN[rk.day]} route list.`;
   $('seqTable').innerHTML = `<thead><tr><th></th><th>Seq</th><th>Customers on the route list</th><th>On the BOL</th><th class="r">Cases</th></tr></thead><tbody>${rows.map(r => {
     const bolNames = r.stops.map(s => s.st.name);
-    const cust = r.cust.length ? r.cust.map(x => { const b = bolNames.some(nm => sameCust(x[2], nm)); return `<span class="${b?'bol':''}">${esc(x[2])}${b?'<span class="tag">BOL</span>':''}</span>`; }).join('') : '<span class="hint">None on the route list</span>';
+    const cust = r.cust.length ? r.cust.map(x => { const b = bolNames.some(nm => sameCust(x[2], nm)); return `<span class="${b?'bol':''}">${esc(x[2])}${b?'<span class="tag">BOL</span>':''}${x[3] != null ? ` <span class="hint">(seq ${x[3]} on the route list)</span>` : ''}</span>`; }).join('') : '<span class="hint">None on the route list</span>';
     const on = r.stops.length ? r.stops.map(s => `Order ${s.i+1}`).join(', ') : '<span class="hint">No order</span>';
     const cs = r.stops.reduce((a,s)=>a+s.cases,0);
     return `<tr class="${r.stops.length?'':'nobol'} ${PICK.has(r.n)?'pick':''}"><td><input type="checkbox" class="seqPick" data-n="${r.n}" ${PICK.has(r.n)?'checked':''} aria-label="Pick sequence ${r.n||'none'}"></td><td class="num"><b>${r.n || '–'}</b></td><td class="cust">${cust}</td><td>${on}</td><td class="r num">${r.stops.length?fmt(cs):''}</td></tr>`;
