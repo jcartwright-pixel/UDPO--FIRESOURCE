@@ -129,7 +129,9 @@ details summary{cursor:pointer;font-weight:600}
 #lmTable .rs{display:inline-block;min-width:1.8em;text-align:center;background:var(--accent);color:#fff;border-radius:4px;font-weight:600;padding:0 5px}
 #lmTable input.lseq{width:4em;text-align:center;font-weight:700;color:#14232f;border:0}
 #lmTable input.lnote{width:100%;min-width:8em}
-#lmTable td.cn{font-weight:600}
+#lmTable tr.main td.cn{font-weight:700}
+#lmTable tr.sub td.cn{font-weight:400;color:var(--muted)}
+#lmTable tr.sub td.cn .note{font-size:.78rem}
 .truck .plab{color:#e6edf3;font-size:.72rem;text-align:center;font-family:var(--f-display);letter-spacing:.03em;padding:1px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 details.items{display:flex;flex-direction:column;gap:8px}
@@ -186,7 +188,7 @@ details.items[open]>summary{margin-bottom:8px}
   </section>
 
   <section class="panel day" aria-label="Truck load map">
-    <div class="panel-head"><h2>Truck load map</h2><span class="hint">Drag a customer up or down to change the run sequence. Type a load sequence in its box; give two stops the same number to merge them onto the same pallets. Odd sequences load on the left and even on the right; sequence 0 goes side to side across the front. Use Side to move one. Each spot is one stack.</span></div>
+    <div class="panel-head"><h2>Truck load map</h2><span class="hint">Bold customers are on the BOL; the plain ones under them share their load sequence on the route list. Drag any customer up or down to change the run sequence. Type a load sequence in its box; give two stops the same number to merge them onto the same pallets. Odd sequences load on the left and even on the right; sequence 0 goes side to side across the front. Use Side to move one. Each spot is one stack.</span></div>
     <div class="lm">
       <div class="lm-left"><div class="truck" id="truck"></div><div class="lm-legend" id="lmLegend"></div></div>
       <div class="lm-right">
@@ -267,7 +269,7 @@ function renderSeqs(){
   if (!rk) { $('seqHint').textContent = 'Name the route with its number and delivery date, like RT 805 · 11/05, to see who is in each load sequence.'; $('seqTable').innerHTML = ''; $('seqCombo').hidden = true; return; }
   const seqs = new Map(); const row = n => { if (!seqs.has(n)) seqs.set(n, {n, cust:[], stops:[]}); return seqs.get(n); };
   rk.list.forEach(x => row(x[0]).cust.push(x));
-  S.stops.forEach((st, i) => { const n = stopSeq(st); if (n != null) row(n).stops.push({i, st, cases:stopCases(st)}); });
+  S.stops.forEach((st, i) => { if (st.sub) return; const n = stopSeq(st); if (n != null) row(n).stops.push({i, st, cases:stopCases(st)}); });
   const rows = [...seqs.values()].sort((a,b) => (a.n||999) - (b.n||999));
   [...PICK].forEach(n => { if (!seqs.has(n)) PICK.delete(n); });
   $('seqHint').textContent = rk.list.length ? `Route ${rk.route}, ${WDN[rk.day]}: ${rk.list.length} customers on the route list. The BOL prints one customer per sequence; everyone sharing it is listed here. Tick sequences to see them combined.` : `Route ${rk.route} has no customers on the ${WDN[rk.day]} route list.`;
@@ -342,7 +344,7 @@ function orderCases(st){
 
 // Truck load map (like the Customer List app's Truck Load Map): spots colored by load sequence, front to back door.
 const SEQ_COLORS = ['#9fd3a8','#f4a3c4','#d9a6e6','#f7b38f','#86d0c8','#e9ef9e','#c7a7e8','#a9c8f0','#f2d48a','#b9e3a1','#f0a8a8','#a6dfe9'];
-const seqColor = n => SEQ_COLORS[(Math.abs(+n || 0)) % SEQ_COLORS.length];
+const seqColor = n => { n = Math.abs(+n || 0); return SEQ_COLORS[(n <= 12 ? n + 11 : n * 5 + 3) % SEQ_COLORS.length]; };
 const lmLabel = i => { const n = stopSeq(S.stops[i]); return n ? String(n) : '#' + (i + 1); };
 let DRAG = null; const LMPICK = new Set();
 function palFirst(pl){ return [...pl.stops].sort((a, c) => a - c)[0]; }
@@ -384,12 +386,12 @@ function renderMap(R){
   const SIDES = [['', 'Auto'], ['L', 'Left'], ['R', 'Right'], ['F', 'Across front']];
   $('lmTable').innerHTML = `<thead><tr><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
     const n = stopSeq(st);
-    return `<tr draggable="true" data-i="${i}"><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
+    return `<tr draggable="true" data-i="${i}" class="${st.sub ? 'sub' : 'main'}"><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
       <td><input type="checkbox" class="lmPick" data-i="${i}" ${LMPICK.has(st.id) ? 'checked' : ''} aria-label="Pick ${esc(st.name || 'order ' + (i + 1))} to merge"></td>
       <td><span class="rs num">${i + 1}</span></td>
       <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
-      <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}</td>
-      <td class="r num">${fmt(R.stats[i].cases)}</td>
+      <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}${st.sub && st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>
+      <td class="r num">${st.sub ? '' : fmt(R.stats[i].cases)}</td>
       <td><select class="lside" data-i="${i}" aria-label="Truck side">${SIDES.map(([v, l]) => `<option value="${v}" ${(st.side || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td><input class="lnote" type="text" value="${esc(st.note || '')}" data-i="${i}" placeholder="Note" aria-label="Note"></td></tr>`;
   }).join('')}</tbody>`;
@@ -406,6 +408,7 @@ function renderStops(){
   $('route').value = S.route; $('spots').value = S.spots || ''; $('split').checked = !!S.split;
   const rk = routeKey(S);
   $('stops').innerHTML = S.stops.map((st, i) => {
+    if (st.sub) return '';
     const rows = st.lines.map((ln, j) => {
       const p = BY.get(String(ln.sku));
       const d = p ? `${esc(p.desc)}<small>${esc(p.size)} · ${p.upc ? p.upc + ' per case' : 'case count not set'}</small>` : `<span style="color:var(--warn)">Product ${esc(ln.sku)} isn't in the list</span>`;
@@ -434,7 +437,7 @@ function renderStops(){
       </details>
     </div>`;
   }).join('');
-  $('pasteStop').innerHTML = `<option value="route">A new route, split into orders</option>` + S.stops.map((st, i) => `<option value="${i}">Order ${i+1}: ${esc(st.name || 'unnamed')}</option>`).join('');
+  $('pasteStop').innerHTML = `<option value="route">A new route, split into orders</option>` + S.stops.map((st, i) => st.sub ? '' : `<option value="${i}">Order ${i+1}: ${esc(st.name || 'unnamed')}</option>`).join('');
   $('routePick').innerHTML = DB.routes.map((r, i) => `<option value="${i}" ${i===DB.cur?'selected':''}>${esc(r.route || 'Untitled route')}</option>`).join('');
   $('delRoute').disabled = DB.routes.length < 2;
 }
@@ -492,7 +495,7 @@ function render(){
   const sum = k => R.stats.reduce((a,s)=>a+s[k],0);
   const over = S.spots && n > S.spots;
   $('tiles').innerHTML = `
-    <div class="tile"><div class="k">Route case count</div><div class="v num">${fmt(sum('cases'))}</div><div class="s">${S.stops.length} orders, rounded up</div></div>
+    <div class="tile"><div class="k">Route case count</div><div class="v num">${fmt(sum('cases'))}</div><div class="s">${S.stops.filter(s=>!s.sub).length} orders, rounded up</div></div>
     <div class="tile ${over?'over':''}"><div class="k">Pallets</div><div class="v num">${n}${S.spots?` <span style="font-size:1rem;color:var(--muted)">/ ${S.spots}</span>`:''}</div><div class="s">${over?`${n - S.spots} over the truck`:`exact load ${fmt(sum('share'),2)}`}</div></div>
     <div class="tile"><div class="k">Units</div><div class="v num">${fmt(sum('units'))}</div><div class="s">jugs, cartons, tubs</div></div>
     <div class="tile"><div class="k">Product weight</div><div class="v num">${fmt(sum('wt'))}</div><div class="s">lb, no crates or pallets</div></div>`;
@@ -512,7 +515,7 @@ function render(){
 
   const name = i => S.stops[i].name || `Order ${i+1}`;
   $('stopTable').innerHTML = `<thead><tr><th>#</th><th>Order</th><th class="r">Units</th><th class="r">Cases</th><th class="r">Lb</th><th class="r">Pallets</th></tr></thead><tbody>${
-    S.stops.map((st,i)=>{const s=R.stats[i];return `<tr><td class="num">${i+1}</td><td>${esc(name(i))}</td><td class="r num">${fmt(s.units)}</td><td class="r num">${fmt(s.cases)}${s.totes?` + ${s.totes} tote`:''}</td><td class="r num">${fmt(s.wt)}</td><td class="r num">${fmt(s.share,2)}</td></tr>`}).join('')}
+    S.stops.map((st,i)=>{if (st.sub) return ''; const s=R.stats[i];return `<tr><td class="num">${i+1}</td><td>${esc(name(i))}</td><td class="r num">${fmt(s.units)}</td><td class="r num">${fmt(s.cases)}${s.totes?` + ${s.totes} tote`:''}</td><td class="r num">${fmt(s.wt)}</td><td class="r num">${fmt(s.share,2)}</td></tr>`}).join('')}
     <tr><td></td><td><b>Route total</b></td><td class="r num"><b>${fmt(sum('units'))}</b></td><td class="r num"><b>${fmt(sum('cases'))}</b></td><td class="r num"><b>${fmt(sum('wt'))}</b></td><td class="r num"><b>${fmt(sum('share'),2)}</b></td></tr></tbody>`;
 
   const cells = R.pallets.map((pl, k) => {
@@ -623,7 +626,7 @@ document.addEventListener('click', e => {
     const ns = pick.map(stopSeq).filter(Boolean); const n = ns.length ? Math.min(...ns) : Math.max(0, ...S.stops.map(stopSeq).filter(Boolean)) + 1;
     pick.forEach(st => st.seq = n); LMPICK.clear(); S.sample = false; all(); $('lmMsg').textContent = `Merged ${pick.length} stops into load sequence ${n}.`; return; }
   if (b.id === 'lmFromRun') { S.stops.forEach((st, i) => st.seq = i + 1); S.sample = false; all(); $('lmMsg').textContent = 'Load sequence now follows the run order.'; return; }
-  if (b.id === 'lmFromBol') { S.stops.forEach(st => { delete st.seq; }); all(); $('lmMsg').textContent = 'Back to the load sequence from the BOL.'; return; }
+  if (b.id === 'lmFromBol') { S.stops.forEach(st => { if (st.sub) st.seq = st.bolSeq; else delete st.seq; }); all(); $('lmMsg').textContent = 'Back to the load sequence from the BOL.'; return; }
   if (b.classList.contains('addp')) addProd(i);
   else if (b.classList.contains('del')){ S.stops[i].lines.splice(+b.dataset.l,1); refreshSizes(); }
   else if (b.classList.contains('rmstop')){ S.stops.splice(i,1); if(!S.stops.length) S.stops.push({id:nid(),name:'',lines:[]}); all(); }
@@ -664,5 +667,20 @@ DB = load();
   if (DB.routes.length === 1 && DB.routes[0].sample) DB.routes = [];
   const at = DB.routes.length; DB.routes.push(...add); if (first) DB.cur = at;
 })();
+
+// Joe: a load sequence can hold several customers. The BOL names the main one; every other customer the route list has in
+// that sequence is added under it as a listed stop (no products, plain text), with its own run order, so it can be moved.
+function fillSeqCustomers(r){
+  if (!r || r.seqFilled) return; const rk = routeKey(r); if (!rk || !rk.list.length) return;
+  const out = [];
+  r.stops.forEach(st => {
+    out.push(st); if (st.sub) return;
+    const n = stopSeq(st); if (!n) return;
+    rk.list.filter(x => x[0] === n && !sameCust(x[2], st.name) && !r.stops.some(o => sameCust(x[2], o.name)))
+      .forEach(x => out.push({id:nid(), name:x[2], acct:x[1], seq:n, bolSeq:n, sub:true, lines:[]}));
+  });
+  r.stops = out; r.seqFilled = true;
+}
+DB.routes.forEach(fillSeqCustomers);
 DB.cur = Math.min(DB.cur||0, DB.routes.length-1); S = DB.routes[DB.cur]; all();
 </script>
