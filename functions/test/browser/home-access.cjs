@@ -242,7 +242,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await mods.waitForSelector('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.hover('.side-plant[data-plant="fac_uniontown"] .side-sec-btn');
     await mods.waitForSelector('.side-flyouts .flyout.open a[data-plant="fac_uniontown"]', { state: 'visible' });
-    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Vacations & Schedule', 'Plant Maintenance', 'Shipping & Receiving', 'Debag / Labeling Room', 'Route Distribution', 'Fleet & Maintenance', 'Garage', 'Reports', 'Safety Walkthrough']);
+    assert.deepEqual(await mods.$$eval('.side-flyouts .flyout.open a', a => a.map(x => x.textContent)), ['Plant Distribution', 'Plant Production', 'Plant Vacations & Schedule', 'Plant Maintenance', 'Shipping & Receiving', 'Debag / Labeling Room', 'Pallet Builder', 'Route Distribution', 'Fleet & Maintenance', 'Garage', 'Reports', 'Safety Walkthrough']);
     await Promise.all([mods.waitForURL(/reportcenter\.html/), mods.click('.side-flyouts .flyout.open a[data-side="reports"]')]);
     await mods.waitForSelector('.rc-card');
     assert.deepEqual(await mods.$$eval('.rc-group h2', h => h.map(x => x.textContent)), ['Walkthrough Reports', 'Driver Reports', 'Plant Reports', 'Garage Reports']);
