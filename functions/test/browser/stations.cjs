@@ -308,8 +308,11 @@ async function signOnce(page) {
     assert.equal(await cut.textContent('#work .sw-empty'), 'STILL WAITING FOR TODAY\'S LOADS. IF THIS STAYS, CHECK THE TABLET\'S INTERNET.');
     await cut.unroute(/127\.0\.0\.1:8080\//);
     await cut.waitForFunction(() => (document.querySelector('#work .sw-empty') || {}).textContent === 'NO CASE LOADS TODAY', null, { timeout: 150000 });
+    // Joe 11-5-26 "Refresh, fix this": with nothing changing, the tablet still asks the server each minute, so Last refreshed moves.
+    const fresh = await cut.evaluate(() => window.UDReads.freshAt);
+    await cut.waitForFunction((t) => window.UDReads.freshAt > t + 30000, fresh, { timeout: 75000 });
     await cut.close();
-    results.push('Plant Station: Case Loadout & Yard Services shows the same case loads as Case Loadout; NO CASE LOADS TODAY only once the server has answered, and a red STILL WAITING line until it does');
+    results.push('Plant Station: Case Loadout & Yard Services shows the same case loads as Case Loadout; NO CASE LOADS TODAY only once the server has answered, and a red STILL WAITING line until it does; Last refreshed moves each minute with nothing changing');
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');

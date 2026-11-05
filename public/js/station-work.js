@@ -6,7 +6,7 @@
  * any manager screen. The saves are the same ones the Loadout Center and Unloading & Washing make.
  */
 import { save, escapeHtml, shortDate, showError, allowedSaves, maySave, plantNames } from './app.js';
-import { collection, doc, query, where, onSnapshot } from './firebase.js';
+import { collection, doc, query, where, onSnapshot, getDoc } from './firebase.js';
 import { watchWashRequests } from './recent-records.js';
 import * as P from './plant-core.js';
 import { watchProducts, OTHER } from './products.js';
@@ -933,18 +933,34 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (view === 'returns') render();
   }, () => {})];
   watch();
+  // Joe 11-5-26 ("Refresh, fix this"): the live reads only speak when something changes, so a quiet tablet kept an old Last
+  // refreshed time. Each minute the tablet asks the server once (the app settings, one small read): an answer moves Last
+  // refreshed (firebase.js), and an answer while the loads have still not come from the server starts the reads again.
+  function ping() {
+    if (stopped) return;
+    getDoc(doc(db, 'config', 'app')).then(s => { if (!stopped && s && s.metadata && !s.metadata.fromCache && !runsLive) watch(); }, () => {});
+  }
   const stopScans = listenForScans({ onScan: raw => { if (stopped || !boxing()) return; if (view === 'takeout' && takeout) takeout.onScan(raw); else onRecvScan(raw); } });
   // The day rolls at 6 AM; a running load's state is drawn again each minute (not while someone is typing).
   tick = setInterval(() => {
     if (today() !== date) { Object.keys(drafts).forEach(k => delete drafts[k]); watch(); }
     else if (!runsLive && Date.now() - runsAsked >= WAIT_RETRY) watch();
+    ping();
     if (takeout) takeout.dayChanged();
     const a = document.activeElement;
     if (!(a && box.contains(a) && a.dataset && a.dataset.k)) render();
   }, 60000);
 
   return {
-    set(st, v) { const changed = !station || !st || station.id !== st.id; station = st; view = v; if (changed) Object.keys(drafts).forEach(k => delete drafts[k]); watchSched(); render(); },
+    set(st, v) {
+      const changed = !station || !st || station.id !== st.id, toLoading = v === 'loading' && view !== 'loading';
+      station = st; view = v; if (changed) Object.keys(drafts).forEach(k => delete drafts[k]); watchSched();
+      // Picking Loading (Case Loadout on a two-part tablet, also after Yard Services): loads not yet heard from the server
+      // are read again at once, and the server is asked straight away.
+      if (toLoading && !runsLive) watch();
+      if (toLoading) ping();
+      render();
+    },
     render,
     // The loads left on a tab (for the count under it), or null for a tab with no count.
     count(v) {
