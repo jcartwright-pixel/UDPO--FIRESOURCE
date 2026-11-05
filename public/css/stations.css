@@ -632,6 +632,7 @@ body.ps-page { height: auto; overflow: visible; overflow-x: hidden; }
 .sw-add.ret { grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) minmax(90px, .6fr) auto; }
 .sw-rule { margin: 0; padding: 12px 14px; border-radius: 10px; background: #fde8e7; color: #8f1d14; font-size: 17px; }
 .sw-empty { margin: 8px 0; padding: 30px 12px; text-align: center; color: #4a5b6c; font-size: 18px; }
+.sw-empty.wait { color: #b42318; font-weight: 700; }
 @media (max-width: 1100px) {
   .sw-cols, .sw-head { grid-template-columns: 70px minmax(0, 1fr) 100px 100px 150px 300px 24px; gap: 8px; }
   .sw-cols span:nth-child(5), .sw-cols span:last-child { grid-column: auto; }

@@ -27,6 +27,11 @@ export function mountStationWork({ db, box, person, onDraw }) {
   const sched = { SHIPPING: [], RECEIVING: [] };
   let routeDocs = [];   // Route Master (coverage_type, Drop and Hook); [] until it is read
   const got = { runs: false, week: false, SHIPPING: false, RECEIVING: false };
+  // Joe 11-5-26 (Case Loadout showed "No cases loads today" and never changed): the loads first come from the tablet's own
+  // kept copy, which can be empty. "NO CASE LOADS TODAY" is said only once the server has answered (runsLive); until then the
+  // screen says it is still waiting, and after 2 minutes with no answer the reads start again by themselves.
+  let runsLive = false, runsAsked = Date.now();
+  const WAIT_SAY = 30000, WAIT_RETRY = 120000;
   const pending = {};       // card id -> what is shown before the server has it
   const drafts = {};        // card id -> { field: typed value } until it is saved
   const opened = {}, closed = {}, puForm = {}, pauseForm = {};
@@ -256,9 +261,15 @@ export function mountStationWork({ db, box, person, onDraw }) {
       }
       html += '</article>';
     });
-    if (!list.length) html += '<p class="sw-empty">' + (got.runs ? 'No ' + unit.tile.toLowerCase() + ' loads ' + (box ? 'or shipments ' : '') + 'today.' : 'Reading today\'s loads&hellip;') + '</p>';
+    if (!list.length) html += '<p class="sw-empty' + (!runsLive && Date.now() - runsAsked >= WAIT_SAY ? ' wait' : '') + '">' + emptyWords(unit, box) + '</p>';
     html += '<div class="sw-band end"><b>&#9632; END</b><span>of today\'s ' + (box ? 'shipping' : 'loadout') + '</span></div>';
     return panel(box ? 'Shipping / Loadout' : 'Loading', plural(total, 'item'), '<div class="sw-list">' + html + '</div>');
+  }
+  // Joe's rule: screens read in plain words, ALL CAPITALS. Only the server's answer says there are no loads.
+  function emptyWords(unit, box) {
+    if (got.runs && runsLive) return 'NO ' + unit.name.toUpperCase() + ' LOADS ' + (box ? 'OR SHIPMENTS ' : '') + 'TODAY';
+    if (Date.now() - runsAsked < WAIT_SAY) return 'Reading today\'s loads&hellip;';
+    return 'STILL WAITING FOR TODAY\'S LOADS. IF THIS STAYS, CHECK THE TABLET\'S INTERNET.';
   }
   const LEGEND = '<div class="sw-legend" aria-label="Who takes the load"><span><i class="ut"></i>Uniontown truck</span><span><i class="branch"></i>Branch</span><span><i class="carrier"></i>Carrier</span></div>';
   const who = (by) => '<span class="sw-who ' + by + '">' + HAULER[by] + '</span>';
@@ -892,10 +903,15 @@ export function mountStationWork({ db, box, person, onDraw }) {
     if (stopped) return;
     unsubs.forEach(u => u());
     date = today();
+    runsLive = false; runsAsked = Date.now();
     const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1)), [L.weekStart(date)]))];
     const fail = (what) => (e) => { if (!stopped) showError('Could not read ' + what + ': ' + e.message); };
     unsubs = [
-      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); got.runs = true; render(); }, fail('the loads')),
+      // includeMetadataChanges: the server's answer is heard even when it matches the kept copy (no change in the loads).
+      onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), { includeMetadataChanges: true }, s => {
+        if (!s.metadata.fromCache) runsLive = true;
+        runs = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); got.runs = true; render();
+      }, fail('the loads')),
       onSnapshot(query(collection(db, 'pickups'), where('date', 'in', [-1, 0, 1, 2].map(n => L.addDays(date, n)))), s => { pickups = s.docs.map(d => d.data()); render(); }, fail('the pickups')),
       onSnapshot(query(collection(db, 'plantJournal'), where('date', 'in', weekDays())), s => { week = s.docs.map(d => d.data()); got.week = true; render(); }, fail('the unloading list')),
       // Refusals called in by email: a tablet with no UD account cannot read them; the rest still works.
@@ -921,6 +937,7 @@ export function mountStationWork({ db, box, person, onDraw }) {
   // The day rolls at 6 AM; a running load's state is drawn again each minute (not while someone is typing).
   tick = setInterval(() => {
     if (today() !== date) { Object.keys(drafts).forEach(k => delete drafts[k]); watch(); }
+    else if (!runsLive && Date.now() - runsAsked >= WAIT_RETRY) watch();
     if (takeout) takeout.dayChanged();
     const a = document.activeElement;
     if (!(a && box.contains(a) && a.dataset && a.dataset.k)) render();

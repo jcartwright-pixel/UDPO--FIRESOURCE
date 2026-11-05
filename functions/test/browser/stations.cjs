@@ -272,6 +272,44 @@ async function signOnce(page) {
     await ps.waitForSelector('#work .sw-panel-head h2:text-is("Washing")');
     assert.deepEqual(ps.errors, []);
     results.push('Plant Station: a tablet picks its station once; Case Loadout shows Loading only, Case Unloading shows the choice of Case Unloading (Unloading, Washing and Returns) or Trailer Assignments, Tote Loadout shows Loading, Unloading and Washing');
+
+    // Joe 11-5-26: Case Loadout on the Case Loadout & Yard Services tablet showed no loads. It shows the very same loads as the
+    // Case Loadout tablet, also after Yard Services was opened first.
+    const ids = (page) => page.$$eval('#work .sw-card', c => c.map(x => x.dataset.sw));
+    const lone = await openPage(browser, 1920, 1080, '/plant-station.html' + MANAGER, clock);
+    await lone.click('[data-station="CASE"]');
+    await lone.waitForSelector('#work .sw-card');
+    await lone.waitForTimeout(1500);
+    const caseIds = await ids(lone);
+    assert.ok(caseIds.length > 0, 'the Case Loadout tablet has loads today');
+    const both = await openPage(browser, 1920, 1080, '/plant-station.html' + MANAGER, clock);
+    await both.click('[data-station="CASE_YARD"]');
+    await both.click('[data-part="yard"]');
+    await both.waitForSelector('#work iframe.sw-frame');
+    await both.click('#ps-back');
+    await both.click('[data-part="case"]');
+    await both.waitForSelector('#work .sw-card');
+    await both.waitForTimeout(1500);
+    assert.deepEqual(await ids(both), caseIds, 'Case Loadout & Yard Services shows the same case loads');
+    assert.deepEqual(lone.errors.concat(both.errors), []);
+    await lone.close(); await both.close();
+    // Before the server answers, the tablet never says there are no loads: it says it is reading them, then (red) that it is
+    // still waiting. Once the server answers, a day with no case loads says NO CASE LOADS TODAY (real time: no loads today).
+    const cut = await openPage(browser, 1920, 1080, '/plant-station.html' + MANAGER);
+    await cut.waitForSelector('[data-station="CASE_YARD"]');
+    await cut.route(/127\.0\.0\.1:8080\//, route => route.abort());
+    await cut.reload();
+    await cut.click('[data-station="CASE_YARD"]');
+    await cut.click('[data-part="case"]');
+    await cut.waitForSelector('#work .sw-empty');
+    await cut.waitForTimeout(12000);
+    assert.equal(await cut.textContent('#work .sw-empty'), 'Reading today\'s loads…', 'no "no loads" before the server answers');
+    await cut.waitForSelector('#work .sw-empty.wait', { timeout: 70000 });
+    assert.equal(await cut.textContent('#work .sw-empty'), 'STILL WAITING FOR TODAY\'S LOADS. IF THIS STAYS, CHECK THE TABLET\'S INTERNET.');
+    await cut.unroute(/127\.0\.0\.1:8080\//);
+    await cut.waitForFunction(() => (document.querySelector('#work .sw-empty') || {}).textContent === 'NO CASE LOADS TODAY', null, { timeout: 150000 });
+    await cut.close();
+    results.push('Plant Station: Case Loadout & Yard Services shows the same case loads as Case Loadout; NO CASE LOADS TODAY only once the server has answered, and a red STILL WAITING line until it does');
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
