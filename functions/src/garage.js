@@ -5,7 +5,7 @@
  * Joe's picks (10/8): the technicians' names on the screen, sign in with name + number, a simple job flow (Need Parts /
  * Add a Helper / Done), "What did you fix?", safe to drive + finger signature, and Report a Problem. Mechanics have no
  * United Dairy email (Joe 10/10), so the tablet needs no Google account: a technician taps their name and types their
- * login ID (5 or 6 digits, GARAGE TECHNICIANS column login_id). The IDs are never readable from the screens: the copy
+ * login ID (4 to 6 digits, GARAGE TECHNICIANS column login_id). The IDs are never readable from the screens: the copy
  * keeps only a hash of each, in `garageLogins`, which no browser may read. Wrong numbers: 5 in a row lock that technician
  * for 5 minutes, and the whole station takes at most 30 wrong numbers a minute. A sign-in lasts 30 minutes from the last
  * step; at most two technicians are signed in on a tablet at once.
@@ -274,7 +274,7 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
 async function signIn(db, input, nowMs, source) {
   const src = source || GARAGE_SOURCE, want = src.station === 'GARAGE' ? null : { station: src.station, facilityId: src.facilityId };
   const techId = text(input.techId, 80), loginId = String(input.loginId || '').trim();
-  if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+  if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
   return db.runTransaction(async tx => {
     const stamp = new Date(nowMs).toISOString();
     const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input), src);
@@ -304,7 +304,7 @@ async function saveSignature(db, input, nowMs) {
     let people = await signedInTechs(tx, db, input.tokens, nowMs);
     if (!people.length && input.signIn && typeof input.signIn === 'object') {
       const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
-      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
       const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
       if (checked.wrong) return { wrong: true };
       people = [{ id: techId, name: checked.tech.name }];
@@ -424,7 +424,7 @@ async function step(db, input, nowMs) {
     // a sign-in that may have run out by the time it is sent; they are checked here as at sign-in.
     if (!people.length && input.signIn && typeof input.signIn === 'object') {
       const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
-      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
       const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
       if (checked.wrong) return { wrong: true };
       people = [{ id: techId, name: checked.tech.name, ref: null }];
@@ -823,7 +823,7 @@ function validateSend(input, out) {
  *   saveFleetRules  config/fleetRules: PM miles and warning, reefer months / hours / warning days, DOT months / warning, plate warning.
  *   saveFleetUnit   fleetSetup/<unit>: track due dates (YES / NO / blank = default), last service date / miles / hours, reefer
  *                   hours now, DOT due, plate expires, notes.
- *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (5 or 6 digits, kept
+ *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (4 to 6 digits, kept
  *                   only as a hash in garageLogins, never readable; two technicians cannot share one).
  * These stay in the new app (like the work orders made here): a later change to the same row in the sheet copy replaces them.
  * Joe 10/13: each plant has its own (facilityId, a known plant, Uniontown when not sent): Uniontown's rules stay in
@@ -890,7 +890,7 @@ function validateFleet(action, input, out) {
   if (out.op === 'ACTIVE') out.active = input.active === true;
   if (out.op === 'ADD' || out.op === 'LOGIN') {
     out.loginId = String(input.loginId == null ? '' : input.loginId).trim();
-    if (out.op === 'LOGIN' || out.loginId) { if (!/^\d{5,6}$/.test(out.loginId)) throw SaveErr('BAD_REQUEST', 'The login ID is 5 or 6 digits'); }
+    if (out.op === 'LOGIN' || out.loginId) { if (!/^\d{4,6}$/.test(out.loginId)) throw SaveErr('BAD_REQUEST', 'The login ID is 4 to 6 digits'); }
   }
   return out;
 }

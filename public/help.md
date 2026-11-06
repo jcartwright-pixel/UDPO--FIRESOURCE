@@ -212,6 +212,9 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
+- **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
+- A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
+- Load 1 and Load 2 of the same route with the same driver are normal (one truck pulling two loads). They are never pink.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
 - **BACKUP** means the driver is a backup that day. A **Day Note** (for example "riding with...") shows in teal in place of AVAILABLE.
@@ -223,6 +226,8 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 - Managers can grab a route's line and drag it up or down to change the order.
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
+
+> If a box is pink and the times look wrong, fix the leave time or route hours in Route Master. With no hours, the app cannot tell when the run is back, so it stays pink.
 
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
 
@@ -360,7 +365,7 @@ Drivers' time off: vacation, personal, sick, bereavement and unpaid days. At mos
 - `Edit` and `Remove` on a line change or take off a day off.
 - `Print` prints one driver or every driver, one page each.
 
-> An approved day off shows on Weekly Dispatch, and the driver's runs read NEEDS DRIVER.
+> An approved day off takes the driver off their runs on those days, in every week already made (this week, next week and the weeks after). The runs read NEEDS DRIVER with who is off. Changing the dates, or cancelling it, puts the driver back on the days no longer off, unless someone else was picked.
 
 !> Do not book a 4th driver off on a day. Check the Calendar first.
 
@@ -528,6 +533,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 6. `Waiting on Parts`: name the parts you need in your own words, then `Waiting on Parts` again and your login ID. When they come in, `Parts are here` starts it again.
 7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, then safe to drive. Your signature on file signs it.
 
+- Your login ID can be 4 numbers or 6 numbers. `Enter` lights up after the fourth number.
 - What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
 - A leased truck's write-up comes only when the office sends it to the garage.
 - Each work order says how many times the unit was written up and the day of the first one ("Written up 2 times · first 10-16-26"). A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
@@ -1481,7 +1487,7 @@ To add a person to the schedule:
 On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
 
 1. Add the mechanic on `People` (`+ Add Person`) and type their name.
-2. In their **Station login ID** box, type a 5- or 6-digit number and leave the box. It saves and the box then says `Set`.
+2. In their **Station login ID** box, type a 4- or 6-digit number and leave the box. It saves and the box then says `Set`.
 3. Tell the mechanic their number. It is never shown again; type a new one to change it.
 
 !> Do not give two mechanics the same login ID. The app will not save it.
@@ -1615,7 +1621,7 @@ What the status says:
 - **Not loaded, 45 min behind:** its dispatch time passed more than 30 minutes ago and it is not loaded yet.
 - **Loaded** or **Not loaded:** its dispatch time has not come yet.
 
-The time a load left comes from the GPS on its dispatch truck (the tractor on Daily Dispatch): the time that truck left the yard. Only when the truck has no GPS is the trailer's GPS used. When one truck pulls two loads, each load gets the leave nearest its own dispatch time.
+The time a load left comes from the GPS on its dispatch truck (the tractor on Daily Dispatch): the time that truck left the yard. When the truck is not seen leaving (it has no GPS, or its GPS shows no leave after the load was loaded), the trailer's GPS is used instead, so a run whose trailer is out still shows as left. When one truck pulls two loads, each load gets the leave nearest its own dispatch time.
 
 > `Send a test to me` shows this morning's email as it was at 6:00 AM, even when you press it later in the day.
 
@@ -1746,7 +1752,7 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. **Schedule texts** tell drivers the posted week is up; they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** text each driver their own posted week, read the way **My Schedule** shows it on the phone (a block a day with the route, truck, trailer, leaving time and any day note); they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
@@ -1757,7 +1763,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
 8. A driver's number was wrong: fix it on the **Driver Roster** first. Then in **Texts and replies**, find that driver's schedule text and press `Resend` twice. Only that driver gets it, at the new number. `Resend` shows only on texts for the posted week.
 
-> To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
+> To see exactly what a driver gets: under **See a driver's text** in part 3, pick the driver in `Sample for`. Their text shows on the screen. Press `Text this sample to my phone` twice to see how it comes through; it goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver.
 
 > To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
@@ -1819,8 +1825,8 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). The arrow at the top left (Back) comes back to the cards.
 5. Scroll the routes. Tap a route and the map at the top moves to that truck, and the whole place shows under the map. The map stays on top while you keep scrolling; tap another route to move it again.
 
-- **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the Driver Room board. A route that is not delivering today is not on it. A load from an earlier delivery day that has not left yet stays at the top, under **Left over from** that day, until it leaves.
-- **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the 6 AM route status email. A route that is not delivering today is not on it, and nothing from an earlier day carries over, even a load that never showed a leave time.
+- **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. The leave time is the dispatch truck's (the tractor's GPS); if the truck is not seen leaving, the trailer's GPS is used, so a run whose trailer is on the road shows as left. Routes marked Ended Up Not Running are not shown.
 - **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out. If the trailer's GPS has not moved since the load day but the truck's has (the trailer was changed out), **Where now** follows the truck. A GPS unit that has not reported for a day is not used; when neither the trailer nor the truck is reporting, it says **Unknown: GPS not reporting**.
 - **Drop and hook.** Any route ticked **Drop and Hook** in the Route Editor (like the Save-A-Lot routes) leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the store (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2 hr 12 min late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).

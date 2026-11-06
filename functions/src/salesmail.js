@@ -12,7 +12,8 @@
  *
  * When a load left (Joe 11-5-26, routes 813 and 824 both showed "Left 6:02 AM": "you should be pulling it from ... the dispatch
  * tractor"; this replaces 10/31's trailer first): the dispatch tractor's GPS, its yard leave (gpsDays yardOuts) after the load
- * was loaded, the one nearest the load's dispatch time (two loads can share a tractor). The trailer's GPS (gpsReefer/<trailer> trip `out`) is used only when the tractor has no GPS. The trailer's
+ * was loaded, the one nearest the load's dispatch time (two loads can share a tractor). The trailer's GPS (gpsReefer/<trailer> trip `out`) is used
+ * when the tractor is not seen leaving (Joe 11-6-26: no GPS on it, or its GPS shows no leave after loading). The trailer's
  * time is only the 5-minute read that first saw it out, and a trailer's unit reports far less often than a tractor's (or its
  * trip starts late when the load is marked loaded late), so several trailers can show the same wrong time.
  *
@@ -78,25 +79,28 @@ function loadsOn(runs, loadDate) {
 
 /*
  * When a load left the yard, as wall minutes, or null. reefer: {trailer: gpsReefer doc}; gpsDays: [{tag, date, yardOut}].
- * Returns { at, by: 'TRUCK' | 'TRAILER' } or { at: null, truckGps } (truckGps: the dispatch tractor has GPS, so the trailer is not used).
+ * Returns { at, by: 'TRUCK' | 'TRAILER' } or { at: null }.
+ * Joe 11-6-26 ("it goes by tractor first, and then it switches to trailer, if in fact it doesn't see it moving, just in case
+ * something happened"): the dispatch tractor's yard leave first; when the tractor is not seen leaving (no GPS, or a GPS that shows
+ * no leave after loading, like a tractor swapped at the last minute), the trailer's trip for this load counts.
  */
 function leftAt(x, reefer, gpsDays) {
   const k = unitKey(x.truck), from = dayNum(x.loadDate);
   // The dispatch tractor has GPS when it has a GPS day from the load date on.
   const days = k ? (gpsDays || []).filter(g => unitKey(g.tag) === k && dayNum(g.date) !== null && dayNum(g.date) >= from) : [];
-  if (days.length) {
-    if (!x.loaded) return { at: null, truckGps: true };
+  if (days.length && x.loaded) {
     const done = R.wallMinutes(x.completedAt);
     // Every yard leave of those days (yardOuts; an older day has only its first, yardOut), after the load was loaded.
     const outs = [...new Set(days.flatMap(g => (Array.isArray(g.yardOuts) ? g.yardOuts : []).concat(text(g.yardOut) ? [g.yardOut] : [])))]
       .map(v => R.wallClock(Date.parse(v))).filter(t => isFinite(t) && (done === null || t >= done)).sort((a, b) => a - b);
-    if (!outs.length) return { at: null, truckGps: true };
-    // Two loads on one tractor: each takes the leave nearest its own dispatch time (with no dispatch time, the first one).
-    const leaves = R.departWall({ departureDate: x.departureDate, deliveryDate: x.deliveryDate, loadDate: x.loadDate, leavesOn: x.leavesOn, dispatchTime: clockMinutes(x.dispatchTime) });
-    const at = leaves === null ? outs[0] : outs.reduce((best, t) => (Math.abs(t - leaves) < Math.abs(best - leaves) ? t : best), outs[0]);
-    return { at, by: 'TRUCK' };
+    if (outs.length) {
+      // Two loads on one tractor: each takes the leave nearest its own dispatch time (with no dispatch time, the first one).
+      const leaves = R.departWall({ departureDate: x.departureDate, deliveryDate: x.deliveryDate, loadDate: x.loadDate, leavesOn: x.leavesOn, dispatchTime: clockMinutes(x.dispatchTime) });
+      const at = leaves === null ? outs[0] : outs.reduce((best, t) => (Math.abs(t - leaves) < Math.abs(best - leaves) ? t : best), outs[0]);
+      return { at, by: 'TRUCK' };
+    }
   }
-  // No GPS on the tractor: the trailer's trip for this load.
+  // The tractor was not seen leaving: the trailer's trip for this load.
   const tk = x.trailer ? trailerKey(x.trailer) : '', trip = tk ? (reefer || {})[tk] : null;
   if (trip && text(trip.id) === x.runDocId + '|' + x.day && text(trip.out)) return { at: R.wallClock(Date.parse(trip.out)), by: 'TRAILER' };
   return { at: null };

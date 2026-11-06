@@ -12,7 +12,7 @@ const run = (id, route, run, day) => ({ id, weekStart: '2026-11-01', route, run,
   days: { tue: Object.assign({ runs: true, deliveryDate: '2026-11-03', loadDate: '2026-11-02' }, day) } });
 const iso = (local) => new Date(Date.parse(local + '-05:00')).toISOString();
 
-test('statuses: the dispatch tractor\'s GPS first, the trailer only when the tractor has none, late and behind counted from dispatch', () => {
+test('statuses: the dispatch tractor\'s GPS first, the trailer when the tractor is not seen leaving, late and behind counted from dispatch', () => {
   const runs = [
     run('a', '802', 'Pittsburgh North', { dispatchTime: 210, trailer: 'T-101', truck: '501', completeTime: iso('2026-11-03T02:00:00') }),
     run('b', '811', 'Washington', { dispatchTime: 270, trailer: 'T-102', truck: '502', completeTime: iso('2026-11-03T03:00:00') }),
@@ -58,12 +58,12 @@ test('statuses: the dispatch tractor\'s GPS first, the trailer only when the tra
 });
 
 // Joe 11-5-26 (routes 813 and 824 both said "Left 6:02 AM" with different late times): the departure is the dispatch tractor's,
-// never a trailer GPS read that first saw two trailers out at the same time.
+// never a trailer GPS read that first saw two trailers out at the same time. Joe 11-6-26: the trailer only when the tractor is not seen leaving.
 test('two trailers first seen out by the same GPS read still get their own tractors\' leave times', () => {
   const runs = [
     run('a', '813', 'Cumberland', { dispatchTime: 90, trailer: 'T-301', truck: '701', completeTime: iso('2026-11-03T00:40:00') }),
     run('b', '824', 'Morgantown', { dispatchTime: 60, trailer: 'T-302', truck: '702', completeTime: iso('2026-11-03T00:20:00') }),
-    // Tractor 703 has GPS and has not left: Not departed, even though its trailer's GPS is out.
+    // Joe 11-6-26: tractor 703 has GPS but is not seen leaving; its trailer's GPS is out, so the trailer's leave counts.
     run('c', '826', 'Fairmont', { dispatchTime: 240, trailer: 'T-303', truck: '703', completeTime: iso('2026-11-03T03:00:00') })
   ];
   const reefer = {
@@ -77,7 +77,8 @@ test('two trailers first seen out by the same GPS read still get their own tract
     { tag: '703', date: '2026-11-03', miles: 0, yardOut: '' }
   ];
   const got = Object.fromEntries(S.salesRows({ runs, reefer, gpsDays }, SIX_TUE).groups[0].rows.map(r => [r.route, r.status]));
-  assert.deepEqual(got, { 813: 'On time, left 1:35 AM', 824: 'Left 2:40 AM, 1 hr 40 min late', 826: 'Not departed, 2 hr behind' });
+  assert.deepEqual(got, { 813: 'On time, left 1:35 AM', 824: 'Left 2:40 AM, 1 hr 40 min late', 826: 'On time, left 4:10 AM' });
+  assert.equal(S.leftAt(Object.assign({ loaded: true, runDocId: 'c', day: 'tue', loadDate: '2026-11-02', completedAt: '' }, { truck: '703', trailer: 'T-303' }), reefer, gpsDays).by, 'TRAILER');
   assert.deepEqual(S.leftAt(Object.assign({ loaded: true, runDocId: 'a', day: 'tue', loadDate: '2026-11-02', completedAt: '' }, { truck: '701', trailer: 'T-301' }), reefer, gpsDays).by, 'TRUCK');
 });
 

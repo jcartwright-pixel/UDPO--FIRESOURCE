@@ -218,7 +218,7 @@
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
             return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
           }).join(''), 'No technicians yet.') +
-          (boss ? '<div class="fs-addtech"><input id="tech-name" placeholder="New technician name" maxlength="40" aria-label="New technician name"><input id="tech-login" placeholder="Login ID (5-6 digits)" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
+          (boss ? '<div class="fs-addtech"><input id="tech-name" placeholder="New technician name" maxlength="40" aria-label="New technician name"><input id="tech-login" placeholder="Login ID (4 or 6 digits)" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
         foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations. Login IDs are never shown once saved.';
       }
       const s = document.getElementById('search');
@@ -406,7 +406,7 @@
         showError('');
         try {
           if (tb.dataset.op === 'ACTIVE') await save('saveGarageTech', { op: 'ACTIVE', techId: tb.dataset.tech, active: tb.dataset.on === '1' });
-          else { const id = prompt('New login ID for this technician (5 or 6 digits). It is never shown again.'); if (id === null) return; await save('saveGarageTech', { op: 'LOGIN', techId: tb.dataset.tech, loginId: id.trim() }); tb.textContent = 'Login ID saved'; }
+          else { const id = prompt('New login ID for this technician (4 or 6 digits). It is never shown again.'); if (id === null) return; await save('saveGarageTech', { op: 'LOGIN', techId: tb.dataset.tech, loginId: id.trim() }); tb.textContent = 'Login ID saved'; }
         } catch (err) { showError(err.message); }
         return;
       }
