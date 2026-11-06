@@ -11,7 +11,8 @@
  *     ("Marietta 1"), never Dispatch's trailer number; the office Case Unloading shows the same name in the Trailer column;
  *   - the trailer being unloaded now is number 1, at the top.
  *   Joe 10/27: the trailers today's loadout needs come first (by when their load leaves), then the ones not needed today;
- *   a trailer that is here goes ahead of one still on the road. The office Unloading & Washing list uses the same order.
+ *   a trailer that is here goes ahead of one still on the road. (Joe 11-6-26: the office Unloading & Washing list now puts a
+ *   trailer the live GPS shows not back yet below the ones back: test/browser/unload-office-gps.cjs.)
  * With SHOTS_DIR=<folder> it also saves pictures at 1024 and 800.
  */
 const assert = require('node:assert/strict');

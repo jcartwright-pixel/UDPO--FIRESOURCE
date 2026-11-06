@@ -485,7 +485,9 @@ async function adminCall(db, user, input, deps) {
   const ACCOUNTING = require('./accounting').OPS;
   // Weekly route report (routereports.js, Joe 11-6-26): Vicki's weekly route report, read once for Route Cost Analysis.
   const ROUTE_REPORTS = require('./routereports').OPS;
-  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op] || UPLOADS[op] || ACCOUNTING[op] || ROUTE_REPORTS[op];
+  // Daily BOL (bol.js, Joe 11-6-26): the office's Daily Load By Route, read once from the ROUTES/BOL label for every app.
+  const BOL = require('./bol').OPS;
+  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op] || UPLOADS[op] || ACCOUNTING[op] || BOL[op] || ROUTE_REPORTS[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Administration step: ' + op);
   const email = await requireAdmin(db, user);
   const stamp = (d.now ? d.now() : new Date()).toISOString();

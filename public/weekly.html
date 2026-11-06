@@ -16,6 +16,8 @@
     .legend i.added { background: #e4d8fb; border: 1px solid #7a4fd0; }
     /* Joe 10/16: a driver marked Backup for a day. */
     .legend i.backup { background: #ffe45c; }
+    /* Joe 11/6: pink is a driver on two runs whose times on the road overlap; the legend says so. */
+    .legend i.booked { background: #ffdbe6; border: 2px solid #f0a5bd; }
     .weekly-page .board td.b-backup, .weekly-page .board tr.relief td.b-backup { background: #ffe45c !important; color: #3d2f00 !important; }
     .weekly-page .board td.b-added, .weekly-page .board tr.relief td.b-added { background: #e4d8fb !important; color: #4b2a91 !important; }
     /* Joe 10/23: a Day Note ("riding with ...") shows the note in teal in place of AVAILABLE. */
@@ -37,9 +39,10 @@
        buttons stay beside the title, a little closer together; narrower, they sit under the title and go onto a second line
        rather than run off the right edge. */
     @media (min-width: 1500px) {
-      body.weekly-page .head .actions.in-head { gap: 4px; }
+      body.weekly-page .head .actions.in-head { gap: 3px; }
       body.weekly-page .head { gap: 8px; }
-      body.weekly-page .head .actions.in-head > :is(button, a.button) { padding: 0 6px; }
+      /* Joe 11/6: PUBLISH TO WEEKLY DISPATCH in capitals is longer, so the buttons sit a little tighter to still fit at 1536. */
+      body.weekly-page .head .actions.in-head > :is(button, a.button) { padding: 0 4px; }
       body.weekly-page .head .title h1 { font-size: 24px; }
     }
     @media (max-width: 1499px) {
@@ -74,7 +77,7 @@
         <button type="button" id="run-days">Route Run Days</button>
         <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
         <button type="button" id="print-week">Print Weekly Dispatch</button>
-        <button type="button" class="publish" id="publish">Publish to Daily Dispatch</button>
+        <button type="button" class="publish" id="publish">PUBLISH TO WEEKLY DISPATCH</button>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
@@ -89,7 +92,7 @@
       </div>
       <div class="legend" id="legend">
         <span><i class="relief"></i>Relief Driver</span><span><i class="needs"></i>Needs Driver</span>
-        <span><i class="vacation-needs"></i>Driver Off &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span><span><i class="backup"></i>Backup Driver</span><span><i class="daynote"></i>Day Note &mdash; No Route</span>
+        <span><i class="vacation-needs"></i>Driver Off &mdash; Needs Driver</span><span><i class="plant"></i>Plant Load</span><span><i class="conflict"></i>Conflict</span><span><i class="booked"></i>Driver Times Overlap</span><span><i class="off"></i>Does Not Run</span><span><i class="extra"></i>Changed This Week</span><span><i class="added"></i>Added to Driver's Week</span><span><i class="backup"></i>Backup Driver</span><span><i class="daynote"></i>Day Note &mdash; No Route</span>
       </div>
       <button type="button" class="override" id="override" aria-pressed="false">Override</button>
     </section>
@@ -190,6 +193,8 @@
         .map(r => Object.assign(L.buildWeekRun(r, week, ctx), { id: week + '__' + r.id, rev: 0 }));
     }
     const getRuns = () => runs;
+    // That run's Route Master day (dispatch time, hours), for a day on the week that has none of its own.
+    const masterDay = (row, p) => { const r = routeList && row.runId && routeList.find(x => x.id === row.runId); return r && r.days ? r.days[p] : null; };
     const SPECIAL = { __CARRIER__: 'CARRIER', __OPEN__: 'OPEN' };
 
     function headCells(first) {
@@ -210,7 +215,7 @@
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       ['run-days', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('publish').disabled = !canSave() || kind === 'old' || !!publishBusy;
-      if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'Publish to Daily Dispatch';
+      if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'PUBLISH TO WEEKLY DISPATCH';
       document.getElementById('reset').disabled = !canReorder() || kind !== 'live';
       showNote(kind, preview);
       const ob = document.getElementById('override');
@@ -223,7 +228,7 @@
       const unitParts = (d) => [[d.truck, d.truckId, 'TRUCK'], [d.trailer, d.trailerId, 'TRAILER']].filter(x => x[0]).map(x => ({ text: x[0], off: offOf(x[2], x[1], x[0]) }));
       const unitsText = (d) => unitParts(d).map(u => u.text + (u.off ? ' (' + u.off + ')' : '')).join(' / ');
       const unitsHtml = (d) => unitParts(d).map(u => escapeHtml(u.text) + (u.off ? ' <b class="unit-down">' + escapeHtml(u.off) + '</b>' : '')).join(' / ');
-      const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads);
+      const ctx = L.weeklyContext(rows, lists.allDrivers, lists.exceptions, plantLoads, masterDay);
       plantCtx = ctx;
       document.getElementById('heads').innerHTML = headCells('<th>Route</th><th>Run / Destination</th>');
       // Joe 10/23: clicking a run's name shows "+ Extra this week" (a second line for this week only); an extra line reads THIS WEEK ONLY
@@ -252,7 +257,7 @@
           if (cls === 'coverage' && !override) return '<td class="day off c-coverage" data-day="' + p + '" title="' + escapeHtml(String(r.coverageType || 'Covered') + ' covers this run') + '"></td>';
           const units = [d.truck, d.trailer].filter(Boolean).join(' / '), plant = L.plantFor(ctx, r, p);
           const name = d.driver || (cls === 'coverage' ? r.coverageType : cls === 'vacation-needs' ? coverText(L.offCover(r, p, d.date, ctx)) : cls === 'plant' ? 'PLANT LOAD' : cls === 'carrier' ? (L.coveredRoute(r) ? String(r.coverageType).toUpperCase() : 'CARRIER') : '\u2014 NEEDS DRIVER \u2014');
-          const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (on two runs that day)' : cls === 'plant' ? ', needs a driver' : cls === 'vacation-needs' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
+          const full = name + (units ? ', ' + unitsText(d) : '') + (cls === 'conflict' ? ' (off that day)' : cls === 'booked' ? ' (times overlap: ' + L.weeklyClash(ctx, r, p) + ')' : cls === 'plant' ? ', needs a driver' : cls === 'vacation-needs' ? ', needs a driver' : '') + (plant ? '. ' + L.plantTitle(plant) : '');
           // Joe 10/20 ("Donnie Rugg is off, but it's not pronounced good enough"): a run whose driver is off reads NEEDS DRIVER in
           // white on solid red, with who is off and why under it, until someone picks a driver.
           const off = !d.driver && cls === 'vacation-needs' && L.offCover(r, p, d.date, ctx);
@@ -261,7 +266,7 @@
             (units ? '<span class="unit">' + unitsHtml(d) + '</span>' : '') + '</td>';
         }).join('') + '</tr>').join('') || '<tr><td colspan="9" class="empty">' + (kind === 'old' ? 'This older week was not kept in Operations.' : kind === 'future' ? 'Loading Route Master to preview this week.' : 'This week is not one of the copied Live weeks.') + '</td></tr>';
 
-      const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week, lists.backups);
+      const board = L.driverBoardRows(lists.allDrivers, rows, lists.exceptions, week, lists.backups, masterDay);
       document.getElementById('board-heads').innerHTML = headCells('<th>Driver</th>');
       let role = '';
       document.getElementById('board-rows').innerHTML = board.map(b => {
@@ -283,7 +288,9 @@
     /* ---------- One day of one run: driver (with NEEDS DRIVER, CARRIER, OPEN, NOT RUNNING), truck and trailer ---------- */
     function driverOptions(row, day) {
       const d = row.days[day], date = d.date, busy = {};
-      rows.forEach(r => { const x = r.days[day]; if (r !== row && x.runs && x.driverId) busy[x.driverId] = 'on ' + r.route; });
+      // Joe 11/6 (Cooney on 8301, back before this run leaves): a driver on another run that day is only left out when its time on
+      // the road overlaps this one (L.driverClash); Load 1 and Load 2 of the same route never block each other.
+      rows.forEach(r => { const x = r.days[day]; if (r === row || !x.runs || !x.driverId || busy[x.driverId]) return; const why = L.driverClash(row, r, day, masterDay); if (why) busy[x.driverId] = why; });
       const who = String(d.driver || '').toUpperCase();
       // Joe 10/13 (836 PECK): a plant load can be marked Not running here too, and put back to needing a driver.
       const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && (L.plantCarrier(plant) || L.coveredRoute(row));
@@ -507,7 +514,7 @@
       saveOptimistic('resetWeek', { weekStart: week }, () => {}, () => {}, render);
     };
     /*
-     * Publish to Daily Dispatch. On the Live Next week (or, from a preview week, the stored Next week) it moves the weeks on,
+     * PUBLISH TO WEEKLY DISPATCH (Joe 11/6: was Publish to Daily Dispatch). On the Live Next week (or, from a preview week, the stored Next week) it moves the weeks on,
      * as on the current screen: a second click within 8 seconds confirms, saves still on their way finish first, then Current
      * becomes Previous, Next becomes Current, the new Next week is built, and the screen opens the new Next week.
      * On the Current or Previous week one click records that the week was checked and sent.
@@ -545,7 +552,13 @@
       const out = await saveOptimistic('publishWeek', { weekStart: target }, () => {}, () => {}, render);
       publishBusy = false; publishArmed = '';
       if (!out || !out.nextWeek) { say(''); return; }
-      noteText = out.message || ('Week pushed live. Current is now ' + shortDate(out.currentWeek) + '.'); noteKind = 'good';
+      // Joe 11/6: right after publishing, the screen switches to Weekly Dispatch (the week just published). Publishing sends no texts
+      // and no email; he sends them himself from there. Coming back to the Template opens the new Next week.
+      const message = out.message || ('Week pushed live. Current is now ' + shortDate(out.currentWeek) + '.');
+      try { if (who) { localStorage.setItem('ud.weekly.week.' + who, out.nextWeek); localStorage.setItem('ud.weekly.next.' + who, out.nextWeek); } } catch (e) { /* storage off */ }
+      try { sessionStorage.setItem('ud.weekly.published', message); } catch (e) { /* storage off */ }
+      if (window.self === window.top) { location.href = 'weekly.html?view=live' + testQuery; return; }
+      noteText = message; noteKind = 'good';
       live = { previous: out.previousWeek, current: out.currentWeek, next: out.nextWeek };
       week = out.nextWeek;
       runs = [];
@@ -638,7 +651,8 @@
     }
     // Route Master, read only while a week after Next is open (its preview).
     function watchRoutes(db) {
-      if (weekKind() !== 'future' || unsubscribeRoutes) return;
+      // Joe 11/6: always read, so the driver lists and pink overlap use Route Master's leave time and hours when the week has none.
+      if (unsubscribeRoutes) return;
       unsubscribeRoutes = onSnapshot(collection(db, 'routes'), snap => { routeList = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read Route Master: ' + e.message));
     }
     function move(days) { noteText = ''; week = L.addDays(week, days); watch(); }
@@ -672,6 +686,8 @@
       // it brings in the following next week"): Weekly opens on the week he last picked here; with none picked, or when the week he
       // was on has since been published, on the Live Next week. It never moves by the calendar.
       if (liveView) {
+        // Just published on the Template: what the Publish did shows here, once.
+        try { const m = sessionStorage.getItem('ud.weekly.published'); if (m) { sessionStorage.removeItem('ud.weekly.published'); noteText = m; noteKind = 'good'; } } catch (e) { /* storage off */ }
         const first = await getDoc(doc(db, 'config', 'app')).then(s => (s.data() || {}).liveWeeks || {}, () => ({}));
         if (first.current) { live = first; week = first.current; }
         opened = true; watch(); return;

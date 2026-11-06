@@ -24,6 +24,8 @@
 const ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
 // Joe 11-2-26: the old Apps Script address opens "Sorry, unable to open the file"; UDMS now runs on its own Firebase site.
 const UDMS_URL = 'https://udms-bfccd.web.app/';
+// Joe 11-6-26: the Accident & Injury Reporting app on the hub too; it has one address (its own Firebase site).
+const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
 
 class HubError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -44,11 +46,13 @@ function apps(project) {
     // Joe 11-5-26: the Route & Trip Estimator moved off ChatGPT into this project; its PC Miler key is on Keys & Connections.
     { key: 'routes', name: 'Route & Trip Costs', note: 'Round-trip cost for a delivery or plant transfer, with PC Miler truck miles and tolls', url: site('routes'), may: isAdmin },
     // Joe 11-6-26: route cost analysis as its own app (united-dairy-route-cost), linked from the hub.
-    { key: 'routecost', name: 'Route Cost Analysis', note: 'Monthly delivery cost by route and stop: cost per case, per stop and per day on the road', url: site('route-cost'), may: isAdmin }
+    { key: 'routecost', name: 'Route Cost Analysis', note: 'Monthly delivery cost by route and stop: cost per case, per stop and per day on the road', url: site('route-cost'), may: isAdmin },
+    // Joe 11-6-26: "You don't have the link to the accident app." Anyone enabled can report an accident or injury.
+    { key: 'accident', name: 'Accident & Injury Reporting', note: 'Report an accident or injury from a phone, tablet or computer', url: ACCIDENT_URL, may: isActive }
   ];
 }
 
-const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost'];
+const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident'];
 const ALWAYS = 'operations';
 
 /** The apps a person may open: their saved ticks, or the rule above when none are saved. Plant & Distribution always. */

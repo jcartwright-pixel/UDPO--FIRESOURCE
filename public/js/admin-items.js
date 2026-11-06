@@ -36,9 +36,8 @@ export const ADMIN_GROUPS = [
   ]],
   // Batch 8, mock-up 2 (10/23): dispatch set-up lives on the Dispatch Administration page; this list keeps one line for it.
   // The other dispatch items stay here (Find a setting and ?item= still open them) but are left off the list ('moved').
-  ['Dispatch & Fleet', 'Dispatch set-up (on the Dispatch Administration page), fleet service rules and GPS', [
+  ['Dispatch & Fleet', 'Dispatch set-up (on the Dispatch Administration page) and GPS', [
     ['dispatch-admin', 'Dispatch Administration', 'Dispatch rules, carriers and the dispatch administration cards.', 'admin.html', 'distribution-truck-v1-560.webp'],
-    ['fleet-setup', 'Fleet Service Setup', 'Service rules: PM miles, reefer months, annual inspection and plate warnings.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp'],
     ['gps', 'GPS Setup', 'The Verizon Connect sign-in and a plain pass or fail test.', 'gps.html', 'pin'],
     ['ops', 'Operational Assignments', 'Branch, carrier and CVG assignments drivers can be given on Daily Dispatch.', 'ops.html', 'people', 'moved'],
     ['print', 'Print Layouts', 'How the dispatch sheets print.', 'print.html', 'day', 'moved'],
@@ -77,6 +76,11 @@ export const ADMIN_GROUPS = [
   ['Plant Maintenance Setup', 'Set-up for Plant Maintenance', [
     ['maint-crew-setup', 'Maintenance Schedule Setup', "Plant Maintenance's own schedule: its areas and shifts, jobs, mechanics and time-off limits.", 'maint-crew.html?view=setup', 'wrench'],
     ['plant-equipment', 'Maintenance Equipment', 'What maintenance looks after besides the production machines (refrigeration, boilers, compressors, the building): add and edit it.', 'plant-equipment.html', 'gear']
+  ]],
+  // Joe 11-6-26: Fleet Maintenance Setup, beside Plant Maintenance Setup; Fleet Service Setup moved here from Dispatch & Fleet
+  // (?item=fleet-setup and Find a setting still open it).
+  ['Fleet Maintenance Setup', 'Set-up for the garage and Fleet Service', [
+    ['fleet-setup', 'Fleet Service Setup', 'Service rules (PM miles, reefer months, annual inspection and plate warnings) and the garage technicians.', 'fleet.html?view=setup', 'maintenance-trailer-v1-560.webp']
   ]],
   // Joe 10/12: Driver Station and Plant Station moved to Links & Codes. Review item 54 (Joe 10/13): Phone Screens is gone.
   // Audit batch 6: the date tools work on the practice copy's sheets only, so the live app leaves them off the list.

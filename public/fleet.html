@@ -57,10 +57,10 @@
     // unit's dates and the garage technicians, managers and administrators only (garage.js saveFleet).
     const L = window.UDLogic;
     const STATUS = { OVERDUE: ['Overdue', 'warn'], AT_GARAGE: ['At garage', 'yes'], DUE_SOON: ['Due soon', 'warn soon'], NO_MILES: ['No miles yet', 'no'], SET_UP: ['Needs start date', 'no'], OK: ['OK', 'yes'] };
-    const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours', workOrders: 'work orders', garageTechs: 'technician list' };
+    const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours', workOrders: 'work orders', garageTechs: 'technician list', employees: 'employee list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
     let editing = null;
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
+    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], employees = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
     // Joe 10/13: Fleet Service follows the plant you are in (the plant home you came through, as the plant pages do; Uniontown
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
     // before plants were kept (no facility) is Uniontown's.
@@ -216,9 +216,11 @@
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
           '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
-            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
+            const emp = L.employeeForTech(employees, x);
+            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + (emp ? '<small class="fs-emp">Signs in with employee ID</small>' : '') + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
           }).join(''), 'No technicians yet.') +
-          (boss ? '<div class="fs-addtech"><input id="tech-name" placeholder="New technician name" maxlength="40" aria-label="New technician name"><input id="tech-login" placeholder="Login ID (4 or 6 digits)" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
+          (boss ? '<div class="fs-addtech"><input id="tech-name" list="tech-people" placeholder="Pick or type the name" maxlength="40" aria-label="New technician name" autocomplete="off"><datalist id="tech-people">' + techPeople().map(e => '<option value="' + escapeHtml(e.label) + '">' + escapeHtml(e.dept) + '</option>').join('') + '</datalist>' +
+            '<input id="tech-login" placeholder="Employee ID fills in" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
         foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations. Login IDs are never shown once saved.';
       }
       const s = document.getElementById('search');
@@ -229,6 +231,7 @@
       // Batch 5 (10/23): no Save Rules button; a rule saves when its box is left.
       document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; i.onchange = saveRules; });
       const ta = document.getElementById('tech-add'); if (ta) ta.onclick = addTech;
+      const tn = document.getElementById('tech-name'); if (tn) tn.oninput = () => { const who = pickedPerson(tn.value); if (who) document.getElementById('tech-login').value = who.id; };
     }
 
     const jobRank = (x) => { const st = String(x.status || 'NEW').toUpperCase(); return st === 'WORKING' ? 0 : st === 'NEW' && String(x.source).toUpperCase() === 'OFFICE' ? 1 : st === 'PARTS' ? 2 : 3; };
@@ -281,11 +284,21 @@
       try { await save('saveFleetRules', { rules: out, facilityId: plant.id }); ruleDraft = {}; }
       catch (err) { showError(err.message + ' Change the box again to retry.'); }
     }
+    // Joe 11-6-26: the names to add come from the Employees list (the garage's first); picking one fills in their employee ID
+    // as the login ID ("SHAUN MARTIN" from "MARTIN, SHAUN"). The zeros at the front or back never have to be typed.
+    const firstLast = (n) => { const m = /^([^,]+),\s*(.+)$/.exec(String(n || '')); return (m ? m[2] + ' ' + m[1] : String(n || '')).trim().toUpperCase(); };
+    function techPeople() {
+      const taken = {}; techs.forEach(t => { taken[L.personKey(t.name)] = true; });
+      return employees.filter(e => e.employeeId && e.active !== false && e.status !== 'GONE' && !taken[L.personKey(e.name)])
+        .map(e => ({ label: firstLast(e.name), id: String(e.employeeId), dept: e.department || '', garage: e.department === 'GARAGE' }))
+        .sort((a, b) => (b.garage - a.garage) || a.label.localeCompare(b.label));
+    }
+    const pickedPerson = (name) => techPeople().find(e => e.label === String(name || '').trim().toUpperCase()) || null;
     async function addTech() {
-      const name = document.getElementById('tech-name').value.trim(), loginId = document.getElementById('tech-login').value.trim();
+      const name = document.getElementById('tech-name').value.trim(), loginId = document.getElementById('tech-login').value.trim(), person = pickedPerson(name);
       if (!name) { showError('Type the technician\'s name'); return; }
       showError('');
-      try { await save('saveGarageTech', { op: 'ADD', name, loginId, facilityId: plant.id }); } catch (err) { showError(err.message); }
+      try { await save('saveGarageTech', { op: 'ADD', name, loginId, employeeId: person ? person.id : '', facilityId: plant.id }); } catch (err) { showError(err.message); }
     }
     // Unit Edit (FleetService.html:141-150): track, last service, reefer hours now, DOT due, plate expires, notes.
     function openUnit(unit) {
@@ -454,6 +467,7 @@
       loadWaiting().then(render);
       watch('workOrders', v => { rawOrders = v; pick(); unlinked(); });
       watch('garageTechs', v => { rawTechs = v; pick(); });
+      watch('employees', v => { employees = v.filter(e => !e.facilityId || e.facilityId === plant.id); });
       let stopRules = null;
       const follow = () => {
         if (stopRules) stopRules();

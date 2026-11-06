@@ -393,3 +393,35 @@ test('Joe 10/19: a branch box load starts the week as not running; every other r
   const ran = loads.map(r => L.DAYS.filter(p => L.buildWeekRun(r, '2026-10-18', pctx).days[p].runs));
   assert.deepEqual(ran, [['mon', 'tue'], ['tue'], []]);
 });
+
+test('Weekly: a driver on two runs is pink only when their times on the road overlap; Load 1 and Load 2 of one route never (Joe 11-6-26)', () => {
+  const day = (o) => Object.fromEntries(L.DAYS.map((p, i) => [p, Object.assign({ date: L.addDays('2026-11-08', i), runs: false }, p === 'wed' ? o : {})]));
+  // Times as the Live week keeps them: dispatch in minutes of the day, route hours.
+  const early = { route: '8301', runId: 'r8301', days: day({ runs: true, driverId: 'w', driver: 'COONEY, WILLIAM', dispatchTime: 3 * 60 + 30, routeHours: 10 }) }; // back 1:30 PM
+  const late = { route: '849', runId: 'r849', days: day({ runs: true, driverId: 'w', driver: 'COONEY, WILLIAM', dispatchTime: 16 * 60 + 30, routeHours: 14 }) }; // leaves 4:30 PM
+  const load1 = { route: '6301', run: '6301_1', runId: 'r63a', days: day({ runs: true, driverId: 't', driver: 'THOMAS, CARSON', dispatchTime: 5 * 60, routeHours: 8 }) };
+  const load2 = { route: '6301_2', run: '6301_2', runId: 'r63b', days: day({ runs: true, driverId: 't', driver: 'THOMAS, CARSON', dispatchTime: 9 * 60, routeHours: 6 }) };
+  const a = { route: '813', runId: 'r813', days: day({ runs: true, driverId: 'k', driver: 'KEMP, JOHN', dispatchTime: 90, routeHours: 12 }) };
+  const b = { route: '8302', runId: 'r8302', days: day({ runs: true, driverId: 'k', driver: 'KEMP, JOHN', dispatchTime: 5 * 60 + 30 }) }; // no hours on the week
+  const rows = [early, late, load1, load2, a, b];
+  const ctx = L.weeklyContext(rows, [], [], [], () => null);
+  assert.deepEqual(rows.map(r => L.weeklyCellClass(r, 'wed', ctx)), ['assigned', 'assigned', 'assigned', 'assigned', 'booked', 'booked'],
+    'back before the next run leaves is fine; same route is fine; overlapping or not known stays pink');
+  assert.equal(L.weeklyClash(ctx, a, 'wed'), 'ON 8302 — TIMES NOT KNOWN');
+  // Route Master's hours fill in a day the week has none for: 8302 leaves 5:30 AM for 10 hours, still inside 813's 1:30 AM to 1:30 PM.
+  const rm = (row, p) => row.runId === 'r8302' ? { dispatchTime: 330, hours: '10' } : null;
+  const ctx2 = L.weeklyContext(rows, [], [], [], rm);
+  assert.equal(L.weeklyClash(ctx2, a, 'wed'), 'ON 8302 UNTIL 3:30 PM');
+  assert.equal(L.weeklyClash(ctx2, b, 'wed'), 'ON 813 UNTIL 1:30 PM');
+  // The driver list: Cooney on 8301 is offered for a run leaving after 8301 is back; not for one leaving while 8301 is out.
+  assert.equal(L.driverClash(late, early, 'wed'), '');
+  const midday = { route: '6302', days: day({ runs: true, dispatchTime: 9 * 60, routeHours: 8 }) };
+  assert.equal(L.driverClash(midday, early, 'wed'), 'ON 8301 UNTIL 1:30 PM');
+  // Fifteen minutes' leeway at the turn, as the truck and trailer lists.
+  const turn = { route: '852', days: day({ runs: true, dispatchTime: 13 * 60 + 20, routeHours: 14 }) };
+  assert.equal(L.driverClash(turn, early, 'wed'), '');
+  // The Driver Assignment Board follows the same rule.
+  const drivers = ['w', 't', 'k'].map(id => ({ id, name: id, status: 'ACTIVE' }));
+  const board = L.driverBoardRows(drivers, rows, [], '2026-11-08', [], () => null);
+  assert.deepEqual(board.map(x => x.id + ' ' + x.days.wed.kind), ['k booked', 't assigned', 'w assigned']);
+});

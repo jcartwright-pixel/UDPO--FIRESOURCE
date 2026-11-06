@@ -192,7 +192,7 @@ async function deleteDriver(tx, db, req, email, stamp, logRef, mode) {
  * Driver Weekly Template (udpoV780DriverWeeklyTemplateSave_): one driver's normal day in Driver Master: Available, Off, or the
  * runs they drive (more than one allowed). A run must be active in Route Master and run that day, and belongs to one driver a day.
  * Then, like the current save (udpoV7267DriverMasterToLive_), the copied Live weeks from this week on take the new driver on
- * those days, except days someone changed by hand (route_override).
+ * those days, except days someone changed by hand (route_override) and loads already loaded.
  */
 async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection(C.drivers).doc(M.safeIdPart(req.driverId));
@@ -225,7 +225,10 @@ async function saveDriverTemplate(tx, db, req, email, stamp, logRef, mode) {
   const result = { ok: true, requestId: req.requestId, runs: [] }, mine = new Set(req.runIds), live = [];
   runSnap.docs.forEach(s => {
     const run = s.data(), day = run.days && run.days[p], date = L.addDays(run.weekStart, L.DAYS.indexOf(p));
-    if (!day || date < today || L.yes(day.routeOverride)) return;
+    // Joe 11/6 ("make sure it's also changing not only the current live sheet, but the future live sheet, and it has to change the
+    // master"): this week (Weekly Dispatch) and next week (the Weekly Dispatch Template) both follow, from today on. A day changed
+    // by hand on that week keeps the hand change, and a load already loaded is not touched.
+    if (!day || date < today || L.yes(day.routeOverride) || L.isLoaded(day)) return;
     let after = null;
     if (mine.has(run.runId) && day.runs && day.driverId !== d.id) after = { driverId: d.id, driver: d.name };
     else if (!mine.has(run.runId) && day.driverId === d.id) after = { driverId: '', driver: '' };
