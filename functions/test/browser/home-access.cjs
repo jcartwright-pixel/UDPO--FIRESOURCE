@@ -224,7 +224,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in eight groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in nine groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');

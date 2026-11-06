@@ -228,7 +228,7 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 .adm-nav-list { padding: 8px 10px 12px; }
 .adm-nav-group { margin: 0 0 4px; }
 .adm-nav-group h2 { margin: 0; font-size: 17px; letter-spacing: 0; text-transform: none; }
-.adm-gh { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; border: 0; border-radius: 9px; background: #c8102e; color: #fff; font: inherit; font-size: 17px; font-weight: 900; text-align: left; padding: 8px 12px; cursor: pointer; }
+.adm-gh { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 36px; border: 0; border-radius: 9px; background: #c8102e; color: #fff; font: inherit; font-size: 17px; font-weight: 900; text-align: left; padding: 6px 12px; cursor: pointer; }
 .adm-gh:hover { background: #a90d26; }
 .adm-gh::before { content: '\25B8'; width: 16px; flex: none; }
 .adm-nav-group.open .adm-gh::before { content: '\25BE'; }
