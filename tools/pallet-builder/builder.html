@@ -112,6 +112,7 @@ details summary{cursor:pointer;font-weight:600}
 .sizes .row b{font-family:var(--f-mono);font-weight:500}
 .sizes .tot{border-top:1px solid var(--line);padding-top:4px;font-weight:600}
 .part{color:var(--muted);font-size:.78rem}
+.lm-plan{display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--line);padding-top:14px;min-width:0}
 .lm{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:760px){.lm{grid-template-columns:minmax(0,1fr)}}
 .truck{background:#3f4a55;border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(3,1fr) 10px repeat(3,1fr);gap:4px}
@@ -194,11 +195,22 @@ details.items[open]>summary{margin-bottom:8px}
       <div class="lm-right">
         <div class="addline"><button id="lmMerge">Merge checked stops</button><button id="lmFromRun">Load seq = run order</button><button id="lmFromBol">Back to BOL load seq</button><span class="hint" id="lmMsg"></span></div>
         <div class="tbl"><table id="lmTable"></table></div>
+        <!-- Joe 11-5-26: the route totals sit right below the stop list (the sequencing), beside the truck. -->
+        <section class="lm-plan" aria-label="Load plan">
+          <div class="panel-head"><h2>Route totals and load plan</h2><button id="copyPlan">Copy plan</button></div>
+          <div class="tiles" id="tiles"></div>
+          <div class="outrow" id="outRow"></div>
+          <div class="warns" id="warns"></div>
+          <details id="sizeWrap"><summary>Cases by size for the whole route</summary><div class="tbl"><table id="sizeTable"></table></div></details>
+          <div class="tbl"><table id="stopTable"></table></div>
+          <div class="legend"><span><span class="chip Crate">Crate</span> 54 per pallet</span><span><span class="chip Box">Box</span> in a crate</span><span><span class="chip Dispenser">Dispenser</span> in a crate</span><span><span class="chip Tote">Tote</span> 1 spot</span></div>
+          <div class="detail" id="detail"></div>
+        </section>
       </div>
     </div>
   </section>
 
-  <div class="cols">
+  <div class="orders">
     <section class="panel" aria-label="Orders">
       <div class="panel-head">
         <h2>Orders in delivery order</h2>
@@ -220,16 +232,6 @@ details.items[open]>summary{margin-bottom:8px}
       </details>
     </section>
 
-    <section class="panel" aria-label="Load plan">
-      <div class="panel-head"><h2>Route totals and load plan</h2><button id="copyPlan">Copy plan</button></div>
-      <div class="tiles" id="tiles"></div>
-      <div class="outrow" id="outRow"></div>
-      <div class="warns" id="warns"></div>
-      <details id="sizeWrap"><summary>Cases by size for the whole route</summary><div class="tbl"><table id="sizeTable"></table></div></details>
-      <div class="tbl"><table id="stopTable"></table></div>
-      <div class="legend"><span><span class="chip Crate">Crate</span> 54 per pallet</span><span><span class="chip Box">Box</span> in a crate</span><span><span class="chip Dispenser">Dispenser</span> in a crate</span><span><span class="chip Tote">Tote</span> 1 spot</span></div>
-      <div class="detail" id="detail"></div>
-    </section>
   </div>
 </div>
 <datalist id="plist"></datalist>
@@ -460,8 +462,6 @@ function plan(){
       if (x.special === 'Tanker') { tankers.push({stop:i, x}); return; }
       if (x.special === 'Bulk') { loose.push({stop:i, x}); warns.push(`Order ${i+1}: ${x.label} is sold by the pound and has no pallet rule yet.`); return; }
       if (x.special === 'Tote') { s.totes += x.units; s.share += x.units; return; }
-      if (!x.upc) warns.push(`Order ${i+1}: ${x.label}. Each unit is counted as its own case.`);
-      if (x.noWt) warns.push(`Order ${i+1}: a product in ${x.label} has no weight, so it's left out of the weight.`);
       s.cases += x.cases; s.units += x.units; s.wt += x.wt; s.share += x.cases / x.cpp;
     });
   });

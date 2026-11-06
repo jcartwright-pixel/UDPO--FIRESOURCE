@@ -36,3 +36,12 @@ test('dispensers and boxes ride inside crates (Joe 11-5-26): 54 to a pallet and 
   assert.match(src, /out\.Crate \+ out\.Box \+ out\.Dispenser\)\}<\/b> crates/, 'Going out adds dispensers and boxes into the crates');
   assert.ok(!/<\/b> boxes · /.test(src) && !/<\/b> dispensers\$\{/.test(src), 'no separate boxes and dispensers counts going out');
 });
+
+test('route totals sit right under the stop list beside the truck, without the no-weight and case-count notes (Joe 11-5-26)', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  const right = src.indexOf('<div class="lm-right">'), list = src.indexOf('id="lmTable"'), totals = src.indexOf('aria-label="Load plan"'), orders = src.indexOf('aria-label="Orders"');
+  assert.ok(right > 0 && right < list && list < totals && totals < orders, 'Route totals and load plan comes right after the stop list, in the same column, before Orders');
+  assert.ok(!/has no weight, so it's left out/.test(src), 'no "has no weight" notes');
+  assert.ok(!/Each unit is counted as its own case\./.test(src), 'no "case count not set" notes');
+  assert.match(src, /isn't in the product list, so it isn't counted/, 'a product missing from the list is still named');
+});
