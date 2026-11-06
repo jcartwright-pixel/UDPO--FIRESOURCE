@@ -38,8 +38,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
     assert.equal(await p.textContent('#hello'), 'Your apps, Pat');
     assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
-    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs']);
-    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 5, 'every card has its picture');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs', 'Route Cost Analysis']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 6, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 });
     await p.waitForSelector('#tiles a');
