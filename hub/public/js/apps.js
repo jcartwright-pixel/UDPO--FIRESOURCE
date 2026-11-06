@@ -30,3 +30,22 @@ export const LOOK = {
   keys: { color: '#8a2d3b', icon: path('<circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M17 5l2 2M15 7l2 2"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
+
+// The Home screen's areas (Joe 11-5-26: "have a menu option to divide areas of the program"). Each app and each
+// Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
+export const AREAS = [
+  { key: 'plant', name: 'Plant & Delivery', note: 'Running the plant, dispatch, customers and routes', apps: ['operations', 'customers'] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use and what each trip costs', apps: ['fuel', 'routes'] },
+  { key: 'people', name: 'People & Compliance', note: 'Employee records, drivers and hiring', apps: ['udms'] },
+  { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
+    { name: 'Who gets in', items: ['people', 'roles'] },
+    { name: 'Messages and links', items: ['email', 'links'] },
+    { name: 'Plants and connections', items: ['plant-setup', 'keys'] }
+  ] }
+];
+export const areaOf = (key) => (AREAS.find(a => (a.apps || []).indexOf(key) >= 0) || AREAS[0]).key;
+// The area pictures for the menu.
+export const AREA_ICON = {
+  all: path('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  plant: LOOK['plant-setup'].icon, fleet: LOOK.operations.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
+};

@@ -9,8 +9,9 @@ screens: index.html
 The **United Dairy Hub** is the one place to sign in and open every United Dairy app. Sign in with the same United Dairy Google account as Operations. You see a tile for each app you are allowed to use.
 
 1. Press `Sign in with Google` and pick your United Dairy account.
-2. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
-3. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
+2. Home shows your apps in areas: **Plant & Delivery**, **Fleet & Costs**, **People & Compliance**, and for administrators **Administration**. The **Areas** menu on the left (along the top on a phone) shows one area at a time; the number is how many cards it has. **Everything** shows them all.
+3. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
+4. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
 
 ### The apps
 - **Plant & Distribution** (the Operations app): dispatch, the plant floor, fleet, schedules and plant reports.
@@ -19,11 +20,19 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Employees & Compliance** (UDMS): employee records, driver qualification, accidents, workers' comp and hiring.
 - **Route & Trip Costs** (the Route Estimator): the round-trip cost of a delivery or plant transfer, with PC Miler truck miles and tolls.
 
+### The areas
+- **Plant & Delivery**: Plant & Distribution and Customers & Routes.
+- **Fleet & Costs**: Fuel Tracking and Route & Trip Costs.
+- **People & Compliance**: Employees & Compliance.
+- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes) and **Plants and connections** (Plant Setup, Keys & Connections).
+
 ### Which cards you see
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance** and **Route & Trip Costs**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler.
+
+> A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
