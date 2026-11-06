@@ -35,11 +35,11 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
   try {
     let p = await open(browser, 'pat.admin@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes']);
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
     assert.equal(await p.textContent('#hello'), 'Your apps, Pat');
     assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
-    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs']);
-    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 5, 'every card has its picture');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs', 'Route Cost Analysis']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 6, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 });
     await p.waitForSelector('#tiles a');
@@ -59,8 +59,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.$$eval('#rows tr[data-email]', r => r.length), 2);
     // Each app is a tick box, ticked for what each person can open now.
     const ticks = (email) => p.$$eval('#rows tr[data-email="' + email + '"] input[data-app]', b => b.map(x => x.dataset.app + (x.checked ? '+' : '-')).join(' '));
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes-');
-    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+');
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes- routecost-');
+    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+ routecost+');
     assert.ok(await p.isDisabled('#rows tr[data-email="pat.admin@uniteddairy.com"] input[data-app="fuel"]'), 'nobody unticks their own apps');
     assert.ok(await p.isDisabled('#rows tr[data-email="sam.sales@uniteddairy.com"] input[data-app="operations"]'), 'Plant & Distribution stays on');
     // Tick Fuel Tracking for Sam: it saves at once, and Sam's Home gets the Fuel card.
@@ -68,14 +68,14 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#list-msg.good');
     assert.match(await p.textContent('#list-msg'), /Sam Sales can now open Fuel Tracking/);
     assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel']);
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes-');
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes- routecost-');
     assert.equal(await p.$eval('#edit', b => b.querySelector('.pblock') === null), true, 'ticking does not open the person');
     // The page scrolls (Joe 11-3-26: "You can't scroll on this screen").
     await p.setViewportSize({ width: 1280, height: 400 });
     await p.evaluate(() => window.scrollTo(0, 300));
     assert.ok(await p.evaluate(() => window.scrollY > 0), 'People & Access scrolls');
     await p.setViewportSize({ width: 1920, height: 1080 });
-    await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"]');
+    await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"] td.who');
     // Joe 11-4-26: the person opens on the whole page; the list is out of the way and the address names them.
     await p.waitForSelector('.people.full #f-role');
     assert.ok(await p.isHidden('#rows'), 'the list steps aside while a person is open');

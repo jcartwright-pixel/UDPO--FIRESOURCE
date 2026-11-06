@@ -8,6 +8,7 @@
  *   Fuel Tracking (Fuel)                    Administrators only (the same rule as fuelApp)
  *   Employees & Compliance (UDMS)           Administrators for now: UDMS keeps its own access list and checks again
  *   Route & Trip Costs (Route Estimator)    Administrators only (the same rule as routeEstimator), like Fuel Tracking
+ *   Route Cost Analysis                     Administrators only (the same rule as routeCost), like Fuel Tracking
  * Joe 11-3-26 ("tick ... which apps each person is allowed to see and use ... pre-tick" what they have now): People & Access
  * can tick each app per person. Those ticks are kept in appAccess/<email> (not on the Users list, which is still copied from
  * the Users sheet and would lose them). With no ticks saved, a person has the rule above. Plant & Distribution always stays
@@ -41,11 +42,13 @@ function apps(project) {
     { key: 'fuel', name: 'Fuel Tracking', note: 'Monthly fuel use, fuel prices, tank deliveries and trip fuel', url: site('fuel'), may: isAdmin },
     { key: 'udms', name: 'Employees & Compliance', note: "Employee records, driver qualification, accidents, workers' comp and hiring", url: UDMS_URL, may: isAdmin },
     // Joe 11-5-26: the Route & Trip Estimator moved off ChatGPT into this project; its PC Miler key is on Keys & Connections.
-    { key: 'routes', name: 'Route & Trip Costs', note: 'Round-trip cost for a delivery or plant transfer, with PC Miler truck miles and tolls', url: site('routes'), may: isAdmin }
+    { key: 'routes', name: 'Route & Trip Costs', note: 'Round-trip cost for a delivery or plant transfer, with PC Miler truck miles and tolls', url: site('routes'), may: isAdmin },
+    // Joe 11-6-26: route cost analysis as its own app (united-dairy-route-cost), linked from the hub.
+    { key: 'routecost', name: 'Route Cost Analysis', note: 'Monthly delivery cost by route and stop: cost per case, per stop and per day on the road', url: site('route-cost'), may: isAdmin }
   ];
 }
 
-const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes'];
+const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost'];
 const ALWAYS = 'operations';
 
 /** The apps a person may open: their saved ticks, or the rule above when none are saved. Plant & Distribution always. */
