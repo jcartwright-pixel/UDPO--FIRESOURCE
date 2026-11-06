@@ -62,6 +62,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
     assert.ok(await p.isVisible('a[data-admin="accounting"]'), 'and Accounting Numbers');
     assert.ok(await p.isVisible('a[data-admin="bol"]'), 'and Daily BOL');
+    assert.ok(await p.isVisible('a[data-admin="routeweekly"]'), 'and Weekly Route Report');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -359,6 +360,35 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Daily BOL: no sideways page scroll on a phone');
     await shot(p, 'hub-bol-390');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'bol.html');
+    await p.waitForSelector('#error:not([hidden])');
+
+    // Weekly Route Report (Joe 11-6-26): MIS's weekly cases by route and store added by hand lands in routeWeekly under its
+    // week-ending Saturday, the label starts as Routes/Sale by Route, and the screen shows routes, stores and cases (no sales).
+    const wkPath = path.join(require('os').tmpdir(), 'Weekly Daily Avg Cases By Route.xls');
+    fs.writeFileSync(wkPath, require('../../../../functions/test/fixtures/route-weekly').sampleXls('2026-10-31'));
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'route-weekly.html');
+    await p.waitForSelector('#pick');
+    assert.match(await p.textContent('#days'), /NO WEEKS YET/);
+    assert.equal(await p.inputValue('#label'), 'Routes/Sale by Route');
+    await p.setInputFiles('#file', wkPath);
+    await p.waitForSelector('#msg.good');
+    assert.match(await p.textContent('#msg'), /WEEK ENDING 10-31-26: 2 ROUTES, 3 STORES READ FROM Weekly Daily Avg Cases By Route\.xls/);
+    assert.deepEqual(await p.$$eval('.bol-routes tbody tr', t => t.map(x => [...x.children].map(c => c.textContent))), [['805', '2', '4', '42'], ['6301', '1', '2', '250']]);
+    assert.equal((await db().collection('routeWeekly').doc('2026-10-31').get()).data().stops[0].customer, 'MADEUP GOLF CENTER');
+    assert.doesNotMatch(await p.textContent('#days'), /5,000|410/, 'no sales on the screen');
+    await p.fill('#mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#enabled');
+    await p.waitForFunction(() => /EVERY MORNING FOR A NEW WEEK/.test(document.querySelector('#mail').textContent));
+    assert.equal(((await db().collection('config').doc('routeWeeklyMail').get()).data() || {}).mailbox, 'pat.sample@uniteddairy.com');
+    await shot(p, 'hub-route-weekly-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'route-weekly.html');
+    await p.waitForSelector('.bol-routes');
+    await shot(p, 'hub-route-weekly-1536');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'route-weekly.html');
+    await p.waitForSelector('.bol-routes');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Weekly Route Report: no sideways page scroll on a phone');
+    await shot(p, 'hub-route-weekly-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'route-weekly.html');
     await p.waitForSelector('#error:not([hidden])');
 
     // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.

@@ -93,8 +93,8 @@ async function fakeAdmin(email, data) {
     return { ok: true, role, message: data.name + ' added. Give it to people in People & Roles.' };
   }
   // Links & Codes: Operations' real calls (functions/src/admin.js OPS) on the emulator, so the hub is tested against them.
-  if (LINK_OPS.indexOf(data.op) >= 0 || EMAIL_OPS.indexOf(data.op) >= 0 || ACCOUNTING_OPS.indexOf(data.op) >= 0 || BOL_OPS.indexOf(data.op) >= 0) {
-    const fn = opsAdmin().OPS[data.op] || opsModule('admintools').OPS[data.op] || opsModule('accounting').OPS[data.op] || opsModule('bol').OPS[data.op];
+  if (LINK_OPS.indexOf(data.op) >= 0 || EMAIL_OPS.indexOf(data.op) >= 0 || ACCOUNTING_OPS.indexOf(data.op) >= 0 || BOL_OPS.indexOf(data.op) >= 0 || WEEKLY_OPS.indexOf(data.op) >= 0) {
+    const fn = opsAdmin().OPS[data.op] || opsModule('admintools').OPS[data.op] || opsModule('accounting').OPS[data.op] || opsModule('bol').OPS[data.op] || opsModule('routeweekly').OPS[data.op];
     try { return await fn(db(), email, data, new Date().toISOString(), { env: {}, mailDeps: { env: {} }, readMail: async () => { throw new Error('Gmail is not reached in the hub tests'); } }); }
     catch (e) { throw Object.assign(new Error(e.message), { status: CODES[e.code] || 'INTERNAL' }); }
   }
@@ -106,6 +106,8 @@ const EMAIL_OPS = ['sentLog', 'setSending', 'setForecastEmail', 'reportGroups', 
 const ACCOUNTING_OPS = ['accountingStatus', 'accountingSaveSettings', 'accountingUpload', 'accountingCheckNow'];
 // Daily BOL: Operations' real calls. Nothing reaches Gmail: the label check answers that it could not be read.
 const BOL_OPS = ['bolStatus', 'bolSaveSettings', 'bolUpload', 'bolCheckNow'];
+// Weekly Route Report: Operations' real calls. Nothing reaches Gmail.
+const WEEKLY_OPS = ['routeWeeklyStatus', 'routeWeeklySaveSettings', 'routeWeeklyUpload', 'routeWeeklyCheckNow'];
 const LINK_OPS = ['appLinks', 'routeCodeNew', 'routeCodeOnOff', 'releaseCodes', 'releaseCodeNew', 'stations', 'stationAdd', 'stationCode', 'stationRemove', 'noAccountSet'];
 // Operations' functions/node_modules may not be installed (the hub's own tests install only hub/functions), so its packages
 // are found in the hub's node_modules when they are not there.
