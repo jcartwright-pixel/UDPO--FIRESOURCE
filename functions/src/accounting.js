@@ -18,9 +18,10 @@
  */
 'use strict';
 
-const XLSX = require('@e965/xlsx');
-const JSZip = require('jszip');
 const OTR = require('./otr-core');
+// The Excel and zip readers are big: loaded only when a file is read, so every other Administration step stays as quick.
+let XLSX = null, JSZip = null;
+const readers = () => { if (!XLSX) { XLSX = require('@e965/xlsx'); JSZip = require('jszip'); } };
 
 const KEYS = ['gallons_sold', 'distribution_cost', 'employee_cost', 'fuel_cost'];
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -41,6 +42,7 @@ async function readPackage(buffer, fileName, yearNow) {
   if (!buffer || !buffer.length) fail('BAD_REQUEST', 'The file is empty');
   if (buffer.length > MAX_BYTES) fail('BAD_REQUEST', 'The file is too big (more than 15 MB)');
   const name = String(fileName || 'file');
+  readers();
   let books = [{ name, data: buffer }];
   if (/\.zip$/i.test(name)) {
     const zip = await JSZip.loadAsync(buffer);
