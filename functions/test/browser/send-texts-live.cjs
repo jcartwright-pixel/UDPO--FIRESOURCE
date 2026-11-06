@@ -71,12 +71,14 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     assert.deepEqual(wk.errors, []);
     await wk.context().close();
 
-    // Daily Dispatch on another week still names (and would send) the posted week.
+    // Daily Dispatch on another week still sends the posted week. Joe 11/6 (ks): Daily's line is short ("Texts sent ..."); the posted
+    // week's dates are on its hover, and the driver count shows on a wide screen.
     for (const [w, h] of [[1920, 1080], [390, 844]]) {
       const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-20&' + ADMIN);
-      await dd.waitForFunction(() => /: Sent /.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
-      assert.match(await dd.textContent('#send-texts'), /posted week, 10-11-26 to 10-17-26/);
-      assert.equal(await dd.textContent('#send-texts button'), 'Send Again: Week of 10-11-26');
+      await dd.waitForFunction(() => /^Texts sent /.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
+      assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
+      assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
+      assert.equal(await dd.textContent('#send-texts button'), 'Send Again');
       assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
       assert.deepEqual(await small(dd), []);
       if (SHOTS) await dd.screenshot({ path: path.join(SHOTS, 'live-send-daily-' + w + '.png') });
@@ -84,7 +86,7 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
         // Send Again needs both taps too, and texts the posted week a second time.
         const at = l.at;
         await dd.click('#send-texts button');
-        assert.equal(await dd.textContent('#send-texts button'), 'Tap Again: Text 1 driver for 10-11-26');
+        assert.equal(await dd.textContent('#send-texts button'), 'Tap Again: Text 1 driver');
         await dd.click('#send-texts button');
         for (let i = 0; i < 100 && (await lastSend()).at === at; i++) await dd.waitForTimeout(100);
         assert.equal((await lastSend()).week, '2026-10-11');

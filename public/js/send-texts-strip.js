@@ -10,7 +10,10 @@ const day = (k) => window.UDLogic.dateText(k);
 const stamp = (t) => { const d = t ? new Date(t) : null; return d && !isNaN(d) ? dateTimeText(d) : ''; };
 const drivers = (n) => n + (n === 1 ? ' driver' : ' drivers');
 
-export function sendTextsStrip(db, el) {
+// opts.short (Daily Dispatch, Joe 11/6 mock-up ks): one short line that fits beside the week and the loadout day; the week shown
+// there is the posted week, so its dates move to the button's hover. The driver count hides on a laptop (.send-more).
+export function sendTextsStrip(db, el, opts) {
+  const short = !!(opts && opts.short);
   let s = null, armed = null, busy = false, error = '', week = null;
   el.className = 'send-strip';
   el.hidden = true;
@@ -19,12 +22,15 @@ export function sendTextsStrip(db, el) {
   function render() {
     if (!s || !s.week) { show(false); return; }
     const keys = s.hasSid && s.hasToken && s.from, n = (s.drivers || []).length, l = s.lastSend, done = !!(l && l.week === s.week);
-    const words = 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + ': ' +
+    const words = short ? 'Texts ' + (done ? '<b>sent</b> ' + stamp(l.at) + '<span class="send-more"> to ' + drivers(l.drivers || 0) + '</span>' + (l.live ? '' : ' (test copy)')
+        : '<b>not sent</b><span class="send-more"> (' + drivers(n) + ' ticked)</span>') + (keys ? '' : '. Set up Administration &gt; Texts first') : 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + ': ' +
       (done ? '<b>Sent</b> ' + stamp(l.at) + ' to ' + drivers(l.drivers || 0) + (l.live ? '' : ' (test copy, written to the list only)') + '.'
         : '<b>Not sent</b> (' + drivers(n) + ' ticked on the Driver Roster).') +
       (keys ? '' : ' Save the Twilio account on Administration &gt; Texts first.');
-    const label = armed ? 'Tap Again: Text ' + drivers(n) + ' for ' + day(s.week) : (done ? 'Send Again: Week of ' : 'Send Schedule Texts: Week of ') + day(s.week);
+    const label = short ? (armed ? 'Tap Again: Text ' + drivers(n) : done ? 'Send Again' : 'Send Texts') : armed ? 'Tap Again: Text ' + drivers(n) + ' for ' + day(s.week) : (done ? 'Send Again: Week of ' : 'Send Schedule Texts: Week of ') + day(s.week);
     el.classList.toggle('sent', done);
+    el.classList.toggle('short', short);
+    el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') : '';
     el.innerHTML = '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (armed ? ' armed' : '') + '"' + (!keys || !n || busy ? ' disabled' : '') + '>' + label + '</button>' +
       (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
     el.querySelector('button').onclick = press;

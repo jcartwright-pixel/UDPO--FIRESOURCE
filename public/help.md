@@ -133,11 +133,19 @@ screens: daily.html
 
 One day's loads: who drives each load, on which truck and trailer, and when it leaves. It is the same sheet as the old Daily Dispatch.
 
+### The top of the screen
+
+- **The buttons** sit on the title line: `Weekly Dispatch`, `Print Daily Schedule`, `Print Weekly Schedule`, `Down Trucks / Trailers`, `Driver Call-Off` and `+ Add Route / Run`.
+- **The line under them** is information: **Week of** (the week on the screen), **Drivers Covered**, the schedule texts line (administrators) and, on the right, **Loadout Day**.
+
 ### Pick the day
 
-- **Loadout Day** (top right) is the day the loads are loaded. Use the arrows or the list to move a day. The line above it says which day those loads deliver.
-- **Week Beginning** moves a whole week.
-- The day you pick stays picked on this computer until you change it.
+- This screen always shows **the current week**. The week cannot be changed here. It moves on by itself on Saturday morning.
+- **Loadout Day** (right, under the buttons) is the day the loads are loaded, Saturday to Friday. Use the arrows or the list to move a day. Beside it, **Delivers** says which day those loads deliver.
+- The arrows stop at the ends of the week (they turn gray).
+- The day you pick stays picked on this computer while it is in the current week.
+
+> To see or plan another week, use `Weekly Dispatch` or the Weekly Dispatch Template.
 
 ### What to do
 
@@ -152,17 +160,17 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 - `Down Trucks / Trailers` lists every load from today on that still has a down unit, with one button to take them off.
 - `Driver Call-Off` marks a driver off for the day.
 - `+ Add Route / Run` adds an extra load for this day.
-- `Print Dispatch Sheet` prints the day's sheet. Its heading names the Sunday the week begins.
+- `Print Daily Schedule` prints the day's dispatch sheet. Its heading names the Sunday the week begins.
+- `Print Weekly Schedule` prints the whole week's Driver Assignment Board on one page, the same page Weekly Dispatch prints. You stay on this screen.
 - `Weekly Dispatch` opens the whole live week, Sunday to Saturday, the week this screen is running. See [Weekly Dispatch](#weekly-live).
 - Managers can drag a line up or down to change the load order.
 
 ### Send schedule texts
 
-Administrators see a strip above the loads: **Schedule texts for the posted week**, with that week's dates, and whether its texts were sent.
+Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers.
 
-1. Check the week on the button: `Send Schedule Texts: Week of ...`.
-2. Press it once. It turns red and says how many drivers it will text.
-3. Press it again within 5 seconds to send. The strip turns green and says when it was sent and to how many drivers.
+1. Press `Send Texts` once. It turns red and says how many drivers it will text.
+2. Press it again within 5 seconds to send. The line turns green and says when it was sent.
 
 - It always sends the posted week, even when you are looking at another week or day here.
 - `Send Again` sends the same week a second time (press it twice too).

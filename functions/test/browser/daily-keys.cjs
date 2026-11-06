@@ -315,30 +315,43 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     assert.deepEqual(sun.errors, []);
     results.push('Sunday 10/11 shows 801 under ALREADY LOADED SATURDAY, 10-10-26, then 802 under LOADING TODAY; count 2 loads');
 
-    // Joe 10/12: the picked day stays after leaving and coming back; a move into another week asks first (Continue or Cancel).
-    const dp = await openPage(browser, 1536, 730, '/daily.html?date=2026-10-10&testEmail=dispatch.test@uniteddairy.com');
+    // Joe 11/6: Daily shows only the current week (loadout Saturday 10/10 to Friday 10/16, delivering 10-11-26 to 10-17-26 here,
+    // "now" being Saturday 10/10). The arrows stop at the ends of the week, greyed with why; there is no week box.
+    const NOW = '&now=2026-10-10T16:00:00Z';
+    const dp = await openPage(browser, 1536, 730, '/daily.html?date=2026-10-10' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForSelector('#rows tr');
-    await dp.click('#prev');
-    await dp.waitForSelector('#week-panel:not([hidden])');
-    assert.match(await dp.textContent('#week-text'), /week beginning 10-11-26 to the week beginning 10-4-26/, await dp.textContent('#week-text'));
-    await dp.click('#week-panel [data-close]');
-    assert.equal(await dp.$eval('#load-day', s => s.value), '2026-10-10', 'Cancel stays on Saturday');
-    await dp.click('#prev');
-    await dp.click('#week-go');
-    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-09');
+    assert.equal(await dp.textContent('#week-of'), '10-11-26 to 10-17-26');
+    assert.equal(await dp.$$eval('#week-begin, #week-prev, #week-next, #week-panel', n => n.length), 0, 'no way to change the week');
+    assert.deepEqual(await dp.$$eval('#load-day option', o => o.map(x => x.value)), ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16']);
+    assert.deepEqual(await dp.$eval('#prev', b => [b.disabled, b.title]), [true, 'Daily Dispatch shows only this week'], 'Saturday is the first day');
     await dp.click('#next');
-    await dp.waitForSelector('#week-panel:not([hidden])');
-    await dp.click('#week-go');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    assert.equal(await dp.$eval('#prev', b => b.disabled), false);
+    await dp.selectOption('#load-day', '2026-10-16');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-16');
+    assert.deepEqual(await dp.$eval('#next', b => [b.disabled, b.title]), [true, 'Daily Dispatch shows only this week'], 'Friday is the last day');
+    assert.match(await dp.textContent('#delivers'), /^Delivers Saturday$/);
+    await dp.click('#prev');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-15');
+    // A link to a day in another week opens today instead.
+    await dp.goto(HOSTING + '/daily.html?date=2026-10-05' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-10');
-    await dp.click('#next');
+    // The kept day stays while it is in the current week; once the week has moved on, today shows.
+    await dp.selectOption('#load-day', '2026-10-11');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
-    assert.equal(await dp.$eval('#week-panel', w => w.hidden), true, 'a move inside the week does not ask');
+    await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com' + NOW);
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com&now=2026-10-17T16:00:00Z');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-17');
+    assert.equal(await dp.textContent('#week-of'), '10-18-26 to 10-24-26');
+    await dp.selectOption('#load-day', '2026-10-18');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-18');
     await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com');
-    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-18');
     // Joe 10/13 ("REMOVE THE GO TO TODAY"): Daily has no Go to today button; the arrows and the day box change the day.
     assert.equal(await dp.$$eval('#go-today, #day-pin', n => n.length), 0, 'no Go to today on Daily');
     assert.deepEqual(dp.errors, []);
-    results.push('Daily keeps the picked day after leaving and coming back; moving into another week asks Continue or Cancel');
+    results.push('Daily shows only the current week: no week box, the arrows stop at Saturday and Friday, a link into another week opens today, the kept day stays inside the week (Joe 11/6)');
 
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
