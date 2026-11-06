@@ -59,7 +59,8 @@ const HEAD = `<!doctype html>
 
 const TAIL = `</script>
   <script type="module">
-    import { requireSignIn, callServer, currentPlant, serverText } from './js/app.js';
+    import { requireSignIn, callServer, currentPlant, serverText, start } from './js/app.js';
+    import { collection, getDocs, query, orderBy, limit } from './js/firebase.js';
     // Joe 11-6-26: the route map is the Customer List's route day (udclRouteDays, through its own server call, customerList,
     // which checks who may change it, checks nobody saved the same route day in between and logs every save). The builder in
     // the frame asks for it through window.udRouteMap: load(route, day) when a route opens, save(...) for Save to route map.
@@ -98,8 +99,28 @@ const TAIL = `</script>
       }
     };
     // The builder keeps its saved routes in this browser (as it always has); the frame is this site's own page, so they stay.
-    requireSignIn(() => {
+    // Joe 11-6-26 (lb): the builder opens with the newest BOL the Hub picked up (bolDays, kept by Hub > Daily BOL in the company
+    // database), shaped like the BOL built into the builder. No BOL there, or it can't be read: the builder's own one stays.
+    const two = (n) => String(n).padStart(2, '0');
+    window.udBolShape = (d) => {
+      if (!d || !d.date || !(d.routes || []).length) return null;
+      const y = d.date.slice(0, 4);
+      // The builder's own route-name key (MM/DD/YY, read back by its routeKey to find the weekday), not a date for people.
+      const tag = d.date.slice(5).replace('-', '/') + '/' + y.slice(2);
+      return { key: 'udpb-hub-' + d.date, label: window.UDLogic.dateText(d.date), date: d.date,
+        routes: d.routes.map(r => ({ route: 'RT ' + r.route + ' \u00b7 ' + tag, bolAt: d.received || d.savedAt || '',
+          stops: (r.stops || []).map(st => ({ name: st.name + (st.seq != null ? ' (sub-rt ' + two(st.seq) + ')' : ''), acct: st.custNo || '',
+            lines: (st.lines || []).map(l => [String(l.item), Number(l.qty) || 0]) })) })) };
+    };
+    async function newestBol() {
+      const { homeDb } = await start();
+      const snap = await getDocs(query(collection(homeDb, 'bolDays'), orderBy('date', 'desc'), limit(1)));
+      return snap.empty ? null : window.udBolShape(snap.docs[0].data());
+    }
+    requireSignIn(async () => {
       const frame = document.getElementById('builder');
+      if (frame.srcdoc) return;
+      try { window.udBol = await newestBol(); } catch (e) { window.udBol = null; }
       if (frame.srcdoc) return;
       const builder = JSON.parse(document.getElementById('builder-page').textContent);
       frame.srcdoc = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>' + builder + '</body></html>';

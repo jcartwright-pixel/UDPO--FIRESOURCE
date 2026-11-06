@@ -127,6 +127,28 @@ async function openPage(ctx, url) {
     await p.waitForTimeout(500);
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-390.png') });
     assert.deepEqual(p.errors, []);
+
+    // Joe 11-6-26 (lb): the builder opens with the newest BOL the Hub picked up (bolDays, here a made-up one read the way Hub >
+    // Daily BOL reads the office's PDF); the routes are added with their customers' account numbers and BOL load sequences.
+    const B = require('../../src/bol');
+    const bolDay = B.readBol(require('../fixtures/bol-pdf').samplePdf(), 'Daily Load UT.pdf').days[0];
+    await db().collection('bolDays').doc('2026-11-08').set(Object.assign({}, bolDay, { date: '2026-11-08', received: '2026-11-08T21:00:00.000Z' }));
+    await db().collection('bolDays').doc(bolDay.date).set(Object.assign({}, bolDay, { file: 'Daily Load UT.pdf', source: 'EMAIL', received: '2026-11-09T21:00:00.000Z' }));
+    const hubCtx = await browser.newContext({ viewport: { width: 1536, height: 860 }, serviceWorkers: 'block' });
+    p = await openPage(hubCtx, '/pallet-builder.html?testEmail=manager.test@uniteddairy.com');
+    await p.waitForSelector('#screen:not([hidden]) #builder');
+    const hb = p.frameLocator('#builder');
+    await hb.locator('#dayTable tr').first().waitFor();
+    assert.match(await hb.locator('#dayHint').textContent(), /The 11-9-26 BOL from the Hub is loaded: 2 routes/, 'the newest load day, not the older one');
+    const dayText = await hb.locator('#dayTable').textContent();
+    assert.ok(/RT 805 · 11\/09\/26/.test(dayText) && /RT 6301 · 11\/09\/26/.test(dayText), 'both BOL routes are listed: ' + dayText.slice(0, 300));
+    assert.ok(!/11\/08\/26/.test(dayText), 'the older BOL is not added');
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/09/26', 'the first BOL route opens');
+    assert.ok(/MADEUP GOLF CENTER/.test(await hb.locator('#lmTable').textContent()), 'its customers are on the truck load map');
+    await p.waitForTimeout(500);
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-hub-bol-1536.png') });
+    assert.deepEqual(p.errors, []);
+    await hubCtx.close();
     console.log('pallet builder browser test passed');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

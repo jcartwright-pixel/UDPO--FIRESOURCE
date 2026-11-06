@@ -70,7 +70,7 @@ test('Joe 11-5-26 tweaks: pallets beside cases, the truck stays in view, a stop 
 // The Pallet Builder screen's bridge to the Customer List's route map, run with a stand-in for its server call.
 function bridgeWith(answer) {
   const page = fs.readFileSync(PB.OUT, 'utf8');
-  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/app\.js';/, '');
+  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/(app|firebase)\.js';/g, '');
   const calls = [], window = {};
   const callServer = async (name, data) => { calls.push([name, JSON.parse(JSON.stringify(data))]); return answer(data); };
   new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, callServer, () => 'fac_uniontown', (e) => e.message);
@@ -110,4 +110,21 @@ test('Print sequence changes and Save to route map are on the truck load map; on
   assert.match(src, /<button class="primary" id="lmSave">Save to route map<\/button>/);
   assert.match(src, /@media print\{[^\n]*\.wrap,\.toast\{display:none!important\}#printSheet\{display:block/);
   assert.match(src, /<th>Chain<\/th><th>Account #<\/th><th>Customer<\/th><th class="n">New sequence<\/th>/);
+});
+
+test('Pallet Builder opens with the newest BOL from the Hub (Joe 11-6-26, lb), shaped like the BOL built in', () => {
+  const { window } = (() => { const page = fs.readFileSync(PB.OUT, 'utf8');
+    const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/(app|firebase)\.js';/g, '');
+    const window = { UDLogic: L }; new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, async () => ({}), () => 'fac_uniontown', (e) => e.message);
+    return { window }; })();
+  const day = { date: '2026-11-09', received: '2026-11-09T20:00:00.000Z', routes: [
+    { route: '805', stops: [{ seq: 0, custNo: '1001', name: 'MADEUP GOLF CENTER', lines: [{ item: '908', desc: 'UD 3.25 BMILK PLS HGL', qty: 6 }] }, { seq: 2, custNo: '1002', name: 'SAMPLE FOOD MART', lines: [{ item: '305', desc: 'UD 2% GAL', qty: 20 }] }] }] };
+  const b = window.udBolShape(day);
+  assert.equal(b.key, 'udpb-hub-2026-11-09'); assert.equal(b.label, '11-9-26');
+  assert.deepEqual(b.routes, [{ route: 'RT 805 \u00b7 11/09/26', bolAt: '2026-11-09T20:00:00.000Z', stops: [
+    { name: 'MADEUP GOLF CENTER (sub-rt 00)', acct: '1001', lines: [['908', 6]] }, { name: 'SAMPLE FOOD MART (sub-rt 02)', acct: '1002', lines: [['305', 20]] }] }]);
+  assert.equal(window.udBolShape({ date: '2026-11-09', routes: [] }), null, 'an empty BOL leaves the built-in one');
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /window\.parent\.udBol/, 'the builder takes the BOL the screen hands it');
+  assert.match(src, /const key = HUBBOL \? HUBBOL\.key : DAYKEY, day = HUBBOL \? HUBBOL\.routes : BOLDAY;/, 'and keeps its own BOL when there is none');
 });
