@@ -65,7 +65,7 @@ const DRAW = {
     return sendingLine(d.sending) + '<section class="lc-block"><div class="lc-code"><span>' + (d.on ? '<span class="pill good">On</span> The sales email goes out at 6:00 AM, Monday through Saturday.' : '<span class="pill bad">Off</span> The sales email is not sent.') + '</span><span class="lc-acts">' +
       (d.on ? '<button type="button" class="warn" data-act="sales-off">Turn Off</button>' : '<button type="button" class="primary" data-act="sales-on" data-twice="Press again to turn on">Turn On</button>') +
       '<button type="button" data-act="sales-test">Send a test to me</button></span></div>' +
-      '<p class="muted">One line per route: Route, Run and Status, for the shift that just ended (Monday\'s also has Saturday\'s). Never on Sunday.</p>' +
+      '<p class="muted">One line per route: Route, Run and Status, for the routes delivering that day, as of 6:00 AM. Never on Sunday.</p>' +
       '<label class="em-field">Who gets it<small>Addresses with commas between them. Saves when you leave the box.</small><input id="sales-to" data-was="' + e(d.to.join(', ')) + '" value="' + e(d.to.join(', ')) + '"></label>' + changed(d.changedAt, d.changedBy) + '</section>';
   },
   senders(d) {

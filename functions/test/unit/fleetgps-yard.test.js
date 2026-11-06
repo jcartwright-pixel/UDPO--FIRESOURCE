@@ -16,6 +16,8 @@ test('yard out and in: first time seen out of Uniontown Branch / Plant, last tim
   step('', 170, '2026-10-13T17:00:00.000Z');
   d = step('Uniontown Branch', 180, '2026-10-13T18:00:00.000Z');
   assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-13T09:05:00.000Z', '2026-10-13T18:00:00.000Z'], 'the first leave and the last return');
+  // Joe 11-5-26 (two loads on one tractor): every leave of the day is kept too.
+  assert.deepEqual(d.yardOuts, ['2026-10-13T09:05:00.000Z', '2026-10-13T17:00:00.000Z']);
   seen = {};
   step('', 100, '2026-10-13T09:00:00.000Z');
   d = step('', 110, '2026-10-13T09:05:00.000Z');
