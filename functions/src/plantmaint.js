@@ -224,7 +224,7 @@ function maintSource(facilityId) {
 }
 const maintWant = (facilityId) => ({ station: 'MAINT', facilityId: plantOf(L.plantOf(facilityId), A().SaveError) });
 const loginKey = (facilityId, loginId) => 'id_' + require('crypto').createHash('sha256').update('UDPO-MAINT-ID|' + facilityId + '|' + String(loginId).trim()).digest('hex');
-// Maintenance Schedule Setup, People: set or change a plant mechanic's login ID (5 or 6 digits; two of the plant's mechanics cannot
+// Maintenance Schedule Setup, People: set or change a plant mechanic's login ID (4 to 6 digits; two of the plant's mechanics cannot
 // share one). Reads first, then writes, inside the save's transaction. The number itself is never kept or logged.
 async function setMechanicLogin(tx, db, facilityId, personId, loginId, stamp, email) {
   const keyRef = db.collection(MECH_LOGINS).doc(loginKey(facilityId, loginId)), mineRef = db.collection(MECH_LOGINS).doc(docId(personId));

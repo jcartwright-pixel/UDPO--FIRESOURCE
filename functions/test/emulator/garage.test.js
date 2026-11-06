@@ -34,7 +34,7 @@ test('sign in with name and login ID: wrong numbers lock after five, two technic
   const r = await garageCall(db(), { op: 'read', tokens: [] }, now());
   assert.deepEqual(r.techs.map(t => t.name), ['JELLICK Tom', 'MARTIN Sean', 'MYERS John', 'NARD Jaxon']);
   assert.deepEqual(r.jobs, [], 'no jobs before someone signs in');
-  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '4821' }, now()), /5- or 6-digit login ID/);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '482' }, now()), /4- or 6-digit login ID/);
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '12345' }, now()), /no login ID yet/);
   for (let i = 0; i < 5; i++) await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JN', loginId: '99999' }, now()), /Wrong login ID/);
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JN', loginId: '70001' }, now()), /Too many wrong numbers/);

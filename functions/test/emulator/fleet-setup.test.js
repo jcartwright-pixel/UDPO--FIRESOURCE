@@ -56,10 +56,13 @@ test('technicians: add with a login ID, sign in with it, reset it, turn off; no 
   assert.equal(pat.name, 'SMITH PAT');
   await assert.rejects(applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'smith pat' }), /already on the list/);
   await assert.rejects(applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '24680' }), /Another technician/);
-  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '12' }), /5 or 6 digits/);
+  await assert.rejects(applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '12' }), /4 to 6 digits/);
   // A technician with no ID yet (Sean) gets one and can sign in.
   await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '13579' });
   assert.equal((await garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '13579' }, now)).name, 'MARTIN Sean');
+  // Joe 11/6: the garage tablet takes a 4-digit login ID as well as a 6-digit one.
+  await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '2468' });
+  assert.equal((await garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '2468' }, now)).name, 'MARTIN Sean');
   // Reset Pat's ID: the old one stops working and is free for someone else.
   await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: added.techId, loginId: '97531' });
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: added.techId, loginId: '24680' }, now), /Wrong login ID/);
