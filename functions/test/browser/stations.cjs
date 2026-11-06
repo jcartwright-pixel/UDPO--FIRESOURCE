@@ -310,7 +310,8 @@ async function signOnce(page) {
     await cut.waitForFunction(() => (document.querySelector('#work .sw-empty') || {}).textContent === 'NO CASE LOADS TODAY', null, { timeout: 150000 });
     // Joe 11-5-26 "Refresh, fix this": with nothing changing, the tablet still asks the server each minute, so Last refreshed moves.
     const fresh = await cut.evaluate(() => window.UDReads.freshAt);
-    await cut.waitForFunction((t) => window.UDReads.freshAt > t + 30000, fresh, { timeout: 75000 });
+    // The minute ping can land just under 30 s after `fresh`; the one after it is then up to 90 s away, so allow two pings.
+    await cut.waitForFunction((t) => window.UDReads.freshAt > t + 30000, fresh, { timeout: 135000 });
     await cut.close();
     results.push('Plant Station: Case Loadout & Yard Services shows the same case loads as Case Loadout; NO CASE LOADS TODAY only once the server has answered, and a red STILL WAITING line until it does; Last refreshed moves each minute with nothing changing');
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
