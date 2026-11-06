@@ -212,6 +212,9 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
+- **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
+- A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
+- Load 1 and Load 2 of the same route with the same driver are normal (one truck pulling two loads). They are never pink.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
 - **BACKUP** means the driver is a backup that day. A **Day Note** (for example "riding with...") shows in teal in place of AVAILABLE.
@@ -223,6 +226,8 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 - Managers can grab a route's line and drag it up or down to change the order.
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
+
+> If a box is pink and the times look wrong, fix the leave time or route hours in Route Master. With no hours, the app cannot tell when the run is back, so it stays pink.
 
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
 
@@ -360,7 +365,7 @@ Drivers' time off: vacation, personal, sick, bereavement and unpaid days. At mos
 - `Edit` and `Remove` on a line change or take off a day off.
 - `Print` prints one driver or every driver, one page each.
 
-> An approved day off shows on Weekly Dispatch, and the driver's runs read NEEDS DRIVER.
+> An approved day off takes the driver off their runs on those days, in every week already made (this week, next week and the weeks after). The runs read NEEDS DRIVER with who is off. Changing the dates, or cancelling it, puts the driver back on the days no longer off, unless someone else was picked.
 
 !> Do not book a 4th driver off on a day. Check the Calendar first.
 
