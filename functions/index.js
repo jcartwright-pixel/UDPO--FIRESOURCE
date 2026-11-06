@@ -615,6 +615,12 @@ exports.accountingMailMornings = onSchedule({ schedule: '0 6 * * *', timeZone: '
   if (out.status === 'FAIL') console.error('Accounting mail check: ' + out.message);
 });
 
+// Weekly route report (src/routereports.js): Vicki's Wednesday email, read once a day at 2:00 PM when switched on.
+exports.routeReportMail = onSchedule({ schedule: '0 14 * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '1GiB' }, async () => {
+  const out = await require('./src/routereports').dailyCheck(db);
+  if (out.status === 'FAIL') console.error('Route report mail check: ' + out.message);
+});
+
 exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
   await eachPlant('salesRouteEmail', async (pdb) => {
     const r = await require('./src/salesmail').sendMorning(pdb);
