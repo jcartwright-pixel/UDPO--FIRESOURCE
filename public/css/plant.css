@@ -1264,6 +1264,7 @@ body.yard-page .head .badge-test { order: 6; }
 .products-page .pm-sheet thead tr:not(.pm-band) th { top: 30px; height: 58px; padding: 4px 3px; overflow-wrap: anywhere; }
 .products-page .pm-sheet thead th { border-right: 1px solid rgba(255, 255, 255, .18); }
 .products-page .pm-sheet thead th.pm-m { background: #0d6b45; }
+.products-page .pm-sheet thead th.pm-pal { background: #1f4e79; }
 .products-page .pm-sheet .pm-pin { position: sticky; left: 0; z-index: 2; box-shadow: 2px 0 0 #c9d6e3; }
 .products-page .pm-sheet td.pm-pin { background: #fff; }
 .products-page .pm-sheet thead th.pm-pin { z-index: 4; }

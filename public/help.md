@@ -803,8 +803,17 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
 12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
 13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
+14. At the very top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (Hub > **Weekly Route Report**, kept in the Customer List): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH** and **LAST 5 WEEKS**. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
+15. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** follows Pallet Rules). It saves by itself, and the Customer List shows the same pick.
+16. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (HIGH unless changed), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
 
 > When a newer BOL comes in for the same day (more orders keyed), opening Pallet Builder again puts it in place of the older one on those routes.
+
+> Held space is shaded with stripes on the truck and counted in the pallets, so a customer that is lighter today still keeps its whole pallet (in summer a full pallet, maybe half in winter). The builder never makes the space smaller on its own; only **PALLET USES** or **PALLET RULES** change it. **HELD SPACE** under the truck says how many cases of space are held.
+
+> A product's **Units In A Case**, **Cases To A Pallet** and **Net Weight** on the **Product Sheet** win over the builder's own numbers and Pallet Rules for that product. A blank box leaves the builder's number.
+
+!> Do not pick **LOW** for a customer that grows in summer: its pallet comes up short when it does.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
@@ -814,11 +823,11 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > Each order's items, **Cases by size for the whole route** and **Pallet by pallet** start hidden. Click the line to show them, and click again to hide them.
 
-> Dispensers and boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Every crate goes 54 to a pallet, and a tote takes a pallet spot of its own.
+> Boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Crates go 54 to a pallet and dispensers 45 (both set on `PALLET RULES`), and a tote takes a pallet spot of its own.
 
 !> Do not add the dispensers or boxes on top of the crate count: they are already in it.
 
-> A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
+> A load sequence never shares a pallet with the next one (unless **NEW PALLET FOR EACH LOAD SEQUENCE** is turned off on `PALLET RULES`). When a sequence is done, its held space is added, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
 
 > `Save to route map` changes only the load sequences. The customers on the route, their order on the route map and their notes stay as they are; change those in the Customer List. A customer who is not on the route map cannot be saved, and the line says how many.
 
@@ -1387,7 +1396,13 @@ Every product the plant makes, one line each: SKU, type, group, UPC, speeds, tar
 - **Areas & Groups** sets the areas and groups products are sorted into.
 - `Download Product List` saves the list; `Upload` reads a list in (check it, then `Save Upload`).
 
+- **Cases and Pallets** (the blue columns): **Units In A Case**, **Cases To A Pallet**, **Stack Height** (how many cases high one stack is), **Net Weight** (the product in a full case) and **Gross Weight** (the case, the jugs and the product), in pounds. The Pallet Builder reads them by SKU. Type them on `Edit`, or put them in the downloaded list and `Upload`.
+
 > The product name is what counts. A SKU used by two products is marked.
+
+> A blank Cases and Pallets box leaves the Pallet Builder on its own number for that product. An upload that leaves one blank keeps what the product has.
+
+!> Do not type the weight of one jug in Net Weight or Gross Weight: both are for a full case.
 
 ## Machine Setup
 id: machine-setup
