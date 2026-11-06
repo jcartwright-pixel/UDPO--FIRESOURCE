@@ -95,3 +95,5 @@ table.otr-fuel { width: 560px; margin-top: 14px; }
 /* Joe 10/18: Month Recap's three groups (Uniontown Delivered, Transfers, Carriers), each with a heading and a line above it. */
 table.otr-mrecap tr.grp td { border-top: 3px solid var(--ud-blue); background: #eef3fa; color: var(--ud-blue); font-weight: 800; font-size: 17px; padding: 8px 10px; }
 table.otr-mrecap td.empty { color: #5b6b7d; font-style: italic; }
+/* Joe 11-6-26: a number from the Hub's Accounting Numbers is shown gray and changed there. */
+.otr-fig input.otr-in.otr-hub { background: #eef1f4; color: #33414e; border-color: #d3dbe3; }

@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const NAMES = Object.freeze([
-    'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
+    'accountingMail', 'accountingMonthly', 'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
     'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dataLoads', 'dateBackups', 'driverBackups',
     'deletedDrivers', 'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
     'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',

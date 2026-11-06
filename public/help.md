@@ -604,6 +604,10 @@ The Over the Road runs report and cost per gallon, laid out like the OTR Trips w
 - `By Date Columns` adds, renames or removes your own columns (an outside carrier, for example).
 - `Print` prints the page.
 
+> **Gallons Sold, Del Cost, Employee Cost and FUEL COST** come from the Hub's **Accounting Numbers** screen, which reads the monthly accounting zip from email (or added by hand) once for every app. On Recap those boxes are gray for a month the Hub has; change them there, not here.
+
+!> Do not type a month's gallons or costs here when the Hub already has that month. Add the corrected zip on the Hub's Accounting Numbers instead, so the cost analysis app gets the same numbers.
+
 ## Trucks Today
 id: trucks
 screens: trucks.html

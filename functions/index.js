@@ -293,7 +293,7 @@ function adminDeps() {
 
 // Joe 10/26: People & Roles, role templates, people's access links and the Upload Center are the company's, kept with the one
 // Users list (Uniontown's database); every other Administration page is the plant's own.
-const COMPANY_ADMIN_OPS = ['people', 'savePerson', 'setHomeScreen', 'saveRoleTemplate', 'addRole', 'roleTemplates', 'accessLinks', 'accessGenerate', 'accessRevoke', 'accessEmail', 'uploadStatus', 'uploadSave'];
+const COMPANY_ADMIN_OPS = ['people', 'savePerson', 'setHomeScreen', 'saveRoleTemplate', 'addRole', 'roleTemplates', 'accessLinks', 'accessGenerate', 'accessRevoke', 'accessEmail', 'uploadStatus', 'uploadSave', 'accountingStatus', 'accountingSaveSettings', 'accountingUpload', 'accountingCheckNow'];
 // Pages that list every plant on one page (Manager Links' release codes, Email Senders, the station codes): each plant's line
 // comes from that plant's own database, and a save of several plants' lines goes to each plant's own database.
 async function eachPlantOf(user) {
@@ -608,6 +608,13 @@ exports.scorecardKioskEvery15Minutes = onSchedule({ schedule: 'every 15 minutes'
 
 // Joe 10/31: the route status email for the salespeople (src/salesmail.js), 6:00 AM Monday through Saturday. It sends nothing
 // until Administration switches it on with at least one address (private/salesRouteEmail).
+// Accounting Numbers (src/accounting.js, Joe 11-6-26): each morning the accounting mailbox set on the Hub's Accounting Numbers
+// screen is read for the monthly accounting zip, when that check is switched on. Company-wide (Uniontown's database).
+exports.accountingMailMornings = onSchedule({ schedule: '0 6 * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '1GiB' }, async () => {
+  const out = await require('./src/accounting').morningCheck(db);
+  if (out.status === 'FAIL') console.error('Accounting mail check: ' + out.message);
+});
+
 exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {
   await eachPlant('salesRouteEmail', async (pdb) => {
     const r = await require('./src/salesmail').sendMorning(pdb);

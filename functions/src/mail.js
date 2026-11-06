@@ -164,9 +164,33 @@ async function readMail({ owner, query, max }, deps) {
     const m = await get(LIST_URL + '/' + encodeURIComponent(id) + '?format=full');
     const h = {};
     ((m.payload && m.payload.headers) || []).forEach(x => { h[String(x.name).toLowerCase()] = x.value; });
-    out.push({ id: m.id, internalDate: Number(m.internalDate) || 0, from: h.from || '', to: [h.to, h.cc, h['delivered-to']].filter(Boolean).join(', '), subject: h.subject || '', body: bodyText(m.payload) });
+    out.push({ id: m.id, internalDate: Number(m.internalDate) || 0, from: h.from || '', to: [h.to, h.cc, h['delivered-to']].filter(Boolean).join(', '), subject: h.subject || '', body: bodyText(m.payload), files: attachedFiles(m.payload) });
   }
   return out;
+}
+
+// The attachments of one message: [{name, attachmentId, size}] (the files themselves are fetched one at a time, readAttachment).
+function attachedFiles(part, out) {
+  out = out || [];
+  if (!part) return out;
+  if (part.filename && part.body && part.body.attachmentId) out.push({ name: part.filename, attachmentId: part.body.attachmentId, size: Number(part.body.size) || 0 });
+  (part.parts || []).forEach(p => attachedFiles(p, out));
+  return out;
+}
+
+/*
+ * Accounting Numbers (accounting.js): one attachment of one message in `owner`'s mailbox, read only (gmail.readonly).
+ * Returns a Buffer.
+ */
+async function readAttachment({ owner, messageId, attachmentId }, deps) {
+  const d = deps || {}, fetchFn = d.fetch || fetch;
+  const sub = addresses([owner])[0];
+  if (!sub) throw new MailError('NO_OWNER', 'No mailbox is set');
+  const token = await gmailToken(sub, GMAIL_READ, d);
+  const res = await fetchFn(LIST_URL + '/' + encodeURIComponent(messageId) + '/attachments/' + encodeURIComponent(attachmentId), { headers: { Authorization: 'Bearer ' + token } });
+  const body = await readJson(res);
+  if (!res.ok) throw new MailError(res.status === 403 ? 'GMAIL_OFF' : 'READ', 'Gmail did not answer (' + ((body.error && body.error.message) || res.status) + ')');
+  return Buffer.from(String(body.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
 
 async function readJson(res) {
@@ -200,4 +224,4 @@ async function sendMail(message, deps) {
   return { id: sent.id || '', to };
 }
 
-module.exports = { sendMail, readMail, bodyText, buildMime, textHtml, addresses, headerText, MailError, GMAIL_SEND, GMAIL_READ };
+module.exports = { sendMail, readMail, readAttachment, attachedFiles, bodyText, buildMime, textHtml, addresses, headerText, MailError, GMAIL_SEND, GMAIL_READ };

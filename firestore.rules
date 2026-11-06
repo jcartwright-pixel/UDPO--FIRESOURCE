@@ -109,6 +109,8 @@ service cloud.firestore {
     match /otrRoutes/{id} { allow read: if activeUser(); }
     match /otrDaily/{id} { allow read: if activeUser(); }
     match /otrMonthly/{id} { allow read: if activeUser(); }
+    // Accounting Numbers (functions/src/accounting.js): read by Over the Road; only the server writes them.
+    match /accountingMonthly/{id} { allow read: if activeUser(); }
     match /otrMonthRuns/{id} { allow read: if activeUser(); }
     match /otrComments/{id} { allow read: if activeUser(); }
     // By Date columns Joe adds in OTR Routes Setup (an outside carrier such as Darden).

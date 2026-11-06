@@ -21,6 +21,7 @@ export const SCREENS = [
   { href: 'email.html', name: 'Email & Texts', note: 'Administrators: who gets each email and text, and who it comes from', admin: true },
   { href: 'plant-setup.html', name: 'Plant Setup', note: 'Administrators: each plant\'s shifts, areas, menu, schedules and new plant data', admin: true },
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
+  { href: 'accounting.html', name: 'Accounting Numbers', note: 'Administrators: the monthly accounting package, read once for Over the Road and cost analysis', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 
@@ -35,9 +36,9 @@ async function start() {
   return services;
 }
 
-export async function callServer(name, fields) {
+export async function callServer(name, fields, timeoutMs) {
   const { functions } = await start();
-  const res = await httpsCallable(functions, name, { timeout: 30000 })(fields || {});
+  const res = await httpsCallable(functions, name, { timeout: timeoutMs || 30000 })(fields || {});
   return res.data;
 }
 

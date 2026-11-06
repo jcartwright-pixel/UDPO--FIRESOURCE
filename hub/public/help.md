@@ -23,7 +23,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance** and **Route & Trip Costs**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, and **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -193,6 +193,29 @@ screens: keys.html
 !> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
 
 !> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or PC Miler miles and tolls stop until the key is saved again.
+
+## Accounting Numbers
+id: accounting
+screens: accounting.html
+
+Where the monthly accounting package comes in (administrators). The Hub reads the zip from accounting once and keeps each month's gallons sold, delivery cost, employee cost and fuel cost. **Over the Road** in Plant & Distribution and the cost analysis app read the numbers from here, so they always match.
+
+1. Type the **Mailbox the zip comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
+2. Tick **Check every morning**. Every morning at 6:00 AM the Hub looks in that mailbox for a new zip and reads it.
+3. To read it now, press `CHECK EMAIL NOW`.
+4. If the zip came another way, press `ADD A FILE BY HAND` and pick it.
+5. Check the newest month in the table. Over the Road shows the same numbers on its Recap and Cost Per Gallon tabs.
+
+### Buttons
+- `CHECK EMAIL NOW` reads the mailbox at once (the last 45 days). A zip already read is not read again.
+- `ADD A FILE BY HAND` reads a zip, or one Excel workbook, from your computer.
+- **Only from** (optional): type accounting's address, so only their zips are read.
+
+> The zip is the one accounting sends each month: P&L Expenses by Dept, Gallon Comparison and the rest. Only the month tabs (like SEPT 2026) and the Gallon Comparison are used. A month's numbers change only when a newer file has different ones.
+
+> The first time, Google Workspace has to let the app read the mailbox (the same permission as Driver Check-In Email). If it has not, the last-checked line says so in red.
+
+!> Do not type the numbers on Over the Road's Recap for a month that is already here. Fix the file, or add the corrected file by hand, so every app gets the same numbers.
 
 ## Help
 id: help

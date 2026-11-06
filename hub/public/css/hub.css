@@ -320,3 +320,23 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .people-edit .papps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .people-edit .papps li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
 .people-edit .papps p { margin: 0; }
+
+/* Accounting Numbers (accounting.html) */
+.acc { padding: 8px 16px 30px; max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.acc-card, .acc > * { min-width: 0; }
+.acc-row button:not(.primary) { min-height: 42px; padding: 0 16px; border: 1px solid #b9c7d3; border-radius: 8px; background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.acc-row input[type="email"], .acc-row input[type="text"] { min-height: 40px; padding: 0 10px; border: 1px solid #b7c9d8; border-radius: 6px; }
+.acc > p { margin: 0; }
+.acc-card { background: #fff; border: 1px solid var(--line); border-top: 4px solid #2f6f4e; border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.acc-card h2 { margin: 0; font-size: 19px; color: var(--ud-blue); }
+.acc-card p { margin: 0; }
+.acc-row { display: flex; gap: 10px 16px; align-items: end; flex-wrap: wrap; }
+.acc-row label { display: grid; gap: 4px; font-weight: 700; }
+.acc-row label.inline { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+.acc-row input[type="email"], .acc-row input[type="text"] { min-width: 280px; font-size: 16px; }
+.acc-bad { color: var(--error-ink, #9b1c1c); font-weight: 700; }
+.acc-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 16px; }
+.acc-table th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 10px; }
+.acc-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.acc-table .strong { font-weight: 800; }
+@media (max-width: 760px) { .acc-table { display: block; overflow-x: auto; max-width: 100%; } .acc-row input[type="email"], .acc-row input[type="text"] { min-width: 0; width: 100%; } .acc-row label { width: 100%; } }
