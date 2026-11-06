@@ -52,6 +52,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="keys"]'), 'and Keys & Connections');
     assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
     assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
+    assert.ok(await p.isVisible('a[data-admin="accounting"]'), 'and Accounting Numbers');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -283,6 +284,38 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('.key-card[data-key="sms"]');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Keys: no sideways page scroll on a phone');
     await shot(p, 'hub-keys-390');
+
+    // Accounting Numbers (Joe 11-6-26): a made-up accounting zip added by hand lands in accountingMonthly, the email box saves
+    // by itself, and Check Email Now answers in plain words (Gmail is never reached in the tests).
+    const zipPath = path.join(require('os').tmpdir(), 'plcomparisonsmadeup.zip');
+    fs.writeFileSync(zipPath, await require('../../../../functions/test/fixtures/accounting-zip').septemberZip());
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'accounting.html');
+    await p.waitForSelector('#pick');
+    assert.match(await p.textContent('#months'), /No months yet/);
+    assert.ok(await p.isDisabled('#check'), 'no mailbox yet, so Check Email Now is gray');
+    await p.setInputFiles('#file', zipPath);
+    await p.waitForSelector('#msg.good');
+    assert.match(await p.textContent('#msg'), /2 months read from plcomparisonsmadeup\.zip \(newest Sep 2026\)/);
+    assert.deepEqual(await p.$$eval('.acc-table tbody tr td:first-child', t => t.map(x => x.textContent)), ['Sep 2026', 'Aug 2026']);
+    assert.match(await p.textContent('.acc-table tbody tr'), /\$600,000\.00/);
+    assert.equal((await db().collection('accountingMonthly').doc('2026-09').get()).data().gallons_sold, 2100000);
+    await p.fill('#mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#enabled');
+    await p.waitForFunction(() => /every morning at 6:00 AM/.test(document.querySelector('#mail').textContent));
+    assert.deepEqual(((await db().collection('config').doc('accountingMail').get()).data() || {}).mailbox, 'pat.sample@uniteddairy.com');
+    await p.click('#check');
+    await p.waitForFunction(() => /Last checked/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
+    assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
+    await shot(p, 'hub-accounting-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'accounting.html');
+    await p.waitForSelector('.acc-table');
+    await shot(p, 'hub-accounting-1536');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'accounting.html');
+    await p.waitForSelector('.acc-table');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Accounting: no sideways page scroll on a phone');
+    await shot(p, 'hub-accounting-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'accounting.html');
+    await p.waitForSelector('#error:not([hidden])');
 
     // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.
     await db().collection('private').doc('emailSettings').set({ sending: false });

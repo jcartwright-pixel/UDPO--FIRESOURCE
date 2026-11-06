@@ -93,15 +93,17 @@ async function fakeAdmin(email, data) {
     return { ok: true, role, message: data.name + ' added. Give it to people in People & Roles.' };
   }
   // Links & Codes: Operations' real calls (functions/src/admin.js OPS) on the emulator, so the hub is tested against them.
-  if (LINK_OPS.indexOf(data.op) >= 0 || EMAIL_OPS.indexOf(data.op) >= 0) {
-    const fn = opsAdmin().OPS[data.op] || opsModule('admintools').OPS[data.op];
-    try { return await fn(db(), email, data, new Date().toISOString(), { env: {}, mailDeps: { env: {} } }); }
+  if (LINK_OPS.indexOf(data.op) >= 0 || EMAIL_OPS.indexOf(data.op) >= 0 || ACCOUNTING_OPS.indexOf(data.op) >= 0) {
+    const fn = opsAdmin().OPS[data.op] || opsModule('admintools').OPS[data.op] || opsModule('accounting').OPS[data.op];
+    try { return await fn(db(), email, data, new Date().toISOString(), { env: {}, mailDeps: { env: {} }, readMail: async () => { throw new Error('Gmail is not reached in the hub tests'); } }); }
     catch (e) { throw Object.assign(new Error(e.message), { status: CODES[e.code] || 'INTERNAL' }); }
   }
   throw Object.assign(new Error('Unknown request.'), { status: 'INVALID_ARGUMENT' });
 }
 // Email & Texts: Operations' real email settings calls. Sending is Off on the emulator, so nothing is ever emailed.
 const EMAIL_OPS = ['sentLog', 'setSending', 'setForecastEmail', 'reportGroups', 'saveReportGroup', 'salesEmail', 'saveSalesEmail', 'emailSenders', 'saveEmailSenders', 'repairEmail', 'saveRepairEmail', 'checkinEmail', 'saveCheckinEmail'];
+// Accounting Numbers: Operations' real calls. Nothing reaches Gmail: the mailbox check answers that it could not be read.
+const ACCOUNTING_OPS = ['accountingStatus', 'accountingSaveSettings', 'accountingUpload', 'accountingCheckNow'];
 const LINK_OPS = ['appLinks', 'routeCodeNew', 'routeCodeOnOff', 'releaseCodes', 'releaseCodeNew', 'stations', 'stationAdd', 'stationCode', 'stationRemove', 'noAccountSet'];
 // Operations' functions/node_modules may not be installed (the hub's own tests install only hub/functions), so its packages
 // are found in the hub's node_modules when they are not there.

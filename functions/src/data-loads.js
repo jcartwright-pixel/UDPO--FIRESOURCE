@@ -57,6 +57,9 @@
  * leaves its marker (otrHistorySandbox loaded both there on 10/11). On the live app (Joe 10/18: "Load the Over the Road history
  * (otr-history-2026-10-18) into the live app.") loadOtrHistory runs. It is about 19,000 day counts, so it runs from the
  * otrHistoryOnce step of the dataLoadsOnce job in index.js (5 minutes, 512MiB) rather than in runDataLoads.
+ *
+ * otr-costing-2026-09 (Joe 11/6, "y" = load his September accounting zip into the live app for him): the four September 2026
+ * numbers Import From Accounting finds in that zip go into otrMonthly/2026-09, on both apps (see OTR_SEPT below).
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -356,13 +359,32 @@ async function loadOtrHistoryOnce(db, opts) {
   return out;
 }
 
+const OTR_SEPT_ID = 'otr-costing-2026-09';
+// Joe 11/6: the September 2026 accounting zip (plcomparisonsseptember.zip), "y" = load it into the live app for him. These are
+// exactly the four numbers Over the Road > Recap > Import From Accounting finds in that zip (P&L Expenses by Dept "SEPT 2026"
+// tab, Gallon Comparison 2026), written the same way that button writes them (actions-otr.js saveOtr op import). Runs on both
+// apps. The marker keeps what September held before, for undoing by hand.
+const OTR_SEPT = Object.freeze({ year: 2026, month: 9, gallons_sold: 2509342, distribution_cost: 761362.15, employee_cost: 375996.13, fuel_cost: 177131 });
+async function loadOtrSeptemberOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  const mark = db.collection('dataLoads').doc(OTR_SEPT_ID), ref = db.collection('otrMonthly').doc('2026-09');
+  return db.runTransaction(async tx => {
+    const [m, had] = await Promise.all([tx.get(mark), tx.get(ref)]);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const before = had.exists ? had.data() : null;
+    tx.set(ref, Object.assign({}, OTR_SEPT, { source: 'IMPORT', updatedAt: stamp, updatedBy: BY, testEdited: false }), { merge: true });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'September 2026 OTR costing from the accounting zip (Joe 11/6, "y")', set: OTR_SEPT, before });
+    return { set: OTR_SEPT, before };
+  });
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [FLEET_START_ID, loadFleetServiceStartOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [FLEET_START_ID, loadFleetServiceStartOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce], [OTR_SEPT_ID, loadOtrSeptemberOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadFleetServiceStartOnce, FLEET_START_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadFleetServiceStartOnce, FLEET_START_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID, loadOtrSeptemberOnce, OTR_SEPT_ID, OTR_SEPT };

@@ -186,3 +186,18 @@ test('Over the Road history load: on the live app fills the history and OTR runs
   assert.equal((await d.collection('dataLoads').doc(DL.OTR_HISTORY_ID).get()).data().status, 'DONE');
   assert.deepEqual(await DL.loadOtrHistoryOnce(d, { now: tick, data, project: 'ud-distribution' }), { skipped: true }, 'once');
 });
+
+// Joe 11/6: his September 2026 accounting zip, "y" = load it into the live app for him.
+test('September 2026 OTR costing: the four numbers from the zip, on both apps, once; other months untouched', async () => {
+  await clear();
+  const d = db();
+  await d.collection('otrMonthly').doc('2026-09').set({ year: 2026, month: 9, miles: 1234, source: 'TYPED' });
+  await d.collection('otrMonthly').doc('2026-08').set({ year: 2026, month: 8, gallons_sold: 2506226, source: 'IMPORT' });
+  const r = (await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.OTR_SEPT_ID];
+  assert.deepEqual(r.before, { year: 2026, month: 9, miles: 1234, source: 'TYPED' });
+  const sep = (await d.collection('otrMonthly').doc('2026-09').get()).data();
+  assert.deepEqual([sep.gallons_sold, sep.distribution_cost, sep.employee_cost, sep.fuel_cost, sep.miles, sep.source, sep.testEdited],
+    [2509342, 761362.15, 375996.13, 177131, 1234, 'IMPORT', false]);
+  assert.deepEqual((await d.collection('otrMonthly').doc('2026-08').get()).data(), { year: 2026, month: 8, gallons_sold: 2506226, source: 'IMPORT' });
+  assert.deepEqual((await DL.runDataLoads(d, { now: tick, project: 'ud-distribution' }))[DL.OTR_SEPT_ID], { skipped: true });
+});

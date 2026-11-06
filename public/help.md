@@ -597,12 +597,16 @@ screens: otr.html
 
 The Over the Road runs report and cost per gallon, laid out like the OTR Trips workbook.
 
-- **Today** shows today's runs. **By Date** lists each day's runs for the month. **Recap** and **Month Recap** total them (Uniontown Delivered, Transfers, Carriers). **Cost Per Gallon** compares cost to gallons sold.
+- **Today** shows today's runs. **By Date** lists each day's runs for the month. **Recap** and **Month Recap** total them (Uniontown Delivered, Transfers, Carriers). **Cost Per Gallon** compares cost to gallons sold; its **Fuel Cost By Gallon** table shows each month and the average.
 - Tick **Compare to last year** to see last year's numbers.
 - `Copy Daily Count` copies the day's count. `Enter Month Figures` types the month's gallons and costs.
 - **OTR Routes Setup** says who takes each run (United Dairy, a carrier, or a transfer) and its round-trip miles.
 - `By Date Columns` adds, renames or removes your own columns (an outside carrier, for example).
 - `Print` prints the page.
+
+> **Gallons Sold, Del Cost, Employee Cost and FUEL COST** come from the Hub's **Accounting Numbers** screen, which reads the monthly accounting zip from email (or added by hand) once for every app. On Recap those boxes are gray for a month the Hub has; change them there, not here.
+
+!> Do not type a month's gallons or costs here when the Hub already has that month. Add the corrected zip on the Hub's Accounting Numbers instead, so the cost analysis app gets the same numbers.
 
 ## Trucks Today
 id: trucks

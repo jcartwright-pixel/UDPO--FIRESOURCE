@@ -481,7 +481,9 @@ async function adminCall(db, user, input, deps) {
   const TOOLS = require('./admintools').OPS;
   // The Upload Center (uploads.js, Joe 10/18): a new plant's data from one workbook.
   const UPLOADS = require('./uploads').OPS;
-  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op] || UPLOADS[op];
+  // Accounting Numbers (accounting.js, Joe 11-6-26): the monthly accounting package, read once for every app.
+  const ACCOUNTING = require('./accounting').OPS;
+  const fn = (d.ops && d.ops[op]) || OPS[op] || TOOLS[op] || UPLOADS[op] || ACCOUNTING[op];
   if (!fn) fail('BAD_REQUEST', 'Unknown Administration step: ' + op);
   const email = await requireAdmin(db, user);
   const stamp = (d.now ? d.now() : new Date()).toISOString();
