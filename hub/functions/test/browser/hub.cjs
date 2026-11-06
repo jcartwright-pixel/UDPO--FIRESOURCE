@@ -36,29 +36,34 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     let p = await open(browser, 'pat.admin@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     // Home by area (11-5-26): the cards sit under their area, in the area's order.
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'routes', 'udms']);
-    assert.deepEqual(await p.$$eval('#tiles section.area', s => s.map(x => x.dataset.area + ':' + x.querySelectorAll('a').length)), ['plant:2', 'fleet:2', 'people:1']);
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'distribution', 'customers', 'fuel', 'routes', 'udms']);
+    assert.deepEqual(await p.$$eval('#tiles section.area', s => s.map(x => x.dataset.area + ':' + x.querySelectorAll('a').length)), ['plant:1', 'distribution:2', 'fleet:2', 'people:1']);
     assert.equal(await p.textContent('#hello'), 'Good to see you, Pat');
-    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area + ' ' + a.querySelector('.area-n').textContent)), ['all 11', 'plant 2', 'fleet 2', 'people 1', 'admin 6']);
+    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area + ' ' + a.querySelector('.area-n').textContent)), ['all 12', 'plant 1', 'distribution 2', 'fleet 2', 'people 1', 'admin 6']);
     assert.equal(await p.getAttribute('#area-menu a[data-area="all"]', 'aria-current'), 'true', 'Everything shows first');
     assert.ok(!(await p.isVisible('#practice-band')), 'the live hub has no practice band');
-    assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
-    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Route & Trip Costs', 'Employees & Compliance']);
-    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 5, 'every card has its picture');
+    assert.equal(await p.getAttribute('#tiles a[data-app="plant"]', 'target'), '_blank');
+    assert.match(await p.getAttribute('#tiles a[data-app="plant"]', 'href'), /group\.html\?g=plantops$/, 'Plant Operations opens the plant side');
+    assert.match(await p.getAttribute('#tiles a[data-app="distribution"]', 'href'), /group\.html\?g=routeops$/, 'Route Distribution opens the distribution side');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant Operations', 'Route Distribution', 'Customers & Routes', 'Fuel Tracking', 'Route & Trip Costs', 'Employees & Compliance']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 6, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     // Pick an area: only its cards show, the address keeps it, and Back goes to Everything.
     await p.click('#area-menu a[data-area="fleet"]');
+    await p.waitForSelector('#area-menu a[data-area="fleet"][aria-current]');
     assert.match(p.url(), /#area=fleet$/);
     assert.equal(await p.getAttribute('#area-menu a[data-area="fleet"]', 'aria-current'), 'true');
     assert.ok(await p.isVisible('#tiles a[data-app="fuel"]') && await p.isVisible('#tiles a[data-app="routes"]'));
-    assert.ok(!(await p.isVisible('#tiles a[data-app="operations"]')) && !(await p.isVisible('a[data-admin="people"]')), 'other areas are hidden');
+    assert.ok(!(await p.isVisible('#tiles a[data-app="plant"]')) && !(await p.isVisible('a[data-admin="people"]')), 'other areas are hidden');
     await shot(p, 'hub-area-fleet-1920');
     await p.click('#area-menu a[data-area="admin"]');
+    await p.waitForSelector('#area-menu a[data-area="admin"][aria-current]');
     assert.ok(await p.isVisible('a[data-admin="keys"]') && !(await p.isVisible('#tiles a[data-app="fuel"]')));
     assert.deepEqual(await p.$$eval('#admin-tiles .area-group', h => h.map(x => x.textContent)), ['Who gets in', 'Messages and links', 'Plants and connections']);
     await p.goBack();
     await p.goBack();
-    assert.ok(await p.isVisible('#tiles a[data-app="operations"]') && await p.isVisible('a[data-admin="people"]'), 'Back to Everything');
+    await p.waitForSelector('#area-menu a[data-area="all"][aria-current]');
+    assert.ok(await p.isVisible('#tiles a[data-app="plant"]') && await p.isVisible('a[data-admin="people"]'), 'Back to Everything');
     // The practice hub says so at the top, with a link to the live hub.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'index.html?practicetest=1');
     await p.waitForSelector('#tiles a');
@@ -403,8 +408,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
 
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
-    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area)), ['all', 'plant', 'fleet', 'people'], 'no Administration area for Sam');
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'distribution', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
+    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area)), ['all', 'plant', 'distribution', 'fleet', 'people'], 'no Administration area for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');
     await p.waitForSelector('#error:not([hidden])');

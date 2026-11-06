@@ -18,6 +18,9 @@ export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a =
 // Each app's picture and colour on its tile (Joe 11-2-26: "I want my cards to look more professional ... they don't have any icons").
 const path = (d) => '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
 export const LOOK = {
+  // Joe 11-5-26: Plant & Distribution is two cards on Home, Plant Operations (the plant) and Route Distribution (the truck).
+  plant: { color: '#2f6e3a', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
+  distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
   operations: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
   customers: { color: '#1d7a46', icon: path('<path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.4"/>') },
   fuel: { color: '#c05a00', icon: path('<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M2.5 21h13"/><path d="M6.5 8h5"/><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8.5L18 5.5"/>') },
@@ -34,7 +37,8 @@ export const LOOK = {
 // The Home screen's areas (Joe 11-5-26: "have a menu option to divide areas of the program"). Each app and each
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
-  { key: 'plant', name: 'Plant & Delivery', note: 'Running the plant, dispatch, customers and routes', apps: ['operations', 'customers'] },
+  { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant'] },
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers and delivery routes', apps: ['distribution', 'customers'] },
   { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use and what each trip costs', apps: ['fuel', 'routes'] },
   { key: 'people', name: 'People & Compliance', note: 'Employee records, drivers and hiring', apps: ['udms'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
@@ -47,5 +51,5 @@ export const areaOf = (key) => (AREAS.find(a => (a.apps || []).indexOf(key) >= 0
 // The area pictures for the menu.
 export const AREA_ICON = {
   all: path('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-  plant: LOOK['plant-setup'].icon, fleet: LOOK.operations.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
+  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, fleet: LOOK.fuel.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
 };
