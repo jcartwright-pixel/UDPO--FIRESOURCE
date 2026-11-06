@@ -5,13 +5,13 @@ export const isAdminRole = (roles) => (roles || []).some(r => ['ADMINISTRATOR', 
 export const APPS = [
   { key: 'operations', name: 'Plant & Distribution' }, { key: 'customers', name: 'Customers & Routes' },
   { key: 'fuel', name: 'Fuel Tracking' }, { key: 'udms', name: 'Employees & Compliance' }, { key: 'routes', name: 'Route & Trip Costs' },
-  { key: 'routecost', name: 'Route Cost Analysis' }
+  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'accident', name: 'Accident & Injury Reporting' }
 ];
 // ticks = the apps saved for this person in People & Access (appAccess), or null for the standard rule. Plant & Distribution
 // always stays on for an Enabled person.
 export function appKeysFor(p, ticks) {
   if (!p || String(p.status || '').trim().toUpperCase() !== 'ACTIVE') return [];
-  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost'] : []);
+  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost'] : []).concat(['accident']);
   return APPS.map(a => a.key).filter(k => k === 'operations' || ticks.indexOf(k) >= 0);
 }
 export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a => a.key === k).name);
@@ -25,6 +25,7 @@ export const LOOK = {
   udms: { color: '#5a3d9e', icon: path('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M15.5 11.5l2 2 4-4"/>') },
   routes: { color: '#9c2a3a', icon: path('<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M8 18.5h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>') },
   routecost: { color: '#2f6f8f', icon: path('<path d="M3 20h18"/><path d="M6 20V11M11 20V6M16 20v-6M21 20V9"/>') },
+  accident: { color: '#b3261e', icon: path('<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>') },
   roles: { color: '#7a4b12', icon: path('<circle cx="8" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5.5 5.5-5.5"/><path d="M14 11h7M14 15h7M14 19h7"/><path d="M11.5 11l.8.8 1.4-1.6"/>') },
   links: { color: '#0f6b5c', icon: path('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>') },
   email: { color: '#a3570f', icon: path('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>') },

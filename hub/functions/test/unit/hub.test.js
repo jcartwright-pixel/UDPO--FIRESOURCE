@@ -16,9 +16,9 @@ const db = fakeDb({
 });
 const keys = (r) => r.tiles.map(t => t.key);
 
-test('an administrator sees all six apps, live addresses on the live project', async () => {
+test('an administrator sees all seven apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
+  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident']);
   assert.equal(r.admin, true);
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/');
   assert.equal(r.tiles[1].url, 'https://ud-distribution-customers.web.app/');
@@ -28,6 +28,8 @@ test('an administrator sees all six apps, live addresses on the live project', a
   assert.equal(r.tiles[4].name, 'Route & Trip Costs');
   assert.equal(r.tiles[5].url, 'https://ud-distribution-route-cost.web.app/');
   assert.equal(r.tiles[5].name, 'Route Cost Analysis');
+  assert.equal(r.tiles[6].url, 'https://united-dairy-accident-app.web.app/');
+  assert.equal(r.tiles[6].name, 'Accident & Injury Reporting');
 });
 
 test('the practice copy links to the practice copies', async () => {
@@ -37,9 +39,9 @@ test('the practice copy links to the practice copies', async () => {
   assert.equal(r.tiles[4].url, 'https://ud-distribution-sandbox-routes.web.app/');
 });
 
-test('someone who is not an administrator sees Operations and the Customer List only', async () => {
+test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {
   const r = await H.hubCall(db, { email: 'sam.sales@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['operations', 'customers']);
+  assert.deepEqual(keys(r), ['operations', 'customers', 'accident']);
   assert.equal(r.admin, false);
 });
 
@@ -118,7 +120,7 @@ test('saved app ticks decide the tiles; only administrators change them, never t
     runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
   };
   const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'customers']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'customers', 'accident']);
   await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
   assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
   assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'fuel']);
