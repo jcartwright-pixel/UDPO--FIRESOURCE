@@ -315,7 +315,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.click('#check');
     await p.waitForFunction(() => /Last checked/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
     assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
-    // Weekly route report (Joe 11-6-26): a made-up report added by hand lands in routeWeeks for Route Cost Analysis; the label
+    // Weekly route report (Joe 11-6-26): a made-up report added by hand lands in routeWeekly for Route Cost Analysis; the label
     // starts as Joe's, and the mailbox and tick save by themselves.
     const weekPath = path.join(require('os').tmpdir(), 'Weekly Daily Avg Cases By Route.xls');
     fs.writeFileSync(weekPath, require('../../../../functions/test/fixtures/route-report').routeReport());
@@ -327,7 +327,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#wk-msg.good');
     assert.match(await p.textContent('#wk-msg'), /Week ending 10-31-26 read from Weekly Daily Avg Cases By Route\.xls: 2 routes, 4 stops/);
     assert.match(await p.textContent('#wk-table tbody tr'), /10-31-26.*146.*\$3,895\.75/);
-    assert.equal((await db().collection('routeWeeks').doc('2026-10-31').get()).data().stops.length, 4);
+    assert.equal((await db().collection('routeWeekly').doc('2026-10-31').get()).data().stops.length, 4);
     await p.fill('#wk-mailbox', 'pat.sample@uniteddairy.com');
     await p.check('#wk-enabled');
     await p.waitForFunction(() => /every day at 2:00 PM/.test(document.querySelector('#weeks').textContent));

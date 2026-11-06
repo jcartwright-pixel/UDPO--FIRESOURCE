@@ -2,7 +2,7 @@
  * Weekly route report (Joe 11-6-26: "material for the route cost analysis"). Vicki's Wednesday email "Weekly Daily Avg
  * Cases by Route By Store" carries the Crystal report ROUTE WEEKLY CASE DELIVERY REVIEW BY STORE (.xls): each stop's cases
  * Sunday to Saturday, deliveries and sales for one week. The Hub reads it once, here, and keeps each week in
- * routeWeeks/<week ending yyyy-mm-dd> in the company (Uniontown) database. The Route Cost Analysis app reads the weeks from
+ * routeWeekly/<week ending yyyy-mm-dd> in the company (Uniontown) database. The Route Cost Analysis app reads the weeks from
  * there (read only), so nobody has to save the files and run a script by hand. Nothing else writes them.
  *
  * Two ways in, both on the Hub's Accounting Numbers screen (Administrators), next to the accounting zip:
@@ -30,6 +30,8 @@ const fail = (code, message) => require('./admin').fail(code, message);
 const isNum = (v) => typeof v === 'number' && isFinite(v);
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
+// Crystal leaves float dust (like 9e-16 cases) on empty days: days are kept to 6 places.
+const r6 = (v) => Math.round(v * 1e6) / 1e6;
 
 // An Excel date number as yyyy-mm-dd (the report's week-ending date).
 function excelDay(n) {
@@ -45,7 +47,10 @@ function rec(nums) {
   return r;
 }
 
-/** Reads one report .xls / .xlsx: {week_ending, stops: [...], totals: [...]}; throws (BAD_REQUEST) in plain words. */
+/**
+ * Reads one report .xls / .xlsx: {weeks: [{week_ending, stops: [...], totals: [...]}]}, oldest first; throws (BAD_REQUEST) in
+ * plain words. One file can hold several weeks, each starting with its own title line; a later copy of a week in the file wins.
+ */
 function readReport(buffer, fileName) {
   if (!buffer || !buffer.length) fail('BAD_REQUEST', 'The file is empty');
   if (buffer.length > MAX_BYTES) fail('BAD_REQUEST', 'The file is too big (more than 10 MB)');
@@ -56,7 +61,7 @@ function readReport(buffer, fileName) {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '', blankrows: true })
     .map(row => row.filter(x => x !== '' && x != null));
-  const stops = [], totals = [];
+  const byWeek = new Map();
   let week = null;
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -65,7 +70,8 @@ function readReport(buffer, fileName) {
     const nums = row.filter(isNum);
     if (strs.indexOf(TITLE) >= 0) {
       if (!nums.length) fail('BAD_REQUEST', name + ': no week-ending date on the title line');
-      week = excelDay(nums[0]); continue;
+      week = { week_ending: excelDay(nums[0]), stops: [], totals: [] };
+      byWeek.set(week.week_ending, week); continue;
     }
     if (strs.length && strs[0].indexOf('TOTALS FOR ROUTE') === 0) {
       const m = strs[0].match(/(\d+)/);
@@ -73,51 +79,65 @@ function readReport(buffer, fileName) {
       const route = m ? Number(m[1]) : n.shift();
       if (n.length < 10) { const next = rows.slice(i + 1).find(r => r.length); n = next ? next.filter(isNum) : []; }
       if (n.length !== 10) fail('BAD_REQUEST', name + ': the total line for route ' + route + ' does not have its 10 numbers');
-      totals.push(Object.assign({ route }, rec(n))); continue;
+      if (week) week.totals.push(Object.assign({ route }, rec(n)));
+      continue;
     }
     // A stop line: route, chain, customer number, the name, then 10 numbers (Sun..Sat cases, deliveries, sales, average).
     if (row.length >= 14 && isNum(row[0]) && isNum(row[1]) && isNum(row[2]) && typeof row[3] === 'string') {
       const n = row.slice(4);
       if (n.length !== 10 || !n.every(isNum)) fail('BAD_REQUEST', name + ': a stop line for route ' + row[0] + ' does not have its 10 numbers');
-      stops.push(Object.assign({ route: Math.round(row[0]), chain: Math.round(row[1]), customer_no: Math.round(row[2]), customer: row[3].trim() }, rec(n)));
+      if (week) week.stops.push(Object.assign({ route: Math.round(row[0]), chain: Math.round(row[1]), customer_no: Math.round(row[2]), customer: row[3].trim() }, rec(n)));
     }
   }
-  if (!week || !stops.length) fail('BAD_REQUEST', name + ' is not the weekly route report (' + TITLE + ')');
-  return { week_ending: week, stops, totals };
+  const weeks = [...byWeek.values()].filter(w => w.stops.length).sort((a, b) => a.week_ending < b.week_ending ? -1 : 1);
+  if (!weeks.length) fail('BAD_REQUEST', name + ' is not the weekly route report (' + TITLE + ')');
+  return { weeks };
 }
 
-/** The stops of each route must add up to the report's own total line for it. Returns the routes that do not. */
+/**
+ * The stops of each route must add up to the report's own total line for it (cases and sales). Returns the routes that do not.
+ * The deliveries count is not checked: the total line counts invoices, so it does not match the stops' count.
+ */
 function checkTotals(read) {
   const bad = [];
   for (const t of read.totals) {
     const s = read.stops.filter(x => x.route === t.route);
     const cases = (rows) => rows.reduce((a, r) => a + DAYS.reduce((b, d) => b + r[d], 0), 0);
     const sum = (f) => s.reduce((a, r) => a + r[f], 0);
-    if (Math.abs(cases(s) - cases([t])) > 0.01 || Math.abs(sum('deliveries') - t.deliveries) > 0.01 || Math.abs(sum('net_sales') - t.net_sales) > 0.05) bad.push(t.route);
+    if (Math.abs(cases(s) - cases([t])) > 0.01 || Math.abs(sum('net_sales') - t.net_sales) > 0.05) bad.push(t.route);
   }
   return bad;
 }
 
 /** Saves one week. A week already saved is replaced only when the file's stops differ. */
 async function saveWeek(db, read, how) {
-  const bad = checkTotals(read);
-  if (bad.length) fail('BAD_REQUEST', 'The report for the week ending ' + shortDay(read.week_ending) + ' does not add up for route ' + bad.slice(0, 5).join(', ') + ', so it was not saved');
   const stops = read.stops.map(s => {
     const o = { route: s.route, chain: s.chain, customer_no: s.customer_no, customer: s.customer };
-    DAYS.forEach(d => { o[d] = r3(s[d]); });
+    DAYS.forEach(d => { o[d] = r6(s[d]); });
     o.deliveries = r3(s.deliveries); o.net_sales = r2(s.net_sales);
     return o;
   });
-  const ref = db.collection('routeWeeks').doc(read.week_ending);
+  const ref = db.collection('routeWeekly').doc(read.week_ending);
   const old = await ref.get();
   const same = old.exists && JSON.stringify(old.data().stops) === JSON.stringify(stops);
   const cases = r3(stops.reduce((a, s) => a + DAYS.reduce((b, d) => b + s[d], 0), 0));
   const routes = new Set(stops.map(s => s.route)).size;
   if (!same) {
-    await ref.set({ week_ending: read.week_ending, stops, routes, cases, net_sales: r2(stops.reduce((a, s) => a + s.net_sales, 0)),
+    await ref.set({ week_ending: read.week_ending, stops, routes, stop_count: stops.length, cases, net_sales: r2(stops.reduce((a, s) => a + s.net_sales, 0)),
       file: String(how.file || '').slice(0, 120), source: how.source, received: how.received || how.stamp, savedAt: how.stamp, savedBy: how.by });
   }
   return { week: read.week_ending, weekText: shortDay(read.week_ending), changed: !same, stops: stops.length, routes };
+}
+
+/** Saves every week of one file, or none of them when any week does not add up. Returns each week's result, oldest first. */
+async function saveReport(db, read, how) {
+  for (const w of read.weeks) {
+    const bad = checkTotals(w);
+    if (bad.length) fail('BAD_REQUEST', 'The report for the week ending ' + shortDay(w.week_ending) + ' does not add up for route ' + bad.slice(0, 5).join(', ') + ', so it was not saved');
+  }
+  const out = [];
+  for (const w of read.weeks) out.push(await saveWeek(db, w, how));
+  return out;
 }
 
 const settingsRef = (db) => db.collection('config').doc('routeReportMail');
@@ -125,7 +145,7 @@ const lastRef = (db) => db.collection('config').doc('routeReportMailLast');
 
 async function status(db) {
   const [s, last, list] = await Promise.all([settingsRef(db).get(), lastRef(db).get(),
-    db.collection('routeWeeks').select('week_ending', 'routes', 'cases', 'net_sales', 'file', 'source', 'savedAt').get()]);
+    db.collection('routeWeekly').select('week_ending', 'routes', 'cases', 'net_sales', 'file', 'source', 'savedAt').get()]);
   const st = Object.assign({ enabled: false, mailbox: '', label: DEFAULT_LABEL }, s.exists ? s.data() : {});
   return { settings: { enabled: !!st.enabled, mailbox: st.mailbox || '', label: st.label || DEFAULT_LABEL },
     last: last.exists ? last.data() : null,
@@ -143,8 +163,8 @@ async function saveSettings(db, email, input, stamp) {
 async function upload(db, email, input, stamp) {
   const name = String(input.fileName || '').slice(0, 120);
   const read = readReport(Buffer.from(String(input.base64 || ''), 'base64'), name);
-  const saved = await saveWeek(db, read, { file: name, source: 'BY HAND', stamp, by: email });
-  return Object.assign({ saved, file: name }, await status(db));
+  const weeks = await saveReport(db, read, { file: name, source: 'BY HAND', stamp, by: email });
+  return Object.assign({ saved: weeks[weeks.length - 1], savedWeeks: weeks, file: name }, await status(db));
 }
 
 // Gmail's search words for a label: "ROUTES/SALE BY ROUTE" is label:routes-sale-by-route.
@@ -172,9 +192,9 @@ async function checkMail(db, by, deps) {
         run.read++;
         try {
           const buf = await readAttachment({ owner: s.mailbox, messageId: m.id, attachmentId: f.attachmentId });
-          const saved = await saveWeek(db, readReport(buf, f.name), { file: f.name, source: 'EMAIL ' + shortDay(new Date(m.internalDate || now)), received, stamp, by: 'email:' + s.mailbox });
-          if (saved.changed) run.saved++;
-          found.push({ name: f.name, week: saved.week, changed: saved.changed, stops: saved.stops });
+          const weeks = await saveReport(db, readReport(buf, f.name), { file: f.name, source: 'EMAIL', received, stamp, by: 'email:' + s.mailbox });
+          run.saved += weeks.filter(w => w.changed).length;
+          weeks.forEach(w => found.push({ name: f.name, week: w.week, changed: w.changed, stops: w.stops }));
         } catch (e) { found.push({ name: f.name, error: String(e.message || e).slice(0, 200) }); }
       }
       run.files.push(...found.map(x => Object.assign({ received }, x)));
@@ -184,7 +204,7 @@ async function checkMail(db, by, deps) {
     const newest = run.files.filter(f => f.week).map(f => f.week).sort().pop();
     const bad = run.files.find(f => f.error);
     run.message = bad ? 'Could not read ' + bad.name + ': ' + bad.error
-      : run.files.length ? run.files.length + ' new report' + (run.files.length === 1 ? '' : 's') + ' read' + (newest ? '; newest week ending ' + shortDay(newest) : '') + '.'
+      : run.files.length ? run.files.length + ' week' + (run.files.length === 1 ? '' : 's') + ' read' + (newest ? '; newest week ending ' + shortDay(newest) : '') + '.'
         : 'No new route report.';
   } catch (e) {
     run.status = 'FAIL';
@@ -210,4 +230,4 @@ const OPS = {
   routeReportCheckNow: async (db, email, input, stamp, d) => Object.assign({ run: await checkMail(db, email, d) }, await status(db))
 };
 
-module.exports = { OPS, readReport, checkTotals, saveWeek, status, checkMail, dailyCheck, labelQuery, DAYS, TITLE };
+module.exports = { OPS, readReport, checkTotals, saveWeek, saveReport, status, checkMail, dailyCheck, labelQuery, DAYS, TITLE };

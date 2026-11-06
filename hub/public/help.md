@@ -231,6 +231,8 @@ The same screen also reads the weekly report of cases and sales by route and sto
 
 > A report whose stops do not add up to its own route totals is not saved, and the message says which route. Ask for a fresh copy of the report.
 
+> One file can hold several weeks. Each week is kept, and a newer copy of a week takes the older one's place.
+
 !> Do not take the label off the report emails, or the Hub will not find the next one.
 
 ## Daily BOL

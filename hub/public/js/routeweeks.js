@@ -2,7 +2,7 @@
  * Weekly route report in the hub (Joe 11-6-26: "material for the route cost analysis"), on the Accounting Numbers screen.
  * Vicki's weekly "Weekly Daily Avg Cases by Route By Store" report is read once, by Operations' server
  * (functions/src/routereports.js, Administration steps routeReportStatus / routeReportSaveSettings / routeReportUpload /
- * routeReportCheckNow), and kept in routeWeeks/<week ending>. Route Cost Analysis reads the weeks from there.
+ * routeReportCheckNow), and kept in routeWeekly/<week ending>. Route Cost Analysis reads the weeks from there.
  * The settings save by themselves.
  */
 import { callServer, escapeHtml as e, serverText, shortDate } from './shell.js';
@@ -75,7 +75,8 @@ function wire() {
       const f = ev.target.files[0];
       if (!f) return;
       run('file', async () => admin('routeReportUpload', { fileName: f.name, base64: await fileText(f) }, 120000),
-        (d) => d.saved.changed ? 'Week ending ' + d.saved.weekText + ' read from ' + d.file + ': ' + d.saved.routes + ' routes, ' + d.saved.stops + ' stops.' : 'Nothing new in ' + d.file + ': the week ending ' + d.saved.weekText + ' already matches.');
+        (d) => (d.savedWeeks || []).length > 1 ? 'Weeks ending ' + d.savedWeeks.map(w => w.weekText).join(', ') + ' read from ' + d.file + ' (' + d.savedWeeks.filter(w => w.changed).length + ' new or changed).'
+          : d.saved.changed ? 'Week ending ' + d.saved.weekText + ' read from ' + d.file + ': ' + d.saved.routes + ' routes, ' + d.saved.stops + ' stops.' : 'Nothing new in ' + d.file + ': the week ending ' + d.saved.weekText + ' already matches.');
       return;
     }
     if (['wk-mailbox', 'wk-label', 'wk-enabled'].indexOf(ev.target.id) >= 0) saveSettings();
