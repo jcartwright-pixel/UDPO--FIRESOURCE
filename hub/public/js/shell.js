@@ -22,6 +22,7 @@ export const SCREENS = [
   { href: 'plant-setup.html', name: 'Plant Setup', note: 'Administrators: each plant\'s shifts, areas, menu, schedules and new plant data', admin: true },
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
   { href: 'accounting.html', name: 'Accounting Numbers', note: 'Administrators: the monthly accounting package, read once for Over the Road and cost analysis', admin: true },
+  { href: 'bol.html', name: 'Daily BOL', note: 'Administrators: the daily load by route from the office, picked up from the ROUTES/BOL email label', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 
