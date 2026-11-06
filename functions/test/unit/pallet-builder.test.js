@@ -51,3 +51,10 @@ test('no separate Load sequences section: the truck load map stop list already s
   assert.ok(!/Load sequences on this route/.test(src) && !/id="seqTable"/.test(src));
   assert.match(src, /id="lmTable"/, 'the truck load map stop list stays');
 });
+
+test('grouped stops (Joe 11-5-26, mock-up 3): a colored bar per load sequence and shared customers indented under the BOL one', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /<td class="grp" style="background:\$\{seqColor\(/, 'each stop row has a bar in its sequence color');
+  assert.match(src, /#lmTable tr\.kid td\.cn\{padding-left:34px\}/, 'a shared customer is indented');
+  assert.match(src, /\.lm-plan\{[^}]*background:var\(--accent-soft\)/, 'route totals sit in the light blue box');
+});

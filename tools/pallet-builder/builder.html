@@ -112,7 +112,19 @@ details summary{cursor:pointer;font-weight:600}
 .sizes .row b{font-family:var(--f-mono);font-weight:500}
 .sizes .tot{border-top:1px solid var(--line);padding-top:4px;font-weight:600}
 .part{color:var(--muted);font-size:.78rem}
-.lm-plan{display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--line);padding-top:14px;min-width:0}
+/* Joe 11-5-26 (mock-up 3 "Grouped stops"): route totals in a light blue box under the stop list. */
+.lm-plan{display:flex;flex-direction:column;gap:14px;background:var(--accent-soft);border-radius:10px;padding:16px;min-width:0}
+.lm-plan .tile,.lm-plan .outrow{background:var(--panel)}
+.lm-plan .outrow{font-size:18px}
+#lmTable td.grp,#lmTable th.grp{width:8px;min-width:8px;padding:0}
+#lmTable tr.main td{border-top:3px solid var(--line)}
+#lmTable tr.same td{border-top:0}
+#lmTable tr.kid td.cn{padding-left:34px}
+#lmTable tr.kid td.cn::before{content:'\21B3  ';color:var(--muted)}
+#lmTable tr.kid input.lseq:not(:focus):not(:hover){background:transparent!important;color:transparent}
+.lm,.lm .hint,.lm-plan .tile .k,.lm-plan .tile .s,.lm-plan .outrow .k,.lm-plan .legend,.truck .plab,#lmTable th,#lmTable td,#lmTable .note,#stopTable th,#stopTable td,.lm-legend span{font-size:16px}
+.truck i{height:34px;font-size:16px}
+.truck .plab{white-space:normal}
 .lm{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:760px){.lm{grid-template-columns:minmax(0,1fr)}}
 .truck{background:#3f4a55;border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(3,1fr) 10px repeat(3,1fr);gap:4px}
@@ -353,9 +365,11 @@ function renderMap(R){
   R.pallets.forEach(pl => { const s = seen.get(pl.tote ? null : lmLabel(palFirst(pl))); if (s) s.pals++; });
   $('lmLegend').innerHTML = [...seen.values()].sort((a, b) => a.o - b.o || a.n - b.n).map(s => `<span style="background:${seqColor(s.n)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
   const SIDES = [['', 'Auto'], ['L', 'Left'], ['R', 'Right'], ['F', 'Across front']];
-  $('lmTable').innerHTML = `<thead><tr><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
+  $('lmTable').innerHTML = `<thead><tr><th class="grp"></th><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
     const n = stopSeq(st);
-    return `<tr draggable="true" data-i="${i}" class="${st.sub ? 'sub' : 'main'}"><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
+    // Joe 11-5-26 (mock-up 3): a colored bar per load sequence; a customer sharing the sequence above sits indented under it.
+    const same = i > 0 && n != null && stopSeq(S.stops[i - 1]) === n, kid = st.sub && same;
+    return `<tr draggable="true" data-i="${i}" class="${st.sub ? 'sub' : 'main'}${kid ? ' kid' : ''}${same ? ' same' : ''}"><td class="grp" style="background:${seqColor(n ? n : 5 + i)}" aria-hidden="true"></td><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
       <td><input type="checkbox" class="lmPick" data-i="${i}" ${LMPICK.has(st.id) ? 'checked' : ''} aria-label="Pick ${esc(st.name || 'order ' + (i + 1))} to merge"></td>
       <td><span class="rs num">${i + 1}</span></td>
       <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
