@@ -16,6 +16,8 @@ test('yard out and in: first time seen out of Uniontown Branch / Plant, last tim
   step('', 170, '2026-10-13T17:00:00.000Z');
   d = step('Uniontown Branch', 180, '2026-10-13T18:00:00.000Z');
   assert.deepEqual([d.yardOut, d.yardIn], ['2026-10-13T09:05:00.000Z', '2026-10-13T18:00:00.000Z'], 'the first leave and the last return');
+  // Joe 11-5-26 (two loads on one tractor): every leave of the day is kept too.
+  assert.deepEqual(d.yardOuts, ['2026-10-13T09:05:00.000Z', '2026-10-13T17:00:00.000Z']);
   seen = {};
   step('', 100, '2026-10-13T09:00:00.000Z');
   d = step('', 110, '2026-10-13T09:05:00.000Z');
@@ -116,6 +118,7 @@ test('reefer recording: the place it is at and since when', () => {
   const unit = (place, lastReport) => ({ 'T-702': { unitId: 'u2', tag: 'T-702', place, address: 'I-80 E', speedMph: 0, lastReport } });
   let s = reeferTrips({}, load, unit('Loading Dock', '2026-10-18T12:04:00.000Z'), '2026-10-18T12:05:00.000Z');
   s = reeferTrips(s, load, unit('', '2026-10-18T14:00:00.000Z'), '2026-10-18T14:05:00.000Z');
+  assert.equal(s.trips['T-702'].out, '2026-10-18T14:00:00.000Z', 'out is the unit\'s own report time, not the read time');
   assert.deepEqual([s.trips['T-702'].place, s.trips['T-702'].placeSince], ['', '']);
   s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T19:03:00.000Z'), '2026-10-18T19:05:00.000Z');
   s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T21:00:00.000Z'), '2026-10-18T21:05:00.000Z');

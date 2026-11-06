@@ -258,6 +258,7 @@ function truckRow(r, at) {
  * seen = private/gpsFleetSeen {date, units: {truck: {lr, odo0, odo, first, last, since}}}: the first odometer read each New York
  * day, the latest one, and the first and last read at which it went up. Only units whose report changed are written.
  */
+const YARD_OUTS_KEPT = 12;
 function advanceDays(seen, trucks, at) {
   const date = nyDate(at), fresh = seen.date !== date, units = fresh ? {} : Object.assign({}, seen.units || {});
   const changedTrucks = {}, days = {}, spots = yardSpots(trucks);
@@ -268,17 +269,19 @@ function advanceDays(seen, trucks, at) {
     // being in the yard, and the last time it was seen back.
     const yard = inYard(t, spots), wasYard = u.yard === undefined ? null : u.yard;
     const yardOut = u.yardOut || (wasYard === true && !yard ? at : ''), yardIn = wasYard === false && yard ? at : (u.yardIn || '');
-    const yardChanged = yardOut !== (u.yardOut || '') || yardIn !== (u.yardIn || '');
+    // Joe 11-5-26 (two loads on one tractor, like 852 Load 1 and Load 2): every yard leave today, not only the first.
+    const yardOuts = (u.yardOuts || []).concat(wasYard === true && !yard ? [at] : []).slice(-YARD_OUTS_KEPT);
+    const yardChanged = yardOut !== (u.yardOut || '') || yardIn !== (u.yardIn || '') || yardOuts.length !== (u.yardOuts || []).length;
     if (t.odometerMiles === null) {
-      units[k] = Object.assign({}, u, { lr: t.lastReport, yard, yardOut, yardIn });
-      if (yardChanged) days[date + '_' + k] = { tag: t.tag, date, yardOut, yardIn, updatedAt: at };
+      units[k] = Object.assign({}, u, { lr: t.lastReport, yard, yardOut, yardIn, yardOuts });
+      if (yardChanged) days[date + '_' + k] = { tag: t.tag, date, yardOut, yardIn, yardOuts, updatedAt: at };
       return;
     }
-    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '', since: u.since || at, yard, yardOut, yardIn };
+    const next = { lr: t.lastReport, odo0: u.odo0 == null ? t.odometerMiles : u.odo0, odo: t.odometerMiles, first: u.first || '', last: u.last || '', since: u.since || at, yard, yardOut, yardIn, yardOuts };
     if (u.odo != null && t.odometerMiles - u.odo > 0.2) { next.first = next.first || at; next.last = at; }
     units[k] = next;
     if (fresh || u.odo !== next.odo || !u.lr || yardChanged) {
-      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last, since: next.since, yardOut, yardIn,
+      days[date + '_' + k] = { tag: t.tag, date, miles: Math.max(0, Math.round((next.odo - next.odo0) * 10) / 10), firstMove: next.first, lastMove: next.last, since: next.since, yardOut, yardIn, yardOuts,
         lastPlace: t.place || t.address || '', updatedAt: at };
     }
   });
@@ -515,7 +518,9 @@ function reeferTrips(prev, loaded, units, at) {
     if (u) {
       t.unitId = u.unitId || ''; t.tag = u.tag || ''; t.seenAt = u.lastReport || at;
       const yard = inYard(u, spots);
-      if (!yard && !t.out) t.out = at;
+      // Joe 11-5-26 ("improve the read for the trailer"): out is the time the trailer's unit sent the report that put it off
+      // the lot (its own report time, when that is after the trip began), not the time of our 5-minute read.
+      if (!yard && !t.out) t.out = u.lastReport && u.lastReport >= t.startedAt && u.lastReport <= at ? u.lastReport : at;
       else if (yard && t.out) { t.back = at; return stop('BACK_IN_YARD'); }
       // Joe 10/18: out of the yard, keep where it is (Fleet's place name, such as a store, or the address) and whether it moves.
       // stillSince = the first report seen standing still (under REEFER_MOVING_MPH); cleared once it moves again.

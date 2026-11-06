@@ -1590,7 +1590,7 @@ Where email goes and who it comes from: Repair Email, Email Senders, Manager Rep
 id: admin-sales-email
 screens: administration.html?item=sales-email
 
-The email the salespeople get at 6:00 AM, Monday through Saturday (never Sunday). It has one line for each route: the route number, the run, and where that load stands. It lists the loads of the shift that just ended. Monday's email also has Saturday's loads. Loads marked Ended Up Not Running are left off.
+The email the salespeople get at 6:00 AM, Monday through Saturday (never Sunday). It has one line for each route: the route number, the run, and where that load stands. It lists only the routes delivering that day. Nothing from an earlier day carries over, even a load whose leaving the GPS never saw. Every status is as of 6:00 AM that morning. Loads marked Ended Up Not Running are left off.
 
 What the status says:
 
@@ -1601,7 +1601,9 @@ What the status says:
 - **Not loaded, 45 min behind:** its dispatch time passed more than 30 minutes ago and it is not loaded yet.
 - **Loaded** or **Not loaded:** its dispatch time has not come yet.
 
-The time a load left comes from its trailer's GPS. When the trailer has no GPS, the truck's GPS is used.
+The time a load left comes from the GPS on its dispatch truck (the tractor on Daily Dispatch): the time that truck left the yard. Only when the truck has no GPS is the trailer's GPS used. When one truck pulls two loads, each load gets the leave nearest its own dispatch time.
+
+> `Send a test to me` shows this morning's email as it was at 6:00 AM, even when you press it later in the day.
 
 Who gets it, and On or Off, are changed in the **United Dairy Hub** now (Email & Texts, Sales Route Email): press `Change this in the Hub` on the blue line at the top. It still works here for now; both are the same setting.
 

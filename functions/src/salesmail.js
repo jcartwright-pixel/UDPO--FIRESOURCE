@@ -2,14 +2,19 @@
  * The morning route status email for the salespeople (Joe 10/31): 6:00 AM Monday through Saturday (never Sunday), one line per
  * load: Route (the number only), Run, Status.
  *
- * Which loads: every load of the shift that just ended at the 6 a.m. roll (the operating day before), the same loads Daily
- * Dispatch lists for that load date. Monday's email also carries Saturday's loads, since no email goes out Sunday. Loads marked
- * Ended Up Not Running are left off (Joe: "There's no sense to show it on the list").
+ * Which loads (Joe 11-5-26: "it should reset and only show that day's deliveries ... at 6:00 a.m. whatever is supposed to be
+ * delivered that particular day shows up on this report"): the loads delivering on the day that starts at the 6 a.m. roll, by
+ * delivery date, like the Sales app. Nothing from an earlier delivery day carries over. Loads marked Ended Up Not Running are
+ * left off (Joe: "There's no sense to show it on the list").
  *
- * When a load left (Joe 10/31: "first, let's try the trailer. If not, the tractor associated with that route"; two loads can
- * share a truck): the trailer's GPS first, from its trip (gpsReefer/<trailer>: the trip starts once the load is marked loaded
- * and `out` is the first 5-minute read that saw it out of the yard). Only when the trailer has no GPS unit, the truck's first
- * yard leave (gpsDays yardOut) after the load was loaded.
+ * As of 6:00 AM: every status is worked out at 6:00 AM that morning, also for "Send a test to me" pressed later in the day
+ * (Joe 11-5-26: an evening test had counted "1 day 7 hr behind" from the evening and shown leaves from after 6 AM).
+ *
+ * When a load left (Joe 11-5-26, routes 813 and 824 both showed "Left 6:02 AM": "you should be pulling it from ... the dispatch
+ * tractor"; this replaces 10/31's trailer first): the dispatch tractor's GPS, its yard leave (gpsDays yardOuts) after the load
+ * was loaded, the one nearest the load's dispatch time (two loads can share a tractor). The trailer's GPS (gpsReefer/<trailer> trip `out`) is used only when the tractor has no GPS. The trailer's
+ * time is only the 5-minute read that first saw it out, and a trailer's unit reports far less often than a tractor's (or its
+ * trip starts late when the load is marked loaded late), so several trailers can show the same wrong time.
  *
  * The status (Joe 10/31: "on time if it has left ... not departed if the truck has not departed, or the trailer has not departed,
  * past its dispatch time only ... not loaded if it's not loaded", and "let's put however much time behind it is"):
@@ -53,6 +58,9 @@ const unitKey = (v) => L.unitKey(v);
 // Whether the load is loaded: the one rule in logic.js (rules audit, Joe 11/3).
 function loaded(day) { return L.isLoaded(day); }
 
+// Load Day routes are loaded up to this many days before they deliver.
+const LOAD_LOOK_BACK = 3;
+
 // The loads of one load date: Daily Dispatch's (shown on Daily, running that day).
 function loadsOn(runs, loadDate) {
   const out = [];
@@ -70,21 +78,28 @@ function loadsOn(runs, loadDate) {
 
 /*
  * When a load left the yard, as wall minutes, or null. reefer: {trailer: gpsReefer doc}; gpsDays: [{tag, date, yardOut}].
- * Returns { at, by: 'TRAILER' | 'TRUCK' } or { at: null, trailerGps } (trailerGps: the trailer has a GPS unit, so the truck is not used).
+ * Returns { at, by: 'TRUCK' | 'TRAILER' } or { at: null, truckGps } (truckGps: the dispatch tractor has GPS, so the trailer is not used).
  */
 function leftAt(x, reefer, gpsDays) {
-  const tk = x.trailer ? trailerKey(x.trailer) : '', trip = tk ? (reefer || {})[tk] : null;
-  if (trip && text(trip.id) === x.runDocId + '|' + x.day) {
-    if (text(trip.out)) return { at: R.wallClock(Date.parse(trip.out)), by: 'TRAILER' };
-    if (text(trip.unitId)) return { at: null, trailerGps: true };
+  const k = unitKey(x.truck), from = dayNum(x.loadDate);
+  // The dispatch tractor has GPS when it has a GPS day from the load date on.
+  const days = k ? (gpsDays || []).filter(g => unitKey(g.tag) === k && dayNum(g.date) !== null && dayNum(g.date) >= from) : [];
+  if (days.length) {
+    if (!x.loaded) return { at: null, truckGps: true };
+    const done = R.wallMinutes(x.completedAt);
+    // Every yard leave of those days (yardOuts; an older day has only its first, yardOut), after the load was loaded.
+    const outs = [...new Set(days.flatMap(g => (Array.isArray(g.yardOuts) ? g.yardOuts : []).concat(text(g.yardOut) ? [g.yardOut] : [])))]
+      .map(v => R.wallClock(Date.parse(v))).filter(t => isFinite(t) && (done === null || t >= done)).sort((a, b) => a - b);
+    if (!outs.length) return { at: null, truckGps: true };
+    // Two loads on one tractor: each takes the leave nearest its own dispatch time (with no dispatch time, the first one).
+    const leaves = R.departWall({ departureDate: x.departureDate, deliveryDate: x.deliveryDate, loadDate: x.loadDate, leavesOn: x.leavesOn, dispatchTime: clockMinutes(x.dispatchTime) });
+    const at = leaves === null ? outs[0] : outs.reduce((best, t) => (Math.abs(t - leaves) < Math.abs(best - leaves) ? t : best), outs[0]);
+    return { at, by: 'TRUCK' };
   }
-  if (!x.loaded) return { at: null };
-  const k = unitKey(x.truck);
-  if (!k) return { at: null };
-  const done = R.wallMinutes(x.completedAt), from = dayNum(x.loadDate);
-  const outs = (gpsDays || []).filter(g => unitKey(g.tag) === k && text(g.yardOut) && dayNum(g.date) !== null && dayNum(g.date) >= from)
-    .map(g => R.wallClock(Date.parse(g.yardOut))).filter(t => isFinite(t) && (done === null || t >= done)).sort((a, b) => a - b);
-  return outs.length ? { at: outs[0], by: 'TRUCK' } : { at: null };
+  // No GPS on the tractor: the trailer's trip for this load.
+  const tk = x.trailer ? trailerKey(x.trailer) : '', trip = tk ? (reefer || {})[tk] : null;
+  if (trip && text(trip.id) === x.runDocId + '|' + x.day && text(trip.out)) return { at: R.wallClock(Date.parse(trip.out)), by: 'TRAILER' };
+  return { at: null };
 }
 
 // One load's status line at wall minute `now`: { word, tone, late } (tone: ok | late | loaded | waiting).
@@ -101,22 +116,43 @@ function statusOf(x, left, now) {
   return x.loaded ? { word: 'Loaded', tone: 'loaded', late: 0 } : { word: 'Not loaded', tone: 'waiting', late: 0 };
 }
 
-// The load dates an email at `nowMs` covers: the operating day that just ended; Monday's also covers Saturday's. [] on Sunday.
+// The delivery date an email at `nowMs` covers: the day that starts at that 6 a.m. roll. [] on Sunday (no email).
 function coveredDates(nowMs) {
-  const today = L.operatingDay(new Date(nowMs + 60000)), ended = L.addDays(today, -1), w = weekdayOf(today);
-  if (w === 'Sunday') return [];
-  return w === 'Monday' ? [L.addDays(today, -2), ended] : [ended];
+  const today = L.operatingDay(new Date(nowMs + 60000));
+  return weekdayOf(today) === 'Sunday' ? [] : [today];
+}
+
+// The loads delivering on `date` (loaded that day or up to LOAD_LOOK_BACK days before), each once.
+function deliveriesOn(runs, date) {
+  const seen = new Set(), out = [];
+  for (let i = LOAD_LOOK_BACK; i >= 0; i--) {
+    loadsOn(runs, L.addDays(date, -i)).forEach(x => {
+      const k = x.runDocId + '|' + x.day;
+      if (seen.has(k) || x.deliveryDate !== date) return;
+      seen.add(k);
+      out.push(x);
+    });
+  }
+  return out;
+}
+
+// 6:00 AM of the email's day, as wall minutes (the time every status is worked out at), or `nowMs` if that is earlier.
+function asOf(nowMs) {
+  const today = L.operatingDay(new Date(nowMs + 60000));
+  return Math.min(R.wallClock(nowMs), dayNum(today) * 1440 + T.DAY_ROLL);
 }
 
 const byRoute = (a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.run.localeCompare(b.run, undefined, { numeric: true });
 
-/** The email's rows. input: { runs, reefer, gpsDays }. Returns { today, groups: [{ loadDate, rows: [{route, run, status, tone}] }] }. */
+/** The email's rows. input: { runs, reefer, gpsDays }. Returns { today, groups: [{ deliveryDate, rows: [{route, run, status, tone}] }] }. */
 function salesRows(input, nowMs) {
-  const now = R.wallClock(nowMs), today = L.operatingDay(new Date(nowMs + 60000));
-  const groups = coveredDates(nowMs).map(loadDate => ({
-    loadDate,
-    rows: loadsOn(input.runs, loadDate).map(x => {
-      const s = statusOf(x, leftAt(x, input.reefer, input.gpsDays), now);
+  const now = asOf(nowMs), today = L.operatingDay(new Date(nowMs + 60000));
+  const groups = coveredDates(nowMs).map(deliveryDate => ({
+    deliveryDate,
+    rows: deliveriesOn(input.runs, deliveryDate).map(x => {
+      // A leave after 6:00 AM had not happened yet at 6:00 AM.
+      const l = leftAt(x, input.reefer, input.gpsDays), left = l.at !== null && l.at > now ? { at: null } : l;
+      const s = statusOf(x, left, now);
       return { route: x.route, run: x.run, status: s.word, tone: s.tone };
     }).sort(byRoute)
   }));
@@ -132,14 +168,12 @@ const TONE = { ok: [C.green, C.greenBg], caution: [C.yellowInk, C.yellow], late:
 function salesEmail(data) {
   const day = weekdayOf(data.today) + ' ' + shortDate(data.today);
   const subject = 'Route status for ' + shortDate(data.today) + ' (6:00 AM)';
-  const intro = 'Good morning. Here is where every route stands as of 6:00 AM, ' + day + '.';
-  const foot = 'The time a load left is when its trailer left the lot, from the trailer\'s GPS (or the truck\'s GPS if the trailer has none). On time is within 30 minutes either side of each route\'s dispatch time; yellow is 30 to 60 minutes early or late, red more than 60.';
-  const many = data.groups.length > 1, none = !data.groups.some(g => g.rows.length);
-  const head = (g) => (many ? 'Loaded ' + weekdayOf(g.loadDate) + ' ' + shortDate(g.loadDate) : '');
+  const intro = 'Good morning. Here is where every route delivering today stands as of 6:00 AM, ' + day + '.';
+  const foot = 'The time a load left is when its dispatch truck left the lot, from the truck\'s GPS (or the trailer\'s GPS if the truck has none). On time is within 30 minutes either side of each route\'s dispatch time; yellow is 30 to 60 minutes early or late, red more than 60.';
+  const none = !data.groups.some(g => g.rows.length);
   const lines = [intro, ''];
   data.groups.forEach(g => {
     if (!g.rows.length) return;
-    if (many) lines.push(head(g));
     g.rows.forEach(r => lines.push(r.route + '  ' + r.run + '  ' + r.status));
     lines.push('');
   });
@@ -151,7 +185,6 @@ function salesEmail(data) {
   let html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#222;max-width:720px">' + '<p style="margin:0 0 12px">' + esc(intro) + '</p>';
   data.groups.forEach(g => {
     if (!g.rows.length) return;
-    if (many) html += '<h3 style="margin:16px 0 8px;font-size:18px">' + esc(head(g)) + '</h3>';
     html += '<table style="border-collapse:collapse;width:100%;table-layout:fixed"><tr>' + th('Route', '18%') + th('Run', '37%') + th('Status', 'auto') + '</tr>' +
       g.rows.map(r => '<tr>' + td(esc(r.route), 'font-weight:700') + td(esc(r.run)) + td(tag(r)) + '</tr>').join('') + '</table>';
   });
@@ -170,12 +203,13 @@ async function settings(db) {
 async function readInput(db, nowMs) {
   const dates = coveredDates(nowMs);
   if (!dates.length) return { runs: [], reefer: {}, gpsDays: [] };
-  const weeks = [...new Set(dates.flatMap(d => [L.weekStart(d), L.weekStart(L.addDays(d, 6))]))];
+  // A load sits in its delivery day's week.
+  const weeks = [...new Set(dates.map(d => L.weekStart(d)))];
   const runs = (await db.collection('runs').where('weekStart', 'in', weeks).get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
-  const trailers = [...new Set(dates.flatMap(d => loadsOn(runs, d)).map(x => x.trailer ? trailerKey(x.trailer) : '').filter(Boolean))];
+  const trailers = [...new Set(dates.flatMap(d => deliveriesOn(runs, d)).map(x => x.trailer ? trailerKey(x.trailer) : '').filter(Boolean))];
   const reefer = {};
   if (trailers.length) (await db.getAll(...trailers.map(t => db.collection('gpsReefer').doc(safeIdPart(t))))).forEach((s, i) => { if (s.exists) reefer[trailers[i]] = s.data(); });
-  const from = dates[0], to = L.operatingDay(new Date(nowMs + 60000));
+  const from = L.addDays(dates[0], -LOAD_LOOK_BACK), to = L.operatingDay(new Date(nowMs + 60000));
   const gpsDays = (await db.collection('gpsDays').where('date', '>=', from).where('date', '<=', to).get()).docs.map(x => x.data());
   return { runs, reefer, gpsDays };
 }
@@ -230,4 +264,4 @@ async function adminTest(db, email, input, stamp, deps) {
   return { ok: out.status === 'SENT', message: out.status === 'SENT' ? 'Sent to ' + email + '.' : (out.reason || 'The test did not go out.') };
 }
 
-module.exports = { unitKey, shortDate, weekdayOf, adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, leftAt, statusOf, howLong, clock12, SETTINGS_DOC };
+module.exports = { unitKey, shortDate, weekdayOf, adminView, adminSave, adminTest, SalesMailError, salesRows, salesEmail, sendMorning, coveredDates, loadsOn, deliveriesOn, asOf, leftAt, statusOf, howLong, clock12, SETTINGS_DOC };

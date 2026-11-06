@@ -8,7 +8,7 @@
  * Divisions: the plants (Uniontown, Charleston, Martins Ferry) that are running; each keeps its own loads in its own database.
  *
  * Which loads: the operating day that is running now (the 6 a.m. roll) and the one before it, whose trucks may still be out.
- * The status is the 6:00 AM sales email's (salesmail.js): the trailer's GPS first for when it left, else the truck's; On time /
+ * The status is the 6:00 AM sales email's (salesmail.js): the dispatch tractor's GPS first for when it left, else the trailer's; On time /
  * Left late / Not departed / Not loaded, with how far behind, counted from dispatch. Ended Up Not Running is left off.
  *
  * Where it is: the trailer's GPS unit (Verizon Connect Fleet, gpsTrucks) first, else the truck's: its last report, as words
