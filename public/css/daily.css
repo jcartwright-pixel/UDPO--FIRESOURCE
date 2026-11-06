@@ -7,12 +7,6 @@ input.ovr { width: 15px; height: min(15px, calc(var(--row) - 6px)); margin: 0; v
 @media print {
   #print .pgroup td { font-weight: 700; background: #eee !important; }
 }
-.head:has(#print-sheet) #week-begin { width: 118px; min-width: 0; }
-.head:has(#print-sheet) #delivery-day { width: 160px; }
-@media (max-width: 1700px) {
-  .head:has(#print-sheet) #week-begin { width: 118px; }
-  .head:has(#print-sheet) #delivery-day { width: 160px; }
-}
 /* Daily Dispatch, Joe's pick 10/10 (mock-up A): every row a white card with a blue edge, route numbers in blue,
    delivery-day lines as blue banners, RUNS and Edit as round buttons. Rows still size to fit the window. */
 body.daily-look .sheet { background: transparent; border: 0; box-shadow: none; overflow: visible; }
@@ -74,18 +68,13 @@ body.daily-look table.daily tbody tr.already:not(.group) td:first-child { border
   body.daily-look .head:has(#print-sheet) { flex-wrap: wrap; row-gap: 6px; align-items: flex-end; gap: 10px; }
   body.daily-look .head:has(#print-sheet) .title { flex: none; }
   body.daily-look .head:has(#print-sheet) .actions.in-head { margin-left: 0; flex-wrap: nowrap; gap: 6px; }
-  body.daily-look .head:has(#print-sheet) .actions.in-head + .field { margin-left: auto; }
 }
-body.daily-look #delivers { display: none; }
 @media (min-width: 701px) and (max-width: 1899px) {
   /* Room for one line at 1536: Delivery day shows beside Loadout day, buttons and arrows are a little tighter. */
   body.daily-look .head:has(#print-sheet) { gap: 8px; }
-  body.daily-look .head:has(#print-sheet) .field:has(#delivery-day) { display: none; }
-  body.daily-look #delivers { display: block; }
   body.daily-look .head:has(#print-sheet) .actions.in-head :is(button, a.button) { padding: 0 8px; }
   body.daily-look .head:has(#print-sheet) .coverage { min-width: 0; padding: 1px 6px; }
   body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 6px; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 84px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 112px; }
 }
 /* Review item 56 (Joe 10/13): with 16px text Daily's top line still fits at 1536 and 1920: the coverage tile puts DRIVERS
@@ -95,9 +84,7 @@ body.daily-look #delivers { display: none; }
   body.daily-look .head:has(#print-sheet) .coverage { flex-direction: row; align-items: center; gap: 6px; min-width: 0; padding: 1px 8px; }
   body.daily-look .head:has(#print-sheet) .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; }
   body.daily-look .head:has(#print-sheet) .field label { letter-spacing: 0; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 96px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 128px; }
-  body.daily-look .head:has(#print-sheet) #delivery-day { width: 110px; }
 }
 @media (min-width: 701px) and (max-width: 1799px) {
   body.daily-look .head:has(#print-sheet) { gap: 6px; }
@@ -106,7 +93,6 @@ body.daily-look #delivers { display: none; }
   body.daily-look .head:has(#print-sheet) .coverage { padding: 1px 6px; }
   body.daily-look .head:has(#print-sheet) .coverage span { width: 70px; }
   body.daily-look .head:has(#print-sheet) .stepper button { padding: 0 4px; }
-  body.daily-look .head:has(#print-sheet) #week-begin { width: 72px; }
   body.daily-look .head:has(#print-sheet) #load-day { width: 104px; }
 }
 /* Joe 10/11, 10/20: a load whose regular driver is off (vacation, sick, unpaid...) reads NEEDS DRIVER in bold white on solid red, with who is off and why under it,
@@ -116,3 +102,31 @@ table.daily td.offcover::before { content: "NEEDS DRIVER"; font-size: 16px; font
 table.daily td.offcover::after { content: attr(data-off-who) "\A" attr(data-off-why); display: block; font-size: 16px; font-weight: 700; line-height: 1.15; color: #fff; white-space: pre-line; }
 /* Joe 10/23: a down truck or trailer says "T-532 DOWN" only; the driver cell's NEEDS DRIVER words are not put on it. */
 table.daily td.unit-down::before, table.daily td.unit-down::after { content: none; display: none; }
+/* Joe 11/6 (mock-up ks): the action buttons on the title line; under them ONE line of information: the week (always the current
+   week, it cannot be changed here), Drivers Covered, the short schedule-texts line and, on the right, the Loadout day with the
+   day it delivers. The table starts right under it. */
+body.daily-look .head:has(#print-sheet) { padding-bottom: 6px; }
+body.daily-look .day-info { display: flex; align-items: center; gap: 12px; margin: 0 16px 8px; flex-wrap: nowrap; }
+.day-info .week-of { display: flex; align-items: center; height: 42px; padding: 0 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 18px; font-weight: 800; color: #0f2747; white-space: nowrap; text-transform: uppercase; }
+.day-info .week-of small { font-size: 16px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin-right: 8px; }
+.day-info .coverage { flex-direction: row; align-items: center; gap: 6px; height: 42px; padding: 1px 10px; border-radius: 10px; box-sizing: border-box; flex: none; }
+.day-info .coverage b { font-size: 18px; }
+.day-info .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; font-size: 16px; }
+.day-info .send-strip { margin: 0; flex: 1 1 auto; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 4px 10px; flex-wrap: nowrap; gap: 10px; }
+.day-info .send-strip:has(.send-error) { flex-wrap: wrap; }
+.day-info .send-strip .send-words, .day-info .send-strip .send-button { white-space: nowrap; }
+.day-info .send-strip .send-button { flex: none; }
+.day-info .day-pick { display: flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; flex: none; }
+.day-info .day-pick label, .day-info .delivers { font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
+.day-info .day-pick label { font-weight: 700; color: var(--muted); }
+.day-info .delivers { font-weight: 800; color: #0f2747; }
+.day-info .stepper { height: 42px; }
+.day-info .stepper #load-day { width: 128px; min-width: 0; }
+.day-info .stepper button:disabled { opacity: .3; cursor: not-allowed; }
+@media (max-width: 1899px) { .day-info .send-more { display: none; } }
+@media (max-width: 700px) {
+  body.daily-look .day-info { flex-wrap: wrap; gap: 8px; }
+  .day-info .send-strip { flex-basis: 100%; flex-wrap: wrap; }
+  .day-info .send-strip .send-words { white-space: normal; }
+  .day-info .day-pick { margin-left: 0; flex-wrap: wrap; }
+}

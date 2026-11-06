@@ -127,6 +127,11 @@ async function printed(page, button) {
     await daily.waitForSelector('#rows tr[data-id]');
     sent = await printed(daily, '#print-sheet');
     assert.deepEqual([sent.pages, sent.size], [3, '11in 8.5in'], 'Daily Print: one landscape page, 3 copies: ' + JSON.stringify(sent));
+    // Joe 11/6: Daily's Print Weekly Schedule prints Weekly Dispatch's Driver Assignment Board (Weekly's own print) without leaving Daily.
+    sent = await printed(daily, '#print-week');
+    assert.match(sent.text, /WEEKLY DISPATCH · DRIVER ASSIGNMENT BOARD/, 'Print Weekly Schedule: ' + sent.text.slice(0, 200));
+    assert.equal(sent.pages, 1, 'the board on one page');
+    assert.match(daily.url(), /daily\.html/, 'still on Daily Dispatch');
     await daily.click('#rows tr[data-id] [data-open]');
     await daily.waitForSelector('#edit-modal [data-print-one]');
     sent = await printed(daily, '#edit-modal [data-print-one]');
@@ -134,7 +139,7 @@ async function printed(page, button) {
     assert.ok(/801[\s\S]*802/.test(sent.text), 'the pop-up prints the whole sheet, not one run');
     assert.deepEqual(daily.errors, []);
     await daily.close();
-    results.push('Daily Print and the edit pop-up Print: the whole sheet, one landscape page, 3 copies');
+    results.push('Daily Print Daily Schedule and the edit pop-up Print: the whole sheet, one landscape page, 3 copies; Print Weekly Schedule: the Driver Assignment Board on one page, still on Daily');
 
     // Joe 10/11: a run added to a day outside the driver's normal week is purple (Joe 10/17; was yellow) on the Driver Assignment Board, and the Weekly
     // print is that board only, on one page, in the board's colours.
