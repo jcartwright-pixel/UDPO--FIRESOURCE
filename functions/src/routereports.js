@@ -6,10 +6,10 @@
  * there (read only), so nobody has to save the files and run a script by hand. Nothing else writes them.
  *
  * Two ways in, both on the Hub's Accounting Numbers screen (Administrators), next to the accounting zip:
- *   - Add a file by hand: one weekly report .xls, or one Daily Load By Route PDF (the BOL, src/dailyloads.js).
- *   - From email: once a day (routeReportMail, 5:00 PM) the mailbox set on the screen is read, read only (gmail.readonly,
+ *   - Add a file by hand: one report .xls.
+ *   - From email: once a day (routeReportMail, 2:00 PM) the mailbox set on the screen is read, read only (gmail.readonly,
  *     the same Google Workspace permission as the accounting zip), for messages with the Gmail label set there (Joe's is
- *     ROUTES/SALE BY ROUTE) and an .xls attached, and with the BOL label (ROUTES/BOL) and a PDF attached; each message is read once (routeReportMail/<message id> remembers it).
+ *     ROUTES/SALE BY ROUTE) and an .xls attached; each message is read once (routeReportMail/<message id> remembers it).
  * A report whose stops do not add up to its own route totals is not saved (the screen says which route).
  * Settings: config/routeReportMail {enabled, mailbox, label}. Last run: config/routeReportMailLast.
  * The reader follows the Route Cost Analysis repository's scripts/parse_route_report.py: cells are read in order, not by
@@ -25,8 +25,6 @@ const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const MAX_BYTES = 10 * 1024 * 1024;
 const EMAIL = /^[^\s@<>(),;:"[\]\\]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const DEFAULT_LABEL = 'ROUTES/SALE BY ROUTE';
-const DEFAULT_BOL_LABEL = 'ROUTES/BOL';
-const LOADS = require('./dailyloads');
 
 const fail = (code, message) => require('./admin').fail(code, message);
 const isNum = (v) => typeof v === 'number' && isFinite(v);
@@ -128,33 +126,25 @@ const lastRef = (db) => db.collection('config').doc('routeReportMailLast');
 async function status(db) {
   const [s, last, list] = await Promise.all([settingsRef(db).get(), lastRef(db).get(),
     db.collection('routeWeeks').select('week_ending', 'routes', 'cases', 'net_sales', 'file', 'source', 'savedAt').get()]);
-  const st = Object.assign({ enabled: false, mailbox: '', label: DEFAULT_LABEL, bolLabel: DEFAULT_BOL_LABEL }, s.exists ? s.data() : {});
-  return { settings: { enabled: !!st.enabled, mailbox: st.mailbox || '', label: st.label || DEFAULT_LABEL, bolLabel: st.bolLabel || DEFAULT_BOL_LABEL },
+  const st = Object.assign({ enabled: false, mailbox: '', label: DEFAULT_LABEL }, s.exists ? s.data() : {});
+  return { settings: { enabled: !!st.enabled, mailbox: st.mailbox || '', label: st.label || DEFAULT_LABEL },
     last: last.exists ? last.data() : null,
-    weeks: list.docs.map(d => d.data()).sort((a, b) => a.week_ending < b.week_ending ? 1 : -1).slice(0, 20),
-    days: await LOADS.recentDays(db) };
+    weeks: list.docs.map(d => d.data()).sort((a, b) => a.week_ending < b.week_ending ? 1 : -1).slice(0, 20) };
 }
 
 async function saveSettings(db, email, input, stamp) {
   const mailbox = String(input.mailbox || '').trim().toLowerCase(), label = String(input.label || '').trim().slice(0, 100) || DEFAULT_LABEL;
-  const bolLabel = String(input.bolLabel || '').trim().slice(0, 100) || DEFAULT_BOL_LABEL;
   if (mailbox && !EMAIL.test(mailbox)) fail('BAD_REQUEST', 'The mailbox is not an email address');
   if (input.enabled && !mailbox) fail('BAD_REQUEST', 'Type the mailbox first');
-  await settingsRef(db).set({ enabled: !!input.enabled, mailbox, label, bolLabel, savedAt: stamp, savedBy: email });
+  await settingsRef(db).set({ enabled: !!input.enabled, mailbox, label, savedAt: stamp, savedBy: email });
   return status(db);
 }
 
 async function upload(db, email, input, stamp) {
   const name = String(input.fileName || '').slice(0, 120);
-  const saved = await readAndSave(db, Buffer.from(String(input.base64 || ''), 'base64'), name, { file: name, source: 'BY HAND', stamp, by: email });
+  const read = readReport(Buffer.from(String(input.base64 || ''), 'base64'), name);
+  const saved = await saveWeek(db, read, { file: name, source: 'BY HAND', stamp, by: email });
   return Object.assign({ saved, file: name }, await status(db));
-}
-
-// One file of either report: the weekly route report (.xls) or the daily load by route (BOL, .pdf).
-async function readAndSave(db, buf, name, how) {
-  if (/\.pdf$/i.test(name)) return Object.assign({ kind: 'bol' }, await LOADS.saveLoadDay(db, await LOADS.readLoadPdf(buf, name), how));
-  if (!/\.xlsx?$/i.test(name)) fail('BAD_REQUEST', 'Pick the weekly route report (.xls) or the Daily Load By Route PDF');
-  return Object.assign({ kind: 'week' }, await saveWeek(db, readReport(buf, name), how));
 }
 
 // Gmail's search words for a label: "ROUTES/SALE BY ROUTE" is label:routes-sale-by-route.
@@ -172,22 +162,19 @@ async function checkMail(db, by, deps) {
   const MAIL = require('./mail');
   const readMail = d.readMail || MAIL.readMail, readAttachment = d.readAttachment || MAIL.readAttachment;
   try {
-    const weekly = await readMail({ owner: s.mailbox, query: labelQuery(s.label) + ' has:attachment newer_than:60d', max: 30 });
-    const bol = await readMail({ owner: s.mailbox, query: labelQuery(s.bolLabel) + ' has:attachment filename:pdf newer_than:14d', max: 20 });
-    const byId = new Map();
-    weekly.concat(bol).forEach(m => byId.set(m.id, m));
-    for (const m of [...byId.values()].sort((a, b) => a.internalDate - b.internalDate)) {
+    const messages = await readMail({ owner: s.mailbox, query: labelQuery(s.label) + ' has:attachment newer_than:60d', max: 30 });
+    for (const m of messages.sort((a, b) => a.internalDate - b.internalDate)) {
       const seen = db.collection('routeReportMail').doc(String(m.id).replace(/[^A-Za-z0-9_-]/g, '_'));
       if ((await seen.get()).exists) { run.skipped++; continue; }
       const received = new Date(m.internalDate || now).toISOString();
       const found = [];
-      for (const f of (m.files || []).filter(x => /\.(xlsx?|pdf)$/i.test(x.name) && x.size <= 15 * 1024 * 1024)) {
+      for (const f of (m.files || []).filter(x => /\.xlsx?$/i.test(x.name) && x.size <= MAX_BYTES)) {
         run.read++;
         try {
           const buf = await readAttachment({ owner: s.mailbox, messageId: m.id, attachmentId: f.attachmentId });
-          const saved = await readAndSave(db, buf, f.name, { file: f.name, source: 'EMAIL ' + shortDay(new Date(m.internalDate || now)), received, stamp, by: 'email:' + s.mailbox });
+          const saved = await saveWeek(db, readReport(buf, f.name), { file: f.name, source: 'EMAIL ' + shortDay(new Date(m.internalDate || now)), received, stamp, by: 'email:' + s.mailbox });
           if (saved.changed) run.saved++;
-          found.push(saved.kind === 'bol' ? { name: f.name, day: saved.date, changed: saved.changed, lines: saved.lines } : { name: f.name, week: saved.week, changed: saved.changed, stops: saved.stops });
+          found.push({ name: f.name, week: saved.week, changed: saved.changed, stops: saved.stops });
         } catch (e) { found.push({ name: f.name, error: String(e.message || e).slice(0, 200) }); }
       }
       run.files.push(...found.map(x => Object.assign({ received }, x)));
@@ -195,10 +182,9 @@ async function checkMail(db, by, deps) {
       await seen.set({ at: stamp, subject: String(m.subject || '').slice(0, 200), from: String(m.from || '').slice(0, 120), files: found });
     }
     const newest = run.files.filter(f => f.week).map(f => f.week).sort().pop();
-    const newestDay = run.files.filter(f => f.day).map(f => f.day).sort().pop();
     const bad = run.files.find(f => f.error);
     run.message = bad ? 'Could not read ' + bad.name + ': ' + bad.error
-      : run.files.length ? run.files.length + ' new report' + (run.files.length === 1 ? '' : 's') + ' read' + (newest ? '; newest week ending ' + shortDay(newest) : '') + (newestDay ? '; newest daily load ' + shortDay(newestDay) : '') + '.'
+      : run.files.length ? run.files.length + ' new report' + (run.files.length === 1 ? '' : 's') + ' read' + (newest ? '; newest week ending ' + shortDay(newest) : '') + '.'
         : 'No new route report.';
   } catch (e) {
     run.status = 'FAIL';
@@ -224,4 +210,4 @@ const OPS = {
   routeReportCheckNow: async (db, email, input, stamp, d) => Object.assign({ run: await checkMail(db, email, d) }, await status(db))
 };
 
-module.exports = { OPS, readAndSave, readReport, checkTotals, saveWeek, status, checkMail, dailyCheck, labelQuery, DAYS, TITLE };
+module.exports = { OPS, readReport, checkTotals, saveWeek, status, checkMail, dailyCheck, labelQuery, DAYS, TITLE };

@@ -19,7 +19,6 @@
     "firebase": "12.18.0",
     "firebase-tools": "15.30.2",
     "jszip": "3.10.1",
-    "pdfjs-dist": "4.10.38",
     "playwright": "1.56.1"
   }
 }
