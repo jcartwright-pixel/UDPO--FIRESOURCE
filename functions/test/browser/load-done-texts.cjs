@@ -73,7 +73,7 @@ const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - inn
       assert.equal(await p.$eval('#drivers tr td', td => td.textContent), 'CASEY, LEE');
       assert.equal(await p.$eval('#preview tr td', td => td.textContent), 'CASEY, LEE');
       assert.match(await p.textContent('#sample'), /^United Dairy: your load is done\. Route 801 .*Pickups: 2 crates chocolate milk\.$/);
-      assert.match(await p.textContent('#preview-text'), /your schedule for the week of/);
+      assert.match(await p.textContent('#preview-text'), /Each driver gets their own posted week, the way My Schedule shows it/);
       assert.match(await p.textContent('#mode'), /Test copy/);
       assert.match(await p.textContent('#ask-text'), /Reply YES to get them/);
       await p.waitForSelector('#log tr td:nth-child(6)');
