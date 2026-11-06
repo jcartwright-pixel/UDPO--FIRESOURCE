@@ -75,7 +75,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.evaluate(() => window.scrollTo(0, 300));
     assert.ok(await p.evaluate(() => window.scrollY > 0), 'People & Access scrolls');
     await p.setViewportSize({ width: 1920, height: 1080 });
-    await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"]');
+    await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"] td.who');
     // Joe 11-4-26: the person opens on the whole page; the list is out of the way and the address names them.
     await p.waitForSelector('.people.full #f-role');
     assert.ok(await p.isHidden('#rows'), 'the list steps aside while a person is open');
