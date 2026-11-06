@@ -38,4 +38,15 @@ test('Driver Weekly Template: a run belongs to one driver a day; Off and runs sa
   assert.equal(brook.cells.tue_default_route_id, 'rte_t801');
   const live = await run('2026-10-04__run_t801');
   assert.equal(live.days.tue.driverId, 'drv_test_brook', 'the Live week took the new template driver');
+
+  // Joe 11/6: next week (the Weekly Dispatch Template) follows too; a day changed by hand there keeps the hand change, and a
+  // load already loaded is not touched.
+  const next = await run('2026-10-11__run_t801');
+  assert.equal(next.days.tue.driverId, 'drv_test_brook', 'next week took the new template driver');
+  await db().collection('runs').doc('2026-10-11__run_t801').update({ 'days.mon.routeOverride': 'TRUE', 'days.mon.driverId': 'drv_test_casey', 'days.mon.driver': 'CASEY, LEE' });
+  await db().collection('runs').doc('2026-10-04__run_t801').update({ 'days.mon.loadStatus': 'LOADED' });
+  const monBefore = (await run('2026-10-04__run_t801')).days.mon;
+  await applyAction(db(), MANAGER, { action: 'saveDriverTemplate', requestId: rid(), driverId: 'drv_test_adams', day: 'mon', status: 'OFF' }, now);
+  assert.equal((await run('2026-10-11__run_t801')).days.mon.driverId, 'drv_test_casey', 'a hand change on next week stays');
+  assert.equal((await run('2026-10-04__run_t801')).days.mon.driverId, monBefore.driverId, 'a loaded load keeps its driver');
 });
