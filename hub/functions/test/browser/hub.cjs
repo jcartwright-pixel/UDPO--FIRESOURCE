@@ -35,7 +35,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
   try {
     let p = await open(browser, 'pat.admin@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes']);
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
     assert.equal(await p.textContent('#hello'), 'Your apps, Pat');
     assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
     assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs']);
