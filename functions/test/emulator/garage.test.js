@@ -242,3 +242,23 @@ test('Joe 11-6-26: a login ID padded with zeros to 6 digits signs in with just i
   // A 5-digit ID stays exact apart from zeros: 48213 does not sign in as 4821.
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '4821' }, now()), /Wrong login ID/);
 });
+
+// Joe 11-6-26: a technician on the Employees list signs in with their employee ID, zeros at the front or back not typed,
+// with no login ID set; a technician added by picking them from the list keeps that employee.
+test('Joe 11-6-26: a technician signs in with their employee ID from the Employees list, zeros or not', async () => {
+  await db().collection('garageTechs').doc('TECH-PS').set({ tech_id: 'TECH-PS', name: 'SAMPLE PAT', active: 'YES' });
+  await db().collection('employees').doc('009354').set({ employeeId: '009354', name: 'SAMPLE, PAT', department: 'GARAGE', active: true });
+  for (const typed of ['9354', '009354']) assert.ok((await garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: typed }, now())).token, 'signs in with ' + typed);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: '9355' }, now()), /Wrong login ID/);
+  assert.equal((await db().collection('garageLocks').doc('TECH-PS').get()).data().count, 1, 'a wrong number still counts towards the lock');
+  // Someone else's employee ID does not sign Pat in, and a technician matching nobody still needs a login ID.
+  await db().collection('employees').doc('004444').set({ employeeId: '004444', name: 'OTHER, LEE', department: 'GARAGE', active: true });
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: '4444' }, now()), /Wrong login ID/);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '4444' }, now()), /no login ID yet/);
+  // Added by picking Lee from the list: the employee is kept on the technician and Lee signs in with 4444.
+  const added = await applyAction(db(), { email: 'manager.test@uniteddairy.com' }, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'Lee Other', loginId: '004444', employeeId: '004444' });
+  const lee = (await db().collection('garageTechs').doc(added.techId || added.id || 'x').get());
+  const leeDoc = lee.exists ? lee.data() : (await db().collection('garageTechs').where('name', '==', 'LEE OTHER').get()).docs[0].data();
+  assert.equal(leeDoc.employee_id, '004444');
+  assert.ok((await garageCall(db(), { op: 'signIn', techId: leeDoc.tech_id, loginId: '4444' }, now())).token);
+});

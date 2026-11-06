@@ -226,7 +226,7 @@ table.gl-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-s
 .adm-hide { flex: none; font: inherit; font-size: 16px; font-weight: 800; color: #1565c0; background: #e8f1fb; border: 1px solid #b9d3f0; border-radius: 9px; padding: 0 10px; cursor: pointer; white-space: nowrap; }
 .adm-hide:hover { background: #d6e7fa; }
 .adm-nav-list { padding: 8px 10px 12px; }
-.adm-nav-group { margin: 0 0 6px; }
+.adm-nav-group { margin: 0 0 4px; }
 .adm-nav-group h2 { margin: 0; font-size: 17px; letter-spacing: 0; text-transform: none; }
 .adm-gh { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; border: 0; border-radius: 9px; background: #c8102e; color: #fff; font: inherit; font-size: 17px; font-weight: 900; text-align: left; padding: 8px 12px; cursor: pointer; }
 .adm-gh:hover { background: #a90d26; }

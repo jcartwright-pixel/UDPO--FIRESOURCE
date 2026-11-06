@@ -867,6 +867,17 @@
     'T-876': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' }, 'T-950': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' } };
   // FLEET_BY_DAYS: trucks with no GPS whose PM goes by the date (every truckDaysMonths), not miles.
   var FLEET_BY_DAYS = { '688': 'Joe 10/19: yard truck, no GPS, goes by days', '9737': 'Joe 10/19: yard truck, no GPS, goes by days' };
+  // Joe 11-6-26: a garage technician is the employee on the Employees list (UDMS) with the same name, or the one picked when
+  // they were added (employee_id); their employee ID signs them in on the Garage Station. Names match whatever the order or
+  // commas ("MARTIN, SHAUN" is SHAUN MARTIN); a name two employees share matches nobody.
+  function personKey(name) { return String(name || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean).sort().join(' '); }
+  function employeeForTech(employees, tech) {
+    var list = (employees || []).filter(function (e) { return e && e.employeeId && e.active !== false && e.status !== 'GONE'; });
+    var id = String(tech && tech.employee_id || '').trim();
+    if (id) { var byId = list.filter(function (e) { return String(e.employeeId) === id; }); if (byId.length) return byId[0]; }
+    var key = personKey(tech && tech.name), hit = key ? list.filter(function (e) { return personKey(e.name) === key; }) : [];
+    return hit.length === 1 ? hit[0] : null;
+  }
   function fleetUnitKey(u) {
     var s = String(u === null || u === undefined ? '' : u).trim().toUpperCase().replace(/\s+/g, ''), m = s.match(/^([A-Z]+)-?0*(\d+)$/), n = s.match(/^0*(\d+)$/);
     return m ? m[1] + '-' + m[2] : n ? n[1] : s;
@@ -1785,7 +1796,7 @@
     PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
     unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts, weeklyWindow: weeklyWindow, driverClash: driverClash, weeklyClash: weeklyClash,
-    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, personKey: personKey, employeeForTech: employeeForTech, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     COLORS: COLORS, dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,

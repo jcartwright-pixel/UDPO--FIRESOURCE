@@ -523,7 +523,7 @@ Every work order at the garage: unit, problem, category, whether the unit can ru
 id: garage-station
 screens: garage-station.html
 
-The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with its picture and the number of open work orders. Mechanics sign in with their name and login ID for each step. A login ID padded with zeros to 6 digits also works with just its real digits (Sean Martin types 4).
+The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with its picture and the number of open work orders. Mechanics sign in with their name and login ID for each step. A mechanic's employee ID (from the Employees list) is their login ID, and the zeros at the front or back never have to be typed: an employee ID of 009354 works as 9354 or 009354. A login ID padded with zeros to 6 digits also works with just its real digits.
 
 1. Tap a card to see its open work orders. `← All work orders` goes back to the cards.
 2. Tap `Open` on a work order. The big yellow `← Back` goes back to the list.
@@ -577,7 +577,10 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - **Due · Services & Annual Inspection** shows each unit with PM / Reefer, Annual Inspection and Plates side by side. Overdue and due soon stand out in color.
 - **Work Orders** lists the open work orders and what the mechanics did this week.
 - **History** shows the last 12 months.
-- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup.
+- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup. It is also in Administration under **Fleet Maintenance Setup**.
+- To add a technician: click the name box and pick the person from the Employees list (the GARAGE department is first). Their employee ID fills in as the login ID. Press `Add Technician`.
+- A technician who matches someone on the Employees list says **Signs in with employee ID**. They sign in on the Garage Station with that number, without the zeros at the front or back. `Set login ID` gives them a different number as well.
+- Login IDs are never shown once saved.
 - To start a unit's dates, click its PM / Reefer or Annual Inspection on **Due**, or `Edit dates`. Type the last service date and miles, reefer hours, inspection due and plate expiry.
 - A PM, reefer service or Annual Inspection that is due soon or overdue goes onto the Garage Station by itself, with its checklist. `Send to Garage` sends one sooner.
 - `Print Fleet Service Report` prints the report.
@@ -1510,7 +1513,7 @@ Each plant's areas and sub-areas (pick the plant at the top right): whether each
 id: administration
 screens: administration.html
 
-Everything administrators set up, in a menu down the left. Each **red bar** is a group: People & Access, Links & Codes, Email & Texts, Dispatch & Fleet, Plant Setup, Products & Machines, Plant Maintenance Setup, and Checks & Repairs. The **blue** words under a bar are its items; the one that is open is solid blue. The number on a bar says how many items it holds.
+Everything administrators set up, in a menu down the left. Each **red bar** is a group: People & Access, Links & Codes, Email & Texts, Dispatch & Fleet, Plant Setup, Products & Machines, Plant Maintenance Setup, Fleet Maintenance Setup, and Checks & Repairs. The **blue** words under a bar are its items; the one that is open is solid blue. The number on a bar says how many items it holds.
 
 1. Press a red bar to open its group. The group that was open closes, so the menu fits on one screen.
 2. Press a blue item to open it on the right.
@@ -1522,7 +1525,7 @@ Everything administrators set up, in a menu down the left. Each **red bar** is a
 - An item marked **In the Hub** is changed in the United Dairy Hub now: People & Roles, Role Templates, the Links & Codes items and the email items. A blue line at its top has `Change this in the Hub`. It still works here for now; both save to the same place.
 - Administration is for administrators only; the button in the top bar shows only to them.
 
-> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup and GPS Setup are under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
+> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup (the service rules and the garage technicians) is under Fleet Maintenance Setup. GPS Setup is under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
 

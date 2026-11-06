@@ -267,11 +267,20 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
   const dev = device || 'unknown', byDevice = FAILS.current(station.byDevice, f => f.minute === minute);
   const stationFails = (byDevice[dev] || {}).count || 0;
   if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on ' + src.where + '. Wait a minute and try again.');
-  const login = loginSnap.exists ? loginSnap.data() : null;
-  if (!login || !login.hash) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
-  const want = Buffer.from(login.hash, 'hex');
-  const match = (id) => { const given = Buffer.from(loginHash(techId, id), 'hex'); return given.length === want.length && crypto.timingSafeEqual(given, want); };
-  if (!(src.station === 'GARAGE' ? loginForms(loginId) : [loginId]).some(match)) {
+  const login = loginSnap.exists && loginSnap.data().hash ? loginSnap.data() : null;
+  const want = login ? Buffer.from(login.hash, 'hex') : null;
+  const match = (id) => { const given = Buffer.from(loginHash(techId, id), 'hex'); return !!want && given.length === want.length && crypto.timingSafeEqual(given, want); };
+  const typed = src.station === 'GARAGE' ? loginForms(loginId) : [loginId];
+  let ok = typed.some(match);
+  // Joe 11-6-26: at the garage, the technician's employee ID (Employees list, UDMS) also signs them in, zeros or not.
+  let employee = null;
+  if (!ok && src.station === 'GARAGE') {
+    employee = L.employeeForTech((await tx.get(db.collection('employees'))).docs.map(d => d.data()), Object.assign({ name: tech.name }, techSnap.data()));
+    const empId = employee ? String(employee.employeeId).trim() : '';
+    ok = !!empId && (typed.indexOf(empId) >= 0 || loginForms(empId).indexOf(loginId) >= 0);
+  }
+  if (!ok && !login && !employee) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
+  if (!ok) {
     tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
     byDevice[dev] = { minute, count: stationFails + 1 };
     tx.set(stationRef, { byDevice });
@@ -897,6 +906,8 @@ function validateFleet(action, input, out) {
   out.techId = text(input.techId, 80);
   if (out.op !== 'ADD' && !out.techId) throw SaveErr('BAD_REQUEST', 'Pick the technician');
   if (out.op === 'ADD' || out.op === 'NAME') { out.name = text(input.name, 40).toUpperCase(); if (!out.name) throw SaveErr('BAD_REQUEST', 'Type the technician\'s name'); }
+  // Joe 11-6-26: the employee picked from the Employees list when adding (their employee ID also signs them in).
+  if (out.op === 'ADD') out.employeeId = text(input.employeeId, 40);
   if (out.op === 'ACTIVE') out.active = input.active === true;
   if (out.op === 'ADD' || out.op === 'LOGIN') {
     out.loginId = String(input.loginId == null ? '' : input.loginId).trim();
@@ -943,7 +954,7 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     if (taken.exists && taken.data().techId !== id) throw SaveErr('BAD_REQUEST', 'Another technician already uses that login ID. Pick a different number.');
     if (mine.exists && mine.data().key && mine.data().key !== keyRef.id) oldKeyRef = db.collection(LOGINS).doc(mine.data().key);
   }
-  if (req.op === 'ADD') tx.set(ref, { tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true });
+  if (req.op === 'ADD') tx.set(ref, Object.assign({ tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true }, req.employeeId ? { employee_id: req.employeeId } : {}));
   if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
   if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
   if (keyRef) {

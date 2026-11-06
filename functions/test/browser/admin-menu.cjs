@@ -17,7 +17,7 @@ const HOSTING = 'http://127.0.0.1:5000';
 const SDK = path.dirname(require.resolve('firebase/package.json'));
 const SHOTS = process.env.SHOTS_DIR;
 const ADMIN = 'testEmail=admin.test@uniteddairy.com';
-const GROUPS = ['People & Access', 'Links & Codes', 'Email & Texts', 'Dispatch & Fleet', 'Plant Setup', 'Products & Machines', 'Plant Maintenance Setup', 'Checks & Repairs'];
+const GROUPS = ['People & Access', 'Links & Codes', 'Email & Texts', 'Dispatch & Fleet', 'Plant Setup', 'Products & Machines', 'Plant Maintenance Setup', 'Fleet Maintenance Setup', 'Checks & Repairs'];
 
 async function openPage(context, url) {
   const page = await context.newPage();
@@ -85,7 +85,7 @@ const color = (p, sel, prop) => p.$eval(sel, (e, k) => getComputedStyle(e)[k], p
       assert.deepEqual(p.errors, []);
       await ctx.close();
     }
-    results.push('Administration: eight red group bars (white words), one open at a time, blue items with the open one solid blue; the folded menu fits at 1536x790 and 1920; Find a setting opens the groups it matches; Hide menu gives the item the full width, Show menu brings it back and the choice is remembered');
+    results.push('Administration: nine red group bars (white words), one open at a time, blue items with the open one solid blue; the folded menu fits at 1536x790 and 1920; Find a setting opens the groups it matches; Hide menu gives the item the full width, Show menu brings it back and the choice is remembered');
 
     // A phone or narrow window: the menu sits above the item and still folds.
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
