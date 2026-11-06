@@ -440,6 +440,41 @@
     open.repairedLast30 = written.filter(function (r) { return r.done && r.completedMs && now - r.completedMs <= 30 * DAY; }).length;
     return open;
   }
+  // Joe 11/6 ("825 was in the garage ... it should at least let me know that it's been in there"): an open write-up counts as at
+  // the garage however it got there, not only by its own Garage / To garage button. It is at the garage when a work order points
+  // at it (the Garage Station's Start on a listed write-up, or a work order made from 2 or more of the unit's write-ups), or when
+  // the same unit has a work order in the garage since the write-up: one done on or after the day it was reported, or one still
+  // open that a person sent (office, mechanic, a write-up) or a mechanic started. One the app made by itself (an engine code, a
+  // service coming due) that nobody has started does not count. Sets atGarage (and garageAt, garageBy, garageOrder, garageHow)
+  // on the rows of kind from orders (workOrders), and returns the rows.
+  var ISSUE_ORDER_KIND = { TRUCK: 'trucks', TRAILER: 'trailers', FORK_TRUCK: 'forks' };
+  function issueGarageVisits(rows, orders, kind) {
+    var kindName = ISSUE_ORDER_KIND[kind];
+    var mine = (orders || []).filter(function (o) { return o && o.work_order_id && (!o.facility_id || o.facility_id === 'fac_uniontown'); });
+    var done = function (o) { return String(o.status || 'NEW').toUpperCase() === 'DONE'; };
+    var started = function (o) { return !!o.started_at || /^(WORKING|PARTS)$/.test(String(o.status || '').toUpperCase()); };
+    var sameType = function (o) { var t = String(o.unit_type || '').toUpperCase(); return (t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK') === kind; };
+    (rows || []).forEach(function (r) {
+      if (r.atGarage || !kindName) return;
+      var ids = r.recordIds && r.recordIds.length ? r.recordIds : [r.recordId], day = localDay(r.reported);
+      var linked = mine.filter(function (o) {
+        return o.source_kind === kindName && (ids.indexOf(o.source_id) >= 0 || (Array.isArray(o.also_ids) && o.also_ids.some(function (id) { return ids.indexOf(id) >= 0; })));
+      });
+      var visit = linked[0] || (r.unitKey ? mine.filter(function (o) {
+        if (!sameType(o) || issueUnitKey(o.unit) !== r.unitKey) return false;
+        if (done(o)) return !!o.completed_at && (!day || localDay(o.completed_at) >= day);
+        return started(o) || /^(OFFICE|TECH|WRITE_UP)$/.test(String(o.source || '').toUpperCase());
+      }).sort(function (a, b) { return (done(a) ? 1 : 0) - (done(b) ? 1 : 0) || String(b.started_at || b.created_at || '').localeCompare(String(a.started_at || a.created_at || '')); })[0] : null);
+      if (!visit) return;
+      var status = String(visit.status || 'NEW').toUpperCase();
+      r.atGarage = true;
+      r.garageOrder = String(visit.work_order_id);
+      r.garageHow = status === 'DONE' ? 'done' : status === 'PARTS' ? 'parts' : started(visit) ? 'working' : 'waiting';
+      r.garageAt = (status === 'DONE' ? visit.completed_at : visit.started_at || visit.created_at) || '';
+      r.garageBy = String(status === 'DONE' ? visit.completed_by || visit.techs || '' : visit.techs || visit.sent_by || visit.created_by || '').trim();
+    });
+    return rows;
+  }
   // The hub numbers for one kind's open list.
   function issueNumbers(open, nowMs) {
     var DAY = 86400000, now = nowMs || Date.now(), ages = open.filter(function (r) { return r.openedMs; }).map(function (r) { return (now - r.openedMs) / DAY; });
@@ -1789,7 +1824,7 @@
     COLORS: COLORS, dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, issueGarageVisits: issueGarageVisits, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows,

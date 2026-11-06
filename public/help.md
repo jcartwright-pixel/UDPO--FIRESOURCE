@@ -502,11 +502,15 @@ Driver, date reported, what's wrong, how many times it was reported, reviewed, e
 
 > The same problem reported 2 or 3 times shows as one line with a count. Repaired and Remove close every copy.
 
+> **Garage** shows a tick when the unit has been to our garage for that write-up, however it got there: you pressed `Garage` / `To garage`, a mechanic started it on the Garage Station, it was sent from the office, or the unit had a work order finished at the garage since the day it was reported. The words under the buttons say where it is: "In the garage now", "In the garage, waiting on parts", "On the garage list" or "Was in the garage 11-5-26", with the work order number. A service the app put on the garage list by itself that nobody has started does not count. **At garage** at the top shows just these. The write-up stays on the list until you press `Repaired`.
+
 > A pale button cannot be pressed, and the words under the buttons say why: already emailed to the lessor, already at the garage, a leased truck (the lessor fixes it, so `Garage` is off), or a truck we own or that is not on the fleet list (so `Lessor` is off). `Lessor` stays pressable until the email really goes.
 
 > A red lessor that says "Outbound email is turned off" or "has no email address yet" is fixed in the Hub under Email & Texts. Any other reason: ask an administrator.
 
 !> Do not mark a write-up Repaired before the unit is really fixed. It drops off the list and off the driver's next check.
+
+!> Do not use `Remove` on a write-up because the unit is at the garage. It stays on the list with its tick until you press `Repaired`.
 
 # Garage
 

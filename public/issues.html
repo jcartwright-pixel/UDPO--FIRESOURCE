@@ -61,7 +61,7 @@
     import { start, requireSignIn, escapeHtml, shortDate, showError, dateTimeText } from './js/app.js';
     import { lists, watchLists, canSave, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
     import { collection, doc, getDoc, onSnapshot } from './js/firebase.js';
-    import { watchIssueRecords } from './js/recent-records.js';
+    import { watchIssueRecords, watchHubWorkOrders } from './js/recent-records.js';
     forScreen('checkIns');
 
     const L = window.UDLogic;
@@ -74,7 +74,7 @@
     const params = new URLSearchParams(location.search);
     let kind = KINDS.some(k => k[0] === params.get('kind')) ? params.get('kind') : 'TRUCK', filter = FILTERS.some(f => f[0] === params.get('filter')) ? params.get('filter') : 'all';
     // ?q= (a Latest write-ups line on Fleet & Maintenance): the list opens searched for that unit, as in the current app.
-    let search = (params.get('q') || '').trim(), records = [], removeFor = null, openFor = null;
+    let search = (params.get('q') || '').trim(), records = [], orders = [], removeFor = null, openFor = null;
     // Joe 10/25: who owns each truck is the fleet list's LEASE column (config/fleetOwnership), and a write-up shows its route
     // number from Route Master, not the route's inside code.
     let ownership = null, routeNums = {};
@@ -83,7 +83,15 @@
     const now = () => Date.now();
     const daysAgo = (ms) => ms ? Math.floor((now() - ms) / 86400000) : '';
     const dateText = (s) => { const k = String(s || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(k) ? shortDate(k) : escapeHtml(s || ''); };
-    const open = (k) => L.issueRows(records, k, now());
+    // Joe 11/6: a write-up is at the garage however it got there (L.issueGarageVisits): its own button, a work order made from it
+    // on the Garage Station, or the unit in the garage since it was reported.
+    const open = (k) => L.issueGarageVisits(L.issueRows(records, k, now()), orders, k);
+    const orderNo = (r) => r.garageOrder ? ' (work order ' + r.garageOrder + ')' : '';
+    const garageWords = (r) => !r.garageOrder ? 'Already sent to the garage.'
+      : r.garageHow === 'done' ? 'Was in the garage ' + localWhen(r.garageAt) + orderNo(r) + '.'
+      : r.garageHow === 'parts' ? 'In the garage, waiting on parts' + orderNo(r) + '.'
+      : r.garageHow === 'working' ? 'In the garage now' + orderNo(r) + '.'
+      : 'On the garage list' + orderNo(r) + '.';
     const tick = (title) => '<span class="tick" title="' + escapeHtml(title || '') + '">&#10003;</span>';
     const dash = '<span class="dash">&mdash;</span>';
 
@@ -111,7 +119,7 @@
         const lessorBtn = !truck ? '' : '<button type="button" class="seg-l" data-step="lessor"' + (!edit || (sent && !again) || !(again ? r.lessor : who.lessor) ? ' disabled' : '') + ' title="' + escapeHtml(again ? (r.emailQueued ? 'Waiting for ' + r.lessor + '\'s once-a-day email. Press to send it now.' : 'The email to ' + r.lessor + (r.emailBlank ? ' went out blank' : ' did not go') + '. Press to email it again.') : who && who.lessor ? 'Send to ' + who.lessor + ' (the lessor): marks it sent and emails it as set in Administration > Repair Email.' : who ? who.why : '') + '">Lessor</button>';
         const garageBtn = '<button type="button" class="' + (truck ? 'seg-g' : 'to-garage') + '" data-step="garage"' + (!edit || sent ? ' disabled' : '') + ' title="Send to the garage">' + (truck ? 'Garage' : 'To garage') + '</button>';
         // Joe 11/4 ("why is some of this grayed out"): a pale button says why under the buttons, in words.
-        const offWhy = !edit ? '' : r.atGarage ? 'Already sent to the garage.'
+        const offWhy = !edit ? '' : r.atGarage ? garageWords(r)
           : truck && r.emailed ? 'Already emailed to ' + r.lessor + '.'
           : truck && r.toLessor ? 'Leased: ' + r.lessor + ' fixes it, so Garage is off.'
           : truck && who && !who.lessor ? (who.why || 'Not leased') + ', so Lessor is off.' : '';
@@ -126,7 +134,7 @@
         const reviewed = r.needsReview ? '<input type="checkbox" data-review aria-label="Mark reviewed"' + (!edit || !r.text ? ' disabled' : '') + (r.text ? '' : ' title="Add what is wrong first"') + '>' : tick(r.reviewedBy ? 'Reviewed by ' + r.reviewedBy : 'Reviewed');
         // Joe 10/25: a write-up sent to the lessor shows the lessor under Emailed (green once the email went, red while it has not);
         // Garage is only for our own garage.
-        const garage = r.atGarage ? tick('Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy) : dash;
+        const garage = !r.atGarage ? dash : tick(r.garageOrder ? garageWords(r) + (r.garageBy ? ' ' + r.garageBy : '') : 'Sent to the garage ' + localWhen(r.garageAt) + ' by ' + r.garageBy);
         // Joe 11/4 (224001): a red lessor says why its email did not go; one waiting for the lessor's once-a-day email is amber.
         const emailed = r.toLessor ? '<span class="pill ' + (r.emailed ? 'yes' : r.emailQueued ? 'warn' : 'bad') + '" title="' + escapeHtml(r.emailed ? 'Emailed to ' + r.lessor + ' ' + localWhen(r.emailedAt) + ' (sent by ' + r.lessorBy + ')' : r.emailBlank ? 'The email to ' + r.lessor + ' went out blank. Press Lessor to send it again.' : r.emailQueued ? 'Waiting for ' + r.lessor + '\'s once-a-day repair email. Press Lessor to send it now.' : 'Marked for ' + r.lessor + ' ' + localWhen(r.lessorAt) + ' by ' + r.lessorBy + ', but the email has not gone' + (r.emailWhy ? ': ' + r.emailWhy.replace(/\.$/, '') + '.' : '.') + ' Press Lessor to send it again.') + '">' + escapeHtml(r.lessor) + '</span>' + (!r.emailed && !r.emailQueued && r.emailWhy ? '<small class="why">' + escapeHtml(r.emailWhy) + '</small>' : '')
           : r.emailed ? tick('Emailed ' + r.emailedAt) : dash;
@@ -244,6 +252,8 @@
       watchLists(user, render);
       // Joe 10/18 (screen speed): the open write-ups and the recent ones their counts need, not every write-up ever made.
       watchIssueRecords(db, r => { records = r; render(); }, e => showError('Could not read the write-ups: ' + e.message));
+      // The work orders open now and the ones finished in the last 120 days, for the Garage column (Joe 11/6).
+      watchHubWorkOrders(db, new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10), r => { orders = r; render(); }, e => showError('Could not read the garage work orders: ' + e.message));
       onSnapshot(doc(db, 'config', 'fleetOwnership'), d => { const o = d.exists() ? d.data() : null; ownership = o && o.units ? o : null; render(); }, () => {});
       onSnapshot(collection(db, 'routes'), s => {
         routeNums = {};

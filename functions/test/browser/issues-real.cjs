@@ -99,6 +99,13 @@ async function buttonsFit(p, label) {
     notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com\nRepair email sent ' + sentAt.replace(/\.\d+Z$/, '-00:00') + ' to repairs@idealease.test' }));
   await db().collection('maintenance').doc('MAIL_m15_tractor').set(Object.assign(mail('m15', '223877', 'Chad Herman', 'Wiper blades', 0.1), { status: 'OPEN',
     notes: 'Sent to lessor Idealease ' + sentAt + ' by manager.test@uniteddairy.com' }));
+  // Joe 11/6 ("825 was in the garage ... it should at least let me know"): T-826's write-up was started on the Garage Station (its
+  // work order points at it) and T-843 had a work order finished at the garage after its write-up; neither was sent with To garage.
+  await db().collection('maintenance').doc('MAIL_m16_trailer').set(Object.assign(mail('m16', 'T-843', 'Sam Driver', 'Left rear marker light out', 26, 'TRAILER'), { status: 'OPEN' }));
+  await db().collection('workOrders').doc('224100').set({ work_order_id: '224100', facility_id: 'fac_uniontown', unit: 'T-826', unit_type: 'TRAILER', problem: '826-back Door Busted Cables Snapped Will Not Open',
+    source: 'WRITE_UP', source_kind: 'trailers', source_id: 'MAIL|m10|trailer', status: 'WORKING', started_at: at(1), techs: 'Sam Tester', created_at: at(10) });
+  await db().collection('workOrders').doc('224101').set({ work_order_id: '224101', facility_id: 'fac_uniontown', unit: 'T-843', unit_type: 'TRAILER', problem: 'Lights', source: 'TECH',
+    status: 'DONE', created_at: at(30), started_at: at(5), completed_at: at(2), completed_by: 'Sam Tester' });
   const browser = await chromium.launch();
   const results = [];
   try {
@@ -161,6 +168,17 @@ async function buttonsFit(p, label) {
       await p.click('[data-kind="TRAILER"]');
       await p.waitForSelector('tr[data-id="MAIL_m10_trailer"]');
       assert.equal(await p.locator('tr[data-id="MAIL_m6_trailer"]').count(), 0);
+      // Joe 11/6: both show the Garage tick, To garage is pale and says where the unit is, and both stay open.
+      await p.waitForSelector('tr[data-id="MAIL_m16_trailer"] .acts-why');
+      for (const [id, words] of [['MAIL_m10_trailer', /^In the garage now \(work order 224100\)\.$/], ['MAIL_m16_trailer', /^Was in the garage \d+-\d+-\d+ \(work order 224101\)\.$/]]) {
+        assert.equal(await p.locator('tr[data-id="' + id + '"] td:nth-child(6) .tick').count(), 1, id + ' has the Garage tick');
+        assert.equal(await p.locator('tr[data-id="' + id + '"] [data-step="garage"]').isDisabled(), true, id + ' To garage is pale');
+        assert.match((await p.textContent('tr[data-id="' + id + '"] .acts-why')).trim(), words);
+      }
+      await p.click('[data-filter="garage"]');
+      assert.deepEqual((await p.$$eval('#rows tr[data-id]', trs => trs.map(t => t.dataset.id))).sort(), ['MAIL_m10_trailer', 'MAIL_m16_trailer'], 'At garage shows both');
+      await shot(p, 'trailers-garage-' + width + '.png');
+      await p.click('[data-filter="all"]');
       await shot(p, 'trailers-' + width + '.png');
       await buttonsFit(p, 'Trailers at ' + width);
       await p.click('[data-kind="FORK_TRUCK"]');
@@ -194,6 +212,7 @@ async function buttonsFit(p, label) {
     }
     results.push('Truck Issues at 390, 768, 1024, 1366, 1536 and 1920, in the page font and in DejaVu Sans: every column heading and the whole lessor name under Emailed fit their cells');
     results.push('Pre / Post Trip answers like YES-NO, yes-no, YS, Y/N, YES - NO WRITE UPS and a mistyped UYES make no row on Trucks, Trailers or Fork Truck / Pallet Jack; real problems stay');
+    results.push('A trailer started on the Garage Station, and one whose unit had a work order finished at the garage since the write-up, show the Garage tick, a pale To garage that says where the unit is, and stay open; At garage lists them');
     results.push('Every Work Actions button, the red X included, fits inside the list on Trucks, Trailers and Fork Truck at 1536 and 1920');
     results.push('A write-up sent to Idealease shows Idealease whole under Emailed (green once emailed, red while not) and a dash under Garage, at 1536 and 1920');
     results.push('A pale Lessor or Garage button says why under the buttons: owned truck, already emailed, or leased; one whose email has not gone stays pressable');

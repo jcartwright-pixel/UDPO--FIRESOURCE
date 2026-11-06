@@ -65,3 +65,40 @@ test('the Garage Station lists one job for one email', () => {
   ], []);
   assert.equal(jobs.length, 1);
 });
+
+// Joe 11/6 ("825 was in the garage ... it should at least let me know that it's been in there"): the Garage column ticks however
+// the unit got to the garage, and the write-up stays open until Repaired.
+test('a write-up is at the garage when a work order points at it or the unit was in the garage since it was reported', () => {
+  const up = (id, unit, opened, notes) => ({ record_id: id, kind: 'TRAILER', trailer_number: unit, issue_details: 'Light out', status: 'OPEN', opened_at: opened, notes: notes || '' });
+  const records = [up('W1', 'T-826', '2026-11-03T12:00:00Z'), up('W2', '843', '2026-11-04T12:00:00Z'), up('W3', 'T-887', '2026-11-05T12:00:00Z'),
+    up('W4', 'T-893', '2026-11-05T12:00:00Z'), up('W5', 'T-954', '2026-11-05T12:00:00Z'), up('W6', 'T-965', '2026-11-03T12:00:00Z', 'Sent to garage 2026-11-03T13:00:00Z by joe'),
+    up('W7', 'T-543', '2026-11-05T12:00:00Z'), up('W8', 'T-956', '2026-11-03T12:00:00Z')];
+  const orders = [
+    // Started on the Garage Station from the listed write-up: points at it.
+    { work_order_id: '224100', unit: 'T-826', unit_type: 'TRAILER', source: 'WRITE_UP', source_kind: 'trailers', source_id: 'W1', status: 'WORKING', started_at: '2026-11-04T14:00:00Z', techs: 'Sam Tester' },
+    // The unit's other write-up's work order, finished after this one was reported.
+    { work_order_id: '224101', unit: 'T-843', unit_type: 'TRAILER', source: 'TECH', status: 'DONE', created_at: '2026-11-01T10:00:00Z', completed_at: '2026-11-05T16:00:00Z', completed_by: 'Sam Tester' },
+    // Finished before T-887's write-up: not this problem.
+    { work_order_id: '224102', unit: 'T-887', unit_type: 'TRAILER', source: 'TECH', status: 'DONE', completed_at: '2026-11-02T16:00:00Z' },
+    // Sent from the office and waiting.
+    { work_order_id: '224103', unit: 'T-893', unit_type: 'TRAILER', source: 'OFFICE', status: 'NEW', created_at: '2026-11-05T15:00:00Z', created_by: 'office@example.com' },
+    // A service coming due that the app made by itself and nobody started: not at the garage.
+    { work_order_id: '224104', unit: 'T-954', unit_type: 'TRAILER', source: 'SERVICE', status: 'NEW', created_at: '2026-11-05T15:00:00Z', created_by: 'Fleet Service' },
+    // A truck with the same number is another unit.
+    { work_order_id: '224105', unit: '543', unit_type: 'TRUCK', source: 'TECH', status: 'WORKING', started_at: '2026-11-05T15:00:00Z' },
+    // A work order made from 2 write-ups names the other in also_ids; waiting on parts.
+    { work_order_id: '224106', unit: 'T-999', unit_type: 'TRAILER', source: 'WRITE_UP', source_kind: 'trailers', source_id: 'OTHER', also_ids: ['W8'], status: 'PARTS', started_at: '2026-11-04T09:00:00Z' }];
+  const rows = L.issueGarageVisits(L.issueRows(records, 'TRAILER', Date.parse('2026-11-06T20:00:00Z')), orders, 'TRAILER');
+  const by = (u) => rows.find(r => r.unit === u);
+  assert.equal(rows.length, 8, 'every write-up stays on the list until Repaired');
+  assert.deepEqual([by('T-826').atGarage, by('T-826').garageOrder, by('T-826').garageHow, by('T-826').garageBy], [true, '224100', 'working', 'Sam Tester']);
+  assert.deepEqual([by('843').atGarage, by('843').garageOrder, by('843').garageHow, by('843').garageAt], [true, '224101', 'done', '2026-11-05T16:00:00Z']);
+  assert.equal(by('T-887').atGarage, false);
+  assert.deepEqual([by('T-893').atGarage, by('T-893').garageHow], [true, 'waiting']);
+  assert.equal(by('T-954').atGarage, false);
+  assert.equal(by('T-543').atGarage, false);
+  assert.deepEqual([by('T-956').atGarage, by('T-956').garageHow], [true, 'parts']);
+  // The To garage button's own note still wins.
+  assert.deepEqual([by('T-965').atGarage, by('T-965').garageOrder, by('T-965').garageBy], [true, undefined, 'joe']);
+  assert.equal(L.issueNumbers(rows).atGarage, 5);
+});
