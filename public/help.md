@@ -211,6 +211,7 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
 4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
 
+- The box beside the title shows how much of the week has a driver, for example **87% OF RUNS COVERED**. It is red until every run that goes out has a driver, then green at 100%. It changes as soon as you pick a driver. Days a run does not go out, and runs a carrier or another company covers, do not count. Point at it to see how many of the week's runs have a driver.
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
@@ -240,6 +241,7 @@ It always shows the live week. After next week is published, it moves on to that
 2. The change shows on Daily Dispatch for that day straight away. There is nothing to publish.
 3. On the Driver Assignment Board, click a driver's day to set their availability, the same as on the template.
 
+- The box beside the title shows how much of this week has a driver, for example **87% OF RUNS COVERED**: red until every run has one, green at 100%.
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.

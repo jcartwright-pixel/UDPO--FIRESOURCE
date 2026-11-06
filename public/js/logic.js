@@ -1234,6 +1234,23 @@
     return ctx.relief[d.driverId] ? 'relief' : 'assigned';
   }
 
+  // Joe 11/6: "percentage of all routes covered" beside the Weekly Dispatch title. Every day a run goes out that needs a United
+  // Dairy driver counts (a driver on it, NEEDS DRIVER, a driver off, a PLANT LOAD, OPEN); a day it does not run, or a carrier or
+  // outside company covers, does not. A driver who is off that day does not cover it. percent is rounded down, so 100 means
+  // every one has a driver.
+  function weeklyCoverage(rows, ctx) {
+    var have = 0, all = 0;
+    (rows || []).forEach(function (r) {
+      DAYS.forEach(function (p) {
+        var c = weeklyCellClass(r, p, ctx);
+        if (c === 'off' || c === 'coverage' || c === 'carrier') return;
+        all++;
+        if (c === 'assigned' || c === 'relief' || c === 'booked') have++;
+      });
+    });
+    return { have: have, all: all, percent: all ? Math.floor(have * 100 / all) : 100 };
+  }
+
   // The Plant Route loads for one run on one day (plant scheduler copy), or null.
   // Joe 10/20 (844 Ohio Processor: "the dispatch sheet overrides the time, driver and truck"): the driver dispatch has on a day
   // (a driver, Carrier or another CVG), or '' when there is none. OPEN is a day still waiting for one.
@@ -1736,7 +1753,7 @@
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
-    coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
+    coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyCoverage: weeklyCoverage, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,

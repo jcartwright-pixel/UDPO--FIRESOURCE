@@ -67,7 +67,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1 id="page-name">Weekly Dispatch Template</h1><small id="published"></small></div>
+      <div class="title"><div class="wk-title-line"><h1 id="page-name">Weekly Dispatch Template</h1><span class="wk-covered" id="covered" hidden></span></div><small id="published"></small></div>
       <div class="actions in-head">
         <a class="button" id="go-daily" href="daily.html">Daily Dispatch</a>
         <a class="button" id="go-other" href="weekly.html?view=live">Weekly Dispatch</a>
@@ -276,6 +276,12 @@
       }).join('') || '<tr><td colspan="8" class="empty">No active drivers in the Driver Master copy.</td></tr>';
 
       const open = rows.reduce((n, r) => n + L.DAYS.filter(p => ['needs', 'vacation-needs', 'plant'].indexOf(L.weeklyCellClass(r, p, ctx)) >= 0).length, 0);
+      // Joe 11/6: the share of the week's runs that have a driver, right beside the title: red until every one has a driver, then green.
+      const cov = L.weeklyCoverage(rows, ctx), covEl = document.getElementById('covered');
+      covEl.hidden = !cov.all;
+      covEl.textContent = cov.percent + '% OF RUNS COVERED';
+      covEl.classList.toggle('full', cov.percent === 100);
+      covEl.title = cov.have + ' of ' + cov.all + ' run days this week have a driver';
       document.getElementById('count').textContent = rows.length + ' runs' + (open ? ', ' + open + (open === 1 ? ' day needs a driver' : ' days need a driver') : '') + ' \u00b7 ' + board.length + ' active drivers';
       if (!document.getElementById('days-modal').hidden) paintRunDays();
     }
