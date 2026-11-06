@@ -5,13 +5,13 @@ export const isAdminRole = (roles) => (roles || []).some(r => ['ADMINISTRATOR', 
 export const APPS = [
   { key: 'operations', name: 'Plant & Distribution' }, { key: 'customers', name: 'Customers & Routes' },
   { key: 'fuel', name: 'Fuel Tracking' }, { key: 'udms', name: 'Employees & Compliance' }, { key: 'routes', name: 'Route & Trip Costs' },
-  { key: 'routecost', name: 'Route Cost Analysis' }
+  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'accident', name: 'Accident & Injury Reporting' }
 ];
 // ticks = the apps saved for this person in People & Access (appAccess), or null for the standard rule. Plant & Distribution
 // always stays on for an Enabled person.
 export function appKeysFor(p, ticks) {
   if (!p || String(p.status || '').trim().toUpperCase() !== 'ACTIVE') return [];
-  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost'] : []);
+  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost'] : []).concat(['accident']);
   return APPS.map(a => a.key).filter(k => k === 'operations' || ticks.indexOf(k) >= 0);
 }
 export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a => a.key === k).name);
@@ -25,6 +25,7 @@ export const LOOK = {
   udms: { color: '#5a3d9e', icon: path('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M15.5 11.5l2 2 4-4"/>') },
   routes: { color: '#9c2a3a', icon: path('<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M8 18.5h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>') },
   routecost: { color: '#2f6f8f', icon: path('<path d="M3 20h18"/><path d="M6 20V11M11 20V6M16 20v-6M21 20V9"/>') },
+  accident: { color: '#b3261e', icon: path('<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>') },
   roles: { color: '#7a4b12', icon: path('<circle cx="8" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5.5 5.5-5.5"/><path d="M14 11h7M14 15h7M14 19h7"/><path d="M11.5 11l.8.8 1.4-1.6"/>') },
   links: { color: '#0f6b5c', icon: path('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>') },
   email: { color: '#a3570f', icon: path('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>') },
@@ -33,3 +34,41 @@ export const LOOK = {
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
+
+// Joe 11-6-26: "an action button to list all of the mobile app direct links ... group them ... so everything's all in one place
+// for people." Home's All app links list: links only, never codes (codes stay in Links & Codes, administrators only).
+// ops = Plant & Distribution's own site for this hub (live or practice); the accident app and the apply page have one address.
+export const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
+export const APPLY_URL = 'https://udms-apply.web.app/';
+export function linkGroups(ops) {
+  const o = (path) => ops.replace(/\/$/, '') + '/' + path;
+  return [
+    { name: 'Everyone', links: [
+      { name: 'Plant Operations on a phone', note: 'The full app; your role decides what you see', url: o('index.html'), how: 'United Dairy sign-in' },
+      { name: 'Accident & Injury Reporting', note: 'Report an accident or injury right away', url: ACCIDENT_URL, how: 'Open to report' }
+    ] },
+    { name: 'Managers', links: [
+      { name: 'Plant Managers App', note: 'The plant managers\' phones and tablets', url: o('walkthrough.html?view=home&app=1'), how: 'United Dairy sign-in, then the Plant Managers code once' },
+      { name: 'Distribution Manager', note: 'Dispatch, routes, trucks and drivers', url: o('distribution.html'), how: 'United Dairy sign-in' }
+    ] },
+    { name: 'Sales', links: [
+      { name: 'Sales App', note: 'Salespeople on their phones; it only shows, nothing changes', url: o('sales.html'), how: 'United Dairy sign-in' }
+    ] },
+    { name: 'Drivers', links: [
+      { name: 'Drivers\' phones (Route Distribution)', note: 'View Loadout, DVIR, Check-In and My Schedule', url: o('route.html'), how: 'The Route Distribution code' },
+      { name: 'Driver Station', note: 'The Driver Room TV and the drivers\' tablet', url: o('driver-station.html'), how: 'The station\'s code' }
+    ] },
+    { name: 'Plant floor', links: [
+      { name: 'Plant Station', note: 'A plant tablet', url: o('plant-station.html'), how: 'United Dairy sign-in, then the station\'s code once' },
+      { name: 'Plant Station with no United Dairy account', note: 'A tablet or phone with only its station\'s code', url: o('plant-station.html?noaccount=1'), how: 'The station\'s code' },
+      { name: 'Line Tablet', note: 'The tablet at a production line', url: o('line.html?tablet=1'), how: 'United Dairy sign-in, then the Line Tablet code once' }
+    ] },
+    { name: 'Garage & Maintenance', links: [
+      { name: 'Garage Station', note: 'The garage tablet', url: o('garage-station.html'), how: 'The station\'s code, then each mechanic\'s login ID' },
+      { name: 'Maintenance Station', note: 'The maintenance shop tablet', url: o('maint-station.html'), how: 'The station\'s code, then name and login ID' }
+    ] },
+    { name: 'Hiring', links: [
+      { name: 'Job application', note: 'For people applying to work at United Dairy', url: APPLY_URL, how: 'Anyone with the link' }
+    ] }
+  ];
+}
