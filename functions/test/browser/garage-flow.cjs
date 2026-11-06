@@ -60,6 +60,8 @@ async function login(page, techId, digits) {
   await page.waitForSelector('#view-sign:not([hidden])');
   await page.click('[data-who="' + techId + '"]');
   for (const k of digits) await page.click('[data-key="' + k + '"]');
+  // Joe 11-6-26: a 6-digit ID looked like only 5 took, the 6th dot was pale. Every digit typed shows a solid dot.
+  assert.deepEqual(await page.$$eval('#dots i.on', d => d.map(x => getComputedStyle(x).opacity)), digits.split('').map(() => '1'), 'every digit typed is a solid dot');
   await page.click('[data-key="go"]');
   await page.waitForFunction(() => document.getElementById('view-sign').hidden, null, { timeout: 10000 });
   if (await page.isVisible('#view-mysig')) { if (!signShot) { signShot = true; await shot(page, '3b-sign-once-tablet-1280.png'); } await signOnce(page); }

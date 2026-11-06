@@ -70,3 +70,4 @@ table.fs-grid td.fs-cell.editing { background: #fff; cursor: default; outline: 2
 .fs-cell-edit .fs-cell-saved { font-size: 16px; min-height: 20px; }
 .fs-cell-edit .fs-cell-saved.ok { color: #1f7a4d; }
 .fs-cell-edit .fs-cell-saved.bad { color: #b42318; }
+.fs-emp { display: block; font-weight: normal; font-size: 16px; color: var(--muted, #555); }
