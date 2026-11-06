@@ -118,6 +118,7 @@ test('reefer recording: the place it is at and since when', () => {
   const unit = (place, lastReport) => ({ 'T-702': { unitId: 'u2', tag: 'T-702', place, address: 'I-80 E', speedMph: 0, lastReport } });
   let s = reeferTrips({}, load, unit('Loading Dock', '2026-10-18T12:04:00.000Z'), '2026-10-18T12:05:00.000Z');
   s = reeferTrips(s, load, unit('', '2026-10-18T14:00:00.000Z'), '2026-10-18T14:05:00.000Z');
+  assert.equal(s.trips['T-702'].out, '2026-10-18T14:00:00.000Z', 'out is the unit\'s own report time, not the read time');
   assert.deepEqual([s.trips['T-702'].place, s.trips['T-702'].placeSince], ['', '']);
   s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T19:03:00.000Z'), '2026-10-18T19:05:00.000Z');
   s = reeferTrips(s, [], unit('SAL Williamsport', '2026-10-18T21:00:00.000Z'), '2026-10-18T21:05:00.000Z');

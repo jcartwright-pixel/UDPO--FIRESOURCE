@@ -518,7 +518,9 @@ function reeferTrips(prev, loaded, units, at) {
     if (u) {
       t.unitId = u.unitId || ''; t.tag = u.tag || ''; t.seenAt = u.lastReport || at;
       const yard = inYard(u, spots);
-      if (!yard && !t.out) t.out = at;
+      // Joe 11-5-26 ("improve the read for the trailer"): out is the time the trailer's unit sent the report that put it off
+      // the lot (its own report time, when that is after the trip began), not the time of our 5-minute read.
+      if (!yard && !t.out) t.out = u.lastReport && u.lastReport >= t.startedAt && u.lastReport <= at ? u.lastReport : at;
       else if (yard && t.out) { t.back = at; return stop('BACK_IN_YARD'); }
       // Joe 10/18: out of the yard, keep where it is (Fleet's place name, such as a store, or the address) and whether it moves.
       // stillSince = the first report seen standing still (under REEFER_MOVING_MPH); cleared once it moves again.
