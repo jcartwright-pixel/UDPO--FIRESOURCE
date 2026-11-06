@@ -344,13 +344,17 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 id: template
 screens: template.html
 
-Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template. Changes there are for that week only and do not change the template.
+Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template.
+
+A change here goes three places at once: **Driver Master**, **this week** on [Weekly Dispatch](#weekly-live) and **next week** on the [Weekly Dispatch Template](#weekly), from today on. Changes made on a week are for that week only and do not change the template.
 
 1. In a driver's day, pick **Available**, **Off** or **Assigned**.
 2. For Assigned, pick the run. `+ Add Run` adds a second run the same day.
-3. Each changed box saves on its own.
+3. Each changed box saves on its own, and the two weeks change with it.
 
 - `Copy` under a driver's name copies their whole week. `Paste` puts it on another driver; `Paste + Add` adds it to what that driver already has.
+
+> A day you already changed by hand on Weekly Dispatch or the Weekly Dispatch Template keeps your hand change. A load already loaded does not change.
 
 !> Do not use the template for one week's change. Change the week on the Weekly Dispatch Template.
 
