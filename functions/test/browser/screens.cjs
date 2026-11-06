@@ -431,6 +431,13 @@ async function noScroll(page) {
     await vac.click('.tabs [data-view="calendar"]');
     await vac.fill('#cal-month', '2026-11');
     await vac.dispatchEvent('#cal-month', 'change');
+    // The Calendar has its own + Add Vacation (Joe 11/5): the same boxes open above the month, and Cancel puts them away.
+    await vac.click('#cal-add');
+    assert.equal(await vac.isVisible('#view-calendar #form'), true, '+ Add Vacation on the Calendar opens the boxes on the Calendar');
+    assert.equal(await vac.$eval('#form select[name="driverId"]', s => s.value), '', 'the driver starts blank');
+    if (SHOTS) await vac.screenshot({ path: path.join(SHOTS, 'vacation-calendar-add-1920.png') });
+    await vac.click('#cancel');
+    assert.equal(await vac.isVisible('#form'), false);
     await vac.click('#calendar [data-day="2026-11-24"]');
     await vac.selectOption('#day-form select[name="driverId"]', 'drv_test_adams');
     await vac.click('#day-save');
