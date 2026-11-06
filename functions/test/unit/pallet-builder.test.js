@@ -24,3 +24,15 @@ test('the Pallet Builder is its own area (Joe 11-5-26), so People & Roles can ti
   assert.equal(keys.indexOf('pallets'), keys.indexOf('debag') + 1, 'right under Debag / Labeling Room');
   assert.equal(L.pageGated('pallet-builder.html'), true);
 });
+
+test('dispensers and boxes ride inside crates (Joe 11-5-26): 54 to a pallet and one crate count going out', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  const vm = require('vm');
+  const code = src.match(/^const P = .*$/m)[0] + '\n' + src.match(/^const IN_CRATE = .*$/m)[0] + '\n' + src.match(/^const BY = .*$/m)[0] + '\nthis.BY = BY;';
+  const box = {}; vm.runInNewContext(code, box);
+  const kinds = new Set();
+  box.BY.forEach(p => { if (p.type === 'Box' || p.type === 'Dispenser' || p.type === 'Crate') { kinds.add(p.type); assert.equal(p.cpp, 54, p.desc + ' should go 54 to a pallet'); } });
+  assert.deepEqual([...kinds].sort(), ['Box', 'Crate', 'Dispenser']);
+  assert.match(src, /out\.Crate \+ out\.Box \+ out\.Dispenser\)\}<\/b> crates/, 'Going out adds dispensers and boxes into the crates');
+  assert.ok(!/<\/b> boxes · /.test(src) && !/<\/b> dispensers\$\{/.test(src), 'no separate boxes and dispensers counts going out');
+});

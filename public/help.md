@@ -782,7 +782,9 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > Each order's items, **Cases by size for the whole route** and **Pallet by pallet** start hidden. Click the line to show them, and click again to hide them.
 
-> Crates go 54 cases to a pallet, boxes and dispensers 45, and a tote takes a pallet spot of its own.
+> Dispensers and boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Every crate goes 54 to a pallet, and a tote takes a pallet spot of its own.
+
+!> Do not add the dispensers or boxes on top of the crate count: they are already in it.
 
 > A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
 
