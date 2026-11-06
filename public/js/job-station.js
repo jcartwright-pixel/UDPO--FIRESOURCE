@@ -434,7 +434,7 @@ export function mountJobStation(cfg) {
       return '<button type="button" class="gs-name' + (on ? ' on' : '') + '" data-who="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + '<small>' + (on ? 'enter login ID' : busyHere(t) ? 'on this job' : t.on ? 'on ' + escapeHtml(t.on.unit) : '&nbsp;') + '</small></button>';
     }).join('') || '<p class="gs-hint">' + escapeHtml(cfg.noTechs) + '</p>';
     $('pin-title').textContent = picked ? picked.name + ', your login ID' : 'Tap your name';
-    $('dots').innerHTML = [0, 1, 2, 3, 4, 5].map(i => '<i class="' + (i < typed.length ? 'on' : '') + (i >= 4 ? ' extra' : '') + '"></i>').join('');
+    $('dots').innerHTML = [0, 1, 2, 3, 4, 5].map(i => '<i class="' + (i < typed.length ? 'on' : '') + (i >= 4 && i >= typed.length ? ' extra' : '') + '"></i>').join('');
     $('keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'go'].map(k => k === 'go' ? '<button type="button" class="go" data-key="go"' + (typed.length >= 4 && !S.busy ? '' : ' disabled') + '>Enter</button>' :
       k === 'del' ? '<button type="button" class="small" data-key="del" title="Hold to clear">&#9003;</button>' : '<button type="button" data-key="' + k + '">' + k + '</button>').join('');
   }
