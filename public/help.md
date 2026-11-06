@@ -597,7 +597,7 @@ screens: otr.html
 
 The Over the Road runs report and cost per gallon, laid out like the OTR Trips workbook.
 
-- **Today** shows today's runs. **By Date** lists each day's runs for the month. **Recap** and **Month Recap** total them (Uniontown Delivered, Transfers, Carriers). **Cost Per Gallon** compares cost to gallons sold.
+- **Today** shows today's runs. **By Date** lists each day's runs for the month. **Recap** and **Month Recap** total them (Uniontown Delivered, Transfers, Carriers). **Cost Per Gallon** compares cost to gallons sold; its **Fuel Cost By Gallon** table shows each month and the average.
 - Tick **Compare to last year** to see last year's numbers.
 - `Copy Daily Count` copies the day's count. `Enter Month Figures` types the month's gallons and costs.
 - **OTR Routes Setup** says who takes each run (United Dairy, a carrier, or a transfer) and its round-trip miles.

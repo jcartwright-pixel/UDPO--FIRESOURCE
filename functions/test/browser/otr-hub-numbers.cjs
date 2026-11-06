@@ -45,6 +45,12 @@ const SHOTS = process.env.SHOTS_DIR || '';
       assert.equal(await page.inputValue(box(7, 'gallons_sold')), '1,500,000', 'a month the Hub does not have keeps its own number');
       assert.ok(!(await page.isDisabled(box(7, 'gallons_sold'))));
       assert.match(await page.textContent('body'), /Hub's Accounting Numbers/);
+      // Joe 11-6-26: Cost Per Gallon's Fuel Cost By Gallon table keeps Avg and has no "total" row.
+      await page.click('[data-view="cpg"]');
+      await page.waitForFunction(() => [...document.querySelectorAll('tr.tot td.l')].some(td => td.textContent === 'Avg'));
+      assert.deepEqual(await page.$$eval('tr.tot td.l', t => t.map(x => x.textContent).filter(x => /^(avg|total)$/i.test(x))), ['Avg']);
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'otr-cost-per-gallon-' + w + '.png'), fullPage: true });
+      await page.click('[data-view="figures"]');
       assert.deepEqual(errors, []);
       if (SHOTS) { await page.waitForTimeout(800); await page.locator('.otr-fig').scrollIntoViewIfNeeded(); }
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'otr-recap-hub-' + w + '.png') });

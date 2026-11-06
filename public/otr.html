@@ -223,7 +223,8 @@
         const fuel = '<table class="otr-sheet otr-fuel"><colgroup><col style="width:130px"><col><col><col></colgroup><thead><tr><th class="l" rowspan="2">Month</th><th colspan="2">Fuel Cost By Gallon</th><th rowspan="2">Difference</th></tr><tr class="sub"><th>' + c.year + '</th><th>' + c.prior + '</th></tr></thead><tbody>' +
           c.months.map(m => '<tr><td class="l">' + m.label + '</td><td>' + f3(m.fuel[0]) + '</td><td>' + f3(m.fuel[1]) + '</td><td' + neg(m.fuelDiff) + '>' + pf(m.fuelDiff) + '</td></tr>').join('') +
           '<tr class="tot"><td class="l">Avg</td><td>' + (F ? f3(F.avg[0]) : '') + '</td><td>' + (F ? f3(F.avg[1]) : '') + '</td><td' + (F ? neg(F.avgDiff) : '') + '>' + (F ? paren(F.avgDiff, x => x.toFixed(4)) : '') + '</td></tr>' +
-          '<tr class="tot"><td class="l">total</td><td>' + (F ? f3(F.total[0]) : '') + '</td><td>' + (F ? f3(F.total[1]) : '') + '</td><td' + (F ? neg(F.totalDiff) : '') + '>' + (F ? pf(F.totalDiff) : '') + '</td></tr></tbody></table>';
+          // Joe 11-6-26: no "total" row under Avg (adding up twelve per-gallon numbers was misleading).
+          '</tbody></table>';
         sheet.innerHTML = '<div id="otr-sheet-print"><div class="otr-top">' + cardRow([
           card('Cost per gallon, year to date', Y ? c5(Y.cpg[0]) : '–', Y ? 'vs ' + c5(Y.cpg[1]) + ' in ' + c.prior : 'No months with figures in both years', Y ? chg(-Y.vari, v => '$' + v.toFixed(5), true) : null),
           card('Cost Diff, year to date', Y ? pm(Y.costDiffMoney) : '–', Y ? (Y.costDiffMoney < 0 ? 'more' : 'less') + ' than at ' + c.prior + '\'s cost per gallon' : '', null, Y && Y.costDiffMoney < 0),
