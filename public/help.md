@@ -140,10 +140,12 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 ### Pick the day
 
-- This screen always shows **the current week**. The week cannot be changed here. It moves on by itself on Saturday morning.
+- This screen always shows **the published week**, the same week as `Weekly Dispatch`. The week cannot be changed here, and the calendar does not change it either. It moves on only when you press `PUBLISH TO WEEKLY DISPATCH` on the Weekly Dispatch Template.
 - **Loadout Day** (right, under the buttons) is the day the loads are loaded, Saturday to Friday. Use the arrows or the list to move a day. Beside it, **Delivers** says which day those loads deliver.
 - The arrows stop at the ends of the week (they turn gray).
-- The day you pick stays picked on this computer while it is in the current week.
+- The day you pick stays picked on this computer while it is in the published week, even when you go to the Weekly Dispatch Template and back.
+
+!> Do not wait past Friday to publish next week. Saturday's loadout is the first day of the next week, so it shows here only after that week is published.
 
 > To see or plan another week, use `Weekly Dispatch` or the Weekly Dispatch Template.
 
@@ -198,18 +200,18 @@ The lists show only this plant's units, using the plant the fleet list gives eac
 id: weekly
 screens: weekly.html
 
-Next week, the week you get ready and then publish to Daily Dispatch. The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
+Next week, the week you get ready and then publish to Weekly Dispatch and Daily Dispatch. It is always one week ahead of Weekly Dispatch. The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
 
 ### Pick the week
 
-Weekly Dispatch Template opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer.
+Weekly Dispatch Template opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer, also when you go to Daily Dispatch or Weekly Dispatch and come back.
 
 ### What to do
 
 1. Click a driver box on a route's day. The driver list opens right there. Pick a driver and it saves.
 2. On the Driver Assignment Board, click a driver's day to set their availability: Available, Backup, Day Note, Vacation, Sick, Personal, Bereavement, Unpaid or Off. Type a **Note** if needed, then `Save availability`.
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
-4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
+4. When the week is right, press `PUBLISH TO WEEKLY DISPATCH`. Press it a second time within a few seconds to confirm. That week becomes the week on Weekly Dispatch and Daily Dispatch, and the screen switches to [Weekly Dispatch](#weekly-live) by itself so you can check it. Publishing does not send any texts or emails. Send the drivers' schedule texts yourself afterwards, from Weekly Dispatch or [Daily Dispatch](#daily), when you are ready.
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
@@ -237,7 +239,7 @@ screens: weekly.html?view=live
 
 The live week, the one Daily Dispatch is running now, Sunday to Saturday. It looks just like the Weekly Dispatch Template, with the same two halves. Open it with the `Weekly Dispatch` button on Daily Dispatch.
 
-It always shows the live week. After next week is published, it moves on to that week by itself. There are no arrows and no Publish here: next week is changed and published on the [Weekly Dispatch Template](#weekly).
+It always shows the published week, the same week as Daily Dispatch. The calendar does not change it. It moves on only when you press `PUBLISH TO WEEKLY DISPATCH` on the Weekly Dispatch Template. There are no arrows and no Publish here: next week is changed and published on the [Weekly Dispatch Template](#weekly).
 
 ### What to do
 
