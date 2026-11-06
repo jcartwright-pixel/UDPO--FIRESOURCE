@@ -34,3 +34,41 @@ export const LOOK = {
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
+
+// Joe 11-6-26: "an action button to list all of the mobile app direct links ... group them ... so everything's all in one place
+// for people." Home's All app links list: links only, never codes (codes stay in Links & Codes, administrators only).
+// ops = Plant & Distribution's own site for this hub (live or practice); the accident app and the apply page have one address.
+export const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
+export const APPLY_URL = 'https://udms-apply.web.app/';
+export function linkGroups(ops) {
+  const o = (path) => ops.replace(/\/$/, '') + '/' + path;
+  return [
+    { name: 'Everyone', links: [
+      { name: 'Plant Operations on a phone', note: 'The full app; your role decides what you see', url: o('index.html'), how: 'United Dairy sign-in' },
+      { name: 'Accident & Injury Reporting', note: 'Report an accident or injury right away', url: ACCIDENT_URL, how: 'Open to report' }
+    ] },
+    { name: 'Managers', links: [
+      { name: 'Plant Managers App', note: 'The plant managers\' phones and tablets', url: o('walkthrough.html?view=home&app=1'), how: 'United Dairy sign-in, then the Plant Managers code once' },
+      { name: 'Distribution Manager', note: 'Dispatch, routes, trucks and drivers', url: o('distribution.html'), how: 'United Dairy sign-in' }
+    ] },
+    { name: 'Sales', links: [
+      { name: 'Sales App', note: 'Salespeople on their phones; it only shows, nothing changes', url: o('sales.html'), how: 'United Dairy sign-in' }
+    ] },
+    { name: 'Drivers', links: [
+      { name: 'Drivers\' phones (Route Distribution)', note: 'View Loadout, DVIR, Check-In and My Schedule', url: o('route.html'), how: 'The Route Distribution code' },
+      { name: 'Driver Station', note: 'The Driver Room TV and the drivers\' tablet', url: o('driver-station.html'), how: 'The station\'s code' }
+    ] },
+    { name: 'Plant floor', links: [
+      { name: 'Plant Station', note: 'A plant tablet', url: o('plant-station.html'), how: 'United Dairy sign-in, then the station\'s code once' },
+      { name: 'Plant Station with no United Dairy account', note: 'A tablet or phone with only its station\'s code', url: o('plant-station.html?noaccount=1'), how: 'The station\'s code' },
+      { name: 'Line Tablet', note: 'The tablet at a production line', url: o('line.html?tablet=1'), how: 'United Dairy sign-in, then the Line Tablet code once' }
+    ] },
+    { name: 'Garage & Maintenance', links: [
+      { name: 'Garage Station', note: 'The garage tablet', url: o('garage-station.html'), how: 'The station\'s code, then each mechanic\'s login ID' },
+      { name: 'Maintenance Station', note: 'The maintenance shop tablet', url: o('maint-station.html'), how: 'The station\'s code, then name and login ID' }
+    ] },
+    { name: 'Hiring', links: [
+      { name: 'Job application', note: 'For people applying to work at United Dairy', url: APPLY_URL, how: 'Anyone with the link' }
+    ] }
+  ];
+}

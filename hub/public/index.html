@@ -24,20 +24,28 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1><p class="hub-sub">Pick an app to open it. Each one opens in its own tab.</p></div></div>
+    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1><p class="hub-sub">Pick an app to open it. Each one opens in its own tab.</p></div><div class="hub-head-acts"><button type="button" class="primary" id="all-links">All app links</button></div></div>
     <div class="hub-home" id="tiles"></div>
     <div class="admin-only">
       <h2 class="hub-section">Administration</h2>
       <div class="hub-home" id="admin-tiles"></div>
     </div>
     <div class="hub-empty" id="empty" hidden>You are on the Users list, but no app is turned on for you yet. Ask an administrator.</div>
+    <div class="modal-back hub-back" id="links-back" hidden></div>
+    <div class="modal wide-modal hub-links" id="links-box" role="dialog" aria-modal="true" aria-labelledby="links-title" hidden>
+      <h2 id="links-title">All app links <small>for phones and tablets</small></h2>
+      <p class="hub-sub">Open a link, or copy it to text or email to someone. Codes are not shown here; an administrator gives them out from Links &amp; Codes.</p>
+      <div id="links-list"></div>
+      <div class="modal-actions"><button type="button" id="links-close">Close</button></div>
+    </div>
     <div class="hub-install" id="install-box" hidden>
       <b>Get the hub app</b>
       <span>It opens on this computer in its own window, with its own icon, like your other United Dairy apps.</span>
       <button type="button" class="primary" id="install">Install the app</button>
     </div>
   </div>
-  <script type="module">import { LOOK } from './js/apps.js';
+  <script type="module">import { LOOK, linkGroups } from './js/apps.js';
+import { opsOrigin } from './js/links.js';
 import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
 function tile(key, url, name, note, newTab) {
@@ -53,6 +61,24 @@ document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html',
   tile('plant-setup', 'plant-setup.html', 'Plant Setup', 'Each plant\'s shifts, areas, menu and schedules, and the Upload Center for a new plant', false).replace('data-app="plant-setup"', 'data-admin="plant-setup"') +
   tile('keys', 'keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each', false).replace('data-app="keys"', 'data-admin="keys"') +
   tile('accounting', 'accounting.html', 'Accounting Numbers', 'The monthly accounting package, read once for Over the Road and cost analysis', false).replace('data-app="accounting"', 'data-admin="accounting"');
+// All app links: every phone and tablet link, grouped, with Open and Copy.
+function drawLinks() {
+  document.getElementById('links-list').innerHTML = linkGroups(opsOrigin(location)).map(g => '<section class="hub-link-group"><h3>' + e(g.name) + '</h3>' +
+    g.links.map(l => '<div class="hub-link"><div class="hub-link-text"><b>' + e(l.name) + '</b><span>' + e(l.note) + '</span><small>' + e(l.how) + '</small></div>' +
+      '<div class="hub-link-acts"><a class="hub-link-open" href="' + e(l.url) + '" target="_blank" rel="noopener">Open</a><button type="button" data-copy="' + e(l.url) + '">Copy link</button></div></div>').join('') + '</section>').join('');
+}
+function showLinks(on) { document.getElementById('links-box').hidden = !on; document.getElementById('links-back').hidden = !on; if (on) { document.getElementById('links-close').focus({ preventScroll: true }); document.getElementById('links-box').scrollTop = 0; } }
+document.getElementById('all-links').onclick = () => { drawLinks(); showLinks(true); };
+document.getElementById('links-close').onclick = () => showLinks(false);
+document.getElementById('links-back').onclick = () => showLinks(false);
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') showLinks(false); });
+document.getElementById('links-list').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-copy]'); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); } catch (err) {
+    const t = document.createElement('textarea'); t.value = b.dataset.copy; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (x) { /* none */ } t.remove();
+  }
+  b.textContent = 'Copied'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copy link'; }, 1400);
+});
 function showInstall() { document.getElementById('install-box').hidden = installed() || !canInstall(); }
 document.addEventListener('hub-installable', showInstall);
 document.getElementById('install').onclick = async () => { await installApp(); showInstall(); };

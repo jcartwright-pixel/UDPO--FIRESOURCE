@@ -130,3 +130,18 @@ test('saved app ticks decide the tiles; only administrators change them, never t
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['statements'] }), /could not be read/);
   assert.equal(Object.values(docs.actions).length, 1, 'each change is logged');
 });
+
+// Joe 11-6-26: Home's All app links, grouped, links only (no codes), on the live or practice site the hub runs on.
+test('All app links: every group has links, they point at this hub\'s Operations site, and the accident app is under Everyone', async () => {
+  const { linkGroups, ACCIDENT_URL, APPLY_URL } = await import('../../../public/js/apps.js');
+  const g = linkGroups('https://ud-distribution.web.app');
+  assert.deepEqual(g.map(x => x.name), ['Everyone', 'Managers', 'Sales', 'Drivers', 'Plant floor', 'Garage & Maintenance', 'Hiring']);
+  g.forEach(x => assert.ok(x.links.length > 0, x.name));
+  const urls = g.flatMap(x => x.links.map(l => l.url));
+  assert.ok(urls.includes('https://ud-distribution.web.app/route.html'));
+  assert.ok(urls.includes('https://ud-distribution.web.app/garage-station.html'));
+  assert.ok(g[0].links.some(l => l.url === ACCIDENT_URL));
+  assert.ok(urls.includes(APPLY_URL));
+  urls.filter(u => u !== ACCIDENT_URL && u !== APPLY_URL).forEach(u => assert.ok(u.startsWith('https://ud-distribution.web.app/'), u));
+  assert.ok(linkGroups('https://ud-distribution-sandbox.web.app/')[3].links[0].url.startsWith('https://ud-distribution-sandbox.web.app/route.html'));
+});

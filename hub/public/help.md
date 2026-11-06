@@ -11,6 +11,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 1. Press `Sign in with Google` and pick your United Dairy account.
 2. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
 3. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
+4. Press `All app links` (top right) for every phone and tablet link in one list, grouped by who uses it (Everyone, Managers, Sales, Drivers, Plant floor, Garage & Maintenance, Hiring). Press `Open`, or `Copy link` to text or email it. The codes are not on that list; an administrator gives them out from **Links & Codes**.
 
 ### The apps
 - **Plant & Distribution** (the Operations app): dispatch, the plant floor, fleet, schedules and plant reports.
