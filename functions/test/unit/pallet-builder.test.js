@@ -12,7 +12,7 @@ test('the Pallet Builder screen is made from builder.html, unchanged', () => {
   assert.equal(page, PB.build(src), 'public/pallet-builder.html is out of date: run node tools/pallet-builder.cjs');
   const inside = JSON.parse(page.match(/<script type="application\/json" id="builder-page">([\s\S]*?)<\/script>/)[1]);
   assert.equal(inside, src.replace(/\s+$/, ''));
-  assert.match(page, /import \{ requireSignIn \} from '\.\/js\/app\.js'/);
+  assert.match(page, /import \{ requireSignIn[^}]*\} from '\.\/js\/app\.js'/);
   assert.ok(!/\b(alert|confirm|prompt)\(/.test(src), 'no pop-ups');
 });
 
@@ -65,4 +65,49 @@ test('Joe 11-5-26 tweaks: pallets beside cases, the truck stays in view, a stop 
   assert.match(src, /\.lm-left\{position:sticky/, 'the truck stays in view');
   assert.match(src, /function lightUp\(g\)/, 'pointing at a stop lights up its pallets');
   assert.match(src, /\$\{kid \? `<td><\/td>/, 'no Side or Note box on a shared customer');
+});
+
+// The Pallet Builder screen's bridge to the Customer List's route map, run with a stand-in for its server call.
+function bridgeWith(answer) {
+  const page = fs.readFileSync(PB.OUT, 'utf8');
+  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/app\.js';/, '');
+  const calls = [], window = {};
+  const callServer = async (name, data) => { calls.push([name, JSON.parse(JSON.stringify(data))]); return answer(data); };
+  new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, callServer, () => 'fac_uniontown', (e) => e.message);
+  return { map: window.udRouteMap, calls };
+}
+const DAY = () => ({ customers: { 40496: { account: '40496', name: 'SAMPLE CONE SHOP', chain: 'SAMPLE CHAIN' } }, canEdit: true,
+  routeDays: [{ route: '813', day: 'THU', rev: 4, updatedAt: '2026-11-05T20:46:00.000Z', stops: [{ key: '16175', account: '16175', name: 'SAMPLE MARKET', loadSeq: 2, note: 'Back door' }, { key: '40496', account: '40496', name: 'SAMPLE CONE', loadSeq: 9, note: '' }] }] });
+
+test('Save to route map (Joe 11-6-26): the route map comes from the Customer List, with chains, and a save sends only the new load sequences', async () => {
+  const day = DAY();
+  const { map, calls } = bridgeWith(d => d.op === 'view' ? day : { ok: true, routeDay: Object.assign({}, day.routeDays[0], { rev: 5, stops: d.stops }) });
+  const m = await map.load('813', 'THU');
+  assert.equal(m.found, true); assert.equal(m.rev, 4); assert.equal(m.canEdit, true);
+  assert.deepEqual(m.stops.map(s => [s.account, s.chain, s.loadSeq]), [['16175', '', 2], ['40496', 'SAMPLE CHAIN', 9]]);
+  assert.equal((await map.load('813', 'MON')).found, false, 'a day not on the route map');
+  const n = await map.save('813', 'THU', 4, { 40496: 8 });
+  const [name, sent] = calls[calls.length - 1];
+  assert.equal(name, 'customerList');
+  assert.equal(sent.op, 'saveRouteDay'); assert.equal(sent.plant, 'fac_uniontown'); assert.equal(sent.rev, 4);
+  assert.deepEqual(sent.stops, [{ key: '16175', loadSeq: 2, note: 'Back door' }, { key: '40496', loadSeq: 8, note: '' }], 'same stops, same order, notes kept, one new sequence');
+  assert.equal(n.rev, 5);
+  assert.equal(calls.filter(c => c[1].op === 'view').length, 1, 'the Customer List is read once');
+});
+
+test('Save to route map: someone else saved first, so it says so and reads the route map again', async () => {
+  let views = 0;
+  const { map } = bridgeWith(d => { if (d.op === 'view') { views++; return DAY(); } const e = new Error('Someone else changed route 813 Thursday a moment ago.'); e.code = 'functions/aborted'; throw e; });
+  await map.load('813', 'THU');
+  await assert.rejects(map.save('813', 'THU', 4, { 40496: 8 }), e => e.changed === true && /Someone else changed route 813/.test(e.message));
+  await map.load('813', 'THU');
+  assert.equal(views, 2);
+});
+
+test('Print sequence changes and Save to route map are on the truck load map; only the sheet prints', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /<button id="lmPrint">Print sequence changes<\/button>/);
+  assert.match(src, /<button class="primary" id="lmSave">Save to route map<\/button>/);
+  assert.match(src, /@media print\{[^\n]*\.wrap,\.toast\{display:none!important\}#printSheet\{display:block/);
+  assert.match(src, /<th>Chain<\/th><th>Account #<\/th><th>Customer<\/th><th class="n">New sequence<\/th>/);
 });

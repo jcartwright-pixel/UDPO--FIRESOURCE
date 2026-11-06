@@ -71,6 +71,54 @@ async function openPage(ctx, url) {
     assert.deepEqual(p.errors, []);
     await ctx.close();
 
+    // Joe 11-6-26: the route opens sequenced like the route map (the Customer List's route day, answered here by a stand-in for
+    // its customerList call), Save to route map sends only the changed load sequences, and Print sequence changes fills one page.
+    const map = await browser.newContext({ viewport: { width: 1536, height: 860 }, serviceWorkers: 'block' });
+    const src = fs.readFileSync(path.join(__dirname, '../../../tools/pallet-builder/builder.html'), 'utf8');
+    const list = JSON.parse(/const SEQS = (\{.*?\}); \/\//.exec(src)[1])['813|THU'];
+    const stops = list.map((x, i) => ({ key: x[1] || 'name' + i, account: x[1], name: x[2], chain: /^DQ /.test(x[2]) ? 'DAIRY QUEEN' : '', loadSeq: /RALPH/.test(x[2]) ? 9 : x[0], note: i === 0 ? 'Back door' : '' }));
+    const sent = [];
+    const answer = (d) => d.op === 'view'
+      ? { plant: 'fac_uniontown', customers: {}, canEdit: true, routeDays: [{ plant: 'fac_uniontown', route: '813', day: 'THU', rev: 2, updatedAt: '2026-11-05T20:46:00.000Z', stops }] }
+      : (sent.push(d), { ok: true, routeDay: { plant: 'fac_uniontown', route: '813', day: 'THU', rev: 3, updatedAt: '2026-11-06T14:15:00.000Z', stops: d.stops.map(s => Object.assign({}, stops.find(x => x.key === s.key), s)) } });
+    p = await map.newPage();
+    await p.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
+    await localCalls(p);
+    await p.route(/\/customerList$/, (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: answer((route.request().postDataJSON() || {}).data || {}) }) }));
+    p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+    await p.goto(HOSTING + '/pallet-builder.html?testEmail=manager.test@uniteddairy.com');
+    await p.waitForSelector('#screen:not([hidden]) #builder');
+    const f = p.frameLocator('#builder');
+    await f.locator('#dayTable tr').first().waitFor();
+    const open813 = f.locator('#dayTable tr', { hasText: 'RT 813' }).locator('button.openR');
+    if (await open813.count()) await open813.click(); // (the route already open has no Open button)
+    await f.locator('#mapMsg', { hasText: 'Same as the route map' }).waitFor();
+    assert.match(await f.locator('#mapMsg').textContent(), /Last saved to the route map 11-5-26/);
+    assert.ok(await f.locator('#lmSave').isDisabled(), 'nothing to save yet');
+    const ralph = f.locator('#lmTable tr', { hasText: 'RALPH' }).locator('input.lseq');
+    assert.equal(await ralph.inputValue(), '9', 'the load sequence comes from the route map');
+    await ralph.fill('8'); await ralph.dispatchEvent('change');
+    await f.locator('#mapMsg', { hasText: '1 sequence changed since the route map (1 customer)' }).waitFor();
+    const fr = p.frame({ url: /about:srcdoc/ }) || p.frames().find(x => x !== p.mainFrame());
+    await fr.evaluate(() => { window.print = () => { window.printedAt = Date.now(); }; });
+    await f.locator('#lmPrint').click();
+    const sheet = await f.locator('#printSheet').textContent();
+    assert.match(sheet, /Route: 813/); assert.match(sheet, /Day: Thursday/); assert.match(sheet, /DAIRY QUEEN/);
+    assert.ok(/DQ JEANNETTE/.test(sheet) && /DQ RALPH/.test(sheet), 'every customer on the changed sequence is on the sheet');
+    assert.ok(await fr.evaluate(() => !!window.printedAt), 'it prints');
+    assert.equal(await f.locator('#printSheet tr.chg').count(), 1, 'the changed one is bold');
+    await f.locator('#lmSave').click();
+    await f.locator('#mapMsg', { hasText: 'Saved 1 customer to the route map' }).waitFor();
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].op, 'saveRouteDay'); assert.equal(sent[0].route, '813'); assert.equal(sent[0].day, 'THU'); assert.equal(sent[0].rev, 2);
+    assert.deepEqual(sent[0].stops.map(s => s.key), stops.map(s => s.key), 'the same stops in the same order');
+    assert.equal(sent[0].stops.find(s => s.key === '40496').loadSeq, 8, 'the new load sequence');
+    assert.equal(sent[0].stops[0].note, 'Back door', 'stop notes stay');
+    assert.ok(sent[0].stops.every((s, i) => s.key === '40496' || s.loadSeq === stops[i].loadSeq), 'nothing else changes');
+    if (SHOTS) { await f.locator('section[aria-label="Truck load map"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-route-map-1536.png') }); }
+    assert.deepEqual(p.errors, []);
+    await map.close();
+
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     p = await openPage(phone, '/pallet-builder.html?testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('#screen:not([hidden]) #builder');

@@ -773,6 +773,9 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 8. To move a stop to the other side, pick **Left**, **Right** or **Across front** in its **Side** box. **Auto** puts it back on its odd or even side.
 9. To merge stops, tick them and press `Merge checked stops`. `Load seq = run order` gives every stop the load sequence of its place in the run, and `Back to BOL load seq` puts back the sequences from the bill of lading.
 10. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
+11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
+12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
+13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
@@ -787,6 +790,12 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 !> Do not add the dispensers or boxes on top of the crate count: they are already in it.
 
 > A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
+
+> `Save to route map` changes only the load sequences. The customers on the route, their order on the route map and their notes stay as they are; change those in the Customer List. A customer who is not on the route map cannot be saved, and the line says how many.
+
+> `Save to route map` is greyed out when nothing changed, and for anyone who is not a Manager or Administrator (the line says why).
+
+!> Do not save over someone else: if someone saved the same route day a moment before you, the screen says so and shows their sequences. Make your change again and save.
 
 !> Do not count on another computer seeing your routes: the builder keeps saved routes on the computer and browser you made them on. Press `Copy plan` to share one.
 ## Unloading (Case, Tote, Boxing and Tanker)

@@ -9,7 +9,8 @@
  *
  * Operations only reads them, here: the Sales app's Customers card takes its lines only from the Customer List (Joe 11/1:
  * "Any changes or ever, it goes through that"; salescustomers.js forSales), and the drivers' phone (Route Check-In) shows a route day's Route Book (phone.js routeBook).
- * Nothing in Operations changes them. udcl-rules.js is the Customer List's rules file (the same file as in that app).
+ * Operations changes only load sequences, and only through the Customer List's own call (customerList, op saveRouteDay): the
+ * Pallet Builder's Save to route map (Joe 11-6-26). udcl-rules.js is the Customer List's rules file (the same file as in that app).
  */
 'use strict';
 

@@ -169,6 +169,19 @@ details.items[open]>summary{margin-bottom:8px}
 .seqline li.bol{font-weight:600}
 .seqline .note{color:var(--muted);font-size:.78rem}
 .tag{display:inline-block;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:0 6px;border-radius:4px;background:var(--ink);color:var(--panel);margin-left:4px;vertical-align:1px}
+#printSheet{display:none}
+.mapline .hint{font-size:16px}
+#lmSave[disabled]{opacity:.6;cursor:not-allowed}
+#printSheet h1{font-family:var(--f-display);font-size:28px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em}
+#printSheet .when{font-size:16px;margin:0 0 18px}
+#printSheet table{width:100%;border-collapse:collapse;font-size:16px}
+#printSheet th{text-align:left;text-transform:uppercase;font-family:var(--f-display);letter-spacing:.04em;border-bottom:2px solid #14232f;padding:6px 8px}
+#printSheet td{padding:8px;border-bottom:1px solid #c8d2da}
+#printSheet tr.first td{border-top:2px solid #14232f}
+#printSheet tr.chg td{font-weight:700}
+#printSheet td.n,#printSheet th.n{text-align:center;font-weight:700}
+#printSheet .sign{margin-top:22px;font-size:16px}
+@media print{body{background:#fff!important;color:#000}.wrap,.toast{display:none!important}#printSheet{display:block;color:#000}}
 </style>
 
 <div class="wrap">
@@ -199,7 +212,9 @@ details.items[open]>summary{margin-bottom:8px}
     <div class="lm">
       <div class="lm-left"><div class="truck" id="truck"></div><div class="lm-legend" id="lmLegend"></div></div>
       <div class="lm-right">
-        <div class="addline"><button id="lmMerge">Merge checked stops</button><button id="lmFromRun">Load seq = run order</button><button id="lmFromBol">Back to BOL load seq</button><span class="hint" id="lmMsg"></span></div>
+        <div class="addline"><button id="lmMerge">Merge checked stops</button><button id="lmFromRun">Load seq = run order</button><button id="lmFromBol">Back to BOL load seq</button><button id="lmPrint">Print sequence changes</button><span class="hint" id="lmMsg"></span></div>
+        <!-- Joe 11-6-26: save the load sequences back to the Customer List's route map; the next time, the route opens sequenced like the route map. -->
+        <div class="addline mapline"><button class="primary" id="lmSave">Save to route map</button><span class="hint" id="mapMsg"></span></div>
         <div class="tbl"><table id="lmTable"></table></div>
         <!-- Joe 11-5-26: the route totals sit right below the stop list (the sequencing), beside the truck. -->
         <section class="lm-plan" aria-label="Load plan">
@@ -240,6 +255,8 @@ details.items[open]>summary{margin-bottom:8px}
 
   </div>
 </div>
+<!-- Joe 11-6-26: the sequence changes sheet for the office; only it prints. -->
+<section id="printSheet" aria-label="Sequence changes to print"></section>
 <datalist id="plist"></datalist>
 <div class="toast" id="toast" hidden></div>
 
@@ -534,7 +551,7 @@ function render(){
     return `<div class="pd"><div class="pd-h"><h3>Pallet ${k+1} · ${({L:'left',R:'right'})[R.lay[k].side]}${k===0?' · nose':''}${k===R.pallets.length-1?' · doors':''}</h3><span class="num">${Math.round(pl.fill*100)}% full · ${fmt(pl.wt)} lb</span></div>
       <div class="tbl"><table><thead><tr><th>Order</th><th>Size</th><th>Type</th><th class="r">Cases</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('') + '</details>' : '';
-  save(); window._R = R; renderDay(); renderMap(R);
+  save(); window._R = R; renderDay(); renderMap(R); renderMapLine();
 }
 
 function renderDay(){
@@ -618,7 +635,7 @@ function addProd(i){
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('button'); if(!b) return; const i=+b.dataset.s;
-  if (b.classList.contains('openR')) { useRoute(+b.dataset.r); document.querySelector('.cols').scrollIntoView({behavior:'smooth'}); return; }
+  if (b.classList.contains('openR')) { useRoute(+b.dataset.r); const to = document.querySelector('section[aria-label="Truck load map"]'); if (to) to.scrollIntoView({behavior:'smooth'}); return; }
   if (b.id === 'lmMerge') { const pick = S.stops.filter(st => LMPICK.has(st.id)); if (pick.length < 2) { $('lmMsg').textContent = 'Check two or more stops to merge.'; return; }
     const ns = pick.map(stopSeq).filter(Boolean); const n = ns.length ? Math.min(...ns) : Math.max(0, ...S.stops.map(stopSeq).filter(Boolean)) + 1;
     pick.forEach(st => st.seq = n); LMPICK.clear(); S.sample = false; all(); $('lmMsg').textContent = `Merged ${pick.length} stops into load sequence ${n}.`; return; }
@@ -678,6 +695,86 @@ function fillSeqCustomers(r){
   });
   r.stops = out; r.seqFilled = true;
 }
+// Joe 11-6-26: the route map is the Customer List's route day (its stops, each with a load sequence). Operations hands it to
+// this page (window.udRouteMap, set by the Pallet Builder screen around this frame). When a route opens, its load sequences
+// come from the route map; Save to route map writes the changed ones back; Print sequence changes prints them for the office.
+const MAP = {}; // "813|THU" -> {found, rev, stops:[{key, account, name, chain, loadSeq, note}], updatedAt, updatedBy, canEdit} | {error}
+const bridge = () => { try { return (window.parent && window.parent !== window && window.parent.udRouteMap) || null; } catch(e){ return null; } };
+const DT = iso => { const d = iso ? new Date(iso) : new Date(); if (isNaN(d)) return ''; return `${d.getMonth()+1}-${d.getDate()}-${String(d.getFullYear()).slice(2)}`; };
+const TM = iso => { const d = new Date(iso); if (isNaN(d)) return ''; let h = d.getHours(); const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; return `${h}:${String(d.getMinutes()).padStart(2,'0')} ${ap}`; };
+// The route's list to compare with: the route map when it came, else the route list built in.
+function baseList(rk){
+  const m = MAP[rk.key];
+  if (m && m.found) return m.stops.map(x => ({key:x.key, acct:String(x.account || ''), name:x.name || '', chain:x.chain || '', seq:+x.loadSeq || 0}));
+  return rk.list.map(x => ({key:'', acct:String(x[1] || ''), name:x[2], chain:'', seq:+x[0] || 0}));
+}
+function entryOf(st, list){ return (st.acct && list.find(e => e.acct === String(st.acct))) || list.find(e => sameCust(e.name, st.name)) || null; }
+// Every stop with its route map entry, its sequence now, and whether that differs from the route map.
+function seqChanges(){
+  const rk = routeKey(S); if (!rk) return null;
+  const list = baseList(rk);
+  const rows = S.stops.map((st, i) => { const e = entryOf(st, list), n = stopSeq(st); return {st, i, e, n, changed: !!e && n != null && n !== e.seq}; });
+  return {rk, list, rows, changed: rows.filter(r => r.changed), seqs: [...new Set(rows.filter(r => r.changed).map(r => r.n))].sort((a, b) => a - b), missing: rows.filter(r => !r.e && String(r.st.name || '').trim())};
+}
+// The route opens sequenced like the route map (each time the route map has a newer save than the one this route took).
+function applyMap(r, m){
+  const rk = routeKey(r); if (!rk || !m || !m.found || r.mapRev === m.rev) return;
+  SEQS[rk.key] = m.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']);
+  const list = baseList(rk);
+  r.stops.forEach(st => { const e = entryOf(st, list); if (e) { st.seq = e.seq; if (st.sub) st.bolSeq = e.seq; } });
+  // A customer the route map has in a sequence one of the BOL stops is in, but not on this list yet, goes under that stop.
+  const out = [];
+  r.stops.forEach(st => {
+    out.push(st); if (st.sub) return; const n = stopSeq(st); if (!n) return;
+    list.filter(e => e.seq === n && !r.stops.some(o => (e.acct && o.acct === e.acct) || sameCust(e.name, o.name)) && !out.some(o => o.sub && o.acct === e.acct && sameCust(e.name, o.name)))
+      .forEach(e => out.push({id:nid(), name:e.name, acct:e.acct, seq:n, bolSeq:n, sub:true, lines:[]}));
+  });
+  r.stops = out; r.mapRev = m.rev; r.seqFilled = true;
+}
+function loadMap(rk){
+  const b = bridge(); if (!b || !rk || MAP[rk.key]) return;
+  MAP[rk.key] = {loading:true};
+  b.load(rk.route, rk.day).then(m => { MAP[rk.key] = m || {found:false}; if (m && m.found) DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) applyMap(r, m); }); all(); },
+    err => { MAP[rk.key] = {error: (err && err.message) || 'The route map could not be reached.'}; renderMapLine(); });
+}
+function renderMapLine(){
+  const msg = $('mapMsg'), btn = $('lmSave'); if (!msg || !btn) return;
+  const rk = routeKey(S), b = bridge(), m = rk && MAP[rk.key];
+  const no = (why) => { btn.disabled = true; btn.title = why; msg.textContent = why; };
+  if (!b) return no('Save to route map works on the Pallet Builder screen in Operations.');
+  if (!rk) return no('This route has no route number and date in its name, so it has no route map.');
+  if (!m) { loadMap(rk); return no('Getting the route map for route ' + rk.route + ' ' + WDN[rk.day] + '.'); }
+  if (m.loading) return no('Getting the route map for route ' + rk.route + ' ' + WDN[rk.day] + '.');
+  if (m.error) return no(m.error);
+  if (!m.found) return no('Route ' + rk.route + ' ' + WDN[rk.day] + ' is not on the route map yet. Add it in the Customer List first.');
+  const c = seqChanges(), last = m.updatedAt ? ` Last saved to the route map ${DT(m.updatedAt)} ${TM(m.updatedAt)}.` : '';
+  const left = c.missing.length ? ` ${c.missing.length} customer${c.missing.length === 1 ? ' is' : 's are'} not on the route map, so ${c.missing.length === 1 ? 'its' : 'their'} sequence can't be saved.` : '';
+  if (!m.canEdit) { btn.disabled = true; btn.title = 'Only a Manager or Administrator can save to the route map.'; msg.textContent = (c.changed.length ? `${c.changed.length} customer${c.changed.length === 1 ? '' : 's'} changed from the route map. ` : 'Same as the route map. ') + 'Only a Manager or Administrator can save to the route map.' + last; return; }
+  btn.disabled = !c.changed.length; btn.title = c.changed.length ? '' : 'Nothing changed from the route map.';
+  msg.textContent = (c.changed.length ? `${c.seqs.length} sequence${c.seqs.length === 1 ? '' : 's'} changed since the route map (${c.changed.length} customer${c.changed.length === 1 ? '' : 's'}).` : 'Same as the route map.') + last + left;
+}
+function saveMap(){
+  const rk = routeKey(S), m = rk && MAP[rk.key], b = bridge(); if (!b || !m || !m.found) return;
+  const c = seqChanges(); if (!c.changed.length) return;
+  const want = {}; c.changed.forEach(r => { want[r.e.key] = r.n; });
+  const btn = $('lmSave'); btn.disabled = true; $('mapMsg').textContent = 'Saving to the route map.';
+  b.save(rk.route, rk.day, m.rev, want).then(n => { MAP[rk.key] = n; DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) r.mapRev = n.rev; }); SEQS[rk.key] = n.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']); save(); renderMapLine(); $('mapMsg').textContent = `Saved ${c.changed.length} customer${c.changed.length === 1 ? '' : 's'} to the route map.` + (n.updatedAt ? ` ${DT(n.updatedAt)} ${TM(n.updatedAt)}.` : ''); },
+    err => { if (err && err.changed) { delete MAP[rk.key]; } btn.disabled = false; $('mapMsg').textContent = (err && err.message) || 'The route map could not be saved. Try again.'; });
+}
+// One page for the office: every customer on each sequence that changed (the changed ones in bold).
+function printChanges(){
+  const c = seqChanges();
+  if (!c) { $('lmMsg').textContent = 'This route has no route number and date in its name, so there is nothing to compare.'; return; }
+  if (!c.changed.length) { $('lmMsg').textContent = 'No sequence changes to print. The load sequences match the route map.'; return; }
+  const chainOf = r => (r.e && r.e.chain) || '';
+  const body = c.seqs.map(n => c.rows.filter(r => r.n === n).map((r, k) => `<tr class="${k ? '' : 'first'}${r.changed ? ' chg' : ''}"><td>${esc(chainOf(r))}</td><td class="num">${esc((r.e && r.e.acct) || r.st.acct || '')}</td><td>${esc((r.st.name || '').replace(/\s*\(sub-rt.*$/i, ''))}</td><td class="n">${n}</td></tr>`).join('')).join('');
+  $('printSheet').innerHTML = `<h1>United Dairy · Sequence changes</h1><p class="when"><b>Date:</b> ${DT()} &nbsp;·&nbsp; <b>Route:</b> ${esc(c.rk.route)} &nbsp;·&nbsp; <b>Day:</b> ${WDN[c.rk.day]}</p>
+    <table><thead><tr><th>Chain</th><th>Account #</th><th>Customer</th><th class="n">New sequence</th></tr></thead><tbody>${body}</tbody></table>
+    <p class="sign">Changed by: ____________________ &nbsp;&nbsp; Entered in office: ____________________</p>`;
+  $('lmMsg').textContent = '';
+  window.print();
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmSave') saveMap(); });
 DB.routes.forEach(fillSeqCustomers);
 DB.cur = Math.min(DB.cur||0, DB.routes.length-1); S = DB.routes[DB.cur]; all();
 </script>
