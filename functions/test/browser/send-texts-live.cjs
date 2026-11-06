@@ -111,10 +111,12 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await tx.selectOption('#sample-for', 'drv_test_casey');
       await tx.waitForFunction(() => !document.getElementById('sample-text').hidden);
       const text = await tx.textContent('#sample-text');
-      assert.match(text, /^United Dairy schedule\nWeek of 10-11-26 to 10-17-26\n\nDAY \| ROUTE \| RUN \| DEPART\nSUN \| /);
-      assert.match(text, /\nWED \| 905 \| UT DSD MILK/);
-      assert.match(text, /\nMON \| 802 \| UT DSD MILK \| 4A$/m);
-      assert.match(await tx.textContent('#preview-text'), /is posted\. Open UD Routes > My Schedule/, 'drivers still get the short text');
+      // Joe 11/6 (ik): the driver's own week, a block a day, the way My Schedule reads; it is the text the drivers get.
+      assert.match(text, /^United Dairy schedule for Lee Casey\nWeek of 10-11-26 to 10-17-26\n\nSUNDAY 10-11-26\n/);
+      assert.match(text, /\n\nWEDNESDAY 10-14-26\n905 UT DSD MILK\n/);
+      assert.match(text, /\n\nMONDAY 10-12-26\n802 UT DSD MILK\n(.+ · )?Leaves 4:00 AM\n/);
+      assert.match(text, /\n\nAlso on UD Routes > My Schedule\.$/);
+      assert.match(await tx.textContent('#preview-text'), /Each driver gets their own posted week/);
       if (w === 1536) {
         assert.equal(await tx.isDisabled('#sample-send'), true, 'needs the part 5 cell');
         assert.match(await tx.textContent('#sample-hint'), /Type your cell in part 5 first/);

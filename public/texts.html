@@ -69,8 +69,7 @@
             <p class="hint" id="state-text"></p>
             <div class="gps-buttons"><button type="button" class="primary big" id="send"></button></div>
             <p class="hint" id="last"></p>
-            <p class="hint">The text:</p>
-            <p class="texts-sample" id="preview-text"></p>
+            <p class="hint" id="preview-text"></p>
           </div>
           <div>
             <h3>Who gets them <span class="pill" id="preview-count">-</span></h3>
@@ -79,11 +78,11 @@
             <p class="hint" id="preview-note"></p>
           </div>
         </div>
-        <!-- Joe 10/31 (im): see the new text, each driver's own week, on your own phone before the drivers get it. -->
-        <h3 class="texts-new">New text: each driver's own week <span class="pill warn">Sample only</span></h3>
+        <!-- Joe 10/31 (im): see a driver's text on your own phone. Joe 11/6 (ik): it is the text the drivers get. -->
+        <h3 class="texts-new">See a driver's text</h3>
         <div class="texts-kind-grid">
           <div>
-            <p class="hint">Drivers still get the text above. Pick a driver to see their posted week in the new text, then text it to your own phone to see how it comes through.</p>
+            <p class="hint">Pick a driver to see the text they get for the posted week. To see how it comes through on a phone, text it to your own phone; no driver gets it.</p>
             <form class="texts-test" autocomplete="off" onsubmit="return false">
               <label>Sample for<select id="sample-for"><option value=""></option></select></label>
             </form>

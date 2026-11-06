@@ -1744,7 +1744,7 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. **Schedule texts** tell drivers the posted week is up; they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** text each driver their own posted week, read the way **My Schedule** shows it on the phone (a block a day with the route, truck, trailer, leaving time and any day note); they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
@@ -1755,7 +1755,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
 8. A driver's number was wrong: fix it on the **Driver Roster** first. Then in **Texts and replies**, find that driver's schedule text and press `Resend` twice. Only that driver gets it, at the new number. `Resend` shows only on texts for the posted week.
 
-> To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
+> To see exactly what a driver gets: under **See a driver's text** in part 3, pick the driver in `Sample for`. Their text shows on the screen. Press `Text this sample to my phone` twice to see how it comes through; it goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver.
 
 > To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
