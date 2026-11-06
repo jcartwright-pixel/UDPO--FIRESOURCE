@@ -338,5 +338,6 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .acc-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 16px; }
 .acc-table th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 8px 10px; }
 .acc-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.acc-sub { margin: 14px 0 6px; font-size: 17px; color: var(--ud-blue); }
 .acc-table .strong { font-weight: 800; }
 @media (max-width: 760px) { .acc-table { display: block; overflow-x: auto; max-width: 100%; } .acc-row input[type="email"], .acc-row input[type="text"] { min-width: 0; width: 100%; } .acc-row label { width: 100%; } }

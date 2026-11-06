@@ -1,5 +1,6 @@
 /*
- * Weekly route report in the hub (Joe 11-6-26: "material for the route cost analysis"), on the Accounting Numbers screen.
+ * Route reports in the hub (Joe 11-6-26: "material for the route cost analysis and for the [BOLs]"), on the Accounting Numbers screen.
+ * The daily Daily Load By Route PDF (BOL) is read the same way and kept in dailyLoads/<load date> for any app to use.
  * Vicki's weekly "Weekly Daily Avg Cases by Route By Store" report is read once, by Operations' server
  * (functions/src/routereports.js, Administration steps routeReportStatus / routeReportSaveSettings / routeReportUpload /
  * routeReportCheckNow), and kept in routeWeeks/<week ending>. Route Cost Analysis reads the weeks from there.
@@ -19,19 +20,20 @@ const when = (v) => v ? shortDate(v) + ' ' + time(v) : '';
 function say(text, kind) { const m = $('#wk-msg'); m.hidden = !text; m.textContent = text || ''; m.className = 'list-msg ' + (kind || ''); }
 
 const pillHtml = (s) => s.enabled ? '<span class="pill good">ON</span>' : '<span class="pill">OFF</span>';
-const lineHtml = (s) => s.enabled ? 'Checks <b>' + e(s.mailbox) + '</b> every day at 2:00 PM for a new report with the label <b>' + e(s.label) + '</b>.' : 'Not checking email. Type the mailbox and tick Check every day.';
+const lineHtml = (s) => s.enabled ? 'Checks <b>' + e(s.mailbox) + '</b> every day at 5:00 PM for new reports with the labels <b>' + e(s.label) + '</b> and <b>' + e(s.bolLabel) + '</b>.' : 'Not checking email. Type the mailbox and tick Check every day.';
 
 function card() {
   const s = got.settings, last = got.last;
   const lastLine = last ? '<p class="' + (last.status === 'FAIL' ? 'acc-bad' : 'muted') + '">Last checked ' + e(when(last.at)) + ': ' + e(last.message || '') + '</p>' : '<p class="muted">Not checked yet.</p>';
-  return '<section class="acc-card"><div class="acc-row"><h2>WEEKLY ROUTE REPORT</h2><span id="wk-pill">' + pillHtml(s) + '</span></div>' +
-    '<p class="muted">The weekly report of cases and sales by route and stop (Weekly Daily Avg Cases by Route By Store). Route Cost Analysis reads each week from here.</p>' +
+  return '<section class="acc-card"><div class="acc-row"><h2>ROUTE REPORTS</h2><span id="wk-pill">' + pillHtml(s) + '</span></div>' +
+    '<p class="muted">The weekly report of cases and sales by route and stop (Weekly Daily Avg Cases by Route By Store), and the daily load by route (BOL). Route Cost Analysis and the other apps read them from here.</p>' +
     '<p id="wk-line">' + lineHtml(s) + '</p>' +
     '<div class="acc-row"><label>Mailbox the report comes to<input id="wk-mailbox" type="email" autocomplete="off" spellcheck="false" value="' + e(s.mailbox) + '" placeholder="name@uniteddairy.com"></label>' +
-    '<label>Gmail label<input id="wk-label" type="text" autocomplete="off" spellcheck="false" value="' + e(s.label) + '"></label>' +
+    '<label>Weekly report label<input id="wk-label" type="text" autocomplete="off" spellcheck="false" value="' + e(s.label) + '"></label>' +
+    '<label>Daily load (BOL) label<input id="wk-bol" type="text" autocomplete="off" spellcheck="false" value="' + e(s.bolLabel) + '"></label>' +
     '<label class="inline"><input id="wk-enabled" type="checkbox"' + (s.enabled ? ' checked' : '') + '> Check every day</label></div>' + lastLine +
     '<div class="acc-row"><button type="button" class="primary" id="wk-check"' + (s.mailbox && !busy ? '' : ' disabled title="Type the mailbox first"') + '>' + (busy === 'check' ? 'CHECKING…' : 'CHECK EMAIL NOW') + '</button>' +
-    '<button type="button" id="wk-pick"' + (busy ? ' disabled' : '') + '>' + (busy === 'file' ? 'READING THE FILE…' : 'ADD A REPORT BY HAND') + '</button><input type="file" id="wk-file" accept=".xls,.xlsx" hidden></div>' +
+    '<button type="button" id="wk-pick"' + (busy ? ' disabled' : '') + '>' + (busy === 'file' ? 'READING THE FILE…' : 'ADD A REPORT BY HAND') + '</button><input type="file" id="wk-file" accept=".xls,.xlsx,.pdf" hidden></div>' +
     '<div class="list-msg" id="wk-msg" role="status" hidden></div></section>';
 }
 
@@ -42,7 +44,14 @@ function table() {
       '<td class="muted">' + e(w.file || '') + '<br><small>' + e(String(w.source || '').toLowerCase().startsWith('email') ? 'email ' + shortDate(w.received || w.savedAt) : 'by hand ' + shortDate(w.savedAt)) + '</small></td></tr>').join('') + '</tbody></table>';
 }
 
-function draw() { $('#weeks').innerHTML = card() + table(); }
+function dayTable() {
+  if (!got.days || !got.days.length) return '<p class="hub-empty">No daily loads yet. They come from the 4:00 PM Daily Load By Route email, or press ADD A REPORT BY HAND and pick the PDF.</p>';
+  return '<table class="acc-table" id="day-table"><thead><tr><th>Load date</th><th>Routes</th><th>Stops</th><th>Quantity</th><th>From</th></tr></thead><tbody>' +
+    got.days.map(d => '<tr><td class="strong">' + e(shortDate(d.load_date)) + '</td><td>' + whole(d.route_count) + '</td><td>' + whole(d.stops) + '</td><td>' + whole(d.qty) + '</td>' +
+      '<td class="muted">' + e(d.file || '') + '<br><small>' + e(String(d.source || '').toLowerCase().startsWith('email') ? 'email ' + shortDate(d.received || d.savedAt) : 'by hand ' + shortDate(d.savedAt)) + '</small></td></tr>').join('') + '</tbody></table>';
+}
+
+function draw() { $('#weeks').innerHTML = card() + '<h3 class="acc-sub">Weekly route report</h3>' + table() + '<h3 class="acc-sub">Daily load by route (BOL)</h3>' + dayTable(); }
 
 async function run(kind, fn, done) {
   busy = kind; draw();
@@ -57,7 +66,7 @@ const fileText = (f) => new Promise((ok, bad) => { const r = new FileReader(); r
 let saving = Promise.resolve();
 function saveSettings() {
   saving = saving.then(async () => {
-    const fields = { mailbox: $('#wk-mailbox').value.trim(), label: $('#wk-label').value.trim(), enabled: $('#wk-enabled').checked };
+    const fields = { mailbox: $('#wk-mailbox').value.trim(), label: $('#wk-label').value.trim(), bolLabel: $('#wk-bol').value.trim(), enabled: $('#wk-enabled').checked };
     try { got = await admin('routeReportSaveSettings', fields); say(''); }
     catch (err) { say(serverText(err, 'the weekly route report'), 'bad'); if (fields.enabled && !fields.mailbox) $('#wk-enabled').checked = false; return; }
     $('#wk-pill').innerHTML = pillHtml(got.settings);
@@ -75,10 +84,11 @@ function wire() {
       const f = ev.target.files[0];
       if (!f) return;
       run('file', async () => admin('routeReportUpload', { fileName: f.name, base64: await fileText(f) }, 120000),
-        (d) => d.saved.changed ? 'Week ending ' + d.saved.weekText + ' read from ' + d.file + ': ' + d.saved.routes + ' routes, ' + d.saved.stops + ' stops.' : 'Nothing new in ' + d.file + ': the week ending ' + d.saved.weekText + ' already matches.');
+        (d) => d.saved.kind === 'bol' ? (d.saved.changed ? 'Daily load for ' + d.saved.dateText + ' read from ' + d.file + ': ' + d.saved.routes + ' routes, ' + d.saved.lines + ' lines.' : 'Nothing new in ' + d.file + ': the load for ' + d.saved.dateText + ' already matches.')
+          : d.saved.changed ? 'Week ending ' + d.saved.weekText + ' read from ' + d.file + ': ' + d.saved.routes + ' routes, ' + d.saved.stops + ' stops.' : 'Nothing new in ' + d.file + ': the week ending ' + d.saved.weekText + ' already matches.');
       return;
     }
-    if (['wk-mailbox', 'wk-label', 'wk-enabled'].indexOf(ev.target.id) >= 0) saveSettings();
+    if (['wk-mailbox', 'wk-label', 'wk-bol', 'wk-enabled'].indexOf(ev.target.id) >= 0) saveSettings();
   });
   $('#weeks').addEventListener('click', (ev) => {
     if (ev.target.id === 'wk-pick') $('#wk-file').click();

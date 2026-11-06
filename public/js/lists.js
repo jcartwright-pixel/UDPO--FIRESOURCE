@@ -20,7 +20,7 @@
   'use strict';
   const NAMES = Object.freeze([
     'accountingMail', 'accountingMonthly', 'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
-    'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dataLoads', 'dateBackups', 'driverBackups',
+    'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dailyLoads', 'dataLoads', 'dateBackups', 'driverBackups',
     'deletedDrivers', 'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
     'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',
     'garageSignatures', 'garageTechs', 'gpsAlerts', 'gpsDays', 'gpsReefer', 'gpsReeferReadings', 'gpsTemps', 'gpsTripFuel',

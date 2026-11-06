@@ -319,9 +319,19 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.match(await p.textContent('#wk-msg'), /Week ending 10-31-26 read from Weekly Daily Avg Cases By Route\.xls: 2 routes, 4 stops/);
     assert.match(await p.textContent('#wk-table tbody tr'), /10-31-26.*146.*\$3,895\.75/);
     assert.equal((await db().collection('routeWeeks').doc('2026-10-31').get()).data().stops.length, 4);
+    // The daily load by route (BOL, Joe 11-6-26: "just gather the information and store it"): a made-up PDF by hand.
+    const bolPath = path.join(require('os').tmpdir(), 'Daily Load UT.pdf');
+    fs.writeFileSync(bolPath, require('../../../../functions/test/fixtures/daily-load-pdf').sampleLoad());
+    assert.equal(await p.inputValue('#wk-bol'), 'ROUTES/BOL');
+    assert.match(await p.textContent('#weeks'), /No daily loads yet/);
+    await p.setInputFiles('#wk-file', bolPath);
+    await p.waitForFunction(() => /Daily load for 11-6-26/.test(document.querySelector('#wk-msg').textContent));
+    assert.match(await p.textContent('#wk-msg'), /read from Daily Load UT\.pdf: 2 routes, 6 lines/);
+    assert.match(await p.textContent('#day-table tbody tr'), /11-6-26.*2.*3.*37,145/);
+    assert.equal((await db().collection('dailyLoads').doc('2026-11-06').get()).data().lines.length, 6);
     await p.fill('#wk-mailbox', 'pat.sample@uniteddairy.com');
     await p.check('#wk-enabled');
-    await p.waitForFunction(() => /every day at 2:00 PM/.test(document.querySelector('#weeks').textContent));
+    await p.waitForFunction(() => /every day at 5:00 PM/.test(document.querySelector('#weeks').textContent));
     assert.equal(((await db().collection('config').doc('routeReportMail').get()).data() || {}).enabled, true);
     await shot(p, 'hub-accounting-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'accounting.html');

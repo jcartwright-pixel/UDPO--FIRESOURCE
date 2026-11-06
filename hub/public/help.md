@@ -24,7 +24,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs** and **Route Cost Analysis**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, and **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis, and the weekly route report for Route Cost Analysis.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, and **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis, and the weekly route report and daily loads (BOL) for Route Cost Analysis and the other apps.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -218,16 +218,18 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 
 !> Do not type the numbers on Over the Road's Recap for a month that is already here. Fix the file, or add the corrected file by hand, so every app gets the same numbers.
 
-### Weekly route report
-The same screen also reads the weekly report of cases and sales by route and stop (the email **Weekly Daily Avg Cases by Route By Store**). **Route Cost Analysis** reads each week from here, so nobody has to save the files by hand.
+### Route reports
+The same screen also reads two reports from routing's emails and keeps them for every app: the weekly report of cases and sales by route and stop (**Weekly Daily Avg Cases by Route By Store**), and the daily **Daily Load By Route** PDF (the BOL: every item for every stop on each route's load). **Route Cost Analysis** reads the weekly report from here, and any app can read the daily loads, so nobody has to save the files by hand.
 
 1. Type the **Mailbox the report comes to**. It saves by itself.
-2. Check the **Gmail label**. It starts as ROUTES/SALE BY ROUTE: the label the report email gets in that mailbox.
-3. Tick **Check every day**. Every day at 2:00 PM the Hub reads any new report with that label.
-4. To read it now, press `CHECK EMAIL NOW` in the WEEKLY ROUTE REPORT box. To add a report that came another way, press `ADD A REPORT BY HAND` and pick the .xls.
-5. Check the newest week in its table: routes, cases and sales.
+2. Check the two labels the emails get in that mailbox: **Weekly report label** starts as ROUTES/SALE BY ROUTE, and **Daily load (BOL) label** starts as ROUTES/BOL.
+3. Tick **Check every day**. Every day at 5:00 PM the Hub reads any new report with those labels.
+4. To read them now, press `CHECK EMAIL NOW` in the ROUTE REPORTS box. To add a report that came another way, press `ADD A REPORT BY HAND` and pick the weekly .xls or the daily PDF.
+5. Check the newest week and the newest load date in the two tables under the box.
 
-> A report whose stops do not add up to its own route totals is not saved, and the message says which route. Ask for a fresh copy of the report.
+> A weekly report whose stops do not add up to its own route totals is not saved, and the message says which route. Ask for a fresh copy of the report.
+
+> A newer daily load email for the same load date replaces the earlier one (orders keyed later).
 
 !> Do not take the label off the report emails, or the Hub will not find the next one.
 
