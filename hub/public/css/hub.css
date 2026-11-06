@@ -320,3 +320,46 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .people-edit .papps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .people-edit .papps li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
 .people-edit .papps p { margin: 0; }
+
+/* Home, by area (Joe 11-5-26: "make the card layout look a little better ... a menu option to divide areas"): the area menu on
+   the left (a row of buttons on a phone), a welcome band, then each area with its own heading and cards. */
+.home-wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; max-width: 1500px; padding: 20px 16px 32px; }
+.area-menu { position: sticky; top: 12px; align-self: start; display: flex; flex-direction: column; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; box-shadow: 0 1px 3px rgba(16, 40, 70, .06); }
+.area-menu-title { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 4px 10px 8px; }
+.area-menu a { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; color: var(--ink); font-weight: 700; text-decoration: none; }
+.area-menu a:hover { background: var(--band); }
+.area-menu a[aria-current] { background: var(--ud-blue); color: #fff; }
+.area-menu .area-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--band); color: var(--ud-blue); }
+.area-menu a[aria-current] .area-icon { background: rgba(255, 255, 255, .18); color: #fff; }
+.area-menu .area-icon svg { width: 18px; height: 18px; }
+.area-n { min-width: 26px; text-align: center; font-size: 13px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--band); color: var(--ud-blue-dark); }
+.area-menu a[aria-current] .area-n { background: #fff; }
+.area-icon { display: grid; place-items: center; flex: none; }
+.home-main { min-width: 0; }
+.home-hero { border-radius: 16px; padding: 24px 28px; color: #fff; background: linear-gradient(120deg, var(--ud-blue-dark), var(--ud-blue) 60%, #1f6fb2); box-shadow: 0 6px 18px rgba(8, 61, 107, .18); }
+.home-hero .eyebrow { color: #cfe0f1; font-size: 14px; font-weight: 700; letter-spacing: .04em; }
+.home-hero h1 { margin: 4px 0 0; font-size: 30px; color: #fff; }
+.home-hero .hub-sub { color: #dbe8f5; margin-top: 6px; }
+.area { margin-top: 26px; }
+.area-head { display: flex; align-items: center; gap: 14px; padding: 0 2px 10px; border-bottom: 2px solid var(--line); }
+.area-head .area-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--band); color: var(--ud-blue); }
+.area-head h2 { margin: 0; font-size: 21px; color: var(--ud-blue-dark); }
+.area-head p { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+.area-group { margin: 16px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.home-main .hub-home { padding: 14px 0 0; max-width: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.home-main .hub-home a.app-tile { border-top: 1px solid var(--line); border-left: 5px solid var(--app); min-height: 0; padding: 18px 18px 14px; }
+.home-main .app-icon { background: var(--app); color: #fff; box-shadow: 0 3px 8px color-mix(in srgb, var(--app) 35%, transparent); }
+.home-main .app-open { justify-self: stretch; padding-top: 10px; border-top: 1px solid #e4ebf2; }
+.home-main .hub-empty, .home-main .hub-install { margin: 20px 0 0; }
+@media (max-width: 860px) {
+  .home-wrap { grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 12px; }
+  .area-menu { position: static; flex-direction: row; overflow-x: auto; padding: 8px; }
+  .area-menu-title { display: none; }
+  .area-menu a { flex: none; grid-template-columns: 24px auto auto; padding: 8px 10px; }
+  .area-menu .area-icon { width: 24px; height: 24px; }
+  .home-hero { padding: 18px; } .home-hero h1 { font-size: 24px; }
+  .home-main .hub-home { grid-template-columns: 1fr; }
+}
+/* The practice hub says so at the top (11-5-26). */
+.practice-band { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; background: #fff4cc; border-bottom: 1px solid #e5c95c; color: #5a4300; }
+.practice-band a { margin-left: auto; font-weight: 800; color: var(--ud-blue); }
