@@ -45,3 +45,9 @@ test('route totals sit right under the stop list beside the truck, without the n
   assert.ok(!/Each unit is counted as its own case\./.test(src), 'no "case count not set" notes');
   assert.match(src, /isn't in the product list, so it isn't counted/, 'a product missing from the list is still named');
 });
+
+test('no separate Load sequences section: the truck load map stop list already shows it (Joe 11-5-26)', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.ok(!/Load sequences on this route/.test(src) && !/id="seqTable"/.test(src));
+  assert.match(src, /id="lmTable"/, 'the truck load map stop list stays');
+});
