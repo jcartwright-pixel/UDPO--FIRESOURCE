@@ -18,12 +18,15 @@ const when = (v) => v ? shortDate(v) + ' ' + time(v) : '';
 
 function say(text, kind) { const m = $('#msg'); m.hidden = !text; m.textContent = text || ''; m.className = 'list-msg ' + (kind || ''); }
 
+const pillHtml = (s) => s.enabled ? '<span class="pill good">ON</span>' : '<span class="pill">OFF</span>';
+const lineHtml = (s) => s.enabled ? 'Checks <b>' + e(s.mailbox) + '</b> every morning at 6:00 AM for a new zip from accounting.' : 'Not checking email. Type the mailbox and tick Check every morning.';
+
 function mailCard() {
   const s = got.settings, last = got.last;
-  const pill = s.enabled ? '<span class="pill good">ON</span>' : '<span class="pill">OFF</span>';
+  const pill = '<span id="mail-pill">' + pillHtml(s) + '</span>';
   const lastLine = last ? '<p class="' + (last.status === 'FAIL' ? 'acc-bad' : 'muted') + '">Last checked ' + e(when(last.at)) + ': ' + e(last.message || '') + '</p>' : '<p class="muted">Not checked yet.</p>';
   return '<section class="acc-card"><div class="acc-row"><h2>FROM EMAIL</h2>' + pill + '</div>' +
-    '<p>' + (s.enabled ? 'Checks <b>' + e(s.mailbox) + '</b> every morning at 6:00 AM for a new zip from accounting.' : 'Not checking email. Type the mailbox and tick Check every morning.') + '</p>' +
+    '<p id="mail-line">' + lineHtml(s) + '</p>' +
     '<div class="acc-row"><label>Mailbox the zip comes to<input id="mailbox" type="email" autocomplete="off" spellcheck="false" value="' + e(s.mailbox) + '" placeholder="name@uniteddairy.com"></label>' +
     '<label>Only from (optional)<input id="sender" type="text" autocomplete="off" spellcheck="false" value="' + e(s.sender) + '" placeholder="accounting address"></label>' +
     '<label class="inline"><input id="enabled" type="checkbox"' + (s.enabled ? ' checked' : '') + '> Check every morning</label></div>' + lastLine +
@@ -49,10 +52,21 @@ async function run(kind, fn, done) {
 
 const fileText = (f) => new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, '')); r.onerror = () => bad(new Error('Could not read the file')); r.readAsDataURL(f); });
 
-async function saveSettings() {
-  const fields = { mailbox: $('#mailbox').value.trim(), sender: $('#sender').value.trim(), enabled: $('#enabled').checked };
-  try { got = await admin('accountingSaveSettings', fields); say(''); } catch (err) { say(serverText(err, 'the accounting numbers'), 'bad'); if (fields.enabled && !fields.mailbox) $('#enabled').checked = false; return; }
-  draw();
+// Saves one at a time, each with the boxes as they are when it runs, and never redraws the boxes (a tick made while the
+// last save was on its way stays ticked).
+let saving = Promise.resolve();
+function saveSettings() {
+  saving = saving.then(async () => {
+    const fields = { mailbox: $('#mailbox').value.trim(), sender: $('#sender').value.trim(), enabled: $('#enabled').checked };
+    try { got = await admin('accountingSaveSettings', fields); say(''); }
+    catch (err) { say(serverText(err, 'the accounting numbers'), 'bad'); if (fields.enabled && !fields.mailbox) $('#enabled').checked = false; return; }
+    $('#mail-pill').innerHTML = pillHtml(got.settings);
+    $('#mail-line').innerHTML = lineHtml(got.settings);
+    const c = $('#check');
+    c.disabled = !got.settings.mailbox || !!busy;
+    if (got.settings.mailbox) c.removeAttribute('title'); else c.title = 'Type the mailbox first';
+  });
+  return saving;
 }
 
 function wire() {
