@@ -8,7 +8,8 @@
  *   - a trailer the GPS shows away from the plant says NOT BACK YET and sits below every trailer that is back, even one
  *     today's loadout needs (T-777);
  *   - the dispatch tractor in the lot with a newer report than its trailer's counts as back;
- *   - when a trailer comes in, the list moves and turns it green by itself, with no reload.
+ *   - when a trailer comes in, the list moves and turns it green by itself, with no reload;
+ *   - a trailer today's loadout needs that is in the lot is the first one waiting (Joe, later the same day).
  * With SHOTS_DIR=<folder> it also saves pictures at 1536 and 1920.
  */
 const assert = require('node:assert/strict');
@@ -66,7 +67,7 @@ const rowsNow = (p) => p.$$eval('#rows tr[data-key]', trs => trs.map(t => ({
     assert.ok(waiting.length >= 4, 'several trailers waiting: ' + JSON.stringify(first));
     // The live GPS: T-777 (needed today) and the next trailer are on the road; two others are in the lot. The tractor of a
     // fifth is in the lot with a newer report than its trailer's old road reading.
-    const [needed] = waiting.filter(r => r.trailer === 'T-777'), others = waiting.filter(r => r.trailer !== 'T-777');
+    const [needed] = waiting.filter(r => r.trailer === 'T-777'), others = waiting.filter(r => r.trailer !== 'T-777' && !r.where); // not checked in
     assert.ok(needed, 'T-777 is on the list');
     const roadOne = others[0].trailer, lotOnes = [others[1].trailer, others[2].trailer], comeIn = others[3].trailer;
     const b = d.batch();
@@ -96,6 +97,15 @@ const rowsNow = (p) => p.$$eval('#rows tr[data-key]', trs => trs.map(t => ({
     assert.ok(at(comeIn) < at('T-777') && at(comeIn) < at(roadOne), comeIn + ' moved up when it came in');
     assert.equal(row(comeIn).where, 'IN THE LOT');
     results.push(comeIn + ' came in: green and moved up with no reload');
+    // Joe 11-6-26 (later): a trailer you need that is in the lot goes on top. T-777 (today's loadout needs it) comes in.
+    await d.collection('gpsTrucks').doc('T-777').set(unit('T-777', LOT, '2026-10-08T14:00:00Z'));
+    await o.waitForFunction(() => [...document.querySelectorAll('#rows tr.lot .trl')].some(x => x.textContent.trim() === 'T-777'), null, { timeout: 15000 });
+    rows = await rowsNow(o);
+    const wait = rows.filter(r => r.status === 'Waiting'), i777 = wait.findIndex(r => r.trailer === 'T-777');
+    assert.ok(wait.slice(0, i777).every(r => r.where === 'IN THE LOT') && wait.slice(i777).filter(r => r.where !== 'IN THE LOT').length === wait.length - wait.filter(r => r.where === 'IN THE LOT').length,
+      'T-777, needed and in the lot, is above every trailer not in the lot ' + JSON.stringify(wait.map(r => r.trailer + ' ' + r.where)));
+    assert.ok(i777 < wait.findIndex(r => r.trailer === lotOnes[1]) || i777 < wait.findIndex(r => r.trailer === comeIn), 'and above trailers in the lot that are not needed today');
+    results.push('T-777 needed and in the lot: up top (' + wait.slice(0, i777 + 1).map(r => r.trailer).join(', ') + ')');
     assert.deepEqual(o.errors, []);
     await o.close();
     if (SHOTS) {
@@ -106,6 +116,11 @@ const rowsNow = (p) => p.$$eval('#rows tr[data-key]', trs => trs.map(t => ({
       await w.click('[data-mode="view"]');
       await w.waitForTimeout(500);
       await w.screenshot({ path: path.join(SHOTS, 'after-1920.png') });
+      await w.setViewportSize({ width: 1536, height: 790 });
+      await w.waitForTimeout(500);
+      await w.screenshot({ path: path.join(SHOTS, 'needed-in-lot-1536.png') });
+      await w.setViewportSize({ width: 1920, height: 1040 });
+      await w.waitForTimeout(500);
       // The lower part of the list: the trailers not back yet, then the unloaded ones.
       await w.$eval('#rows tr.road', e => e.scrollIntoView({ block: 'start' }));
       await w.waitForTimeout(300);

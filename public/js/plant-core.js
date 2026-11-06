@@ -577,7 +577,7 @@ export function liveSpot(row, whereNow) {
 /*
  * Joe 11-6-26: the office list in the order the plant needs it. The one being unloaded now on top; then the trailers that are
  * back (in the lot, or checked in, or back by Fleet's yard return): first the ones today's loadout needs (in loading order),
- * then yesterday's and added ones, then the rest; then every trailer the GPS says is not back yet (in the same order); then
+ * then yesterday's and added ones, then the rest; in each of those, the ones in the lot first; then every trailer the GPS says is not back yet (in the same order); then
  * transfer trailers; the unloaded ones at the bottom. rows = unloadOrder's rows (transfer, back and road set).
  * Each row gets spot: 'LOT' (green on the screen), 'ROAD' (NOT BACK YET) or ''.
  */
@@ -589,7 +589,8 @@ export function officeOrder(rows, whereNow) {
     const spot = r.status !== 'WAITING' || r.transfer ? '' : live === 'LOT' || (!road && (r.checkedIn || r.back)) ? 'LOT' : road ? 'ROAD' : '';
     return Object.assign({}, r, { road, spot });
   });
-  const group = (r) => (r.nextLoad ? 0 : r.prior || r.added ? 1 : 2);
+  // Joe 11-6-26 (later): a trailer you need that is in the lot goes on top; then the rest by what you need.
+  const group = (r) => (r.nextLoad ? 0 : r.prior || r.added ? 2 : 4) + (r.spot === 'LOT' ? 0 : 1);
   const rank = (r) => r.status === 'COMPLETE' ? 90 : r.status === 'UNLOADING' ? 0 : r.transfer ? 80 : (r.road ? 40 : 10) + group(r);
   const firstIn = (r) => (r.prior ? 0 : 1), num = (v) => (isFinite(v) ? v : 1e9);
   return out.sort((a, b) => rank(a) - rank(b) || num(a.nextRank) - num(b.nextRank) || firstIn(a) - firstIn(b) ||
