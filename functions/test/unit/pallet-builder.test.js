@@ -58,3 +58,11 @@ test('grouped stops (Joe 11-5-26, mock-up 3): a colored bar per load sequence an
   assert.match(src, /#lmTable tr\.kid td\.cn\{padding-left:34px\}/, 'a shared customer is indented');
   assert.match(src, /\.lm-plan\{[^}]*background:var\(--accent-soft\)/, 'route totals sit in the light blue box');
 });
+
+test('Joe 11-5-26 tweaks: pallets beside cases, the truck stays in view, a stop lights up its pallets, shared customers have no Side or Note box', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /cs<span class="pals"> · \$\{pals\} pallet/, 'pallets beside cases');
+  assert.match(src, /\.lm-left\{position:sticky/, 'the truck stays in view');
+  assert.match(src, /function lightUp\(g\)/, 'pointing at a stop lights up its pallets');
+  assert.match(src, /\$\{kid \? `<td><\/td>/, 'no Side or Note box on a shared customer');
+});

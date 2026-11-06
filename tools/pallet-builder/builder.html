@@ -117,6 +117,14 @@ details summary{cursor:pointer;font-weight:600}
 .lm-plan .tile,.lm-plan .outrow{background:var(--panel)}
 .lm-plan .outrow{font-size:18px}
 #lmTable td.grp,#lmTable th.grp{width:8px;min-width:8px;padding:0}
+#lmTable td.cs{white-space:nowrap}
+/* Joe 11-5-26: the truck stays in view while the stop list and totals scroll; pointing at a stop lights up its pallets. */
+.lm-left{position:sticky;top:8px;align-self:start;max-height:calc(100vh - 16px);overflow-y:auto}
+@media (max-width:760px){.lm-left{position:static;max-height:none;overflow:visible}}
+.truck.lit i[data-g]{opacity:.3}
+.truck.lit i.hl{opacity:1;outline:3px solid #fff;outline-offset:-1px}
+.truck.lit .plab span.hl{color:#fff;font-weight:700}
+#lmTable tr.hl td{background:var(--accent-soft)}
 #lmTable tr.main td{border-top:3px solid var(--line)}
 #lmTable tr.same td{border-top:0}
 #lmTable tr.kid td.cn{padding-left:34px}
@@ -350,8 +358,9 @@ function renderMap(R){
     const pl = R.pallets[k], first = palFirst(pl), n = stopSeq(S.stops[first]);
     const lab = pl.tote ? 'T' : lmLabel(first), used = pl.tote ? 9 : Math.max(1, Math.min(9, Math.ceil(pl.fill * 9 - 1e-9)));
     const cases = pl.items.reduce((a, it) => a + it.cases, 0), col = seqColor(n ? n : 5 + first);
-    return {cells: Array.from({length: 9}, (_, j) => j < used ? `<i style="background:${col}" title="Pallet ${k + 1} · load seq ${esc(lab)}">${esc(lab)}</i>` : `<i class="e" title="Pallet ${k + 1}"></i>`),
-      label: `Pallet ${k + 1} · Seq ${n == null ? '–' : esc(String(n))} · ${pl.tote ? 'tote' : cases + ' cs'}`};
+    const gk = n ? 'q' + n : 'o' + first;
+    return {cells: Array.from({length: 9}, (_, j) => j < used ? `<i style="background:${col}" data-g="${gk}" title="Pallet ${k + 1} · load seq ${esc(lab)}">${esc(lab)}</i>` : `<i class="e" title="Pallet ${k + 1}"></i>`),
+      label: `<span data-g="${gk}">Pallet ${k + 1} · Seq ${n == null ? '–' : esc(String(n))} · ${pl.tote ? 'tote' : cases + ' cs'}</span>`};
   };
   let html = '<div class="tend">Front</div>';
   grid.forEach(r => {
@@ -369,20 +378,28 @@ function renderMap(R){
     const n = stopSeq(st);
     // Joe 11-5-26 (mock-up 3): a colored bar per load sequence; a customer sharing the sequence above sits indented under it.
     const same = i > 0 && n != null && stopSeq(S.stops[i - 1]) === n, kid = st.sub && same;
-    return `<tr draggable="true" data-i="${i}" class="${st.sub ? 'sub' : 'main'}${kid ? ' kid' : ''}${same ? ' same' : ''}"><td class="grp" style="background:${seqColor(n ? n : 5 + i)}" aria-hidden="true"></td><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
+    const pals = R.pallets.filter(pl => pl.stops.has(i)).length;
+    return `<tr draggable="true" data-i="${i}" data-g="${n ? 'q' + n : 'o' + i}" class="${st.sub ? 'sub' : 'main'}${kid ? ' kid' : ''}${same ? ' same' : ''}"><td class="grp" style="background:${seqColor(n ? n : 5 + i)}" aria-hidden="true"></td><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
       <td><input type="checkbox" class="lmPick" data-i="${i}" ${LMPICK.has(st.id) ? 'checked' : ''} aria-label="Pick ${esc(st.name || 'order ' + (i + 1))} to merge"></td>
       <td><span class="rs num">${i + 1}</span></td>
       <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
       <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}${st.sub && st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>
-      <td class="r num">${st.sub ? '' : fmt(R.stats[i].cases)}</td>
-      <td><select class="lside" data-i="${i}" aria-label="Truck side">${SIDES.map(([v, l]) => `<option value="${v}" ${(st.side || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
-      <td><input class="lnote" type="text" value="${esc(st.note || '')}" data-i="${i}" placeholder="Note" aria-label="Note"></td></tr>`;
+      <td class="r num cs">${st.sub ? '' : `${fmt(R.stats[i].cases)} cs<span class="pals"> · ${pals} pallet${pals === 1 ? '' : 's'}</span>`}</td>
+      ${kid ? `<td></td><td>${st.note ? `<span class="note">${esc(st.note)}</span>` : ''}</td></tr>` /* Joe 11-5-26: a shared customer rides on the main stop's pallets and side, so no Side or Note box */
+      : `<td><select class="lside" data-i="${i}" aria-label="Truck side">${SIDES.map(([v, l]) => `<option value="${v}" ${(st.side || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td><input class="lnote" type="text" value="${esc(st.note || '')}" data-i="${i}" placeholder="Note" aria-label="Note"></td></tr>`}`;
   }).join('')}</tbody>`;
 }
 function moveStop(from, to){ if (from === to || from == null) return; const [s] = S.stops.splice(from, 1); S.stops.splice(to, 0, s); S.sample = false; all(); }
 document.addEventListener('dragstart', e => { const tr = e.target.closest && e.target.closest('#lmTable tr[data-i]'); if (!tr) return; DRAG = +tr.dataset.i; tr.classList.add('drag'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(DRAG)); } catch(_){} });
 document.addEventListener('dragover', e => { const tr = e.target.closest && e.target.closest('#lmTable tr[data-i]'); if (!tr || DRAG == null) return; e.preventDefault(); document.querySelectorAll('#lmTable tr.over').forEach(x => x.classList.remove('over')); tr.classList.add('over'); });
 document.addEventListener('drop', e => { const tr = e.target.closest && e.target.closest('#lmTable tr[data-i]'); if (!tr || DRAG == null) return; e.preventDefault(); const to = +tr.dataset.i, from = DRAG; DRAG = null; moveStop(from, to); });
+function lightUp(g){ const t = $('truck'); if (!t) return; t.classList.toggle('lit', !!g);
+  t.querySelectorAll('.hl').forEach(x => x.classList.remove('hl')); document.querySelectorAll('#lmTable tr.hl').forEach(x => x.classList.remove('hl'));
+  if (g) { t.querySelectorAll(`[data-g="${g}"]`).forEach(x => x.classList.add('hl')); const f = t.querySelector('i.hl'), box = t.closest('.lm-left'); if (f && box && box.scrollHeight > box.clientHeight) { const r = f.getBoundingClientRect(), b = box.getBoundingClientRect(); if (r.top < b.top || r.bottom > b.bottom) box.scrollTop += r.top - b.top - 40; } document.querySelectorAll(`#lmTable tr[data-g="${g}"]`).forEach(x => x.classList.add('hl')); } }
+document.addEventListener('mouseover', e => { const tr = e.target.closest && e.target.closest('#lmTable tbody tr[data-g]'); if (tr && DRAG == null) lightUp(tr.dataset.g); });
+document.addEventListener('mouseout', e => { const tr = e.target.closest && e.target.closest('#lmTable tbody tr[data-g]'); if (tr && !(e.relatedTarget && tr.contains(e.relatedTarget))) lightUp(null); });
+document.addEventListener('focusin', e => { const tr = e.target.closest && e.target.closest('#lmTable tbody tr[data-g]'); lightUp(tr ? tr.dataset.g : null); });
 document.addEventListener('dragend', () => { DRAG = null; document.querySelectorAll('#lmTable tr.drag,#lmTable tr.over').forEach(x => x.classList.remove('drag', 'over')); });
 const OPEN = new Set(); let OPEN_PAL = false, OPEN_SIZE = false; // item breakdowns start hidden (Joe)
 document.addEventListener('toggle', e => { const d = e.target; if (!(d instanceof HTMLDetailsElement)) return; if (d.dataset.open) { if (d.open) OPEN.add(d.dataset.open); else OPEN.delete(d.dataset.open); } else if (d.id === 'palDetail') OPEN_PAL = d.open; else if (d.id === 'sizeWrap') OPEN_SIZE = d.open; }, true);
