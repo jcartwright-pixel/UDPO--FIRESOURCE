@@ -528,6 +528,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 6. `Waiting on Parts`: name the parts you need in your own words, then `Waiting on Parts` again and your login ID. When they come in, `Parts are here` starts it again.
 7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, then safe to drive. Your signature on file signs it.
 
+- Your login ID can be 4 numbers or 6 numbers. `Enter` lights up after the fourth number.
 - What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
 - A leased truck's write-up comes only when the office sends it to the garage.
 - Each work order says how many times the unit was written up and the day of the first one ("Written up 2 times · first 10-16-26"). A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
@@ -1479,7 +1480,7 @@ To add a person to the schedule:
 On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
 
 1. Add the mechanic on `People` (`+ Add Person`) and type their name.
-2. In their **Station login ID** box, type a 5- or 6-digit number and leave the box. It saves and the box then says `Set`.
+2. In their **Station login ID** box, type a 4- or 6-digit number and leave the box. It saves and the box then says `Set`.
 3. Tell the mechanic their number. It is never shown again; type a new one to change it.
 
 !> Do not give two mechanics the same login ID. The app will not save it.

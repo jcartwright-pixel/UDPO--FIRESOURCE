@@ -406,7 +406,7 @@
         showError('');
         try {
           if (tb.dataset.op === 'ACTIVE') await save('saveGarageTech', { op: 'ACTIVE', techId: tb.dataset.tech, active: tb.dataset.on === '1' });
-          else { const id = prompt('New login ID for this technician (5 or 6 digits). It is never shown again.'); if (id === null) return; await save('saveGarageTech', { op: 'LOGIN', techId: tb.dataset.tech, loginId: id.trim() }); tb.textContent = 'Login ID saved'; }
+          else { const id = prompt('New login ID for this technician (4 or 6 digits). It is never shown again.'); if (id === null) return; await save('saveGarageTech', { op: 'LOGIN', techId: tb.dataset.tech, loginId: id.trim() }); tb.textContent = 'Login ID saved'; }
         } catch (err) { showError(err.message); }
         return;
       }
