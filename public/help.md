@@ -766,13 +766,16 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 1. On Home, press **Pallet Builder** on the **Plant Operations** card, right under **Debag / Labeling Room**. It is in the menu in the same place.
 2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
 3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
-4. Read **Route totals and load plan**: the cases by size and the cases and pallets for each stop.
-5. Look at the **Truck load map** below **Load sequences on this route**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence, with a label under each pallet such as **Pallet 1 · Seq 3 · 40 cs**. Sequence 0 (or a stop with no sequence) goes side to side across the front and loads first. Then odd load sequences fill the left side and even ones the right side, each from the front toward the back door. The table under it lists each stop's run sequence, load sequence, customer, cases and a note. Each load sequence shows every customer from the route list that is in it: the customer on the bill of lading is in **bold**, and the other customers in that sequence are listed under it in plain text, with no products and their own run sequence. You can drag them or give them a new load sequence too. A customer you moved shows once, in the sequence it loads in now, with its route list sequence in brackets. A note you type is kept with that stop.
+4. Read **Route totals and load plan**, in the light blue box right under the stop list beside the **Truck load map**: the route case count, pallets, units, weight, the crates going out, the cases by size and the cases and pallets for each stop. It does not list products with no weight or no case count.
+5. Look at the **Truck load map**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence, with a label under each pallet such as **Pallet 1 · Seq 3 · 40 cs**. Sequence 0 (or a stop with no sequence) goes side to side across the front and loads first. Then odd load sequences fill the left side and even ones the right side, each from the front toward the back door. The table beside it lists each stop's run sequence, load sequence, customer, cases and pallets (like **59 cs · 2 pallets**), and a note. The truck stays in view while you scroll down the list. Point at a stop to light up its pallets on the truck. Each load sequence is one group with a colored bar down its left side, in the same color as its pallets on the truck. The customer on the bill of lading is in **bold**, and the other customers from the route list in that sequence sit indented under it in plain text, with no products, their own run sequence and their load sequence number. They ride on the main stop's pallets and side, so they have no **Side** or **Note** box. You can drag them or give them a new load sequence too. A note you type is kept with that stop.
 6. To change the run order, drag a stop's row up or down in the table.
 7. To change a stop's load sequence, type a new number in its **Load seq** box. Stops with the same load sequence are merged and share pallets. You can type 0 to put a stop across the front.
 8. To move a stop to the other side, pick **Left**, **Right** or **Across front** in its **Side** box. **Auto** puts it back on its odd or even side.
 9. To merge stops, tick them and press `Merge checked stops`. `Load seq = run order` gives every stop the load sequence of its place in the run, and `Back to BOL load seq` puts back the sequences from the bill of lading.
 10. Press `Copy plan` to copy the plan and paste it into an email or a sheet.
+11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
+12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
+13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
@@ -782,9 +785,17 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > Each order's items, **Cases by size for the whole route** and **Pallet by pallet** start hidden. Click the line to show them, and click again to hide them.
 
-> Crates go 54 cases to a pallet, boxes and dispensers 45, and a tote takes a pallet spot of its own.
+> Dispensers and boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Every crate goes 54 to a pallet, and a tote takes a pallet spot of its own.
+
+!> Do not add the dispensers or boxes on top of the crate count: they are already in it.
 
 > A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
+
+> `Save to route map` changes only the load sequences. The customers on the route, their order on the route map and their notes stay as they are; change those in the Customer List. A customer who is not on the route map cannot be saved, and the line says how many.
+
+> `Save to route map` is greyed out when nothing changed, and for anyone who is not a Manager or Administrator (the line says why).
+
+!> Do not save over someone else: if someone saved the same route day a moment before you, the screen says so and shows their sequences. Make your change again and save.
 
 !> Do not count on another computer seeing your routes: the builder keeps saved routes on the computer and browser you made them on. Press `Copy plan` to share one.
 ## Unloading (Case, Tote, Boxing and Tanker)

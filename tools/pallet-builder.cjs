@@ -59,7 +59,44 @@ const HEAD = `<!doctype html>
 
 const TAIL = `</script>
   <script type="module">
-    import { requireSignIn } from './js/app.js';
+    import { requireSignIn, callServer, currentPlant, serverText } from './js/app.js';
+    // Joe 11-6-26: the route map is the Customer List's route day (udclRouteDays, through its own server call, customerList,
+    // which checks who may change it, checks nobody saved the same route day in between and logs every save). The builder in
+    // the frame asks for it through window.udRouteMap: load(route, day) when a route opens, save(...) for Save to route map.
+    let view = null; // this plant's Customer List, read once per visit
+    const what = 'the Customer List';
+    const plain = (e) => { const c = String(e && e.code || '').replace('functions/', ''); return c === 'not-found' ? 'Could not reach ' + what + '. Try again later.' : serverText(e, what); };
+    const num = (v) => (/[0-9]{3,}/.exec(String(v || '')) || [])[0] || String(v || '');
+    const routeDayOf = (d, route, day) => (d.routeDays || []).find(r => r.day === day && (String(r.route) === String(route) || num(r.route) === String(route)));
+    function shape(d, rd) {
+      if (!rd) return { found: false };
+      const cs = d.customers || {};
+      return { found: true, route: rd.route, rev: rd.rev || 0, updatedAt: rd.updatedAt || '', updatedBy: rd.updatedBy || '', canEdit: !!d.canEdit,
+        stops: (rd.stops || []).map(s => { const c = cs[s.key] || {}; return { key: s.key, account: c.account || s.account || '', name: c.name || s.name || '', chain: c.chain || s.chain || '', loadSeq: +s.loadSeq || 0, note: s.note || '' }; }) };
+    }
+    const read = () => (view = view || callServer('customerList', { op: 'view', plant: currentPlant() }).catch(e => { view = null; throw e; }));
+    window.udRouteMap = {
+      async load(route, day) {
+        try { const d = await read(); return shape(d, routeDayOf(d, route, day)); } catch (e) { throw new Error(plain(e)); }
+      },
+      // seqs = { customer key: new load sequence }. Only the load sequences change; the stops, their order and notes stay.
+      async save(route, day, rev, seqs) {
+        let d;
+        try { d = await read(); } catch (e) { throw new Error(plain(e)); }
+        const rd = routeDayOf(d, route, day);
+        if (!rd) throw new Error('Route ' + route + ' is not on the route map for that day. Add it in the Customer List first.');
+        const stops = (rd.stops || []).map(s => ({ key: s.key, loadSeq: seqs[s.key] != null ? seqs[s.key] : (s.loadSeq || 0), note: s.note || '' }));
+        try {
+          const out = await callServer('customerList', { op: 'saveRouteDay', plant: currentPlant(), route: rd.route, day, rev, stops });
+          Object.assign(rd, out.routeDay || {});
+          return shape(d, rd);
+        } catch (e) {
+          const err = new Error(plain(e));
+          if (/aborted/.test(String(e && e.code || ''))) { view = null; err.changed = true; }
+          throw err;
+        }
+      }
+    };
     // The builder keeps its saved routes in this browser (as it always has); the frame is this site's own page, so they stay.
     requireSignIn(() => {
       const frame = document.getElementById('builder');
