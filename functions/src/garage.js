@@ -241,6 +241,15 @@ function renew(write, people, nowMs) { people.filter(p => p.ref).forEach(p => wr
 const GARAGE_SOURCE = Object.freeze({ station: 'GARAGE', techs: TECHS, logins: LOGINS, locks: LOCKS, tech: (d) => activeTechs([d])[0] || null,
   noLogin: (name) => name + ' has no login ID yet. Ask the office to add it.', where: 'the garage station' });
 
+// Joe 11-6-26 (Sean Martin): a login ID padded with zeros to 6 digits signs in with just its real digits, and the other way
+// round: the typed number also counts with its zeros added (front or back) or taken off, to 4 to 6 digits.
+function loginForms(typed) {
+  const out = [typed];
+  for (const n of [5, 6]) if (typed.length < n) out.push(typed.padStart(n, '0'), typed.padEnd(n, '0'));
+  for (const t of [typed.replace(/^0+/, ''), typed.replace(/0+$/, '')]) if (t.length >= 4) out.push(t);
+  return out.filter((x, i) => out.indexOf(x) === i);
+}
+
 // A mechanic's name and login ID, checked inside a save (wrong numbers count towards the 5-minute lock, as at sign-in).
 // Returns {tech} or {wrong: true}; the caller lets the transaction finish (so the count is kept) and then refuses.
 async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
@@ -260,8 +269,9 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
   if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on ' + src.where + '. Wait a minute and try again.');
   const login = loginSnap.exists ? loginSnap.data() : null;
   if (!login || !login.hash) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
-  const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
-  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+  const want = Buffer.from(login.hash, 'hex');
+  const match = (id) => { const given = Buffer.from(loginHash(techId, id), 'hex'); return given.length === want.length && crypto.timingSafeEqual(given, want); };
+  if (!(src.station === 'GARAGE' ? loginForms(loginId) : [loginId]).some(match)) {
     tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
     byDevice[dev] = { minute, count: stationFails + 1 };
     tx.set(stationRef, { byDevice });
@@ -1016,4 +1026,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, serviceOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };
+module.exports = { G, engineCodeOrders, serviceOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, loginForms, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };

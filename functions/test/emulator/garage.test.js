@@ -229,3 +229,16 @@ test('a PM or reefer service done safe records the GPS miles or hours when they 
   assert.equal((await db().collection('workOrders').doc(pm.workOrderId).get()).data().odometer, 98123);
   assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().last_service_hours, '5123');
 });
+
+test('Joe 11-6-26: a login ID padded with zeros to 6 digits signs in with just its 4 real digits, or all 6', async () => {
+  for (const saved of ['123400', '001234']) {
+    await db().collection('garageLogins').doc('TECH-SM').set({ techId: 'TECH-SM', hash: loginHash('TECH-SM', saved) });
+    for (const typed of ['1234', saved]) {
+      const s = await garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: typed }, now());
+      assert.ok(s.token, saved + ' signs in with ' + typed);
+    }
+    await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '1235' }, now()), /Wrong login ID/, 'a wrong number is still wrong');
+  }
+  // A 5-digit ID stays exact apart from zeros: 48213 does not sign in as 4821.
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '4821' }, now()), /Wrong login ID/);
+});
