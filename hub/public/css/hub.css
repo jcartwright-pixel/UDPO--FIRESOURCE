@@ -340,3 +340,24 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 .acc-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .acc-table .strong { font-weight: 800; }
 @media (max-width: 760px) { .acc-table { display: block; overflow-x: auto; max-width: 100%; } .acc-row input[type="email"], .acc-row input[type="text"] { min-width: 0; width: 100%; } .acc-row label { width: 100%; } }
+/* Daily BOL (bol.html): load days on the left, that day's routes on the right; one column on a phone. */
+.bol-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 16px; align-items: start; }
+.bol-part { display: grid; gap: 8px; min-width: 0; }
+.bol-part h2 { margin: 0; font-size: 19px; color: var(--ud-blue); }
+.bol-part p { margin: 0; }
+.bol-days tr.on td, .bol-routes tr.on td { background: #e7f0f8; }
+.bol-day, .bol-route { border: 0; background: none; padding: 0; font: inherit; font-weight: 800; color: var(--ud-blue); cursor: pointer; text-align: left; min-height: 32px; }
+.acc.bol-wide { max-width: 1880px; }
+.bol-part table { table-layout: auto; }
+.bol-part td { white-space: normal; overflow: visible; text-overflow: clip; height: auto; text-align: left; line-height: 1.3; vertical-align: middle; }
+.bol-day { white-space: nowrap; }
+.bol-part td:not(:first-child):not(.muted) { text-align: right; }
+.bol-part th:not(:first-child) { text-align: right; }
+.bol-part th:last-child.from, .bol-part td.muted { text-align: left; }
+.bol-stops > td { padding: 0 0 10px 18px !important; background: #f6f9fc; }
+.bol-stops table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.bol-stops th { position: static; background: #f6f9fc; text-align: left; padding: 6px 8px; color: var(--ud-blue-dark, #053a66); border-bottom: 2px solid var(--line); }
+.bol-stops td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.bol-stops td:nth-child(2), .bol-stops th:nth-child(2) { text-align: left !important; }
+@media (max-width: 1100px) { .bol-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .bol-days th.from, .bol-days td.muted { display: none; } .bol-part th, .bol-part td { padding: 8px 6px; } }
