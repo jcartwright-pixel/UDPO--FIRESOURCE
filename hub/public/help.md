@@ -26,7 +26,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution**, **Customers & Routes** and **Accident & Injury Reporting**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs** and **Route Cost Analysis**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, and **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis, and **Daily BOL** picks up the office's daily load by route.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -219,6 +219,30 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Driver Check-In Email). If it has not, the last-checked line says so in red.
 
 !> Do not type the numbers on Over the Road's Recap for a month that is already here. Fix the file, or add the corrected file by hand, so every app gets the same numbers.
+
+## Daily BOL
+id: bol
+screens: bol.html
+
+Where the office's **Daily Load By Route** comes in (administrators). The office emails it every afternoon, and Gmail puts it under the label **ROUTES/BOL**. The Hub picks it up from there, reads every route, every customer and what is on their order, and keeps each load day here so the other apps read the same thing.
+
+1. Type the **Mailbox the BOL comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
+2. Check the **Email label**. It starts as ROUTES/BOL, the label the BOL emails go under. Change it only if the label is renamed.
+3. Tick **Check every hour**. Every hour the Hub looks under that label for a new BOL and reads it.
+4. To read it now, press `CHECK EMAIL NOW`.
+5. If the BOL came another way, press `ADD A FILE BY HAND` and pick the PDF.
+6. Press a load day in **LOAD DAYS** to see its routes. Press a route to see its customers, in the order the BOL lists them.
+
+### Buttons
+- `CHECK EMAIL NOW` reads the label at once (the last 10 days). An email already read is not read again.
+- `ADD A FILE BY HAND` reads the BOL PDF from your computer. An Excel or CSV file with the same columns works too.
+- **Only from** (optional): type the office's address, so only BOLs from them are read.
+
+> The BOL lists each order line: load day, route, load sequence, customer and number, product and quantity. When a newer BOL for the same load day comes in (more orders keyed), it takes the older one's place.
+
+> The first time, Google Workspace has to let the app read the mailbox (the same permission as Accounting Numbers and Driver Check-In Email). If it has not, the last-checked line says so in red.
+
+!> Do not move the BOL emails out of the ROUTES/BOL label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
 
 ## Help
 id: help

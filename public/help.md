@@ -214,6 +214,9 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 4. When the week is right, press `PUBLISH TO WEEKLY DISPATCH`. Press it a second time within a few seconds to confirm. That week becomes the week on Weekly Dispatch and Daily Dispatch, and the screen switches to [Weekly Dispatch](#weekly-live) by itself so you can check it. Publishing does not send any texts or emails. Send the drivers' schedule texts yourself afterwards, from Weekly Dispatch or [Daily Dispatch](#daily), when you are ready.
 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
+- **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
+- A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
+- Load 1 and Load 2 of the same route with the same driver are normal (one truck pulling two loads). They are never pink.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
 - **BACKUP** means the driver is a backup that day. A **Day Note** (for example "riding with...") shows in teal in place of AVAILABLE.
@@ -225,6 +228,8 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 - Managers can grab a route's line and drag it up or down to change the order.
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
+
+> If a box is pink and the times look wrong, fix the leave time or route hours in Route Master. With no hours, the app cannot tell when the run is back, so it stays pink.
 
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
 
@@ -366,7 +371,7 @@ Drivers' time off: vacation, personal, sick, bereavement and unpaid days. At mos
 - `Edit` and `Remove` on a line change or take off a day off.
 - `Print` prints one driver or every driver, one page each.
 
-> An approved day off shows on Weekly Dispatch, and the driver's runs read NEEDS DRIVER.
+> An approved day off takes the driver off their runs on those days, in every week already made (this week, next week and the weeks after). The runs read NEEDS DRIVER with who is off. Changing the dates, or cancelling it, puts the driver back on the days no longer off, unless someone else was picked.
 
 !> Do not book a 4th driver off on a day. Check the Calendar first.
 
@@ -783,7 +788,7 @@ screens: pallet-builder.html
 Turns a route's orders into its true case count, its pallets and a trailer plan. Orders are entered in units. Each order adds its units up by size and rounds up to full cases, then the route adds up every order.
 
 1. On Home, press **Pallet Builder** on the **Plant Operations** card, right under **Debag / Labeling Room**. It is in the menu in the same place.
-2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
+2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**. The newest BOL the Hub picked up (Hub > **Daily BOL**, from the ROUTES/BOL email) is already there: every route on it, named like **RT 805 · 11/09/26**, with its customers in BOL order and what is on their orders. The line above the list says which day's BOL it is.
 3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
 4. Read **Route totals and load plan**, in the light blue box right under the stop list beside the **Truck load map**: the route case count, pallets, units, weight, the crates going out, the cases by size and the cases and pallets for each stop. It does not list products with no weight or no case count.
 5. Look at the **Truck load map**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence, with a label under each pallet such as **Pallet 1 · Seq 3 · 40 cs**. Sequence 0 (or a stop with no sequence) goes side to side across the front and loads first. Then odd load sequences fill the left side and even ones the right side, each from the front toward the back door. The table beside it lists each stop's run sequence, load sequence, customer, cases and pallets (like **59 cs · 2 pallets**), and a note. The truck stays in view while you scroll down the list. Point at a stop to light up its pallets on the truck. Each load sequence is one group with a colored bar down its left side, in the same color as its pallets on the truck. The customer on the bill of lading is in **bold**, and the other customers from the route list in that sequence sit indented under it in plain text, with no products, their own run sequence and their load sequence number. They ride on the main stop's pallets and side, so they have no **Side** or **Note** box. You can drag them or give them a new load sequence too. A note you type is kept with that stop.
@@ -795,6 +800,8 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
 12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
 13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
+
+> When a newer BOL comes in for the same day (more orders keyed), opening Pallet Builder again puts it in place of the older one on those routes.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
@@ -829,7 +836,10 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 4. `Edit` fixes the Cases Returned count, the Trailer Back, **Unloaded By** and Notes.
 5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
-- **The order:** the trailer being unloaded is at the top. Then every trailer you load today, in the order Case Loadout loads them, whether it is here or still on the road. Then the rest that came back and still need unloading: yesterday's and added ones, then the ones here, then the ones on the road.
+- **The order:** what you need first is at the top. The trailer being unloaded comes first. Then a trailer you need that is **in the lot**: every trailer you load today that is in the lot comes first, in the order Case Loadout loads them. After that the list goes by what you need next: the other trailers you load today, then yesterday's and added ones, then the rest, with the ones in the lot first each time. A trailer the GPS says is **not back yet** moves down, below every trailer that is back. Transfer trailers come next, and the ones already unloaded are at the bottom.
+- **Green = in the lot.** A trailer the GPS shows in the parking lot (or whose driver checked in) is green and says **IN THE LOT**. One the GPS shows away from the plant is grey and says **NOT BACK YET**.
+- **The list keeps itself up to date.** The GPS is checked every 5 minutes and the list moves on its own as trailers come in; the line under the list says when the GPS was last checked. A trailer's own GPS sends about once an hour, so when the truck that pulled it is already back in the lot, that counts too.
+- On the plant tablet the order is the same as before: every trailer you load today first, here or on the road.
 - **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
 - A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
@@ -851,6 +861,8 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 !> Do not start a trailer for someone who is not unloading it. Each person unloads one trailer at a time, and no more than two trailers at once.
 
 !> Do not use `+ Add a Trailer` for a load that is already on the list. Find it and press `Start`.
+
+!> Do not wait on a trailer that says **NOT BACK YET**. Unload the green ones first; it moves up and turns green by itself when it comes in.
 
 ## Truck Washing
 id: washing

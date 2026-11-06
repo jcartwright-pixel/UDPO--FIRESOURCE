@@ -61,6 +61,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
     assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
     assert.ok(await p.isVisible('a[data-admin="accounting"]'), 'and Accounting Numbers');
+    assert.ok(await p.isVisible('a[data-admin="bol"]'), 'and Daily BOL');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -323,6 +324,41 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Accounting: no sideways page scroll on a phone');
     await shot(p, 'hub-accounting-390');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'accounting.html');
+    await p.waitForSelector('#error:not([hidden])');
+
+    // Daily BOL (Joe 11-6-26): a made-up Daily Load By Route PDF added by hand lands in bolDays, the label starts as
+    // ROUTES/BOL, the mailbox saves by itself, and Check Email Now answers in plain words (Gmail is never reached in the tests).
+    const bolPath = path.join(require('os').tmpdir(), 'Daily Load UT.pdf');
+    fs.writeFileSync(bolPath, require('../../../../functions/test/fixtures/bol-pdf').samplePdf());
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'bol.html');
+    await p.waitForSelector('#pick');
+    assert.match(await p.textContent('#days'), /NO BOL YET/);
+    assert.equal(await p.inputValue('#label'), 'ROUTES/BOL');
+    assert.ok(await p.isDisabled('#check'), 'no mailbox yet, so Check Email Now is gray');
+    await p.setInputFiles('#file', bolPath);
+    await p.waitForSelector('#msg.good');
+    assert.match(await p.textContent('#msg'), /LOAD DAY 11-9-26: 2 ROUTES, 3 CUSTOMERS READ FROM Daily Load UT\.pdf/);
+    assert.deepEqual(await p.$$eval('.bol-routes .bol-route', t => t.map(x => x.textContent.slice(2))), ['805', '6301']);
+    await p.click('.bol-route[data-route="805"]');
+    assert.deepEqual(await p.$$eval('.bol-stops tbody td:nth-child(2)', t => t.map(x => x.textContent)), ['MADEUP GOLF CENTER', 'SAMPLE FOOD MART (CO-OP)']);
+    assert.equal((await db().collection('bolDays').doc('2026-11-09').get()).data().totals.qty, 606);
+    await p.fill('#mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#enabled');
+    await p.waitForFunction(() => /EVERY HOUR FOR A NEW BOL/.test(document.querySelector('#mail').textContent));
+    assert.equal(((await db().collection('config').doc('bolMail').get()).data() || {}).mailbox, 'pat.sample@uniteddairy.com');
+    await p.click('#check');
+    await p.waitForFunction(() => /LAST CHECKED/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
+    assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
+    await p.click('.bol-route[data-route="805"]');
+    await shot(p, 'hub-bol-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'bol.html');
+    await p.waitForSelector('.bol-routes');
+    await shot(p, 'hub-bol-1536');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'bol.html');
+    await p.waitForSelector('.bol-routes');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Daily BOL: no sideways page scroll on a phone');
+    await shot(p, 'hub-bol-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'bol.html');
     await p.waitForSelector('#error:not([hidden])');
 
     // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.

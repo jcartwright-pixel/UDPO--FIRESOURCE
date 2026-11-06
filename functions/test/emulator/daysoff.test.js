@@ -83,6 +83,20 @@ test('a day off takes the driver off that day\'s runs (Weekly shows who it was f
   assert.equal(mon.driverExceptionStatus, '');
 });
 
+test('Joe 11-6-26: a vacation entered after the week is built takes the driver off those runs; moving or cancelling it puts him back', async () => {
+  const mon = async (week) => (await db().collection('runs').doc(week + '__run_t802').get()).data().days.mon;
+  const one = await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-12', endDate: '2026-10-12', type: 'VACATION', status: 'APPROVED' });
+  let d = await mon('2026-10-11');
+  assert.deepEqual([d.driver, d.intendedDriver, d.driverExceptionStatus], ['', 'CASEY, LEE', 'VACATION'], 'reads NEEDS DRIVER with who is off, not a red conflict');
+  assert.equal((await mon('2026-10-04')).driver, 'CASEY, LEE', 'a day outside the vacation is not touched');
+  await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), vacationId: one.vacationId, driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', type: 'VACATION', status: 'APPROVED' });
+  assert.equal((await mon('2026-10-11')).driver, 'CASEY, LEE', 'the day no longer off gets him back');
+  assert.equal((await mon('2026-10-04')).driver, '', 'the new day takes him off');
+  await applyAction(db(), MANAGER, { action: 'saveVacation', requestId: rid(), vacationId: one.vacationId, driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', type: 'VACATION', status: 'CANCELLED' });
+  d = await mon('2026-10-04');
+  assert.deepEqual([d.driver, d.driverExceptionStatus], ['CASEY, LEE', '']);
+});
+
 test('Backup (Joe 10/16): kept in the app only, clears a day off for that day, and any other choice takes it off', async () => {
   const backups = async () => (await all('driverBackups')).map(b => b.docId).sort();
   await applyAction(db(), DISPATCHER, { action: 'saveDriverException', requestId: rid(), driverId: 'drv_test_casey', startDate: '2026-10-05', endDate: '2026-10-05', reason: 'VACATION', status: 'UNAVAILABLE' });
