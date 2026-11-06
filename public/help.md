@@ -828,7 +828,10 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 4. `Edit` fixes the Cases Returned count, the Trailer Back, **Unloaded By** and Notes.
 5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
-- **The order:** the trailer being unloaded is at the top. Then every trailer you load today, in the order Case Loadout loads them, whether it is here or still on the road. Then the rest that came back and still need unloading: yesterday's and added ones, then the ones here, then the ones on the road.
+- **The order:** what you need first is at the top. The trailer being unloaded comes first. Then a trailer you need that is **in the lot**: every trailer you load today that is in the lot comes first, in the order Case Loadout loads them. After that the list goes by what you need next: the other trailers you load today, then yesterday's and added ones, then the rest, with the ones in the lot first each time. A trailer the GPS says is **not back yet** moves down, below every trailer that is back. Transfer trailers come next, and the ones already unloaded are at the bottom.
+- **Green = in the lot.** A trailer the GPS shows in the parking lot (or whose driver checked in) is green and says **IN THE LOT**. One the GPS shows away from the plant is grey and says **NOT BACK YET**.
+- **The list keeps itself up to date.** The GPS is checked every 5 minutes and the list moves on its own as trailers come in; the line under the list says when the GPS was last checked. A trailer's own GPS sends about once an hour, so when the truck that pulled it is already back in the lot, that counts too.
+- On the plant tablet the order is the same as before: every trailer you load today first, here or on the road.
 - **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
 - A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
@@ -850,6 +853,8 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 !> Do not start a trailer for someone who is not unloading it. Each person unloads one trailer at a time, and no more than two trailers at once.
 
 !> Do not use `+ Add a Trailer` for a load that is already on the list. Find it and press `Start`.
+
+!> Do not wait on a trailer that says **NOT BACK YET**. Unload the green ones first; it moves up and turns green by itself when it comes in.
 
 ## Truck Washing
 id: washing
