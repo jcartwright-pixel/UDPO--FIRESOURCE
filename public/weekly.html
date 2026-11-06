@@ -39,9 +39,10 @@
        buttons stay beside the title, a little closer together; narrower, they sit under the title and go onto a second line
        rather than run off the right edge. */
     @media (min-width: 1500px) {
-      body.weekly-page .head .actions.in-head { gap: 4px; }
+      body.weekly-page .head .actions.in-head { gap: 3px; }
       body.weekly-page .head { gap: 8px; }
-      body.weekly-page .head .actions.in-head > :is(button, a.button) { padding: 0 6px; }
+      /* Joe 11/6: PUBLISH TO WEEKLY DISPATCH in capitals is longer, so the buttons sit a little tighter to still fit at 1536. */
+      body.weekly-page .head .actions.in-head > :is(button, a.button) { padding: 0 4px; }
       body.weekly-page .head .title h1 { font-size: 24px; }
     }
     @media (max-width: 1499px) {
@@ -76,7 +77,7 @@
         <button type="button" id="run-days">Route Run Days</button>
         <button type="button" id="reset" title="Rebuild this whole week from Route Master and Driver Master (managers). Trucks, trailers and notes stay.">Reset Week</button>
         <button type="button" id="print-week">Print Weekly Dispatch</button>
-        <button type="button" class="publish" id="publish">Publish to Daily Dispatch</button>
+        <button type="button" class="publish" id="publish">PUBLISH TO WEEKLY DISPATCH</button>
       </div>
       <div class="badge-test"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
@@ -214,7 +215,7 @@
       document.getElementById('mode-text').textContent = modeLabel(!edit ? 'TEST COPY, READ ONLY' : writeBack ? 'TEST COPY: SAVES GO TO THE SANDBOX SHEET' : 'TEST COPY: SAVES STAY IN OPERATIONS');
       ['run-days', 'override'].forEach(id => { document.getElementById(id).disabled = !edit; });
       document.getElementById('publish').disabled = !canSave() || kind === 'old' || !!publishBusy;
-      if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'Publish to Daily Dispatch';
+      if (publishArmed !== (kind === 'future' ? live.next : week)) document.getElementById('publish').textContent = kind === 'future' ? 'Publish Stored Next Week First' : 'PUBLISH TO WEEKLY DISPATCH';
       document.getElementById('reset').disabled = !canReorder() || kind !== 'live';
       showNote(kind, preview);
       const ob = document.getElementById('override');
@@ -513,7 +514,7 @@
       saveOptimistic('resetWeek', { weekStart: week }, () => {}, () => {}, render);
     };
     /*
-     * Publish to Daily Dispatch. On the Live Next week (or, from a preview week, the stored Next week) it moves the weeks on,
+     * PUBLISH TO WEEKLY DISPATCH (Joe 11/6: was Publish to Daily Dispatch). On the Live Next week (or, from a preview week, the stored Next week) it moves the weeks on,
      * as on the current screen: a second click within 8 seconds confirms, saves still on their way finish first, then Current
      * becomes Previous, Next becomes Current, the new Next week is built, and the screen opens the new Next week.
      * On the Current or Previous week one click records that the week was checked and sent.
@@ -551,7 +552,13 @@
       const out = await saveOptimistic('publishWeek', { weekStart: target }, () => {}, () => {}, render);
       publishBusy = false; publishArmed = '';
       if (!out || !out.nextWeek) { say(''); return; }
-      noteText = out.message || ('Week pushed live. Current is now ' + shortDate(out.currentWeek) + '.'); noteKind = 'good';
+      // Joe 11/6: right after publishing, the screen switches to Weekly Dispatch (the week just published). Publishing sends no texts
+      // and no email; he sends them himself from there. Coming back to the Template opens the new Next week.
+      const message = out.message || ('Week pushed live. Current is now ' + shortDate(out.currentWeek) + '.');
+      try { if (who) { localStorage.setItem('ud.weekly.week.' + who, out.nextWeek); localStorage.setItem('ud.weekly.next.' + who, out.nextWeek); } } catch (e) { /* storage off */ }
+      try { sessionStorage.setItem('ud.weekly.published', message); } catch (e) { /* storage off */ }
+      if (window.self === window.top) { location.href = 'weekly.html?view=live' + testQuery; return; }
+      noteText = message; noteKind = 'good';
       live = { previous: out.previousWeek, current: out.currentWeek, next: out.nextWeek };
       week = out.nextWeek;
       runs = [];
@@ -679,6 +686,8 @@
       // it brings in the following next week"): Weekly opens on the week he last picked here; with none picked, or when the week he
       // was on has since been published, on the Live Next week. It never moves by the calendar.
       if (liveView) {
+        // Just published on the Template: what the Publish did shows here, once.
+        try { const m = sessionStorage.getItem('ud.weekly.published'); if (m) { sessionStorage.removeItem('ud.weekly.published'); noteText = m; noteKind = 'good'; } } catch (e) { /* storage off */ }
         const first = await getDoc(doc(db, 'config', 'app')).then(s => (s.data() || {}).liveWeeks || {}, () => ({}));
         if (first.current) { live = first; week = first.current; }
         opened = true; watch(); return;

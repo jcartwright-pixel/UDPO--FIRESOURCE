@@ -203,7 +203,7 @@ details.items[open]>summary{margin-bottom:8px}
   <p class="hint" id="delConfirm" hidden>Delete this saved route? <button id="delYes">Yes, delete</button> <button id="delNo">Keep</button></p>
 
   <section class="panel day" aria-label="All routes">
-    <div class="panel-head"><h2>All routes</h2><span class="hint">The 11/05 BOL is loaded: 25 routes, stops in BOL order. Open a route to see its orders, cases and pallets.</span></div>
+    <div class="panel-head"><h2>All routes</h2><span class="hint" id="dayHint">The 11/05 BOL is loaded: 25 routes, stops in BOL order. Open a route to see its orders, cases and pallets.</span></div>
     <div class="tbl dayscroll"><table id="dayTable"></table></div>
   </section>
 
@@ -673,10 +673,18 @@ document.addEventListener('click', e => {
 });
 
 DB = load();
+// Joe 11-6-26 (lb): the newest BOL the Hub picked up from the ROUTES/BOL email label (Hub > Daily BOL), handed over by the
+// Pallet Builder screen around this frame (window.udBol). Without it (the page on its own) the BOL built in is used.
+const HUBBOL = (() => { try { const b = window.parent && window.parent !== window && window.parent.udBol; return b && b.routes && b.routes.length ? b : null; } catch(e){ return null; } })();
 (function addDay(){
-  let first = false; try { first = !localStorage.getItem(DAYKEY); localStorage.setItem(DAYKEY,'1'); } catch(e){ first = true; }
+  const key = HUBBOL ? HUBBOL.key : DAYKEY, day = HUBBOL ? HUBBOL.routes : BOLDAY;
+  if (HUBBOL && $('dayHint')) $('dayHint').textContent = `The ${HUBBOL.label} BOL from the Hub is loaded: ${day.length} route${day.length === 1 ? '' : 's'}, stops in BOL order. Open a route to see its orders, cases and pallets.`;
+  let first = false; try { first = !localStorage.getItem(key); localStorage.setItem(key,'1'); } catch(e){ first = true; }
+  const mk = r => ({route:r.route, spots:0, split:false, sample:false, bol:true, bolAt:r.bolAt || '', stops:r.stops.map(st => ({id:nid(), name:st.name, acct:st.acct || undefined, lines:st.lines.map(([sku,u]) => ({sku:String(sku), units:u}))}))});
+  // A newer BOL for the same load day (more orders keyed) takes the older one's place on that route.
+  if (HUBBOL) DB.routes.forEach((r, i) => { const n = day.find(x => x.route === r.route); if (n && r.bol && n.bolAt && r.bolAt !== n.bolAt) DB.routes[i] = mk(n); });
   const have = new Set(DB.routes.map(r => r.route));
-  const add = BOLDAY.filter(r => !have.has(r.route)).map(r => ({route:r.route, spots:0, split:false, sample:false, bol:true, stops:r.stops.map(st => ({id:nid(), name:st.name, lines:st.lines.map(([sku,u]) => ({sku:String(sku), units:u}))}))}));
+  const add = day.filter(r => !have.has(r.route)).map(mk);
   if (!add.length) return;
   if (DB.routes.length === 1 && DB.routes[0].sample) DB.routes = [];
   const at = DB.routes.length; DB.routes.push(...add); if (first) DB.cur = at;

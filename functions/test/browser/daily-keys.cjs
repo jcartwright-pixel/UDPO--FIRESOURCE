@@ -317,6 +317,9 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
 
     // Joe 11/6: Daily shows only the current week (loadout Saturday 10/10 to Friday 10/16, delivering 10-11-26 to 10-17-26 here,
     // "now" being Saturday 10/10). The arrows stop at the ends of the week, greyed with why; there is no week box.
+    // Joe 11/6 (later): the current week is the published one (liveWeeks.current), never the calendar's.
+    const liveBefore = ((await db().collection('config').doc('app').get()).data() || {}).liveWeeks || {};
+    await db().collection('config').doc('app').set({ liveWeeks: { previous: '2026-10-04', current: '2026-10-11', next: '2026-10-18' } }, { merge: true });
     const NOW = '&now=2026-10-10T16:00:00Z';
     const dp = await openPage(browser, 1536, 730, '/daily.html?date=2026-10-10' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForSelector('#rows tr');
@@ -330,28 +333,36 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await dp.selectOption('#load-day', '2026-10-16');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-16');
     assert.deepEqual(await dp.$eval('#next', b => [b.disabled, b.title]), [true, 'Daily Dispatch shows only this week'], 'Friday is the last day');
-    assert.match(await dp.textContent('#delivers'), /^Delivers Saturday$/);
+    await dp.waitForFunction(() => document.getElementById('delivers').textContent === 'Delivers Saturday', null, { timeout: 8000 });
     await dp.click('#prev');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-15');
-    // A link to a day in another week opens today instead.
-    await dp.goto(HOSTING + '/daily.html?date=2026-10-05' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
-    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-10');
-    // The kept day stays while it is in the current week; once the week has moved on, today shows.
+    // A link to a day in another week (the Template's Daily Dispatch button on next week) opens the day kept here (Thursday 10/15).
+    await dp.goto(HOSTING + '/daily.html?date=2026-10-19' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-15');
+    assert.equal(await dp.textContent('#week-of'), '10-11-26 to 10-17-26');
+    // The kept day stays while it is in the published week.
     await dp.selectOption('#load-day', '2026-10-11');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
     await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com' + NOW);
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-11');
+    // Saturday 10/17 after 6 a.m. (the calendar's next week) with next week not published yet: the week does not change.
     await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com&now=2026-10-17T16:00:00Z');
-    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-17');
+    await dp.waitForSelector('#rows tr');
+    assert.equal(await dp.$eval('#load-day', s => s.value), '2026-10-11', 'the calendar does not move the week');
+    assert.equal(await dp.textContent('#week-of'), '10-11-26 to 10-17-26');
+    // Publish (liveWeeks moves on) while the screen is open: it moves to today in the newly published week.
+    await db().collection('config').doc('app').set({ liveWeeks: { previous: '2026-10-11', current: '2026-10-18', next: '2026-10-25' } }, { merge: true });
+    await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-17', null, { timeout: 10000 });
     assert.equal(await dp.textContent('#week-of'), '10-18-26 to 10-24-26');
     await dp.selectOption('#load-day', '2026-10-18');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-18');
-    await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com');
+    await dp.goto(HOSTING + '/daily.html?testEmail=dispatch.test@uniteddairy.com&now=2026-10-17T16:00:00Z');
     await dp.waitForFunction(() => document.getElementById('load-day').value === '2026-10-18');
+    await db().collection('config').doc('app').set({ liveWeeks: liveBefore }, { merge: true });
     // Joe 10/13 ("REMOVE THE GO TO TODAY"): Daily has no Go to today button; the arrows and the day box change the day.
     assert.equal(await dp.$$eval('#go-today, #day-pin', n => n.length), 0, 'no Go to today on Daily');
     assert.deepEqual(dp.errors, []);
-    results.push('Daily shows only the current week: no week box, the arrows stop at Saturday and Friday, a link into another week opens today, the kept day stays inside the week (Joe 11/6)');
+    results.push('Daily shows only the current week: no week box, the arrows stop at Saturday and Friday, a link into another week opens the kept day, the kept day stays inside the week, the calendar never moves the week and a Publish does (Joe 11/6)');
 
     assert.deepEqual(p.errors, []);
     console.log('Daily keys:\n- ' + results.join('\n- '));
