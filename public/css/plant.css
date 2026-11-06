@@ -146,6 +146,14 @@
 .plant-page td.rr b { display: block; font-size: 17px; color: var(--ud-blue-dark); }
 .plant-page td.rr span { display: block; color: var(--muted); }
 .plant-page .trl { display: inline-block; padding: 3px 10px; border-radius: 7px; background: var(--band); color: var(--ud-blue-dark); font-weight: 800; }
+/* Joe 11-6-26 (Unloading & Washing): a trailer in the parking lot by the GPS is green; one not back yet is greyed. */
+.plant-page.unload-page tr.lot > td { background: var(--green-bg) !important; }
+.plant-page.unload-page tr.lot:not(.prior) > td:first-child { box-shadow: inset 5px 0 0 var(--green); }
+.plant-page.unload-page tr.lot .trl { background: var(--green); color: #fff; }
+.plant-page.unload-page tr.road .trl { background: #eef1f4; color: #5b6b7b; }
+.plant-page.unload-page small.where { display: block; margin-top: 3px; font-size: 16px; font-weight: 800; letter-spacing: .02em; }
+.plant-page.unload-page small.where.lot { color: var(--green); }
+.plant-page.unload-page small.where.road { color: #5b6b7b; }
 .plant-page small.next { display: block; margin-top: 2px; color: var(--muted); font-weight: 600; }
 .plant-page .na { color: #9aa8b6; }
 .plant-page .chk { font-weight: 800; white-space: nowrap; }
