@@ -214,6 +214,7 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
 4. When the week is right, press `PUBLISH TO WEEKLY DISPATCH`. Press it a second time within a few seconds to confirm. That week becomes the week on Weekly Dispatch and Daily Dispatch, and the screen switches to [Weekly Dispatch](#weekly-live) by itself so you can check it. Publishing does not send any texts or emails. Send the drivers' schedule texts yourself afterwards, from Weekly Dispatch or [Daily Dispatch](#daily), when you are ready.
 
+- The box beside the title shows how much of the week has a driver, for example **87% OF RUNS COVERED**. It is red until every run that goes out has a driver, then green at 100%. It changes as soon as you pick a driver. Days a run does not go out, and runs a carrier or another company covers, do not count. Point at it to see how many of the week's runs have a driver.
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
 - A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
@@ -248,6 +249,7 @@ It always shows the published week, the same week as Daily Dispatch. The calenda
 2. The change shows on Daily Dispatch for that day straight away. There is nothing to publish.
 3. On the Driver Assignment Board, click a driver's day to set their availability, the same as on the template.
 
+- The box beside the title shows how much of this week has a driver, for example **87% OF RUNS COVERED**: red until every run has one, green at 100%.
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
@@ -597,6 +599,25 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - `Print Fleet Service Report` prints the report.
 
 > Miles marked GPS come from Verizon Connect Fleet; others come from the driver's DVIR or were typed.
+
+## Garage Technicians
+id: garage-techs
+screens: fleet.html?view=techs, administration.html?item=garage-techs
+
+The garage mechanics who sign in on the Garage Station. It is in Administration under **Fleet Maintenance Setup**, so you do not have to scroll down Fleet Service Setup to reach it.
+
+1. Click **Pick or type the name** and pick the person from the Employees list (the GARAGE department is first). Their employee ID fills in the box beside it.
+2. Press `Add Technician`.
+
+- A technician who matches someone on the Employees list says **Signs in with employee ID**. They type that number on the Garage Station, without the zeros at the front or back (an employee ID of 009354 works as 9354).
+- A technician whose name is not found on the Employees list says **Not found on the Employees list** in red, with a box under it. Pick the right person in that box and they sign in with that person's employee ID.
+- `Set login ID` gives a technician a different number as well. `Turn off` takes them off the Garage Station.
+- `Service Rules and Units` opens the rest of Fleet Service Setup.
+- Login IDs are never shown once saved.
+
+> The boxes keep what you typed while the screen brings in new information.
+
+!> Do not add the plant's mechanics here. They are on Maintenance Schedule Setup and sign in on the Maintenance Station.
 
 # Manager Reports
 
@@ -1558,7 +1579,7 @@ Everything administrators set up, in a menu down the left. Each **red bar** is a
 - An item marked **In the Hub** is changed in the United Dairy Hub now: People & Roles, Role Templates, the Links & Codes items and the email items. A blue line at its top has `Change this in the Hub`. It still works here for now; both save to the same place.
 - Administration is for administrators only; the button in the top bar shows only to them.
 
-> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup (the service rules and the garage technicians) is under Fleet Maintenance Setup. GPS Setup is under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
+> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup (the service rules) and Garage Technicians are under Fleet Maintenance Setup. GPS Setup is under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
 

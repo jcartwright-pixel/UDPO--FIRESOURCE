@@ -494,6 +494,15 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .weekly-page .head .title { flex: none; }
 .weekly-page .head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
 .weekly-page .head .tabs button { white-space: nowrap; }
+.weekly-page .wk-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+/* Joe 11/6: "87% OF RUNS COVERED" beside the title, red until every run has a driver, green at 100%. */
+.wk-covered { flex: none; background: var(--red); color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .02em; line-height: 1; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+.wk-covered.full { background: var(--green); }
+/* On a laptop the longer buttons go onto two lines so the figure and every button still fit on the title line. */
+@media (max-width: 1700px) {
+  .weekly-page .head .actions.in-head :is(button, a.button) { white-space: normal; max-width: 124px; line-height: 1.1; padding-left: 8px; padding-right: 8px; text-align: center; justify-content: center; }
+  .weekly-page .head .actions.in-head #publish { max-width: 160px; }
+}
 .weekly-page .week td { height: 40px; }
 
 /* Header shows only the user's initials; the full email is on hover. */
