@@ -120,6 +120,12 @@ test('Weekly colours and the Driver Assignment Board follow the current Weekly l
   const ctx = L.weeklyContext(rows, drivers, exceptions);
   assert.deepEqual(rows.map(r => L.weeklyCellClass(r, 'mon', ctx)), ['booked', 'booked', 'vacation-needs', 'carrier', 'relief', 'conflict', 'coverage', 'needs']);
   assert.equal(L.weeklyCellClass(rows[0], 'tue', ctx), 'off');
+  // Joe 11/6: "% OF RUNS COVERED" beside the Weekly title. A carrier, an outside company and a day off do not count; a driver
+  // who is off that day (conflict), a driver off with nobody picked, and NEEDS DRIVER count as not covered.
+  assert.deepEqual(L.weeklyCoverage(rows, ctx), { have: 3, all: 6, percent: 50 });
+  assert.deepEqual(L.weeklyCoverage([rows[0], rows[1], rows[3], rows[4], rows[6]], ctx), { have: 3, all: 3, percent: 100 });
+  assert.deepEqual(L.weeklyCoverage([], ctx), { have: 0, all: 0, percent: 100 });
+  assert.equal(L.weeklyCoverage([rows[0], rows[1], rows[2]], ctx).percent, 66, 'rounded down, so 100% only when every run has a driver');
   const board = L.driverBoardRows(drivers, rows, exceptions, '2026-10-04');
   assert.deepEqual(board.map(b => b.name), ['BROOK', 'ADAMS', 'CASEY'], 'relief first, then seniority; inactive drivers left out');
   assert.deepEqual([board[1].days.mon.text, board[1].days.mon.kind], ['801 / 802', 'booked']);
