@@ -203,6 +203,7 @@ details.items[open]>summary{margin-bottom:8px}
 .daystep{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .daystep button{font-size:18px;padding:10px 14px}
 .dayline{margin:0;font-size:20px;font-weight:700;text-transform:uppercase}
+#dayPick option{color:var(--ink)}#dayPick option.old,#dayPick.old,.dayline.old{color:#6b7884}
 .daybad{margin:0;font-size:18px;font-weight:700;color:#b4471f}
 .savebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 button.save{font-size:22px;font-weight:800;padding:14px 22px;background:#1f7a4d;border-color:#1f7a4d;color:#fff}
@@ -821,8 +822,10 @@ function pickDay(date, open){
 }
 function renderDayPick(){
   const sel = $('dayPick'); if (!sel) return;
-  sel.innerHTML = BOLDAYS.map(d => `<option value="${d.date}" ${d.date === DAYSEL ? 'selected' : ''}>${DAYTEXT(d.date)}</option>`).join('');
+  // Joe 11-7-26: "it should also show the old days faded": the newest BOL day as normal, every older day greyed.
+  sel.innerHTML = BOLDAYS.map((d, k) => `<option value="${d.date}"${k ? ' class="old"' : ''} ${d.date === DAYSEL ? 'selected' : ''}>${DAYTEXT(d.date)}</option>`).join('');
   const i = BOLDAYS.findIndex(d => d.date === DAYSEL);
+  sel.classList.toggle('old', i > 0); $('dayLine').classList.toggle('old', i > 0);
   $('dayPrev').disabled = i < 0 || i >= BOLDAYS.length - 1; $('dayPrev').title = $('dayPrev').disabled ? 'There is no BOL before this day.' : '';
   $('dayNext').disabled = i <= 0; $('dayNext').title = $('dayNext').disabled ? 'This is the newest BOL.' : '';
   const day = BOLDAYS[i], n = dayRoutes(DAYSEL).length, when = day && day.routes[0] && day.routes[0].bolAt ? new Date(day.routes[0].bolAt) : null;

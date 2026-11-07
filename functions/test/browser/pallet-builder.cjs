@@ -191,6 +191,9 @@ async function openPage(ctx, url) {
     assert.match(await hb.locator('#dayLine').textContent(), /^BOL FOR MONDAY 11-9-26 · 2 ROUTES · RECEIVED 11-9-26 .* · NEWEST BOL$/);
     assert.deepEqual(await hb.locator('#dayPick option').allTextContents(), ['MONDAY 11-9-26', 'SUNDAY 11-8-26', 'THURSDAY 11-5-26']);
     assert.ok(await hb.locator('#dayNext').isDisabled(), 'nothing newer');
+    // Joe 11-7-26: the older days are faded, the newest is not.
+    assert.deepEqual(await hb.locator('#dayPick option').evaluateAll(o => o.map(x => x.className)), ['', 'old', 'old']);
+    assert.ok(!(await hb.locator('#dayPick').evaluate(e => e.classList.contains('old'))), 'the newest day open: not faded');
     assert.ok(await hb.locator('#dayBad').isHidden(), 'the Hub BOL days came: no red line');
     assert.deepEqual(await hb.locator('#routePick optgroup').evaluateAll(g => g.map(x => x.label)), ['ON THE MONDAY 11-9-26 BOL'], 'the routes on the open day, grouped under it');
     const fs16 = await hb.locator('#dayPick, #routePick, #dayLine, #lmSave').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)));
@@ -202,6 +205,8 @@ async function openPage(ctx, url) {
     assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/08/26', 'the day before opens on its first route');
     assert.ok(/RT 805 · 11\/08\/26/.test(await hb.locator('#dayTable').textContent()), 'and its routes are brought in');
     assert.ok(await hb.locator('#dayNext').isEnabled());
+    assert.ok(await hb.locator('#dayPick').evaluate(e => e.classList.contains('old')), 'an older day open: the day box is faded');
+    assert.equal(await hb.locator('#dayLine').evaluate(e => getComputedStyle(e).color), 'rgb(107, 120, 132)', 'and its line');
     await p.waitForTimeout(300);
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-day-before-1536.png') });
     assert.deepEqual(p.errors, []);
