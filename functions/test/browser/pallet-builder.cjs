@@ -57,6 +57,10 @@ async function openPage(ctx, url) {
     assert.ok(await frame().locator('h1').textContent().then(t => /PALLET BUILDER/.test(t)), 'the builder shows in the frame');
     const menu = await p.$$eval('a[href^="pallet-builder.html"]', as => as.length);
     assert.ok(menu >= 1, 'Pallet Builder is in the menu');
+    // Joe 11-7-26: with no BOL days in the Hub it says so in red, so the built-in BOL is not taken for the newest.
+    assert.match(await frame().locator('#dayBad').textContent(), /^THE HUB HAS NO BOL DAYS YET/);
+    assert.ok(await frame().locator('#dayBad').isVisible());
+    assert.match(await frame().locator('#dayLine').textContent(), /THE BOL BUILT INTO PALLET BUILDER$/);
     await frame().locator('#loadSample').click();
     await frame().locator('#tiles .tile').first().waitFor();
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-1536.png') });
@@ -187,6 +191,7 @@ async function openPage(ctx, url) {
     assert.match(await hb.locator('#dayLine').textContent(), /^BOL FOR MONDAY 11-9-26 · 2 ROUTES · RECEIVED 11-9-26 .* · NEWEST BOL$/);
     assert.deepEqual(await hb.locator('#dayPick option').allTextContents(), ['MONDAY 11-9-26', 'SUNDAY 11-8-26', 'THURSDAY 11-5-26']);
     assert.ok(await hb.locator('#dayNext').isDisabled(), 'nothing newer');
+    assert.ok(await hb.locator('#dayBad').isHidden(), 'the Hub BOL days came: no red line');
     assert.deepEqual(await hb.locator('#routePick optgroup').evaluateAll(g => g.map(x => x.label)), ['ON THE MONDAY 11-9-26 BOL'], 'the routes on the open day, grouped under it');
     const fs16 = await hb.locator('#dayPick, #routePick, #dayLine, #lmSave').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)));
     assert.ok(fs16.every(n => n >= 16), 'big letters at the top ' + JSON.stringify(fs16));

@@ -213,7 +213,9 @@ const TAIL = `</script>
     requireSignIn(async () => {
       const frame = document.getElementById('builder');
       if (frame.srcdoc) return;
-      try { window.udBolDays = await bolDays(); window.udBol = window.udBolDays[0] || null; } catch (e) { window.udBolDays = []; window.udBol = null; }
+      // Joe 11-7-26: a read that fails says why on the screen (window.udBolError), instead of quietly showing the built-in BOL.
+      try { window.udBolDays = await bolDays(); window.udBol = window.udBolDays[0] || null; window.udBolError = ''; }
+      catch (e) { window.udBolDays = []; window.udBol = null; window.udBolError = String((e && (e.code || e.message)) || 'unknown').replace('firestore/', ''); }
       try { window.udProducts = await sheetProducts(); } catch (e) { window.udProducts = {}; }
       if (frame.srcdoc) return;
       const builder = JSON.parse(document.getElementById('builder-page').textContent);
