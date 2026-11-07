@@ -4453,7 +4453,7 @@ async function writes() {
     if (rec.routesAfter.length !== before) note('Pallet Builder: ' + before + ' routes before, ' + rec.routesAfter.length + ' after deleting the test route');
     // 6.91 (#661, #662, #664): the Truck load map on a copy of a BOL route that has load sequences with more than one customer.
     const fh = await (await p.$('#builder')).contentFrame();
-    const pickAt = await fh.evaluate(() => DB.routes.findIndex(r => { const k = routeKey(r); return k && k.list.length && r.stops.some(st => st.sub) && r.stops.filter(st => !st.sub).length >= 3; }));
+    const pickAt = await fh.evaluate(() => DB.routes.findIndex(r => { const k = routeKey(r); return /11\/05\/26/.test(r.route) && k && k.list.length && r.stops.some(st => st.sub) && r.stops.filter(st => !st.sub).length >= 3; }));
     rec.mapRoute = pickAt >= 0 ? await fh.evaluate(i => DB.routes[i].route, pickAt) : '';
     if (pickAt < 0) bad.push('no BOL route with a load sequence of more than one customer to test the Truck load map on');
     else {
@@ -4577,7 +4577,7 @@ async function writes() {
     const plant = await p.evaluate(() => import('./js/app.js').then(m => m.currentPlant()));
     const keys = await fh.evaluate(() => DB.routes.map((r, i) => { const k = routeKey(r); return k ? { i, name: r.route, route: k.route, day: k.day, seq: k.list.length, bol: r.stops.filter(st => !st.sub).length } : null; }).filter(Boolean));
     let real = null, use = null;
-    for (const k of keys) { if (k.bol < 3 || !k.seq || / copy$/.test(k.name)) continue; const d = await db.collection('udclRouteDays').doc(plant + '__' + k.route + '__' + k.day).get(); if (d.exists && (d.data().stops || []).length >= 3) { real = d; use = k; break; } }
+    for (const k of keys) { if (k.bol < 3 || !k.seq || !/11\/05\/26/.test(k.name) || / copy$/.test(k.name)) continue; const d = await db.collection('udclRouteDays').doc(plant + '__' + k.route + '__' + k.day).get(); if (d.exists && (d.data().stops || []).length >= 3) { real = d; use = k; break; } }
     rec.routeMap = { plant, routeDays: keys.length, real: use ? use.route + ' ' + use.day : 'none' };
     if (!real) bad.push('no builder route has a route map in the Customer List to copy for the Save to route map test');
     else {
@@ -4586,6 +4586,7 @@ async function writes() {
       const testName = use.name.replace(use.route, '9990');
       const logs = async () => { const out = new Map(); for (const [f, v] of [['route', '9990'], ['routeDay', TEST], ['docId', TEST], ['id', TEST], ['route', 9990]]) {
         for (const x of (await db.collection('udclLog').where(f, '==', v).get().catch(() => ({ docs: [] }))).docs) out.set(x.id, x.ref); } return [...out.values()]; };
+      const custBefore = new Set((await db.collection('udclCustomers').where('plant', '==', plant).get()).docs.map(d => d.id));
       try {
         const td = JSON.parse(realBefore); Object.keys(td).forEach(k => { if (td[k] === real.data().route) td[k] = '9990'; });
         Object.assign(td, { route: '9990', rev: 9990, updatedAt: '', updatedBy: '', testEdited: true, practiceTest: true });
@@ -4605,38 +4606,45 @@ async function writes() {
         const line = async () => (await fr.locator('#mapMsg').textContent()).trim();
         rec.mapOpen = { msg: (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME'), disabled: await fr.locator('#lmSave').isDisabled(), route: await fm.evaluate(() => S.route) };
         if (rec.mapOpen.route !== testName) bad.push('the builder copy is named ' + rec.mapOpen.route);
-        else if (!/^SAME AS THE ROUTE MAP\./.test(rec.mapOpen.msg) || !rec.mapOpen.disabled) bad.push('the test route opens with "' + rec.mapOpen.msg + '"' + (rec.mapOpen.disabled ? '' : ' and Save to route map not greyed'));
+        // 6.91 (#693): one SAVE sends it all: the line names what differs from the route map (load sequences, customers to add,
+        // run order, truck load map), or SAME AS THE ROUTE MAP with SAVE greyed.
+        else if (/^SAME AS THE ROUTE MAP\./.test(rec.mapOpen.msg) ? !rec.mapOpen.disabled : (!/PRESS SAVE TO SEND IT ALL TO THE CUSTOMER LIST\.$/.test(rec.mapOpen.msg) || rec.mapOpen.disabled)) bad.push('the test route opens with "' + rec.mapOpen.msg + '"' + (rec.mapOpen.disabled ? ' and SAVE greyed' : ''));
         else {
+          const num = (m, re) => +((re.exec(m) || [])[1] || 0);
+          const seq0 = num(rec.mapOpen.msg, /(\d+) LOAD SEQUENCES? CHANGED/), add0 = num(rec.mapOpen.msg, /(\d+) CUSTOMERS? TO ADD/);
           // Change one BOL customer's load sequence to one the route does not use.
-          const ch = await fm.evaluate(() => { const c = seqChanges(), r = c.rows.find(x => !x.st.sub && x.e && x.n); if (!r) return null; const n = Math.max(...c.rows.map(x => x.n || 0)) + 1; return { i: r.i, n, key: r.e.key }; });
+          const ch = await fm.evaluate(() => { const c = seqChanges(), r = c.rows.find(x => !x.st.sub && x.e && x.n && !x.changed); if (!r) return null; const n = Math.max(...c.rows.map(x => x.n || 0)) + 1; return { i: r.i, n, key: r.e.key }; });
           if (!ch) bad.push('no BOL customer on the route map to change');
           else {
             const box = fr.locator('#lmTable input.lseq[data-i="' + ch.i + '"]');
             await box.fill(String(ch.n)); await box.dispatchEvent('change');
             await p.waitForTimeout(500);
             rec.mapChanged = { msg: (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME'), disabled: await fr.locator('#lmSave').isDisabled() };
-            if ((!/^1 LOAD SEQUENCE CHANGED\b/.test(rec.mapChanged.msg) || /TO ADD/.test(rec.mapChanged.msg)) || rec.mapChanged.disabled) bad.push('after changing one load sequence the line reads "' + rec.mapChanged.msg + '"');
+            if (num(rec.mapChanged.msg, /(\d+) LOAD SEQUENCES? CHANGED/) !== seq0 + 1 || num(rec.mapChanged.msg, /(\d+) CUSTOMERS? TO ADD/) !== add0 || rec.mapChanged.disabled) bad.push('after changing one load sequence the line reads "' + rec.mapChanged.msg + '"');
             // Print sequence changes: the page is filled; the printer is never used.
             await fm.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; });
             await fr.locator('#lmPrint').click();
             await p.waitForTimeout(300);
             rec.print = await fm.evaluate((n) => { const s = document.getElementById('printSheet'); return { printed: window.__printed || 0, route: /Route:\s*9990/.test(s.textContent), day: /Day:\s*[A-Z][a-z]+day/.test(s.textContent),
-              heads: [...s.querySelectorAll('th')].map(t => t.textContent.trim()).join('|'), chg: s.querySelectorAll('tr.chg').length, seq: [...s.querySelectorAll('td.n')].every(t => t.textContent.trim() === String(n)), rows: s.querySelectorAll('tbody tr').length,
+              heads: [...s.querySelectorAll('th')].map(t => t.textContent.trim()).join('|'), chg: s.querySelectorAll('tr.chg').length, seq: [...s.querySelectorAll('td.n')].some(t => t.textContent.trim() === String(n)), rows: s.querySelectorAll('tbody tr').length,
               sign: /Changed by:/.test(s.textContent) && /Entered in office:/.test(s.textContent) }; }, ch.n);
-            if (rec.print.printed !== 1 || !rec.print.route || !rec.print.day || rec.print.heads !== 'Chain|Account #|Customer|New sequence' || rec.print.chg !== 1 || !rec.print.seq || !rec.print.sign) bad.push('Print sequence changes: ' + JSON.stringify(rec.print));
-            // Save to route map: only the test route day changes, only that customer's load sequence.
+            if (rec.print.printed !== 1 || !rec.print.route || !rec.print.day || rec.print.heads !== 'Chain|Account #|Customer|New sequence' || rec.print.chg < 1 || !rec.print.seq || !rec.print.sign) bad.push('Print sequence changes: ' + JSON.stringify(rec.print));
+            // SAVE: only the test route day changes: every customer it had stays with its note, the changed one has its new load
+            // sequence, the customers to add are added; a customer the Customer List did not have at all is added to it first
+            // (removed again after the test).
             const tBefore = (await testRef.get()).data();
             await fr.locator('#lmSave').click();
             await fm.waitForFunction(() => /^Saved|could not|Try again|someone/i.test(document.getElementById('mapMsg').textContent), null, { timeout: 30000 }).catch(() => {});
             rec.mapSaved = (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME');
             const tAfter = (await testRef.get()).data();
             const st0 = tBefore.stops || [], st1 = (tAfter && tAfter.stops) || [];
-            rec.mapDoc = { rev: [tBefore.rev, tAfter && tAfter.rev], sameStops: st0.length === st1.length && st0.every((x, j) => st1[j] && st1[j].key === x.key && (st1[j].note || '') === (x.note || '')),
-              newSeq: (st1.find(x => x.key === ch.key) || {}).loadSeq, othersSame: st0.every((x, j) => x.key === ch.key || (+(st1[j] || {}).loadSeq || 0) === (+x.loadSeq || 0)) };
+            rec.mapDoc = { rev: [tBefore.rev, tAfter && tAfter.rev], kept: st0.every(x => st1.some(y => y.key === x.key && (y.note || '') === (x.note || ''))), added: st1.length - st0.length, toAdd: add0,
+              newSeq: (st1.find(x => x.key === ch.key) || {}).loadSeq, othersSame: seq0 ? 'not compared (' + seq0 + ' changed before)' : st0.every(x => x.key === ch.key || (+(st1.find(y => y.key === x.key) || {}).loadSeq || 0) === (+x.loadSeq || 0)), map: !!(tAfter && tAfter.map) };
             if (!/^SAVED: \d+ CUSTOMERS?, THEIR LOAD SEQUENCES AND RUN ORDER/.test(rec.mapSaved)) bad.push('SAVE TO ROUTE MAP answered "' + rec.mapSaved + '"');
-            // 6.91 (#693): nothing was added to the Customer List (every customer on the test route is on it already).
-            if (p.w.calls.some(c => c.op === 'saveCustomer')) bad.push('SAVE TO ROUTE MAP added a customer to the Customer List');
-            if (+rec.mapDoc.newSeq !== ch.n || !rec.mapDoc.sameStops || !rec.mapDoc.othersSame) bad.push('the test route day after Save reads ' + JSON.stringify(rec.mapDoc));
+            if (+rec.mapDoc.newSeq !== ch.n || !rec.mapDoc.kept || rec.mapDoc.othersSame === false || rec.mapDoc.added !== add0) bad.push('the test route day after SAVE reads ' + JSON.stringify(rec.mapDoc));
+            if (/TRUCK LOAD MAP CHANGED/.test(rec.mapChanged.msg) && !rec.mapDoc.map) bad.push('SAVE did not keep the truck load map on the route day');
+            await p.waitForTimeout(800);
+            rec.afterSave = (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME');
             await shot(p, 'pallet-builder-saved-to-route-map');
           }
         }
@@ -4646,6 +4654,10 @@ async function writes() {
       } finally {
         const lg = await logs(); rec.mapLogRows = lg.length; for (const ref of lg) await ref.delete();
         await testRef.delete();
+        // A customer SAVE added to the Customer List for the test route only (it was on no list): taken off again.
+        const madeCust = (await db.collection('udclCustomers').where('plant', '==', plant).get()).docs.filter(d => !custBefore.has(d.id));
+        rec.customersAddedAndRemoved = madeCust.length;
+        for (const d of madeCust) { for (const x of (await db.collection('udclLog').where('record', '==', d.id).get().catch(() => ({ docs: [] }))).docs) await x.ref.delete(); await d.ref.delete(); }
         rec.realUnchanged = JSON.stringify((await real.ref.get()).data()) === realBefore;
         if (!rec.realUnchanged) bad.push('the real route day ' + use.route + ' ' + use.day + ' changed during the test');
       }
@@ -5028,7 +5040,9 @@ async function writes() {
       if (rec.techs.own !== 'On the Employees list') bad.push('the made-up technician\'s line reads ' + rec.techs.own);
       // 6.91 (#694): each row shows its LOGIN ID in a box, the employee ID filled in by itself.
       rec.loginBox = await p.evaluate((nm) => { const row = [...document.querySelectorAll('.fs-techs tr')].find(tr => ((tr.querySelector('td.strong') || {}).textContent || '').indexOf(nm) === 0); const b = row && row.querySelector('input[data-login-tech]'); return b ? b.value : 'no box'; }, NAME);
-      if (rec.loginBox.replace(/^0+/, '') !== '5678') bad.push('the made-up technician\'s LOGIN ID box reads ' + (rec.loginBox === 'no box' ? 'nothing (no box)' : 'another number'));
+      // Its login ID was set by hand (not its employee ID), so the box is empty and says SET BY HAND.
+      rec.loginBox = rec.loginBox === 'no box' ? rec.loginBox : await p.evaluate((nm) => { const row = [...document.querySelectorAll('.fs-techs tr')].find(tr => ((tr.querySelector('td.strong') || {}).textContent || '').indexOf(nm) === 0); const b = row.querySelector('input[data-login-tech]'); return b.value ? 'a number' : b.placeholder; }, NAME);
+      if (rec.loginBox !== 'SET BY HAND') bad.push('the made-up technician\'s LOGIN ID box (set by hand) reads ' + rec.loginBox);
       if (!rec.techs.add) bad.push('Garage Technicians has no Add Technician for the administrator');
       else {
         let ok2 = '';
@@ -5188,7 +5202,11 @@ async function writes() {
       return { days: [...q('dayPick').options].map(o => o.value), picked: q('dayPick').value, line: q('dayLine').textContent.trim(), prev: { off: q('dayPrev').disabled, title: q('dayPrev').title, text: q('dayPrev').textContent.trim() },
         next: { off: q('dayNext').disabled, title: q('dayNext').title, text: q('dayNext').textContent.trim() }, route: S.route, save: sv ? sv.textContent.trim() : '', saveTop: sv ? Math.round(sv.getBoundingClientRect().top) : -1,
         more: more ? (more.querySelector('summary') || {}).textContent.trim() : '', inMore: !!(more && more.querySelector('#newRoute') && more.querySelector('#dupRoute') && more.querySelector('#delRoute') && more.querySelector('#route')) }; });
-    const d0 = await dayLook();
+    let d0 = await dayLook();
+    // The builder reopens the day of the route that was open last (an earlier step worked on the built-in 11-5-26 day); a
+    // new BOL opens on the newest. Go to the newest with DAY AFTER first.
+    rec.reopenedOn = d0.picked;
+    for (let k = 0; k < 5 && d0.days.length && d0.picked !== d0.days[0] && !d0.next.off; k++) { await fr.locator('#dayNext').click(); await p.waitForTimeout(800); d0 = await dayLook(); }
     rec.bolDay = { days: d0.days.length, line: d0.line, prev: d0.prev, next: d0.next, save: d0.save, saveTop: d0.saveTop, more: d0.more, inMore: d0.inMore };
     if (!d0.days.length || d0.picked !== d0.days[0]) bad.push('BOL DAY does not open on the newest day (' + d0.picked + ' of ' + d0.days.join(', ') + ')');
     if (!/^BOL FOR [A-Z]+DAY \d{1,2}-\d{1,2}-\d\d · \d+ ROUTES? (· RECEIVED .+ )?· NEWEST BOL$/.test(d0.line)) bad.push('the BOL DAY line reads "' + d0.line + '"');
@@ -6386,23 +6404,48 @@ async function writes() {
       if (!/\d+ of \d+ loaded/.test(rec.report.forecast) || !/(Case|Boxing|Tote|Tanker) Loadout/.test(rec.report.forecast)) bad.push('the recap does not say how many are loaded per loadout: ' + rec.report.forecast.slice(0, 160));
     } else note('Shift report: no forecast section on Manager Center right now (' + rec.report.banner + ')');
     if (!/ROUTES? LATE|ROUTES? BEHIND|WILL MISS|WILL BE LATE|LOADED LATE|ALL ROUTES ON TIME/.test(rec.report.banner)) bad.push('the banner reads ' + rec.report.banner);
-    // 6.91 (#692): under the recap, the CASE LOADOUT FORECAST box: one finish time for every case load, then one line per truck
-    // time still ahead with its loads, DONE ABOUT and the TIME TO SPARE (or LATE); above the Downtime line.
-    rec.box = await p.evaluate(() => { const b = document.getElementById('rp-body'); const t = b ? b.innerText.replace(/[ \t]+/g, ' ') : ''; const at = t.indexOf('CASE LOADOUT FORECAST');
-      const box = [...(b ? b.querySelectorAll('div') : [])].find(d => /^CASE LOADOUT FORECAST/.test((d.firstElementChild || {}).textContent || '') && d.firstElementChild.tagName === 'DIV');
-      const rows = box ? [...box.querySelectorAll('table tr')].map(tr => [...tr.children].map(td => td.textContent.trim())) : [];
-      return { at, down: Math.max(t.indexOf('NO DOWNTIME'), t.indexOf('DOWN ')), recap: t.search(/Recap \(estimated\)/), text: box ? box.innerText.replace(/\s+/g, ' ').slice(0, 300) : '', rows }; });
-    if (rec.box.at < 0) note('Shift report: no CASE LOADOUT FORECAST box (no case loads still to load on the practice copy right now)');
-    else {
-      if (!/ALL CASE LOADS DONE ABOUT [A-Z]{3} \d{1,2}:\d\d [AP]M|ALL CASE LOADS DONE ABOUT \d{1,2}:\d\d [AP]M/.test(rec.box.text)) bad.push('the forecast box does not give one finish time: ' + rec.box.text.slice(0, 120));
-      if (rec.box.rows.length) {
-        if (rec.box.rows[0].join('|') !== 'TRUCK LEAVES|LOADS|DONE ABOUT|TIME TO SPARE') bad.push('the truck time columns read ' + rec.box.rows[0].join(', '));
-        const odd = rec.box.rows.slice(1).filter(r => r.length !== 4 || !/^\d+ LOADS?$/.test(r[1]) || !/\d:\d\d [AP]M/.test(r[2]) || !/^(JUST IN TIME|LATE .+|\d.*(HR|MIN).*)$/.test(r[3]));
-        if (odd.length) bad.push('truck time lines read ' + JSON.stringify(odd.slice(0, 2)));
-        if (!/EVERY TRUCK READY IN TIME|\d+ TRUCK TIMES? WILL BE LATE/.test(rec.box.text)) bad.push('the forecast box does not say whether every truck is ready');
+    // 6.91 (#692): in the email, under the recap, the CASE LOADOUT FORECAST box: one finish time for every case load, then one
+    // line per truck time still ahead with its loads, DONE ABOUT and the TIME TO SPARE (or LATE); above the Downtime line. Two
+    // case loads of the test's own (leaving 6:00 AM today) so there is a truck time; the email is read from Print with printing
+    // stopped (nothing sent); the loads are removed after.
+    const cases = await todayTestLoads(2, { offset: 0, leavesOn: 'Delivery Day', day: { loadType: 'CASE', dispatchTime: 360, startTime: 360 } });
+    try {
+      if (!cases.made) bad.push('no load on the practice copy to copy for the forecast box');
+      else {
+        await new Promise(res => setTimeout(res, 6000));
+        await open(p, 'manager.html?report=1');
+        await p.waitForSelector('#rp-body .mc-banner', { timeout: 30000 }).catch(() => {});
+        await p.waitForTimeout(2000);
+        await p.evaluate(() => { window.__mail = ''; new MutationObserver((ms) => ms.forEach(m => m.addedNodes.forEach(n => { if (n.tagName === 'IFRAME') { try { n.contentWindow.print = () => {}; } catch (e) { /* */ } setTimeout(() => { try { window.__mail = n.contentDocument.documentElement.outerHTML; } catch (e) { /* */ } }, 200); } }))).observe(document.body, { childList: true, subtree: true }); });
+        await p.click('#print-report');
+        await p.waitForFunction(() => window.__mail, null, { timeout: 10000 }).catch(() => {});
+        const mail = await p.evaluate(() => window.__mail || '');
+        if (!mail) bad.push('the shift report email could not be read from Print');
+        else {
+          const mp = await newPage({ viewport: { width: 600, height: 900 }, mailLook: true });
+          try {
+            await mp.setContent(mail.replace(/<script[\s\S]*?<\/script>/gi, ''));
+            rec.box = await mp.evaluate(() => { const t = document.body.innerText.replace(/[ \t]+/g, ' '); const at = t.indexOf('CASE LOADOUT FORECAST');
+              const head = [...document.querySelectorAll('div')].find(d => /^CASE LOADOUT FORECAST/.test(d.textContent.trim()) && !d.querySelector('div')), box = head ? head.parentElement : null;
+              const rows = box ? [...box.querySelectorAll('table tr')].map(tr => [...tr.children].map(td => td.textContent.trim())) : [];
+              return { at, down: Math.max(t.indexOf('NO DOWNTIME'), t.search(/\bDOWN \d/)), text: box ? box.innerText.replace(/\s+/g, ' ').slice(0, 400) : '', rows }; });
+            if (rec.box.at < 0) bad.push('the shift report email has no CASE LOADOUT FORECAST box with two case loads still to load');
+            else {
+              if (!/ALL CASE LOADS DONE ABOUT ([A-Z]{3} )?\d{1,2}:\d\d [AP]M/.test(rec.box.text)) bad.push('the forecast box does not give one finish time: ' + rec.box.text.slice(0, 120));
+              if (!rec.box.rows.length) bad.push('the forecast box has no truck time lines: ' + rec.box.text.slice(0, 160));
+              else {
+                if (rec.box.rows[0].join('|') !== 'TRUCK LEAVES|LOADS|DONE ABOUT|TIME TO SPARE') bad.push('the truck time columns read ' + rec.box.rows[0].join(', '));
+                const odd = rec.box.rows.slice(1).filter(r => r.length !== 4 || !/^\d+ LOADS?$/.test(r[1]) || !/\d:\d\d [AP]M/.test(r[2]) || !/^(JUST IN TIME|LATE .+|\d.*(HR|MIN).*)$/.test(r[3]));
+                if (rec.box.rows.length < 2 || odd.length) bad.push('truck time lines read ' + JSON.stringify(rec.box.rows.slice(1, 3)));
+                if (!/EVERY TRUCK READY IN TIME|\d+ TRUCK TIMES? WILL BE LATE/.test(rec.box.text)) bad.push('the forecast box does not say whether every truck is ready');
+              }
+              if (rec.box.down >= 0 && rec.box.down < rec.box.at) bad.push('the Downtime line is above the forecast box');
+            }
+            await shot(mp, 'shift-email-forecast-box');
+          } finally { await mp.done(); }
+        }
       }
-      if (rec.box.down >= 0 && rec.box.down < rec.box.at) bad.push('the Downtime line is above the forecast box');
-    }
+    } finally { await cases.remove(); }
     await shot(p, 'manager-forecast');
     if (p.w.calls.some(c => /send/i.test((c.op || '') + c.fn))) bad.push('looking at the report sent something');
     } finally { await own.remove(); }
