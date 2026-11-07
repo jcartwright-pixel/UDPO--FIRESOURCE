@@ -74,6 +74,21 @@ async function covered(page) {
       assert.deepEqual(live.errors, []);
       await live.close();
     }
+    // Coordinator 11/7 (found by the texts work): on a phone or tablet the box was cut at the right edge ("50% OF"). It now fits
+    // whole, on both Weekly screens, from 390 to 1024 wide.
+    for (const url of ['/weekly.html?week=2026-10-04&', '/weekly.html?view=live&']) {
+      for (const [w, h] of [[390, 844], [768, 1024], [1024, 768]]) {
+        const small = await openPage(browser, w, h, url + 'testEmail=dispatch.test@uniteddairy.com');
+        await small.waitForSelector('#covered:not([hidden])');
+        assert.match(await covered(small), /^\d+% OF RUNS COVERED$/);
+        const fit = await small.evaluate(() => { const el = document.getElementById('covered'), c = el.getBoundingClientRect();
+          return { right: c.right, left: c.left, width: innerWidth, whole: el.scrollWidth <= el.clientWidth + 1 }; });
+        assert.ok(fit.left >= 0 && fit.right <= fit.width && fit.whole, 'the box fits whole at ' + w + ' (' + url + '): ' + JSON.stringify(fit));
+        if (SHOTS && w === 390) await small.screenshot({ path: path.join(SHOTS, 'weekly-covered-390' + (url.includes('live') ? '-live' : '') + '.png') });
+        assert.deepEqual(small.errors, []);
+        await small.close();
+      }
+    }
     // Picking a driver for 802 Tuesday (NEEDS DRIVER) moves it to 4 of 8 straight away.
     const page = await openPage(browser, 1536, 790, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
     await page.waitForSelector('#covered:not([hidden])');
