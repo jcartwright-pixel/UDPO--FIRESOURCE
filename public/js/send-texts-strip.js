@@ -23,14 +23,14 @@ export function sendTextsStrip(db, el, opts) {
     if (!s || !s.week) { show(false); return; }
     const keys = s.hasSid && s.hasToken && s.from, n = (s.drivers || []).length, l = s.lastSend, done = !!(l && l.week === s.week);
     const words = short ? 'Texts ' + (done ? '<b>sent</b> ' + stamp(l.at) + '<span class="send-more"> to ' + drivers(l.drivers || 0) + '</span>' + (l.live ? '' : ' (test copy)')
-        : '<b>not sent</b><span class="send-more"> (' + drivers(n) + ' ticked)</span>') + (keys ? '' : '. Set up Administration &gt; Texts first') : 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + ': ' +
+        : '<b>not sent</b><span class="send-more"> (' + drivers(n) + ' ticked)</span>') + (keys ? '' : '. Not set up yet') : 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + ': ' +
       (done ? '<b>Sent</b> ' + stamp(l.at) + ' to ' + drivers(l.drivers || 0) + (l.live ? '' : ' (test copy, written to the list only)') + '.'
         : '<b>Not sent</b> (' + drivers(n) + ' ticked on the Driver Roster).') +
       (keys ? '' : ' Save the Twilio account on Administration &gt; Texts first.');
     const label = short ? (armed ? 'Tap Again: Text ' + drivers(n) : done ? 'Send Again' : 'Send Texts') : armed ? 'Tap Again: Text ' + drivers(n) + ' for ' + day(s.week) : (done ? 'Send Again: Week of ' : 'Send Schedule Texts: Week of ') + day(s.week);
     el.classList.toggle('sent', done);
     el.classList.toggle('short', short);
-    el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') : '';
+    el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') + (keys ? '' : '. Set up Administration > Texts first') : '';
     el.innerHTML = '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (armed ? ' armed' : '') + '"' + (!keys || !n || busy ? ' disabled' : '') + '>' + label + '</button>' +
       (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
     el.querySelector('button').onclick = press;
