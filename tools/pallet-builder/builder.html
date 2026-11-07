@@ -24,7 +24,7 @@
   --box:#a597de; --box-soft:#2b2640; --disp:#5cc4b8; --disp-soft:#17332f;
   --warn:#f08a62; --warn-soft:#3b2219; --ok:#6cc58a; color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
 h1,h2,h3{font-family:var(--f-display);letter-spacing:.01em;text-wrap:balance;margin:0}
 h1{font-size:2rem;font-weight:700}
@@ -35,34 +35,34 @@ h3{font-size:1.1rem;font-weight:600}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 header.top p{margin:4px 0 0;color:var(--muted);max-width:62ch}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-label.f{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-input,textarea,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:16px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 10px;min-width:0}
 input:focus-visible,textarea:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 input[type=number]{width:5.5em}
 button{font:inherit;font-weight:600;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
 button.ghost{border-color:transparent;background:transparent;color:var(--muted);padding:4px 8px}
 button.ghost:hover{color:var(--warn)}
-.check{display:flex;gap:6px;align-items:center;font-size:.9rem}
+.check{display:flex;gap:6px;align-items:center;font-size:16px}
 .cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
-.sample{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;background:var(--crate-soft);color:var(--crate);padding:2px 8px;border-radius:99px;font-weight:600}
+.sample{font-size:16px;text-transform:uppercase;letter-spacing:.08em;background:var(--crate-soft);color:var(--crate);padding:2px 8px;border-radius:99px;font-weight:600}
 .stop{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
 .stop:first-of-type{border-top:0;padding-top:0}
 .stop-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .seq{font-family:var(--f-display);font-weight:700;font-size:1.05rem;background:var(--ink);color:var(--panel);border-radius:5px;min-width:2.1em;text-align:center;padding:1px 6px}
 .stop-head input.name{flex:1 1 180px;font-weight:600}
-.stop-meta{font-size:.82rem;color:var(--muted)}
+.stop-meta{font-size:16px;color:var(--muted)}
 table{border-collapse:collapse;width:100%}
 .tbl{overflow-x:auto}
-th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+th{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
 td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
 td.r,th.r{text-align:right}
-.desc{font-size:.9rem}
-.desc small{display:block;color:var(--muted);font-size:.75rem}
-.chip{display:inline-block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px}
+.desc{font-size:16px}
+.desc small{display:block;color:var(--muted);font-size:16px}
+.chip{display:inline-block;font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px}
 .chip.Crate{background:var(--crate-soft);color:var(--crate)}
 .chip.Box{background:var(--box-soft);color:var(--box)}
 .chip.Dispenser{background:var(--disp-soft);color:var(--disp)}
@@ -72,46 +72,46 @@ td.r,th.r{text-align:right}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 @media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px}
-.tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tile .k{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .tile .v{font-family:var(--f-display);font-size:1.8rem;font-weight:700;line-height:1.1}
-.tile .s{font-size:.78rem;color:var(--muted)}
+.tile .s{font-size:16px;color:var(--muted)}
 .tile.over{border-color:var(--warn);background:var(--warn-soft)}
 .tile.over .v{color:var(--warn)}
-.outrow{font-size:.92rem;border:1px dashed var(--line);border-radius:8px;padding:8px 10px}
-.outrow .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+.outrow{font-size:16px;border:1px dashed var(--line);border-radius:8px;padding:8px 10px}
+.outrow .k{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
 .warns{display:flex;flex-direction:column;gap:6px}
-.warn{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:7px 10px;font-size:.88rem}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:7px 10px;font-size:16px}
 /* trailer */
-.side{text-align:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.side{text-align:center;font-size:16px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .trailer{border:2px solid var(--ink);border-radius:6px 6px 2px 2px;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;position:relative}
-.end{grid-column:1/-1;text-align:center;font-family:var(--f-display);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.end{grid-column:1/-1;text-align:center;font-family:var(--f-display);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .pal{border:1px solid var(--line);border-radius:5px;padding:7px 8px;display:flex;flex-direction:column;gap:3px;background:var(--panel);min-width:0}
 .pal.sel{outline:2px solid var(--accent)}
 .pal .ph{display:flex;justify-content:space-between;gap:6px;font-family:var(--f-display);font-weight:600}
 .bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent)}
-.pal .st{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pal .st{font-size:16px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pal.tote{background:var(--accent-soft)}
 .stk{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
 .stk i{font-style:normal;display:flex;align-items:center;justify-content:center;aspect-ratio:1.6/1;border:1px dashed var(--line);border-radius:3px;font-family:var(--f-display);font-weight:700;font-size:1.05rem;color:var(--muted)}
 .stk i.on{border:1px solid var(--ink);background:var(--accent-soft);color:var(--ink)}
 .pal.tote .stk i.on{background:var(--panel)}
 .trailer{column-gap:18px}
-.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.8rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:16px;color:var(--muted)}
 .detail{display:flex;flex-direction:column;gap:10px}
 .pd{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
 .pd-h{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.pd-h span{color:var(--muted);font-size:.85rem}
-.paste textarea{width:100%;min-height:90px;font-family:var(--f-mono);font-size:.85rem}
-.hint{font-size:.82rem;color:var(--muted);margin:0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:6px;font-size:.9rem}
+.pd-h span{color:var(--muted);font-size:16px}
+.paste textarea{width:100%;min-height:90px;font-family:var(--f-mono);font-size:16px}
+.hint{font-size:16px;color:var(--muted);margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:6px;font-size:16px}
 details summary{cursor:pointer;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .sizes{display:flex;flex-direction:column;gap:4px;background:var(--bg);border-radius:8px;padding:8px 10px}
-.sizes .row{display:flex;justify-content:space-between;gap:10px;font-size:.88rem;flex-wrap:wrap}
+.sizes .row{display:flex;justify-content:space-between;gap:10px;font-size:16px;flex-wrap:wrap}
 .sizes .row b{font-family:var(--f-mono);font-weight:500}
 .sizes .tot{border-top:1px solid var(--line);padding-top:4px;font-weight:600}
-.part{color:var(--muted);font-size:.78rem}
+.part{color:var(--muted);font-size:16px}
 /* Joe 11-5-26 (mock-up 3 "Grouped stops"): route totals in a light blue box under the stop list. */
 .lm-plan{display:flex;flex-direction:column;gap:14px;background:var(--accent-soft);border-radius:10px;padding:16px;min-width:0}
 .lm-plan .tile,.lm-plan .outrow{background:var(--panel)}
@@ -135,12 +135,12 @@ details summary{cursor:pointer;font-weight:600}
 .lm{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:760px){.lm{grid-template-columns:minmax(0,1fr)}}
 .truck{background:#3f4a55;border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(3,1fr) 10px repeat(3,1fr);gap:4px}
-.truck .tend{grid-column:1/-1;text-align:center;color:#fff;font-family:var(--f-display);font-size:.8rem;letter-spacing:.14em;text-transform:uppercase}
+.truck .tend{grid-column:1/-1;text-align:center;color:#fff;font-family:var(--f-display);font-size:16px;letter-spacing:.14em;text-transform:uppercase}
 .truck .gap{background:transparent}
 .truck i{font-style:normal;display:flex;align-items:center;justify-content:center;height:30px;border-radius:3px;font-family:var(--f-display);font-weight:700;color:#14232f;background:#55616c}
 .truck i.e{background:#55616c;color:#8995a0;font-weight:500;font-size:.7rem}
 .lm-legend{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.lm-legend span{font-family:var(--f-display);font-weight:700;border-radius:5px;padding:2px 9px;color:#14232f;font-size:.95rem}
+.lm-legend span{font-family:var(--f-display);font-weight:700;border-radius:5px;padding:2px 9px;color:#14232f;font-size:16px}
 .lm-right{display:flex;flex-direction:column;gap:10px;min-width:0}
 #lmTable th{background:var(--accent);color:#fff}
 #lmTable tr.drag td{opacity:.45}
@@ -151,11 +151,11 @@ details summary{cursor:pointer;font-weight:600}
 #lmTable input.lnote{width:100%;min-width:8em}
 #lmTable tr.main td.cn{font-weight:700}
 #lmTable tr.sub td.cn{font-weight:400;color:var(--muted)}
-#lmTable tr.sub td.cn .note{font-size:.78rem}
-.truck .plab{color:#e6edf3;font-size:.72rem;text-align:center;font-family:var(--f-display);letter-spacing:.03em;padding:1px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lmTable tr.sub td.cn .note{font-size:16px}
+.truck .plab{color:#e6edf3;font-size:16px;text-align:center;font-family:var(--f-display);letter-spacing:.03em;padding:1px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 details.items{display:flex;flex-direction:column;gap:8px}
-details.items>summary,#palDetail>summary,#sizeWrap>summary{font-weight:500;color:var(--muted);font-size:.9rem;padding:2px 0}
+details.items>summary,#palDetail>summary,#sizeWrap>summary{font-weight:500;color:var(--muted);font-size:16px;padding:2px 0}
 details.items[open]>summary{margin-bottom:8px}
 #palDetail{display:flex;flex-direction:column;gap:10px}
 #palDetail[open]>summary{margin-bottom:10px}
@@ -163,15 +163,14 @@ details.items[open]>summary{margin-bottom:8px}
 .dayscroll{max-height:420px;overflow:auto}
 #dayTable tr.cur td{background:var(--bg);font-weight:600}
 #dayTable button{padding:3px 10px}
-.seqline{font-size:.84rem;background:var(--accent-soft);border-radius:8px;padding:7px 10px;display:flex;flex-direction:column;gap:3px}
-.seqline .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);font-weight:600}
+.seqline{font-size:16px;background:var(--accent-soft);border-radius:8px;padding:7px 10px;display:flex;flex-direction:column;gap:3px}
+.seqline .k{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);font-weight:600}
 .seqline ul{margin:0;padding-left:18px}
 .seqline li.bol{font-weight:600}
-.seqline .note{color:var(--muted);font-size:.78rem}
-.tag{display:inline-block;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:0 6px;border-radius:4px;background:var(--ink);color:var(--panel);margin-left:4px;vertical-align:1px}
+.seqline .note{color:var(--muted);font-size:16px}
+.tag{display:inline-block;font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:0 6px;border-radius:4px;background:var(--ink);color:var(--panel);margin-left:4px;vertical-align:1px}
 #printSheet{display:none}
 .mapline .hint{font-size:16px}
-#lmSave[disabled]{opacity:.6;cursor:not-allowed}
 #printSheet h1{font-family:var(--f-display);font-size:28px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.02em}
 #printSheet .when{font-size:16px;margin:0 0 18px}
 #printSheet table{width:100%;border-collapse:collapse;font-size:16px}
@@ -192,30 +191,53 @@ details.items[open]>summary{margin-bottom:8px}
 .cust-hint,.rules .hint{font-size:16px}
 .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 18px;background:var(--bg);border-radius:8px;padding:10px 12px}
 .rules label{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:7px 0;font-size:16px;font-weight:600}
-.rules label small{display:block;font-weight:400;color:var(--muted);font-size:14px}
+.rules label small{display:block;font-weight:400;color:var(--muted);font-size:16px}
 .rules input[type=number]{width:5em;text-align:center}
 .truck i.held{background:repeating-linear-gradient(45deg,#eef2f5 0 6px,#b9c4cc 6px 12px);color:#14232f;outline:2px dashed #fff;outline-offset:-2px}
 .stk i.held{background:repeating-linear-gradient(45deg,var(--panel) 0 6px,var(--line) 6px 12px);border-style:dashed}
 .lm-legend span.held{background:repeating-linear-gradient(45deg,#eef2f5 0 6px,#b9c4cc 6px 12px)}
+.pick{background:var(--panel);border:2px solid var(--accent);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.pick-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.f.big{display:flex;flex-direction:column;gap:4px;font-size:16px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
+.f.big select{font-size:20px;font-weight:700;padding:10px 12px;min-width:16em}
+.daystep{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.daystep button{font-size:18px;padding:10px 14px}
+.dayline{margin:0;font-size:20px;font-weight:700;text-transform:uppercase}
+.savebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+button.save{font-size:22px;font-weight:800;padding:14px 22px;background:#1f7a4d;border-color:#1f7a4d;color:#fff}
+button.save[disabled]{background:var(--line);border-color:var(--line);color:var(--muted);cursor:not-allowed}
+.savemsg{font-size:18px;font-weight:600;text-transform:uppercase}
+details.more summary{cursor:pointer;font-weight:700;font-size:16px}
+details.more .controls{margin-top:10px}
 @media print{body{background:#fff!important;color:#000}.wrap,.toast{display:none!important}#printSheet{display:block;color:#000}}
 </style>
 
 <div class="wrap">
   <header class="top">
-    <div>
-      <h1>United Dairy Pallet Builder</h1>
-      <p>Enter each order's products in units, stop by stop in delivery order. Each order adds its units up by size and rounds up to full cases, so a route gets a true case count. Dispensers and boxes (cheese, sour cream and the like) ride inside milk crates, so each one counts as a crate. Pallets hold 54 crates, and a tote takes one spot. Each load sequence gets its own pallets: when a sequence is done, its last pallet stops there, even if it isn't full, and the next sequence starts a new pallet. Order 1 loads first, at the nose, and the rest follow toward the doors. Odd pallets go on the left side, even on the right.</p>
-    </div>
-    <div class="controls">
-      <label class="f" for="routePick">Saved routes<select id="routePick"></select></label>
-      <label class="f" for="route">Route name<input id="route" type="text" placeholder="Route name"></label>
-      <input id="spots" type="hidden">
-      <label class="check" for="split"><input id="split" type="checkbox"> New pallet for each stop</label>
-      <button id="newRoute">New route</button>
-      <button id="dupRoute">Copy route</button>
-      <button id="delRoute">Delete route</button>
-    </div>
+    <h1>PALLET BUILDER</h1>
   </header>
+  <!-- Joe 11-7-26: "it should just be pulling in the BOLs for that day ... it tells me for what day it is ... go backwards and like
+       pick the days ... I didn't see where to save the new map and the new sequences." The day, the route and SAVE, at the top. -->
+  <section class="pick" aria-label="Day and route">
+    <div class="pick-row">
+      <div class="f big"><span>BOL DAY</span>
+        <div class="daystep"><button id="dayPrev" type="button">&#9664; DAY BEFORE</button><select id="dayPick" aria-label="BOL day"></select><button id="dayNext" type="button">DAY AFTER &#9654;</button></div>
+      </div>
+      <label class="f big" for="routePick"><span>ROUTE</span><select id="routePick"></select></label>
+    </div>
+    <p class="dayline" id="dayLine"></p>
+    <div class="savebar"><button class="save" id="lmSave" type="button">SAVE TO ROUTE MAP</button><span class="savemsg" id="mapMsg"></span></div>
+    <details class="more"><summary>MORE ROUTE TOOLS</summary>
+      <div class="controls">
+        <label class="f" for="route">ROUTE NAME<input id="route" type="text" placeholder="Route name"></label>
+        <input id="spots" type="hidden">
+        <label class="check" for="split"><input id="split" type="checkbox"> NEW PALLET FOR EACH STOP</label>
+        <button id="newRoute">NEW ROUTE</button>
+        <button id="dupRoute">COPY ROUTE</button>
+        <button id="delRoute">DELETE ROUTE</button>
+      </div>
+    </details>
+  </section>
   <p class="hint" id="delConfirm" hidden>Delete this saved route? <button id="delYes">Yes, delete</button> <button id="delNo">Keep</button></p>
 
   <!-- Joe 11-6-26: at the very top, the customers on this route and day, the number each one's space is held for, and the standard. -->
@@ -238,7 +260,6 @@ details.items[open]>summary{margin-bottom:8px}
       <div class="lm-right">
         <div class="addline"><button id="lmMerge">Merge checked stops</button><button id="lmFromRun">Load seq = run order</button><button id="lmFromBol">Back to BOL load seq</button><button id="lmPrint">Print sequence changes</button><span class="hint" id="lmMsg"></span></div>
         <!-- Joe 11-6-26: save the load sequences back to the Customer List's route map; the next time, the route opens sequenced like the route map. -->
-        <div class="addline mapline"><button class="primary" id="lmSave">Save to route map</button><span class="hint" id="mapMsg"></span></div>
         <div class="tbl"><table id="lmTable"></table></div>
         <!-- Joe 11-5-26: the route totals sit right below the stop list (the sequencing), beside the truck. -->
         <section class="lm-plan" aria-label="Load plan">
@@ -374,7 +395,7 @@ function load(){
 }
 let DB, S;
 function save(){ DB.routes[DB.cur] = S; try { localStorage.setItem(KEY3, JSON.stringify(DB)); } catch(e){} }
-function useRoute(i){ DB.cur = i; S = DB.routes[i]; all(); }
+function useRoute(i){ DB.cur = i; S = DB.routes[i]; const d = routeDate(S); if (BOLDAYS.some(x => x.date === d)) DAYSEL = d; all(); }
 
 $('plist').innerHTML = P.map(p => `<option value="${p[0]} · ${esc(p[1])}"></option>`).join('');
 
@@ -508,7 +529,11 @@ function renderStops(){
     </div>`;
   }).join('');
   $('pasteStop').innerHTML = `<option value="route">A new route, split into orders</option>` + S.stops.map((st, i) => st.sub ? '' : `<option value="${i}">Order ${i+1}: ${esc(st.name || 'unnamed')}</option>`).join('');
-  $('routePick').innerHTML = DB.routes.map((r, i) => `<option value="${i}" ${i===DB.cur?'selected':''}>${esc(r.route || 'Untitled route')}</option>`).join('');
+  const onDay = dayRoutes(DAYSEL), others = DB.routes.map((r, i) => ({r, i})).filter(x => routeDate(x.r) !== DAYSEL);
+  const opt = x => { const rk = routeKey(x.r); return `<option value="${x.i}" ${x.i===DB.cur?'selected':''}>${esc(rk ? 'ROUTE ' + rk.route + ' · ' + WDN[rk.day].toUpperCase() : (x.r.route || 'Untitled route'))}</option>`; };
+  $('routePick').innerHTML = (onDay.length ? `<optgroup label="ON THE ${esc(DAYTEXT(DAYSEL))} BOL">${onDay.map(opt).join('')}</optgroup>` : '') +
+    (others.length ? `<optgroup label="OTHER SAVED ROUTES">${others.map(x => `<option value="${x.i}" ${x.i===DB.cur?'selected':''}>${esc(x.r.route || 'Untitled route')}</option>`).join('')}</optgroup>` : '');
+  renderDayPick();
   $('delRoute').disabled = DB.routes.length < 2;
 }
 
@@ -684,7 +709,7 @@ function refreshSizes(){ const y = window.scrollY; const f = document.activeElem
 document.addEventListener('input', e => {
   if (e.target.classList && e.target.classList.contains('lnote')) { S.stops[+e.target.dataset.i].note = e.target.value; save(); return; }
   const t = e.target;
-  if (t.id==='route'){ S.route=t.value; S.sample=false; $('sampleTag').hidden=true; render(); const o=$('routePick').options[DB.cur]; if(o) o.textContent=t.value||'Untitled route'; }
+  if (t.id==='route'){ S.route=t.value; S.sample=false; $('sampleTag').hidden=true; render(); const o=[...$('routePick').options].find(x => +x.value === DB.cur); if(o) o.textContent=t.value||'Untitled route'; }
   else if (t.id==='spots'){ S.spots=parseInt(t.value)||0; render(); }
   else if (t.classList.contains('name')){ S.stops[+t.dataset.s].name=t.value; S.sample=false; render(); }
   else if (t.classList.contains('qty')){ S.stops[+t.dataset.s].lines[+t.dataset.l].units=Math.max(0,parseInt(t.value)||0); render(); }
@@ -694,6 +719,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id==='split'){ S.split=t.checked; render(); }
   else if (t.id==='routePick'){ useRoute(+t.value); }
+  else if (t.id==='dayPick'){ pickDay(t.value, true); all(); }
   else if (t.classList.contains('qty')){ refreshSizes(); }
   else if (t.classList.contains('lseq')){ const st=S.stops[+t.dataset.i]; const v=parseInt(t.value); st.seq = v>=0 ? v : null; S.sample=false; all(); }
   else if (t.classList.contains('lside')){ const st=S.stops[+t.dataset.i]; st.side = t.value || undefined; if (!st.side) delete st.side; all(); }
@@ -749,20 +775,61 @@ document.addEventListener('click', e => {
 DB = load();
 // Joe 11-6-26 (lb): the newest BOL the Hub picked up from the ROUTES/BOL email label (Hub > Daily BOL), handed over by the
 // Pallet Builder screen around this frame (window.udBol). Without it (the page on its own) the BOL built in is used.
-const HUBBOL = (() => { try { const b = window.parent && window.parent !== window && window.parent.udBol; return b && b.routes && b.routes.length ? b : null; } catch(e){ return null; } })();
-(function addDay(){
-  const key = HUBBOL ? HUBBOL.key : DAYKEY, day = HUBBOL ? HUBBOL.routes : BOLDAY;
-  if (HUBBOL && $('dayHint')) $('dayHint').textContent = `The ${HUBBOL.label} BOL from the Hub is loaded: ${day.length} route${day.length === 1 ? '' : 's'}, stops in BOL order. Open a route to see its orders, cases and pallets.`;
-  let first = false; try { first = !localStorage.getItem(key); localStorage.setItem(key,'1'); } catch(e){ first = true; }
+// Joe 11-7-26: the BOL DAY picker. Every BOL day the Hub has (newest first, window.udBolDays, handed over by the screen around
+// this frame; the newest is also window.udBol), and the 11/05 BOL built in when the Hub has no copy of that day. The page opens
+// on the newest; DAY BEFORE / DAY AFTER step through them; picking a day brings its routes in and opens its first route.
+const HUBDAYS = (() => { try { const p = window.parent && window.parent !== window ? window.parent : null; const list = p && (p.udBolDays || (p.udBol ? [p.udBol] : null)); return (list || []).filter(b => b && b.routes && b.routes.length); } catch(e){ return []; } })();
+const HUBBOL = HUBDAYS[0] || null;
+const BUILTIN_DAY = {key: DAYKEY, date: '2026-11-05', routes: BOLDAY, builtIn: true};
+const BOLDAYS = HUBDAYS.concat(HUBDAYS.some(d => d.date === BUILTIN_DAY.date) ? [] : [BUILTIN_DAY]).sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : 0);
+const DAYTEXT = iso => { const [y, m, d] = String(iso || '').split('-').map(Number); if (!y) return ''; const dt = new Date(y, m - 1, d, 12); return WDN[WD[dt.getDay()]].toUpperCase() + ' ' + DT(dt.toISOString()); };
+// A route's BOL day (yyyy-mm-dd) from its name ("RT 805 · 11/05" or "RT 805 · 11/05/26").
+function routeDate(r){
+  const d = /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec((r && r.route) || ''); if (!d || !/\d{3,}/.test(r.route)) return '';
+  const y = d[3] ? (d[3].length === 2 ? 2000 + +d[3] : +d[3]) : 2026;
+  return y + '-' + String(d[1]).padStart(2, '0') + '-' + String(d[2]).padStart(2, '0');
+}
+let DAYSEL = (BOLDAYS[0] || BUILTIN_DAY).date;
+// One BOL day's routes, brought into the saved routes: a route not there yet is added; a newer BOL for the same day takes the
+// older one's place on that route (more orders are keyed during the day).
+function addDay(day){
+  if (!day) return;
+  const list = day.routes;
+  let first = false; try { first = !localStorage.getItem(day.key); localStorage.setItem(day.key,'1'); } catch(e){ first = true; }
   const mk = r => ({route:r.route, spots:0, split:false, sample:false, bol:true, bolAt:r.bolAt || '', stops:r.stops.map(st => ({id:nid(), name:st.name, acct:st.acct || undefined, lines:st.lines.map(([sku,u]) => ({sku:String(sku), units:u}))}))});
-  // A newer BOL for the same load day (more orders keyed) takes the older one's place on that route.
-  if (HUBBOL) DB.routes.forEach((r, i) => { const n = day.find(x => x.route === r.route); if (n && r.bol && n.bolAt && r.bolAt !== n.bolAt) DB.routes[i] = mk(n); });
+  if (!day.builtIn) DB.routes.forEach((r, i) => { const n = list.find(x => x.route === r.route); if (n && r.bol && n.bolAt && r.bolAt !== n.bolAt) DB.routes[i] = mk(n); });
   const have = new Set(DB.routes.map(r => r.route));
-  const add = day.filter(r => !have.has(r.route)).map(mk);
-  if (!add.length) return;
+  const add = list.filter(r => !have.has(r.route)).map(mk);
+  if (!add.length) return first;
   if (DB.routes.length === 1 && DB.routes[0].sample) DB.routes = [];
-  const at = DB.routes.length; DB.routes.push(...add); if (first) DB.cur = at;
+  DB.routes.push(...add);
+  return first;
+}
+const dayRoutes = date => DB.routes.map((r, i) => ({r, i})).filter(x => routeDate(x.r) === date).sort((a, b) => (+((/(\d{3,})/.exec(a.r.route) || [])[1]) || 0) - (+((/(\d{3,})/.exec(b.r.route) || [])[1]) || 0));
+function pickDay(date, open){
+  DAYSEL = date;
+  addDay(BOLDAYS.find(d => d.date === date));
+  const rs = dayRoutes(date);
+  if (open && rs.length && routeDate(DB.routes[DB.cur]) !== date) DB.cur = rs[0].i;
+  DB.cur = Math.max(0, Math.min(DB.cur || 0, DB.routes.length - 1)); S = DB.routes[DB.cur];
+  save();
+}
+function renderDayPick(){
+  const sel = $('dayPick'); if (!sel) return;
+  sel.innerHTML = BOLDAYS.map(d => `<option value="${d.date}" ${d.date === DAYSEL ? 'selected' : ''}>${DAYTEXT(d.date)}</option>`).join('');
+  const i = BOLDAYS.findIndex(d => d.date === DAYSEL);
+  $('dayPrev').disabled = i < 0 || i >= BOLDAYS.length - 1; $('dayPrev').title = $('dayPrev').disabled ? 'There is no BOL before this day.' : '';
+  $('dayNext').disabled = i <= 0; $('dayNext').title = $('dayNext').disabled ? 'This is the newest BOL.' : '';
+  const day = BOLDAYS[i], n = dayRoutes(DAYSEL).length, when = day && day.routes[0] && day.routes[0].bolAt ? new Date(day.routes[0].bolAt) : null;
+  $('dayLine').textContent = `BOL FOR ${DAYTEXT(DAYSEL)} · ${n} ROUTE${n === 1 ? '' : 'S'}` + (when && !isNaN(when) ? ` · RECEIVED ${DT(when.toISOString())} ${TM(when.toISOString())}` : '') + (i === 0 ? ' · NEWEST BOL' : '');
+}
+(function openDay(){
+  // The newest BOL day opens on its first route the first time it comes; after that the route last worked on stays open.
+  const first = addDay(BOLDAYS[0]);
+  if (routeDate(DB.routes[DB.cur]) && BOLDAYS.some(d => d.date === routeDate(DB.routes[DB.cur])) && !first) DAYSEL = routeDate(DB.routes[DB.cur]);
+  pickDay(DAYSEL, first || !routeDate(DB.routes[DB.cur]));
 })();
+if (HUBBOL && $('dayHint')) $('dayHint').textContent = `The ${HUBBOL.label} BOL from the Hub is loaded: ${HUBBOL.routes.length} route${HUBBOL.routes.length === 1 ? '' : 's'}, stops in BOL order. Open a route to see its orders, cases and pallets.`;
 
 // Joe: a load sequence can hold several customers. The BOL names the main one; every other customer the route list has in
 // that sequence is added under it as a listed stop (no products, plain text), with its own run order, so it can be moved.
@@ -819,29 +886,61 @@ function loadMap(rk){
   b.load(rk.route, rk.day).then(m => { MAP[rk.key] = m || {found:false}; if (m && m.rules) { RULES = Object.assign({}, RULES0, m.rules); applyRules(); } if (m && m.found) DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) applyMap(r, m); }); all(); },
     err => { MAP[rk.key] = {error: (err && err.message) || 'The route map could not be reached.'}; renderMapLine(); });
 }
+// Joe 11-7-26: SAVE sends everything the screen worked out to the Customer List's route day in one press: each customer's
+// load sequence, the run order (the order on the truck load map list), the truck drawing as this page lays the pallets out,
+// and any customer on the BOL that the route day did not have (added to the Customer List first when it is not on it at all).
+// A route day the Customer List does not have yet is started. Customers on the route day but not on this BOL stay, in their place.
+const SPOTS_ROW = 6; // the Customer List's truck drawing: 6 spots across a row, 3 left and 3 right
+function mapFromPlan(R){
+  if (!R || !R.pallets || !R.pallets.length) return null;
+  const lay = R.lay || palLayout(R), rows = Math.min(30, Math.max(1, ...lay.map(o => o.row + 1)));
+  const cells = Array.from({length: rows}, () => Array(SPOTS_ROW).fill(null));
+  R.pallets.forEach((pl, k) => { const o = lay[k]; if (!o || o.row >= rows) return; const n = stopSeq(S.stops[palFirst(pl)]); if (!(n > 0)) return;
+    for (let j = 0; j < 3; j++) cells[o.row][(o.side === 'R' ? 3 : 0) + j] = n; });
+  return {rows, cells};
+}
+const mapRows = m => ((m && m.cells) || []).map(r => (typeof r === 'string' ? r.split(',') : r || []).slice(0, SPOTS_ROW).map(v => +v > 0 ? +v : null).concat(Array(SPOTS_ROW).fill(null)).slice(0, SPOTS_ROW));
+function saveWhat(){
+  const rk = routeKey(S); if (!rk) return null;
+  const m = MAP[rk.key] || {}, list = m.found ? m.stops : [];
+  const rows = S.stops.filter(st => String(st.name || '').trim()).map(st => { const e = entryOf(st, baseList(rk)); const n = stopSeq(st);
+    return {key: e && m.found ? e.key : '', acct: (e && e.acct) || st.acct || '', name: String(st.name || '').replace(/\s*\(sub-rt.*$/i, '').replace(/\s*·.*$/, '').trim(), chain: (e && e.chain) || '', loadSeq: n > 0 ? n : 0}; });
+  // One line per customer (a customer with two orders on the BOL is one stop).
+  const seen = new Set(), stops = rows.filter(r => { const k = r.key || ('A' + r.acct) || ('N' + normName(r.name)); if (seen.has(k)) return false; seen.add(k); return true; });
+  const map = mapFromPlan(window._R);
+  const seqChanged = stops.filter(x => x.key && (list.find(y => y.key === x.key) || {}).loadSeq !== x.loadSeq).length;
+  const added = stops.filter(x => !x.key).length;
+  const orderChanged = stops.filter(x => x.key).map(x => x.key).join('|') !== list.filter(x => stops.some(y => y.key === x.key)).map(x => x.key).join('|');
+  const mapChanged = !!map && JSON.stringify(mapRows(map)) !== JSON.stringify(mapRows(m.map));
+  return {rk, m, stops, map, seqChanged, added, orderChanged, mapChanged, newDay: !m.found};
+}
 function renderMapLine(){
   const msg = $('mapMsg'), btn = $('lmSave'); if (!msg || !btn) return;
   const rk = routeKey(S), b = bridge(), m = rk && MAP[rk.key];
   const no = (why) => { btn.disabled = true; btn.title = why; msg.textContent = why; };
-  if (!b) return no('Save to route map works on the Pallet Builder screen in Operations.');
-  if (!rk) return no('This route has no route number and date in its name, so it has no route map.');
-  if (!m) { loadMap(rk); return no('Getting the route map for route ' + rk.route + ' ' + WDN[rk.day] + '.'); }
-  if (m.loading) return no('Getting the route map for route ' + rk.route + ' ' + WDN[rk.day] + '.');
-  if (m.error) return no(m.error);
-  if (!m.found) return no('Route ' + rk.route + ' ' + WDN[rk.day] + ' is not on the route map yet. Add it in the Customer List first.');
-  const c = seqChanges(), last = m.updatedAt ? ` Last saved to the route map ${DT(m.updatedAt)} ${TM(m.updatedAt)}.` : '';
-  const left = c.missing.length ? ` ${c.missing.length} customer${c.missing.length === 1 ? ' is' : 's are'} not on the route map, so ${c.missing.length === 1 ? 'its' : 'their'} sequence can't be saved.` : '';
-  if (!m.canEdit) { btn.disabled = true; btn.title = 'Only a Manager or Administrator can save to the route map.'; msg.textContent = (c.changed.length ? `${c.changed.length} customer${c.changed.length === 1 ? '' : 's'} changed from the route map. ` : 'Same as the route map. ') + 'Only a Manager or Administrator can save to the route map.' + last; return; }
-  btn.disabled = !c.changed.length; btn.title = c.changed.length ? '' : 'Nothing changed from the route map.';
-  msg.textContent = (c.changed.length ? `${c.seqs.length} sequence${c.seqs.length === 1 ? '' : 's'} changed since the route map (${c.changed.length} customer${c.changed.length === 1 ? '' : 's'}).` : 'Same as the route map.') + last + left;
+  if (!b) return no('SAVE WORKS ON THE PALLET BUILDER SCREEN IN OPERATIONS.');
+  if (!rk) return no('THIS ROUTE HAS NO ROUTE NUMBER AND DATE IN ITS NAME, SO IT HAS NO ROUTE MAP.');
+  if (!m || m.loading) { if (!m) loadMap(rk); return no('GETTING THE ROUTE MAP FOR ROUTE ' + rk.route + ' ' + WDN[rk.day].toUpperCase() + '.'); }
+  if (m.error) return no(String(m.error).toUpperCase());
+  const w = saveWhat(), last = m.updatedAt ? ` LAST SAVED ${DT(m.updatedAt)} ${TM(m.updatedAt)}.` : '';
+  const parts = [];
+  if (w.newDay) parts.push('ROUTE ' + rk.route + ' ' + WDN[rk.day].toUpperCase() + ' IS NEW TO THE CUSTOMER LIST');
+  if (w.seqChanged) parts.push(w.seqChanged + ' LOAD SEQUENCE' + (w.seqChanged === 1 ? '' : 'S') + ' CHANGED');
+  if (w.added) parts.push(w.added + ' CUSTOMER' + (w.added === 1 ? '' : 'S') + ' TO ADD');
+  if (w.orderChanged) parts.push('RUN ORDER CHANGED');
+  if (w.mapChanged) parts.push('TRUCK LOAD MAP CHANGED');
+  if (!m.canEdit) { btn.disabled = true; btn.title = 'Only a Manager or Administrator can save to the route map.'; msg.textContent = (parts.length ? parts.join(' · ') + '. ' : 'SAME AS THE ROUTE MAP. ') + 'ONLY A MANAGER OR ADMINISTRATOR CAN SAVE.' + last; return; }
+  btn.disabled = !parts.length; btn.title = parts.length ? '' : 'Nothing changed from the route map.';
+  msg.textContent = parts.length ? parts.join(' · ') + '. PRESS SAVE TO SEND IT ALL TO THE CUSTOMER LIST.' : 'SAME AS THE ROUTE MAP.' + last;
 }
 function saveMap(){
-  const rk = routeKey(S), m = rk && MAP[rk.key], b = bridge(); if (!b || !m || !m.found) return;
-  const c = seqChanges(); if (!c.changed.length) return;
-  const want = {}; c.changed.forEach(r => { want[r.e.key] = r.n; });
-  const btn = $('lmSave'); btn.disabled = true; $('mapMsg').textContent = 'Saving to the route map.';
-  b.save(rk.route, rk.day, m.rev, want).then(n => { MAP[rk.key] = n; DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) r.mapRev = n.rev; }); SEQS[rk.key] = n.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']); save(); renderMapLine(); $('mapMsg').textContent = `Saved ${c.changed.length} customer${c.changed.length === 1 ? '' : 's'} to the route map.` + (n.updatedAt ? ` ${DT(n.updatedAt)} ${TM(n.updatedAt)}.` : ''); },
-    err => { if (err && err.changed) { delete MAP[rk.key]; } btn.disabled = false; $('mapMsg').textContent = (err && err.message) || 'The route map could not be saved. Try again.'; });
+  const w = saveWhat(), b = bridge(); if (!w || !b || !b.saveAll) return;
+  const btn = $('lmSave'); btn.disabled = true; $('mapMsg').textContent = 'SAVING TO THE ROUTE MAP.';
+  const rk = w.rk;
+  b.saveAll(rk.route, rk.day, w.m.found ? w.m.rev : null, {stops: w.stops, map: w.map}).then(n => { MAP[rk.key] = n; DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) { r.mapRev = null; applyMap(r, n); } });
+    SEQS[rk.key] = n.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']); save(); all();
+    $('mapMsg').textContent = `SAVED: ${w.stops.length} CUSTOMER${w.stops.length === 1 ? '' : 'S'}, THEIR LOAD SEQUENCES AND RUN ORDER${w.map ? ' AND THE TRUCK LOAD MAP' : ''}${w.added ? ' (' + w.added + ' ADDED)' : ''}. ROUTE BOOK AND TRUCK LOAD MAP IN THE CUSTOMER LIST NOW SHOW IT.`; },
+    err => { if (err && err.changed) { delete MAP[rk.key]; } btn.disabled = false; $('mapMsg').textContent = String((err && err.message) || 'The route map could not be saved. Try again.').toUpperCase(); });
 }
 // One page for the office: every customer on each sequence that changed (the changed ones in bold).
 function printChanges(){
@@ -856,7 +955,8 @@ function printChanges(){
   $('lmMsg').textContent = '';
   window.print();
 }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmSave') saveMap(); });
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmSave') saveMap();
+  else if (b.id === 'dayPrev' || b.id === 'dayNext') { const i = BOLDAYS.findIndex(d => d.date === DAYSEL), j = i + (b.id === 'dayPrev' ? 1 : -1); if (BOLDAYS[j]) { pickDay(BOLDAYS[j].date, true); all(); } } });
 // Joe 11-6-26: one customer's cases on this route day, from the route map (the Customer List keeps them from the Hub's Weekly
 // Route Report): {key, stats, uses, held, canEdit} or null when the route map or the customer is not there.
 function caseInfo(st){

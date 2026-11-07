@@ -54,13 +54,14 @@ async function openPage(ctx, url) {
     await frame().locator('#dayTable tr').first().waitFor();
     assert.equal(await p.textContent('.head h1'), 'Pallet Builder');
     assert.ok(await p.isHidden('#signin'), 'signed in: no sign-in box');
-    assert.ok(await frame().locator('h1').textContent().then(t => /Pallet Builder/.test(t)), 'the builder shows in the frame');
+    assert.ok(await frame().locator('h1').textContent().then(t => /PALLET BUILDER/.test(t)), 'the builder shows in the frame');
     const menu = await p.$$eval('a[href^="pallet-builder.html"]', as => as.length);
     assert.ok(menu >= 1, 'Pallet Builder is in the menu');
     await frame().locator('#loadSample').click();
     await frame().locator('#tiles .tile').first().waitFor();
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-1536.png') });
-    // Its saved routes stay in this browser after a reload.
+    // Its saved routes stay in this browser after a reload (the route name is under MORE ROUTE TOOLS, Joe 11-7-26).
+    await frame().locator('details.more summary').click();
     await frame().locator('#route').fill('Test route 1');
     await frame().locator('#route').dispatchEvent('input');
     await frame().locator('#route').dispatchEvent('change');
@@ -85,7 +86,7 @@ async function openPage(ctx, url) {
       ? { plant: 'fac_uniontown', customers: {}, canEdit: true, palletRules: rules, routeDays: [{ plant: 'fac_uniontown', route: '813', day: 'THU', rev: 2, updatedAt: '2026-11-05T20:46:00.000Z', stops, cases, palletUses: {}, caseWeeks: 2 }] }
       : d.op === 'setPalletUses' ? (caseCalls.push(d), { ok: true, palletUses: { [d.key]: d.rule } })
       : d.op === 'savePalletRules' ? (caseCalls.push(d), rules = Object.assign({}, rules, d.rules), { ok: true, palletRules: rules })
-      : (sent.push(d), { ok: true, routeDay: { plant: 'fac_uniontown', route: '813', day: 'THU', rev: 3, updatedAt: '2026-11-06T14:15:00.000Z', stops: d.stops.map(s => Object.assign({}, stops.find(x => x.key === s.key), s)) } });
+      : (sent.push(d), { ok: true, routeDay: { plant: 'fac_uniontown', route: '813', day: 'THU', rev: 3, updatedAt: '2026-11-06T14:15:00.000Z', stops: d.stops.map(s => Object.assign({}, stops.find(x => x.key === s.key), s)), map: d.map } });
     p = await map.newPage();
     await p.route(/https:\/\/www\.gstatic\.com\/firebasejs\/[^/]+\/(firebase-[a-z-]+\.js)$/, (route) => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, route.request().url().split('/').pop())) }));
     await localCalls(p);
@@ -97,13 +98,16 @@ async function openPage(ctx, url) {
     await f.locator('#dayTable tr').first().waitFor();
     const open813 = f.locator('#dayTable tr', { hasText: 'RT 813' }).locator('button.openR');
     if (await open813.count()) await open813.click(); // (the route already open has no Open button)
-    await f.locator('#mapMsg', { hasText: 'Same as the route map' }).waitFor();
-    assert.match(await f.locator('#mapMsg').textContent(), /Last saved to the route map 11-5-26/);
-    assert.ok(await f.locator('#lmSave').isDisabled(), 'nothing to save yet');
+    // Joe 11-7-26: the route map has no truck drawing yet and its run order is not the BOL's, so SAVE is ready to send them.
+    await f.locator('#mapMsg', { hasText: 'TRUCK LOAD MAP CHANGED' }).waitFor();
+    assert.ok(!/LOAD SEQUENCE/.test(await f.locator('#mapMsg').textContent()), 'the load sequences are the route map\'s');
+    assert.ok(await f.locator('#lmSave').isEnabled());
+    assert.equal(await f.locator('#lmSave').textContent(), 'SAVE TO ROUTE MAP');
     const ralph = f.locator('#lmTable tr', { hasText: 'RALPH' }).locator('input.lseq');
     assert.equal(await ralph.inputValue(), '9', 'the load sequence comes from the route map');
     await ralph.fill('8'); await ralph.dispatchEvent('change');
-    await f.locator('#mapMsg', { hasText: '1 sequence changed since the route map (1 customer)' }).waitFor();
+    await f.locator('#mapMsg', { hasText: '1 LOAD SEQUENCE CHANGED' }).waitFor();
+    if (SHOTS) { await f.locator('section.pick').scrollIntoViewIfNeeded(); await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-save-ready-1536.png') }); }
     const fr = p.frame({ url: /about:srcdoc/ }) || p.frames().find(x => x !== p.mainFrame());
     await fr.evaluate(() => { window.print = () => { window.printedAt = Date.now(); }; });
     await f.locator('#lmPrint').click();
@@ -113,13 +117,17 @@ async function openPage(ctx, url) {
     assert.ok(await fr.evaluate(() => !!window.printedAt), 'it prints');
     assert.equal(await f.locator('#printSheet tr.chg').count(), 1, 'the changed one is bold');
     await f.locator('#lmSave').click();
-    await f.locator('#mapMsg', { hasText: 'Saved 1 customer to the route map' }).waitFor();
+    await f.locator('#mapMsg', { hasText: 'SAVED: 11 CUSTOMERS, THEIR LOAD SEQUENCES AND RUN ORDER AND THE TRUCK LOAD MAP' }).waitFor();
     assert.equal(sent.length, 1);
     assert.equal(sent[0].op, 'saveRouteDay'); assert.equal(sent[0].route, '813'); assert.equal(sent[0].day, 'THU'); assert.equal(sent[0].rev, 2);
-    assert.deepEqual(sent[0].stops.map(s => s.key), stops.map(s => s.key), 'the same stops in the same order');
+    assert.deepEqual(sent[0].stops.map(s => s.key).sort(), stops.map(s => s.key).sort(), 'the same stops, none added or lost');
+    const keys = sent[0].stops.map(s => s.key);
+    assert.equal(keys.indexOf('211567'), keys.indexOf('811496') + 1, 'a customer not on this BOL keeps its place on the route');
+    assert.ok(sent[0].map && sent[0].map.cells.length >= 1 && sent[0].map.cells.every(r => r.length === 6), 'the truck drawing goes too, 6 spots a row');
+    assert.ok(sent[0].map.cells.some(r => r.includes(8)), 'the pallets carry their load sequences');
     assert.equal(sent[0].stops.find(s => s.key === '40496').loadSeq, 8, 'the new load sequence');
     assert.equal(sent[0].stops[0].note, 'Back door', 'stop notes stay');
-    assert.ok(sent[0].stops.every((s, i) => s.key === '40496' || s.loadSeq === stops[i].loadSeq), 'nothing else changes');
+    assert.ok(sent[0].stops.every(s => s.key === '40496' || s.loadSeq === stops.find(x => x.key === s.key).loadSeq), 'no other load sequence changes');
     if (SHOTS) { await f.locator('section[aria-label="Truck load map"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-route-map-1536.png') }); }
 
     // Joe 11-6-26: at the very top, the customers on the route with their cases; each one's space is held at HIGH (shaded on the
@@ -175,8 +183,22 @@ async function openPage(ctx, url) {
     assert.ok(!/11\/08\/26/.test(dayText), 'the older BOL is not added');
     assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/09/26', 'the first BOL route opens');
     assert.ok(/MADEUP GOLF CENTER/.test(await hb.locator('#lmTable').textContent()), 'its customers are on the truck load map');
+    // Joe 11-7-26: BOL DAY says which day is open; DAY BEFORE goes back one BOL day and brings that day's routes in.
+    assert.match(await hb.locator('#dayLine').textContent(), /^BOL FOR MONDAY 11-9-26 · 2 ROUTES · RECEIVED 11-9-26 .* · NEWEST BOL$/);
+    assert.deepEqual(await hb.locator('#dayPick option').allTextContents(), ['MONDAY 11-9-26', 'SUNDAY 11-8-26', 'THURSDAY 11-5-26']);
+    assert.ok(await hb.locator('#dayNext').isDisabled(), 'nothing newer');
+    assert.deepEqual(await hb.locator('#routePick optgroup').evaluateAll(g => g.map(x => x.label)), ['ON THE MONDAY 11-9-26 BOL'], 'the routes on the open day, grouped under it');
+    const fs16 = await hb.locator('#dayPick, #routePick, #dayLine, #lmSave').evaluateAll(els => els.map(e => parseFloat(getComputedStyle(e).fontSize)));
+    assert.ok(fs16.every(n => n >= 16), 'big letters at the top ' + JSON.stringify(fs16));
     await p.waitForTimeout(500);
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-hub-bol-1536.png') });
+    await hb.locator('#dayPrev').click();
+    await hb.locator('#dayLine', { hasText: 'BOL FOR SUNDAY 11-8-26' }).waitFor();
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/08/26', 'the day before opens on its first route');
+    assert.ok(/RT 805 · 11\/08\/26/.test(await hb.locator('#dayTable').textContent()), 'and its routes are brought in');
+    assert.ok(await hb.locator('#dayNext').isEnabled());
+    await p.waitForTimeout(300);
+    if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-day-before-1536.png') });
     assert.deepEqual(p.errors, []);
     await hubCtx.close();
     console.log('pallet builder browser test passed');
