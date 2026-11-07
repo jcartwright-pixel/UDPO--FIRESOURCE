@@ -72,7 +72,8 @@
  * Joe 11-7-26: "I know a customer may be closed right now, but I have to map it out as if they wasn't". The truck drawing stays
  * while every number on it is still a load sequence there; a new route day gets the Customer List's starting drawing. A
  * customer marked not active is made active again because it is on a route day now. The marker lists everything added, for
- * undoing by hand. Runs on both apps (LIVE_OK).
+ * undoing by hand. Runs on both apps (LIVE_OK). First (Joe 11-7-26, Helds was bought out) the old account number of each
+ * renames line becomes the new one on every route day, in the same place and load sequence; the old customer is marked not active.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -412,7 +413,38 @@ async function loadCustomerListOctoberOnce(db, opts) {
   cs.docs.forEach(d => { const c = d.data(); customers[c.key] = c; if (c.account) byAcct[String(c.account)] = c.key; const n = U.nameKey(c.name); if (n && !byName[n]) byName[n] = c.key; });
   const days = {};
   rs.docs.forEach(d => { const r = d.data(); days[r.route + '|' + r.day] = r; });
-  const custWrites = {}, dayWrites = {}, added = { customers: [], reactivated: [], routeDays: [], stops: [], already: 0 };
+  const custWrites = {}, dayWrites = {}, added = { customers: [], reactivated: [], routeDays: [], stops: [], already: 0, renamed: [] };
+  // Joe 11-7-26: "Helge did upgrade to the newer account number. Make sure that is changed everywhere. They was bought out."
+  // The old account's stop on every route day becomes the new account, in the same place with the same load sequence and stop
+  // note. The new customer starts as a copy of the old one (same store: address, phone, keys, notes), with the new number and
+  // name; the old one is marked not active (it is on no route day any more), with a note saying why.
+  for (const [fromAcct, toAcct, toName, why] of (UDCL_OCT.renames || [])) {
+    const fromKey = byAcct[String(fromAcct)];
+    if (!fromKey) continue;
+    const old = customers[fromKey];
+    let toKey = byAcct[String(toAcct)];
+    if (!toKey) {
+      toKey = U.custKey(toAcct, toName);
+      const c = Object.assign({}, old, { key: toKey, account: String(toAcct), name: U.text(toName, U.LIMITS.name), active: true, addedBy: 'Data load ' + UDCL_OCT_ID, updatedAt: stamp, updatedBy: BY });
+      delete c.inactive;
+      customers[toKey] = c; custWrites[toKey] = c; byAcct[String(toAcct)] = toKey; byName[U.nameKey(c.name)] = toKey;
+      added.customers.push({ key: toKey, account: c.account, name: c.name, from: 'NEW ACCOUNT ' + fromAcct });
+    }
+    const nc = customers[toKey];
+    Object.keys(days).forEach(dk => {
+      const rd = days[dk], stops = rd.stops || [];
+      if (!stops.some(s => s.key === fromKey)) return;
+      const hasNew = stops.some(s => s.key === toKey);
+      const next = hasNew ? stops.filter(s => s.key !== fromKey)
+        : stops.map(s => (s.key === fromKey ? Object.assign({}, s, { key: toKey, account: nc.account, name: nc.name, chain: nc.chain || s.chain || '' }) : s));
+      days[dk] = dayWrites[dk] = Object.assign({}, rd, { stops: next });
+      added.renamed.push({ route: rd.route, day: rd.day, from: fromAcct, to: toAcct });
+    });
+    const was = Object.assign({}, old, { active: false, notes: ((old.notes ? old.notes + '\n' : '') + 'Account changed to ' + toAcct + ' (' + why.replace(/^Joe [^:]*: /, '') + ').').slice(0, U.LIMITS.notes), updatedAt: stamp, updatedBy: BY });
+    customers[fromKey] = was; custWrites[fromKey] = was;
+    delete byAcct[String(fromAcct)];
+    if (byName[U.nameKey(old.name)] === fromKey) delete byName[U.nameKey(old.name)];
+  }
   for (const [routeIn, dayIn, account, chain, name, seq, from] of UDCL_OCT.lines) {
     const route = U.numText(routeIn, U.LIMITS.route), day = U.dayOf(dayIn), loadSeq = U.seqOf(seq);
     // The customer: by account number, then by name; else a new one, as the Route Menu upload makes it.
@@ -455,7 +487,7 @@ async function loadCustomerListOctoberOnce(db, opts) {
     writes.slice(i, i + 400).forEach(([ref, v]) => batch.set(ref, v));
     await batch.commit();
   }
-  const counts = { customers: added.customers.length, reactivated: added.reactivated.length, routeDays: added.routeDays.length, stops: added.stops.length, already: added.already };
+  const counts = { renamed: added.renamed.length, customers: added.customers.length, reactivated: added.reactivated.length, routeDays: added.routeDays.length, stops: added.stops.length, already: added.already };
   await db.collection('udclLog').add({ what: 'data load', plant, record: UDCL_OCT_ID, before: null, after: { counts }, by: BY, at: stamp });
   await mark.set({ status: 'DONE', doneAt: stamp, what: UDCL_OCT.what, counts, added });
   return Object.assign({ counts }, added);

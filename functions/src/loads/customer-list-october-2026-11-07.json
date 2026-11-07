@@ -2,6 +2,9 @@
   "id": "customer-list-october-2026-11-07",
   "plant": "fac_uniontown",
   "what": "Joe 11-7-26: LOAD THE OCTOBER NEW CUSTOMERS AND ROUTE DAYS",
+  "renames": [
+    ["811495", "811496", "HELDS SNS #211496", "Joe 11-7-26: Helds was bought out and has the newer account number"]
+  ],
   "lines": [
     ["803", "FRI", "1860", "", "TASTYLAND MONROEVILLE", 0, "OCTOBER"],
     ["803", "FRI", "119005", "", "DQ HERMINIE", 0, "OCTOBER"],

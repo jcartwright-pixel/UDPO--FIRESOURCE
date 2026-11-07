@@ -23,6 +23,10 @@ test('the October customers and route days load once: only adds, keeps every sto
   await cust('5241', { name: 'WAL-MART #5241 N HUNTINGTON', active: false });
   await cust('N-YOUNGWOOD-SNS-211122', { account: '', name: 'YOUNGWOOD SNS #211122' });
   await day('811', 'SAT', [stop('N-YOUNGWOOD-SNS-211122', 0)]);
+  // Joe 11-7-26: Helds was bought out; the old account (811495) is on 813 THU at load sequence 3 with a stop note.
+  await cust('811495', { name: 'HELDS SNS #211495', address: '1 TEST ST', phone: '555-0100' });
+  await cust('900004');
+  await day('813', 'THU', [stop('900004', 5), Object.assign(stop('811495', 3), { name: 'HELDS SNS #211495', note: 'Side door' }), stop('900002', 1)]);
   // DQ Herminie is on 803 TUE already.
   await cust('119005', { name: 'DQ HERMINIE' });
   await day('803', 'TUE', [stop('119005', 4)]);
@@ -47,8 +51,13 @@ test('the October customers and route days load once: only adds, keeps every sto
   const thu = await getDay('8302', 'THU');
   assert.ok(thu && thu.stops.some(s => s.key === '5241' || s.account === '1703'), 'a missing route day is added');
   assert.ok(thu.map && thu.map.cells.length, 'with a starting truck drawing');
-  const helds = (await getDay('813', 'THU')).stops.find(s => s.account === '811496');
-  assert.equal(helds.loadSeq, 3, 'the BOL load sequence where the BOL has one');
+  const thu813 = (await getDay('813', 'THU')).stops;
+  assert.deepEqual(thu813.slice(0, 3).map(s => [s.account, s.loadSeq, s.note]), [['900004', 5, 'Ring bell'], ['811496', 3, 'Side door'], ['900002', 1, 'Ring bell']], 'Helds has the new account number in the same place, load sequence and note');
+  assert.ok(!thu813.some(s => s.account === '811495'), 'the old Helds number is on no route day');
+  assert.equal(thu813.filter(s => s.account === '811496').length, 1, 'and the new one is not added twice');
+  const oldH = (await db().collection('udclCustomers').doc(U.customerId(PLANT, '811495')).get()).data(), newH = (await db().collection('udclCustomers').doc(U.customerId(PLANT, '811496')).get()).data();
+  assert.equal(oldH.active, false); assert.match(oldH.notes, /Account changed to 811496/);
+  assert.equal(newH.name, 'HELDS SNS #211496'); assert.equal(newH.address, '1 TEST ST'); assert.equal(newH.phone, '555-0100'); assert.equal(newH.active, true);
 
   const wm = (await db().collection('udclCustomers').doc(U.customerId(PLANT, '5241')).get()).data();
   assert.equal(wm.active, true, 'a customer on a route day again is active');
