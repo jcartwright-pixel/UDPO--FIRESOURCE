@@ -147,9 +147,53 @@ test('Save to route map: someone else saved first, so it says so and reads the r
 test('Print sequence changes and Save to route map are on the truck load map; only the sheet prints', () => {
   const src = fs.readFileSync(PB.SRC, 'utf8');
   assert.match(src, /<button id="lmPrint">Print sequence changes<\/button>/);
-  assert.match(src, /<button class="primary" id="lmSave">Save to route map<\/button>/);
+  assert.match(src, /<button class="save" id="lmSave" type="button">SAVE TO ROUTE MAP<\/button>/, 'one big SAVE at the top (Joe 11-7-26)');
   assert.match(src, /@media print\{[^\n]*\.wrap,\.toast\{display:none!important\}#printSheet\{display:block/);
   assert.match(src, /<th>Chain<\/th><th>Account #<\/th><th>Customer<\/th><th class="n">New sequence<\/th>/);
+});
+
+test('SAVE TO ROUTE MAP sends it all in one press (Joe 11-7-26): sequences, run order, truck drawing, and a missing customer added first', async () => {
+  const day = DAY();
+  day.routeDays[0].stops.push({ key: '50001', account: '50001', name: 'MADEUP DELI', loadSeq: 5, note: 'Closed for winter' });
+  day.customers[50001] = { account: '50001', name: 'MADEUP DELI' };
+  const { map, calls } = bridgeWith(d => d.op === 'view' ? day : d.op === 'saveCustomer' ? { ok: true, customer: { key: '77001', account: '77001', name: d.fields.name, chain: d.fields.chain } }
+    : { ok: true, routeDay: { rev: 5, stops: d.stops, map: d.map } });
+  const out = await map.saveAll('813', 'THU', 4, { stops: [
+    { key: '', acct: '40496', name: 'SAMPLE CONE', loadSeq: 9 },
+    { key: '', acct: '', name: 'Sample Market', loadSeq: 3 },
+    { key: '', acct: '77001', name: 'TASTY MADEUP STAND', chain: '12', loadSeq: 1 }],
+    map: { rows: 2, cells: [[9, 9, 9, 3, 3, 3], [1, 1, 1, null, null, null]] } });
+  const add = calls.find(c => c[1].op === 'saveCustomer');
+  assert.ok(add, 'the customer not on the list is added first');
+  assert.deepEqual([add[1].add, add[1].account, add[1].fields], [true, '77001', { name: 'TASTY MADEUP STAND', chain: '12' }]);
+  const [, sent] = calls[calls.length - 1];
+  assert.equal(sent.op, 'saveRouteDay'); assert.equal(sent.rev, 4);
+  assert.deepEqual(sent.stops, [{ key: '40496', loadSeq: 9, note: '' }, { key: '50001', loadSeq: 5, note: 'Closed for winter' },
+    { key: '16175', loadSeq: 3, note: 'Back door' }, { key: '77001', loadSeq: 1, note: '' }],
+    'found by account, then by name; notes kept; a closed customer not on this BOL stays, right after the stop it came after');
+  assert.deepEqual(sent.map.cells[1], [1, 1, 1, null, null, null], 'the truck drawing goes too');
+  assert.equal(out.rev, 5);
+  // A route day the Customer List does not have yet is started (no rev to check).
+  const second = bridgeWith(d => d.op === 'view' ? DAY() : { ok: true, routeDay: { rev: 1, stops: d.stops } });
+  await second.map.saveAll('813', 'MON', null, { stops: [{ key: '', acct: '16175', name: 'SAMPLE MARKET', loadSeq: 2 }] });
+  const [, made] = second.calls[second.calls.length - 1];
+  assert.equal(made.day, 'MON'); assert.equal('rev' in made, false); assert.equal('map' in made, false);
+  assert.deepEqual(made.stops, [{ key: '16175', loadSeq: 2, note: '' }]);
+});
+
+test('Pallet Builder BOL DAY (Joe 11-7-26): opens on the newest BOL, steps back a day at a time, big ALL CAPS top', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /<button id="dayPrev"[^>]*>&#9664; DAY BEFORE<\/button>/);
+  assert.match(src, /<select id="dayPick"/);
+  assert.match(src, /<button id="dayNext"[^>]*>DAY AFTER &#9654;<\/button>/);
+  assert.match(src, /<p class="dayline" id="dayLine"/);
+  assert.match(src, /p\.udBolDays \|\| \(p\.udBol \? \[p\.udBol\] : null\)/, 'every BOL day the Hub has');
+  assert.match(src, /optgroup label="ON THE /, 'the routes on the picked day come first');
+  const page = fs.readFileSync(PB.OUT, 'utf8');
+  assert.match(page, /collection\(homeDb, 'bolDays'\), orderBy\('date', 'desc'\), limit\(14\)/, 'the last two weeks of BOLs');
+  const css = src.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const small = (css.match(/font-size:\s*([\d.]+)(px|rem)/g) || []).map(x => x.match(/([\d.]+)(px|rem)/)).filter(m => (m[2] === 'px' ? +m[1] : +m[1] * 16) < 16);
+  assert.ok(small.length <= 1, 'letters 16 or bigger: ' + small.map(m => m[0]).join(', '));
 });
 
 test('Pallet Builder opens with the newest BOL from the Hub (Joe 11-6-26, lb), shaped like the BOL built in', () => {
@@ -165,8 +209,9 @@ test('Pallet Builder opens with the newest BOL from the Hub (Joe 11-6-26, lb), s
     { name: 'MADEUP GOLF CENTER (sub-rt 00)', acct: '1001', lines: [['908', 6]] }, { name: 'SAMPLE FOOD MART (sub-rt 02)', acct: '1002', lines: [['305', 20]] }] }]);
   assert.equal(window.udBolShape({ date: '2026-11-09', routes: [] }), null, 'an empty BOL leaves the built-in one');
   const src = fs.readFileSync(PB.SRC, 'utf8');
-  assert.match(src, /window\.parent\.udBol/, 'the builder takes the BOL the screen hands it');
-  assert.match(src, /const key = HUBBOL \? HUBBOL\.key : DAYKEY, day = HUBBOL \? HUBBOL\.routes : BOLDAY;/, 'and keeps its own BOL when there is none');
+  assert.match(src, /const p = window\.parent && window\.parent !== window \? window\.parent : null; const list = p && \(p\.udBolDays \|\| \(p\.udBol/, 'the builder takes the BOL the screen hands it');
+  assert.match(src, /const BUILTIN_DAY = \{key: DAYKEY, date: '2026-11-05', routes: BOLDAY, builtIn: true\};/, 'and keeps its own BOL when there is none');
+  assert.match(src, /const BOLDAYS = HUBDAYS\.concat\(/, 'the Hub BOL days and the built-in one, newest first');
 });
 
 test('Pallet Rules and PALLET USES go to the Customer List through its own server call; the cases come with the route map', async () => {

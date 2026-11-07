@@ -71,12 +71,12 @@ const TAIL = `</script>
     const num = (v) => (/[0-9]{3,}/.exec(String(v || '')) || [])[0] || String(v || '');
     const routeDayOf = (d, route, day) => (d.routeDays || []).find(r => r.day === day && (String(r.route) === String(route) || num(r.route) === String(route)));
     function shape(d, rd) {
-      if (!rd) return { found: false };
+      if (!rd) return { found: false, canEdit: !!d.canEdit, rules: d.palletRules || null };
       const cs = d.customers || {};
       // Joe 11-6-26: each customer's cases on this route day (weeks = [[week ending, cases]], kept in the Customer List from the Hub's
       // Weekly Route Report), its PALLET USES, how many weeks there are, and the plant's Pallet Rules.
       const cases = rd.cases || {}, uses = rd.palletUses || {};
-      return { found: true, route: rd.route, rev: rd.rev || 0, updatedAt: rd.updatedAt || '', updatedBy: rd.updatedBy || '', canEdit: !!d.canEdit,
+      return { found: true, route: rd.route, rev: rd.rev || 0, updatedAt: rd.updatedAt || '', updatedBy: rd.updatedBy || '', canEdit: !!d.canEdit, map: rd.map || null,
         rules: d.palletRules || null, caseWeeks: rd.caseWeeks || 0,
         stops: (rd.stops || []).map(s => { const c = cs[s.key] || {}; return { key: s.key, account: c.account || s.account || '', name: c.name || s.name || '', chain: c.chain || s.chain || '', loadSeq: +s.loadSeq || 0, note: s.note || '', weeks: cases[s.key] || [], uses: uses[s.key] || '' }; }) };
     }
@@ -96,6 +96,58 @@ const TAIL = `</script>
           const out = await callServer('customerList', { op: 'saveRouteDay', plant: currentPlant(), route: rd.route, day, rev, stops });
           Object.assign(rd, out.routeDay || {});
           return shape(d, rd);
+        } catch (e) {
+          const err = new Error(plain(e));
+          if (/aborted/.test(String(e && e.code || ''))) { view = null; err.changed = true; }
+          throw err;
+        }
+      },
+      // Joe 11-7-26: SAVE sends it all. stops = [{key, acct, name, chain, loadSeq}] in run order (key '' = a customer the route
+      // day does not have: found on the Customer List by account number or name, else added to it first); map = {rows, cells}
+      // (the truck drawing, or null to keep the one there). A customer on the route day but not in stops stays, after the stop
+      // with the next higher load sequence; every stop keeps its stop note. A route day the Customer List lacks is started.
+      async saveAll(route, day, rev, what) {
+        let d;
+        try { d = await read(); } catch (e) { throw new Error(plain(e)); }
+        const rd = routeDayOf(d, route, day), cs = d.customers || {};
+        const digits = (v) => String(v || '').split('').filter(ch => ch >= '0' && ch <= '9').join('');
+        const letters = (v) => String(v || '').toUpperCase().split('').filter(ch => (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')).join('');
+        const byAcct = {}, byName = {};
+        const know = (k, c) => { if (digits(c.account)) byAcct[digits(c.account)] = byAcct[digits(c.account)] || k; if (letters(c.name)) byName[letters(c.name)] = byName[letters(c.name)] || k; };
+        (d.routeDays || []).forEach(r => (r.stops || []).forEach(s => know(s.key, s)));
+        Object.keys(cs).forEach(k => know(k, cs[k] || {}));
+        const list = [];
+        try {
+          for (const st of (what && what.stops) || []) {
+            let key = st.key || (digits(st.acct) && byAcct[digits(st.acct)]) || byName[letters(st.name)] || '';
+            if (!key) {
+              const out = await callServer('customerList', { op: 'saveCustomer', plant: currentPlant(), add: true, account: digits(st.acct), fields: { name: st.name, chain: st.chain || '' } });
+              const c = out.customer || {}; key = c.key;
+              if (!key) throw new Error('The Customer List did not add ' + (st.name || 'the customer') + '. Try again.');
+              cs[key] = c; if (digits(c.account)) byAcct[digits(c.account)] = key; byName[letters(c.name)] = key;
+            }
+            if (key && !list.some(x => x.key === key)) list.push({ key, loadSeq: +st.loadSeq > 0 ? +st.loadSeq : 0 });
+          }
+        } catch (e) { throw new Error(plain(e)); }
+        const before = rd ? (rd.stops || []) : [];
+        before.forEach(s => { const x = list.find(y => y.key === s.key); if (x) x.note = s.note || ''; });
+        // A customer on the route day but not on this BOL (closed for now, or no order today) keeps its place: right after the
+        // stop it came after on the route day (the start of the route when none of those is on the list).
+        before.forEach((s, at) => {
+          if (list.some(y => y.key === s.key)) return;
+          let i = 0;
+          for (let j = at - 1; j >= 0; j--) { const k = list.findIndex(y => y.key === before[j].key); if (k >= 0) { i = k + 1; break; } }
+          list.splice(i, 0, { key: s.key, loadSeq: +s.loadSeq || 0, note: s.note || '' });
+        });
+        const call = { op: 'saveRouteDay', plant: currentPlant(), route: rd ? rd.route : String(route), day, stops: list.map(x => ({ key: x.key, loadSeq: x.loadSeq, note: x.note || '' })) };
+        if (rd) call.rev = rev;
+        if (what && what.map) call.map = what.map;
+        try {
+          const out = await callServer('customerList', call);
+          let r = rd;
+          if (!r) { r = { route: call.route, day, stops: [] }; (d.routeDays = d.routeDays || []).push(r); }
+          Object.assign(r, out.routeDay || {});
+          return shape(d, r);
         } catch (e) {
           const err = new Error(plain(e));
           if (/aborted/.test(String(e && e.code || ''))) { view = null; err.changed = true; }
@@ -152,15 +204,16 @@ const TAIL = `</script>
           stops: (r.stops || []).map(st => ({ name: st.name + (st.seq != null ? ' (sub-rt ' + two(st.seq) + ')' : ''), acct: st.custNo || '',
             lines: (st.lines || []).map(l => [String(l.item), Number(l.qty) || 0]) })) })) };
     };
-    async function newestBol() {
+    // Joe 11-7-26: every BOL day the Hub has, newest first (the newest 14), for the BOL DAY picker.
+    async function bolDays() {
       const { homeDb } = await start();
-      const snap = await getDocs(query(collection(homeDb, 'bolDays'), orderBy('date', 'desc'), limit(1)));
-      return snap.empty ? null : window.udBolShape(snap.docs[0].data());
+      const snap = await getDocs(query(collection(homeDb, 'bolDays'), orderBy('date', 'desc'), limit(14)));
+      return snap.docs.map(x => window.udBolShape(x.data())).filter(Boolean);
     }
     requireSignIn(async () => {
       const frame = document.getElementById('builder');
       if (frame.srcdoc) return;
-      try { window.udBol = await newestBol(); } catch (e) { window.udBol = null; }
+      try { window.udBolDays = await bolDays(); window.udBol = window.udBolDays[0] || null; } catch (e) { window.udBolDays = []; window.udBol = null; }
       try { window.udProducts = await sheetProducts(); } catch (e) { window.udProducts = {}; }
       if (frame.srcdoc) return;
       const builder = JSON.parse(document.getElementById('builder-page').textContent);
