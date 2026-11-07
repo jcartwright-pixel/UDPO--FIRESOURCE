@@ -588,3 +588,29 @@ test('speed by hour of the night: a slow early evening and a fast late night mov
   assert.ok(late.loads[0].minutes < 36, 'a load starting at 1:05 AM is quicker');
   assert.match(late.paceText, /hour of the night/);
 });
+
+// Joe 11-7-26 (option lg, "let's go ahead and do both"): the email's box under the recap: the Case Loadout finish time and, for each
+// truck time, when its loads should be done and the time to spare.
+test('the email shows when all case loads are done and each truck time with its time to spare', () => {
+  const loads = tonightDone.concat(tonightLeft), forecast = R.loadForecast({ date: MON, loads, history: [] }, NOW);
+  const t = R.truckTimes(forecast);
+  const leaving = forecast.loads.filter(x => x.leaves !== null && !x.outside);
+  assert.equal(t.reduce((a, g) => a + g.loads, 0), leaving.length, 'every load with a dispatch time is under its truck time');
+  assert.deepEqual(t.map(g => g.at), [...new Set(leaving.map(x => x.leaves))].sort((a, b) => a - b), 'one line per truck time, earliest first');
+  t.forEach(g => {
+    const mine = leaving.filter(x => x.leaves === g.at);
+    assert.equal(g.done, Math.max(...mine.map(x => x.est)), 'done when the last of its loads is done');
+    assert.equal(g.late, mine.filter(x => x.late).length);
+    assert.match(g.spareText, g.late ? /^LATE / : /HR|MIN|JUST IN TIME/);
+  });
+  const html = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads, forecast }, NOW))), '');
+  assert.match(html, /CASE LOADOUT FORECAST AS OF 7:00 PM/);
+  assert.match(html, new RegExp('ALL CASE LOADS DONE ABOUT ' + forecast.allDoneWhen.toUpperCase()));
+  assert.match(html, /TIME TO SPARE/);
+  assert.match(html, t.some(g => g.late) ? /TRUCK TIMES? WILL BE LATE/ : /EVERY TRUCK READY IN TIME/);
+  // An outside carrier's load is not a truck time.
+  const outside = R.truckTimes({ loads: [{ leaves: 100, est: 50, outside: true }, { leaves: 200, est: 150 }] });
+  assert.deepEqual(outside.map(g => [g.at, g.loads, g.spareText]), [[200, 1, '50 MIN']]);
+  // With no forecast the box is not there.
+  assert.doesNotMatch(R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), ''), /CASE LOADOUT FORECAST/);
+});
