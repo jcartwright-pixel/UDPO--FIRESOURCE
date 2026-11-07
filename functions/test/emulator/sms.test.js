@@ -74,6 +74,8 @@ test('Joe 10/31: publishing never texts; Send schedule texts texts the posted we
   assert.equal(SMS.postedCheck, undefined, 'nothing sends by itself when a week is posted');
   let r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:00:00Z'));
   assert.deepEqual([r.lastSend.week, r.lastSend.drivers, r.lastSend.sent, r.lastSend.noPhone, r.lastSend.by], [WEEK, 2, 1, 1, ADMIN.email]);
+  // Joe 11/7: a driver with no mobile phone is named as not texted too.
+  assert.deepEqual(r.lastSend.notSent, ['BROOK, SAM (no mobile phone)']);
   assert.equal(calls.length, 1);
   assert.match(calls[0].url, new RegExp('/Accounts/' + SID + '/Messages\\.json$'));
   assert.equal(calls[0].init.headers.Authorization, 'Basic ' + Buffer.from(SID + ':tok').toString('base64'));
