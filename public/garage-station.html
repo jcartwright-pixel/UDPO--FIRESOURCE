@@ -203,7 +203,10 @@
         catch (err) { if (isNoConnection(err)) return { id: picked.id, name: picked.name, loginId: typed, offline: true }; throw err; }
       },
       // Joe 10/28 evening: a mechanic's signature, signed once, kept on file (sent when there is signal, like a step).
-      saveSignature: (who, signature) => offlineCall('garage', { op: 'saveSignature', tokens: who.token ? [who.token] : [], signIn: { techId: who.id, loginId: who.loginId }, requestId: rid(), signature }),
+      // Joe 11-7-26 (Shaun's first sign-in): it goes with this tablet's station code like every step; without it a coded tablet
+      // was refused ("This garage tablet was removed") and the signature was not kept.
+      saveSignature: (who, signature) => offlineCall('garage', Object.assign({ op: 'saveSignature', tokens: who.token ? [who.token] : [], signIn: { techId: who.id, loginId: who.loginId }, requestId: rid(), signature },
+        station ? { station: { key: station.key, version: station.version } } : {})),
       step: (who, job, op, extra) => stepCall(who, Object.assign({ step: op }, onJob(job), extra || {})),
       // A service (it has a checklist) needs no "What did you fix?": it is the service.
       serviceFix: (j) => j.checklist ? (j.serviceKey === 'DOT' ? 'Annual inspection' : 'Oil / PM service') : '',
