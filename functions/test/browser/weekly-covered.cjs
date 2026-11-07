@@ -50,10 +50,11 @@ async function covered(page) {
         const c = document.getElementById('covered').getBoundingClientRect(), h1 = document.getElementById('page-name').getBoundingClientRect();
         const btns = [...document.querySelectorAll('.head .actions.in-head :is(button, a.button)')].filter(b => b.offsetParent).map(b => b.getBoundingClientRect());
         return { bg: getComputedStyle(document.getElementById('covered')).backgroundColor, besideTitle: Math.abs((c.top + c.bottom) - (h1.top + h1.bottom)) < 12 && c.left > h1.right,
-          clear: btns.every(b => b.left >= c.right), fits: btns.every(b => b.right <= innerWidth) && document.documentElement.scrollWidth <= innerWidth, oneRow: new Set(btns.map(b => Math.round(b.top / 10))).size === 1 };
+          clear: btns.every(b => b.left >= c.right), cut: [...document.querySelectorAll('.head .actions.in-head :is(button, a.button)')].filter(b => b.offsetParent && b.scrollHeight > b.clientHeight + 1).map(b => b.textContent), fits: btns.every(b => b.right <= innerWidth) && document.documentElement.scrollWidth <= innerWidth, oneRow: new Set(btns.map(b => Math.round(b.top / 10))).size === 1 };
       });
       assert.equal(look.bg, 'rgb(180, 35, 24)', 'red until every run has a driver');
       assert.ok(look.besideTitle, 'right beside the title');
+      assert.deepEqual(look.cut, [], 'no button has its words cut off at ' + w);
       assert.ok(look.clear && look.fits && look.oneRow, 'every button still fits on the title line at ' + w + ': ' + JSON.stringify(look));
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'weekly-covered-' + w + '.png') });
       assert.deepEqual(page.errors, []);
@@ -66,8 +67,9 @@ async function covered(page) {
       assert.match(await covered(live), /^\d+% OF RUNS COVERED$/);
       assert.equal(await live.textContent('#page-name'), 'Weekly Dispatch');
       const at = await live.evaluate(() => { const c = document.getElementById('covered').getBoundingClientRect(), h1 = document.getElementById('page-name').getBoundingClientRect();
-        return Math.abs((c.top + c.bottom) - (h1.top + h1.bottom)) < 12 && c.left > h1.right && document.documentElement.scrollWidth <= innerWidth; });
-      assert.ok(at, 'beside the Weekly Dispatch title at ' + w);
+        const cut = [...document.querySelectorAll('.head .actions.in-head :is(button, a.button)')].some(b => b.offsetParent && b.scrollHeight > b.clientHeight + 1);
+        return Math.abs((c.top + c.bottom) - (h1.top + h1.bottom)) < 12 && c.left > h1.right && document.documentElement.scrollWidth <= innerWidth && !cut; });
+      assert.ok(at, 'beside the Weekly Dispatch title, no button words cut, at ' + w);
       if (SHOTS) await live.screenshot({ path: path.join(SHOTS, 'weekly-dispatch-covered-' + w + '.png') });
       assert.deepEqual(live.errors, []);
       await live.close();
