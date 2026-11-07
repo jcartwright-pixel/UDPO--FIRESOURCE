@@ -61,8 +61,7 @@ document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html',
   tile('plant-setup', 'plant-setup.html', 'Plant Setup', 'Each plant\'s shifts, areas, menu and schedules, and the Upload Center for a new plant', false).replace('data-app="plant-setup"', 'data-admin="plant-setup"') +
   tile('keys', 'keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each', false).replace('data-app="keys"', 'data-admin="keys"') +
   tile('accounting', 'accounting.html', 'Accounting Numbers', 'The monthly accounting package, read once for Over the Road and cost analysis', false).replace('data-app="accounting"', 'data-admin="accounting"') +
-  tile('bol', 'bol.html', 'Daily BOL', 'The daily load by route from the office, picked up every hour from the ROUTES/BOL email label', false).replace('data-app="bol"', 'data-admin="bol"') +
-  tile('routeweekly', 'route-weekly.html', 'Weekly Route Report', 'The weekly cases by route and store from MIS, kept every week for the customer list and Pallet Builder', false).replace('data-app="routeweekly"', 'data-admin="routeweekly"');
+  tile('bol', 'bol.html', 'Daily BOL', 'The daily load by route from the office, picked up every hour from the ROUTES/BOL email label', false).replace('data-app="bol"', 'data-admin="bol"');
 // All app links: every phone and tablet link, grouped, with Open and Copy.
 function drawLinks() {
   document.getElementById('links-list').innerHTML = linkGroups(opsOrigin(location)).map(g => '<section class="hub-link-group"><h3>' + e(g.name) + '</h3>' +

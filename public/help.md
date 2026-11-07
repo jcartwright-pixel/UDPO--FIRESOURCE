@@ -344,13 +344,17 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 id: template
 screens: template.html
 
-Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template. Changes there are for that week only and do not change the template.
+Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template.
+
+A change here goes three places at once: **Driver Master**, **this week** on [Weekly Dispatch](#weekly-live) and **next week** on the [Weekly Dispatch Template](#weekly), from today on. Changes made on a week are for that week only and do not change the template.
 
 1. In a driver's day, pick **Available**, **Off** or **Assigned**.
 2. For Assigned, pick the run. `+ Add Run` adds a second run the same day.
-3. Each changed box saves on its own.
+3. Each changed box saves on its own, and the two weeks change with it.
 
 - `Copy` under a driver's name copies their whole week. `Paste` puts it on another driver; `Paste + Add` adds it to what that driver already has.
+
+> A day you already changed by hand on Weekly Dispatch or the Weekly Dispatch Template keeps your hand change. A load already loaded does not change.
 
 !> Do not use the template for one week's change. Change the week on the Weekly Dispatch Template.
 
@@ -803,7 +807,7 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
 12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
 13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
-14. At the very top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (Hub > **Weekly Route Report**, kept in the Customer List): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH** and **LAST 5 WEEKS**. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
+14. At the very top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (the WEEKLY ROUTE REPORT box on Hub > Administration > **Accounting Numbers**; the Customer List keeps them by route day): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH** and **LAST 5 WEEKS**. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
 15. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** follows Pallet Rules). It saves by itself, and the Customer List shows the same pick.
 16. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (HIGH unless changed), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
 

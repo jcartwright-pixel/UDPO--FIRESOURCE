@@ -293,7 +293,7 @@ function adminDeps() {
 
 // Joe 10/26: People & Roles, role templates, people's access links and the Upload Center are the company's, kept with the one
 // Users list (Uniontown's database); every other Administration page is the plant's own.
-const COMPANY_ADMIN_OPS = ['people', 'savePerson', 'setHomeScreen', 'saveRoleTemplate', 'addRole', 'roleTemplates', 'accessLinks', 'accessGenerate', 'accessRevoke', 'accessEmail', 'uploadStatus', 'uploadSave', 'accountingStatus', 'accountingSaveSettings', 'accountingUpload', 'accountingCheckNow', 'bolStatus', 'bolSaveSettings', 'bolUpload', 'bolCheckNow', 'routeWeeklyStatus', 'routeWeeklySaveSettings', 'routeWeeklyUpload', 'routeWeeklyCheckNow'];
+const COMPANY_ADMIN_OPS = ['people', 'savePerson', 'setHomeScreen', 'saveRoleTemplate', 'addRole', 'roleTemplates', 'accessLinks', 'accessGenerate', 'accessRevoke', 'accessEmail', 'uploadStatus', 'uploadSave', 'accountingStatus', 'accountingSaveSettings', 'accountingUpload', 'accountingCheckNow', 'bolStatus', 'bolSaveSettings', 'bolUpload', 'bolCheckNow'];
 // Pages that list every plant on one page (Manager Links' release codes, Email Senders, the station codes): each plant's line
 // comes from that plant's own database, and a save of several plants' lines goes to each plant's own database.
 async function eachPlantOf(user) {
@@ -615,19 +615,17 @@ exports.accountingMailMornings = onSchedule({ schedule: '0 6 * * *', timeZone: '
   if (out.status === 'FAIL') console.error('Accounting mail check: ' + out.message);
 });
 
+// Weekly route report (src/routereports.js): Vicki's Wednesday email, read once a day at 2:00 PM when switched on.
+exports.routeReportMail = onSchedule({ schedule: '0 14 * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '1GiB' }, async () => {
+  const out = await require('./src/routereports').dailyCheck(db);
+  if (out.status === 'FAIL') console.error('Route report mail check: ' + out.message);
+});
+
 // Daily BOL (src/bol.js, Joe 11-6-26): every hour the mailbox set on the Hub's Daily BOL screen is read for a new BOL under its
 // label (ROUTES/BOL), when that check is switched on. The office sends it each afternoon. Company-wide (Uniontown's database).
 exports.bolMailHourly = onSchedule({ schedule: '15 * * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
   const out = await require('./src/bol').hourlyCheck(db);
   if (out.status === 'FAIL') console.error('BOL mail check: ' + out.message);
-});
-
-// Weekly Route Report (src/routeweekly.js, Joe 11-6-26): every morning the mailbox set on the Hub's Weekly Route Report screen is
-// read for MIS's weekly cases by route and store (label Routes/Sale by Route), when that check is switched on. It usually comes
-// on Wednesday, but not always, so it looks every day. Company-wide (Uniontown's database).
-exports.routeWeeklyMornings = onSchedule({ schedule: '30 7 * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '1GiB' }, async () => {
-  const out = await require('./src/routeweekly').morningCheck(db);
-  if (out.status === 'FAIL') console.error('Weekly route report check: ' + out.message);
 });
 
 exports.salesRouteEmailMornings = onSchedule({ schedule: '0 6 * * 1-6', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1, memory: '512MiB' }, async () => {

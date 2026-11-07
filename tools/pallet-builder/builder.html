@@ -880,7 +880,7 @@ function renderCust(R){
   }
   const weeks = m.caseWeeks || 0;
   hint.textContent = CUSTMSG || (weeks ? `EACH CUSTOMER'S SPACE IS HELD FOR THE NUMBER IN YELLOW (${weeks} WEEK${weeks === 1 ? '' : 'S'} OF THE WEEKLY ROUTE REPORT). PALLET USES PICKS ANOTHER NUMBER FOR THIS CUSTOMER ON THIS ROUTE AND DAY; STANDARD FOLLOWS PALLET RULES.`
-    : 'NO WEEKS OF THE WEEKLY ROUTE REPORT YET (HUB > WEEKLY ROUTE REPORT), SO NO SPACE IS HELD. THE PALLETS ARE THE BOL ONLY.');
+    : 'NO WEEKS OF THE WEEKLY ROUTE REPORT YET (HUB > ADMINISTRATION > ACCOUNTING NUMBERS), SO NO SPACE IS HELD. THE PALLETS ARE THE BOL ONLY.');
   const cell = (c, u) => { const v = c && c.stats ? c.stats[u] : null; const on = c && c.stats && (c.uses || RULES.standard) === u; return `<td class="num${on ? ' chosen' : ''}">${v == null ? '–' : fmt(v, u === 'MIDDLE' || u === 'AVERAGE' || u === 'LAST' ? (v % 1 ? 1 : 0) : 0)}</td>`; };
   const rows = S.stops.map((st, i) => {
     const c = caseInfo(st), n = stopSeq(st), bol = R.stats[i].cases, h = R.holdFor[n ? 'q' + n : 'o' + i];

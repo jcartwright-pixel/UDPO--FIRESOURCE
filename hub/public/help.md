@@ -26,7 +26,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution**, **Customers & Routes** and **Accident & Injury Reporting**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs** and **Route Cost Analysis**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis, **Daily BOL** picks up the office's daily load by route, and **Weekly Route Report** keeps MIS's weekly cases by route and store.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -220,6 +220,21 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 
 !> Do not type the numbers on Over the Road's Recap for a month that is already here. Fix the file, or add the corrected file by hand, so every app gets the same numbers.
 
+### Weekly route report
+The same screen also reads the weekly report of cases and sales by route and stop (the email **Weekly Daily Avg Cases by Route By Store**). **Route Cost Analysis** reads each week from here, so nobody has to save the files by hand.
+
+1. Type the **Mailbox the report comes to**. It saves by itself.
+2. Check the **Gmail label**. It starts as ROUTES/SALE BY ROUTE: the label the report email gets in that mailbox.
+3. Tick **Check every day**. Every day at 2:00 PM the Hub reads any new report with that label.
+4. To read it now, press `CHECK EMAIL NOW` in the WEEKLY ROUTE REPORT box. To add a report that came another way, press `ADD A REPORT BY HAND` and pick the .xls.
+5. Check the newest week in its table: routes, cases and sales.
+
+> A report whose stops do not add up to its own route totals is not saved, and the message says which route. Ask for a fresh copy of the report.
+
+> One file can hold several weeks. Each week is kept, and a newer copy of a week takes the older one's place.
+
+!> Do not take the label off the report emails, or the Hub will not find the next one.
+
 ## Daily BOL
 id: bol
 screens: bol.html
@@ -243,30 +258,6 @@ Where the office's **Daily Load By Route** comes in (administrators). The office
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Accounting Numbers and Driver Check-In Email). If it has not, the last-checked line says so in red.
 
 !> Do not move the BOL emails out of the ROUTES/BOL label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
-
-## Weekly Route Report
-id: route-weekly
-screens: route-weekly.html
-
-Where MIS's weekly **cases by route and store** comes in (administrators). Vicki emails the report *Weekly Daily Avg Cases by Route By Store* each week, and Gmail puts it under the label **Routes/Sale by Route**. The Hub reads every store's cases on each day, Sunday to Saturday, and keeps every week here. The Customer List shows each customer's low, middle, average and high cases from these weeks, and Pallet Builder holds pallet space from them, so nothing has to be gathered again.
-
-1. Type the **Mailbox the report comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
-2. Check the **Email label**. It starts as Routes/Sale by Route. Change it only if the label is renamed.
-3. Tick **Check every morning**. Every morning the Hub looks under that label for a new week. The report usually comes on Wednesday, but not always, so it looks every day.
-4. To read it now, press `CHECK EMAIL NOW`. The first time it reads back about four months, so the weeks already in the mailbox come in too.
-5. For an older week that is not in the mailbox (like the July export), press `ADD A FILE BY HAND` and pick the Excel file.
-6. Press a week in **WEEKS KEPT** to see its routes, stores and cases.
-
-### Buttons
-- `CHECK EMAIL NOW` reads the label at once. An email already read is not read again.
-- `ADD A FILE BY HAND` reads the weekly report from your computer (.xls, .xlsx or .csv).
-- **Only from** (optional): type MIS's address, so only reports from them are read.
-
-> When a report for the same week comes in again, it takes the older one's place. Each week is kept under its week-ending Saturday.
-
-> Summer weeks matter: Dairy Queens are much bigger in summer. Add the July report by hand so the high numbers include summer.
-
-!> Do not move the report emails out of the Routes/Sale by Route label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
 
 ## Help
 id: help

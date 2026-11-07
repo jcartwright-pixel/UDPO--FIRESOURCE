@@ -23,7 +23,6 @@ export const SCREENS = [
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
   { href: 'accounting.html', name: 'Accounting Numbers', note: 'Administrators: the monthly accounting package, read once for Over the Road and cost analysis', admin: true },
   { href: 'bol.html', name: 'Daily BOL', note: 'Administrators: the daily load by route from the office, picked up from the ROUTES/BOL email label', admin: true },
-  { href: 'route-weekly.html', name: 'Weekly Route Report', note: 'Administrators: the weekly cases by route and store from MIS, kept every week for the customer list and Pallet Builder', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
 
