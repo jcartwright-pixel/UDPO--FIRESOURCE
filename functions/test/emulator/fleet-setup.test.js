@@ -63,6 +63,10 @@ test('technicians: add with a login ID, sign in with it, reset it, turn off; no 
   // Joe 11/6: the garage tablet takes a 4-digit login ID as well as a 6-digit one.
   await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: 'TECH-SM', loginId: '2468' });
   assert.equal((await garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '2468' }, now)).name, 'MARTIN Sean');
+  // Joe 11-7-26: their row says a number was typed by hand (Garage Technicians), and the number itself is still not readable.
+  const sm = (await db().collection('garageTechs').doc('TECH-SM').get()).data();
+  assert.equal(sm.login_set, true);
+  assert.ok(!JSON.stringify(sm).includes('2468'), 'the typed login ID is not on the readable entry');
   // Reset Pat's ID: the old one stops working and is free for someone else.
   await applyAction(db(), MANAGER, { action: 'saveGarageTech', requestId: rid(), op: 'LOGIN', techId: added.techId, loginId: '97531' });
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: added.techId, loginId: '24680' }, now), /Wrong login ID/);

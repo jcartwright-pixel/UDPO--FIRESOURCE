@@ -25,7 +25,8 @@ const until = async (fn, what) => { for (let i = 0; i < 60; i++) { if (await fn(
   for (const t of (await d.collection('garageTechs').get()).docs) await t.ref.delete();
   await d.collection('garageTechs').doc('TECH-PS').set({ tech_id: 'TECH-PS', name: 'PAT SAMPLE', active: 'YES', facility_id: 'fac_uniontown' });
   await d.collection('garageTechs').doc('TECH-TX').set({ tech_id: 'TECH-TX', name: 'TOMMY EXAMPLE', active: 'YES', facility_id: 'fac_uniontown' });
-  for (const [id, name, dept] of [['009354', 'SAMPLE, PAT', 'GARAGE'], ['004567', 'NEWHIRE, SAM', 'GARAGE'], ['007311', 'EXAMPLE, THOMAS', 'GARAGE'], ['007777', 'DRIVER, ALEX', 'DRIVER']])
+  await d.collection('garageTechs').doc('TECH-DU').set({ tech_id: 'TECH-DU', name: 'DREW UNLISTED', active: 'YES', facility_id: 'fac_uniontown' });
+  for (const [id, name, dept] of [['009354', 'SAMPLE, PAT', 'GARAGE'], ['004567', 'NEWHIRE, SAM', 'GARAGE'], ['007311', 'EXAMPLE, THOMAS', 'GARAGE'], ['006060', 'LISTED, JORDAN', 'GARAGE'], ['007777', 'DRIVER, ALEX', 'DRIVER']])
     await d.collection('employees').doc(id).set({ employeeId: id, name, department: dept, active: true, status: 'ACTIVE', facilityId: 'fac_uniontown' });
   const browser = await chromium.launch();
   try {
@@ -55,11 +56,27 @@ const until = async (fn, what) => { for (let i = 0; i < 60; i++) { if (await fn(
     assert.equal(await p.inputValue('#tech-login'), '004567', 'typed "newhire, sam" finds Sam');
     // A technician whose name is not on the Employees list: red line and a box to pick them.
     const row = (n) => p.locator('#sheet tr', { hasText: n });
-    assert.match(await row('PAT SAMPLE').innerText(), /Signs in with employee ID/);
-    assert.match(await row('TOMMY EXAMPLE').innerText(), /Not found on the Employees list/);
-    await p.selectOption('[data-emp-tech="TECH-TX"]', '007311');
-    await until(async () => ((await d.collection('garageTechs').doc('TECH-TX').get()).data() || {}).employee_id === '007311', 'the picked employee saved on the technician');
-    await until(async () => /Signs in with employee ID/.test(await row('TOMMY EXAMPLE').innerText()), 'Tommy now signs in with the employee ID');
+    // Joe 11-7-26: every row shows the LOGIN ID in a box, filled from the employee ID on its own (Tommy is THOMAS EXAMPLE).
+    const box = (t) => p.locator('[data-login-tech="' + t + '"]');
+    assert.equal(await box('TECH-PS').inputValue(), '009354');
+    assert.equal(await box('TECH-TX').inputValue(), '007311', 'Tommy is Thomas: filled by itself');
+    assert.equal(await p.locator('text=Set login ID').count(), 0, 'no Set login ID button');
+    assert.match(await row('DREW UNLISTED').innerText(), /Not found on the Employees list/);
+    assert.equal(await box('TECH-DU').inputValue(), '');
+    await p.selectOption('[data-emp-tech="TECH-DU"]', '006060');
+    await until(async () => ((await d.collection('garageTechs').doc('TECH-DU').get()).data() || {}).employee_id === '006060', 'the picked employee saved on the technician');
+    await until(async () => (await box('TECH-DU').inputValue()) === '006060', 'Drew now shows that employee ID');
+    // Wrong? Type the right one in the box: a number that is not an employee ID is their own login ID (kept only as a hash,
+    // so the box says SET BY HAND).
+    await box('TECH-TX').fill('2468'); await box('TECH-TX').press('Enter');
+    await until(async () => ((await d.collection('garageTechs').doc('TECH-TX').get()).data() || {}).login_set === true, 'the typed login ID saved');
+    await until(async () => (await box('TECH-TX').inputValue()) === '' && (await box('TECH-TX').getAttribute('placeholder')) === 'SET BY HAND', 'the box says SET BY HAND');
+    assert.ok(!JSON.stringify((await d.collection('garageTechs').doc('TECH-TX').get()).data()).includes('2468'), 'the typed number is not on the readable entry');
+    assert.ok(!(await d.collection('garageLogins').where('techId', '==', 'TECH-TX').get()).empty, 'and it signs them in');
+    // Someone's employee ID typed (zeros or not) links them to that person.
+    await box('TECH-TX').fill('7311'); await box('TECH-TX').press('Enter');
+    await until(async () => { const t = (await d.collection('garageTechs').doc('TECH-TX').get()).data() || {}; return t.employee_id === '007311' && t.login_set === false; }, 'typing 7311 links Thomas');
+    await until(async () => (await box('TECH-TX').inputValue()) === '007311', 'his employee ID shows again');
     // Adding Sam keeps the employee and empties the boxes.
     await p.fill('#tech-name', 'SAM NEWHIRE');
     await p.click('#tech-add');
@@ -67,6 +84,6 @@ const until = async (fn, what) => { for (let i = 0; i < 60; i++) { if (await fn(
     await until(async () => (await p.inputValue('#tech-name')) === '', 'the boxes empty after adding');
     assert.deepEqual(errors, []);
     // (home-access.cjs checks Administration > Fleet Maintenance Setup lists Fleet Service Setup and Garage Technicians.)
-    console.log('ok - Garage Technicians on its own (Administration > Fleet Maintenance Setup): picking a name fills the employee ID and the boxes keep it across a redraw; "newhire, sam" is found; a technician not on the Employees list is picked on it and then signs in with that employee ID');
+    console.log('ok - Garage Technicians on its own (Administration > Fleet Maintenance Setup): picking a name fills the employee ID and the boxes keep it across a redraw; "newhire, sam" is found; every row shows its LOGIN ID box filled from the employee ID (Tommy is Thomas), changed by typing in it; one not on the Employees list is picked on it');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
