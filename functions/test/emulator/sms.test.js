@@ -378,3 +378,22 @@ test('Joe 11/2: on the test copy Resend only writes the text to the list', async
   assert.equal(r.resend.status, 'NOT SENT');
   assert.equal(calls.length, 0);
 });
+
+test('Joe 11/7: drivers Send will not reach whose posted week is not their normal week are listed to text by hand', async () => {
+  await post();
+  let p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
+  // Casey normally runs 802 Mon and Tue, this week 905 Monday; Brook (no normal week) is on 836 Tuesday; Adams normally runs
+  // 801 Mon and Tue and is not on the week. None is signed up.
+  assert.deepEqual(p.byHand.map(x => [x.name, x.why, x.days.join(' ')]), [['ADAMS, PAT', 'Not signed up', 'Mon Tue'], ['BROOK, SAM', 'Not signed up', 'Tue'], ['CASEY, LEE', 'Not signed up', 'Mon Tue']]);
+  // Adams's week back to normal: off the list. Casey signed up with a phone: Send reaches him, off the list.
+  await db().collection('runs').doc(WEEK + '__run_t801').set({ weekStart: WEEK, route: '801', run: 'UT DSD MILK', runId: 'run_t801', rev: 0, days: { mon: { runs: true, driverId: 'drv_test_adams', driver: 'ADAMS, PAT' }, tue: { runs: true, driverId: 'drv_test_adams', driver: 'ADAMS, PAT' } } });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-hand-0001', driverId: 'drv_test_casey', phone: '3305551234' });
+  await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-hand-0001', driverId: 'drv_test_casey', kind: 'SCHEDULE', on: true });
+  p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
+  assert.deepEqual(p.byHand.map(x => x.name), ['BROOK, SAM']);
+  // Signed up with no phone, or a Day Note on a normal day, still needs a hand text.
+  await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-hand-0002', driverId: 'drv_test_adams', kind: 'SCHEDULE', on: true });
+  await applyAction(db(), ADMIN, { action: 'saveDriverException', requestId: 'req-daynote-hand-0001', driverId: 'drv_test_adams', startDate: L.addDays(WEEK, 1), endDate: L.addDays(WEEK, 1), status: 'DAYNOTE', note: 'Start at 2' });
+  p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
+  assert.deepEqual(p.byHand.map(x => [x.name, x.why, x.days.join(' ')]), [['ADAMS, PAT', 'No mobile phone', 'Mon'], ['BROOK, SAM', 'Not signed up', 'Tue']]);
+});

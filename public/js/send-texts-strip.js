@@ -27,12 +27,16 @@ export function sendTextsStrip(db, el, opts) {
       (done ? '<b>Sent</b> ' + stamp(l.at) + ' to ' + drivers(l.drivers || 0) + (l.live ? '' : ' (test copy, written to the list only)') + '.'
         : '<b>Not sent</b> (' + drivers(n) + ' ticked on the Driver Roster).') +
       (keys ? '' : ' Save the Twilio account on Administration &gt; Texts first.');
+    // Joe 11/7: drivers Send will not reach whose week is not their normal week; text them yourself.
+    const hand = s.byHand || [], esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const handNames = hand.map(x => esc(x.name) + ' (' + esc(x.days.join(', ')) + ')').join('; ');
+    const handWords = !hand.length ? '' : short ? '<span class="send-hand-short" title="Not signed up for texts, and their week changed: ' + handNames + '"><b>' + hand.length + ' to text yourself</b></span>' : '<span class="send-hand"><b>Text ' + (hand.length === 1 ? 'this driver' : 'these ' + hand.length + ' drivers') + ' yourself</b> (not signed up, and their week changed): ' + handNames + '.</span>';
     const label = short ? (armed ? 'Tap Again: Text ' + drivers(n) : done ? 'Send Again' : 'Send Texts') : armed ? 'Tap Again: Text ' + drivers(n) + ' for ' + day(s.week) : (done ? 'Send Again: Week of ' : 'Send Schedule Texts: Week of ') + day(s.week);
     el.classList.toggle('sent', done);
     el.classList.toggle('short', short);
     el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') : '';
     el.innerHTML = '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (armed ? ' armed' : '') + '"' + (!keys || !n || busy ? ' disabled' : '') + '>' + label + '</button>' +
-      (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
+      handWords + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
     el.querySelector('button').onclick = press;
     show(true);
   }

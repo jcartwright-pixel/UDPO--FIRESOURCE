@@ -116,6 +116,34 @@ async function weekDrivers(db, week) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Joe 11/7 ("if a driver has not opted in, and his schedule deviated from his normal, is there going to be an alert to come up
+// to let me know I have to manually text them?"): the active drivers Send schedule texts will not reach (Schedule not ticked on
+// the Driver Roster, replied STOP, or no mobile phone) whose posted week is not their normal week: a day whose runs differ from
+// their Driver Weekly Template, or a day off, vacation or Day Note on it. Each with the days that changed.
+const DAY_ABBR = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+async function handDrivers(db, week, rows) {
+  const [drivers, phones, exceptions, backups] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get(), db.collection(C.exceptions).get(), db.collection(C.backups).get()]);
+  const typed = {}, ex = exceptions.docs.map(x => x.data()), bk = backups.docs.map(x => x.data());
+  phones.docs.forEach(x => { typed[x.id] = x.data(); });
+  const template = (d, p) => { let list = []; try { list = JSON.parse((d.cells && d.cells[p + '_assignments_json']) || '[]'); } catch (e) { list = []; }
+    return (Array.isArray(list) ? list : [list]).map(a => String(typeof a === 'string' ? a : a && (a.runId || a.run_id) || '').trim()).filter(Boolean).sort(); };
+  const out = [];
+  drivers.docs.map(x => Object.assign({ id: x.id }, x.data())).filter(x => x.name && L.driverActive(x)).forEach(x => {
+    const t = typed[safeIdPart(x.id)] || {}, phone = phoneE164(t.phone || x.phone || '');
+    if (t.scheduleText === true && phone) return;
+    const days = [];
+    L.DAYS.forEach((p, i) => {
+      const date = L.addDays(week, i);
+      const worked = rows.filter(r => r.days[p].runs && r.days[p].driverId === x.id).map(r => String(r.runId || r.id || '')).sort();
+      const normal = template(x, p);
+      const off = L.exceptionOn(ex, x.id, date), note = L.dayNoteOn(bk, x.id, date);
+      if (worked.join('|') !== normal.join('|') || (off && (normal.length || worked.length)) || note) days.push(DAY_ABBR[p]);
+    });
+    if (days.length) out.push({ driverId: x.id, name: x.name, phone: phoneText(phone), why: t.stoppedAt ? 'Replied STOP' : t.scheduleText !== true ? 'Not signed up' : 'No mobile phone', days });
+  });
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
 async function activeDrivers(db) {
   const [drivers, phones] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
@@ -165,7 +193,8 @@ async function smsCall(db, user, input, options) {
   if (op === 'preview') {
     const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
     const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
-    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+    const byHand = week ? await handDrivers(db, week, await weekRows(db, week)) : [];
+    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand });
   }
   if (op === 'sendSchedule') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
@@ -488,4 +517,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };
+module.exports = { handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };

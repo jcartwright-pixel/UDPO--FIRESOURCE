@@ -76,6 +76,13 @@
             <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
               <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
             <p class="hint" id="preview-note"></p>
+            <!-- Joe 11/7: drivers the texts will not reach whose week is not their normal week; text them yourself. -->
+            <div class="texts-hand" id="hand" hidden>
+              <h3>Text these drivers yourself <span class="pill no" id="hand-count">-</span></h3>
+              <p class="hint">Not signed up for schedule texts, so Send will not reach them, and their posted week is not their normal week (the days listed).</p>
+              <table class="gps-check texts-list"><colgroup><col style="width:40%"><col style="width:30%"><col style="width:30%"></colgroup>
+                <thead><tr><th>Driver</th><th>Why</th><th>Days changed</th></tr></thead><tbody id="hand-rows"></tbody></table>
+            </div>
           </div>
         </div>
         <!-- Joe 10/31 (im): see a driver's text on your own phone. Joe 11/6 (ik): it is the text the drivers get. -->
@@ -172,6 +179,10 @@
       $('preview-count').textContent = sched.length + (sched.length === 1 ? ' driver' : ' drivers'); $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
       $('preview-note').innerHTML = 'Drivers ticked <b>Schedule</b> on the Driver Roster who are on the posted week' + (s.ticked != null ? ' (' + s.ticked + ' ticked in all)' : '') + '.';
       $('preview').innerHTML = list(sched);
+      const hand = s.byHand || [];
+      $('hand').hidden = !hand.length;
+      $('hand-count').textContent = hand.length + (hand.length === 1 ? ' driver' : ' drivers');
+      $('hand-rows').innerHTML = hand.map(x => '<tr><td>' + escapeHtml(x.name) + (x.phone ? '<br>' + escapeHtml(x.phone) : '') + '</td><td>' + escapeHtml(x.why) + '</td><td>' + escapeHtml(x.days.join(', ')) + '</td></tr>').join('');
       // Load done texts
       pill($('done-state'), s.doneOn);
       $('done-state-text').textContent = s.doneOn ? 'On: each ticked driver gets a text when the plant finishes their load.' : 'Off: no load done texts are sent.' + need;
