@@ -235,7 +235,7 @@ async function smsCall(db, user, input, options) {
         continue;
       }
       const log = { direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp, by: email };
-      if (!x.phone) { noPhone++; Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
+      if (!x.phone) { noPhone++; notSent.push(x.name + ' (no mobile phone)'); Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
       else if (!live) { Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' }); }
       else {
         let r;
