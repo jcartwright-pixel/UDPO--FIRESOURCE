@@ -498,6 +498,10 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 /* Joe 11/6: "87% OF RUNS COVERED" beside the title, red until every run has a driver, green at 100%. */
 .wk-covered { flex: none; background: var(--red); color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .02em; line-height: 1; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
 .wk-covered.full { background: var(--green); }
+/* Never wider than the screen: on a phone or tablet the box drops under the title and its words wrap, never cut. */
+.weekly-page .head .title { max-width: 100%; min-width: 0; }
+.wk-covered { max-width: 100%; }
+@media (max-width: 1024px) { .wk-covered { white-space: normal; line-height: 1.15; } }
 /* On a laptop the longer buttons go onto two lines so the figure and every button still fit on the title line. */
 @media (max-width: 1700px) {
   .weekly-page .head .actions.in-head :is(button, a.button) { white-space: normal; max-width: 124px; line-height: 1.1; padding-left: 8px; padding-right: 8px; text-align: center; justify-content: center; }
