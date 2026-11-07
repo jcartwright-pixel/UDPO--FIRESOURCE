@@ -502,6 +502,10 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 @media (max-width: 1700px) {
   .weekly-page .head .actions.in-head :is(button, a.button) { white-space: normal; max-width: 124px; line-height: 1.1; padding-left: 8px; padding-right: 8px; text-align: center; justify-content: center; }
   .weekly-page .head .actions.in-head #publish { max-width: 160px; }
+  /* Joe 11/7 (full test at 1536): a button whose words need three lines grows to hold them instead of cutting the last line
+     off; the buttons on the row all take the tallest one's height. */
+  .weekly-page .head .actions.in-head { align-items: stretch; }
+  .weekly-page .head .actions.in-head :is(button, a.button) { height: auto; min-height: 42px; padding-top: 3px; padding-bottom: 3px; }
 }
 .weekly-page .week td { height: 40px; }
 
