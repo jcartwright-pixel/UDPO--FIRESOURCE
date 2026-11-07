@@ -2995,6 +2995,12 @@ async function writes() {
         if (short && noKeys && !/Set up Administration > Texts first/.test(s.title || '')) bad.push(url + ': the short line\'s hover does not say to set up Administration > Texts (' + (s.title || 'nothing') + ')');
         if (!s.disabled && !noKeys) note(url + ': the strip\'s button is not greyed (a Twilio account is saved); not pressed');
         if (noKeys && !s.disabled) bad.push(url + ': with no Twilio account the button is not greyed');
+        // 6.91 (#696): after this week's send, a green N OF N SENT or red N OF N SENT · N MISSING and Text the Missing (never pressed).
+        const cnt = await p.evaluate(() => { const c = document.querySelector('#send-texts .send-count'); return c ? { text: c.textContent.trim(), good: c.classList.contains('good') } : null; });
+        rec[url].count = cnt;
+        if (cnt && !/^\d+ OF \d+ SENT( · \d+ MISSING)?$/.test(cnt.text)) bad.push(url + ': the sent check reads ' + cnt.text);
+        if (!cnt && /sent/i.test(s.words) && !/not sent/i.test(s.words)) bad.push(url + ': the week is sent but there is no sent check');
+        if (!cnt) note(url + ': this week is not sent on the practice copy, so the N OF N SENT check and Text the Missing do not show');
         await shot(p, 'send-texts-' + url.replace(/\W+/g, '-'));
       }
     }
@@ -4400,7 +4406,7 @@ async function writes() {
   // BOL). The Hub BOL itself is checked on the Pallet Builder BOL step.
   await write('Pallet Builder case counts and a pallet (6.89)', async (p0, rec) => {
     const p = await newPage({ viewport: { width: 1536, height: 790 } });
-    await p.addInitScript(() => { Object.defineProperty(window, 'udBol', { configurable: true, get: () => null, set: () => {} }); });
+    await p.addInitScript(() => { Object.defineProperty(window, 'udBol', { configurable: true, get: () => null, set: () => {} }); Object.defineProperty(window, 'udBolDays', { configurable: true, get: () => [], set: () => {} }); });
     try {
     const bad = [];
     const r = require('module').createRequire(path.join(__dirname, '..', '..', 'package.json'));
@@ -4416,7 +4422,7 @@ async function writes() {
     rec.spots = (await fr.locator('label[for="spots"]').count()) + (await fr.getByText('Truck pallet spots').count());
     if (rec.spots) bad.push('the Truck pallet spots step is still there');
     const before = await fr.locator('#routePick option').count();
-    await fr.locator('#newRoute').click();
+    await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#newRoute').click();
     await fr.locator('#route').fill('PRACTICE TEST PALLET');
     await fr.locator('#route').dispatchEvent('input');
     await fr.locator('#route').dispatchEvent('change');
@@ -4439,7 +4445,7 @@ async function writes() {
     if (!/pallet/i.test(rec.tiles.join(' ') + ' ' + rec.pallets)) bad.push('no pallets in the load plan');
     await shot(p, 'pallet-builder-test-route');
     // The test route is deleted (it lives only in this browser).
-    await fr.locator('#delRoute').click();
+    await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#delRoute').click();
     await fr.locator('#delYes').click({ timeout: 5000 }).catch(() => {});
     await p.waitForTimeout(500);
     rec.routesAfter = await fr.locator('#routePick option').allInnerTexts();
@@ -4454,7 +4460,7 @@ async function writes() {
       await fr.locator('#routePick').selectOption(String(pickAt));
       await p.waitForTimeout(400);
       const nBefore = await fh.evaluate(() => DB.routes.length);
-      await fr.locator('#dupRoute').click();
+      await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#dupRoute').click();
       await p.waitForTimeout(600);
       const cp = await fh.evaluate(() => ({ n: DB.routes.length, cur: DB.cur, name: S.route }));
       rec.copy = cp.name;
@@ -4558,7 +4564,7 @@ async function writes() {
         rec.fromBol = (await fr.locator('#lmMsg').textContent()).trim();
         if (rec.fromBol !== 'Back to the load sequence from the BOL.') bad.push('Back to BOL load seq: "' + rec.fromBol + '"');
         // The test copy is deleted.
-        await fr.locator('#delRoute').click();
+        await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#delRoute').click();
         await fr.locator('#delYes').click({ timeout: 5000 }).catch(() => {});
         await p.waitForTimeout(500);
         const left = await fh.evaluate(c => ({ n: DB.routes.length, has: DB.routes.some(r => r.route === c) }), cp.name);
@@ -4590,7 +4596,7 @@ async function writes() {
         const fm = await (await p.$('#builder')).contentFrame();
         await fr.locator('#routePick').selectOption(String(use.i));
         await p.waitForTimeout(400);
-        await fr.locator('#dupRoute').click();
+        await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#dupRoute').click();
         await p.waitForTimeout(500);
         await fr.locator('#route').fill(testName);
         await fr.locator('#route').dispatchEvent('input');
@@ -4599,7 +4605,7 @@ async function writes() {
         const line = async () => (await fr.locator('#mapMsg').textContent()).trim();
         rec.mapOpen = { msg: (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME'), disabled: await fr.locator('#lmSave').isDisabled(), route: await fm.evaluate(() => S.route) };
         if (rec.mapOpen.route !== testName) bad.push('the builder copy is named ' + rec.mapOpen.route);
-        else if (!/^Same as the route map\./.test(rec.mapOpen.msg) || !rec.mapOpen.disabled) bad.push('the test route opens with "' + rec.mapOpen.msg + '"' + (rec.mapOpen.disabled ? '' : ' and Save to route map not greyed'));
+        else if (!/^SAME AS THE ROUTE MAP\./.test(rec.mapOpen.msg) || !rec.mapOpen.disabled) bad.push('the test route opens with "' + rec.mapOpen.msg + '"' + (rec.mapOpen.disabled ? '' : ' and Save to route map not greyed'));
         else {
           // Change one BOL customer's load sequence to one the route does not use.
           const ch = await fm.evaluate(() => { const c = seqChanges(), r = c.rows.find(x => !x.st.sub && x.e && x.n); if (!r) return null; const n = Math.max(...c.rows.map(x => x.n || 0)) + 1; return { i: r.i, n, key: r.e.key }; });
@@ -4609,7 +4615,7 @@ async function writes() {
             await box.fill(String(ch.n)); await box.dispatchEvent('change');
             await p.waitForTimeout(500);
             rec.mapChanged = { msg: (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME'), disabled: await fr.locator('#lmSave').isDisabled() };
-            if (!/^1 sequence changed since the route map \(1 customer\)\./.test(rec.mapChanged.msg) || rec.mapChanged.disabled) bad.push('after changing one load sequence the line reads "' + rec.mapChanged.msg + '"');
+            if ((!/^1 LOAD SEQUENCE CHANGED\b/.test(rec.mapChanged.msg) || /TO ADD/.test(rec.mapChanged.msg)) || rec.mapChanged.disabled) bad.push('after changing one load sequence the line reads "' + rec.mapChanged.msg + '"');
             // Print sequence changes: the page is filled; the printer is never used.
             await fm.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; });
             await fr.locator('#lmPrint').click();
@@ -4627,13 +4633,15 @@ async function writes() {
             const st0 = tBefore.stops || [], st1 = (tAfter && tAfter.stops) || [];
             rec.mapDoc = { rev: [tBefore.rev, tAfter && tAfter.rev], sameStops: st0.length === st1.length && st0.every((x, j) => st1[j] && st1[j].key === x.key && (st1[j].note || '') === (x.note || '')),
               newSeq: (st1.find(x => x.key === ch.key) || {}).loadSeq, othersSame: st0.every((x, j) => x.key === ch.key || (+(st1[j] || {}).loadSeq || 0) === (+x.loadSeq || 0)) };
-            if (!/^Saved 1 customer to the route map\./.test(rec.mapSaved)) bad.push('Save to route map answered "' + rec.mapSaved + '"');
+            if (!/^SAVED: \d+ CUSTOMERS?, THEIR LOAD SEQUENCES AND RUN ORDER/.test(rec.mapSaved)) bad.push('SAVE TO ROUTE MAP answered "' + rec.mapSaved + '"');
+            // 6.91 (#693): nothing was added to the Customer List (every customer on the test route is on it already).
+            if (p.w.calls.some(c => c.op === 'saveCustomer')) bad.push('SAVE TO ROUTE MAP added a customer to the Customer List');
             if (+rec.mapDoc.newSeq !== ch.n || !rec.mapDoc.sameStops || !rec.mapDoc.othersSame) bad.push('the test route day after Save reads ' + JSON.stringify(rec.mapDoc));
             await shot(p, 'pallet-builder-saved-to-route-map');
           }
         }
         // Delete the builder copy.
-        if (await fm.evaluate((n) => S.route === n, testName)) { await fr.locator('#delRoute').click(); await fr.locator('#delYes').click({ timeout: 5000 }).catch(() => {}); await p.waitForTimeout(500); }
+        if (await fm.evaluate((n) => S.route === n, testName)) { await fr.locator('details.more').evaluate(d => { d.open = true; }); await fr.locator('#delRoute').click(); await fr.locator('#delYes').click({ timeout: 5000 }).catch(() => {}); await p.waitForTimeout(500); }
         if (await fm.evaluate((n) => DB.routes.some(r => r.route === n), testName)) bad.push('the builder copy of the test route was not deleted');
       } finally {
         const lg = await logs(); rec.mapLogRows = lg.length; for (const ref of lg) await ref.delete();
@@ -5017,7 +5025,10 @@ async function writes() {
           scrollTop: Math.round((document.getElementById('tech-name') || { getBoundingClientRect: () => ({ top: -1 }) }).getBoundingClientRect().top) }; }, NAME);
       if (!/^Garage Technicians · /.test(rec.techs.title)) bad.push('Garage Technicians opens with ' + (rec.techs.title || 'no title'));
       if (!rec.techs.rules) bad.push('Garage Technicians has no Service Rules and Units button');
-      if (rec.techs.own !== 'Signs in with employee ID') bad.push('the made-up technician\'s line reads ' + rec.techs.own);
+      if (rec.techs.own !== 'On the Employees list') bad.push('the made-up technician\'s line reads ' + rec.techs.own);
+      // 6.91 (#694): each row shows its LOGIN ID in a box, the employee ID filled in by itself.
+      rec.loginBox = await p.evaluate((nm) => { const row = [...document.querySelectorAll('.fs-techs tr')].find(tr => ((tr.querySelector('td.strong') || {}).textContent || '').indexOf(nm) === 0); const b = row && row.querySelector('input[data-login-tech]'); return b ? b.value : 'no box'; }, NAME);
+      if (rec.loginBox.replace(/^0+/, '') !== '5678') bad.push('the made-up technician\'s LOGIN ID box reads ' + (rec.loginBox === 'no box' ? 'nothing (no box)' : 'another number'));
       if (!rec.techs.add) bad.push('Garage Technicians has no Add Technician for the administrator');
       else {
         let ok2 = '';
@@ -5041,7 +5052,9 @@ async function writes() {
         if (ok2) {
           const line2 = await p.evaluate((nm) => { const row = [...document.querySelectorAll('.fs-techs td.strong')].find(td => td.textContent.indexOf(nm) === 0); return row ? (row.querySelector('.fs-emp') || {}).textContent || 'no line' : 'not listed'; }, NAME2);
           rec.line2 = line2;
-          if (line2 !== 'Signs in with employee ID') bad.push('the added technician\'s line reads ' + line2);
+          if (line2 !== 'On the Employees list') bad.push('the added technician\'s line reads ' + line2);
+          const box2 = await p.evaluate((nm) => { const row = [...document.querySelectorAll('.fs-techs tr')].find(tr => ((tr.querySelector('td.strong') || {}).textContent || '').indexOf(nm) === 0); const b = row && row.querySelector('input[data-login-tech]'); return b ? b.value : 'no box'; }, NAME2);
+          if (box2.replace(/^0+/, '') !== ok2.replace(/^0+/, '')) bad.push('the added technician\'s LOGIN ID box does not show its employee ID');
           rec.boxesCleared = (await p.inputValue('#tech-name')) === '' && (await p.inputValue('#tech-login')) === '';
           if (!rec.boxesCleared) bad.push('the Add Technician boxes were not cleared after the add');
         }
@@ -5169,6 +5182,38 @@ async function writes() {
     const fr = p.frameLocator('#builder');
     await fr.locator('#dayTable tr').first().waitFor({ timeout: 30000 });
     const fm = await (await p.$('#builder')).contentFrame();
+    // 6.91 (#693): BOL DAY at the top opens on the newest BOL; DAY BEFORE brings an older day's routes in and DAY AFTER goes back;
+    // the green SAVE TO ROUTE MAP is at the top; New/Copy/Delete route are under MORE ROUTE TOOLS. Nothing is saved here.
+    const dayLook = () => fm.evaluate(() => { const q = (id) => document.getElementById(id); const sv = q('lmSave'), more = document.querySelector('details.more');
+      return { days: [...q('dayPick').options].map(o => o.value), picked: q('dayPick').value, line: q('dayLine').textContent.trim(), prev: { off: q('dayPrev').disabled, title: q('dayPrev').title, text: q('dayPrev').textContent.trim() },
+        next: { off: q('dayNext').disabled, title: q('dayNext').title, text: q('dayNext').textContent.trim() }, route: S.route, save: sv ? sv.textContent.trim() : '', saveTop: sv ? Math.round(sv.getBoundingClientRect().top) : -1,
+        more: more ? (more.querySelector('summary') || {}).textContent.trim() : '', inMore: !!(more && more.querySelector('#newRoute') && more.querySelector('#dupRoute') && more.querySelector('#delRoute') && more.querySelector('#route')) }; });
+    const d0 = await dayLook();
+    rec.bolDay = { days: d0.days.length, line: d0.line, prev: d0.prev, next: d0.next, save: d0.save, saveTop: d0.saveTop, more: d0.more, inMore: d0.inMore };
+    if (!d0.days.length || d0.picked !== d0.days[0]) bad.push('BOL DAY does not open on the newest day (' + d0.picked + ' of ' + d0.days.join(', ') + ')');
+    if (!/^BOL FOR [A-Z]+DAY \d{1,2}-\d{1,2}-\d\d · \d+ ROUTES? (· RECEIVED .+ )?· NEWEST BOL$/.test(d0.line)) bad.push('the BOL DAY line reads "' + d0.line + '"');
+    if (d0.prev.text !== '◀ DAY BEFORE' || d0.next.text !== 'DAY AFTER ▶') bad.push('the day buttons read ' + d0.prev.text + ' / ' + d0.next.text);
+    if (!d0.next.off || d0.next.title !== 'This is the newest BOL.') bad.push('DAY AFTER on the newest BOL is ' + (d0.next.off ? 'greyed, saying "' + d0.next.title + '"' : 'not greyed'));
+    if (d0.save !== 'SAVE TO ROUTE MAP') bad.push('the save button reads ' + (d0.save || 'nothing'));
+    if (d0.more !== 'MORE ROUTE TOOLS' || !d0.inMore) bad.push('New, Copy and Delete route and the route name are not under MORE ROUTE TOOLS');
+    if (d0.days.length > 1) {
+      if (d0.prev.off) bad.push('DAY BEFORE is greyed with ' + d0.days.length + ' BOL days');
+      await fr.locator('#dayPrev').click(); await p.waitForTimeout(800);
+      const d1 = await dayLook();
+      rec.bolDay.before = { picked: d1.picked, line: d1.line, route: d1.route };
+      if (d1.picked !== d0.days[1] || /NEWEST BOL/.test(d1.line) || !/^BOL FOR /.test(d1.line)) bad.push('DAY BEFORE went to ' + d1.picked + ' ("' + d1.line + '")');
+      const dd = d0.days[1].split('-'), want = '/' + dd[1] + '/' + dd[2].slice(-2);
+      if (d1.route === d0.route || !String(d1.route).replace(/\b0/g, '').includes(want.replace(/\b0/g, '').slice(0, 3))) note('Pallet Builder: after DAY BEFORE the open route is ' + d1.route);
+      await shot(p, 'pallet-builder-bol-day-before');
+      await fr.locator('#dayNext').click(); await p.waitForTimeout(800);
+      const d2 = await dayLook();
+      if (d2.picked !== d0.days[0] || !/NEWEST BOL$/.test(d2.line)) bad.push('DAY AFTER did not come back to the newest BOL (' + d2.picked + ')');
+    } else {
+      if (!d0.prev.off || d0.prev.title !== 'There is no BOL before this day.') bad.push('DAY BEFORE with one BOL day is ' + (d0.prev.off ? 'greyed, saying "' + d0.prev.title + '"' : 'not greyed'));
+      note('Pallet Builder: only one BOL day on the practice copy, so DAY BEFORE was checked greyed only');
+    }
+    await fr.locator('#dayPick').scrollIntoViewIfNeeded().catch(() => {});
+    await shot(p, 'pallet-builder-bol-day');
     const plant = await p.evaluate(() => import('./js/app.js').then(m => m.currentPlant()));
     const keys = await fm.evaluate(() => DB.routes.map((x, i) => { const k = routeKey(x); return k ? { i, route: k.route, day: k.day, n: x.stops.filter(st => !st.sub).length } : null; }).filter(Boolean));
     let use = null;
@@ -5248,7 +5293,7 @@ async function writes() {
     } else bad.push('no Edit button on the Product Sheet for the administrator');
     // Help: the ? on each opens its own part, and the part has the new words.
     rec.help = {};
-    for (const [pg, title, words] of [['pallet-builder.html', 'Pallet Builder', /PALLET USES/], ['products.html', 'Product Sheet', /Cases and Pallets/], ['daily.html', 'Daily Dispatch', /Not set up yet/]]) {
+    for (const [pg, title, words] of [['pallet-builder.html', 'Pallet Builder', /BOL DAY[\s\S]*PALLET USES/], ['manager.html?report=1', 'Send Current Report', /Case Loadout forecast/], ['products.html', 'Product Sheet', /Cases and Pallets/], ['daily.html', 'Daily Dispatch', /Not set up yet/]]) {
       await open(p, pg);
       await p.waitForTimeout(1500);
       const href = await p.evaluate(() => import('./js/help.js').then(m => m.helpHref()).catch(() => ''));
@@ -5335,8 +5380,8 @@ async function writes() {
     await blankPeople(p); await shot(p, 'late-forecast');
     // Help.
     rec.help = {};
-    for (const [pg, title, words] of [['weekly.html?view=live', 'Weekly Dispatch', /OF RUNS COVERED/], ['weekly.html', 'Weekly Dispatch Template', /OF RUNS COVERED/], ['fleet.html?view=techs', 'Garage Technicians', /Signs in with employee ID/],
-      ['administration.html?item=garage-techs', 'Garage Technicians', /Signs in with employee ID/], ['texts.html', 'Texts', /Text these drivers yourself/], ['forecast.html', 'Late Forecast', /hour of the night/]]) {
+    for (const [pg, title, words] of [['weekly.html?view=live', 'Weekly Dispatch', /OF RUNS COVERED/], ['weekly.html', 'Weekly Dispatch Template', /OF RUNS COVERED/], ['fleet.html?view=techs', 'Garage Technicians', /LOGIN ID/],
+      ['administration.html?item=garage-techs', 'Garage Technicians', /LOGIN ID/], ['texts.html', 'Texts', /Text these drivers yourself/], ['forecast.html', 'Late Forecast', /hour of the night/]]) {
       await open(p, pg);
       await p.waitForTimeout(1500);
       const href = await p.evaluate(() => import('./js/help.js').then(m => m.helpHref()).catch(() => ''));
@@ -5351,6 +5396,43 @@ async function writes() {
     }
     if (p.w.calls.some(c => c.fn === 'save' || /send/i.test(String(c.op || '')))) bad.push('the test saved or sent something: ' + p.w.calls.filter(c => c.fn === 'save' || /send/i.test(String(c.op || ''))).map(c => c.fn + ':' + c.op).join(', '));
     if (p.w.errors.length) bad.push('page errors: ' + p.w.errors.slice(0, 3).join(' | '));
+    rec.bad = bad;
+    if (bad.length) throw new Error(bad.join('; '));
+  });
+  // 6.91 (#693, look only, the practice copy's data): the customer-list October load ran here: every October customer is on the
+  // Uniontown Customer List and on its route day, and Helds is account 811496 (811495 is on no route day and is not active).
+  await write('Customer List October customers and Helds 811496 on practice (6.91, look only)', async (p, rec) => {
+    const bad = [];
+    const r = require('module').createRequire(path.join(__dirname, '..', '..', 'package.json'));
+    const db = r('firebase-admin/firestore').getFirestore(r('firebase-admin').app('audit'));
+    const LOAD = require(path.join(__dirname, '..', '..', 'src', 'loads', 'customer-list-october-2026-11-07.json'));
+    const mark = (await db.collection('dataLoads').doc(LOAD.id).get()).data();
+    rec.mark = mark ? { status: mark.status, doneAt: mark.doneAt, counts: mark.counts } : 'none';
+    if (!mark || mark.status !== 'DONE') bad.push('the October load has not run on the practice copy (' + JSON.stringify(rec.mark) + ')');
+    const cust = (await db.collection('udclCustomers').where('plant', '==', LOAD.plant).get()).docs.map(d => d.data());
+    const days = (await db.collection('udclRouteDays').where('plant', '==', LOAD.plant).get()).docs.map(d => d.data());
+    const letters = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const miss = [], off = [], noDay = [];
+    for (const [route, day, account, , name] of LOAD.lines) {
+      const c = cust.find(x => account && String(x.account) === String(account)) || cust.find(x => letters(x.name) === letters(name));
+      if (!c) { miss.push(name); continue; }
+      if (c.active === false) off.push(name);
+      const rd = days.find(x => String(x.route) === String(route) && String(x.day) === String(day));
+      if (!rd || !(rd.stops || []).some(st => st.key === c.key)) noDay.push(route + ' ' + day + ' ' + name);
+    }
+    rec.october = { lines: LOAD.lines.length, missing: miss.length, notActive: off.length, notOnRouteDay: noDay.length };
+    if (miss.length) bad.push(miss.length + ' October customers are not on the Customer List (' + miss.slice(0, 3).join(', ') + ')');
+    if (off.length) bad.push(off.length + ' October customers are not active (' + off.slice(0, 3).join(', ') + ')');
+    if (noDay.length) bad.push(noDay.length + ' October stops are not on their route day (' + noDay.slice(0, 3).join('; ') + ')');
+    const helds = cust.filter(x => String(x.account) === '811496'), old = cust.filter(x => String(x.account) === '811495');
+    const oldOn = days.filter(d => (d.stops || []).some(st => old.some(o => o.key === st.key) || String(st.account) === '811495')).map(d => d.route + ' ' + d.day);
+    const newOn = days.filter(d => (d.stops || []).some(st => helds.some(o => o.key === st.key))).map(d => d.route + ' ' + d.day);
+    rec.helds = { name: helds.map(x => x.name).join(', '), active: helds.every(x => x.active !== false), oldActive: old.filter(x => x.active !== false).length, oldOn, newOn };
+    if (!helds.length) bad.push('no customer has account 811496');
+    else if (!/^HELDS/.test(helds[0].name) || !rec.helds.active) bad.push('account 811496 reads ' + rec.helds.name + (rec.helds.active ? '' : ' (not active)'));
+    if (oldOn.length) bad.push('the old Helds account 811495 is still on ' + oldOn.join(', '));
+    if (rec.helds.oldActive) bad.push('the old Helds account 811495 is still active');
+    if (helds.length && !newOn.length) bad.push('Helds 811496 is on no route day');
     rec.bad = bad;
     if (bad.length) throw new Error(bad.join('; '));
   });
@@ -6304,6 +6386,23 @@ async function writes() {
       if (!/\d+ of \d+ loaded/.test(rec.report.forecast) || !/(Case|Boxing|Tote|Tanker) Loadout/.test(rec.report.forecast)) bad.push('the recap does not say how many are loaded per loadout: ' + rec.report.forecast.slice(0, 160));
     } else note('Shift report: no forecast section on Manager Center right now (' + rec.report.banner + ')');
     if (!/ROUTES? LATE|ROUTES? BEHIND|WILL MISS|WILL BE LATE|LOADED LATE|ALL ROUTES ON TIME/.test(rec.report.banner)) bad.push('the banner reads ' + rec.report.banner);
+    // 6.91 (#692): under the recap, the CASE LOADOUT FORECAST box: one finish time for every case load, then one line per truck
+    // time still ahead with its loads, DONE ABOUT and the TIME TO SPARE (or LATE); above the Downtime line.
+    rec.box = await p.evaluate(() => { const b = document.getElementById('rp-body'); const t = b ? b.innerText.replace(/[ \t]+/g, ' ') : ''; const at = t.indexOf('CASE LOADOUT FORECAST');
+      const box = [...(b ? b.querySelectorAll('div') : [])].find(d => /^CASE LOADOUT FORECAST/.test((d.firstElementChild || {}).textContent || '') && d.firstElementChild.tagName === 'DIV');
+      const rows = box ? [...box.querySelectorAll('table tr')].map(tr => [...tr.children].map(td => td.textContent.trim())) : [];
+      return { at, down: Math.max(t.indexOf('NO DOWNTIME'), t.indexOf('DOWN ')), recap: t.search(/Recap \(estimated\)/), text: box ? box.innerText.replace(/\s+/g, ' ').slice(0, 300) : '', rows }; });
+    if (rec.box.at < 0) note('Shift report: no CASE LOADOUT FORECAST box (no case loads still to load on the practice copy right now)');
+    else {
+      if (!/ALL CASE LOADS DONE ABOUT [A-Z]{3} \d{1,2}:\d\d [AP]M|ALL CASE LOADS DONE ABOUT \d{1,2}:\d\d [AP]M/.test(rec.box.text)) bad.push('the forecast box does not give one finish time: ' + rec.box.text.slice(0, 120));
+      if (rec.box.rows.length) {
+        if (rec.box.rows[0].join('|') !== 'TRUCK LEAVES|LOADS|DONE ABOUT|TIME TO SPARE') bad.push('the truck time columns read ' + rec.box.rows[0].join(', '));
+        const odd = rec.box.rows.slice(1).filter(r => r.length !== 4 || !/^\d+ LOADS?$/.test(r[1]) || !/\d:\d\d [AP]M/.test(r[2]) || !/^(JUST IN TIME|LATE .+|\d.*(HR|MIN).*)$/.test(r[3]));
+        if (odd.length) bad.push('truck time lines read ' + JSON.stringify(odd.slice(0, 2)));
+        if (!/EVERY TRUCK READY IN TIME|\d+ TRUCK TIMES? WILL BE LATE/.test(rec.box.text)) bad.push('the forecast box does not say whether every truck is ready');
+      }
+      if (rec.box.down >= 0 && rec.box.down < rec.box.at) bad.push('the Downtime line is above the forecast box');
+    }
     await shot(p, 'manager-forecast');
     if (p.w.calls.some(c => /send/i.test((c.op || '') + c.fn))) bad.push('looking at the report sent something');
     } finally { await own.remove(); }
