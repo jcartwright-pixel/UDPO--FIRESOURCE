@@ -1265,7 +1265,9 @@ function validFacility(v, SaveError) {
 // Joe 10/11: one product list holds everything about each product: UPC, full speed per minute (RedZone's Rate/Min), Target %
 // (RedZone's), the allowed speed range per minute, and shelf life (days from the run date to the code date). The same names are in
 // public/js/products.js (FIELDS) and are read by the Line Targets, line tablet and TV screens; blank ones are left off.
-const PRODUCT_NUMBERS = [['ratePerMin', 'Full Speed Per Min', 100000], ['targetPct', 'Target %', 100], ['minSpeed', 'Lowest Speed', 100000], ['maxSpeed', 'Highest Speed', 100000], ['shelfLifeDays', 'Shelf Life Days', 3650], ['fillGrams', 'Target Fill Weight g', 20000]];
+const PRODUCT_NUMBERS = [['ratePerMin', 'Full Speed Per Min', 100000], ['targetPct', 'Target %', 100], ['minSpeed', 'Lowest Speed', 100000], ['maxSpeed', 'Highest Speed', 100000], ['shelfLifeDays', 'Shelf Life Days', 3650], ['fillGrams', 'Target Fill Weight g', 20000],
+  // Joe 11-6-26: for the Pallet Builder (public/js/products.js PALLET_FIELDS); weights in pounds.
+  ['unitsPerCase', 'Units In A Case', 1000], ['casesPerPallet', 'Cases To A Pallet', 1000], ['stackHeight', 'Stack Height', 100], ['caseNetLbs', 'Net Weight Full Case lb', 2000], ['caseGrossLbs', 'Gross Weight Full Case lb', 2000]];
 // An upload never wipes these: a file that leaves one blank or out keeps what the product has.
 const PRODUCT_KEEP = ['upc'].concat(PRODUCT_NUMBERS.map(x => x[0]));
 function productRows(list, SaveError) {
@@ -1282,7 +1284,7 @@ function productRows(list, SaveError) {
       if (t === '') return;
       const n = Number(t.replace(/,/g, ''));
       if (!isFinite(n) || n < 0 || n > max) throw new SaveError('BAD_REQUEST', row.name + ': ' + label + ' must be a number from 0 to ' + max + '.');
-      row[k] = k === 'shelfLifeDays' ? Math.round(n) : Math.round(n * 100) / 100;
+      row[k] = ['shelfLifeDays', 'unitsPerCase', 'casesPerPallet', 'stackHeight'].indexOf(k) >= 0 ? Math.round(n) : Math.round(n * 100) / 100;
     });
     if (row.minSpeed !== undefined && row.maxSpeed !== undefined && row.minSpeed > row.maxSpeed) throw new SaveError('BAD_REQUEST', row.name + ': Lowest Speed is above Highest Speed.');
     const key = row.name.toUpperCase();
