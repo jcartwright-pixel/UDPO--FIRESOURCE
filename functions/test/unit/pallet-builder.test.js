@@ -214,6 +214,36 @@ test('Pallet Builder opens with the newest BOL from the Hub (Joe 11-6-26, lb), s
   assert.match(src, /const BOLDAYS = HUBDAYS\.concat\(/, 'the Hub BOL days and the built-in one, newest first');
 });
 
+test('the Hub BOL days come from the server when the screen cannot read them itself (Joe 11-7-26: only Thursday showed)', async () => {
+  const page = fs.readFileSync(PB.OUT, 'utf8');
+  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/(app|firebase|products)\.js';/g, '');
+  const calls = [], window = { UDLogic: L };
+  const day = { date: '2026-11-06', received: '2026-11-06T15:59:00.000Z', routes: [{ route: '805', stops: [{ seq: 3, custNo: '1001', name: 'MADEUP MARKET', lines: [{ item: '305', qty: 4 }] }] }] };
+  const callServer = async (name, data) => { calls.push([name, data]); return { days: [day] }; };
+  // start() is not there (as when the direct read fails), so it asks the server.
+  new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, callServer, () => 'fac_uniontown', (e) => e.message);
+  const days = await window.udReadBolDays();
+  assert.deepEqual(calls.map(c => [c[0], c[1].bolDays]), [['save', true]]);
+  assert.equal(days.length, 1); assert.equal(days[0].date, '2026-11-06'); assert.equal(days[0].routes[0].route, 'RT 805 · 11/06/26');
+  // Both fail: the reason comes back, for the red line.
+  new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, async () => { const e = new Error('no'); e.code = 'functions/permission-denied'; throw e; }, () => 'fac_uniontown', (e) => e.message);
+  await assert.rejects(window.udReadBolDays(), e => /permission-denied/.test(e.message));
+});
+
+test('the server reads the newest BOL days for the screens, newest first, only what they use', async () => {
+  const B = require('../../src/bol');
+  const docs = [{ date: '2026-11-06', received: { toDate: () => new Date('2026-11-06T15:59:00Z') }, file: 'x.pdf', totals: {}, routes: [{ route: 805, lines: 9, stops: [{ seq: 3, custNo: '1001', name: 'MADEUP MARKET', lines: [{ item: 305, desc: 'GAL', qty: '4' }], qty: 4 }] }] },
+    { date: '2026-11-05', received: '2026-11-05T20:00:00.000Z', routes: [] }, { routes: [] }];
+  let asked = null;
+  const db = { collection: (c) => ({ orderBy: (f, d) => ({ limit: (n) => ({ get: async () => { asked = [c, f, d, n]; return { docs: docs.map(x => ({ data: () => x })) }; } }) }) }) };
+  const out = await B.recentDays(db, 14);
+  assert.deepEqual(asked, ['bolDays', 'date', 'desc', 14]);
+  assert.deepEqual(out[0], { date: '2026-11-06', received: '2026-11-06T15:59:00.000Z', savedAt: '', routes: [{ route: '805', stops: [{ seq: 3, custNo: '1001', name: 'MADEUP MARKET', lines: [{ item: '305', qty: 4 }] }] }] });
+  assert.equal(out.length, 2, 'a day with no date is left out');
+  const src = fs.readFileSync(require('path').join(__dirname, '../../index.js'), 'utf8');
+  assert.match(src, /request\.data\.bolDays === true\) return \{ days: await require\('\.\/src\/bol'\)\.recentDays\(PLANTS\.companyDb\(db\)/);
+});
+
 test('Pallet Rules and PALLET USES go to the Customer List through its own server call; the cases come with the route map', async () => {
   const day = DAY();
   day.palletRules = { standard: 'HIGH', weeks: 5, cratesPerPallet: 54, cratesPerStack: 6, dispensersPerPallet: 45 };

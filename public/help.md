@@ -847,6 +847,8 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 17. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** follows Pallet Rules). It saves by itself, and the Customer List shows the same pick.
 18. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (HIGH unless changed), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
 
+> When the Hub has no BOL days, or they could not be read, a red line under the day says so (and why), and the day line ends **THE BOL BUILT INTO PALLET BUILDER**: that is the 11-5-26 BOL that comes with the builder, not the newest one. Press Ctrl+F5; if the red line stays, send a picture of it.
+
 > When a newer BOL comes in for the same day (more orders keyed), opening Pallet Builder again puts it in place of the older one on those routes.
 
 > Held space is shaded with stripes on the truck and counted in the pallets, so a customer that is lighter today still keeps its whole pallet (in summer a full pallet, maybe half in winter). The builder never makes the space smaller on its own; only **PALLET USES** or **PALLET RULES** change it. **HELD SPACE** under the truck says how many cases of space are held.

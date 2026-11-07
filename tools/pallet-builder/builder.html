@@ -203,6 +203,7 @@ details.items[open]>summary{margin-bottom:8px}
 .daystep{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .daystep button{font-size:18px;padding:10px 14px}
 .dayline{margin:0;font-size:20px;font-weight:700;text-transform:uppercase}
+.daybad{margin:0;font-size:18px;font-weight:700;color:#b4471f}
 .savebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 button.save{font-size:22px;font-weight:800;padding:14px 22px;background:#1f7a4d;border-color:#1f7a4d;color:#fff}
 button.save[disabled]{background:var(--line);border-color:var(--line);color:var(--muted);cursor:not-allowed}
@@ -226,6 +227,7 @@ details.more .controls{margin-top:10px}
       <label class="f big" for="routePick"><span>ROUTE</span><select id="routePick"></select></label>
     </div>
     <p class="dayline" id="dayLine"></p>
+    <p class="daybad" id="dayBad" hidden></p>
     <div class="savebar"><button class="save" id="lmSave" type="button">SAVE TO ROUTE MAP</button><span class="savemsg" id="mapMsg"></span></div>
     <details class="more"><summary>MORE ROUTE TOOLS</summary>
       <div class="controls">
@@ -780,6 +782,9 @@ DB = load();
 // on the newest; DAY BEFORE / DAY AFTER step through them; picking a day brings its routes in and opens its first route.
 const HUBDAYS = (() => { try { const p = window.parent && window.parent !== window ? window.parent : null; const list = p && (p.udBolDays || (p.udBol ? [p.udBol] : null)); return (list || []).filter(b => b && b.routes && b.routes.length); } catch(e){ return []; } })();
 const HUBBOL = HUBDAYS[0] || null;
+// Why the Hub's BOL days are not here: '' when they were read (or the page is on its own), else the reason.
+const HUBERR = (() => { try { const p = window.parent && window.parent !== window ? window.parent : null; return p ? String(p.udBolError || '') : ''; } catch(e){ return ''; } })();
+const HUBASKED = (() => { try { return !!(window.parent && window.parent !== window && 'udBolDays' in window.parent); } catch(e){ return false; } })();
 const BUILTIN_DAY = {key: DAYKEY, date: '2026-11-05', routes: BOLDAY, builtIn: true};
 const BOLDAYS = HUBDAYS.concat(HUBDAYS.some(d => d.date === BUILTIN_DAY.date) ? [] : [BUILTIN_DAY]).sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : 0);
 const DAYTEXT = iso => { const [y, m, d] = String(iso || '').split('-').map(Number); if (!y) return ''; const dt = new Date(y, m - 1, d, 12); return WDN[WD[dt.getDay()]].toUpperCase() + ' ' + DT(dt.toISOString()); };
@@ -821,7 +826,12 @@ function renderDayPick(){
   $('dayPrev').disabled = i < 0 || i >= BOLDAYS.length - 1; $('dayPrev').title = $('dayPrev').disabled ? 'There is no BOL before this day.' : '';
   $('dayNext').disabled = i <= 0; $('dayNext').title = $('dayNext').disabled ? 'This is the newest BOL.' : '';
   const day = BOLDAYS[i], n = dayRoutes(DAYSEL).length, when = day && day.routes[0] && day.routes[0].bolAt ? new Date(day.routes[0].bolAt) : null;
-  $('dayLine').textContent = `BOL FOR ${DAYTEXT(DAYSEL)} · ${n} ROUTE${n === 1 ? '' : 'S'}` + (when && !isNaN(when) ? ` · RECEIVED ${DT(when.toISOString())} ${TM(when.toISOString())}` : '') + (i === 0 ? ' · NEWEST BOL' : '');
+  $('dayLine').textContent = `BOL FOR ${DAYTEXT(DAYSEL)} · ${n} ROUTE${n === 1 ? '' : 'S'}` + (when && !isNaN(when) ? ` · RECEIVED ${DT(when.toISOString())} ${TM(when.toISOString())}` : '')
+    + (day && day.builtIn ? ' · THE BOL BUILT INTO PALLET BUILDER' : i === 0 ? ' · NEWEST BOL' : '');
+  // Joe 11-7-26: when the Hub's BOL days did not come, say so in red (and why), so the built-in BOL is not taken for the newest.
+  const bad = $('dayBad'); if (bad) { bad.hidden = !(HUBASKED && !HUBDAYS.length);
+    bad.textContent = HUBERR ? `COULD NOT READ THE BOL DAYS FROM THE HUB (${HUBERR.toUpperCase()}). PRESS CTRL+F5 TO TRY AGAIN; IF IT STAYS, SEND A PICTURE OF THIS LINE.`
+      : 'THE HUB HAS NO BOL DAYS YET (HUB > ADMINISTRATION > DAILY BOL), SO THIS IS THE BOL BUILT INTO PALLET BUILDER.'; }
 }
 (function openDay(){
   // The newest BOL day opens on its first route the first time it comes; after that the route last worked on stays open.

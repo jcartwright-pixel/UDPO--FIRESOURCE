@@ -251,4 +251,15 @@ const OPS = {
   bolCheckNow: async (db, email, input, stamp, d) => Object.assign({ run: await checkMail(db, email, d) }, await status(db))
 };
 
-module.exports = { OPS, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };
+// Joe 11-7-26: the newest load days for the apps (Pallet Builder), read by the server for anyone signed in, so a screen gets them
+// even when it cannot read the list itself. Only what the screens use: the date, when it came, and each route's customers.
+async function recentDays(db, max) {
+  const snap = await db.collection('bolDays').orderBy('date', 'desc').limit(Math.max(1, Math.min(21, Number(max) || 14))).get();
+  const str = (v) => (v && typeof v.toDate === 'function') ? v.toDate().toISOString() : (v instanceof Date ? v.toISOString() : String(v || ''));
+  return snap.docs.map(d => d.data()).filter(d => d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || ''))).map(d => ({
+    date: d.date, received: str(d.received), savedAt: str(d.savedAt),
+    routes: (d.routes || []).map(r => ({ route: String(r.route), stops: (r.stops || []).map(st => ({ seq: st.seq == null ? null : st.seq, custNo: String(st.custNo || ''), name: String(st.name || ''),
+      lines: (st.lines || []).map(l => ({ item: String(l.item || ''), qty: Number(l.qty) || 0 })) })) })) }));
+}
+
+module.exports = { OPS, recentDays, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };
