@@ -65,6 +65,10 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     assert.match(await wk.textContent('#send-texts'), /Sent .* to 1 driver \(test copy, written to the list only\)\./);
     const l = await lastSend();
     assert.deepEqual([l.week, l.drivers, l.live, l.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
+    // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week are named in red.
+    await wk.waitForSelector('#send-texts .send-hand', { timeout: 15000 });
+    assert.match(await wk.textContent('#send-texts .send-hand'), /^Text (this driver|these \d+ drivers) yourself \(not signed up, and their week changed\): .+\(.+\)/);
+    assert.doesNotMatch(await wk.textContent('#send-texts .send-hand'), /CASEY/, 'Casey is signed up: Send reaches him');
     assert.ok(await fits(wk) <= 0);
     assert.deepEqual(await small(wk), []);
     if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'live-send-weekly-sent-1536.png') });
@@ -78,10 +82,12 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await dd.waitForFunction(() => /^Texts sent /.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
       assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
+      assert.match(await dd.textContent('#send-texts .send-hand-short'), /^\d+ to text yourself$/);
+      assert.match(await dd.getAttribute('#send-texts .send-hand-short', 'title'), /Not signed up for texts, and their week changed: .+/);
       assert.equal(await dd.textContent('#send-texts button'), 'Send Again');
       assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
       assert.deepEqual(await small(dd), []);
-      if (SHOTS) await dd.screenshot({ path: path.join(SHOTS, 'live-send-daily-' + w + '.png') });
+      if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'live-send-daily-' + w + '.png') });
       if (w === 1920) {
         // Send Again needs both taps too, and texts the posted week a second time.
         const at = l.at;
@@ -95,6 +101,15 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await dd.context().close();
     }
 
+    // Joe 11/7: a driver the send could not text is named in red on the strip.
+    await db().collection('private').doc('sms').set({ lastSend: Object.assign({}, await lastSend(), { notSent: ['ADAMS, PAT'] }) }, { merge: true });
+    const nt = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
+    await nt.waitForFunction(() => /Not texted: ADAMS, PAT\. See Administration > Texts, part 6, for why\./.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
+    assert.deepEqual(await small(nt), []);
+    assert.ok(await fits(nt) <= 0);
+    if (SHOTS) await nt.waitForTimeout(800), await nt.screenshot({ path: path.join(SHOTS, 'not-texted-weekly-1536.png') });
+    await nt.context().close();
+
     // Someone who is not an administrator does not see it.
     const disp = await openPage(browser, 1536, 790, '/daily.html?date=2026-10-12&testEmail=dispatch.test@uniteddairy.com');
     await disp.waitForSelector('#rows tr');
@@ -105,6 +120,14 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     for (const [w, h] of [[1536, 790], [390, 844]]) {
       await db().collection('private').doc('sms').set({ forwardTo: w === 1536 ? '' : '+13305557777' }, { merge: true });
       const tx = await openPage(browser, w, h, '/texts.html?' + ADMIN);
+      // Joe 11/7: part 3 lists, in red, the drivers to text yourself.
+      await tx.waitForSelector('#hand:not([hidden]) #hand-rows tr', { timeout: 15000 });
+      const hand = await tx.$$eval('#hand-rows tr', rs => rs.map(r => [...r.cells].map(c => c.textContent)));
+      assert.ok(hand.length && hand.every(r => /Not signed up|No mobile phone|Replied STOP/.test(r[1]) && /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)/.test(r[2])), JSON.stringify(hand));
+      assert.ok(!hand.some(r => /CASEY/.test(r[0])), 'Casey is signed up');
+      assert.ok(await tx.$$eval('#hand td, #hand th', els => els.every(el => parseFloat(getComputedStyle(el).fontSize) >= 15.9)), '16px');
+      assert.ok(await fits(tx) <= 0, 'no side scroll on Texts at ' + w);
+      if (SHOTS) await tx.waitForTimeout(800), await tx.locator('#hand').locator('xpath=ancestor::section').screenshot({ path: path.join(SHOTS, 'hand-' + w + '.png') });
       await tx.waitForFunction(() => document.querySelectorAll('#sample-for option').length > 1, null, { timeout: 15000 });
       assert.equal(await tx.inputValue('#sample-for'), '', 'the drop-down starts blank');
       assert.equal(await tx.isHidden('#sample-text'), true);

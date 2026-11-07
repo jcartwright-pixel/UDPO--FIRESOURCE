@@ -84,11 +84,15 @@ function weekTextFrom(driver, days, week) {
   return [head.join('\n')].concat(blocks).concat(['Also on UD Routes > My Schedule.']).join('\n\n').slice(0, 1600);
 }
 // rows (the week's Weekly Dispatch rows) can be read once for a whole send.
-async function weekText(db, driverId, week, rows) {
+// driver: the Driver Roster entry when the caller has already read it (a whole send), so it is not read again.
+async function weekText(db, driverId, week, rows, known) {
   const P = require('./phone');
-  const snap = await db.collection(C.drivers).doc(driverId).get();
-  if (!snap.exists) throw new SmsError('BAD_REQUEST', 'That driver is not on the Driver Roster.');
-  const driver = Object.assign({ id: snap.id }, snap.data());
+  let driver = known;
+  if (!driver) {
+    const snap = await db.collection(C.drivers).doc(driverId).get();
+    if (!snap.exists) throw new SmsError('BAD_REQUEST', 'That driver is not on the Driver Roster.');
+    driver = Object.assign({ id: snap.id }, snap.data());
+  }
   const [exceptions, backups] = await Promise.all([db.collection(C.exceptions).where('driverId', '==', driverId).get(), db.collection(C.backups).where('driverId', '==', driverId).get()]);
   const days = P.scheduleDays(driver, rows || await weekRows(db, week), exceptions.docs.map(d => d.data()), week, backups.docs.map(d => d.data()));
   return weekTextFrom(driver, days, week);
@@ -112,8 +116,36 @@ async function weekDrivers(db, week) {
   const typed = {};
   phones.docs.forEach(d => { typed[d.id] = d.data(); });
   return drivers.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => on.has(d.id) && L.driverActive(d) && (typed[safeIdPart(d.id)] || {}).scheduleText === true)
-    .map(d => ({ driverId: d.id, name: d.name || '', phone: phoneE164((typed[safeIdPart(d.id)] || {}).phone || d.phone || '') }))
+    .map(d => ({ driverId: d.id, name: d.name || '', phone: phoneE164((typed[safeIdPart(d.id)] || {}).phone || d.phone || ''), driver: d }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Joe 11/7 ("if a driver has not opted in, and his schedule deviated from his normal, is there going to be an alert to come up
+// to let me know I have to manually text them?"): the active drivers Send schedule texts will not reach (Schedule not ticked on
+// the Driver Roster, replied STOP, or no mobile phone) whose posted week is not their normal week: a day whose runs differ from
+// their Driver Weekly Template, or a day off, vacation or Day Note on it. Each with the days that changed.
+const DAY_ABBR = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
+async function handDrivers(db, week, rows) {
+  const [drivers, phones, exceptions, backups] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get(), db.collection(C.exceptions).get(), db.collection(C.backups).get()]);
+  const typed = {}, ex = exceptions.docs.map(x => x.data()), bk = backups.docs.map(x => x.data());
+  phones.docs.forEach(x => { typed[x.id] = x.data(); });
+  const template = (d, p) => { let list = []; try { list = JSON.parse((d.cells && d.cells[p + '_assignments_json']) || '[]'); } catch (e) { list = []; }
+    return (Array.isArray(list) ? list : [list]).map(a => String(typeof a === 'string' ? a : a && (a.runId || a.run_id) || '').trim()).filter(Boolean).sort(); };
+  const out = [];
+  drivers.docs.map(x => Object.assign({ id: x.id }, x.data())).filter(x => x.name && L.driverActive(x)).forEach(x => {
+    const t = typed[safeIdPart(x.id)] || {}, phone = phoneE164(t.phone || x.phone || '');
+    if (t.scheduleText === true && phone) return;
+    const days = [];
+    L.DAYS.forEach((p, i) => {
+      const date = L.addDays(week, i);
+      const worked = rows.filter(r => r.days[p].runs && r.days[p].driverId === x.id).map(r => String(r.runId || r.id || '')).sort();
+      const normal = template(x, p);
+      const off = L.exceptionOn(ex, x.id, date), note = L.dayNoteOn(bk, x.id, date);
+      if (worked.join('|') !== normal.join('|') || (off && (normal.length || worked.length)) || note) days.push(DAY_ABBR[p]);
+    });
+    if (days.length) out.push({ driverId: x.id, name: x.name, phone: phoneText(phone), why: t.stoppedAt ? 'Replied STOP' : t.scheduleText !== true ? 'Not signed up' : 'No mobile phone', days });
+  });
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
@@ -165,7 +197,8 @@ async function smsCall(db, user, input, options) {
   if (op === 'preview') {
     const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
     const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
-    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })) });
+    const byHand = week ? await handDrivers(db, week, await weekRows(db, week)) : [];
+    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand });
   }
   if (op === 'sendSchedule') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
@@ -181,24 +214,46 @@ async function smsCall(db, user, input, options) {
     });
     if (claimed === 'SENT') throw new SmsError('NOT_ALLOWED', 'This week was already sent. Press Send again to send it a second time.');
     if (claimed === 'BUSY') throw new SmsError('NOT_ALLOWED', 'The schedule texts are being sent now.');
-    const live = liveTexts(o.env), list = await weekDrivers(db, week), rows = await weekRows(db, week);
-    let sent = 0, failed = 0, noPhone = 0;
+    // Joe 11/7: one driver whose text could not be made stopped the whole send halfway. Now each driver is on his own: a
+    // driver who fails is written to the list as not sent, with why, and the others still get theirs. A first Send also
+    // skips a driver who already has a sent schedule text for this week (from a send that stopped), so nobody gets two.
+    let sent = 0, failed = 0, noPhone = 0, already = 0, list = [];
+    const notSent = [];
+    try {
+    const live = liveTexts(o.env), rows = await weekRows(db, week);
+    list = await weekDrivers(db, week);
+    const before = new Set();
+    if (input.again !== true) (await db.collection('textLog').where('week', '==', week).get()).docs.map(x => x.data())
+      .forEach(x => { if (x.direction === 'out' && x.status === 'SENT' && (!x.kind || x.kind === 'RESEND')) before.add(x.driverId); });
     for (const x of list) {
-      const body = await weekText(db, x.driverId, week, rows);
+      if (before.has(x.driverId)) { already++; continue; }
+      let body = '';
+      try { body = await weekText(db, x.driverId, week, rows, x.driver); } catch (e) {
+        failed++; notSent.push(x.name);
+        await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '')).set({ direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body: '', at: stamp, by: email,
+          status: 'FAILED', reason: 'Could not make this driver\'s text: ' + String(e && e.message || e).slice(0, 160) });
+        continue;
+      }
       const log = { direction: 'out', week, driverId: x.driverId, name: x.name, to: x.phone, body, at: stamp, by: email };
       if (!x.phone) { noPhone++; Object.assign(log, { status: 'NO PHONE', reason: 'No mobile phone number on the Driver Roster.' }); }
       else if (!live) { Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' }); }
       else {
         let r;
         try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
-        if (r.ok) sent++; else failed++;
+        if (r.ok) sent++; else { failed++; notSent.push(x.name); }
         Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
         // A driver who replied STOP is unticked on the Driver Roster (Joe 10/26).
         if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
       }
       await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '')).set(log);
     }
-    const lastSend = { week, at: stamp, by: email, drivers: list.length, sent, failed, noPhone, live };
+    } catch (e) {
+      // Something else went wrong part way: free the button, and keep the week unsent so Send can finish it (it skips those
+      // already texted).
+      await ref.set({ sendingAt: '' }, { merge: true });
+      throw e;
+    }
+    const lastSend = { week, at: stamp, by: email, drivers: list.length, sent, failed, noPhone, already, notSent: notSent.slice(0, 20), live: liveTexts(o.env) };
     const next = Object.assign({}, d, { lastSend, sendingAt: '' });
     await ref.set(next);
     return status(next, o.env, o.project);
@@ -488,4 +543,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };
+module.exports = { handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };

@@ -177,6 +177,7 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
 - It always sends the posted week, even when you are looking at another week or day here.
 - `Send Again` sends the same week a second time (press it twice too).
 - Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
+- A red **2 to text yourself** means two drivers are not signed up and their week changed: rest the mouse on it for their names and days, and text them yourself.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
 
@@ -252,7 +253,7 @@ It always shows the published week, the same week as Daily Dispatch. The calenda
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
-- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. A red line under it names any driver to text yourself: not signed up for texts, and their week is not their normal week.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
 
@@ -1811,7 +1812,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. If a red **Text these drivers yourself** list shows under it, those drivers are not signed up for texts (or have no mobile phone) and their posted week is not their normal week, so Send will not reach them: call or text each one yourself about the days it lists. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
 5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
@@ -1824,6 +1825,10 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 > A load done text goes once per load, only for loads finished after you turned it on and ticked the driver.
 
 > Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
+
+If Send could not text a driver, the strip and part 3 say **Not texted:** with the name in red, and part 6 shows that driver's line as FAILED with why. Fix what it says, then press `Resend` twice on that line; only that driver gets it. A first Send never texts a driver who already got this week's text.
+
+!> Do not think every driver was told because Send went out: a driver on the red **Text these drivers yourself** list was not texted.
 
 !> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.
 

@@ -1259,6 +1259,10 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip .send-button.armed { background: #b42318; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
+.send-strip .send-hand { flex-basis: 100%; color: var(--red); }
+.send-strip .send-hand-short { color: var(--red); white-space: nowrap; }
+.texts-page .texts-hand { margin-top: 12px; }
+.texts-page .texts-hand h3 { color: var(--red); }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
 .texts-page .texts-test select { font-size: 16px; min-width: 240px; padding: 6px 8px; }
 .texts-page .texts-week { white-space: pre-line; }
