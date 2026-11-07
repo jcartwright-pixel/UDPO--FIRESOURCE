@@ -169,7 +169,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 ### Send schedule texts
 
-Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers. **Not set up yet** means the texting account is not saved: an administrator sets it up on Administration > Texts. On a laptop a long line is cut short with ...; rest the mouse on it to read it all.
+Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers. **Not set up yet** means the texting account is not saved: an administrator sets it up on Administration > Texts. On a laptop the line may take two lines.
 
 1. Press `Send Texts` once. It turns red and says how many drivers it will text.
 2. Press it again within 5 seconds to send. The line turns green and says when it was sent.
