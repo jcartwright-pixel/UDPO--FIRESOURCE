@@ -7,6 +7,8 @@
  * with the same reader Over the Road's Import From Accounting uses (otr-core.js otrParseImport_), and each month's numbers are
  * kept in accountingMonthly/<yyyy-mm> in the company (Uniontown) database:
  *   {year, month, gallons_sold, distribution_cost, employee_cost, fuel_cost, file, source: 'EMAIL' | 'BY HAND', savedAt, savedBy}
+ * plus the extra P&L lines the route cost app uses (src/accounting-lines.js, Joe 11-7-26): delivery_lines, garage_lines,
+ * delivery_garage_cost, net_sales, material_cost, gallons_sales, gallons_transfers.
  * Over the Road reads them from there (public/otr.html), and so does Joe's separate cost analysis app. Nothing else writes them.
  *
  * Two ways in, both on the Hub's Accounting Numbers screen (Administrators):
@@ -19,11 +21,16 @@
 'use strict';
 
 const OTR = require('./otr-core');
+const LINES = require('./accounting-lines');
 // The Excel and zip readers are big: loaded only when a file is read, so every other Administration step stays as quick.
 let XLSX = null, JSZip = null;
 const readers = () => { if (!XLSX) { XLSX = require('@e965/xlsx'); JSZip = require('jszip'); } };
 
 const KEYS = ['gallons_sold', 'distribution_cost', 'employee_cost', 'fuel_cost'];
+const ALL_KEYS = KEYS.concat(LINES.EXTRA_KEYS);
+// Raised when the reader learns to read more of the package: an email read by an older reader is read again once, so the
+// months it holds get the new numbers too (the zip carries every month since January of last year).
+const READER = 2;
 const MAX_BYTES = 15 * 1024 * 1024;
 const EMAIL = /^[^\s@<>(),;:"[\]\\]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
@@ -51,19 +58,25 @@ async function readPackage(buffer, fileName, yearNow) {
     books = [];
     for (const n of names) books.push({ name: n, data: await zip.files[n].async('nodebuffer') });
   } else if (!/\.xlsx?$/i.test(name)) fail('BAD_REQUEST', 'Pick the accounting zip, or one Excel workbook');
-  const parts = [];
+  const parts = [], extras = [];
   for (const b of books) {
     let wb;
     try { wb = XLSX.read(b.data, { type: 'buffer', cellDates: true }); } catch (e) { continue; }
     wb.SheetNames.forEach(tab => {
       const m = (tab + ' ' + b.name).match(/(20\d{2})/);
-      const parsed = OTR.otrParseImport_(sheetValues(wb.Sheets[tab]), m ? Number(m[1]) : yearNow, tab);
+      const values = sheetValues(wb.Sheets[tab]);
+      const parsed = OTR.otrParseImport_(values, m ? Number(m[1]) : yearNow, tab);
+      extras.push(LINES.readTab(values, tab));
       parsed.tab = b.name.replace(/^.*\//, '') + ' · ' + String(tab).trim();
       parts.push(parsed);
     });
   }
   const merged = OTR.otrMergeImport_(parts), byMonth = {};
   merged.figures.filter(f => KEYS.indexOf(f.key) >= 0).forEach(f => {
+    const id = monthId(f.year, f.month);
+    (byMonth[id] = byMonth[id] || { year: f.year, month: f.month })[f.key] = f.value;
+  });
+  LINES.merge(extras).forEach(f => {
     const id = monthId(f.year, f.month);
     (byMonth[id] = byMonth[id] || { year: f.year, month: f.month })[f.key] = f.value;
   });
@@ -84,10 +97,12 @@ async function saveMonths(db, read, how) {
     const batch = db.batch();
     read.months.slice(i, i + 400).forEach(m => {
       const id = monthId(m.year, m.month), old = had[id];
-      const differs = KEYS.some(k => m[k] != null && (!old || old[k] == null || Math.abs(Number(old[k]) - m[k]) >= 0.005));
+      const differs = ALL_KEYS.some(k => m[k] != null && (!old || !LINES.same(old[k], m[k])));
       if (!differs) return;
       changed.push(id);
-      batch.set(col.doc(id), Object.assign({}, m, { file: String(how.file || '').slice(0, 120), source: how.source, savedAt: how.stamp, savedBy: how.by }), { merge: true });
+      // Only the fields this file has are written, each one whole (a line no longer on the P&L leaves its map).
+      const data = Object.assign({}, m, { file: String(how.file || '').slice(0, 120), source: how.source, savedAt: how.stamp, savedBy: how.by });
+      batch.set(col.doc(id), data, { mergeFields: Object.keys(data) });
     });
     await batch.commit();
   }
@@ -141,7 +156,8 @@ async function checkMail(db, by, deps) {
     const messages = await readMail({ owner: s.mailbox, query, max: 20 });
     for (const m of messages.sort((a, b) => a.internalDate - b.internalDate)) {
       const seen = db.collection('accountingMail').doc(String(m.id).replace(/[^A-Za-z0-9_-]/g, '_'));
-      if ((await seen.get()).exists) { run.skipped++; continue; }
+      const had = await seen.get();
+      if (had.exists && Number(had.data().reader || 1) >= READER) { run.skipped++; continue; }
       const zips = (m.files || []).filter(f => /\.zip$/i.test(f.name) && f.size <= MAX_BYTES);
       const found = [];
       for (const f of zips) {
@@ -158,7 +174,7 @@ async function checkMail(db, by, deps) {
       run.files.push(...found.map(x => Object.assign({ received: new Date(m.internalDate || now).toISOString() }, x)));
       // A file Gmail or the reader could not finish is tried again next time.
       if (found.some(x => x.error)) { run.status = 'FAIL'; continue; }
-      await seen.set({ at: stamp, subject: String(m.subject || '').slice(0, 200), from: String(m.from || '').slice(0, 120), files: found });
+      await seen.set({ reader: READER, at: stamp, subject: String(m.subject || '').slice(0, 200), from: String(m.from || '').slice(0, 120), files: found });
     }
     const newest = run.files.filter(f => f.newest).pop();
     const bad = run.files.find(f => f.error);
@@ -188,4 +204,4 @@ const OPS = {
   accountingCheckNow: async (db, email, input, stamp, d) => Object.assign({ run: await checkMail(db, email, d) }, await status(db))
 };
 
-module.exports = { OPS, readPackage, saveMonths, status, checkMail, morningCheck, KEYS };
+module.exports = { OPS, readPackage, saveMonths, status, checkMail, morningCheck, KEYS, ALL_KEYS, READER };
