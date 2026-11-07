@@ -1264,6 +1264,12 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
 .send-strip .send-hand { flex-basis: 100%; color: var(--red); }
+/* Joe 11/7 (li): the sent check on the send strip. */
+.send-strip .send-count { font-weight: 800; color: #fff; border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+.send-strip .send-count.good { background: var(--green); }
+.send-strip .send-count.bad { background: var(--red); }
+.send-strip.missing { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
+.send-strip .send-button.fix { background: var(--red); }
 .send-strip .send-hand-short { color: var(--red); white-space: nowrap; }
 .texts-page .texts-hand { margin-top: 12px; }
 .texts-page .texts-hand h3 { color: var(--red); }

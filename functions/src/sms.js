@@ -148,6 +148,18 @@ async function handDrivers(db, week, rows) {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Joe 11/7 (li): the fail-safe. Of the drivers who should get the posted week (ticked, on the week), who has it: a schedule text
+// (or Resend) that went out for this week; on the test copy, one written to the list. The rest are missing, with why.
+const gotIt = (x, live) => x.direction === 'out' && (!x.kind || x.kind === 'RESEND') && (x.status === 'SENT' || (!live && x.status === 'NOT SENT'));
+async function sendCheck(db, week, list, live) {
+  const logs = (await db.collection('textLog').where('week', '==', week).get()).docs.map(x => x.data()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const got = new Set(), last = {};
+  logs.forEach(x => { if (gotIt(x, live)) got.add(x.driverId); if (x.direction === 'out' && (!x.kind || x.kind === 'RESEND')) last[x.driverId] = x; });
+  const missing = list.filter(x => !got.has(x.driverId)).map(x => { const l = last[x.driverId];
+    return { name: x.name, why: !x.phone ? 'no mobile phone on the Driver Roster' : !l ? 'not sent yet' : l.status === 'STOPPED' ? 'replied STOP' : String(l.reason || l.status || 'not sent').replace(/\.$/, '') }; });
+  return { total: list.length, sent: list.length - missing.length, missing };
+}
+
 // Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
 async function activeDrivers(db) {
   const [drivers, phones] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
@@ -198,7 +210,8 @@ async function smsCall(db, user, input, options) {
     const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
     const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
     const byHand = week ? await handDrivers(db, week, await weekRows(db, week)) : [];
-    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand });
+    return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand,
+      check: week ? await sendCheck(db, week, list, liveTexts(o.env)) : null });
   }
   if (op === 'sendSchedule') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
@@ -207,7 +220,7 @@ async function smsCall(db, user, input, options) {
     // Claim it first, so two presses never text the same week twice; a second send of a week needs Send again.
     const claimed = await db.runTransaction(async tx => {
       const x = (await tx.get(ref)).data() || {};
-      if (x.lastSend && x.lastSend.week === week && input.again !== true) return 'SENT';
+      if (x.lastSend && x.lastSend.week === week && input.again !== true && input.missing !== true) return 'SENT';
       if (x.sendingAt && Date.parse(stamp) - Date.parse(x.sendingAt) < 120000) return 'BUSY';
       tx.set(ref, { sendingAt: stamp }, { merge: true });
       return '';
@@ -224,7 +237,7 @@ async function smsCall(db, user, input, options) {
     list = await weekDrivers(db, week);
     const before = new Set();
     if (input.again !== true) (await db.collection('textLog').where('week', '==', week).get()).docs.map(x => x.data())
-      .forEach(x => { if (x.direction === 'out' && x.status === 'SENT' && (!x.kind || x.kind === 'RESEND')) before.add(x.driverId); });
+      .forEach(x => { if (gotIt(x, live)) before.add(x.driverId); });
     for (const x of list) {
       if (before.has(x.driverId)) { already++; continue; }
       let body = '';

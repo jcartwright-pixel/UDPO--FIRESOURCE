@@ -177,6 +177,7 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
 - It always sends the posted week, even when you are looking at another week or day here.
 - `Send Again` sends the same week a second time (press it twice too).
 - Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
+- A green **21 OF 21 SENT** means every ticked driver has this week's text. A red count means some are missing: rest the mouse on the strip for who and why, and press `Text 2 Missing` twice to text only them.
 - A red **2 to text yourself** means two drivers are not signed up and their week changed: rest the mouse on it for their names and days, and text them yourself.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
@@ -1837,7 +1838,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 
 > Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
-If Send could not text a driver, the strip and part 3 say **Not texted:** with the name in red ("no mobile phone" when the Driver Roster has no number), and part 6 shows that driver's line as NO PHONE or FAILED with why. Fix what it says, then press `Resend` twice on that line; only that driver gets it. A first Send never texts a driver who already got this week's text.
+After a send, the strip on Weekly and Daily Dispatch checks who has this week's text: green **21 OF 21 SENT** means every ticked driver got it. Red **19 OF 21 SENT · 2 MISSING** names each missing driver and why (no mobile phone, number refused, not sent yet). Fix what it says on the Driver Roster, then press `Text the 2 Missing` twice: only the missing drivers are texted. A driver ticked after the send shows as missing too.
 
 !> Do not think every driver was told because Send went out: a driver on the red **Text these drivers yourself** list was not texted.
 

@@ -62,7 +62,7 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     await wk.click('#send-texts button');
     await wk.waitForFunction(() => /: Sent /.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
     assert.equal(await wk.textContent('#send-texts button'), 'Send Again: Week of 10-11-26');
-    assert.match(await wk.textContent('#send-texts'), /Sent .* to 1 driver \(test copy, written to the list only\)\./);
+    assert.match(await wk.textContent('#send-texts'), /1 OF 1 SENT.*Sent [^.]*\(test copy, written to the list only\)\./);
     const l = await lastSend();
     assert.deepEqual([l.week, l.drivers, l.live, l.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
     // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week are named in red.
@@ -79,7 +79,8 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     // week's dates are on its hover, and the driver count shows on a wide screen.
     for (const [w, h] of [[1920, 1080], [390, 844]]) {
       const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-20&' + ADMIN);
-      await dd.waitForFunction(() => /^Texts sent /.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
+      await dd.waitForFunction(() => /^Texts sent /.test((document.querySelector('#send-texts .send-words') || {}).textContent || ''), null, { timeout: 15000 });
+      assert.equal(await dd.textContent('#send-texts .send-count.good'), '1 OF 1 SENT', 'Joe 11/7 (li): the sent check');
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
       assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
       assert.match(await dd.textContent('#send-texts .send-hand-short'), /^\d+ to text yourself$/);
@@ -101,14 +102,41 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await dd.context().close();
     }
 
-    // Joe 11/7: a driver the send could not text is named in red on the strip.
-    await db().collection('private').doc('sms').set({ lastSend: Object.assign({}, await lastSend(), { notSent: ['ADAMS, PAT'] }) }, { merge: true });
-    const nt = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
-    await nt.waitForFunction(() => /Not texted: ADAMS, PAT\. See Administration > Texts, part 6, for why\./.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
-    assert.deepEqual(await small(nt), []);
-    assert.ok(await fits(nt) <= 0);
-    if (SHOTS) await nt.waitForTimeout(800), await nt.screenshot({ path: path.join(SHOTS, 'not-texted-weekly-1536.png') });
-    await nt.context().close();
+    // Joe 11/7 (li): the fail-safe. After a send, the strip counts who has the week: 1 OF 1 SENT in green. A driver ticked after the
+    // send is missing: red 1 OF 2 SENT · 1 MISSING with his name and why, and Text the Missing Driver (two taps) texts only him.
+    const wk2 = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
+    await wk2.waitForFunction(() => /^1 OF 1 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
+    if (SHOTS) await wk2.waitForTimeout(800), await wk2.screenshot({ path: path.join(SHOTS, 'check-all-sent-1536.png') });
+    await wk2.context().close();
+    await db().collection('driverPhones').doc('drv_test_adams').set({ driverId: 'drv_test_adams', phone: '+13305550199', scheduleText: true });
+    for (const [w, h, url] of [[1920, 1080, '/daily.html?date=2026-10-12&'], [390, 844, '/weekly.html?view=live&'], [1536, 790, '/weekly.html?view=live&']]) {
+      const p = await openPage(browser, w, h, url + ADMIN);
+      await p.waitForSelector('#send-texts .send-count.bad', { timeout: 15000 });
+      const short = /daily/.test(url);
+      assert.equal(await p.textContent('#send-texts .send-count'), short ? '1 OF 2 SENT' : '1 OF 2 SENT · 1 MISSING');
+      assert.equal(await p.textContent('#send-texts button'), short ? 'Text 1 Missing' : 'Text the Missing Driver');
+      if (short) assert.match(await p.getAttribute('#send-texts', 'title'), /Missing: ADAMS, PAT \(not sent yet\)/);
+      else assert.equal(await p.textContent('#send-texts .send-hand'), 'Missing: ADAMS, PAT (not sent yet)');
+      assert.deepEqual(await small(p), []);
+      assert.ok(await fits(p) <= 0, 'no side scroll at ' + w);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-missing-' + w + '.png') });
+      if (w === 1536) {
+        const before = (await db().collection('textLog').get()).size;
+        await p.click('#send-texts button');
+        assert.equal(await p.textContent('#send-texts button'), 'Tap Again: Text 1 driver');
+        await p.click('#send-texts button');
+        await p.waitForFunction(() => /^2 OF 2 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
+        const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.driverId === 'drv_test_adams');
+        assert.equal((await db().collection('textLog').get()).size, before + 1, 'only the missing driver');
+        assert.equal(added.length, 1);
+        if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-fixed-1536.png') });
+        assert.deepEqual(p.errors, []);
+        await p.context().close();
+        break;
+      }
+      assert.deepEqual(p.errors, []);
+      await p.context().close();
+    }
 
     // Someone who is not an administrator does not see it.
     const disp = await openPage(browser, 1536, 790, '/daily.html?date=2026-10-12&testEmail=dispatch.test@uniteddairy.com');
