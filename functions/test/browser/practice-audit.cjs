@@ -4453,7 +4453,7 @@ async function writes() {
     if (rec.routesAfter.length !== before) note('Pallet Builder: ' + before + ' routes before, ' + rec.routesAfter.length + ' after deleting the test route');
     // 6.91 (#661, #662, #664): the Truck load map on a copy of a BOL route that has load sequences with more than one customer.
     const fh = await (await p.$('#builder')).contentFrame();
-    const pickAt = await fh.evaluate(() => DB.routes.findIndex(r => { const k = routeKey(r); return /11\/05\/26/.test(r.route) && k && k.list.length && r.stops.some(st => st.sub) && r.stops.filter(st => !st.sub).length >= 3; }));
+    const pickAt = await fh.evaluate(() => DB.routes.findIndex(r => { const k = routeKey(r); return /11\/05(\/26)?\b/.test(r.route) && k && k.list.length && r.stops.some(st => st.sub) && r.stops.filter(st => !st.sub).length >= 3; }));
     rec.mapRoute = pickAt >= 0 ? await fh.evaluate(i => DB.routes[i].route, pickAt) : '';
     if (pickAt < 0) bad.push('no BOL route with a load sequence of more than one customer to test the Truck load map on');
     else {
@@ -4577,7 +4577,7 @@ async function writes() {
     const plant = await p.evaluate(() => import('./js/app.js').then(m => m.currentPlant()));
     const keys = await fh.evaluate(() => DB.routes.map((r, i) => { const k = routeKey(r); return k ? { i, name: r.route, route: k.route, day: k.day, seq: k.list.length, bol: r.stops.filter(st => !st.sub).length } : null; }).filter(Boolean));
     let real = null, use = null;
-    for (const k of keys) { if (k.bol < 3 || !k.seq || !/11\/05\/26/.test(k.name) || / copy$/.test(k.name)) continue; const d = await db.collection('udclRouteDays').doc(plant + '__' + k.route + '__' + k.day).get(); if (d.exists && (d.data().stops || []).length >= 3) { real = d; use = k; break; } }
+    for (const k of keys) { if (k.bol < 3 || !k.seq || !/11\/05(\/26)?\b/.test(k.name) || / copy$/.test(k.name)) continue; const d = await db.collection('udclRouteDays').doc(plant + '__' + k.route + '__' + k.day).get(); if (d.exists && (d.data().stops || []).length >= 3) { real = d; use = k; break; } }
     rec.routeMap = { plant, routeDays: keys.length, real: use ? use.route + ' ' + use.day : 'none' };
     if (!real) bad.push('no builder route has a route map in the Customer List to copy for the Save to route map test');
     else {
@@ -4818,6 +4818,8 @@ async function writes() {
     const rows = (a) => new Set(a.btns.map(x => Math.round(x.top / 6))).size;
     await open(p, 'daily.html');
     await p.waitForFunction(() => (document.getElementById('week-of') || {}).textContent, null, { timeout: 30000 }).catch(() => {});
+    // The texts strip comes in a moment after the week (it reads the texting state).
+    await p.waitForFunction(() => { const w = document.querySelector('#send-texts .send-words'); return w && w.getClientRects().length; }, null, { timeout: 15000 }).catch(() => {});
     const a = await look();
     rec.look = Object.assign({}, a, { day: undefined });
     if (!a.daily || a.daily.text !== 'Print Daily Schedule' || !a.daily.inHead) bad.push('no Print Daily Schedule on the title line (' + JSON.stringify(a.daily) + ')');
@@ -5201,13 +5203,18 @@ async function writes() {
     const dayLook = () => fm.evaluate(() => { const q = (id) => document.getElementById(id); const sv = q('lmSave'), more = document.querySelector('details.more');
       return { days: [...q('dayPick').options].map(o => o.value), picked: q('dayPick').value, line: q('dayLine').textContent.trim(), prev: { off: q('dayPrev').disabled, title: q('dayPrev').title, text: q('dayPrev').textContent.trim() },
         next: { off: q('dayNext').disabled, title: q('dayNext').title, text: q('dayNext').textContent.trim() }, route: S.route, save: sv ? sv.textContent.trim() : '', saveTop: sv ? Math.round(sv.getBoundingClientRect().top) : -1,
-        more: more ? (more.querySelector('summary') || {}).textContent.trim() : '', inMore: !!(more && more.querySelector('#newRoute') && more.querySelector('#dupRoute') && more.querySelector('#delRoute') && more.querySelector('#route')) }; });
+        more: more ? (more.querySelector('summary') || {}).textContent.trim() : '', bad: q('dayBad') ? { hidden: q('dayBad').hidden, text: q('dayBad').textContent.trim() } : null, inMore: !!(more && more.querySelector('#newRoute') && more.querySelector('#dupRoute') && more.querySelector('#delRoute') && more.querySelector('#route')) }; });
     let d0 = await dayLook();
     // The builder reopens the day of the route that was open last (an earlier step worked on the built-in 11-5-26 day); a
     // new BOL opens on the newest. Go to the newest with DAY AFTER first.
     rec.reopenedOn = d0.picked;
     for (let k = 0; k < 5 && d0.days.length && d0.picked !== d0.days[0] && !d0.next.off; k++) { await fr.locator('#dayNext').click(); await p.waitForTimeout(800); d0 = await dayLook(); }
     rec.bolDay = { days: d0.days.length, line: d0.line, prev: d0.prev, next: d0.next, save: d0.save, saveTop: d0.saveTop, more: d0.more, inMore: d0.inMore };
+    // 6.91 (#698): the days come from the Hub's BOL (Friday 11-6-26 on practice), not only the built-in one, with no red reason line.
+    rec.bolDay.hubDays = d0.days.filter(d => d !== '2026-11-05');
+    rec.bolDay.redLine = d0.bad;
+    if (!rec.bolDay.hubDays.length) bad.push('BOL DAY has only the BOL built into Pallet Builder, none from the Hub' + (d0.bad && !d0.bad.hidden ? ' ("' + d0.bad.text + '")' : ''));
+    if (d0.bad && !d0.bad.hidden) bad.push('the red BOL day line shows: ' + d0.bad.text);
     if (!d0.days.length || d0.picked !== d0.days[0]) bad.push('BOL DAY does not open on the newest day (' + d0.picked + ' of ' + d0.days.join(', ') + ')');
     if (!/^BOL FOR [A-Z]+DAY \d{1,2}-\d{1,2}-\d\d · \d+ ROUTES? (· RECEIVED .+ )?· NEWEST BOL$/.test(d0.line)) bad.push('the BOL DAY line reads "' + d0.line + '"');
     if (d0.prev.text !== '◀ DAY BEFORE' || d0.next.text !== 'DAY AFTER ▶') bad.push('the day buttons read ' + d0.prev.text + ' / ' + d0.next.text);
@@ -5355,6 +5362,23 @@ async function writes() {
       if (!c.btnsOnTitle) bad.push(pg + ': the buttons are no longer on the title line at 1536');
       if (c.side) bad.push(pg + ': scrolls sideways at 1536');
       await blankPeople(p); await shot(p, 'weekly-covered-' + pg.replace(/\W+/g, '-'));
+    }
+    // 6.91 (#697): at 390, 768 and 1024 the box is whole inside the screen on both Weekly screens (under the title, words wrap).
+    rec.narrow = {};
+    for (const wd of [390, 768, 1024]) {
+      const np = await newPage(wd === 390 ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: wd, height: 900 } });
+      try {
+        for (const pg of ['weekly.html?view=live', 'weekly.html']) {
+          await open(np, pg);
+          await np.waitForFunction(() => { const c = document.getElementById('covered'); return c && !c.hidden && /%/.test(c.textContent); }, null, { timeout: 30000 }).catch(() => {});
+          const c = await np.evaluate(() => { const e = document.getElementById('covered'); if (!e || e.hidden) return null; const r = e.getBoundingClientRect();
+            return { text: e.textContent.trim(), left: Math.round(r.left), right: Math.round(r.right), w: innerWidth, cut: e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1, lines: Math.round(r.height / (parseFloat(getComputedStyle(e).lineHeight) || 20)) }; });
+          rec.narrow[wd + ' ' + pg] = c;
+          if (!c) bad.push(pg + ' at ' + wd + ': no % OF RUNS COVERED box');
+          else if (c.left < 0 || c.right > c.w + 1 || c.cut) bad.push(pg + ' at ' + wd + ': the box is not whole inside the screen (' + c.left + '-' + c.right + ' of ' + c.w + (c.cut ? ', words cut' : '') + ')');
+          if (wd === 390) { await blankPeople(np); await shot(np, 'weekly-covered-390-' + pg.replace(/\W+/g, '-')); }
+        }
+      } finally { await np.done(); }
     }
     // Texts: the red Text these drivers yourself list (look only; nothing sent).
     await open(p, 'texts.html');
