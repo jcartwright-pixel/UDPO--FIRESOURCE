@@ -189,9 +189,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/31 (mock-up 1): Employees added under People & Access (everyone at the plant, brought over from UDMS).
     // Joe 10/31: Sales App added under Links & Codes (the salespeople's phone app link).
     // Joe 11/1 (mock-up 1): regrouped into eight groups, nothing removed; the same 42 items.
-    assert.equal(all, 42, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    // Joe 11-7-26: Garage Technicians added under Fleet Maintenance Setup.
+    assert.equal(all, 43, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
     assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Dispatch & Fleet"]) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration', 'GPS Setup']);
-    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Fleet Maintenance Setup"]) .adm-name', s => s.map(x => x.textContent)), ['Fleet Service Setup']);
+    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Fleet Maintenance Setup"]) .adm-name', s => s.map(x => x.textContent)), ['Fleet Service Setup', 'Garage Technicians']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
