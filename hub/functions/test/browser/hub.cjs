@@ -315,6 +315,23 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.click('#check');
     await p.waitForFunction(() => /Last checked/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
     assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
+    // Weekly route report (Joe 11-6-26): a made-up report added by hand lands in routeWeekly for Route Cost Analysis; the label
+    // starts as Joe's, and the mailbox and tick save by themselves.
+    const weekPath = path.join(require('os').tmpdir(), 'Weekly Daily Avg Cases By Route.xls');
+    fs.writeFileSync(weekPath, require('../../../../functions/test/fixtures/route-report').routeReport());
+    await p.waitForSelector('#wk-pick');
+    assert.match(await p.textContent('#weeks'), /No weeks yet/);
+    assert.equal(await p.inputValue('#wk-label'), 'ROUTES/SALE BY ROUTE');
+    assert.ok(await p.isDisabled('#wk-check'), 'no mailbox yet, so Check Email Now is gray');
+    await p.setInputFiles('#wk-file', weekPath);
+    await p.waitForSelector('#wk-msg.good');
+    assert.match(await p.textContent('#wk-msg'), /Week ending 10-31-26 read from Weekly Daily Avg Cases By Route\.xls: 2 routes, 4 stops/);
+    assert.match(await p.textContent('#wk-table tbody tr'), /10-31-26.*146.*\$3,895\.75/);
+    assert.equal((await db().collection('routeWeekly').doc('2026-10-31').get()).data().stops.length, 4);
+    await p.fill('#wk-mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#wk-enabled');
+    await p.waitForFunction(() => /every day at 2:00 PM/.test(document.querySelector('#weeks').textContent));
+    assert.equal(((await db().collection('config').doc('routeReportMail').get()).data() || {}).enabled, true);
     await shot(p, 'hub-accounting-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'accounting.html');
     await p.waitForSelector('.acc-table');

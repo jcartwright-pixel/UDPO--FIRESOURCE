@@ -5,6 +5,7 @@
  * Over the Road and the cost analysis app read them from there. The settings save by themselves.
  */
 import { callServer, escapeHtml as e, showError, serverText, shortDate, setAdmin } from './shell.js';
+import { startWeeks } from './routeweeks.js';
 
 const $ = (s) => document.querySelector(s);
 const admin = (op, fields, ms) => callServer('admin', Object.assign({ op }, fields || {}), ms);
@@ -93,5 +94,6 @@ export async function start() {
     setAdmin(true);
     got = await admin('accountingStatus');
     draw(); wire();
+    await startWeeks();
   } catch (err) { showError(serverText(err, 'the accounting numbers')); }
 }

@@ -615,6 +615,12 @@ exports.accountingMailMornings = onSchedule({ schedule: '0 6 * * *', timeZone: '
   if (out.status === 'FAIL') console.error('Accounting mail check: ' + out.message);
 });
 
+// Weekly route report (src/routereports.js): Vicki's Wednesday email, read once a day at 2:00 PM when switched on.
+exports.routeReportMail = onSchedule({ schedule: '0 14 * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '1GiB' }, async () => {
+  const out = await require('./src/routereports').dailyCheck(db);
+  if (out.status === 'FAIL') console.error('Route report mail check: ' + out.message);
+});
+
 // Daily BOL (src/bol.js, Joe 11-6-26): every hour the mailbox set on the Hub's Daily BOL screen is read for a new BOL under its
 // label (ROUTES/BOL), when that check is switched on. The office sends it each afternoon. Company-wide (Uniontown's database).
 exports.bolMailHourly = onSchedule({ schedule: '15 * * * *', timeZone: 'America/New_York', timeoutSeconds: 300, maxInstances: 1, memory: '512MiB' }, async () => {
