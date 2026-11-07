@@ -38,10 +38,16 @@ export const FIELDS = [
   { k: 'ratePerMin', head: 'Full Speed Per Min', num: true }, { k: 'targetPct', head: 'Target %', num: true },
   { k: 'minSpeed', head: 'Lowest Speed', num: true }, { k: 'maxSpeed', head: 'Highest Speed', num: true }, { k: 'shelfLifeDays', head: 'Shelf Life Days', num: true },
   // Joe 10/14: what the product in one package should weigh, in grams (the fill weight check's target; production-rules fillOf).
-  { k: 'fillGrams', head: 'Target Fill Weight g', num: true }
+  { k: 'fillGrams', head: 'Target Fill Weight g', num: true },
+  // Joe 11-6-26: the Pallet Builder reads these by SKU: units in a case, cases to a pallet, how many cases high a stack is, and what a
+  // full case weighs (net = the product; gross = the case, the jugs and the product), in pounds.
+  { k: 'unitsPerCase', head: 'Units In A Case', num: true }, { k: 'casesPerPallet', head: 'Cases To A Pallet', num: true },
+  { k: 'stackHeight', head: 'Stack Height', num: true }, { k: 'caseNetLbs', head: 'Net Weight Full Case lb', num: true },
+  { k: 'caseGrossLbs', head: 'Gross Weight Full Case lb', num: true }
 ];
+export const PALLET_FIELDS = ['unitsPerCase', 'casesPerPallet', 'stackHeight', 'caseNetLbs', 'caseGrossLbs'];
 // The fields an upload never wipes: a file that leaves one blank or out keeps what the product has (Joe 10/11, targets stay put).
-export const KEEP_FIELDS = ['upc', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed', 'shelfLifeDays', 'fillGrams'];
+export const KEEP_FIELDS = ['upc', 'ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed', 'shelfLifeDays', 'fillGrams'].concat(PALLET_FIELDS);
 // The template's columns, in order; a file with these headings loads (Joe 10/11: always the same layout). Plant is the tab's name
 // in the workbook (or a column in a CSV); a column left out of a file keeps what each product has.
 export const TEMPLATE = ['Plant', 'Area'].concat(FIELDS.map(f => f.head));
@@ -51,7 +57,7 @@ export function cleanProduct(p) {
   FIELDS.forEach(f => {
     let v = p && p[f.k] !== undefined && p[f.k] !== null ? String(p[f.k]).trim() : '';
     if (f.k === 'upc') v = v.replace(/[\s-]/g, '');
-    if (f.num && v !== '' && isFinite(Number(v.replace(/,/g, '')))) { const n = Number(v.replace(/,/g, '')); out[f.k] = f.k === 'shelfLifeDays' ? Math.round(n) : Math.round(n * 100) / 100; return; }
+    if (f.num && v !== '' && isFinite(Number(v.replace(/,/g, '')))) { const n = Number(v.replace(/,/g, '')); out[f.k] = ['shelfLifeDays', 'unitsPerCase', 'casesPerPallet', 'stackHeight'].indexOf(f.k) >= 0 ? Math.round(n) : Math.round(n * 100) / 100; return; }
     if (v !== '' || ['name', 'sku', 'mfgType', 'productGroup'].indexOf(f.k) >= 0) out[f.k] = v;
   });
   return out;
@@ -117,7 +123,7 @@ export function rowsByHeading(rows) {
 // (each machine's checked products are still its own list in plantProducts: the Product drop-down on its Quality Check, in the
 // machine's order, with its own speeds and Target %). A product checked on no machine is kept in productSheet/{plant}.
 // Machine Setup shows the same lists one machine at a time. A product is matched across machines by its name.
-export const SHARED_FIELDS = ['name', 'sku', 'upc', 'mfgType', 'productGroup', 'shelfLifeDays', 'fillGrams'];
+export const SHARED_FIELDS = ['name', 'sku', 'upc', 'mfgType', 'productGroup', 'shelfLifeDays', 'fillGrams'].concat(PALLET_FIELDS);
 export const MACHINE_FIELDS = ['ratePerMin', 'targetPct', 'minSpeed', 'maxSpeed'];
 export const keyOf = (name) => String(name || '').trim().toUpperCase();
 // [{key, p, on: {areaId: product}, loose}] in name order: p is the product's details as first found (machines in their order, then
@@ -151,7 +157,7 @@ export function watchLoose(db, cb, fail) {
 }
 // The Download Product List / Upload columns: the product, a column per machine (an X where it runs), then the numbers.
 export const SHEET_HEAD = ['Product', 'SKU', 'UPC', 'Type', 'Group'];
-export const SHEET_TAIL = ['Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days', 'Target Fill Weight g'];
+export const SHEET_TAIL = ['Full Speed Per Min', 'Target %', 'Lowest Speed', 'Highest Speed', 'Shelf Life Days', 'Target Fill Weight g'].concat(PALLET_FIELDS.map(k => FIELDS.find(f => f.k === k).head));
 // A machine cell is checked when it has anything in it but 0, No, False or a dash.
 export const isChecked = (v) => { const t = String(v == null ? '' : v).trim().toUpperCase(); return t !== '' && ['0', 'NO', 'N', 'FALSE', '-'].indexOf(t) < 0; };
 // Two lists the same once both are as the server keeps them (key order and number form do not count).

@@ -11,6 +11,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 1. Press `Sign in with Google` and pick your United Dairy account.
 2. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
 3. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
+4. Press `All app links` (top right) for every phone and tablet link in one list, grouped by who uses it (Everyone, Managers, Sales, Drivers, Plant floor, Garage & Maintenance, Hiring). Press `Open`, or `Copy link` to text or email it. The codes are not on that list; an administrator gives them out from **Links & Codes**.
 
 ### The apps
 - **Plant & Distribution** (the Operations app): dispatch, the plant floor, fleet, schedules and plant reports.
@@ -19,12 +20,13 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Employees & Compliance** (UDMS): employee records, driver qualification, accidents, workers' comp and hiring.
 - **Route & Trip Costs** (the Route Estimator): the round-trip cost of a delivery or plant transfer, with PC Miler truck miles and tolls.
 - **Route Cost Analysis**: each month's delivery cost by route and stop: cost per case, per stop and per day on the road.
+- **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
 
 ### Which cards you see
-- **Plant & Distribution** and **Customers & Routes**: everyone who is active on the Users list.
+- **Plant & Distribution**, **Customers & Routes** and **Accident & Injury Reporting**: everyone who is active on the Users list.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs** and **Route Cost Analysis**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, and **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
@@ -35,7 +37,7 @@ screens: people.html
 **People & Access** is the one place for who can sign in to the United Dairy apps and what they can see and do in each: their role, their plants, which apps they can open, their screens and their single rights. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
-2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance, Route & Trip Costs, Route Cost Analysis), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
+2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance, Route & Trip Costs, Route Cost Analysis, Accident & Injury Reporting), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
 3. Press a person's name. Their page opens on the whole screen, in three columns: **Who they are** (with their apps and **What they can do in each app**), **What they see in Plant & Distribution**, and **Single rights**. `← Everyone` (or the browser's Back) returns to the list.
 4. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**. **Apps they can open** has the same tick boxes, saved with `Save`.
 5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
@@ -52,7 +54,7 @@ screens: people.html
 
 > Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
-> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution and Customers & Routes; Administrators also get Fuel Tracking, Employees & Compliance, Route & Trip Costs and Route Cost Analysis.
+> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution, Customers & Routes and Accident & Injury Reporting; Administrators also get Fuel Tracking, Employees & Compliance, Route & Trip Costs and Route Cost Analysis.
 
 > **Sales** is the role for salespeople: they see routes and customer pickups. The Sales app on their phone opens for any United Dairy account, so there is nothing to tick for it.
 
@@ -217,6 +219,45 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Driver Check-In Email). If it has not, the last-checked line says so in red.
 
 !> Do not type the numbers on Over the Road's Recap for a month that is already here. Fix the file, or add the corrected file by hand, so every app gets the same numbers.
+
+### Weekly route report
+The same screen also reads the weekly report of cases and sales by route and stop (the email **Weekly Daily Avg Cases by Route By Store**). **Route Cost Analysis** reads each week from here, so nobody has to save the files by hand.
+
+1. Type the **Mailbox the report comes to**. It saves by itself.
+2. Check the **Gmail label**. It starts as ROUTES/SALE BY ROUTE: the label the report email gets in that mailbox.
+3. Tick **Check every day**. Every day at 2:00 PM the Hub reads any new report with that label.
+4. To read it now, press `CHECK EMAIL NOW` in the WEEKLY ROUTE REPORT box. To add a report that came another way, press `ADD A REPORT BY HAND` and pick the .xls.
+5. Check the newest week in its table: routes, cases and sales.
+
+> A report whose stops do not add up to its own route totals is not saved, and the message says which route. Ask for a fresh copy of the report.
+
+> One file can hold several weeks. Each week is kept, and a newer copy of a week takes the older one's place.
+
+!> Do not take the label off the report emails, or the Hub will not find the next one.
+
+## Daily BOL
+id: bol
+screens: bol.html
+
+Where the office's **Daily Load By Route** comes in (administrators). The office emails it every afternoon, and Gmail puts it under the label **ROUTES/BOL**. The Hub picks it up from there, reads every route, every customer and what is on their order, and keeps each load day here so the other apps read the same thing.
+
+1. Type the **Mailbox the BOL comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
+2. Check the **Email label**. It starts as ROUTES/BOL, the label the BOL emails go under. Change it only if the label is renamed.
+3. Tick **Check every hour**. Every hour the Hub looks under that label for a new BOL and reads it.
+4. To read it now, press `CHECK EMAIL NOW`.
+5. If the BOL came another way, press `ADD A FILE BY HAND` and pick the PDF.
+6. Press a load day in **LOAD DAYS** to see its routes. Press a route to see its customers, in the order the BOL lists them.
+
+### Buttons
+- `CHECK EMAIL NOW` reads the label at once (the last 10 days). An email already read is not read again.
+- `ADD A FILE BY HAND` reads the BOL PDF from your computer. An Excel or CSV file with the same columns works too.
+- **Only from** (optional): type the office's address, so only BOLs from them are read.
+
+> The BOL lists each order line: load day, route, load sequence, customer and number, product and quantity. When a newer BOL for the same load day comes in (more orders keyed), it takes the older one's place.
+
+> The first time, Google Workspace has to let the app read the mailbox (the same permission as Accounting Numbers and Driver Check-In Email). If it has not, the last-checked line says so in red.
+
+!> Do not move the BOL emails out of the ROUTES/BOL label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
 
 ## Help
 id: help

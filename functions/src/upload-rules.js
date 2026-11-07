@@ -148,8 +148,13 @@
       col('Lowest Speed', 'minSpeed', false, 'number', 'Per minute. Not above Highest Speed.', 'Lowest Speed', null, { upTo: 100000 }),
       col('Highest Speed', 'maxSpeed', false, 'number', 'Per minute.', 'Highest Speed', null, { upTo: 100000 }),
       col('Shelf Life Days', 'shelfLifeDays', false, 'number', 'Used to check the code date.', 'Shelf Life Days', null, { upTo: 3650 }),
-      col('Target Fill Weight g', 'fillGrams', false, 'number', 'Product weight in grams.', 'Target Fill Weight g', null, { upTo: 20000 })
-    ], example: ['GALLON FILLER', 'GAL WHOLE MILK', '121001', '070852000013', 'Gallon', 'Milk', '60', '85', '', '', '17', '3860'] },
+      col('Target Fill Weight g', 'fillGrams', false, 'number', 'Product weight in grams.', 'Target Fill Weight g', null, { upTo: 20000 }),
+      col('Units In A Case', 'unitsPerCase', false, 'number', 'Jugs or cartons in one case.', 'Units In A Case', null, { upTo: 1000 }),
+      col('Cases To A Pallet', 'casesPerPallet', false, 'number', 'Full cases on one pallet.', 'Cases To A Pallet', null, { upTo: 1000 }),
+      col('Stack Height', 'stackHeight', false, 'number', 'How many cases high one stack is.', 'Stack Height', null, { upTo: 100 }),
+      col('Net Weight Full Case lb', 'caseNetLbs', false, 'number', 'The product in a full case, in pounds.', 'Net Weight Full Case lb', null, { upTo: 2000 }),
+      col('Gross Weight Full Case lb', 'caseGrossLbs', false, 'number', 'The case, the jugs and the product, in pounds.', 'Gross Weight Full Case lb', null, { upTo: 2000 })
+    ], example: ['GALLON FILLER', 'GAL WHOLE MILK', '121001', '070852000013', 'Gallon', 'Milk', '60', '85', '', '', '17', '3860', '4', '36', '6', '34.4', '36.5'] },
     { key: 'machines', tab: 'Machines', part: 'Plant', who: 'Maintenance', about: 'Machines that are not production lines (compressors, boilers, the building).', cols: [
       col('Machine Name', 'name', true, 'upper', '', 'Machinery name', null, { max: 60 }),
       col('Kind', 'kind', true, 'choice', '', 'kind', ['Machine', 'Utility', 'Building', 'Other']),

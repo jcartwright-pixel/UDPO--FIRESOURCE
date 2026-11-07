@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const NAMES = Object.freeze([
-    'accountingMail', 'accountingMonthly', 'actions', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
+    'accountingMail', 'accountingMonthly', 'actions', 'bolDays', 'bolMail', 'caseCounters', 'caseCounts', 'config', 'conflicts', 'crewAreas', 'crewJobs',
     'crewPeople', 'crewRules', 'crewVacations', 'crewWeeks', 'dataLoads', 'dateBackups', 'driverBackups',
     'deletedDrivers', 'driverIncidents', 'driverPhones', 'drivers', 'dvirs', 'employees', 'equipment', 'exceptions',
     'extinguishers', 'fireSystems', 'fleetSetup', 'garageClocks', 'garageLocks', 'garageLogins', 'garageSessions',
@@ -31,7 +31,7 @@
     'plantMaintClocks', 'plantMaintCounters', 'plantMaintLocks', 'plantMaintLogins', 'plantPmTasks', 'plantProducts', 'plantReports',
     'plantReturns', 'plantSetup', 'plantShifts', 'plantUploadLog', 'plantUploads', 'plantWash', 'plantWorkOrders',
     'private', 'productSetup', 'productSheet', 'productionLines', 'productionRuns', 'receivingItems', 'receivingScans',
-    'redzoneChecks', 'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routes', 'runDays',
+    'redzoneChecks', 'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routeReportMail', 'routeWeekly', 'routes', 'runDays',
     'runs', 'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'scorecard', 'scorecardExcuses',
     'scorecardRatings', 'sensors', 'sentEmails', 'stationAccess', 'tempLocations', 'textLog', 'transfers',
     'udclCustomers', 'udclLog', 'udclRouteDays', 'users', 'vacations', 'walkPhotoData', 'walkPhotos', 'weeks', 'windowTests', 'workOrders',

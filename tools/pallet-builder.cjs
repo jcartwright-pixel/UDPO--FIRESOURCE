@@ -59,7 +59,9 @@ const HEAD = `<!doctype html>
 
 const TAIL = `</script>
   <script type="module">
-    import { requireSignIn, callServer, currentPlant, serverText } from './js/app.js';
+    import { requireSignIn, callServer, currentPlant, serverText, start } from './js/app.js';
+    import { collection, getDocs, query, orderBy, limit } from './js/firebase.js';
+    import { PALLET_FIELDS } from './js/products.js';
     // Joe 11-6-26: the route map is the Customer List's route day (udclRouteDays, through its own server call, customerList,
     // which checks who may change it, checks nobody saved the same route day in between and logs every save). The builder in
     // the frame asks for it through window.udRouteMap: load(route, day) when a route opens, save(...) for Save to route map.
@@ -71,10 +73,14 @@ const TAIL = `</script>
     function shape(d, rd) {
       if (!rd) return { found: false };
       const cs = d.customers || {};
+      // Joe 11-6-26: each customer's cases on this route day (weeks = [[week ending, cases]], kept in the Customer List from the Hub's
+      // Weekly Route Report), its PALLET USES, how many weeks there are, and the plant's Pallet Rules.
+      const cases = rd.cases || {}, uses = rd.palletUses || {};
       return { found: true, route: rd.route, rev: rd.rev || 0, updatedAt: rd.updatedAt || '', updatedBy: rd.updatedBy || '', canEdit: !!d.canEdit,
-        stops: (rd.stops || []).map(s => { const c = cs[s.key] || {}; return { key: s.key, account: c.account || s.account || '', name: c.name || s.name || '', chain: c.chain || s.chain || '', loadSeq: +s.loadSeq || 0, note: s.note || '' }; }) };
+        rules: d.palletRules || null, caseWeeks: rd.caseWeeks || 0,
+        stops: (rd.stops || []).map(s => { const c = cs[s.key] || {}; return { key: s.key, account: c.account || s.account || '', name: c.name || s.name || '', chain: c.chain || s.chain || '', loadSeq: +s.loadSeq || 0, note: s.note || '', weeks: cases[s.key] || [], uses: uses[s.key] || '' }; }) };
     }
-    const read = () => (view = view || callServer('customerList', { op: 'view', plant: currentPlant() }).catch(e => { view = null; throw e; }));
+    const read = () => (view = view || callServer('customerList', { op: 'view', plant: currentPlant(), cases: true }).catch(e => { view = null; throw e; }));
     window.udRouteMap = {
       async load(route, day) {
         try { const d = await read(); return shape(d, routeDayOf(d, route, day)); } catch (e) { throw new Error(plain(e)); }
@@ -95,11 +101,67 @@ const TAIL = `</script>
           if (/aborted/.test(String(e && e.code || ''))) { view = null; err.changed = true; }
           throw err;
         }
+      },
+      // Joe 11-6-26: PALLET USES for one customer on one route day ('' = the standard on Pallet Rules).
+      async setUses(route, day, key, rule) {
+        let d;
+        try { d = await read(); } catch (e) { throw new Error(plain(e)); }
+        const rd = routeDayOf(d, route, day);
+        if (!rd) throw new Error('Route ' + route + ' is not on the route map for that day. Add it in the Customer List first.');
+        try {
+          const out = await callServer('customerList', { op: 'setPalletUses', plant: currentPlant(), route: rd.route, day, key, rule });
+          rd.palletUses = out.palletUses || {};
+          return out;
+        } catch (e) { throw new Error(plain(e)); }
+      },
+      // Pallet Rules: only the boxes changed are sent; the Customer List puts anything wrong back to the standard.
+      async saveRules(change) {
+        let d;
+        try { d = await read(); } catch (e) { throw new Error(plain(e)); }
+        try {
+          const out = await callServer('customerList', { op: 'savePalletRules', plant: currentPlant(), rules: change });
+          d.palletRules = out.palletRules;
+          return out.palletRules;
+        } catch (e) { throw new Error(plain(e)); }
       }
     };
+    // Joe 11-6-26: the Product Sheet's case and pallet numbers by SKU (the plant's products on each machine and on no machine),
+    // read once; the builder uses them in place of its own where a box is filled in.
+    async function sheetProducts() {
+      const { db } = await start(), out = {};
+      const take = (p) => { const k = String(p && p.sku || '').trim(); if (!k) return; const o = out[k] || (out[k] = {});
+        PALLET_FIELDS.forEach(f => { if (o[f] == null && Number(p[f]) > 0) o[f] = Number(p[f]); }); };
+      for (const name of ['plantProducts', 'productSheet']) {
+        const snap = await getDocs(collection(db, name));
+        snap.docs.forEach(d => ((d.data() || {}).products || []).forEach(take));
+      }
+      Object.keys(out).forEach(k => { if (!Object.keys(out[k]).length) delete out[k]; });
+      return out;
+    }
     // The builder keeps its saved routes in this browser (as it always has); the frame is this site's own page, so they stay.
-    requireSignIn(() => {
+    // Joe 11-6-26 (lb): the builder opens with the newest BOL the Hub picked up (bolDays, kept by Hub > Daily BOL in the company
+    // database), shaped like the BOL built into the builder. No BOL there, or it can't be read: the builder's own one stays.
+    const two = (n) => String(n).padStart(2, '0');
+    window.udBolShape = (d) => {
+      if (!d || !d.date || !(d.routes || []).length) return null;
+      const y = d.date.slice(0, 4);
+      // The builder's own route-name key (MM/DD/YY, read back by its routeKey to find the weekday), not a date for people.
+      const tag = d.date.slice(5).replace('-', '/') + '/' + y.slice(2);
+      return { key: 'udpb-hub-' + d.date, label: window.UDLogic.dateText(d.date), date: d.date,
+        routes: d.routes.map(r => ({ route: 'RT ' + r.route + ' \u00b7 ' + tag, bolAt: d.received || d.savedAt || '',
+          stops: (r.stops || []).map(st => ({ name: st.name + (st.seq != null ? ' (sub-rt ' + two(st.seq) + ')' : ''), acct: st.custNo || '',
+            lines: (st.lines || []).map(l => [String(l.item), Number(l.qty) || 0]) })) })) };
+    };
+    async function newestBol() {
+      const { homeDb } = await start();
+      const snap = await getDocs(query(collection(homeDb, 'bolDays'), orderBy('date', 'desc'), limit(1)));
+      return snap.empty ? null : window.udBolShape(snap.docs[0].data());
+    }
+    requireSignIn(async () => {
       const frame = document.getElementById('builder');
+      if (frame.srcdoc) return;
+      try { window.udBol = await newestBol(); } catch (e) { window.udBol = null; }
+      try { window.udProducts = await sheetProducts(); } catch (e) { window.udProducts = {}; }
       if (frame.srcdoc) return;
       const builder = JSON.parse(document.getElementById('builder-page').textContent);
       frame.srcdoc = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>' + builder + '</body></html>';

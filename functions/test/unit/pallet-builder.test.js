@@ -25,16 +25,56 @@ test('the Pallet Builder is its own area (Joe 11-5-26), so People & Roles can ti
   assert.equal(L.pageGated('pallet-builder.html'), true);
 });
 
-test('dispensers and boxes ride inside crates (Joe 11-5-26): 54 to a pallet and one crate count going out', () => {
+// Joe 11-6-26 ("provisions"): the numbers follow Pallet Rules (crates 54 a pallet, dispensers 45, a box in a crate) unless the
+// Product Sheet has the product's own; going out still adds dispensers and boxes into the one crate count.
+function rulesBox(sheet) {
+  const src = fs.readFileSync(PB.SRC, 'utf8'), vm = require('vm');
+  const at = src.indexOf('const RULES0'), end = src.indexOf("const WD = ['SUN'");
+  const code = src.match(/^const P = .*$/m)[0] + '\n' + src.match(/^const IN_CRATE = .*$/m)[0] + '\n' + src.match(/^const BY = .*$/m)[0] + '\n' +
+    src.slice(at, end) + '\nthis.BY = BY; this.applyRules = applyRules; this.caseStats = caseStats; this.heldOf = heldOf; this.set = (r) => { RULES = Object.assign({}, RULES0, r); applyRules(); };';
+  const box = { window: { parent: { udProducts: sheet || {} } } }; box.window.parent.parent = box.window.parent; vm.runInNewContext(code, box);
+  return box;
+}
+test('Pallet Rules set the pallets (Joe 11-6-26): crates 54, dispensers 45, a box goes in a crate; one crate count going out', () => {
   const src = fs.readFileSync(PB.SRC, 'utf8');
-  const vm = require('vm');
-  const code = src.match(/^const P = .*$/m)[0] + '\n' + src.match(/^const IN_CRATE = .*$/m)[0] + '\n' + src.match(/^const BY = .*$/m)[0] + '\nthis.BY = BY;';
-  const box = {}; vm.runInNewContext(code, box);
+  const box = rulesBox();
   const kinds = new Set();
-  box.BY.forEach(p => { if (p.type === 'Box' || p.type === 'Dispenser' || p.type === 'Crate') { kinds.add(p.type); assert.equal(p.cpp, 54, p.desc + ' should go 54 to a pallet'); } });
+  box.BY.forEach(p => { if (p.type === 'Box' || p.type === 'Dispenser' || p.type === 'Crate') { kinds.add(p.type); assert.equal(p.cpp, p.type === 'Dispenser' ? 45 : 54, p.desc); } });
   assert.deepEqual([...kinds].sort(), ['Box', 'Crate', 'Dispenser']);
+  box.set({ cratesPerPallet: 56, dispensersPerPallet: 40, boxIsCrate: false });
+  const one = (t) => [...box.BY.values()].find(p => p.type === t);
+  assert.equal(one('Crate').cpp, 56); assert.equal(one('Dispenser').cpp, 40); assert.equal(one('Box').cpp, one('Box').cpp0, 'a box on its own keeps its own number');
   assert.match(src, /out\.Crate \+ out\.Box \+ out\.Dispenser\)\}<\/b> crates/, 'Going out adds dispensers and boxes into the crates');
   assert.ok(!/<\/b> boxes · /.test(src) && !/<\/b> dispensers\$\{/.test(src), 'no separate boxes and dispensers counts going out');
+});
+
+test('the Product Sheet wins by SKU: units in a case, cases to a pallet and the weight of a full case', () => {
+  const box = rulesBox({ 255203: { unitsPerCase: 3, casesPerPallet: 40, caseNetLbs: 60 } });
+  const p = box.BY.get('255203');
+  assert.equal(p.upc, 3); assert.equal(p.cpp, 40); assert.equal(p.uw, 20);
+  const other = [...box.BY.values()].find(x => x.type === 'Crate');
+  assert.equal(other.cpp, 54, 'a product the Product Sheet leaves blank follows Pallet Rules');
+});
+
+test('each customer\'s space is held for its number: HIGH unless PALLET USES picks another (the Customer List\'s own math)', () => {
+  const box = rulesBox();
+  const weeks = [['2026-10-03', 46], ['2026-10-10', 9], ['2026-10-17', 21], ['2026-10-24', 25], ['2026-10-31', 25.5]];
+  const st = box.caseStats(weeks, 5);
+  assert.deepEqual([st.LOW, st.MIDDLE, st.AVERAGE, st.HIGH, st.LAST, st.weeks], [9, 25, 25.3, 46, 25.3, 5]);
+  assert.equal(box.heldOf(st, ''), 46, 'the standard is HIGH');
+  assert.equal(box.heldOf(st, 'AVERAGE'), 26, 'rounded up to whole cases');
+  assert.equal(box.heldOf(null, ''), 0, 'no weeks, no space held');
+});
+
+test('held space is shaded on the truck, more cases add space, and the customers on the route sit at the very top', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  const top = src.indexOf('aria-label="Customers on this route"'), routes = src.indexOf('aria-label="All routes"');
+  assert.ok(top > 0 && top < routes, 'CUSTOMERS ON THIS ROUTE is above All routes');
+  assert.match(src, /<th>LOW<\/th><th>MIDDLE<\/th><th>AVERAGE<\/th><th>HIGH<\/th><th>LAST \$\{RULES\.weeks\} WEEKS<\/th><th>PALLET USES<\/th><th>HELD FOR<\/th><th>TODAY'S BOL<\/th><th>SPACE<\/th>/);
+  assert.match(src, /class="held" data-g=/, 'held stacks are drawn shaded');
+  assert.match(src, /OVER BY \$\{fmt\(h\.cases - h\.held\)\} · SPACE ADDED/);
+  assert.match(src, /if \(!h \|\| RULES\.under !== 'KEEP'\) return;/, 'space is held only while Pallet Rules keep it');
+  assert.match(src, /<button id="rulesBtn" aria-expanded="false">PALLET RULES<\/button>/);
 });
 
 test('route totals sit right under the stop list beside the truck, without the no-weight and case-count notes (Joe 11-5-26)', () => {
@@ -70,7 +110,7 @@ test('Joe 11-5-26 tweaks: pallets beside cases, the truck stays in view, a stop 
 // The Pallet Builder screen's bridge to the Customer List's route map, run with a stand-in for its server call.
 function bridgeWith(answer) {
   const page = fs.readFileSync(PB.OUT, 'utf8');
-  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/app\.js';/, '');
+  const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/(app|firebase|products)\.js';/g, '');
   const calls = [], window = {};
   const callServer = async (name, data) => { calls.push([name, JSON.parse(JSON.stringify(data))]); return answer(data); };
   new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, callServer, () => 'fac_uniontown', (e) => e.message);
@@ -110,4 +150,52 @@ test('Print sequence changes and Save to route map are on the truck load map; on
   assert.match(src, /<button class="primary" id="lmSave">Save to route map<\/button>/);
   assert.match(src, /@media print\{[^\n]*\.wrap,\.toast\{display:none!important\}#printSheet\{display:block/);
   assert.match(src, /<th>Chain<\/th><th>Account #<\/th><th>Customer<\/th><th class="n">New sequence<\/th>/);
+});
+
+test('Pallet Builder opens with the newest BOL from the Hub (Joe 11-6-26, lb), shaped like the BOL built in', () => {
+  const { window } = (() => { const page = fs.readFileSync(PB.OUT, 'utf8');
+    const code = page.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import \{[^}]*\} from '\.\/js\/(app|firebase|products)\.js';/g, '');
+    const window = { UDLogic: L }; new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, async () => ({}), () => 'fac_uniontown', (e) => e.message);
+    return { window }; })();
+  const day = { date: '2026-11-09', received: '2026-11-09T20:00:00.000Z', routes: [
+    { route: '805', stops: [{ seq: 0, custNo: '1001', name: 'MADEUP GOLF CENTER', lines: [{ item: '908', desc: 'UD 3.25 BMILK PLS HGL', qty: 6 }] }, { seq: 2, custNo: '1002', name: 'SAMPLE FOOD MART', lines: [{ item: '305', desc: 'UD 2% GAL', qty: 20 }] }] }] };
+  const b = window.udBolShape(day);
+  assert.equal(b.key, 'udpb-hub-2026-11-09'); assert.equal(b.label, '11-9-26');
+  assert.deepEqual(b.routes, [{ route: 'RT 805 \u00b7 11/09/26', bolAt: '2026-11-09T20:00:00.000Z', stops: [
+    { name: 'MADEUP GOLF CENTER (sub-rt 00)', acct: '1001', lines: [['908', 6]] }, { name: 'SAMPLE FOOD MART (sub-rt 02)', acct: '1002', lines: [['305', 20]] }] }]);
+  assert.equal(window.udBolShape({ date: '2026-11-09', routes: [] }), null, 'an empty BOL leaves the built-in one');
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /window\.parent\.udBol/, 'the builder takes the BOL the screen hands it');
+  assert.match(src, /const key = HUBBOL \? HUBBOL\.key : DAYKEY, day = HUBBOL \? HUBBOL\.routes : BOLDAY;/, 'and keeps its own BOL when there is none');
+});
+
+test('Pallet Rules and PALLET USES go to the Customer List through its own server call; the cases come with the route map', async () => {
+  const day = DAY();
+  day.palletRules = { standard: 'HIGH', weeks: 5, cratesPerPallet: 54, cratesPerStack: 6, dispensersPerPallet: 45 };
+  day.routeDays[0].cases = { 40496: [['2026-10-31', 12], ['2026-10-24', 20]] }; day.routeDays[0].palletUses = { 40496: 'LOW' }; day.routeDays[0].caseWeeks = 2;
+  const { map, calls } = bridgeWith(d => d.op === 'view' ? day : d.op === 'setPalletUses' ? { ok: true, palletUses: { 40496: d.rule } } : { ok: true, palletRules: Object.assign({}, day.palletRules, d.rules) });
+  const m = await map.load('813', 'THU');
+  assert.equal(calls[0][1].cases, true, 'the route map is read with the cases');
+  assert.deepEqual(m.stops[1].weeks, [['2026-10-31', 12], ['2026-10-24', 20]]); assert.equal(m.stops[1].uses, 'LOW'); assert.equal(m.stops[0].uses, '');
+  assert.equal(m.caseWeeks, 2); assert.equal(m.rules.dispensersPerPallet, 45);
+  await map.setUses('813', 'THU', '40496', 'AVERAGE');
+  assert.deepEqual(calls[calls.length - 1], ['customerList', { op: 'setPalletUses', plant: 'fac_uniontown', route: '813', day: 'THU', key: '40496', rule: 'AVERAGE' }]);
+  const r = await map.saveRules({ cratesPerPallet: 56 });
+  assert.deepEqual(calls[calls.length - 1], ['customerList', { op: 'savePalletRules', plant: 'fac_uniontown', rules: { cratesPerPallet: 56 } }]);
+  assert.equal(r.cratesPerPallet, 56);
+});
+
+test('the Product Sheet keeps units in a case, cases to a pallet, stack height and full-case weights (Joe 11-6-26)', async () => {
+  const PL = require('../../src/plant');
+  class SaveError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+  const one = PL.validateMachineProducts({ areaId: 'ut_prod_gallon_filler', products: [{ name: 'SAMPLE 2% GAL', sku: '305', unitsPerCase: '4', casesPerPallet: '54.4', stackHeight: '6', caseNetLbs: '34.4', caseGrossLbs: '36.55' }] }, SaveError).products[0];
+  assert.deepEqual([one.unitsPerCase, one.casesPerPallet, one.stackHeight, one.caseNetLbs, one.caseGrossLbs], [4, 54, 6, 34.4, 36.55]);
+  assert.throws(() => PL.validateMachineProducts({ areaId: 'x', products: [{ name: 'SAMPLE', caseGrossLbs: '-1' }] }, SaveError), /Gross Weight Full Case lb must be a number from 0 to 2000/);
+  const src = fs.readFileSync(require('path').join(__dirname, '../../../public/js/products.js'), 'utf8');
+  assert.match(src, /export const PALLET_FIELDS = \['unitsPerCase', 'casesPerPallet', 'stackHeight', 'caseNetLbs', 'caseGrossLbs'\];/);
+  assert.match(src, /export const KEEP_FIELDS = \[[^\]]*\]\.concat\(PALLET_FIELDS\);/, 'an upload never wipes them');
+  assert.match(src, /export const SHARED_FIELDS = \[[^\]]*\]\.concat\(PALLET_FIELDS\);/, 'one per product, on every machine');
+  assert.match(src, /export const SHEET_TAIL = \[[^\]]*\]\.concat\(PALLET_FIELDS\.map/, 'in the downloaded list');
+  const html = fs.readFileSync(require('path').join(__dirname, '../../../public/products.html'), 'utf8');
+  assert.match(html, /<th class="pm-pal" colspan="' \+ PALLET_FIELDS\.length \+ '">Cases and Pallets<\/th>/);
 });

@@ -16,9 +16,9 @@ const db = fakeDb({
 });
 const keys = (r) => r.tiles.map(t => t.key);
 
-test('an administrator sees all six apps, live addresses on the live project', async () => {
+test('an administrator sees all seven apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
+  assert.deepEqual(keys(r), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident']);
   assert.equal(r.admin, true);
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/');
   assert.equal(r.tiles[1].url, 'https://ud-distribution-customers.web.app/');
@@ -28,6 +28,8 @@ test('an administrator sees all six apps, live addresses on the live project', a
   assert.equal(r.tiles[4].name, 'Route & Trip Costs');
   assert.equal(r.tiles[5].url, 'https://ud-distribution-route-cost.web.app/');
   assert.equal(r.tiles[5].name, 'Route Cost Analysis');
+  assert.equal(r.tiles[6].url, 'https://united-dairy-accident-app.web.app/');
+  assert.equal(r.tiles[6].name, 'Accident & Injury Reporting');
 });
 
 test('the practice copy links to the practice copies', async () => {
@@ -37,9 +39,9 @@ test('the practice copy links to the practice copies', async () => {
   assert.equal(r.tiles[4].url, 'https://ud-distribution-sandbox-routes.web.app/');
 });
 
-test('someone who is not an administrator sees Operations and the Customer List only', async () => {
+test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {
   const r = await H.hubCall(db, { email: 'sam.sales@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['operations', 'customers']);
+  assert.deepEqual(keys(r), ['operations', 'customers', 'accident']);
   assert.equal(r.admin, false);
 });
 
@@ -118,7 +120,7 @@ test('saved app ticks decide the tiles; only administrators change them, never t
     runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
   };
   const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'customers']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'customers', 'accident']);
   await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
   assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
   assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['operations', 'fuel']);
@@ -127,4 +129,19 @@ test('saved app ticks decide the tiles; only administrators change them, never t
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'pat.admin@uniteddairy.com', apps: ['fuel'] }), /from yourself/);
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['statements'] }), /could not be read/);
   assert.equal(Object.values(docs.actions).length, 1, 'each change is logged');
+});
+
+// Joe 11-6-26: Home's All app links, grouped, links only (no codes), on the live or practice site the hub runs on.
+test('All app links: every group has links, they point at this hub\'s Operations site, and the accident app is under Everyone', async () => {
+  const { linkGroups, ACCIDENT_URL, APPLY_URL } = await import('../../../public/js/apps.js');
+  const g = linkGroups('https://ud-distribution.web.app');
+  assert.deepEqual(g.map(x => x.name), ['Everyone', 'Managers', 'Sales', 'Drivers', 'Plant floor', 'Garage & Maintenance', 'Hiring']);
+  g.forEach(x => assert.ok(x.links.length > 0, x.name));
+  const urls = g.flatMap(x => x.links.map(l => l.url));
+  assert.ok(urls.includes('https://ud-distribution.web.app/route.html'));
+  assert.ok(urls.includes('https://ud-distribution.web.app/garage-station.html'));
+  assert.ok(g[0].links.some(l => l.url === ACCIDENT_URL));
+  assert.ok(urls.includes(APPLY_URL));
+  urls.filter(u => u !== ACCIDENT_URL && u !== APPLY_URL).forEach(u => assert.ok(u.startsWith('https://ud-distribution.web.app/'), u));
+  assert.ok(linkGroups('https://ud-distribution-sandbox.web.app/')[3].links[0].url.startsWith('https://ud-distribution-sandbox.web.app/route.html'));
 });

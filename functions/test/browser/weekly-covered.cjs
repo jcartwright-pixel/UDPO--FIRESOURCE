@@ -59,6 +59,19 @@ async function covered(page) {
       assert.deepEqual(page.errors, []);
       await page.close();
     }
+    // Joe 11/7 ("it was supposed to be right beside the weekly dispatch"): the live Weekly Dispatch week shows it beside its title too.
+    for (const [w, h] of [[1536, 790], [1920, 950]]) {
+      const live = await openPage(browser, w, h, '/weekly.html?view=live&testEmail=dispatch.test@uniteddairy.com');
+      await live.waitForSelector('#covered:not([hidden])');
+      assert.match(await covered(live), /^\d+% OF RUNS COVERED$/);
+      assert.equal(await live.textContent('#page-name'), 'Weekly Dispatch');
+      const at = await live.evaluate(() => { const c = document.getElementById('covered').getBoundingClientRect(), h1 = document.getElementById('page-name').getBoundingClientRect();
+        return Math.abs((c.top + c.bottom) - (h1.top + h1.bottom)) < 12 && c.left > h1.right && document.documentElement.scrollWidth <= innerWidth; });
+      assert.ok(at, 'beside the Weekly Dispatch title at ' + w);
+      if (SHOTS) await live.screenshot({ path: path.join(SHOTS, 'weekly-dispatch-covered-' + w + '.png') });
+      assert.deepEqual(live.errors, []);
+      await live.close();
+    }
     // Picking a driver for 802 Tuesday (NEEDS DRIVER) moves it to 4 of 8 straight away.
     const page = await openPage(browser, 1536, 790, '/weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com');
     await page.waitForSelector('#covered:not([hidden])');

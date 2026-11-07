@@ -123,7 +123,7 @@
     import { runArea } from './js/plant-core.js';
     forScreen('dailyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
     import { sendTextsStrip } from './js/send-texts-strip.js';
 
     const L = window.UDLogic, R = window.UDPlant;
@@ -132,12 +132,21 @@
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
     // Joe 11/6: Daily Dispatch shows only the current week. Its loadout days are Saturday to Friday (they deliver Sunday to Saturday);
-    // the arrows and the day list stay inside it, and a day in a link (Weekly's Daily Dispatch button) from another week opens
-    // today instead. Print Layouts' unseen copy (in a frame) still prints the day it was asked for.
-    // On the test server a ?now= time stands for the clock; without one, the day in the link (or the day kept) counts as today.
+    // the arrows and the day list stay inside it. Print Layouts' unseen copy (in a frame) still prints the day it was asked for.
+    // Joe 11/6 ("the week never gets changed in the daily dispatch or the weekly dispatch until I publish"): the current week is the
+    // published one (config/app liveWeeks.current), the same week Weekly Dispatch shows. The calendar never moves it, not the
+    // Saturday 6 a.m. roll either: only a Publish on the Weekly Dispatch Template does. A day in a link from another week (the
+    // Template's Daily Dispatch button on next week) opens the day kept here instead, or today when that is not in the week.
+    // On the test server a ?now= time stands for the clock; without one, the day in the link (or the day kept) counts as today
+    // and its week is the week shown.
     const testServer = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), inFrame = window.self !== window.top;
-    let testToday = testServer && Date.parse(params.get('now') || '') ? L.operatingDay(new Date(Date.parse(params.get('now')))) : '';
+    const testNow = testServer && Date.parse(params.get('now') || '');
+    let testToday = testNow ? L.operatingDay(new Date(Date.parse(params.get('now')))) : '';
     const today = () => testToday || L.operatingDay(new Date());
+    let liveCurrent = '', started = false;
+    // The loadout Saturday that starts the week shown, and a day pulled inside that week.
+    const lockBegin = () => testServer && !testNow ? weekBegin(testToday || loadDate) : L.isDateKey(liveCurrent) ? L.addDays(liveCurrent, -1) : weekBegin(today());
+    const intoWeek = (key) => { const b = lockBegin(), e = L.addDays(b, 6); return key < b ? b : key > e ? e : key; };
     let unsubscribeRuns = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], runs = [], rows = [], editing = false, rowDrag = null, held = false, writeBack = false, editRow = null;
     const getRuns = () => runs;
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
@@ -734,6 +743,12 @@
         writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
+        // A Publish moves the week on: the screen follows it to today, kept inside the newly published week.
+        const cur = (c.liveWeeks || {}).current;
+        if (L.isDateKey(cur) && cur !== liveCurrent) {
+          liveCurrent = cur;
+          if (started && !inFrame && weekBegin(loadDate) !== lockBegin()) { loadDate = intoWeek(today()); watchRuns(); return; }
+        }
         render();
       });
       watchCopied(db, (when) => {
@@ -746,11 +761,16 @@
       document.getElementById('load-day').onchange = e => goTo(e.target.value);
       dayKey = 'ud.daily.day.' + String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
       let kept = '';
-      if (!L.isDateKey(params.get('date'))) { try { kept = localStorage.getItem(dayKey) || ''; if (L.isDateKey(kept)) loadDate = kept; } catch (e) { /* storage off */ } }
+      try { kept = localStorage.getItem(dayKey) || ''; } catch (e) { /* storage off */ }
+      const linked = L.isDateKey(params.get('date'));
+      if (!linked && L.isDateKey(kept)) loadDate = kept;
       if (testServer && !testToday) testToday = loadDate;
-      if (!inFrame && weekBegin(loadDate) !== weekBegin(today())) loadDate = today();
-      // Left open into the next week (Saturday 6 a.m.), the screen moves to the new week's day.
-      if (!inFrame) setInterval(() => { if (weekBegin(loadDate) !== weekBegin(today())) { loadDate = today(); watchRuns(); } }, 60000);
+      const first = await getDoc(doc(db, 'config', 'app')).then(s => ((s.data() || {}).liveWeeks || {}).current || '', () => '');
+      if (L.isDateKey(first)) liveCurrent = first;
+      if (!inFrame && weekBegin(loadDate) !== lockBegin()) loadDate = linked && L.isDateKey(kept) && weekBegin(kept) === lockBegin() ? kept : intoWeek(today());
+      started = true;
+      // Only with no published week to go by (a new copy of the app) does the calendar move the week (Saturday 6 a.m.).
+      if (!inFrame) setInterval(() => { if (weekBegin(loadDate) !== lockBegin()) { loadDate = intoWeek(today()); watchRuns(); } }, 60000);
       window.addEventListener('resize', render);
       watchRuns();
     });

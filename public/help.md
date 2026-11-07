@@ -140,10 +140,12 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 ### Pick the day
 
-- This screen always shows **the current week**. The week cannot be changed here. It moves on by itself on Saturday morning.
+- This screen always shows **the published week**, the same week as `Weekly Dispatch`. The week cannot be changed here, and the calendar does not change it either. It moves on only when you press `PUBLISH TO WEEKLY DISPATCH` on the Weekly Dispatch Template.
 - **Loadout Day** (right, under the buttons) is the day the loads are loaded, Saturday to Friday. Use the arrows or the list to move a day. Beside it, **Delivers** says which day those loads deliver.
 - The arrows stop at the ends of the week (they turn gray).
-- The day you pick stays picked on this computer while it is in the current week.
+- The day you pick stays picked on this computer while it is in the published week, even when you go to the Weekly Dispatch Template and back.
+
+!> Do not wait past Friday to publish next week. Saturday's loadout is the first day of the next week, so it shows here only after that week is published.
 
 > To see or plan another week, use `Weekly Dispatch` or the Weekly Dispatch Template.
 
@@ -167,7 +169,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 ### Send schedule texts
 
-Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers.
+Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers. **Not set up yet** means the texting account is not saved: an administrator sets it up on Administration > Texts. On a laptop the line may take two lines.
 
 1. Press `Send Texts` once. It turns red and says how many drivers it will text.
 2. Press it again within 5 seconds to send. The line turns green and says when it was sent.
@@ -198,21 +200,24 @@ The lists show only this plant's units, using the plant the fleet list gives eac
 id: weekly
 screens: weekly.html
 
-Next week, the week you get ready and then publish to Daily Dispatch. The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
+Next week, the week you get ready and then publish to Weekly Dispatch and Daily Dispatch. It is always one week ahead of Weekly Dispatch. The whole week's routes and drivers, Sunday to Saturday. It has two halves: **Route / Run Assignments** (each route with its driver for each day) and the **Driver Assignment Board** (each driver with what they do each day).
 
 ### Pick the week
 
-Weekly Dispatch Template opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer.
+Weekly Dispatch Template opens on next week, the week you are getting ready. It does not move forward with the calendar. It moves only when you change it with the arrows beside **Week starting**, or when you publish: then it opens the new next week. The week you pick stays picked on this computer, also when you go to Daily Dispatch or Weekly Dispatch and come back.
 
 ### What to do
 
 1. Click a driver box on a route's day. The driver list opens right there. Pick a driver and it saves.
 2. On the Driver Assignment Board, click a driver's day to set their availability: Available, Backup, Day Note, Vacation, Sick, Personal, Bereavement, Unpaid or Off. Type a **Note** if needed, then `Save availability`.
 3. Click a run's name for `+ Extra this week` when the same run goes out twice one day. The extra line reads THIS WEEK ONLY. Click it again for `Remove`.
-4. When the week is right, press `Publish to Daily Dispatch`. Press it a second time within a few seconds to confirm. Publishing does not text the drivers; send their schedule texts afterwards from [Weekly Dispatch](#weekly-live) or [Daily Dispatch](#daily).
+4. When the week is right, press `PUBLISH TO WEEKLY DISPATCH`. Press it a second time within a few seconds to confirm. That week becomes the week on Weekly Dispatch and Daily Dispatch, and the screen switches to [Weekly Dispatch](#weekly-live) by itself so you can check it. Publishing does not send any texts or emails. Send the drivers' schedule texts yourself afterwards, from Weekly Dispatch or [Daily Dispatch](#daily), when you are ready.
 
 - The box beside the title shows how much of the week has a driver, for example **87% OF RUNS COVERED**. It is red until every run that goes out has a driver, then green at 100%. It changes as soon as you pick a driver. Days a run does not go out, and runs a carrier or another company covers, do not count. Point at it to see how many of the week's runs have a driver.
 - **NEEDS DRIVER** in red means the regular driver is off that day.
+- **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
+- A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
+- Load 1 and Load 2 of the same route with the same driver are normal (one truck pulling two loads). They are never pink.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.
 - **BACKUP** means the driver is a backup that day. A **Day Note** (for example "riding with...") shows in teal in place of AVAILABLE.
@@ -225,6 +230,8 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
 
+> If a box is pink and the times look wrong, fix the leave time or route hours in Route Master. With no hours, the app cannot tell when the run is back, so it stays pink.
+
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
 
 ## Weekly Dispatch
@@ -233,7 +240,7 @@ screens: weekly.html?view=live
 
 The live week, the one Daily Dispatch is running now, Sunday to Saturday. It looks just like the Weekly Dispatch Template, with the same two halves. Open it with the `Weekly Dispatch` button on Daily Dispatch.
 
-It always shows the live week. After next week is published, it moves on to that week by itself. There are no arrows and no Publish here: next week is changed and published on the [Weekly Dispatch Template](#weekly).
+It always shows the published week, the same week as Daily Dispatch. The calendar does not change it. It moves on only when you press `PUBLISH TO WEEKLY DISPATCH` on the Weekly Dispatch Template. There are no arrows and no Publish here: next week is changed and published on the [Weekly Dispatch Template](#weekly).
 
 ### What to do
 
@@ -339,13 +346,17 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 id: template
 screens: template.html
 
-Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template. Changes there are for that week only and do not change the template.
+Each driver's normal week, set once. It becomes the starting point of every new week on the Weekly Dispatch Template.
+
+A change here goes three places at once: **Driver Master**, **this week** on [Weekly Dispatch](#weekly-live) and **next week** on the [Weekly Dispatch Template](#weekly), from today on. Changes made on a week are for that week only and do not change the template.
 
 1. In a driver's day, pick **Available**, **Off** or **Assigned**.
 2. For Assigned, pick the run. `+ Add Run` adds a second run the same day.
-3. Each changed box saves on its own.
+3. Each changed box saves on its own, and the two weeks change with it.
 
 - `Copy` under a driver's name copies their whole week. `Paste` puts it on another driver; `Paste + Add` adds it to what that driver already has.
+
+> A day you already changed by hand on Weekly Dispatch or the Weekly Dispatch Template keeps your hand change. A load already loaded does not change.
 
 !> Do not use the template for one week's change. Change the week on the Weekly Dispatch Template.
 
@@ -362,7 +373,7 @@ Drivers' time off: vacation, personal, sick, bereavement and unpaid days. At mos
 - `Edit` and `Remove` on a line change or take off a day off.
 - `Print` prints one driver or every driver, one page each.
 
-> An approved day off shows on Weekly Dispatch, and the driver's runs read NEEDS DRIVER.
+> An approved day off takes the driver off their runs on those days, in every week already made (this week, next week and the weeks after). The runs read NEEDS DRIVER with who is off. Changing the dates, or cancelling it, puts the driver back on the days no longer off, unless someone else was picked.
 
 !> Do not book a 4th driver off on a day. Check the Calendar first.
 
@@ -499,11 +510,15 @@ Driver, date reported, what's wrong, how many times it was reported, reviewed, e
 
 > The same problem reported 2 or 3 times shows as one line with a count. Repaired and Remove close every copy.
 
+> **Garage** shows a tick when the unit has been to our garage for that write-up, however it got there: you pressed `Garage` / `To garage`, a mechanic started it on the Garage Station, it was sent from the office, or the unit had a work order finished at the garage since the day it was reported. The words under the buttons say where it is: "In the garage now", "In the garage, waiting on parts", "On the garage list" or "Was in the garage 11-5-26", with the work order number. A service the app put on the garage list by itself that nobody has started does not count. **At garage** at the top shows just these. The write-up stays on the list until you press `Repaired`.
+
 > A pale button cannot be pressed, and the words under the buttons say why: already emailed to the lessor, already at the garage, a leased truck (the lessor fixes it, so `Garage` is off), or a truck we own or that is not on the fleet list (so `Lessor` is off). `Lessor` stays pressable until the email really goes.
 
 > A red lessor that says "Outbound email is turned off" or "has no email address yet" is fixed in the Hub under Email & Texts. Any other reason: ask an administrator.
 
 !> Do not mark a write-up Repaired before the unit is really fixed. It drops off the list and off the driver's next check.
+
+!> Do not use `Remove` on a write-up because the unit is at the garage. It stays on the list with its tick until you press `Repaired`.
 
 # Garage
 
@@ -520,7 +535,7 @@ Every work order at the garage: unit, problem, category, whether the unit can ru
 id: garage-station
 screens: garage-station.html
 
-The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with its picture and the number of open work orders. Mechanics sign in with their name and login ID for each step.
+The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and **Fork trucks**, each with its picture and the number of open work orders. Mechanics sign in with their name and login ID for each step. A mechanic's employee ID (from the Employees list) is their login ID, and the zeros at the front or back never have to be typed: an employee ID of 009354 works as 9354 or 009354. A login ID padded with zeros to 6 digits also works with just its real digits.
 
 1. Tap a card to see its open work orders. `← All work orders` goes back to the cards.
 2. Tap `Open` on a work order. The big yellow `← Back` goes back to the list.
@@ -530,6 +545,7 @@ The garage's tablet. It opens on three big cards, **Trucks**, **Trailers** and *
 6. `Waiting on Parts`: name the parts you need in your own words, then `Waiting on Parts` again and your login ID. When they come in, `Parts are here` starts it again.
 7. `Complete`: your name and login ID, then what you fixed, what you did and the parts put on (filled in from your notes), `Next`, then safe to drive. Your signature on file signs it.
 
+- Your login ID can be 4 numbers or 6 numbers. `Enter` lights up after the fourth number.
 - What comes here by itself: drivers' write-ups on our own trucks, everything written up on a trailer, fork trucks and pallet jacks, engine codes from Verizon Fleet, and a PM, reefer service or Annual Inspection that Fleet Service shows due soon or overdue.
 - A leased truck's write-up comes only when the office sends it to the garage.
 - Each work order says how many times the unit was written up and the day of the first one ("Written up 2 times · first 10-16-26"). A unit written up more than once shows as one line ("Also written: ..."); completing it repairs every write-up on it.
@@ -573,7 +589,10 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - **Due · Services & Annual Inspection** shows each unit with PM / Reefer, Annual Inspection and Plates side by side. Overdue and due soon stand out in color.
 - **Work Orders** lists the open work orders and what the mechanics did this week.
 - **History** shows the last 12 months.
-- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup.
+- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup. It is also in Administration under **Fleet Maintenance Setup**.
+- To add a technician: click the name box and pick the person from the Employees list (the GARAGE department is first). Their employee ID fills in as the login ID. Press `Add Technician`.
+- A technician who matches someone on the Employees list says **Signs in with employee ID**. They sign in on the Garage Station with that number, without the zeros at the front or back. `Set login ID` gives them a different number as well.
+- Login IDs are never shown once saved.
 - To start a unit's dates, click its PM / Reefer or Annual Inspection on **Due**, or `Edit dates`. Type the last service date and miles, reefer hours, inspection due and plate expiry.
 - A PM, reefer service or Annual Inspection that is due soon or overdue goes onto the Garage Station by itself, with its checklist. `Send to Garage` sends one sooner.
 - `Print Fleet Service Report` prints the report.
@@ -778,7 +797,7 @@ screens: pallet-builder.html
 Turns a route's orders into its true case count, its pallets and a trailer plan. Orders are entered in units. Each order adds its units up by size and rounds up to full cases, then the route adds up every order.
 
 1. On Home, press **Pallet Builder** on the **Plant Operations** card, right under **Debag / Labeling Room**. It is in the menu in the same place.
-2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**.
+2. Under **All routes**, press `Open` on a route, or press `New route` and type its **Route name**. The newest BOL the Hub picked up (Hub > **Daily BOL**, from the ROUTES/BOL email) is already there: every route on it, named like **RT 805 · 11/09/26**, with its customers in BOL order and what is on their orders. The line above the list says which day's BOL it is.
 3. Add each order in delivery order with `Add order`: type the product ID and the number of units. Or open **Paste an order or a whole route** and paste the lines, one product ID per line.
 4. Read **Route totals and load plan**, in the light blue box right under the stop list beside the **Truck load map**: the route case count, pallets, units, weight, the crates going out, the cases by size and the cases and pallets for each stop. It does not list products with no weight or no case count.
 5. Look at the **Truck load map**. It draws the truck from the front to the back door, three stacks on each side, colored by load sequence, with a label under each pallet such as **Pallet 1 · Seq 3 · 40 cs**. Sequence 0 (or a stop with no sequence) goes side to side across the front and loads first. Then odd load sequences fill the left side and even ones the right side, each from the front toward the back door. The table beside it lists each stop's run sequence, load sequence, customer, cases and pallets (like **59 cs · 2 pallets**), and a note. The truck stays in view while you scroll down the list. Point at a stop to light up its pallets on the truck. Each load sequence is one group with a colored bar down its left side, in the same color as its pallets on the truck. The customer on the bill of lading is in **bold**, and the other customers from the route list in that sequence sit indented under it in plain text, with no products, their own run sequence and their load sequence number. They ride on the main stop's pallets and side, so they have no **Side** or **Note** box. You can drag them or give them a new load sequence too. A note you type is kept with that stop.
@@ -790,6 +809,17 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 11. When a route opens, its load sequences come from the **route map** (the route's day in the Customer List). The line beside `Save to route map` says how many sequences you changed since the route map and when it was last saved, like **1 sequence changed since the route map (3 customers). Last saved to the route map 11-5-26 8:46 PM.**
 12. Press `Print sequence changes` to print one page for the office: the date, route and day, then **Chain**, **Account #**, **Customer** and **New sequence** for every customer on each sequence you changed, with the ones you changed in **bold**, and lines for **Changed by** and **Entered in office**.
 13. Press `Save to route map` to save the new load sequences to the route map. The next time anyone opens that route, it is sequenced like the route map and its pallets are built that way.
+14. At the very top, **CUSTOMERS ON ROUTE 813 · THURSDAY** lists every customer on the open route with its cases on that route day from the weekly route report (the WEEKLY ROUTE REPORT box on Hub > Administration > **Accounting Numbers**; the Customer List keeps them by route day): **LOW**, **MIDDLE**, **AVERAGE**, **HIGH** and **LAST 5 WEEKS**. The number in yellow is the one the customer's pallet space is held for, shown in **HELD FOR** with its stacks. **TODAY'S BOL** is the cases on the bill of lading, and **SPACE** says what happened: **17 CS HELD, SHADED** or **OVER BY 6 · SPACE ADDED**.
+15. To hold a customer's space for another number on that route and day, pick it in its **PALLET USES** box (**STANDARD** follows Pallet Rules). It saves by itself, and the Customer List shows the same pick.
+16. Press `PALLET RULES` to open the rules for the whole plant: the **STANDARD RULE** (HIGH unless changed), **WEEKS IN THE LAST WEEKS AVERAGE**, **CRATES TO A PALLET** (54), **CRATES TO A STACK** (6), **DISPENSERS TO A PALLET** (45), **PALLET SPOTS FOR ONE TOTE**, whether **A BOX GOES IN A CRATE**, **NEW PALLET FOR EACH LOAD SEQUENCE**, and what happens **WHEN A CUSTOMER HAS FEWER CASES** (keep the space, shaded) or more (space is added). Each box saves by itself. Press `PALLET RULES` again to close them.
+
+> When a newer BOL comes in for the same day (more orders keyed), opening Pallet Builder again puts it in place of the older one on those routes.
+
+> Held space is shaded with stripes on the truck and counted in the pallets, so a customer that is lighter today still keeps its whole pallet (in summer a full pallet, maybe half in winter). The builder never makes the space smaller on its own; only **PALLET USES** or **PALLET RULES** change it. **HELD SPACE** under the truck says how many cases of space are held.
+
+> A product's **Units In A Case**, **Cases To A Pallet** and **Net Weight** on the **Product Sheet** win over the builder's own numbers and Pallet Rules for that product. A blank box leaves the builder's number.
+
+!> Do not pick **LOW** for a customer that grows in summer: its pallet comes up short when it does.
 
 ### Buttons
 - `New route`, `Copy route`, `Delete route`: start a route, copy the one open, or remove it (it asks you to press `Yes, delete` first).
@@ -799,11 +829,11 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > Each order's items, **Cases by size for the whole route** and **Pallet by pallet** start hidden. Click the line to show them, and click again to hide them.
 
-> Dispensers and boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Every crate goes 54 to a pallet, and a tote takes a pallet spot of its own.
+> Boxes (cheese, sour cream and the like) go inside the milk crates, so each one counts as a crate. **Going out** shows one crate count for the route, with how many of those crates hold dispensers or boxes, like **636 crates (14 with dispensers)**. Crates go 54 to a pallet and dispensers 45 (both set on `PALLET RULES`), and a tote takes a pallet spot of its own.
 
 !> Do not add the dispensers or boxes on top of the crate count: they are already in it.
 
-> A load sequence never shares a pallet with the next one. When a sequence is done, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
+> A load sequence never shares a pallet with the next one (unless **NEW PALLET FOR EACH LOAD SEQUENCE** is turned off on `PALLET RULES`). When a sequence is done, its held space is added, its last pallet closes even if it isn't full, and the next sequence starts a new pallet.
 
 > `Save to route map` changes only the load sequences. The customers on the route, their order on the route map and their notes stay as they are; change those in the Customer List. A customer who is not on the route map cannot be saved, and the line says how many.
 
@@ -824,7 +854,10 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 4. `Edit` fixes the Cases Returned count, the Trailer Back, **Unloaded By** and Notes.
 5. A trailer that is not on the list: press `+ Add a Trailer`, type the trailer, pick **Unload it** or **Wash only** (and the route if you know it), then `Add`. It goes to the top of the list.
 
-- **The order:** the trailer being unloaded is at the top. Then every trailer you load today, in the order Case Loadout loads them, whether it is here or still on the road. Then the rest that came back and still need unloading: yesterday's and added ones, then the ones here, then the ones on the road.
+- **The order:** what you need first is at the top. The trailer being unloaded comes first. Then a trailer you need that is **in the lot**: every trailer you load today that is in the lot comes first, in the order Case Loadout loads them. After that the list goes by what you need next: the other trailers you load today, then yesterday's and added ones, then the rest, with the ones in the lot first each time. A trailer the GPS says is **not back yet** moves down, below every trailer that is back. Transfer trailers come next, and the ones already unloaded are at the bottom.
+- **Green = in the lot.** A trailer the GPS shows in the parking lot (or whose driver checked in) is green and says **IN THE LOT**. One the GPS shows away from the plant is grey and says **NOT BACK YET**.
+- **The list keeps itself up to date.** The GPS is checked every 5 minutes and the list moves on its own as trailers come in; the line under the list says when the GPS was last checked. A trailer's own GPS sends about once an hour, so when the truck that pulled it is already back in the lot, that counts too.
+- On the plant tablet the order is the same as before: every trailer you load today first, here or on the road.
 - **Every trailer you load today is on the list,** also one that came back on an earlier day or was parked in the yard. It shows the load it goes on. Unload it like any other; if it is already empty, `Edit`, then `Take Off the List`.
 - A trailer from yesterday that you load today sits where its load falls in the loading order, still marked red.
 - **Yesterday's trailers:** a load from yesterday that nobody pressed `End` on comes over by itself, at the top, marked in red **From 10-26**, with a red line above the list. Unload it like any other.
@@ -846,6 +879,8 @@ Trucks back from the route: each load's trailer, the empty cases that went out a
 !> Do not start a trailer for someone who is not unloading it. Each person unloads one trailer at a time, and no more than two trailers at once.
 
 !> Do not use `+ Add a Trailer` for a load that is already on the list. Find it and press `Start`.
+
+!> Do not wait on a trailer that says **NOT BACK YET**. Unload the green ones first; it moves up and turns green by itself when it comes in.
 
 ## Truck Washing
 id: washing
@@ -1367,7 +1402,13 @@ Every product the plant makes, one line each: SKU, type, group, UPC, speeds, tar
 - **Areas & Groups** sets the areas and groups products are sorted into.
 - `Download Product List` saves the list; `Upload` reads a list in (check it, then `Save Upload`).
 
+- **Cases and Pallets** (the blue columns): **Units In A Case**, **Cases To A Pallet**, **Stack Height** (how many cases high one stack is), **Net Weight** (the product in a full case) and **Gross Weight** (the case, the jugs and the product), in pounds. The Pallet Builder reads them by SKU. Type them on `Edit`, or put them in the downloaded list and `Upload`.
+
 > The product name is what counts. A SKU used by two products is marked.
+
+> A blank Cases and Pallets box leaves the Pallet Builder on its own number for that product. An upload that leaves one blank keeps what the product has.
+
+!> Do not type the weight of one jug in Net Weight or Gross Weight: both are for a full case.
 
 ## Machine Setup
 id: machine-setup
@@ -1481,7 +1522,7 @@ To add a person to the schedule:
 On the Maintenance Schedule, the `People` tab also has a **Station login ID** box for each mechanic. These people are the names on the plant's [Maintenance Station](#maint-station).
 
 1. Add the mechanic on `People` (`+ Add Person`) and type their name.
-2. In their **Station login ID** box, type a 5- or 6-digit number and leave the box. It saves and the box then says `Set`.
+2. In their **Station login ID** box, type a 4- or 6-digit number and leave the box. It saves and the box then says `Set`.
 3. Tell the mechanic their number. It is never shown again; type a new one to change it.
 
 !> Do not give two mechanics the same login ID. The app will not save it.
@@ -1506,7 +1547,7 @@ Each plant's areas and sub-areas (pick the plant at the top right): whether each
 id: administration
 screens: administration.html
 
-Everything administrators set up, in a menu down the left. Each **red bar** is a group: People & Access, Links & Codes, Email & Texts, Dispatch & Fleet, Plant Setup, Products & Machines, Plant Maintenance Setup, and Checks & Repairs. The **blue** words under a bar are its items; the one that is open is solid blue. The number on a bar says how many items it holds.
+Everything administrators set up, in a menu down the left. Each **red bar** is a group: People & Access, Links & Codes, Email & Texts, Dispatch & Fleet, Plant Setup, Products & Machines, Plant Maintenance Setup, Fleet Maintenance Setup, and Checks & Repairs. The **blue** words under a bar are its items; the one that is open is solid blue. The number on a bar says how many items it holds.
 
 1. Press a red bar to open its group. The group that was open closes, so the menu fits on one screen.
 2. Press a blue item to open it on the right.
@@ -1518,7 +1559,7 @@ Everything administrators set up, in a menu down the left. Each **red bar** is a
 - An item marked **In the Hub** is changed in the United Dairy Hub now: People & Roles, Role Templates, the Links & Codes items and the email items. A blue line at its top has `Change this in the Hub`. It still works here for now; both save to the same place.
 - Administration is for administrators only; the button in the top bar shows only to them.
 
-> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup and GPS Setup are under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
+> Texts is under Email & Texts. MOCREO Key and RedZone Sign-In are under Products & Machines. Fleet Service Setup (the service rules and the garage technicians) is under Fleet Maintenance Setup. GPS Setup is under Dispatch & Fleet. Refresh Rates and Window Test Center are under Checks & Repairs.
 
 !> Do not change a setting you are not sure about. Most changes reach every screen at once.
 
@@ -1615,7 +1656,7 @@ What the status says:
 - **Not loaded, 45 min behind:** its dispatch time passed more than 30 minutes ago and it is not loaded yet.
 - **Loaded** or **Not loaded:** its dispatch time has not come yet.
 
-The time a load left comes from the GPS on its dispatch truck (the tractor on Daily Dispatch): the time that truck left the yard. Only when the truck has no GPS is the trailer's GPS used. When one truck pulls two loads, each load gets the leave nearest its own dispatch time.
+The time a load left comes from the GPS on its dispatch truck (the tractor on Daily Dispatch): the time that truck left the yard. When the truck is not seen leaving (it has no GPS, or its GPS shows no leave after the load was loaded), the trailer's GPS is used instead, so a run whose trailer is out still shows as left. When one truck pulls two loads, each load gets the leave nearest its own dispatch time.
 
 > `Send a test to me` shows this morning's email as it was at 6:00 AM, even when you press it later in the day.
 
@@ -1746,7 +1787,7 @@ Brings a new plant's data (routes, drivers, the plant, people and email) in from
 id: schedule-texts
 screens: texts.html, administration.html?item=schedule-texts
 
-Texts to drivers from the company's Twilio number. **Schedule texts** tell drivers the posted week is up; they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
+Texts to drivers from the company's Twilio number. **Schedule texts** text each driver their own posted week, read the way **My Schedule** shows it on the phone (a block a day with the route, truck, trailer, leaving time and any day note); they go only when you press `Send schedule texts`, never when a week is published. **Load done texts** (when the plant finishes a driver's load, with any open pickups) have their own On / Off. Who gets each kind is ticked on the **Driver Roster**, under Texts; this screen only lists them.
 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
@@ -1757,7 +1798,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** tell drive
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
 8. A driver's number was wrong: fix it on the **Driver Roster** first. Then in **Texts and replies**, find that driver's schedule text and press `Resend` twice. Only that driver gets it, at the new number. `Resend` shows only on texts for the posted week.
 
-> To see the new schedule text (each driver's own week, a line a day) before drivers get it: under **New text: each driver's own week** in part 3, pick a driver in `Sample for`, then press `Text this sample to my phone` twice. It goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver. Drivers keep getting the short text until you say to switch.
+> To see exactly what a driver gets: under **See a driver's text** in part 3, pick the driver in `Sample for`. Their text shows on the screen. Press `Text this sample to my phone` twice to see how it comes through; it goes only to the cell saved in part 5, **Driver replies to your cell**, never to a driver.
 
 > To try schedule texts on a few drivers, tick **Schedule** only for them on the Driver Roster before you press Send.
 
@@ -1819,8 +1860,8 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 4. The app opens on two cards. Tap **Where the routes are** for the routes and the map (below), or **Customers by route** for the customers (see [Sales app: customers](#sales-customers)). The arrow at the top left (Back) comes back to the cards.
 5. Scroll the routes. Tap a route and the map at the top moves to that truck, and the whole place shows under the map. The map stays on top while you keep scrolling; tap another route to move it again.
 
-- **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the Driver Room board. A route that is not delivering today is not on it. A load from an earlier delivery day that has not left yet stays at the top, under **Left over from** that day, until it leaves.
-- **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. Routes marked Ended Up Not Running are not shown.
+- **Every route is two lines.** The first line is the route number and its status. The second line, under the route number, is the driver's full name in bold, then a dot and where the truck is now. A place too long to fit ends in "…"; tap the route to read all of it under the map. The driver is the one on Daily Dispatch. The list is what is being delivered today, whatever day it was loaded: under **Delivering today** with the date. It starts fresh at 6 AM each morning, the same as the 6 AM route status email. A route that is not delivering today is not on it, and nothing from an earlier day carries over, even a load that never showed a leave time.
+- **Status** is in the same words as the 6:00 AM sales email: **On time, left 4:05 AM** (green: within 30 minutes either side of the dispatch time), **Left 5:42 AM, 1 hr 12 min late** or **Left 2:50 AM, 40 min early** (yellow from 30 to 60 minutes, red past 60), **Not departed, 35 min behind** (loaded, more than 30 minutes past its dispatch time, still here), **Not loaded, 45 min behind**, and until then **Loaded** or **Not loaded**. Late, early and behind are counted from the route's dispatch time. The leave time is the dispatch truck's (the tractor's GPS); if the truck is not seen leaving, the trailer's GPS is used, so a run whose trailer is on the road shows as left. Routes marked Ended Up Not Running are not shown.
 - **Where now** comes from the trailer's GPS, or the truck's if the trailer has none. A place marked in Verizon Connect shows by its name (**At Walmart 2291**); otherwise it is the street address (**On the road:** or **Stopped:**), road first and zip code last (**Stopped: Mary Rd (MD-63), 21795**). In the yard it says **At the plant**, or **Back at the plant** once it has been out. If the trailer's GPS has not moved since the load day but the truck's has (the trailer was changed out), **Where now** follows the truck. A GPS unit that has not reported for a day is not used; when neither the trailer nor the truck is reporting, it says **Unknown: GPS not reporting**.
 - **Drop and hook.** Any route ticked **Drop and Hook** in the Route Editor (like the Save-A-Lot routes) leaves its trailer at the store and the driver comes back. Once the trailer's GPS is at the store (the place marked in Verizon Connect, like **SAL Williamsport**), the status says when it got there and how it left (**Dropped 2:48 PM, left 2 hr 12 min late**), and **Where now** follows the driver's truck instead (**Back at the plant**, or on the road to the next stop). Tap the route: the map goes to the truck, and the words under it say where and when the trailer was dropped, where the truck is, and the truck's next route if it has one. The time is when the trailer's GPS first reported from the store, so it can be a little after the real drop.
 - The map title says the route, the driver and when the GPS last heard from it (**GPS at 10:42 AM**).

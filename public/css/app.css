@@ -1200,6 +1200,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
+.texts-page .texts-log td[data-l="Message"] { white-space: pre-line; }
 .texts-page .texts-resend { margin-top: 6px; font-size: 16px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-weight: 700; }
 .texts-page .texts-resend.armed { background: #b42318; border-color: #b42318; color: #fff; }
 /* Phones: each text is a small card (label, then the words), so nothing is squeezed into a narrow column. */

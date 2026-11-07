@@ -158,10 +158,10 @@ function setupHtml() {
   } else if (tab === 'people') {
     const rows = (blank ? [{ id: '', name: '', areaId: area || '', shift: shift, daysOff: [0, 6] }] : []).concat(data.people.filter(p => !area || p.areaId === area).sort((a, b) => String(a.name).localeCompare(b.name)));
     // Joe 10/27: the maintenance mechanics are the plant Maintenance Station's names; each one's station login ID is typed here
-    // (5 or 6 digits, never shown again: the box only says whether one is set).
+    // (4 to 6 digits, never shown again: the box only says whether one is set).
     const maint = team === 'maint';
     const login = (p) => !maint ? '' : '<td class="nowrap">' + (p.id ? '<input type="password" inputmode="numeric" autocomplete="off" maxlength="6" class="short" data-login="1" aria-label="Station login ID" placeholder="' +
-      (p.loginSet ? 'Change' : '5 or 6 digits') + '"' + dis() + '>' + (p.loginSet ? ' <span class="crew-set">Set</span>' : '') : '') + '</td>';
+      (p.loginSet ? 'Change' : '4 or 6 digits') + '"' + dis() + '>' + (p.loginSet ? ' <span class="crew-set">Set</span>' : '') : '') + '</td>';
     html = '<table><thead><tr><th class="left">Name</th><th>Employee ID</th><th>Phone</th><th>Area</th><th>Shift</th><th>Usual job</th><th>Days off</th><th>Hire date</th>' + (maint ? '<th>Station login ID</th>' : '') + '<th>In use</th></tr></thead><tbody>' +
       (rows.map(p => { const u = linked(p) ? ' readonly tabindex="-1" class="from-udms' : ' class="'; return '<tr data-op="person" data-id="' + esc(p.id) + '"><td class="left"><input data-k="name" maxlength="60"' + u + '" value="' + esc(p.name) + '" placeholder="LAST, FIRST"' + dis() + '></td>' +
         '<td><input data-k="employeeId" maxlength="20"' + u + ' short" value="' + esc(p.employeeId || '') + '"' + dis() + '></td><td><input data-k="phone" maxlength="20"' + u + ' short" value="' + esc(p.phone || '') + '"' + dis() + '></td>' +

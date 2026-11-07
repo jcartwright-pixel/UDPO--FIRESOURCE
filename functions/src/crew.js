@@ -50,7 +50,7 @@ function validateSetup(input, SaveError) {
     if (out.team !== 'maint') throw new SaveError('BAD_REQUEST', 'Login IDs are for the maintenance mechanics.');
     if (!out.id) throw new SaveError('BAD_REQUEST', 'Pick the mechanic.');
     out.loginId = text(input.loginId);
-    if (!/^\d{5,6}$/.test(out.loginId)) throw new SaveError('BAD_REQUEST', 'The login ID is 5 or 6 digits.');
+    if (!/^\d{4,6}$/.test(out.loginId)) throw new SaveError('BAD_REQUEST', 'The login ID is 4 to 6 digits.');
     out.fields = {};
     return out;
   }

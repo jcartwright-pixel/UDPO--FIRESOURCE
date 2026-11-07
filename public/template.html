@@ -33,7 +33,7 @@
     <div class="notice error" id="error" hidden></div>
     <div class="view">
       <div class="actions tpl-bar">
-        <span class="tpl-about">Maintain the normal weekly pattern once; it becomes the standard default for every schedule week. Weekly changes override it. A driver can have more than one run on the same day.</span>
+        <span class="tpl-about">Each driver's normal week. A change here also changes Driver Master, this week on Weekly Dispatch and next week on the Weekly Dispatch Template, from today on. A day changed by hand on one of those weeks keeps its hand change. A driver can have more than one run on the same day.</span>
         <span class="tpl-dirty" id="dirty" data-top></span>
         <button type="button" id="refresh" data-top>Refresh</button>
         <span class="tpl-copy" id="copy-state" data-top>Nothing copied</span>
@@ -116,7 +116,10 @@
     const blankRun = (c) => c.status === 'ASSIGNMENT' && c.runs.some(id => !id);
     function setDay(driverId, p, next) {
       const d = drivers.find(x => x.id === driverId), now = saved(d, p);
-      next.runs = [...new Set(next.runs.filter(Boolean))].slice(0, 6);
+      // Joe 11/6: a new run box (Assigned, or + Add Run) stays on screen, empty, until a run is picked in it. It used to be dropped
+      // straight away, so a driver with no runs could not be given one here.
+      const picked = [...new Set(next.runs.filter(Boolean))];
+      next.runs = picked.concat(next.runs.some(id => !id) ? [''] : []).slice(0, 6);
       if (next.runs.length) next.status = 'ASSIGNMENT';
       else if (next.status === 'ASSIGNMENT') next.status = next.keep ? 'ASSIGNMENT' : 'AVAILABLE';
       delete next.keep;

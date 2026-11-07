@@ -67,10 +67,11 @@
   </div>
 
   <script type="module">
-    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote, maySave, plantNames } from './js/app.js';
+    import { start, requireSignIn, watchPerson, save, escapeHtml, shortDate, showError, goLiveNote, maySave, plantNames, currentPlant } from './js/app.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     import { watchWashRequests } from './js/recent-records.js';
     import * as P from './js/plant-core.js';
+    import { gpsIndex, truckState, yardSpots } from './js/gps-state.js';
 
     const L = window.UDLogic, U = window.UDPlant;
     const params = new URLSearchParams(location.search);
@@ -81,6 +82,14 @@
     let runs = [], routes = [], journal = [], prevJournal = [], sheetWash = [], appWash = [], person = null, app = {};
     // Case counters (Joe 10/23): what the case returns counter counted on each trailer, beside the Cases In typed.
     let caseCounts = {}, returnsCounter = null, gpsDays = [];
+    // Joe 11-6-26: where each trailer is right now (Verizon Connect Fleet, read every 5 minutes), the way Trucks Today shows In yard.
+    let gpsNow = [], gpsReadAt = '';
+    function whereNow() {
+      // The yard places Fleet knows are Uniontown's (js/gps-state.js), so the other plants keep the order without it.
+      if (date !== today() || !gpsNow.length || currentPlant() !== 'fac_uniontown') return null;
+      const find = gpsIndex(gpsNow), spots = yardSpots(gpsNow);
+      return (unit) => { const t = find(unit); return t ? { state: truckState(t, unit, spots)[0], at: t.lastReport || '' } : null; };
+    }
     const counting = () => area === 'CASE' && !!(returnsCounter && returnsCounter.controller && returnsCounter.controller.ip);
     // Joe 10/27 (hg): Cases Out (loadout), Driver Said (check-in), Cases Returned (typed here) and Lost. With the counter on,
     // Trailer gives the room for the Counted column.
@@ -95,11 +104,12 @@
     function data() {
       const returns = P.returnsFor(runs, date, journal).map(x => (pending.returns && pending.returns[x.id] ? Object.assign({}, x, { pending: false }) : x));
       const loads = P.loadoutRows(runs, date);
-      // Joe 10/27: the same order as the tablet: what today's loadout needs first, a trailer that is here ahead of one on the road.
+      // Joe 10/27: what today's loadout needs first, a trailer that is here ahead of one on the road (Joe 11-6-26: officeOrder below).
       // Joe 10/27 (hd): yesterday's trailers nobody pressed End on come over by themselves, at the top in red.
       const two = prevJournal.concat(journal), carried = P.nextLoads(P.carriedUnloads(runs, date, two, routes), loads), list = P.unloadRows(runs, date, journal, returns, loads, routes).concat(carried);
       // Joe 10/27: every trailer today's loadout needs is on the list, also one that did not deliver today.
-      const rows = P.unloadOrder(list.concat(P.neededUnloads(runs, date, two, routes, list, loads)).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed))), gpsDays);
+      // Joe 11-6-26: what the plant needs first; a trailer the GPS says is not back yet lower down; the unloaded ones at the bottom.
+      const rows = P.officeOrder(P.unloadOrder(list.concat(P.neededUnloads(runs, date, two, routes, list, loads)).map(r => (pending[r.key] ? Object.assign({}, r, pending[r.key]) : r)).filter(r => !(r.dropped && (r.added || r.prior || r.needed))), gpsDays), whereNow());
       const prevWash = P.washItems(L.addDays(date, -1), [], [], prevJournal.concat(journal)).filter(w => /^ADDED\|/.test(w.id) && carried.some(r => r.washOnly && U.unitKey(r.trailer) === U.unitKey(w.trailer)));
       const wash = P.washItems(date, sheetWash, appWash, journal).concat(prevWash).filter(w => !washedNow[w.id]);
       return { returns, rows, wash };
@@ -174,7 +184,9 @@
       rows.forEach(r => {
         const s = r.status, washes = P.washesForRow(r, wash), hadReturn = r.returns.length > 0;
         // Joe 10/27: a drop-and-hook load shows its name (Ferry Product 1, Lancaster Transfer), never a trailer number.
-        const trailer = r.dropAndHook ? '<span class="trl dh">' + escapeHtml(r.name) + '</span>' : r.trailer ? '<span class="trl">' + escapeHtml(r.trailer) + '</span>' : !ck ? '<span class="na">—</span>' : '<input data-f="trailer"' + k(r) + ' placeholder="Trailer #" aria-label="Trailer back for ' + escapeHtml(r.route) + '">';
+        // Joe 11-6-26: a trailer in the parking lot is green; one the GPS says is not back yet says so.
+        const where = r.spot === 'LOT' ? '<small class="where lot">IN THE LOT</small>' : r.spot === 'ROAD' ? '<small class="where road">NOT BACK YET</small>' : '';
+        const trailer = (r.dropAndHook ? '<span class="trl dh">' + escapeHtml(r.name) + '</span>' : r.trailer ? '<span class="trl">' + escapeHtml(r.trailer) + '</span>' : !ck ? '<span class="na">—</span>' : '<input data-f="trailer"' + k(r) + ' placeholder="Trailer #" aria-label="Trailer back for ' + escapeHtml(r.route) + '">') + where;
         const qty = r.washOnly ? '<span class="na">—</span>' : r.casesIn !== '' ? '<span class="chk ok">&#10003; ' + escapeHtml(r.casesIn) + ' ' + unit.toLowerCase() + '</span>' : !ck ? '<span class="na">—</span>' :
           s === 'UNLOADING' ? '<input data-f="casesIn"' + k(r) + ' inputmode="numeric" placeholder="' + unit + '" aria-label="' + unit + ' returned for ' + escapeHtml(r.route) + '">' : '<span class="chk na">Start first</span>';
         const count = (v) => (v === '' ? '<span class="na">—</span>' : '<b>' + Number(v).toLocaleString() + '</b>');
@@ -189,7 +201,7 @@
         const time = s === 'WAITING' || mins === null ? '<span class="na">—</span>' : '<span class="' + (stale ? 'stale' : s === 'UNLOADING' ? 'running' : '') + '">' + (s === 'UNLOADING' ? P.runningText(r.startedAt, mins) : P.minutesText(mins)) + '</span>';
         const clockCell = !ck ? '' : r.washOnly ? (s === 'COMPLETE' ? '<span class="tick">&#10003;</span>' : '<span class="na">—</span>') : s === 'WAITING' ? '<button type="button" class="clock" data-do="start"' + k(r) + '>Start</button>' : s === 'UNLOADING' ? '<button type="button" class="clock end" data-do="end"' + k(r) + '>End</button>' : '<span class="tick">&#10003;</span>';
         // Joe 10/18: the route cell shows only the route (no run line under it) and the trailer cell only the trailer (no "Next:" line).
-        html += '<tr' + k(r) + ' class="' + (r.prior ? 'prior ' : r.added ? 'added ' : '') + (r.pendingReturns.length ? 'needs-return ' : '') + (s === 'COMPLETE' ? 'done' : s === 'UNLOADING' ? 'loading' : '') + '"' + (titleRet ? ' title="Return: ' + escapeHtml(titleRet) + '"' : '') + '>' +
+        html += '<tr' + k(r) + ' class="' + (r.prior ? 'prior ' : r.added ? 'added ' : '') + (r.pendingReturns.length ? 'needs-return ' : '') + (s === 'COMPLETE' ? 'done' : s === 'UNLOADING' ? 'loading' : r.spot === 'LOT' ? 'lot' : r.spot === 'ROAD' ? 'road' : '') + '"' + (titleRet ? ' title="Return: ' + escapeHtml(titleRet) + '"' : '') + '>' +
           '<td class="rr">' + routeCell(r) + '</td><td class="trlcell">' + trailer + '</td><td>' + pill(r) + '</td><td>' + count(r.casesOut) + '</td><td>' + count(r.driverSaid) + '</td><td>' + qty + '</td><td>' + lostCell(r) + '</td>' + (on ? countedCell(r) : '') + '<td>' + rta + '</td><td>' + washCell + '</td>' +
           '<td>' + clockCell + '</td><td>' + time + '</td><td>' + (ck ? '<button type="button" class="edit-row" data-do="edit"' + k(r) + '>Edit</button>' : '') + '</td></tr>';
         if (ck && editKey === r.key) {
@@ -212,7 +224,7 @@
         if (el) { el.value = keep[3]; el.focus(); }
       }
       document.getElementById('foot').textContent = mine.length + ' ' + name.toLowerCase() + ' loads back ' + (date === today() ? 'today' : 'on ' + shortDate(date)) + '. ' +
-        (ck ? 'Start, type the count, then End. Up to two unloads at a time.' : canSave() ? 'View Only: press Check Off to work the list.' : 'View only.') + ' Changes show on every screen at once.';
+        (ck ? 'Start, type the count, then End. Up to two unloads at a time.' : canSave() ? 'View Only: press Check Off to work the list.' : 'View only.') + ' Changes show on every screen at once.' + (whereNow() && gpsReadAt ? ' GPS CHECKED ' + P.clock(gpsReadAt) + '.' : '');
       const st = L.screenState(app, 'plantLoading');
       goLiveNote(st.live && st.owner !== 'new');
       document.getElementById('mode-text').textContent = st.live ? (st.open ? 'LIVE' : 'VIEW ONLY') : 'TEST COPY';
@@ -407,6 +419,8 @@
         render();
       }, () => { caseCounts = {}; }));
       // Fleet's yard leave and return per unit (here or on the road, for the order). A screen that cannot read them orders without them.
+      // Joe 11-6-26: where each truck and trailer is now; it keeps updating on its own (the server reads Fleet every 5 minutes).
+      unsubs.push(onSnapshot(collection(db, 'gpsTrucks'), s => { gpsNow = s.docs.map(d => d.data()); gpsReadAt = gpsNow.map(t => t.updatedAt || '').filter(Boolean).sort().pop() || ''; render(); }, () => { gpsNow = []; render(); }));
       unsubs.push(onSnapshot(query(collection(db, 'gpsDays'), where('date', 'in', [-1, 0, 1].map(n => L.addDays(date, n)))), s => { gpsDays = s.docs.map(d => d.data()); render(); }, () => { gpsDays = []; render(); }));
     }
 

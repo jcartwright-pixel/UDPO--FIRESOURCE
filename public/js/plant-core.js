@@ -556,6 +556,47 @@ export function unloadOrder(rows, gpsDays) {
   return out;
 }
 
+/*
+ * Joe 11-6-26 (the office Unloading & Washing list, "just like my side"): where each trailer is right now, from Verizon Connect
+ * Fleet's live positions (gpsTrucks, read every 5 minutes; a trailer's own unit reports about once an hour), the same way
+ * Trucks Today shows In yard (js/gps-state.js). whereNow(unit) -> {state, at} (truckState's word and the report time) or null.
+ * The trailer's own unit first. The dispatch tractor counts when the trailer has no live reading, or when the tractor is in
+ * the yard with a newer report than the trailer's (a trailer on the road reports rarely; it came back behind the tractor).
+ * 'LOT' = in the parking lot, 'ROAD' = not back yet, '' = no live reading (the yard return or the check-in decides).
+ */
+export function liveSpot(row, whereNow) {
+  if (!whereNow || row.transfer || (row.dropAndHook && !row.trailer)) return '';
+  const use = (w) => (w && ['yard', 'road', 'stopped'].indexOf(w.state) >= 0 ? w : null);
+  const tr = row.trailer ? use(whereNow(row.trailer)) : null, tk = row.truck ? use(whereNow(row.truck)) : null;
+  if (tr && tr.state === 'yard') return 'LOT';
+  if (tk && tk.state === 'yard' && (!tr || String(tk.at || '') > String(tr.at || ''))) return 'LOT';
+  if (tr || tk) return 'ROAD';
+  return '';
+}
+
+/*
+ * Joe 11-6-26: the office list in the order the plant needs it. The one being unloaded now on top; then the trailers that are
+ * back (in the lot, or checked in, or back by Fleet's yard return): first the ones today's loadout needs (in loading order),
+ * then yesterday's and added ones, then the rest; in each of those, the ones in the lot first; then every trailer the GPS says is not back yet (in the same order); then
+ * transfer trailers; the unloaded ones at the bottom. rows = unloadOrder's rows (transfer, back and road set).
+ * Each row gets spot: 'LOT' (green on the screen), 'ROAD' (NOT BACK YET) or ''.
+ */
+export function officeOrder(rows, whereNow) {
+  const out = (rows || []).map(r => {
+    const live = r.status === 'WAITING' ? liveSpot(r, whereNow) : '';
+    // A driver who checked in is here, whatever an old trailer reading says.
+    const road = r.status === 'WAITING' && !r.transfer && !r.checkedIn && (live ? live === 'ROAD' : !!r.road);
+    const spot = r.status !== 'WAITING' || r.transfer ? '' : live === 'LOT' || (!road && (r.checkedIn || r.back)) ? 'LOT' : road ? 'ROAD' : '';
+    return Object.assign({}, r, { road, spot });
+  });
+  // Joe 11-6-26 (later): a trailer you need that is in the lot goes on top; then the rest by what you need.
+  const group = (r) => (r.nextLoad ? 0 : r.prior || r.added ? 2 : 4) + (r.spot === 'LOT' ? 0 : 1);
+  const rank = (r) => r.status === 'COMPLETE' ? 90 : r.status === 'UNLOADING' ? 0 : r.transfer ? 80 : (r.road ? 40 : 10) + group(r);
+  const firstIn = (r) => (r.prior ? 0 : 1), num = (v) => (isFinite(v) ? v : 1e9);
+  return out.sort((a, b) => rank(a) - rank(b) || num(a.nextRank) - num(b.nextRank) || firstIn(a) - firstIn(b) ||
+    String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.run).localeCompare(String(b.run)));
+}
+
 // Joe 10/27 (hg): the empty cases lost on a load = Cases Out (loadout) less Cases Returned (unloaders); null until both are known.
 export function lostCases(r) {
   if (!r || r.casesOut === '' || r.casesIn === '' || r.casesIn === undefined) return null;

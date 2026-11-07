@@ -35,16 +35,24 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
   try {
     let p = await open(browser, 'pat.admin@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost']);
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident']);
     assert.equal(await p.textContent('#hello'), 'Your apps, Pat');
     assert.equal(await p.getAttribute('#tiles a[data-app="operations"]', 'target'), '_blank');
-    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs', 'Route Cost Analysis']);
-    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 6, 'every card has its picture');
+    assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant & Distribution', 'Customers & Routes', 'Fuel Tracking', 'Employees & Compliance', 'Route & Trip Costs', 'Route Cost Analysis', 'Accident & Injury Reporting']);
+    assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 7, 'every card has its picture');
     await shot(p, 'hub-admin-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 });
     await p.waitForSelector('#tiles a');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no sideways scroll on a phone');
     await shot(p, 'hub-admin-390');
+    // Joe 11-6-26: All app links lists every phone and tablet link, grouped, and fits a phone.
+    await p.click('#all-links');
+    await p.waitForSelector('#links-box:not([hidden]) .hub-link');
+    assert.deepEqual(await p.$$eval('.hub-link-group h3', h => h.map(x => x.textContent)), ['Everyone', 'Managers', 'Sales', 'Drivers', 'Plant floor', 'Garage & Maintenance', 'Hiring']);
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'All app links: no sideways scroll on a phone');
+    await shot(p, 'hub-all-links-390');
+    await p.click('#links-close');
+    assert.ok(await p.isHidden('#links-box'), 'Close shuts All app links');
 
     assert.ok(await p.isVisible('a[data-admin="people"]'), 'an administrator sees People & Access on Home');
     assert.ok(await p.isVisible('a[data-admin="roles"]'), 'and Roles & Rights');
@@ -53,6 +61,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isVisible('a[data-admin="email"]'), 'and Email & Texts');
     assert.ok(await p.isVisible('a[data-admin="plant-setup"]'), 'and Plant Setup');
     assert.ok(await p.isVisible('a[data-admin="accounting"]'), 'and Accounting Numbers');
+    assert.ok(await p.isVisible('a[data-admin="bol"]'), 'and Daily BOL');
 
     // People & Access: the list with each person's apps; make Sam a Manager at all plants, then disable and enable again.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'people.html');
@@ -60,16 +69,16 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.$$eval('#rows tr[data-email]', r => r.length), 2);
     // Each app is a tick box, ticked for what each person can open now.
     const ticks = (email) => p.$$eval('#rows tr[data-email="' + email + '"] input[data-app]', b => b.map(x => x.dataset.app + (x.checked ? '+' : '-')).join(' '));
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes- routecost-');
-    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+ routecost+');
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel- udms- routes- routecost- accident+');
+    assert.equal(await ticks('pat.admin@uniteddairy.com'), 'operations+ customers+ fuel+ udms+ routes+ routecost+ accident+');
     assert.ok(await p.isDisabled('#rows tr[data-email="pat.admin@uniteddairy.com"] input[data-app="fuel"]'), 'nobody unticks their own apps');
     assert.ok(await p.isDisabled('#rows tr[data-email="sam.sales@uniteddairy.com"] input[data-app="operations"]'), 'Plant & Distribution stays on');
     // Tick Fuel Tracking for Sam: it saves at once, and Sam's Home gets the Fuel card.
     await p.click('#rows tr[data-email="sam.sales@uniteddairy.com"] input[data-app="fuel"]');
     await p.waitForSelector('#list-msg.good');
     assert.match(await p.textContent('#list-msg'), /Sam Sales can now open Fuel Tracking/);
-    assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel']);
-    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes- routecost-');
+    assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel', 'accident']);
+    assert.equal(await ticks('sam.sales@uniteddairy.com'), 'operations+ customers+ fuel+ udms- routes- routecost- accident+');
     assert.equal(await p.$eval('#edit', b => b.querySelector('.pblock') === null), true, 'ticking does not open the person');
     // The page scrolls (Joe 11-3-26: "You can't scroll on this screen").
     await p.setViewportSize({ width: 1280, height: 400 });
@@ -94,7 +103,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#f-msg.good');
     const sam = (await db().collection('users').doc('sam.sales@uniteddairy.com').get()).data();
     assert.deepEqual([sam.roles, sam.facilities, sam.status], [['MANAGER'], ['*'], 'ACTIVE']);
-    assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel', 'udms'], 'the apps ticked on the person save with Save');
+    assert.deepEqual((await db().collection('appAccess').doc('sam.sales@uniteddairy.com').get()).data().apps, ['operations', 'customers', 'fuel', 'udms', 'accident'], 'the apps ticked on the person save with Save');
     // What Sam sees in Plant & Distribution: start from the Dispatcher job (it opens Route Distribution), take Sheet
     // Conflicts off, deny one right, then pick the Home screen.
     await p.waitForSelector('#f-job');
@@ -306,6 +315,23 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.click('#check');
     await p.waitForFunction(() => /Last checked/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
     assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
+    // Weekly route report (Joe 11-6-26): a made-up report added by hand lands in routeWeekly for Route Cost Analysis; the label
+    // starts as Joe's, and the mailbox and tick save by themselves.
+    const weekPath = path.join(require('os').tmpdir(), 'Weekly Daily Avg Cases By Route.xls');
+    fs.writeFileSync(weekPath, require('../../../../functions/test/fixtures/route-report').routeReport());
+    await p.waitForSelector('#wk-pick');
+    assert.match(await p.textContent('#weeks'), /No weeks yet/);
+    assert.equal(await p.inputValue('#wk-label'), 'ROUTES/SALE BY ROUTE');
+    assert.ok(await p.isDisabled('#wk-check'), 'no mailbox yet, so Check Email Now is gray');
+    await p.setInputFiles('#wk-file', weekPath);
+    await p.waitForSelector('#wk-msg.good');
+    assert.match(await p.textContent('#wk-msg'), /Week ending 10-31-26 read from Weekly Daily Avg Cases By Route\.xls: 2 routes, 4 stops/);
+    assert.match(await p.textContent('#wk-table tbody tr'), /10-31-26.*146.*\$3,895\.75/);
+    assert.equal((await db().collection('routeWeekly').doc('2026-10-31').get()).data().stops.length, 4);
+    await p.fill('#wk-mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#wk-enabled');
+    await p.waitForFunction(() => /every day at 2:00 PM/.test(document.querySelector('#weeks').textContent));
+    assert.equal(((await db().collection('config').doc('routeReportMail').get()).data() || {}).enabled, true);
     await shot(p, 'hub-accounting-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'accounting.html');
     await p.waitForSelector('.acc-table');
@@ -315,6 +341,41 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Accounting: no sideways page scroll on a phone');
     await shot(p, 'hub-accounting-390');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'accounting.html');
+    await p.waitForSelector('#error:not([hidden])');
+
+    // Daily BOL (Joe 11-6-26): a made-up Daily Load By Route PDF added by hand lands in bolDays, the label starts as
+    // ROUTES/BOL, the mailbox saves by itself, and Check Email Now answers in plain words (Gmail is never reached in the tests).
+    const bolPath = path.join(require('os').tmpdir(), 'Daily Load UT.pdf');
+    fs.writeFileSync(bolPath, require('../../../../functions/test/fixtures/bol-pdf').samplePdf());
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'bol.html');
+    await p.waitForSelector('#pick');
+    assert.match(await p.textContent('#days'), /NO BOL YET/);
+    assert.equal(await p.inputValue('#label'), 'ROUTES/BOL');
+    assert.ok(await p.isDisabled('#check'), 'no mailbox yet, so Check Email Now is gray');
+    await p.setInputFiles('#file', bolPath);
+    await p.waitForSelector('#msg.good');
+    assert.match(await p.textContent('#msg'), /LOAD DAY 11-9-26: 2 ROUTES, 3 CUSTOMERS READ FROM Daily Load UT\.pdf/);
+    assert.deepEqual(await p.$$eval('.bol-routes .bol-route', t => t.map(x => x.textContent.slice(2))), ['805', '6301']);
+    await p.click('.bol-route[data-route="805"]');
+    assert.deepEqual(await p.$$eval('.bol-stops tbody td:nth-child(2)', t => t.map(x => x.textContent)), ['MADEUP GOLF CENTER', 'SAMPLE FOOD MART (CO-OP)']);
+    assert.equal((await db().collection('bolDays').doc('2026-11-09').get()).data().totals.qty, 606);
+    await p.fill('#mailbox', 'pat.sample@uniteddairy.com');
+    await p.check('#enabled');
+    await p.waitForFunction(() => /EVERY HOUR FOR A NEW BOL/.test(document.querySelector('#mail').textContent));
+    assert.equal(((await db().collection('config').doc('bolMail').get()).data() || {}).mailbox, 'pat.sample@uniteddairy.com');
+    await p.click('#check');
+    await p.waitForFunction(() => /LAST CHECKED/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
+    assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
+    await p.click('.bol-route[data-route="805"]');
+    await shot(p, 'hub-bol-1920');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'bol.html');
+    await p.waitForSelector('.bol-routes');
+    await shot(p, 'hub-bol-1536');
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'bol.html');
+    await p.waitForSelector('.bol-routes');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Daily BOL: no sideways page scroll on a phone');
+    await shot(p, 'hub-bol-390');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'bol.html');
     await p.waitForSelector('#error:not([hidden])');
 
     // Email & Texts: Operations' own email settings, saved where Administration saves them. Sending stays Off in the tests.
@@ -413,7 +474,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
 
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
-    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms'], 'Sam\'s Home shows the apps ticked for Sam');
+    assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['operations', 'customers', 'fuel', 'udms', 'accident'], 'Sam\'s Home shows the apps ticked for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');
     await p.waitForSelector('#error:not([hidden])');

@@ -838,6 +838,13 @@ async function noScroll(page) {
     assert.equal(tplCells[1].tue_available, 'FALSE');
     assert.deepEqual(JSON.parse(tplCells[1].mon_assignments_json || '[]'), [], 'CASEY Monday has no run, like ADAMS');
     await tpl.waitForFunction(() => !document.querySelector('.tcell.changed'), null, { timeout: 10000 });
+    // Joe 11/6: picking Assigned on a day with no run shows an empty run box to pick the run in (it used to vanish, so no run
+    // could be given); the day waits for the run. Available again drops the change.
+    await tpl.selectOption(day('drv_test_casey', 'sat'), 'ASSIGNMENT');
+    await tpl.waitForSelector('.tcell[data-driver="drv_test_casey"][data-day="sat"] select[data-run]');
+    assert.match(await tpl.textContent('#dirty'), /1 day waiting for a run to be picked/);
+    await tpl.selectOption(day('drv_test_casey', 'sat'), 'AVAILABLE');
+    await tpl.waitForFunction(() => !document.querySelector('.tcell.changed'), null, { timeout: 10000 });
     assert.deepEqual(tpl.errors, []);
     const dispatcherTpl = await openPage(browser, 1366, 650, '/template.html?testEmail=dispatch.test@uniteddairy.com');
     await dispatcherTpl.waitForSelector('.tcell select[data-status]');
