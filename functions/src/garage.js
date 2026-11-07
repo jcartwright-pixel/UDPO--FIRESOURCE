@@ -5,8 +5,8 @@
  * Joe's picks (10/8): the technicians' names on the screen, sign in with name + number, a simple job flow (Need Parts /
  * Add a Helper / Done), "What did you fix?", safe to drive + finger signature, and Report a Problem. Mechanics have no
  * United Dairy email (Joe 10/10), so the tablet needs no Google account: a technician taps their name and types their
- * login ID (4 to 6 digits, GARAGE TECHNICIANS column login_id). The IDs are never readable from the screens: the copy
- * keeps only a hash of each, in `garageLogins`, which no browser may read. Wrong numbers: 5 in a row lock that technician
+ * login ID (4 to 6 digits, GARAGE TECHNICIANS column login_id). The sign-in checks a hash of each, in `garageLogins`, which
+ * no browser may read; Joe 11-7-26: the office's Garage Technicians list shows the employee ID, or that one was typed by hand. Wrong numbers: 5 in a row lock that technician
  * for 5 minutes, and the whole station takes at most 30 wrong numbers a minute. A sign-in lasts 30 minutes from the last
  * step; at most two technicians are signed in on a tablet at once.
  *
@@ -843,7 +843,7 @@ function validateSend(input, out) {
  *   saveFleetUnit   fleetSetup/<unit>: track due dates (YES / NO / blank = default), last service date / miles / hours, reefer
  *                   hours now, DOT due, plate expires, notes.
  *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (4 to 6 digits, kept
- *                   only as a hash in garageLogins, never readable; two technicians cannot share one).
+ *                   only as a hash in garageLogins, never readable; login_set marks one typed by hand; two technicians cannot share one).
  * These stay in the new app (like the work orders made here): a later change to the same row in the sheet copy replaces them.
  * Joe 10/13: each plant has its own (facilityId, a known plant, Uniontown when not sent): Uniontown's rules stay in
  * config/fleetRules, another plant's in config/fleetRules_<plant>; a technician or unit row added here carries its plant.
@@ -957,9 +957,12 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     if (taken.exists && taken.data().techId !== id) throw SaveErr('BAD_REQUEST', 'Another technician already uses that login ID. Pick a different number.');
     if (mine.exists && mine.data().key && mine.data().key !== keyRef.id) oldKeyRef = db.collection(LOGINS).doc(mine.data().key);
   }
-  if (req.op === 'ADD') tx.set(ref, Object.assign({ tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true }, req.employeeId ? { employee_id: req.employeeId } : {}));
+  if (req.op === 'ADD') tx.set(ref, Object.assign({ tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true }, req.employeeId ? { employee_id: req.employeeId } : {}, req.loginId && req.loginId !== req.employeeId ? { login_set: true } : {}));
   if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
-  if (req.op === 'EMPLOYEE') tx.update(ref, { employee_id: req.employeeId, updated_at: stamp, updated_by: email, testEdited: true });
+  // Joe 11-7-26: Garage Technicians shows each login ID: their employee ID, or (login_set) that a number was typed for them by
+  // hand (that number stays only as a hash, never on a readable entry).
+  if (req.op === 'EMPLOYEE') tx.update(ref, { employee_id: req.employeeId, login_set: false, updated_at: stamp, updated_by: email, testEdited: true });
+  if (req.op === 'LOGIN') tx.update(ref, { login_set: true, updated_at: stamp, updated_by: email, testEdited: true });
   if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
   if (keyRef) {
     // The hash the Garage Station checks (loginHash, salted with the technician), and a marker so no one else picks the same number.

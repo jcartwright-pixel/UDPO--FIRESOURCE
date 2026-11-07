@@ -239,6 +239,27 @@ async function codeFitsPhones(p, name) {
     await gs.waitForSelector('#gs-message:not([hidden])');
     assert.match(await gs.textContent('#gs-message'), /stays here until the plant has a manager release code/);
     assert.ok(await gs.isVisible('[data-type="TRUCK"]'), 'no release code: the garage station stays');
+    // Joe 11-7-26: a mechanic's first sign-in on the coded tablet signs once, and the signature is kept (it used to be refused:
+    // "This garage tablet was removed. Enter the garage station code.").
+    await gs.click('[data-type="TRUCK"]');
+    await gs.waitForSelector('#view-jobs:not([hidden]) .gs-job button');
+    await gs.click('.gs-job button');
+    await gs.waitForSelector('#view-job:not([hidden])');
+    await gs.click('#job-start');
+    await gs.waitForSelector('#view-sign:not([hidden])');
+    await gs.click('[data-who="TECH-JT"]');
+    for (const k of '48213') await gs.click('[data-key="' + k + '"]');
+    await gs.click('[data-key="go"]');
+    await gs.waitForSelector('#view-mysig:not([hidden])');
+    await gs.waitForTimeout(200);
+    const pad = await gs.locator('#mysig-pad').boundingBox();
+    await gs.mouse.move(pad.x + 30, pad.y + pad.height / 2); await gs.mouse.down();
+    await gs.mouse.move(pad.x + 120, pad.y + 30, { steps: 5 }); await gs.mouse.move(pad.x + 220, pad.y + pad.height - 30, { steps: 5 }); await gs.mouse.up();
+    await gs.click('#mysig-save');
+    for (let i = 0; i < 60 && (await db().collection('garageSignatures').get()).empty; i++) await gs.waitForTimeout(250);
+    assert.equal((await db().collection('garageSignatures').get()).size, 1, 'the signature is kept');
+    assert.doesNotMatch(await gs.textContent('#gs-message') || '', /STATION_CODE|was removed/);
+    assert.equal(await gs.isVisible('#view-code'), false, 'the tablet keeps its station');
     assert.deepEqual(gs.errors, []);
     results.push('Garage Station: asks for the garage code, then the work orders; no Back or Home; Release in the bottom-right corner refuses until a manager release code is set');
 

@@ -911,7 +911,20 @@
     var id = String(tech && tech.employee_id || '').trim();
     if (id) { var byId = list.filter(function (e) { return String(e.employeeId) === id; }); if (byId.length) return byId[0]; }
     var key = personKey(tech && tech.name), hit = key ? list.filter(function (e) { return personKey(e.name) === key; }) : [];
-    return hit.length === 1 ? hit[0] : null;
+    if (hit.length) return hit.length === 1 ? hit[0] : null;
+    // Joe 11-7-26: a short or different spelling of the first name is still them ("TOM JELLICK" is JELLICK, THOMAS; "SEAN
+    // MARTIN" is MARTIN, SHAUN): the same last name and the same first letter of the first name, when only one employee fits.
+    var w = key ? key.split(' ') : [];
+    if (w.length < 2) return null;
+    var near = list.filter(function (e) {
+      var ew = personKey(e.name).split(' ').filter(Boolean);
+      return w.some(function (last) {
+        if (last.length < 3 || ew.indexOf(last) < 0) return false;
+        var rest = w.filter(function (x) { return x !== last; }), erest = ew.filter(function (x) { return x !== last; });
+        return rest.length > 0 && rest.every(function (x) { return erest.some(function (y) { return y.charAt(0) === x.charAt(0); }); });
+      });
+    });
+    return near.length === 1 ? near[0] : null;
   }
   function fleetUnitKey(u) {
     var s = String(u === null || u === undefined ? '' : u).trim().toUpperCase().replace(/\s+/g, ''), m = s.match(/^([A-Z]+)-?0*(\d+)$/), n = s.match(/^0*(\d+)$/);

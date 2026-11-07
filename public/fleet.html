@@ -145,7 +145,11 @@
       return '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
             const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
             const emp = L.employeeForTech(employees, x);
-            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + (emp ? '<small class="fs-emp">Signs in with employee ID</small>' : boss ? '<small class="fs-emp warn">Not found on the Employees list</small><select class="fs-emp-pick" data-emp-tech="' + id + '" aria-label="Pick ' + escapeHtml(x.name || '') + ' on the Employees list"><option value="">Pick them on the Employees list</option>' + techPeople(true).map(e => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.label) + (e.dept ? ' · ' + escapeHtml(e.dept) : '') + '</option>').join('') + '</select>' : '') + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
+            // Joe 11-7-26: the row shows their login ID, filled in from their employee ID on its own, in a box that can be
+            // changed if it is wrong (no Set login ID button). A number typed by hand is kept only as a hash, so it shows SET BY HAND.
+            const shown = x.login_set ? '' : String(emp ? emp.employeeId : '');
+            const login = boss ? '<label class="fs-login">LOGIN ID <input data-login-tech="' + id + '" value="' + escapeHtml(shown) + '" data-was="' + escapeHtml(shown) + '" placeholder="' + (x.login_set ? 'SET BY HAND' : 'Type it') + '" inputmode="numeric" maxlength="6" autocomplete="off" aria-label="Login ID for ' + escapeHtml(x.name || '') + '"></label> ' : shown ? '<span class="fs-login">LOGIN ID ' + escapeHtml(shown) + '</span>' : x.login_set ? '<span class="fs-login">LOGIN ID SET BY HAND</span>' : '';
+            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + (emp ? '<small class="fs-emp">On the Employees list</small>' : boss ? '<small class="fs-emp warn">Not found on the Employees list</small><select class="fs-emp-pick" data-emp-tech="' + id + '" aria-label="Pick ' + escapeHtml(x.name || '') + ' on the Employees list"><option value="">Pick them on the Employees list</option>' + techPeople(true).map(e => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.label) + (e.dept ? ' · ' + escapeHtml(e.dept) : '') + '</option>').join('') + '</select>' : '') + '</td><td>' + login + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
           }).join(''), 'No technicians yet.') +
           (boss ? '<div class="fs-addtech"><input id="tech-name" list="tech-people" placeholder="Pick or type the name" maxlength="40" aria-label="New technician name" autocomplete="off"><datalist id="tech-people">' + techPeople().map(e => '<option value="' + escapeHtml(e.label) + '">' + escapeHtml(e.dept) + '</option>').join('') + '</datalist>' +
             '<input id="tech-login" placeholder="Employee ID fills in" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '');
@@ -207,7 +211,7 @@
         bar.innerHTML = '<span class="hint">' + (boss ? 'Pick the name from the Employees list; their employee ID fills in.' : 'Managers and administrators change the technicians.') + '</span><span class="spacer"></span><a class="button" href="fleet.html?view=setup">Service Rules and Units</a>';
         sheet.shown = null;
         sheet.innerHTML = '<div class="fs-techs">' + techSection(boss) + '</div>';
-        foot.textContent = 'The garage technicians sign in on the Garage Station. Login IDs are never shown once saved.';
+        foot.textContent = 'The garage technicians sign in on the Garage Station with their login ID, without the zeros at the front or back.';
       } else {
         k.innerHTML = '';
         const R = rules(), boss = canEdit();
@@ -233,7 +237,7 @@
           '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2>' + typePick + '<div class="fs-rules" id="rules">' + ruleList + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
           techSection(boss) + '</div></div>';
-        foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations. Login IDs are never shown once saved.';
+        foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations.';
       }
       const s = document.getElementById('search');
       if (s) s.oninput = (e) => { search = e.target.value.trim(); const at = e.target.selectionStart; render(); const n = document.getElementById('search'); n.focus(); n.setSelectionRange(at, at); };
@@ -254,6 +258,28 @@
         tl.oninput = () => { addDraft.login = tl.value; };
         [tn, tl].forEach(b => { b.onfocus = () => { addDraft.focus = b.id; }; b.onblur = () => { setTimeout(() => { if (addDraft.focus === b.id && document.activeElement !== b) addDraft.focus = ''; }, 0); }; });
       }
+      // A login ID box: what is being typed stays across a redraw; leaving the box (or Enter) saves it. A number that is someone's
+      // employee ID links the technician to that person; any other 4 to 6 digits is their own login ID (shown as SET BY HAND).
+      document.querySelectorAll('[data-login-tech]').forEach(b => {
+        const t = b.dataset.loginTech;
+        if (loginDraft[t] !== undefined) b.value = loginDraft[t];
+        if (loginFocus === t) { b.focus(); try { b.setSelectionRange(b.value.length, b.value.length); } catch (e) {} }
+        b.oninput = () => { loginDraft[t] = b.value; };
+        b.onfocus = () => { loginFocus = t; };
+        b.onblur = () => { setTimeout(() => { if (loginFocus === t && document.activeElement !== b) loginFocus = ''; }, 0); };
+        b.onkeydown = (e) => { if (e.key === 'Enter') b.blur(); };
+        b.onchange = async () => {
+          const v = b.value.trim(), digits = (n) => String(n || '').replace(/^0+/, '').replace(/0+$/, '');
+          if (v === b.dataset.was) { delete loginDraft[t]; return; }
+          if (!/^\d{4,6}$/.test(v)) { showError('The login ID is 4 to 6 digits'); return; }
+          showError('');
+          const person = employees.find(e => e.employeeId && e.active !== false && e.status !== 'GONE' && digits(e.employeeId) === digits(v));
+          try {
+            await save('saveGarageTech', person ? { op: 'EMPLOYEE', techId: t, employeeId: String(person.employeeId) } : { op: 'LOGIN', techId: t, loginId: v });
+            delete loginDraft[t]; b.dataset.was = v; render();
+          } catch (err) { showError(err.message); }
+        };
+      });
       document.querySelectorAll('[data-emp-tech]').forEach(sel => { sel.onchange = async () => { if (!sel.value) return; try { await save('saveGarageTech', { op: 'EMPLOYEE', techId: sel.dataset.empTech, employeeId: sel.value }); } catch (err) { showError(err.message); } }; });
     }
 
@@ -261,7 +287,7 @@
     const FROM = { WRITE_UP: 'Driver write-up', WRITEUP: 'Driver write-up', OFFICE: 'Sent from the office', TECH: 'Found by the garage', GARAGE: 'Found by the garage', DVIR: 'Driver inspection' };
     const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
-    let me = null, ruleType = 'TRUCK', ruleDraft = {}, addDraft = { name: '', login: '', focus: '' };
+    let me = null, ruleType = 'TRUCK', ruleDraft = {}, addDraft = { name: '', login: '', focus: '' }, loginDraft = {}, loginFocus = '';
     const pick = () => { orders = rawOrders.filter(ours); techs = rawTechs.filter(ours); };
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
     // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
@@ -448,7 +474,6 @@
         showError('');
         try {
           if (tb.dataset.op === 'ACTIVE') await save('saveGarageTech', { op: 'ACTIVE', techId: tb.dataset.tech, active: tb.dataset.on === '1' });
-          else { const id = prompt('New login ID for this technician (4 or 6 digits). It is never shown again.'); if (id === null) return; await save('saveGarageTech', { op: 'LOGIN', techId: tb.dataset.tech, loginId: id.trim() }); tb.textContent = 'Login ID saved'; }
         } catch (err) { showError(err.message); }
         return;
       }

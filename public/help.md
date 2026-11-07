@@ -590,10 +590,9 @@ Service and compliance for our own trucks and this plant's trailers: PM service,
 - **Due · Services & Annual Inspection** shows each unit with PM / Reefer, Annual Inspection and Plates side by side. Overdue and due soon stand out in color.
 - **Work Orders** lists the open work orders and what the mechanics did this week.
 - **History** shows the last 12 months.
-- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`, `Set login ID`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup. It is also in Administration under **Fleet Maintenance Setup**.
+- **Fleet Service Setup** sets the service rules for trucks and trailers and the garage technicians (`Add Technician`). These show only on the Garage Station; the plant's mechanics are on Maintenance Schedule Setup. It is also in Administration under **Fleet Maintenance Setup**.
 - To add a technician: click the name box and pick the person from the Employees list (the GARAGE department is first). Their employee ID fills in as the login ID. Press `Add Technician`.
-- A technician who matches someone on the Employees list says **Signs in with employee ID**. They sign in on the Garage Station with that number, without the zeros at the front or back. `Set login ID` gives them a different number as well.
-- Login IDs are never shown once saved.
+- Each technician's row shows their **LOGIN ID** in a box. For someone on the Employees list it is their employee ID, filled in by itself. If it is wrong, type the right number in the box and click away. They sign in on the Garage Station with that number, without the zeros at the front or back.
 - To start a unit's dates, click its PM / Reefer or Annual Inspection on **Due**, or `Edit dates`. Type the last service date and miles, reefer hours, inspection due and plate expiry.
 - A PM, reefer service or Annual Inspection that is due soon or overdue goes onto the Garage Station by itself, with its checklist. `Send to Garage` sends one sooner.
 - `Print Fleet Service Report` prints the report.
@@ -609,11 +608,16 @@ The garage mechanics who sign in on the Garage Station. It is in Administration 
 1. Click **Pick or type the name** and pick the person from the Employees list (the GARAGE department is first). Their employee ID fills in the box beside it.
 2. Press `Add Technician`.
 
-- A technician who matches someone on the Employees list says **Signs in with employee ID**. They type that number on the Garage Station, without the zeros at the front or back (an employee ID of 009354 works as 9354).
-- A technician whose name is not found on the Employees list says **Not found on the Employees list** in red, with a box under it. Pick the right person in that box and they sign in with that person's employee ID.
-- `Set login ID` gives a technician a different number as well. `Turn off` takes them off the Garage Station.
+- Each row shows the technician's **LOGIN ID** in a box. For everyone on the Employees list it is their employee ID, filled in by itself. A short first name still matches (Tom is Thomas, Sean is Shaun) when only one person has that last name and first letter.
+- If a login ID is wrong, type the right number (4 to 6 digits) in its box and click away or press Enter. It saves by itself. Someone else's employee ID links the technician to that person. Any other number works too, but the box then says **SET BY HAND** instead of showing it.
+- They type that number on the Garage Station, without the zeros at the front or back (an employee ID of 009354 works as 9354).
+- A technician whose name is not found on the Employees list says **Not found on the Employees list** in red, with a box under it. Pick the right person in that box and their employee ID fills in.
+- `Turn off` takes a technician off the Garage Station.
 - `Service Rules and Units` opens the rest of Fleet Service Setup.
-- Login IDs are never shown once saved.
+
+> Nothing has to be typed for a technician whose login ID box already shows a number.
+
+!> Do not give two technicians the same login ID.
 
 > The boxes keep what you typed while the screen brings in new information.
 
