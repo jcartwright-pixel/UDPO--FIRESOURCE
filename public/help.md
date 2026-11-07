@@ -797,12 +797,16 @@ screens: forecast.html
 Will the plant be late? Every case load still to load, in the order it will be loaded, with its **Est. Done** time, compared with when it leaves.
 
 - **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A load whose Est. Done is within 30 minutes of its departure is on time. 30 to 60 minutes after is yellow, more than 60 minutes after is red.
+- **How long each load takes:** 1 hour for every 1,000 cases until 3 of today's loads are timed, then today's own speed, mixed with each route's own times from the same weekday's earlier nights.
+- **Faster or slower by the hour of the night:** the plant does not load at one speed all night. Early evening is slower, and after product is pushed into the cooler later loads go faster. Each hour gets its own speed from the past nights (the same weekday first, then every night of the last 4 weeks), so a load that starts in a slow hour gets more time and one that starts in a fast hour gets less. An hour with fewer than 3 timed loads in the past nights goes at the usual speed.
 - **Loads due by each time** totals the loads and cases due by each hour.
 - **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
 - Last night's left-over loads are marked at the left edge.
 - A load an outside carrier hauls says **Outside carrier, not counted late**. It still takes its loading time, but it is never red.
 
 > Example: Save-A-Lot 1 leaves 8:00 AM and Save-A-Lot 2 leaves 9:30 AM, so when the plant is behind Save-A-Lot 2 is loaded right after Save-A-Lot 1, then Jersey (1:00 PM).
+
+> Loads move up and down with what is in the cooler, so a load loaded early or late changes the times of the loads after it. The forecast catches up as soon as the load is started.
 
 > A time is red only when a load that leaves then will be late. Catching up later turns it back.
 

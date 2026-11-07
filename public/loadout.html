@@ -279,7 +279,7 @@
       let rows = byArea[area].map((r, i) => ({ r, i, k: r.prior ? 0 : 2 })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.r);
       // Joe 11/1 (rules audit line 17): when the plant is behind, the truck that leaves first loads first. The Late Forecast
       // decides it (one rule, in plant-rules.js), and Daily Case Loadout lists the loads still to load in that order.
-      const fc = area === 'CASE' ? R.loadForecast({ date, loads: live, history: nights }, Date.now()) : null;
+      const fc = area === 'CASE' ? R.loadForecast({ date, loads: live, history: nights, allNights: (nights || {}).allNights }, Date.now()) : null;
       rows = R.inLoadingOrder(rows, fc);
       const lf = document.getElementById('leave-first');
       lf.hidden = !R.leaveFirst(fc);
