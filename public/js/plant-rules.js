@@ -1350,6 +1350,27 @@
     var base = f.from === 'today' ? 'today\'s speed (' + f.today.loads + ' loads)' : '1,000 cases an hour';
     return base + (f.share ? ' + ' + Math.round(f.share * 100) + '% past nights (' + (f.nights || []).map(function (n) { return n.label; }).join(', ') + ')' : '') + (f.byHour ? ', faster or slower by the hour of the night' : '');
   }
+  // Joe 11-7-26 (option lg: "let's go ahead and do both"): loads move up and down with what is in the cooler, so one load's own
+  // Est. Done can be far off while the night as a whole holds. For each truck time still ahead (a dispatch time), the loads
+  // leaving then, when the last of them should be done, and the time to spare (the least of them), or how late. Outside
+  // carriers and loads with no dispatch time are left out (the finish time still counts them).
+  function truckTimes(f) {
+    var by = {}, out = [];
+    ((f && f.loads) || []).forEach(function (x) {
+      if (x.outside || x.leaves === null || x.leaves === undefined) return;
+      var g = by[x.leaves];
+      if (!g) { g = by[x.leaves] = { at: x.leaves, day: dayShort(x.leaves), time: minutesText12(x.leaves), loads: 0, done: null, late: 0, spare: null }; out.push(g); }
+      g.loads++; g.done = g.done === null ? x.est : Math.max(g.done, x.est); if (x.late) g.late++;
+    });
+    out.sort(function (a, b) { return a.at - b.at; });
+    var days = {}; out.forEach(function (g) { days[g.day] = 1; });
+    var manyDays = Object.keys(days).length > 1;
+    out.forEach(function (g) {
+      g.spare = g.at - g.done; g.when = (manyDays ? g.day + ' ' : '') + g.time; g.doneText = minutesText12(g.done);
+      g.spareText = g.late ? 'LATE ' + spanText(g.done - g.at).toUpperCase() : g.spare > 0 ? spanText(g.spare).toUpperCase() : 'JUST IN TIME';
+    });
+    return out;
+  }
   // Joe 10/20: how far behind the forecast is: the most any load runs past when it is needed, rounded up to 5 minutes.
   // Joe 10/31: a load already past its dispatch counts only the time until it is loaded (behindBy).
   function forecastBehind(f) {
@@ -1592,6 +1613,22 @@
             '<tr><td colspan="2" style="' + F + 'padding:2px 0 4px;font-size:18px;font-weight:800;color:' + A.fg + '">' + (a.late ? '&#9888; ' : '&#10003; ') + e(a.status) + (a.doneBy ? '<div style="font-size:16px;font-weight:700;color:' + INK + '">Done about ' + e(a.doneBy) + '</div>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
         '</div></td></tr>';
     }
+    // Joe 11-7-26 (option lg, picture lg-mockup): under the recap, the Case Loadout finish time and each truck time with when its
+    // loads should be done and the time to spare. Each load's own est. time stays in the list below as a guide.
+    function truckBox() {
+      var t = truckTimes(fc), lateTimes = t.filter(function (g) { return g.late; }).length;
+      if (!fc.loads || !fc.loads.length) return '';
+      var bad = lateTimes > 0, fg = bad ? RED : GREEN, bg = bad ? '#fde8e6' : '#e2f4ea', line = bad ? '#f2b8b2' : '#b9dcc8';
+      var cell = function (v, right, color, head) { return '<td' + (right ? ' align="right"' : '') + ' style="' + F + 'padding:' + (head ? '4px 4px 4px 0' : '7px 4px 7px 0') + ';font-size:' + (head ? '12px' : '16px') + ';font-weight:800;color:' + (color || (head ? GREY : INK)) + (head ? '' : ';white-space:nowrap;border-top:1px solid ' + line) + '">' + v + '</td>'; };
+      return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + bg + ';border-left:6px solid ' + fg + ';padding:14px">' +
+        '<div style="font-size:15px;font-weight:800;color:' + GREY + '">CASE LOADOUT FORECAST' + (fc.asOf ? ' AS OF ' + e(String(fc.asOf).toUpperCase()) : '') + '</div>' +
+        (fc.allDone === null || fc.allDone === undefined ? '' : '<div style="font-size:24px;font-weight:800;line-height:1.15;margin-top:4px;color:' + INK + '">ALL CASE LOADS DONE ABOUT ' + e(String(fc.allDoneWhen).toUpperCase()) + '</div>') +
+        (t.length ? '<div style="font-size:17px;font-weight:800;margin-top:6px;color:' + fg + '">' + (bad ? '&#9888; ' + lateTimes + ' TRUCK TIME' + (lateTimes === 1 ? '' : 'S') + ' WILL BE LATE' : '&#10003; EVERY TRUCK READY IN TIME') + '</div>' +
+          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px"><tr>' + cell('TRUCK LEAVES', 0, 0, 1) + cell('LOADS', 0, 0, 1) + cell('DONE ABOUT', 0, 0, 1) + cell('TIME TO SPARE', 1, 0, 1) + '</tr>' +
+          t.map(function (g) { return '<tr>' + cell(e(g.when)) + cell(g.loads + (g.loads === 1 ? ' LOAD' : ' LOADS')) + cell(e(g.doneText)) + cell(e(g.spareText), 1, g.late ? RED : GREEN) + '</tr>'; }).join('') + '</table>' : '') +
+        '<div style="font-size:14px;margin-top:10px;color:' + GREY + '">Loads move up and down with what is in the cooler, so each load&#39;s own time below is a guide. The finish time and time to spare are the numbers to watch.</div>' +
+        '</div></td></tr>';
+    }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
     // Joe 10/17: loaded routes in the order they finished loading; not loaded routes in load order (Joe 10/20). Both are split by
     // delivery day ("Delivers Sunday", "Delivers Monday") when the report holds more than one, so a Saturday report shows which
@@ -1635,6 +1672,7 @@
     H.push('<tr><td style="' + F + 'padding:16px 14px;background:' + (bannerLevel === 'bad' ? RED : bannerLevel === 'warn' ? YELLOW : GREEN) + ';color:' + (bannerLevel === 'warn' ? INK : '#ffffff') + '"><div style="font-size:24px;font-weight:800">' + (behind ? '&#9888; ' + behind + ' ROUTE' + (behind === 1 ? '' : 'S') + ' LATE' : leftBehind ? '&#9888; ' + leftBehind + ' ROUTE' + (leftBehind === 1 ? '' : 'S') + ' BEHIND' : late ? '&#9888; ' + late + ' LOAD' + (late === 1 ? ' WILL BE LATE' : 'S WILL BE LATE') : doneLate ? '&#9888; ' + doneLate + ' ROUTE' + (doneLate === 1 ? '' : 'S') + ' LOADED LATE' : '&#10003; ALL ROUTES ON TIME') + '</div><div style="font-size:14px;margin-top:3px">' + e(r.dayLabel) + (fc ? '' : ' &middot; ' + loadedCount + ' of ' + total + ' loaded') + '</div></td></tr>');
     if (note) H.push('<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:#fff7e0;border-left:4px solid #d08700;padding:8px 10px;font-size:15px;color:' + INK + '"><b>Note:</b> ' + e(note) + '</div></td></tr>');
     if (fc) H.push(forecastBox());
+    if (fc) H.push(truckBox());
     // Joe 11-4-26: right under the loadout status, one short line per breakdown in red (what was wrong, how long down, back up or
     // still down), or NO DOWNTIME in green, so a reader sees at a glance why the plant may be behind.
     var dtl = downtimeLines(r);
@@ -1715,7 +1753,7 @@
     return { kind: 'bad', counted: c, number: String(c), word: (c < t ? 'short ' + (t - c) : 'over ' + (c - t)), off: c - t };
   }
 
-  return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, hourSpeeds: hourSpeeds, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
+  return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, hourSpeeds: hourSpeeds, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, truckTimes: truckTimes, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
     INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MILK_KIND: MILK_KIND, MAX_USES: MAX_USES, isMilk: isMilk, madeByProduct: madeByProduct, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
     leaveFirst: leaveFirst, inLoadingOrder: inLoadingOrder, scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
