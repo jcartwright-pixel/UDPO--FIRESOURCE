@@ -1,0 +1,16 @@
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Weekly title row at 1536 and 1920 (look only): ok 
+WRITE Scheduler Save Load trailer 014 shows T-14 (6.84): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Pallet Builder case counts and a pallet (6.89): ok 
+NOTE Daily Dispatch at 1200: buttons on 2 line(s), information line wrapped
+NOTE Daily Dispatch at 1024: buttons on 2 line(s), information line wrapped
+WRITE Daily Dispatch title line, one info line, week locked (6.91, look only): ok 
+NOTE Pallet Builder: after DAY BEFORE the open route is RT 805 · 11/05
+NOTE Pallet Builder: route 805 THU has no weeks of the Weekly Route Report on the practice copy, so no space is held (the table and words were checked; held shading was not seen)
+WRITE Pallet Builder held space, PALLET RULES and Product Sheet case columns (6.91, look only): ok 
+Signed in (768 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Texts: 20 driver(s) to text yourself on the practice copy
+WRITE Weekly % of runs covered, Texts list to text yourself, Late Forecast by hour and their Help (6.91, look only): ok 
+WRITE Receiving products, a load with a PO and two products, Inventory: ok 
