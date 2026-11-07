@@ -902,12 +902,14 @@ function validateFleet(action, input, out) {
   }
   // saveGarageTech
   out.op = text(input.op, 10).toUpperCase();
-  if (['ADD', 'NAME', 'ACTIVE', 'LOGIN'].indexOf(out.op) < 0) throw SaveErr('BAD_REQUEST', 'Unknown technician change');
+  if (['ADD', 'NAME', 'ACTIVE', 'LOGIN', 'EMPLOYEE'].indexOf(out.op) < 0) throw SaveErr('BAD_REQUEST', 'Unknown technician change');
   out.techId = text(input.techId, 80);
   if (out.op !== 'ADD' && !out.techId) throw SaveErr('BAD_REQUEST', 'Pick the technician');
   if (out.op === 'ADD' || out.op === 'NAME') { out.name = text(input.name, 40).toUpperCase(); if (!out.name) throw SaveErr('BAD_REQUEST', 'Type the technician\'s name'); }
   // Joe 11-6-26: the employee picked from the Employees list when adding (their employee ID also signs them in).
-  if (out.op === 'ADD') out.employeeId = text(input.employeeId, 40);
+  if (out.op === 'ADD' || out.op === 'EMPLOYEE') out.employeeId = text(input.employeeId, 40);
+  // Joe 11-7-26: a technician not found on the Employees list by name is picked on it (their employee ID then signs them in).
+  if (out.op === 'EMPLOYEE' && !out.employeeId) throw SaveErr('BAD_REQUEST', 'Pick the person on the Employees list');
   if (out.op === 'ACTIVE') out.active = input.active === true;
   if (out.op === 'ADD' || out.op === 'LOGIN') {
     out.loginId = String(input.loginId == null ? '' : input.loginId).trim();
@@ -947,6 +949,7 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     const snap = await tx.get(ref); if (!snap.exists) throw SaveErr('NOT_FOUND', 'That technician is not on the list');
     before = snap.data();
   }
+  if (req.op === 'EMPLOYEE' && (await tx.get(db.collection('employees').where('employeeId', '==', req.employeeId).limit(1))).empty) throw SaveErr('NOT_FOUND', 'That person is not on the Employees list');
   let keyRef = null, oldKeyRef = null;
   if (req.loginId) {
     keyRef = db.collection(LOGINS).doc('id_' + loginKey(req.loginId));
@@ -956,6 +959,7 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
   }
   if (req.op === 'ADD') tx.set(ref, Object.assign({ tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true }, req.employeeId ? { employee_id: req.employeeId } : {}));
   if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
+  if (req.op === 'EMPLOYEE') tx.update(ref, { employee_id: req.employeeId, updated_at: stamp, updated_by: email, testEdited: true });
   if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
   if (keyRef) {
     // The hash the Garage Station checks (loginHash, salted with the technician), and a marker so no one else picks the same number.

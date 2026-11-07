@@ -60,7 +60,7 @@
     const READ_NAMES = { equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours', workOrders: 'work orders', garageTechs: 'technician list', employees: 'employee list' };
     const JOB = { NEW: ['New', 'warn'], WORKING: ['Working', 'yes'], PARTS: ['Waiting on parts', 'warn'], DONE: ['Done', 'no'] };
     let editing = null;
-    let view = ['due', 'work', 'history', 'setup'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], employees = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
+    let view = ['due', 'work', 'history', 'setup', 'techs'].indexOf(new URLSearchParams(location.search).get('view')) >= 0 ? new URLSearchParams(location.search).get('view') : 'due', equipment = [], employees = [], setup = [], odometers = [], gps = [], orders = [], techs = [], rawOrders = [], rawTechs = [], search = (new URLSearchParams(location.search).get('q') || '').trim(), kindFilter = '', savedRules = null;
     // Joe 10/13: Fleet Service follows the plant you are in (the plant home you came through, as the plant pages do; Uniontown
     // until someone opens another plant). Units, work orders, the rules and the garage technicians are that plant's; a row saved
     // before plants were kept (no facility) is Uniontown's.
@@ -139,6 +139,17 @@
 
     // A data update that changes nothing on the list leaves it as it is (no redraw: the same lines stay, a hovered or clicked one too).
     const put = (el, html) => { if (el.shown !== html) { el.innerHTML = html; el.shown = html; } };
+    // Joe 11-7-26: the Garage Technicians list is also its own item (Administration > Fleet Maintenance Setup > Garage
+    // Technicians, fleet.html?view=techs), so it is reached without scrolling past the units and rules.
+    function techSection(boss) {
+      return '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
+            const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
+            const emp = L.employeeForTech(employees, x);
+            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + (emp ? '<small class="fs-emp">Signs in with employee ID</small>' : boss ? '<small class="fs-emp warn">Not found on the Employees list</small><select class="fs-emp-pick" data-emp-tech="' + id + '" aria-label="Pick ' + escapeHtml(x.name || '') + ' on the Employees list"><option value="">Pick them on the Employees list</option>' + techPeople(true).map(e => '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.label) + (e.dept ? ' · ' + escapeHtml(e.dept) : '') + '</option>').join('') + '</select>' : '') + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
+          }).join(''), 'No technicians yet.') +
+          (boss ? '<div class="fs-addtech"><input id="tech-name" list="tech-people" placeholder="Pick or type the name" maxlength="40" aria-label="New technician name" autocomplete="off"><datalist id="tech-people">' + techPeople().map(e => '<option value="' + escapeHtml(e.label) + '">' + escapeHtml(e.dept) + '</option>').join('') + '</datalist>' +
+            '<input id="tech-login" placeholder="Employee ID fills in" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '');
+    }
     function render() {
       const t = today(), due = L.fleetDue(units(), setup, miles(), open(), savedRules, t), month = t.slice(0, 7), weekAgo = L.weekStart(t);
       const late = due.items.filter(i => i.status === 'OVERDUE').length, soon = due.items.filter(i => i.status === 'DUE_SOON').length, week = done().filter(o => L.localDay(o.completed_at) >= weekAgo);
@@ -190,6 +201,13 @@
             (isOpen ? pill(JOB[String(x.status || 'NEW').toUpperCase()] || [x.status, 'no']) : escapeHtml(x.fixed || '') + (x.safe === 'YES' ? '<small>SAFE' + (x.signed_by ? ' · SIGNED ' + escapeHtml(x.signed_by) : '') + '</small>' : x.signed_by ? '<small>signed ' + escapeHtml(x.signed_by) + '</small>' : '')) + '</td></tr>'; }).join(''), 'Nothing in the garage history yet.');
         put(sheet, unit ? '<div class="fleet-split wide-left"><div>' + list + '</div><div>' + factsPanel(unit, due, t) + '</div></div>' : list);
         foot.textContent = rows.length + (rows.length === 1 ? ' job shown' : ' jobs shown') + (unit ? ' for ' + unit.unit : '') + '.' + (unit ? '' : ' Type one unit\'s number to see its facts.');
+      } else if (view === 'techs') {
+        const boss = canEdit();
+        k.innerHTML = '';
+        bar.innerHTML = '<span class="hint">' + (boss ? 'Pick the name from the Employees list; their employee ID fills in.' : 'Managers and administrators change the technicians.') + '</span><span class="spacer"></span><a class="button" href="fleet.html?view=setup">Service Rules and Units</a>';
+        sheet.shown = null;
+        sheet.innerHTML = '<div class="fs-techs">' + techSection(boss) + '</div>';
+        foot.textContent = 'The garage technicians sign in on the Garage Station. Login IDs are never shown once saved.';
       } else {
         k.innerHTML = '';
         const R = rules(), boss = canEdit();
@@ -214,13 +232,7 @@
             (boss ? '<button type="button" class="edit" data-edit="' + escapeHtml(u.unit) + '">Edit</button>' : '') + '</td></tr>').join(''), 'No units.') +
           '</div><div><h2>Service Rules · ' + escapeHtml(plant.name) + '</h2>' + typePick + '<div class="fs-rules" id="rules">' + ruleList + '</div>' +
           (savedRules && savedRules.updatedBy ? '<p class="hint">Rules last changed ' + when(savedRules.updatedAt) + ' by ' + escapeHtml(savedRules.updatedBy) + '.</p>' : '<p class="hint">These are the current app\'s rules until someone saves new ones.</p>') +
-          '<h2>Garage Technicians · ' + escapeHtml(plant.name) + '</h2>' + table([50, 50], ['Name', ''], techs.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).map(x => {
-            const on = L.yes(x.active === undefined || x.active === '' ? 'TRUE' : x.active), id = escapeHtml(x.tech_id || x.id);
-            const emp = L.employeeForTech(employees, x);
-            return '<tr><td class="strong">' + escapeHtml(x.name || '') + (on ? '' : ' ' + pill(['Off', 'no'])) + (emp ? '<small class="fs-emp">Signs in with employee ID</small>' : '') + '</td><td>' + (boss ? '<button type="button" class="edit" data-tech="' + id + '" data-op="LOGIN">Set login ID</button> <button type="button" class="edit" data-tech="' + id + '" data-op="ACTIVE" data-on="' + (on ? '0' : '1') + '">' + (on ? 'Turn off' : 'Turn on') + '</button>' : '') + '</td></tr>';
-          }).join(''), 'No technicians yet.') +
-          (boss ? '<div class="fs-addtech"><input id="tech-name" list="tech-people" placeholder="Pick or type the name" maxlength="40" aria-label="New technician name" autocomplete="off"><datalist id="tech-people">' + techPeople().map(e => '<option value="' + escapeHtml(e.label) + '">' + escapeHtml(e.dept) + '</option>').join('') + '</datalist>' +
-            '<input id="tech-login" placeholder="Employee ID fills in" inputmode="numeric" maxlength="6" aria-label="Login ID"><button type="button" id="tech-add">Add Technician</button></div>' : '') + '</div></div>';
+          techSection(boss) + '</div></div>';
         foot.textContent = 'Each unit\'s dates, the rules and the technicians are kept in Operations. Login IDs are never shown once saved.';
       }
       const s = document.getElementById('search');
@@ -231,14 +243,25 @@
       // Batch 5 (10/23): no Save Rules button; a rule saves when its box is left.
       document.querySelectorAll('[data-rule]').forEach(i => { i.oninput = () => { ruleDraft[i.dataset.rule] = i.value; }; i.onchange = saveRules; });
       const ta = document.getElementById('tech-add'); if (ta) ta.onclick = addTech;
-      const tn = document.getElementById('tech-name'); if (tn) tn.oninput = () => { const who = pickedPerson(tn.value); if (who) document.getElementById('tech-login').value = who.id; };
+      // Joe 11-7-26: picking a name fills the employee ID. The screen redraws whenever new information comes in, so what is in
+      // the two boxes (and which one has the cursor) is kept across a redraw instead of being wiped.
+      const tn = document.getElementById('tech-name'), tl = document.getElementById('tech-login');
+      if (tn) {
+        tn.value = addDraft.name; tl.value = addDraft.login;
+        if (addDraft.focus) { const f = document.getElementById(addDraft.focus); f.focus(); try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) {} }
+        const fill = () => { addDraft.name = tn.value; const who = pickedPerson(tn.value); if (who) tl.value = addDraft.login = who.id; };
+        tn.oninput = fill; tn.onchange = fill;
+        tl.oninput = () => { addDraft.login = tl.value; };
+        [tn, tl].forEach(b => { b.onfocus = () => { addDraft.focus = b.id; }; b.onblur = () => { setTimeout(() => { if (addDraft.focus === b.id && document.activeElement !== b) addDraft.focus = ''; }, 0); }; });
+      }
+      document.querySelectorAll('[data-emp-tech]').forEach(sel => { sel.onchange = async () => { if (!sel.value) return; try { await save('saveGarageTech', { op: 'EMPLOYEE', techId: sel.dataset.empTech, employeeId: sel.value }); } catch (err) { showError(err.message); } }; });
     }
 
     const jobRank = (x) => { const st = String(x.status || 'NEW').toUpperCase(); return st === 'WORKING' ? 0 : st === 'NEW' && String(x.source).toUpperCase() === 'OFFICE' ? 1 : st === 'PARTS' ? 2 : 3; };
     const FROM = { WRITE_UP: 'Driver write-up', WRITEUP: 'Driver write-up', OFFICE: 'Sent from the office', TECH: 'Found by the garage', GARAGE: 'Found by the garage', DVIR: 'Driver inspection' };
     const cameFrom = (x) => x.source_from || FROM[String(x.source || '').toUpperCase()] || x.source || '';
     const fixedText = (x) => [x.fixed, x.fixed_note].filter(Boolean).join(' · ');
-    let me = null, ruleType = 'TRUCK', ruleDraft = {};
+    let me = null, ruleType = 'TRUCK', ruleDraft = {}, addDraft = { name: '', login: '', focus: '' };
     const pick = () => { orders = rawOrders.filter(ours); techs = rawTechs.filter(ours); };
     const canEdit = () => !!me && L.hasRole(me, L.REORDER_ROLES);
     // A unit's plate number from the fleet sync's text ("External Fleet: year | make | model | VIN | plate | state | Lease: ..."):
@@ -287,18 +310,24 @@
     // Joe 11-6-26: the names to add come from the Employees list (the garage's first); picking one fills in their employee ID
     // as the login ID ("SHAUN MARTIN" from "MARTIN, SHAUN"). The zeros at the front or back never have to be typed.
     const firstLast = (n) => { const m = /^([^,]+),\s*(.+)$/.exec(String(n || '')); return (m ? m[2] + ' ' + m[1] : String(n || '')).trim().toUpperCase(); };
-    function techPeople() {
-      const taken = {}; techs.forEach(t => { taken[L.personKey(t.name)] = true; });
-      return employees.filter(e => e.employeeId && e.active !== false && e.status !== 'GONE' && !taken[L.personKey(e.name)])
+    function techPeople(forLink) {
+      // Adding: everyone not already a technician. Picking for a technician not found: everyone no other technician signs in as.
+      const taken = {}; techs.forEach(t => { if (forLink) { const m = L.employeeForTech(employees, t); if (m) taken['#' + m.employeeId] = true; } else taken[L.personKey(t.name)] = true; });
+      return employees.filter(e => e.employeeId && e.active !== false && e.status !== 'GONE' && !taken[forLink ? '#' + e.employeeId : L.personKey(e.name)])
         .map(e => ({ label: firstLast(e.name), id: String(e.employeeId), dept: e.department || '', garage: e.department === 'GARAGE' }))
         .sort((a, b) => (b.garage - a.garage) || a.label.localeCompare(b.label));
     }
-    const pickedPerson = (name) => techPeople().find(e => e.label === String(name || '').trim().toUpperCase()) || null;
+    const pickedPerson = (name) => {
+      const v = String(name || '').trim().toUpperCase(), all = techPeople(), exact = all.find(e => e.label === v);
+      if (exact || !v) return exact || null;
+      const same = all.filter(e => L.personKey(e.label) === L.personKey(v));
+      return same.length === 1 ? same[0] : null;
+    };
     async function addTech() {
       const name = document.getElementById('tech-name').value.trim(), loginId = document.getElementById('tech-login').value.trim(), person = pickedPerson(name);
       if (!name) { showError('Type the technician\'s name'); return; }
       showError('');
-      try { await save('saveGarageTech', { op: 'ADD', name, loginId, employeeId: person ? person.id : '', facilityId: plant.id }); } catch (err) { showError(err.message); }
+      try { await save('saveGarageTech', { op: 'ADD', name, loginId, employeeId: person ? person.id : '', facilityId: plant.id }); addDraft = { name: '', login: '', focus: '' }; render(); } catch (err) { showError(err.message); }
     }
     // Unit Edit (FleetService.html:141-150): track, last service, reefer hours now, DOT due, plate expires, notes.
     function openUnit(unit) {

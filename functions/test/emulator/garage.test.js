@@ -262,3 +262,16 @@ test('Joe 11-6-26: a technician signs in with their employee ID from the Employe
   assert.equal(leeDoc.employee_id, '004444');
   assert.ok((await garageCall(db(), { op: 'signIn', techId: leeDoc.tech_id, loginId: '4444' }, now())).token);
 });
+
+// Joe 11-7-26: a technician whose name is not found on the Employees list is picked on it; that employee ID then signs them in.
+test('Joe 11-7-26: picking an unmatched technician on the Employees list lets them sign in with that employee ID', async () => {
+  const MGR = { email: 'manager.test@uniteddairy.com' };
+  await db().collection('garageTechs').doc('TECH-TJ').set({ tech_id: 'TECH-TJ', name: 'TOMMY SAMPLE', active: 'YES' });
+  await db().collection('employees').doc('007311').set({ employeeId: '007311', name: 'SAMPLE, THOMAS', department: 'GARAGE', active: true });
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-TJ', loginId: '7311' }, now()), /no login ID yet/, 'no name match yet');
+  await assert.rejects(applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '999999' }), /not on the Employees list/);
+  await assert.rejects(applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '' }), /Pick the person/);
+  await applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '007311' });
+  assert.equal((await db().collection('garageTechs').doc('TECH-TJ').get()).data().employee_id, '007311');
+  for (const typed of ['7311', '007311']) assert.ok((await garageCall(db(), { op: 'signIn', techId: 'TECH-TJ', loginId: typed }, now())).token, 'signs in with ' + typed);
+});
