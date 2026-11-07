@@ -20,11 +20,12 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Employees & Compliance** (UDMS): employee records, driver qualification, accidents, workers' comp and hiring.
 - **Route & Trip Costs** (the Route Estimator): the round-trip cost of a delivery or plant transfer, with PC Miler truck miles and tolls.
 - **Route Cost Analysis**: each month's delivery cost by route and stop: cost per case, per stop and per day on the road.
+- **Customer Statements** (the Statement Center): email, mail and print customer statements for every location, and keep the statement customer list. Pick the location at the top once it opens.
 - **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
 
 ### Which cards you see
 - **Plant & Distribution**, **Customers & Routes** and **Accident & Injury Reporting**: everyone who is active on the Users list.
-- **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs** and **Route Cost Analysis**: administrators. Employees & Compliance keeps its own access list too, so it checks again when it opens.
+- **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis** and **Customer Statements**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
@@ -37,7 +38,7 @@ screens: people.html
 **People & Access** is the one place for who can sign in to the United Dairy apps and what they can see and do in each: their role, their plants, which apps they can open, their screens and their single rights. It is the same Users list as **People & Roles** in Plant & Distribution, saved the same way, so a change here is a change in every app. Administrators only.
 
 1. Find a person with **Find** (part of a name or email), **Role**, or **Enabled / Disabled**.
-2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance, Route & Trip Costs, Route Cost Analysis, Accident & Injury Reporting), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
+2. **Which apps each person opens:** every line has a tick box for each app (Plant & Distribution, Customers & Routes, Fuel Tracking, Employees & Compliance, Route & Trip Costs, Route Cost Analysis, Customer Statements, Accident & Injury Reporting), ticked for what they can open now. Tick or untick one and it saves at once; a green line says what changed.
 3. Press a person's name. Their page opens on the whole screen, in three columns: **Who they are** (with their apps and **What they can do in each app**), **What they see in Plant & Distribution**, and **Single rights**. `← Everyone` (or the browser's Back) returns to the list.
 4. Change their **Role**, their **Plants** (tick **All plants**, or each plant), or turn their account **Enabled** or **Disabled**. **Apps they can open** has the same tick boxes, saved with `Save`.
 5. Under **What they see in Plant & Distribution**, pick the **Plant**, then tick a whole area or press `Show screens` and tick single screens. **Start from a job** ticks the screens that job usually needs; change them after. Nothing ticked yet means they see every screen their role allows.
@@ -54,11 +55,11 @@ screens: people.html
 
 > Everything People & Roles in Plant & Distribution does is here, saved to the same place, so either page shows the same answer.
 
-> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution, Customers & Routes and Accident & Injury Reporting; Administrators also get Fuel Tracking, Employees & Compliance, Route & Trip Costs and Route Cost Analysis.
+> Until an app is ticked or unticked for someone, they get the standard apps: everyone Enabled gets Plant & Distribution, Customers & Routes and Accident & Injury Reporting; Administrators also get Fuel Tracking, Employees & Compliance, Route & Trip Costs, Route Cost Analysis and Customer Statements. To let the office people who send statements open it, tick **Customer Statements** on their line.
 
 > **Sales** is the role for salespeople: they see routes and customer pickups. The Sales app on their phone opens for any United Dairy account, so there is nothing to tick for it.
 
-> Plant & Distribution is always ticked for everyone Enabled. To keep someone off part of it, untick screens under **What they see in Plant & Distribution**. Employees & Compliance still checks its own list too, so its tick only shows or hides the card on their Home.
+> Plant & Distribution is always ticked for everyone Enabled. To keep someone off part of it, untick screens under **What they see in Plant & Distribution**. Employees & Compliance still checks its own list too, so its tick only shows or hides the card on their Home. Customer Statements is the same: its tick shows or hides the card.
 
 !> You cannot untick your own apps. Ask another administrator.
 

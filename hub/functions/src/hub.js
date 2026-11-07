@@ -9,15 +9,19 @@
  *   Employees & Compliance (UDMS)           Administrators for now: UDMS keeps its own access list and checks again
  *   Route & Trip Costs (Route Estimator)    Administrators only (the same rule as routeEstimator), like Fuel Tracking
  *   Route Cost Analysis                     Administrators only (the same rule as routeCost), like Fuel Tracking
+ *   Customer Statements (Statement Center)  Administrators by default (Joe 11-7-26: "Let's add it in now"). It is an Apps Script
+ *                                           app open to United Dairy accounts, so its tick only shows or hides the card
  * Joe 11-3-26 ("tick ... which apps each person is allowed to see and use ... pre-tick" what they have now): People & Access
  * can tick each app per person. Those ticks are kept in appAccess/<email> (not on the Users list, which is still copied from
  * the Users sheet and would lose them). With no ticks saved, a person has the rule above. Plant & Distribution always stays
  * on for an Enabled person (Operations decides each of its screens itself); Fuel Tracking, Customers & Routes and Route & Trip Costs
  * check the same ticks on their own servers; UDMS still checks its own list, so its tick only shows or hides the card.
- * Statement Center is left out until Joe says (11-2-26: "I don't want to move the statement center to this yet").
+ * Statement Center was left out on 11-2-26 ("I don't want to move the statement center to this yet"); Joe added it 11-7-26.
+ * Ticks saved before an app was added say nothing about that app, so until that person's ticks are saved again the new
+ * app follows the standard rule above (ADDED below); otherwise every administrator with saved ticks would lose the card.
  *
  * The addresses come from the project the server runs in: the practice copy (ud-distribution-sandbox) links to the practice
- * copies, the live one to the live apps. UDMS has one address.
+ * copies, the live one to the live apps. UDMS, the accident app and the Statement Center have one address.
  */
 'use strict';
 
@@ -26,6 +30,9 @@ const ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
 const UDMS_URL = 'https://udms-bfccd.web.app/';
 // Joe 11-6-26: the Accident & Injury Reporting app on the hub too; it has one address (its own Firebase site).
 const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
+// Joe 11-7-26: the Statement Center (repo united-dairy-statement-center) is an Apps Script web app with one address for
+// every location (the location is picked inside it; Uniontown first).
+const STATEMENTS_URL = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbyMvVPx0RDcDeP_OXe0kmYo3XWBYA7hQzBGgTecCn10wpszalEtyVoXLYmFMsVgnzz5/exec';
 
 class HubError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -47,13 +54,25 @@ function apps(project) {
     { key: 'routes', name: 'Route & Trip Costs', note: 'Round-trip cost for a delivery or plant transfer, with PC Miler truck miles and tolls', url: site('routes'), may: isAdmin },
     // Joe 11-6-26: route cost analysis as its own app (united-dairy-route-cost), linked from the hub.
     { key: 'routecost', name: 'Route Cost Analysis', note: 'Monthly delivery cost by route and stop: cost per case, per stop and per day on the road', url: site('route-cost'), may: isAdmin },
+    { key: 'statements', name: 'Customer Statements', note: 'Email, mail and print customer statements for every location, and keep the statement customer list', url: STATEMENTS_URL, may: isAdmin },
     // Joe 11-6-26: "You don't have the link to the accident app." Anyone enabled can report an accident or injury.
     { key: 'accident', name: 'Accident & Injury Reporting', note: 'Report an accident or injury from a phone, tablet or computer', url: ACCIDENT_URL, may: isActive }
   ];
 }
 
-const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident'];
+const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident'];
 const ALWAYS = 'operations';
+// When an app joined the hub after per-person ticks started (11-3-26): ticks saved before this day follow the standard rule
+// for it until they are saved again.
+const ADDED = { statements: '2026-11-07T00:00:00Z' };
+
+/** Saved ticks with any app added since they were saved filled in by the standard rule. */
+function withAdded(person, saved) {
+  if (!saved || !Array.isArray(saved.apps)) return null;
+  const when = String(saved.updatedAt || '');
+  const add = Object.keys(ADDED).filter(k => saved.apps.indexOf(k) < 0 && !(when >= ADDED[k]) && apps('x').find(a => a.key === k).may(person));
+  return add.length ? APP_KEYS.filter(k => saved.apps.indexOf(k) >= 0 || add.indexOf(k) >= 0) : saved.apps;
+}
 
 /** The apps a person may open: their saved ticks, or the rule above when none are saved. Plant & Distribution always. */
 function appsOf(person, ticks) {
@@ -66,9 +85,9 @@ async function personOf(db, email) {
   const s = await db.collection('users').doc(safeIdPart(email)).get();
   return s.exists ? s.data() : null;
 }
-async function ticksOf(db, email) {
+async function ticksOf(db, email, person) {
   const s = await db.collection('appAccess').doc(safeIdPart(email)).get();
-  return s.exists && Array.isArray(s.data().apps) ? s.data().apps : null;
+  return s.exists ? withAdded(person, s.data()) : null;
 }
 
 /**
@@ -82,7 +101,7 @@ async function hubCall(db, user, input, options) {
   if (!isActive(person)) throw new HubError('NOT_ALLOWED', 'You are not on the Users list. Ask an administrator to add you.');
   if (op === 'home') {
     const project = (options && options.project) || process.env.GCLOUD_PROJECT || 'demo-ud-distribution';
-    const mine = appsOf(person, await ticksOf(db, email));
+    const mine = appsOf(person, await ticksOf(db, email, person));
     const tiles = apps(project).filter(a => mine.indexOf(a.key) >= 0).map(({ key, name, note, url }) => ({ key, name, note, url }));
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
   }
@@ -90,7 +109,12 @@ async function hubCall(db, user, input, options) {
   if (op === 'appAccess') {
     const snap = await db.collection('appAccess').get();
     const saved = {};
-    snap.docs.forEach(d => { if (Array.isArray(d.data().apps)) saved[d.id] = d.data().apps; });
+    for (const d of snap.docs) {
+      const v = d.data();
+      if (!Array.isArray(v.apps)) continue;
+      const stale = Object.keys(ADDED).some(k => v.apps.indexOf(k) < 0 && !(String(v.updatedAt || '') >= ADDED[k]));
+      saved[d.id] = stale ? withAdded(await personOf(db, d.id), v) || v.apps : v.apps;
+    }
     return { saved };
   }
   if (op === 'setApps') {
@@ -113,4 +137,4 @@ async function hubCall(db, user, input, options) {
   throw new HubError('BAD_REQUEST', 'Unknown request.');
 }
 
-module.exports = { hubCall, HubError, apps, appsOf, APP_KEYS, isActive, isAdmin, UDMS_URL };
+module.exports = { hubCall, HubError, apps, appsOf, withAdded, APP_KEYS, ADDED, isActive, isAdmin, UDMS_URL, STATEMENTS_URL };
