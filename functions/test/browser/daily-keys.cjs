@@ -324,6 +324,17 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     const dp = await openPage(browser, 1536, 730, '/daily.html?date=2026-10-10' + NOW + '&testEmail=dispatch.test@uniteddairy.com');
     await dp.waitForSelector('#rows tr');
     assert.equal(await dp.textContent('#week-of'), '10-11-26 to 10-17-26');
+    // Joe 11/7 (full test at 1536 x 790): the buttons stay on the title line and nothing on the information line under them
+    // runs into the next thing (the texts words, Send Texts, the Loadout day).
+    const fit = await dp.evaluate(() => {
+      const R = e => e.getBoundingClientRect(), t = R(document.querySelector('.head .title')), a = R(document.querySelector('.head .actions.in-head'));
+      const parts = [...document.querySelectorAll('#day-info > *, #send-texts > *')].filter(e => R(e).width > 0);
+      const over = [];
+      parts.forEach((x, i) => parts.slice(i + 1).forEach(y => { if (x.contains(y) || y.contains(x)) return; const p = R(x), q = R(y);
+        if (p.left < q.right - 1 && q.left < p.right - 1 && p.top < q.bottom - 1 && q.top < p.bottom - 1) over.push((x.id || x.className) + ' / ' + (y.id || y.className)); }));
+      return { onLine: a.top < t.bottom && a.bottom > t.top, over, wide: document.documentElement.scrollWidth <= innerWidth };
+    });
+    assert.deepEqual(fit, { onLine: true, over: [], wide: true }, 'Daily at 1536: buttons on the title line, the information line does not overlap');
     assert.equal(await dp.$$eval('#week-begin, #week-prev, #week-next, #week-panel', n => n.length), 0, 'no way to change the week');
     assert.deepEqual(await dp.$$eval('#load-day option', o => o.map(x => x.value)), ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16']);
     assert.deepEqual(await dp.$eval('#prev', b => [b.disabled, b.title]), [true, 'Daily Dispatch shows only this week'], 'Saturday is the first day');
