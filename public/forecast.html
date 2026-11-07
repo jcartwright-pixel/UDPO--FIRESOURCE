@@ -76,7 +76,7 @@
     function render() {
       document.getElementById('dayname').textContent = L.dayName(date).toUpperCase() + '  ·  ' + shortDate(date);
       if (!loaded) return;
-      const now = Date.now(), all = P.loadoutRows(runs, date), f = U.loadForecast({ date, loads: all, history, dueBy }, now);
+      const now = Date.now(), all = P.loadoutRows(runs, date), f = U.loadForecast({ date, loads: all, history, allNights: (history || {}).allNights, dueBy }, now);
       const today = U.wallClock(now), sameDay = (m) => Math.floor(m / 1440) === Math.floor(today / 1440);
       const when = (m, text, day) => (sameDay(m) ? '' : day + ' ') + text;
       const doneCase = all.filter(r => r.area === 'CASE' && r.state === 'DONE');
