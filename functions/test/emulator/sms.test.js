@@ -397,3 +397,28 @@ test('Joe 11/7: drivers Send will not reach whose posted week is not their norma
   p = await SMS.smsCall(db(), ADMIN, { op: 'preview' });
   assert.deepEqual(p.byHand.map(x => [x.name, x.why, x.days.join(' ')]), [['ADAMS, PAT', 'No mobile phone', 'Mon'], ['BROOK, SAM', 'Not signed up', 'Tue']]);
 });
+
+test('Joe 11/7: one driver whose text cannot be made no longer stops Send; the others are texted, he is named, and a send that stopped never texts anyone twice', async () => {
+  const P = require('../../src/phone'), was = P.scheduleDays;
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-stop-0001', driverId: 'drv_test_casey', phone: '3305551234' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-stop-0002', driverId: 'drv_test_brook', phone: '3305554321' });
+  for (const id of ['drv_test_casey', 'drv_test_brook']) await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-stop-' + id, driverId: id, kind: 'SCHEDULE', on: true });
+  const calls = [], fetch = async (url, init) => { calls.push(new URLSearchParams(init.body).get('To')); return { ok: true, status: 201, json: async () => ({}) }; };
+  const live = (t) => ({ env: { LIVE_TEXTS: '1' }, fetch, now: () => new Date(t) });
+  await post();
+  // A send that stopped part way had already texted Brook: the first Send skips him and texts Casey only.
+  await db().collection('textLog').doc('stopped_brook').set({ direction: 'out', week: WEEK, driverId: 'drv_test_brook', name: 'BROOK, SAM', to: '+13305554321', body: 'x', at: '2026-10-17T22:00:00.000Z', status: 'SENT' });
+  let r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:00:00Z'));
+  assert.deepEqual([r.lastSend.sent, r.lastSend.already, r.lastSend.failed, calls], [1, 1, 0, ['+13305551234']]);
+  // Casey's text cannot be made: Brook is still texted, Casey is written to the list as not texted, with why, and named.
+  await db().collection('textLog').doc('stopped_brook').delete();
+  P.scheduleDays = (driver, ...rest) => { if (driver.id === 'drv_test_casey') throw new Error('broken day'); return was(driver, ...rest); };
+  try { r = await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule', again: true }, live('2026-10-17T23:10:00Z')); } finally { P.scheduleDays = was; }
+  assert.deepEqual([r.lastSend.week, r.lastSend.sent, r.lastSend.failed, r.lastSend.notSent, calls.slice(1)], [WEEK, 1, 1, ['CASEY, LEE'], ['+13305554321']]);
+  const bad = (await db().collection('textLog').get()).docs.map(x => Object.assign({ id: x.id }, x.data())).find(x => x.driverId === 'drv_test_casey' && x.status === 'FAILED');
+  assert.match(bad.reason, /^Could not make this driver's text: broken day/);
+  // Resend on his line texts only him.
+  r = await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: bad.id }, live('2026-10-17T23:20:00Z'));
+  assert.deepEqual(calls.slice(2), ['+13305551234']);
+});

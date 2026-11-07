@@ -1805,6 +1805,8 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 
 > Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
+If Send could not text a driver, the strip and part 3 say **Not texted:** with the name in red, and part 6 shows that driver's line as FAILED with why. Fix what it says, then press `Resend` twice on that line; only that driver gets it. A first Send never texts a driver who already got this week's text.
+
 !> Do not think every driver was told because Send went out: a driver on the red **Text these drivers yourself** list was not texted.
 
 !> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.

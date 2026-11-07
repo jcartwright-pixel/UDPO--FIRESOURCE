@@ -101,6 +101,15 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await dd.context().close();
     }
 
+    // Joe 11/7: a driver the send could not text is named in red on the strip.
+    await db().collection('private').doc('sms').set({ lastSend: Object.assign({}, await lastSend(), { notSent: ['ADAMS, PAT'] }) }, { merge: true });
+    const nt = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
+    await nt.waitForFunction(() => /Not texted: ADAMS, PAT\. See Administration > Texts, part 6, for why\./.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
+    assert.deepEqual(await small(nt), []);
+    assert.ok(await fits(nt) <= 0);
+    if (SHOTS) await nt.waitForTimeout(800), await nt.screenshot({ path: path.join(SHOTS, 'not-texted-weekly-1536.png') });
+    await nt.context().close();
+
     // Someone who is not an administrator does not see it.
     const disp = await openPage(browser, 1536, 790, '/daily.html?date=2026-10-12&testEmail=dispatch.test@uniteddairy.com');
     await disp.waitForSelector('#rows tr');

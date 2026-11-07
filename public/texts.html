@@ -174,7 +174,7 @@
       $('state-text').textContent = s.week ? 'Posted week ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + '. Publishing never sends texts; press the button when you are ready.' + need : 'No week is posted yet.';
       if (!sendArmed) $('send').textContent = done ? 'Send again' : 'Send schedule texts';
       $('send').disabled = !keys || !s.week || !sched.length;
-      $('last').textContent = l ? 'Last sent ' + stamp(l.at) + ' for the week of ' + day(l.week) + ': ' + (l.live ? l.sent + ' sent' + (l.failed ? ', ' + l.failed + ' not sent' : '') : l.drivers + ' written to the list (test copy)') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'Not sent yet.';
+      $('last').textContent = l ? 'Last sent ' + stamp(l.at) + ' for the week of ' + day(l.week) + ': ' + (l.live ? l.sent + ' sent' + (l.failed ? ', ' + l.failed + ' not sent' : '') : l.drivers + ' written to the list (test copy)') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + (l.already ? ', ' + l.already + ' already had it' : '') + '.' + ((l.notSent || []).length ? ' Not texted: ' + l.notSent.join(', ') + ' (part 6 says why).' : '') : 'Not sent yet.';
       $('preview-text').textContent = s.message || '';
       $('preview-count').textContent = sched.length + (sched.length === 1 ? ' driver' : ' drivers'); $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
       $('preview-note').innerHTML = 'Drivers ticked <b>Schedule</b> on the Driver Roster who are on the posted week' + (s.ticked != null ? ' (' + s.ticked + ' ticked in all)' : '') + '.';
