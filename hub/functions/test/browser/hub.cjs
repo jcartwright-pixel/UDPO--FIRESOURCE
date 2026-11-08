@@ -355,9 +355,10 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.setInputFiles('#file', bolPath);
     await p.waitForSelector('#msg.good');
     assert.match(await p.textContent('#msg'), /LOAD DAY 11-9-26: 2 ROUTES, 3 CUSTOMERS READ FROM Daily Load UT\.pdf/);
-    assert.deepEqual(await p.$$eval('.bol-routes .bol-route', t => t.map(x => x.textContent.slice(2))), ['805', '6301']);
-    await p.click('.bol-route[data-route="805"]');
-    assert.deepEqual(await p.$$eval('.bol-stops tbody td:nth-child(2)', t => t.map(x => x.textContent)), ['MADEUP GOLF CENTER', 'SAMPLE FOOD MART (CO-OP)']);
+    // Joe 11-8-26: one line per load day (its date, routes, customers, quantity, file), no routes or customers list.
+    assert.deepEqual(await p.$$eval('.bol-days tbody tr', t => t.map(r => [...r.cells].slice(0, 4).map(c => c.textContent))), [['MONDAY 11-9-26', '2', '3', '606']]);
+    assert.equal(await p.$$eval('.bol-routes, .bol-route, .bol-stops', t => t.length), 0, 'no routes list');
+    assert.ok(!/ROUTES ON/.test(await p.textContent('#days')), 'no ROUTES ON section');
     assert.equal((await db().collection('bolDays').doc('2026-11-09').get()).data().totals.qty, 606);
     await p.fill('#mailbox', 'pat.sample@uniteddairy.com');
     await p.check('#enabled');
@@ -366,13 +367,12 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.click('#check');
     await p.waitForFunction(() => /LAST CHECKED/.test(document.querySelector('#mail').textContent) && !/CHECKING/.test(document.querySelector('#mail').textContent));
     assert.match(await p.textContent('#mail .acc-bad'), /Gmail is not reached/);
-    await p.click('.bol-route[data-route="805"]');
     await shot(p, 'hub-bol-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 1536, height: 790 }, 'bol.html');
-    await p.waitForSelector('.bol-routes');
+    await p.waitForSelector('.bol-days');
     await shot(p, 'hub-bol-1536');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'bol.html');
-    await p.waitForSelector('.bol-routes');
+    await p.waitForSelector('.bol-days');
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Daily BOL: no sideways page scroll on a phone');
     await shot(p, 'hub-bol-390');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'bol.html');
