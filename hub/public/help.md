@@ -260,7 +260,7 @@ Where the office's **Daily Load By Route** comes in (administrators). The office
 3. Tick **Check every hour**. Every hour the Hub looks under that label for a new BOL and reads it.
 4. To read it now, press `CHECK EMAIL NOW`.
 5. If the BOL came another way, press `ADD A FILE BY HAND` and pick the PDF.
-6. Press a load day in **LOAD DAYS** to see its routes. Press a route to see its customers, in the order the BOL lists them.
+6. Check **LOAD DAYS**: one line for each load day the Hub has stored, with its routes, customers, quantity and the file it came from. The routes and customers themselves are not shown here; Pallet Builder in Plant & Distribution opens with the newest BOL.
 
 ### Buttons
 - `CHECK EMAIL NOW` reads the label at once (the last 10 days). An email already read is not read again.
@@ -270,6 +270,10 @@ Where the office's **Daily Load By Route** comes in (administrators). The office
 > The BOL lists each order line: load day, route, load sequence, customer and number, product and quantity. When a newer BOL for the same load day comes in (more orders keyed), it takes the older one's place.
 
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Accounting Numbers and Driver Check-In Email). If it has not, the last-checked line says so in red.
+
+> If the file under the label has no BOL lines, the last-checked line turns red and names the file, like **Read Weekly Daily Avg Cases.xls, but it has no BOL lines: it looks like the weekly route report, not the Daily BOL. Check the email label.** The weekly route report's label (ROUTES/SALE BY ROUTE) goes on **Accounting Numbers**, not here.
+
+!> Do not type the weekly route report's label here. Daily BOL's label is ROUTES/BOL.
 
 !> Do not move the BOL emails out of the ROUTES/BOL label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
 

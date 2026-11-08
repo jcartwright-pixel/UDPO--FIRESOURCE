@@ -8,7 +8,7 @@ import { callServer, escapeHtml as e, showError, serverText, shortDate, setAdmin
 
 const $ = (s) => document.querySelector(s);
 const admin = (op, fields, ms) => callServer('admin', Object.assign({ op }, fields || {}), ms);
-let got = null, busy = '', openRoute = '';
+let got = null, busy = '';
 
 const whole = (v) => v == null ? '' : Number(v).toLocaleString('en-US');
 const time = (v) => { const t = new Date(v); return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }); };
@@ -36,31 +36,20 @@ function mailCard() {
 
 function daysTable() {
   if (!got.days.length) return '<p class="hub-empty">NO BOL YET. PRESS ADD A FILE BY HAND AND PICK THE DAILY LOAD BY ROUTE.</p>';
-  const cur = got.open && got.open.date;
   return '<section class="bol-part"><h2>LOAD DAYS</h2><table class="acc-table bol-days"><thead><tr><th>LOAD DAY</th><th>ROUTES</th><th>CUSTOMERS</th><th>QUANTITY</th><th class="from">FROM</th></tr></thead><tbody>' +
-    got.days.map(d => '<tr data-date="' + e(d.date) + '" class="' + (d.date === cur ? 'on' : '') + '"><td class="strong"><button type="button" class="bol-day" data-date="' + e(d.date) + '">' + dayName(d.date) + ' ' + e(shortDate(d.date)) + '</button></td>' +
+    got.days.map(d => '<tr data-date="' + e(d.date) + '"><td class="strong">' + dayName(d.date) + ' ' + e(shortDate(d.date)) + '</td>' +
       '<td>' + whole(d.totals.routes) + '</td><td>' + whole(d.totals.stops) + '</td><td>' + whole(d.totals.qty) + '</td>' +
       '<td class="muted">' + e(d.file) + '<br><small>' + e((d.source === 'EMAIL' ? 'EMAIL ' : 'BY HAND ') + when(d.received)) + '</small></td></tr>').join('') + '</tbody></table></section>';
 }
 
-function routesTable() {
-  const o = got.open;
-  if (!o) return '';
-  return '<section class="bol-part"><h2>ROUTES ON ' + dayName(o.date) + ' ' + e(shortDate(o.date)) + '</h2>' +
-    '<p class="muted">' + whole(o.totals.routes) + ' ROUTES · ' + whole(o.totals.stops) + ' CUSTOMERS · ' + whole(o.totals.lines) + ' ORDER LINES · ' + whole(o.totals.qty) + ' QUANTITY. PRESS A ROUTE TO SEE ITS CUSTOMERS.</p>' +
-    '<table class="acc-table bol-routes"><thead><tr><th>ROUTE</th><th>CUSTOMERS</th><th>ORDER LINES</th><th>QUANTITY</th></tr></thead><tbody>' +
-    o.routes.map(r => '<tr class="' + (r.route === openRoute ? 'on' : '') + '"><td class="strong"><button type="button" class="bol-route" data-route="' + e(r.route) + '">' + (r.route === openRoute ? '▾ ' : '▸ ') + e(r.route) + '</button></td><td>' + r.stops.length + '</td><td>' + whole(r.lines) + '</td><td>' + whole(r.qty) + '</td></tr>' +
-      (r.route === openRoute ? '<tr class="bol-stops"><td colspan="4"><table><thead><tr><th>LOAD SEQ</th><th>CUSTOMER</th><th>NUMBER</th><th>ORDER LINES</th><th>QUANTITY</th></tr></thead><tbody>' +
-        r.stops.map(st => '<tr><td>' + e(st.seq == null ? '' : st.seq) + '</td><td>' + e(st.name) + '</td><td>' + e(st.custNo) + '</td><td>' + whole(st.lines) + '</td><td>' + whole(st.qty) + '</td></tr>').join('') +
-        '</tbody></table></td></tr>' : '')).join('') + '</tbody></table></section>';
-}
-
 function draw() { $('#mail').innerHTML = mailCard(); drawDays(); }
-function drawDays() { $('#days').innerHTML = '<div class="bol-grid">' + daysTable() + routesTable() + '</div>'; }
+// Joe 11-8-26: "I just need the date just like the header row ... I'm just using this to grab the information and to store
+// it on the server": one line per load day, no routes or customers on this screen.
+function drawDays() { $('#days').innerHTML = daysTable(); }
 
 async function run(kind, fn, done) {
   busy = kind; draw(); say('');
-  try { got = await fn(); openRoute = ''; say(done(got), got.run && got.run.status === 'FAIL' ? 'bad' : 'good'); } catch (err) { say(serverText(err, 'the BOL'), 'bad'); }
+  try { got = await fn(); say(done(got), got.run && got.run.status === 'FAIL' ? 'bad' : 'good'); } catch (err) { say(serverText(err, 'the BOL'), 'bad'); }
   busy = ''; draw();
 }
 
@@ -97,14 +86,6 @@ function wire() {
   $('#mail').addEventListener('click', (ev) => {
     if (ev.target.id === 'pick') $('#file').click();
     if (ev.target.id === 'check') run('check', () => admin('bolCheckNow', {}, 300000), (d) => d.run.message || 'CHECKED.');
-  });
-  $('#days').addEventListener('click', async (ev) => {
-    const day = ev.target.closest('.bol-day'), rt = ev.target.closest('.bol-route');
-    if (rt) { openRoute = openRoute === rt.dataset.route ? '' : rt.dataset.route; drawDays(); return; }
-    if (day) {
-      try { const d = await admin('bolStatus', { date: day.dataset.date }); got.open = d.open; got.days = d.days; openRoute = ''; drawDays(); }
-      catch (err) { say(serverText(err, 'the BOL'), 'bad'); }
-    }
   });
 }
 
