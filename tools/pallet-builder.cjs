@@ -207,22 +207,23 @@ const TAIL = `</script>
     // Joe 11-7-26: every BOL day the Hub has, newest first (the newest 14), for the BOL DAY picker.
     // Joe 11-7-26 (the Hub had Friday 11-6-26 but the builder showed only its own Thursday): read straight from the list first;
     // when that fails or finds none, ask the server for them (the save call's bolDays question), which reads them itself.
+    // Joe 11-8-26 (live still said THE HUB HAS NO BOL DAYS YET): a server that cannot answer always says why, and a server that
+    // finds none says when this app's Hub last checked the email (window.udBolHub), so the red line says what to do.
     async function bolDays() {
       const shapeAll = (list) => list.map(d => { try { return window.udBolShape(d); } catch (e) { return null; } }).filter(Boolean);
       let why = '';
+      window.udBolHub = null;
       try {
         const { homeDb } = await start();
         const snap = await getDocs(query(collection(homeDb, 'bolDays'), orderBy('date', 'desc'), limit(14)));
         const got = shapeAll(snap.docs.map(x => x.data()));
         if (got.length) return got;
       } catch (e) { why = String((e && (e.code || e.message)) || 'unknown'); }
-      try {
-        const out = await callServer('save', { bolDays: true, max: 14 });
-        return shapeAll((out && out.days) || []);
-      } catch (e) {
-        if (!why) return []; // the list was read and is empty; the server could not add to it
-        const err = new Error(String((e && (e.code || e.message)) || why)); err.code = err.message; throw err;
-      }
+      let out;
+      try { out = await callServer('save', { bolDays: true, max: 14 }); }
+      catch (e) { const err = new Error(String((e && (e.code || e.message)) || why || 'unknown')); err.code = err.message; throw err; }
+      window.udBolHub = (out && out.hub) || null;
+      return shapeAll((out && out.days) || []);
     }
     window.udReadBolDays = bolDays;
     requireSignIn(async () => {

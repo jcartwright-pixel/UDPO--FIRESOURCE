@@ -161,6 +161,10 @@ details.items[open]>summary{margin-bottom:8px}
 #palDetail[open]>summary{margin-bottom:10px}
 .day{margin-bottom:16px}
 .dayscroll{max-height:420px;overflow:auto}
+/* Joe 11-8-26: "Do a word wrap too", in capitals like the rest of the screen: All routes and the Truck load map. */
+.panel.day{text-transform:uppercase}
+.panel.day .hint,.panel.day h2{overflow-wrap:anywhere}
+#dayTable th,#dayTable td{white-space:normal;overflow-wrap:anywhere;padding-left:10px;padding-right:10px}
 #dayTable tr.cur td{background:var(--bg);font-weight:600}
 #dayTable button{padding:3px 10px}
 .seqline{font-size:16px;background:var(--accent-soft);border-radius:8px;padding:7px 10px;display:flex;flex-direction:column;gap:3px}
@@ -661,12 +665,14 @@ function renderDay(){
     S = r; const R = plan(); S = keep;
     const c = R.stats.reduce((a,s)=>a+s.cases,0), tt = R.stats.reduce((a,s)=>a+s.totes,0);
     const tk = R.tankers.map(t => `${fmt(t.x.units)} ${/lb/i.test(t.x.size||'')?'lb':'gal'}`).join(', ');
-    return {i, r, c, n:R.pallets.length, tt, tk, stops:r.stops.filter(st=>st.lines.length).length};
+    // Joe 11-8-26: "That should say load sequences, not stop": stops sharing a load sequence count once (no sequence: each its own).
+    const on = r.stops.filter(st=>st.lines.length), seqs = new Set(on.map((st, k) => { const q = stopSeq(st); return q == null ? 'stop' + k : 'seq' + q; }));
+    return {i, r, c, n:R.pallets.length, tt, tk, seqs:seqs.size};
   });
   const T = k => rows.reduce((a,x)=>a+x[k],0);
-  $('dayTable').innerHTML = `<thead><tr><th>Route</th><th class="r">Stops</th><th class="r">Cases</th><th class="r">Pallets</th><th class="r">Totes</th><th>Tanker</th><th></th></tr></thead><tbody>${
-    rows.map(x => `<tr class="${x.i===DB.cur?'cur':''}"><td>${esc(x.r.route||'Untitled route')}</td><td class="r num">${x.stops}</td><td class="r num">${fmt(x.c)}</td><td class="r num">${x.n}</td><td class="r num">${x.tt||''}</td><td class="num">${x.tk}</td><td class="r">${x.i===DB.cur?'<span class="hint">Showing</span>':`<button class="openR" data-r="${x.i}">Open</button>`}</td></tr>`).join('')}
-    <tr><td><b>All routes</b></td><td class="r num"><b>${T('stops')}</b></td><td class="r num"><b>${fmt(T('c'))}</b></td><td class="r num"><b>${fmt(T('n'))}</b></td><td class="r num"><b>${T('tt')||''}</b></td><td></td><td></td></tr></tbody>`;
+  $('dayTable').innerHTML = `<thead><tr><th>Route</th><th class="r">Load sequences</th><th class="r">Cases</th><th class="r">Pallets</th><th class="r">Totes</th><th>Tanker</th><th></th></tr></thead><tbody>${
+    rows.map(x => `<tr class="${x.i===DB.cur?'cur':''}"><td>${esc(x.r.route||'Untitled route')}</td><td class="r num">${x.seqs}</td><td class="r num">${fmt(x.c)}</td><td class="r num">${x.n}</td><td class="r num">${x.tt||''}</td><td class="num">${x.tk}</td><td class="r">${x.i===DB.cur?'<span class="hint">Showing</span>':`<button class="openR" data-r="${x.i}">Open</button>`}</td></tr>`).join('')}
+    <tr><td><b>All routes</b></td><td class="r num"><b>${T('seqs')}</b></td><td class="r num"><b>${fmt(T('c'))}</b></td><td class="r num"><b>${fmt(T('n'))}</b></td><td class="r num"><b>${T('tt')||''}</b></td><td></td><td></td></tr></tbody>`;
 }
 
 function planText(){
@@ -785,6 +791,8 @@ const HUBDAYS = (() => { try { const p = window.parent && window.parent !== wind
 const HUBBOL = HUBDAYS[0] || null;
 // Why the Hub's BOL days are not here: '' when they were read (or the page is on its own), else the reason.
 const HUBERR = (() => { try { const p = window.parent && window.parent !== window ? window.parent : null; return p ? String(p.udBolError || '') : ''; } catch(e){ return ''; } })();
+// Joe 11-8-26: when the Hub has none, when this app's Hub last checked the email (window.udBolHub: {mailbox, enabled, last}).
+const HUBCHECK = (() => { try { const p = window.parent && window.parent !== window ? window.parent : null; return (p && p.udBolHub) || null; } catch(e){ return null; } })();
 const HUBASKED = (() => { try { return !!(window.parent && window.parent !== window && 'udBolDays' in window.parent); } catch(e){ return false; } })();
 const BUILTIN_DAY = {key: DAYKEY, date: '2026-11-05', routes: BOLDAY, builtIn: true};
 const BOLDAYS = HUBDAYS.concat(HUBDAYS.some(d => d.date === BUILTIN_DAY.date) ? [] : [BUILTIN_DAY]).sort((x, y) => x.date < y.date ? 1 : x.date > y.date ? -1 : 0);
@@ -834,7 +842,15 @@ function renderDayPick(){
   // Joe 11-7-26: when the Hub's BOL days did not come, say so in red (and why), so the built-in BOL is not taken for the newest.
   const bad = $('dayBad'); if (bad) { bad.hidden = !(HUBASKED && !HUBDAYS.length);
     bad.textContent = HUBERR ? `COULD NOT READ THE BOL DAYS FROM THE HUB (${HUBERR.toUpperCase()}). PRESS CTRL+F5 TO TRY AGAIN; IF IT STAYS, SEND A PICTURE OF THIS LINE.`
-      : 'THE HUB HAS NO BOL DAYS YET (HUB > ADMINISTRATION > DAILY BOL), SO THIS IS THE BOL BUILT INTO PALLET BUILDER.'; }
+      : 'THE HUB HAS NO BOL DAYS YET (HUB > ADMINISTRATION > DAILY BOL), SO THIS IS THE BOL BUILT INTO PALLET BUILDER. ' + hubCheckText(HUBCHECK); }
+}
+// Joe 11-8-26: what this app's Hub says about its email check, so the red line says what to press.
+function hubCheckText(h){
+  if (!h) return '';
+  const last = h.last && h.last.at ? `LAST CHECKED ${DT(h.last.at)} ${TM(h.last.at)}${h.last.message ? ': ' + String(h.last.message).toUpperCase() : ''}` : '';
+  if (!h.mailbox) return (last ? last + '. ' : '') + 'THIS APP\'S HUB HAS NO MAILBOX SET: TYPE IT ON DAILY BOL, TICK CHECK EVERY HOUR AND PRESS CHECK EMAIL NOW.';
+  if (!last) return 'THIS APP\'S HUB HAS NEVER CHECKED THE EMAIL: PRESS CHECK EMAIL NOW ON DAILY BOL.';
+  return last + '.' + (h.enabled ? '' : ' CHECK EVERY HOUR IS NOT TICKED.');
 }
 (function openDay(){
   // The newest BOL day opens on its first route the first time it comes; after that the route last worked on stays open.

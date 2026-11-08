@@ -262,4 +262,15 @@ async function recentDays(db, max) {
       lines: (st.lines || []).map(l => ({ item: String(l.item || ''), qty: Number(l.qty) || 0 })) })) })) }));
 }
 
-module.exports = { OPS, recentDays, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };
+/*
+ * Joe 11-8-26 (live Pallet Builder said THE HUB HAS NO BOL DAYS YET while a Hub showed Friday 11-6-26): with the days, the
+ * last email check on this app's Hub and whether a mailbox is set, so an empty list says plainly whether this app's Hub was
+ * ever checked (a Hub on the practice copy keeps its own BOL days).
+ */
+async function hubCheck(db) {
+  const [s, last] = await Promise.all([settingsRef(db).get(), lastRef(db).get()]);
+  const st = s.exists ? s.data() : {}, l = last.exists ? last.data() : null;
+  return { mailbox: !!st.mailbox, enabled: !!st.enabled, last: l ? { at: String(l.at || ''), status: String(l.status || ''), message: String(l.message || '').slice(0, 200) } : null };
+}
+
+module.exports = { OPS, recentDays, hubCheck, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };

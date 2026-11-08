@@ -60,6 +60,13 @@ async function openPage(ctx, url) {
     // Joe 11-7-26: with no BOL days in the Hub it says so in red, so the built-in BOL is not taken for the newest.
     assert.match(await frame().locator('#dayBad').textContent(), /^THE HUB HAS NO BOL DAYS YET/);
     assert.ok(await frame().locator('#dayBad').isVisible());
+    // Joe 11-8-26: and what this app's Hub says about its email, so the line says what to press.
+    assert.match(await frame().locator('#dayBad').textContent(), /THIS APP'S HUB HAS NO MAILBOX SET: TYPE IT ON DAILY BOL, TICK CHECK EVERY HOUR AND PRESS CHECK EMAIL NOW\.$/);
+    // Joe 11-8-26: "That should say load sequences, not stop. Do a word wrap too", in capitals.
+    assert.equal(await frame().locator('#dayTable th').nth(1).innerText(), 'LOAD SEQUENCES');
+    assert.equal(await frame().locator('#dayTable th').nth(1).evaluate(e => getComputedStyle(e).whiteSpace), 'normal');
+    assert.ok(/^THE 11\/05 BOL IS LOADED/.test(await frame().locator('#dayHint').innerText()), 'the All routes line in capitals');
+    assert.ok(/^BOLD CUSTOMERS ARE ON THE BOL/.test(await frame().locator('section[aria-label="Truck load map"] .hint').first().innerText()), 'the Truck load map note in capitals');
     assert.match(await frame().locator('#dayLine').textContent(), /THE BOL BUILT INTO PALLET BUILDER$/);
     await frame().locator('#loadSample').click();
     await frame().locator('#tiles .tile').first().waitFor();

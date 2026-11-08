@@ -228,6 +228,26 @@ test('the Hub BOL days come from the server when the screen cannot read them its
   // Both fail: the reason comes back, for the red line.
   new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', code)(window, {}, () => {}, async () => { const e = new Error('no'); e.code = 'functions/permission-denied'; throw e; }, () => 'fac_uniontown', (e) => e.message);
   await assert.rejects(window.udReadBolDays(), e => /permission-denied/.test(e.message));
+  // Joe 11-8-26: the list was read and was empty, and the server fails: its reason still comes back (it used to be hidden).
+  const w2 = { UDLogic: L };
+  const fakeStart = 'const start = async () => ({ homeDb: {} }); const getDocs = async () => ({ docs: [] }); const collection = () => 0, query = () => 0, orderBy = () => 0, limit = () => 0;';
+  new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', fakeStart + code)(w2, {}, () => {}, async () => { const e = new Error('no'); e.code = 'functions/internal'; throw e; }, () => 'fac_uniontown', (e) => e.message);
+  await assert.rejects(w2.udReadBolDays(), e => /internal/.test(e.message));
+  // The server finds none: what it says about this app's Hub comes along for the red line.
+  const w3 = { UDLogic: L }, hub = { mailbox: false, enabled: false, last: null };
+  new Function('window', 'document', 'requireSignIn', 'callServer', 'currentPlant', 'serverText', fakeStart + code)(w3, {}, () => {}, async () => ({ days: [], hub }), () => 'fac_uniontown', (e) => e.message);
+  assert.deepEqual(await w3.udReadBolDays(), []); assert.deepEqual(w3.udBolHub, hub);
+});
+
+test('with no BOL days the server says when this app\'s Hub last checked the email (Joe 11-8-26)', async () => {
+  const B = require('../../src/bol');
+  const docs = { bolMail: { mailbox: 'someone@uniteddairy.com', enabled: false }, bolMailLast: { at: '2026-11-07T13:32:00.000Z', status: 'OK', message: 'Read Daily Load UT.pdf: load day 11-6-26, 16 routes.', files: [] } };
+  const db = (have) => ({ collection: () => ({ doc: (id) => ({ get: async () => ({ exists: have && !!docs[id], data: () => docs[id] }) }) }) });
+  assert.deepEqual(await B.hubCheck(db(true)), { mailbox: true, enabled: false, last: { at: '2026-11-07T13:32:00.000Z', status: 'OK', message: 'Read Daily Load UT.pdf: load day 11-6-26, 16 routes.' } });
+  assert.deepEqual(await B.hubCheck(db(false)), { mailbox: false, enabled: false, last: null });
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /THIS APP\\'S HUB HAS NEVER CHECKED THE EMAIL: PRESS CHECK EMAIL NOW ON DAILY BOL\./);
+  assert.match(src, /CHECK EVERY HOUR IS NOT TICKED\./);
 });
 
 test('the server reads the newest BOL days for the screens, newest first, only what they use', async () => {
@@ -241,7 +261,7 @@ test('the server reads the newest BOL days for the screens, newest first, only w
   assert.deepEqual(out[0], { date: '2026-11-06', received: '2026-11-06T15:59:00.000Z', savedAt: '', routes: [{ route: '805', stops: [{ seq: 3, custNo: '1001', name: 'MADEUP MARKET', lines: [{ item: '305', qty: 4 }] }] }] });
   assert.equal(out.length, 2, 'a day with no date is left out');
   const src = fs.readFileSync(require('path').join(__dirname, '../../index.js'), 'utf8');
-  assert.match(src, /request\.data\.bolDays === true\) return \{ days: await require\('\.\/src\/bol'\)\.recentDays\(PLANTS\.companyDb\(db\)/);
+  assert.match(src, /request\.data\.bolDays === true\) \{\s*const BOL = require\('\.\/src\/bol'\), cdb = PLANTS\.companyDb\(db\);\s*const days = await BOL\.recentDays\(cdb, request\.data\.max\);\s*return \{ days, hub: days\.length \? null : await BOL\.hubCheck\(cdb\) \};/);
 });
 
 test('Pallet Rules and PALLET USES go to the Customer List through its own server call; the cases come with the route map', async () => {
