@@ -69,21 +69,27 @@
             <p class="hint" id="state-text"></p>
             <div class="gps-buttons"><button type="button" class="primary big" id="send"></button></div>
             <p class="hint" id="last"></p>
-            <p class="hint">The text:</p>
-            <p class="texts-sample" id="preview-text"></p>
+            <p class="hint" id="preview-text"></p>
           </div>
           <div>
             <h3>Who gets them <span class="pill" id="preview-count">-</span></h3>
             <table class="gps-check texts-list"><colgroup><col style="width:55%"><col style="width:45%"></colgroup>
               <thead><tr><th>Driver</th><th>Mobile phone</th></tr></thead><tbody id="preview"></tbody></table>
             <p class="hint" id="preview-note"></p>
+            <!-- Joe 11/7: drivers the texts will not reach whose week is not their normal week; text them yourself. -->
+            <div class="texts-hand" id="hand" hidden>
+              <h3>Text these drivers yourself <span class="pill no" id="hand-count">-</span></h3>
+              <p class="hint">Not signed up for schedule texts, so Send will not reach them, and their posted week is not their normal week (the days listed).</p>
+              <table class="gps-check texts-list"><colgroup><col style="width:40%"><col style="width:30%"><col style="width:30%"></colgroup>
+                <thead><tr><th>Driver</th><th>Why</th><th>Days changed</th></tr></thead><tbody id="hand-rows"></tbody></table>
+            </div>
           </div>
         </div>
-        <!-- Joe 10/31 (im): see the new text, each driver's own week, on your own phone before the drivers get it. -->
-        <h3 class="texts-new">New text: each driver's own week <span class="pill warn">Sample only</span></h3>
+        <!-- Joe 10/31 (im): see a driver's text on your own phone. Joe 11/6 (ik): it is the text the drivers get. -->
+        <h3 class="texts-new">See a driver's text</h3>
         <div class="texts-kind-grid">
           <div>
-            <p class="hint">Drivers still get the text above. Pick a driver to see their posted week in the new text, then text it to your own phone to see how it comes through.</p>
+            <p class="hint">Pick a driver to see the text they get for the posted week. To see how it comes through on a phone, text it to your own phone; no driver gets it.</p>
             <form class="texts-test" autocomplete="off" onsubmit="return false">
               <label>Sample for<select id="sample-for"><option value=""></option></select></label>
             </form>
@@ -168,11 +174,15 @@
       $('state-text').textContent = s.week ? 'Posted week ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + '. Publishing never sends texts; press the button when you are ready.' + need : 'No week is posted yet.';
       if (!sendArmed) $('send').textContent = done ? 'Send again' : 'Send schedule texts';
       $('send').disabled = !keys || !s.week || !sched.length;
-      $('last').textContent = l ? 'Last sent ' + stamp(l.at) + ' for the week of ' + day(l.week) + ': ' + (l.live ? l.sent + ' sent' + (l.failed ? ', ' + l.failed + ' not sent' : '') : l.drivers + ' written to the list (test copy)') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + '.' : 'Not sent yet.';
+      $('last').textContent = l ? 'Last sent ' + stamp(l.at) + ' for the week of ' + day(l.week) + ': ' + (l.live ? l.sent + ' sent' + (l.failed ? ', ' + l.failed + ' not sent' : '') : l.drivers + ' written to the list (test copy)') + (l.noPhone ? ', ' + l.noPhone + ' with no number' : '') + (l.already ? ', ' + l.already + ' already had it' : '') + '.' + ((l.notSent || []).length ? ' Not texted: ' + l.notSent.join(', ') + ' (part 6 says why).' : '') : 'Not sent yet.';
       $('preview-text').textContent = s.message || '';
       $('preview-count').textContent = sched.length + (sched.length === 1 ? ' driver' : ' drivers'); $('preview-count').className = 'pill ' + (sched.length ? 'yes' : 'no');
       $('preview-note').innerHTML = 'Drivers ticked <b>Schedule</b> on the Driver Roster who are on the posted week' + (s.ticked != null ? ' (' + s.ticked + ' ticked in all)' : '') + '.';
       $('preview').innerHTML = list(sched);
+      const hand = s.byHand || [];
+      $('hand').hidden = !hand.length;
+      $('hand-count').textContent = hand.length + (hand.length === 1 ? ' driver' : ' drivers');
+      $('hand-rows').innerHTML = hand.map(x => '<tr><td>' + escapeHtml(x.name) + (x.phone ? '<br>' + escapeHtml(x.phone) : '') + '</td><td>' + escapeHtml(x.why) + '</td><td>' + escapeHtml(x.days.join(', ')) + '</td></tr>').join('');
       // Load done texts
       pill($('done-state'), s.doneOn);
       $('done-state-text').textContent = s.doneOn ? 'On: each ticked driver gets a text when the plant finishes their load.' : 'Off: no load done texts are sent.' + need;

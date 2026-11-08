@@ -9,10 +9,14 @@ The plan: https://claude.ai/artifact/2yWqo77v8KfayHEUD5svJk
 ## Screens (`public/`)
 
 - **Home** (`index.html`): a tile for each app the person may use, opening it in a new tab: Operations, Customer List,
-  Fuel Reporting, UDMS. Statement Center is not in the hub yet.
+  Fuel Reporting, UDMS, Route & Trip Costs, Route Cost Analysis, Customer Statements (the Statement Center, added 11-7-26)
+  and Accident & Injury Reporting.
 - **People & Access** (`people.html`, administrators): the Users list with each person's role, plants and apps; add,
   change, enable or disable a person. It calls Operations' own `admin` call (`people`, `savePerson`), so it is the same
   list and the same save as Operations' People & Roles. Single-right changes and per-plant screens stay in Operations for now.
+- **Accounting Numbers** (`accounting.html`, administrators, Joe 11-6-26): the monthly accounting zip, read once (from email each
+  morning, or added by hand) by Operations' server (`functions/src/accounting.js`) into `accountingMonthly/<yyyy-mm>`. Over the
+  Road and Joe's cost analysis app read those months; nothing else writes them.
 - **Help** (`help.html`, words in `public/help.md`). Every screen change also changes its part of `help.md`.
 
 ## Server (`functions/`)

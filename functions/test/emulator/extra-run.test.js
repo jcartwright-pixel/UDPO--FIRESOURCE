@@ -59,7 +59,7 @@ test('a second line for this week only: own run, starts off, gets its own driver
   const board = L.driverBoardRows((await db().collection('drivers').get()).docs.map(d => d.data()), rows, [], '2026-10-04', []);
   assert.match(board.find(b => b.id === 'drv_test_casey').days.thu.text, /UT DSD MILK 2/);
   assert.ok(L.dailyRows(runs, '2026-10-07').some(r => r.runDocId === out.runDocId), 'on Daily Dispatch for its load day');
-  // Two runs the same day with the same driver show as double booked.
+  // Two trips of the same run the same day with the same driver, at the same time, show pink (Joe 11-6-26: by their times on the road).
   await applyAction(db(), DISPATCHER, { action: 'setRuns', requestId: rid(), runDocId: out.runDocId, day: 'mon', runs: true }, AT);
   await applyAction(db(), DISPATCHER, { action: 'assignDriver', requestId: rid(), runDocId: out.runDocId, day: 'mon', driverId: 'drv_test_adams' }, AT);
   const rows2 = L.weeklyRows(await week('2026-10-04'), '2026-10-04');

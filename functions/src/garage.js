@@ -5,8 +5,8 @@
  * Joe's picks (10/8): the technicians' names on the screen, sign in with name + number, a simple job flow (Need Parts /
  * Add a Helper / Done), "What did you fix?", safe to drive + finger signature, and Report a Problem. Mechanics have no
  * United Dairy email (Joe 10/10), so the tablet needs no Google account: a technician taps their name and types their
- * login ID (5 or 6 digits, GARAGE TECHNICIANS column login_id). The IDs are never readable from the screens: the copy
- * keeps only a hash of each, in `garageLogins`, which no browser may read. Wrong numbers: 5 in a row lock that technician
+ * login ID (4 to 6 digits, GARAGE TECHNICIANS column login_id). The sign-in checks a hash of each, in `garageLogins`, which
+ * no browser may read; Joe 11-7-26: the office's Garage Technicians list shows the employee ID, or that one was typed by hand. Wrong numbers: 5 in a row lock that technician
  * for 5 minutes, and the whole station takes at most 30 wrong numbers a minute. A sign-in lasts 30 minutes from the last
  * step; at most two technicians are signed in on a tablet at once.
  *
@@ -241,6 +241,15 @@ function renew(write, people, nowMs) { people.filter(p => p.ref).forEach(p => wr
 const GARAGE_SOURCE = Object.freeze({ station: 'GARAGE', techs: TECHS, logins: LOGINS, locks: LOCKS, tech: (d) => activeTechs([d])[0] || null,
   noLogin: (name) => name + ' has no login ID yet. Ask the office to add it.', where: 'the garage station' });
 
+// Joe 11-6-26 (Sean Martin): a login ID padded with zeros to 6 digits signs in with just its real digits, and the other way
+// round: the typed number also counts with its zeros added (front or back) or taken off, to 4 to 6 digits.
+function loginForms(typed) {
+  const out = [typed];
+  for (const n of [5, 6]) if (typed.length < n) out.push(typed.padStart(n, '0'), typed.padEnd(n, '0'));
+  for (const t of [typed.replace(/^0+/, ''), typed.replace(/0+$/, '')]) if (t.length >= 4) out.push(t);
+  return out.filter((x, i) => out.indexOf(x) === i);
+}
+
 // A mechanic's name and login ID, checked inside a save (wrong numbers count towards the 5-minute lock, as at sign-in).
 // Returns {tech} or {wrong: true}; the caller lets the transaction finish (so the count is kept) and then refuses.
 async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
@@ -258,10 +267,20 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
   const dev = device || 'unknown', byDevice = FAILS.current(station.byDevice, f => f.minute === minute);
   const stationFails = (byDevice[dev] || {}).count || 0;
   if (stationFails >= G.STATION_FAILS_PER_MINUTE) throw SaveErr('NOT_ALLOWED', 'Too many wrong numbers on ' + src.where + '. Wait a minute and try again.');
-  const login = loginSnap.exists ? loginSnap.data() : null;
-  if (!login || !login.hash) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
-  const given = Buffer.from(loginHash(techId, loginId), 'hex'), want = Buffer.from(login.hash, 'hex');
-  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+  const login = loginSnap.exists && loginSnap.data().hash ? loginSnap.data() : null;
+  const want = login ? Buffer.from(login.hash, 'hex') : null;
+  const match = (id) => { const given = Buffer.from(loginHash(techId, id), 'hex'); return !!want && given.length === want.length && crypto.timingSafeEqual(given, want); };
+  const typed = src.station === 'GARAGE' ? loginForms(loginId) : [loginId];
+  let ok = typed.some(match);
+  // Joe 11-6-26: at the garage, the technician's employee ID (Employees list, UDMS) also signs them in, zeros or not.
+  let employee = null;
+  if (!ok && src.station === 'GARAGE') {
+    employee = L.employeeForTech((await tx.get(db.collection('employees'))).docs.map(d => d.data()), Object.assign({ name: tech.name }, techSnap.data()));
+    const empId = employee ? String(employee.employeeId).trim() : '';
+    ok = !!empId && (typed.indexOf(empId) >= 0 || loginForms(empId).indexOf(loginId) >= 0);
+  }
+  if (!ok && !login && !employee) throw SaveErr('NOT_FOUND', src.noLogin(tech.name));
+  if (!ok) {
     tx.set(lockRef, { count: fails + 1, since: fails ? lock.since : stamp });
     byDevice[dev] = { minute, count: stationFails + 1 };
     tx.set(stationRef, { byDevice });
@@ -274,7 +293,7 @@ async function checkLogin(tx, db, techId, loginId, nowMs, device, source) {
 async function signIn(db, input, nowMs, source) {
   const src = source || GARAGE_SOURCE, want = src.station === 'GARAGE' ? null : { station: src.station, facilityId: src.facilityId };
   const techId = text(input.techId, 80), loginId = String(input.loginId || '').trim();
-  if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+  if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
   return db.runTransaction(async tx => {
     const stamp = new Date(nowMs).toISOString();
     const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input), src);
@@ -304,7 +323,7 @@ async function saveSignature(db, input, nowMs) {
     let people = await signedInTechs(tx, db, input.tokens, nowMs);
     if (!people.length && input.signIn && typeof input.signIn === 'object') {
       const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
-      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
       const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
       if (checked.wrong) return { wrong: true };
       people = [{ id: techId, name: checked.tech.name }];
@@ -424,7 +443,7 @@ async function step(db, input, nowMs) {
     // a sign-in that may have run out by the time it is sent; they are checked here as at sign-in.
     if (!people.length && input.signIn && typeof input.signIn === 'object') {
       const techId = text(input.signIn.techId, 80), loginId = String(input.signIn.loginId || '').trim();
-      if (!/^\d{5,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 5- or 6-digit login ID.');
+      if (!/^\d{4,6}$/.test(loginId)) throw SaveErr('BAD_REQUEST', 'Enter your 4- or 6-digit login ID.');
       const checked = await checkLogin(tx, db, techId, loginId, nowMs, FAILS.who(input));
       if (checked.wrong) return { wrong: true };
       people = [{ id: techId, name: checked.tech.name, ref: null }];
@@ -823,8 +842,8 @@ function validateSend(input, out) {
  *   saveFleetRules  config/fleetRules: PM miles and warning, reefer months / hours / warning days, DOT months / warning, plate warning.
  *   saveFleetUnit   fleetSetup/<unit>: track due dates (YES / NO / blank = default), last service date / miles / hours, reefer
  *                   hours now, DOT due, plate expires, notes.
- *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (5 or 6 digits, kept
- *                   only as a hash in garageLogins, never readable; two technicians cannot share one).
+ *   saveGarageTech  garageTechs/<id>: add a technician, rename, turn on or off, and set or reset the login ID (4 to 6 digits, kept
+ *                   only as a hash in garageLogins, never readable; login_set marks one typed by hand; two technicians cannot share one).
  * These stay in the new app (like the work orders made here): a later change to the same row in the sheet copy replaces them.
  * Joe 10/13: each plant has its own (facilityId, a known plant, Uniontown when not sent): Uniontown's rules stay in
  * config/fleetRules, another plant's in config/fleetRules_<plant>; a technician or unit row added here carries its plant.
@@ -883,14 +902,18 @@ function validateFleet(action, input, out) {
   }
   // saveGarageTech
   out.op = text(input.op, 10).toUpperCase();
-  if (['ADD', 'NAME', 'ACTIVE', 'LOGIN'].indexOf(out.op) < 0) throw SaveErr('BAD_REQUEST', 'Unknown technician change');
+  if (['ADD', 'NAME', 'ACTIVE', 'LOGIN', 'EMPLOYEE'].indexOf(out.op) < 0) throw SaveErr('BAD_REQUEST', 'Unknown technician change');
   out.techId = text(input.techId, 80);
   if (out.op !== 'ADD' && !out.techId) throw SaveErr('BAD_REQUEST', 'Pick the technician');
   if (out.op === 'ADD' || out.op === 'NAME') { out.name = text(input.name, 40).toUpperCase(); if (!out.name) throw SaveErr('BAD_REQUEST', 'Type the technician\'s name'); }
+  // Joe 11-6-26: the employee picked from the Employees list when adding (their employee ID also signs them in).
+  if (out.op === 'ADD' || out.op === 'EMPLOYEE') out.employeeId = text(input.employeeId, 40);
+  // Joe 11-7-26: a technician not found on the Employees list by name is picked on it (their employee ID then signs them in).
+  if (out.op === 'EMPLOYEE' && !out.employeeId) throw SaveErr('BAD_REQUEST', 'Pick the person on the Employees list');
   if (out.op === 'ACTIVE') out.active = input.active === true;
   if (out.op === 'ADD' || out.op === 'LOGIN') {
     out.loginId = String(input.loginId == null ? '' : input.loginId).trim();
-    if (out.op === 'LOGIN' || out.loginId) { if (!/^\d{5,6}$/.test(out.loginId)) throw SaveErr('BAD_REQUEST', 'The login ID is 5 or 6 digits'); }
+    if (out.op === 'LOGIN' || out.loginId) { if (!/^\d{4,6}$/.test(out.loginId)) throw SaveErr('BAD_REQUEST', 'The login ID is 4 to 6 digits'); }
   }
   return out;
 }
@@ -926,6 +949,7 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     const snap = await tx.get(ref); if (!snap.exists) throw SaveErr('NOT_FOUND', 'That technician is not on the list');
     before = snap.data();
   }
+  if (req.op === 'EMPLOYEE' && (await tx.get(db.collection('employees').where('employeeId', '==', req.employeeId).limit(1))).empty) throw SaveErr('NOT_FOUND', 'That person is not on the Employees list');
   let keyRef = null, oldKeyRef = null;
   if (req.loginId) {
     keyRef = db.collection(LOGINS).doc('id_' + loginKey(req.loginId));
@@ -933,8 +957,12 @@ async function saveFleet(tx, db, req, email, stamp, logRef, mode) {
     if (taken.exists && taken.data().techId !== id) throw SaveErr('BAD_REQUEST', 'Another technician already uses that login ID. Pick a different number.');
     if (mine.exists && mine.data().key && mine.data().key !== keyRef.id) oldKeyRef = db.collection(LOGINS).doc(mine.data().key);
   }
-  if (req.op === 'ADD') tx.set(ref, { tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true });
+  if (req.op === 'ADD') tx.set(ref, Object.assign({ tech_id: id, name: req.name, active: 'YES', facility_id: req.facilityId || FACILITY, created_at: stamp, created_by: email, createdInApp: true }, req.employeeId ? { employee_id: req.employeeId } : {}, req.loginId && req.loginId !== req.employeeId ? { login_set: true } : {}));
   if (req.op === 'NAME') tx.update(ref, { name: req.name, updated_at: stamp, updated_by: email, testEdited: true });
+  // Joe 11-7-26: Garage Technicians shows each login ID: their employee ID, or (login_set) that a number was typed for them by
+  // hand (that number stays only as a hash, never on a readable entry).
+  if (req.op === 'EMPLOYEE') tx.update(ref, { employee_id: req.employeeId, login_set: false, updated_at: stamp, updated_by: email, testEdited: true });
+  if (req.op === 'LOGIN') tx.update(ref, { login_set: true, updated_at: stamp, updated_by: email, testEdited: true });
   if (req.op === 'ACTIVE') tx.update(ref, { active: req.active ? 'YES' : 'NO', updated_at: stamp, updated_by: email, testEdited: true });
   if (keyRef) {
     // The hash the Garage Station checks (loginHash, salted with the technician), and a marker so no one else picks the same number.
@@ -1016,4 +1044,4 @@ async function garageCall(db, input, now, caller) {
   throw SaveErr('BAD_REQUEST', 'Unknown request');
 }
 
-module.exports = { G, engineCodeOrders, serviceOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };
+module.exports = { G, engineCodeOrders, serviceOrders, signedInTechs, renew, fleetRules, validateFleet, saveFleet, RULES_DOC, rulesDocFor, garageCall, loginHash, loginForms, activeTechs, checkLogin, SESSIONS, garageUnits, garageJobs, matchUnit, realWriteUp, unitText, jobOf, sendToGarage, validateSend, writeUpOrderStep, validateDelete, deleteGarageJob, officeJobs, garageLists, LOGINS };

@@ -155,8 +155,8 @@ async function adminNote(browser) {
 (async () => {
   await clear();
   await db().collection('users').doc('sales.admin@uniteddairy.com').set({ name: 'Test Admin', status: 'ACTIVE', roles: ['ADMIN'], facilities: ['*'], cells: { id: 'usr_sadm', version: '1' } });
-  // Joe 11/2: the loads delivered today (loaded yesterday), each with a trailer, a truck and a made-up driver; a leftover from
-  // yesterday's deliveries that never left; and today's loading for tomorrow, which is not on the list.
+  // Joe 11/2: the loads delivered today (loaded yesterday), each with a trailer, a truck and a made-up driver; one of yesterday's
+  // deliveries that never left (Joe 11-6-26: not on the list, nothing older than today); and today's loading for tomorrow, not on it either.
   const today = L.operatingDay(new Date()), now = new Date().toISOString();
   const b = db().batch();
   const add = (id, route, loadDate, day, extra) => {
@@ -221,11 +221,11 @@ async function adminNote(browser) {
       await pg.waitForSelector('.sa-row');
       assert.equal(await pg.textContent('#sa-title'), 'Route Status');
       assert.match(pg.url(), /sales\.html\?view=routes/);
-      assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Left', 'Delivering'], 'leftovers first, then delivering today');
+      assert.deepEqual(await pg.$$eval('.sa-group', x => x.map(e => e.textContent.split(',')[0].split(' ')[0])), ['Delivering'], 'Joe 11-6-26: delivering today only, no "Left over from" heading');
       const rows = await pg.$$eval('.sa-row', x => x.map(r => ['.sa-route', '.sa-driver', '.sa-where'].map(c => r.querySelector(c).textContent.trim())));
-      assert.deepEqual(rows, [['815', 'Tina Moss', 'At the plant'], ['802', 'Sam Porter', 'On the road: I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291'],
+      assert.deepEqual(rows, [['802', 'Sam Porter', 'On the road: I-79 N, Cranberry, PA'], ['811', 'Dana Whitfield', 'At Walmart 2291'],
         ['812', 'Pratt Jr, Michael', 'Stopped: Mary Rd (MD-63), 21795'], ['813', 'Ortiz, Samuel', 'On the road: I-68 E near Cumberland, Allegany County, Maryland 21502'],
-        ['855', 'Reyes, Marco', 'Back at the plant']], '815 left over from yesterday first; 817 (delivers tomorrow) and 820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
+        ['855', 'Reyes, Marco', 'Back at the plant']], '815 (yesterday\'s, never left) not carried over; 817 (delivers tomorrow) and 820 (Ended Up Not Running) left off; 855 (Save-A-Lot drop and hook, dropped) follows its truck');
       // Joe 11/1: the dropped Save-A-Lot trailer's status says when it was dropped, and still says how it left.
       assert.match(await pg.textContent('.sa-row[data-id*="sa855"] .sa-pill'), /^Dropped \d{1,2}:\d{2} [AP]M( \w+day)?, left (on time|(\d+ hr )?\d+ min (late|early))$/);
       assert.match(await pg.textContent('.sa-row[data-id*="sa811"] .sa-pill'), /^On time, left \d{1,2}:\d{2} [AP]M( \w+day)?$/, 'Joe 11-2-26: 12 minutes after its 4:30 AM dispatch is within the 30 minutes on time (with the day when it left on another day, salesmail.js statusOf)');

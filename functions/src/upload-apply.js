@@ -326,7 +326,8 @@ async function applyUploads(home, pdb, plant, saved, tabs, opts) {
       const k = text(p.line).toUpperCase();
       if (!areas[k]) { areas[k] = { name: p.line, products: [] }; order.push(k); }
       areas[k].products.push({ name: p.name, sku: p.sku, upc: p.upc, mfgType: p.mfgType, productGroup: p.productGroup, ratePerMin: p.ratePerMin, targetPct: p.targetPct,
-        minSpeed: p.minSpeed, maxSpeed: p.maxSpeed, shelfLifeDays: p.shelfLifeDays, fillGrams: p.fillGrams });
+        minSpeed: p.minSpeed, maxSpeed: p.maxSpeed, shelfLifeDays: p.shelfLifeDays, fillGrams: p.fillGrams,
+        unitsPerCase: p.unitsPerCase, casesPerPallet: p.casesPerPallet, stackHeight: p.stackHeight, caseNetLbs: p.caseNetLbs, caseGrossLbs: p.caseGrossLbs });
     });
     const req = Object.assign({ action: 'saveProductUpload', requestId: rid('products') }, PLANT.validateProductUpload({ facilityId: plant, areas: order.map(k => areas[k]) }, SaveError));
     const r = await screenSave(pdb, PLANT.saveProductUpload, req, email, stamp);

@@ -187,6 +187,8 @@ function appsBlock(admin) {
     '<h4>Fuel Tracking</h4><ul>' + line('Open it and see every fuel report', has('fuel')) + '</ul>' +
     '<h4>Employees &amp; Compliance</h4><ul>' + line('Card on their Hub home', has('udms')) + '</ul>' +
       '<p class="muted small">Employees &amp; Compliance also keeps its own sign-in list (its Users screen), because it holds private employee records.</p>' +
+    '<h4>Customer Statements</h4><ul>' + line('Card on their Hub home', has('statements')) + '</ul>' +
+      '<p class="muted small">Customer Statements opens for any United Dairy account that has its link; the tick shows or hides its card.</p>' +
     '<h4>Sales app (phones)</h4><p class="muted small">Any United Dairy account can open it. Nothing to tick.</p></section>';
 }
 

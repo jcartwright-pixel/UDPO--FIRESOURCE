@@ -57,6 +57,23 @@
  * leaves its marker (otrHistorySandbox loaded both there on 10/11). On the live app (Joe 10/18: "Load the Over the Road history
  * (otr-history-2026-10-18) into the live app.") loadOtrHistory runs. It is about 19,000 day counts, so it runs from the
  * otrHistoryOnce step of the dataLoadsOnce job in index.js (5 minutes, 512MiB) rather than in runDataLoads.
+ *
+ * otr-costing-2026-09 (Joe 11/6, "y" = load his September accounting zip into the live app for him): the four September 2026
+ * numbers Import From Accounting finds in that zip go into otrMonthly/2026-09, on both apps (see OTR_SEPT below).
+ *
+ * customer-list-october-2026-11-07 (Joe 11-7-26: "as of right now, I want everything updated ... or if I had a customer that I
+ * missed. Everything needs to be in there", then by name: "LOAD THE OCTOBER NEW CUSTOMERS AND ROUTE DAYS"): the Customer List
+ * (udclCustomers, udclRouteDays) gets every customer and route day the October weekly route report delivered 3 or more of the 5
+ * weeks but the Customer List did not have, plus the customers on the 11-5-26 BOL that were missing
+ * (src/loads/customer-list-october-2026-11-07.json). It only adds. A customer is matched by account number, then by name; a
+ * missing one is added the way the Route Menu upload adds one (udcl.js importMenu there). A route day that is missing is added.
+ * A stop goes in where the Customer List's own rule puts a new stop (runOrder: after the stop with the next higher load
+ * sequence), with its BOL load sequence where the BOL has one. Nothing is removed and no load sequence already there changes:
+ * Joe 11-7-26: "I know a customer may be closed right now, but I have to map it out as if they wasn't". The truck drawing stays
+ * while every number on it is still a load sequence there; a new route day gets the Customer List's starting drawing. A
+ * customer marked not active is made active again because it is on a route day now. The marker lists everything added, for
+ * undoing by hand. Runs on both apps (LIVE_OK). First (Joe 11-7-26, Helds was bought out) the old account number of each
+ * renames line becomes the new one on every route day, in the same place and load sequence; the old customer is marked not active.
  */
 const crypto = require('crypto');
 const L = require('./logic');
@@ -200,7 +217,8 @@ const projectId = () => process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIR
 // The test-copy-only loads Joe has OK'd by name for the live app. Joe 10/26, on the list of fleet-gps-start-miles-2026-10-13,
 // fleet-service-start-2026-04-01 and garage-work-orders-2026-10-14: "Well, go ahead and copy all that. I just want that done."
 // Joe 10/27, again: "The live loads and the machine hookups all in one place ... let's just do it all."
-const LIVE_OK = new Set(['fleet-gps-start-miles-2026-10-13', 'fleet-service-start-2026-04-01', 'garage-work-orders-2026-10-14']);
+// Joe 11-7-26, by name: "LOAD THE OCTOBER NEW CUSTOMERS AND ROUTE DAYS" (customer-list-october-2026-11-07).
+const LIVE_OK = new Set(['fleet-gps-start-miles-2026-10-13', 'fleet-service-start-2026-04-01', 'garage-work-orders-2026-10-14', 'customer-list-october-2026-11-07']);
 const runsHere = (id, o) => LIVE_OK.has(id) || (o.project || projectId()) === 'ud-distribution-sandbox';
 const blank = (v) => v === undefined || v === null || String(v).trim() === '';
 async function loadFleetStartMilesOnce(db, opts) {
@@ -356,13 +374,132 @@ async function loadOtrHistoryOnce(db, opts) {
   return out;
 }
 
+const OTR_SEPT_ID = 'otr-costing-2026-09';
+// Joe 11/6: the September 2026 accounting zip (plcomparisonsseptember.zip), "y" = load it into the live app for him. These are
+// exactly the four numbers Over the Road > Recap > Import From Accounting finds in that zip (P&L Expenses by Dept "SEPT 2026"
+// tab, Gallon Comparison 2026), written the same way that button writes them (actions-otr.js saveOtr op import). Runs on both
+// apps. The marker keeps what September held before, for undoing by hand.
+const OTR_SEPT = Object.freeze({ year: 2026, month: 9, gallons_sold: 2509342, distribution_cost: 761362.15, employee_cost: 375996.13, fuel_cost: 177131 });
+async function loadOtrSeptemberOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  const mark = db.collection('dataLoads').doc(OTR_SEPT_ID), ref = db.collection('otrMonthly').doc('2026-09');
+  return db.runTransaction(async tx => {
+    const [m, had] = await Promise.all([tx.get(mark), tx.get(ref)]);
+    if (m.exists && m.data().status === 'DONE') return { skipped: true };
+    const before = had.exists ? had.data() : null;
+    tx.set(ref, Object.assign({}, OTR_SEPT, { source: 'IMPORT', updatedAt: stamp, updatedBy: BY, testEdited: false }), { merge: true });
+    tx.set(mark, { status: 'DONE', doneAt: stamp, what: 'September 2026 OTR costing from the accounting zip (Joe 11/6, "y")', set: OTR_SEPT, before });
+    return { set: OTR_SEPT, before };
+  });
+}
+
+const UDCL_OCT = require('./loads/customer-list-october-2026-11-07.json');
+const UDCL_OCT_ID = UDCL_OCT.id;
+async function loadCustomerListOctoberOnce(db, opts) {
+  const o = opts || {}, now = o.now ? o.now() : new Date(), stamp = now.toISOString();
+  if (!runsHere(UDCL_OCT_ID, o)) return { skipped: 'not OK\'d for this app' };
+  const U = require('./udcl-rules'), plant = UDCL_OCT.plant;
+  db = require('./plants').companyDb(db); // the Customer List lives in the company's database
+  const mark = db.collection('dataLoads').doc(UDCL_OCT_ID);
+  const m = await mark.get();
+  if (m.exists && m.data().status === 'DONE') return { skipped: true };
+  const [cs, rs] = await Promise.all([
+    db.collection('udclCustomers').where('plant', '==', plant).get(),
+    db.collection('udclRouteDays').where('plant', '==', plant).get()
+  ]);
+  // A plant with no Customer List yet (the test copy before its first Route Menu upload) waits: nothing to add to.
+  if (!cs.size && !rs.size) return { waiting: 'no Customer List for ' + plant + ' yet' };
+  const customers = {}, byAcct = {}, byName = {};
+  cs.docs.forEach(d => { const c = d.data(); customers[c.key] = c; if (c.account) byAcct[String(c.account)] = c.key; const n = U.nameKey(c.name); if (n && !byName[n]) byName[n] = c.key; });
+  const days = {};
+  rs.docs.forEach(d => { const r = d.data(); days[r.route + '|' + r.day] = r; });
+  const custWrites = {}, dayWrites = {}, added = { customers: [], reactivated: [], routeDays: [], stops: [], already: 0, renamed: [] };
+  // Joe 11-7-26: "Helge did upgrade to the newer account number. Make sure that is changed everywhere. They was bought out."
+  // The old account's stop on every route day becomes the new account, in the same place with the same load sequence and stop
+  // note. The new customer starts as a copy of the old one (same store: address, phone, keys, notes), with the new number and
+  // name; the old one is marked not active (it is on no route day any more), with a note saying why.
+  for (const [fromAcct, toAcct, toName, why] of (UDCL_OCT.renames || [])) {
+    const fromKey = byAcct[String(fromAcct)];
+    if (!fromKey) continue;
+    const old = customers[fromKey];
+    let toKey = byAcct[String(toAcct)];
+    if (!toKey) {
+      toKey = U.custKey(toAcct, toName);
+      const c = Object.assign({}, old, { key: toKey, account: String(toAcct), name: U.text(toName, U.LIMITS.name), active: true, addedBy: 'Data load ' + UDCL_OCT_ID, updatedAt: stamp, updatedBy: BY });
+      delete c.inactive;
+      customers[toKey] = c; custWrites[toKey] = c; byAcct[String(toAcct)] = toKey; byName[U.nameKey(c.name)] = toKey;
+      added.customers.push({ key: toKey, account: c.account, name: c.name, from: 'NEW ACCOUNT ' + fromAcct });
+    }
+    const nc = customers[toKey];
+    Object.keys(days).forEach(dk => {
+      const rd = days[dk], stops = rd.stops || [];
+      if (!stops.some(s => s.key === fromKey)) return;
+      const hasNew = stops.some(s => s.key === toKey);
+      const next = hasNew ? stops.filter(s => s.key !== fromKey)
+        : stops.map(s => (s.key === fromKey ? Object.assign({}, s, { key: toKey, account: nc.account, name: nc.name, chain: nc.chain || s.chain || '' }) : s));
+      days[dk] = dayWrites[dk] = Object.assign({}, rd, { stops: next });
+      added.renamed.push({ route: rd.route, day: rd.day, from: fromAcct, to: toAcct });
+    });
+    const was = Object.assign({}, old, { active: false, notes: ((old.notes ? old.notes + '\n' : '') + 'Account changed to ' + toAcct + ' (' + why.replace(/^Joe [^:]*: /, '') + ').').slice(0, U.LIMITS.notes), updatedAt: stamp, updatedBy: BY });
+    customers[fromKey] = was; custWrites[fromKey] = was;
+    delete byAcct[String(fromAcct)];
+    if (byName[U.nameKey(old.name)] === fromKey) delete byName[U.nameKey(old.name)];
+  }
+  for (const [routeIn, dayIn, account, chain, name, seq, from] of UDCL_OCT.lines) {
+    const route = U.numText(routeIn, U.LIMITS.route), day = U.dayOf(dayIn), loadSeq = U.seqOf(seq);
+    // The customer: by account number, then by name; else a new one, as the Route Menu upload makes it.
+    let key = (account && byAcct[String(account)]) || byName[U.nameKey(name)] || null;
+    if (!key) {
+      key = U.custKey(account, name);
+      const c = { plant, key, account: U.numText(account, U.LIMITS.account), name: U.text(name, U.LIMITS.name), chain: U.numText(chain, U.LIMITS.chain),
+        address: '', address2: '', city: '', state: '', zip: '', phone: '', contact: '', keys: '', notes: '', lat: null, lon: null,
+        active: true, dc: (U.PLANT_DC || {})[plant] || '', addedBy: 'Data load ' + UDCL_OCT_ID, updatedAt: stamp, updatedBy: BY };
+      customers[key] = c; custWrites[key] = c; if (c.account) byAcct[c.account] = key; byName[U.nameKey(name)] = key;
+      added.customers.push({ key, account: c.account, name: c.name, from });
+    } else if (customers[key].active === false) {
+      const c = Object.assign({}, customers[key], { active: true, updatedAt: stamp, updatedBy: BY });
+      customers[key] = c; custWrites[key] = c; added.reactivated.push({ key, name: c.name });
+    }
+    const c = customers[key], dk = route + '|' + day;
+    let rd = days[dk];
+    if (!rd) {
+      rd = { plant, route, day, stops: [], startTime: '', notes: '', map: null, rev: 0 };
+      days[dk] = rd; added.routeDays.push({ route, day });
+    }
+    if ((rd.stops || []).some(s => s.key === key)) { added.already++; continue; }
+    const stop = { key, account: c.account || '', name: c.name || name, chain: c.chain || '', loadSeq, note: '' };
+    const saved = (rd.stops || []).map(s => s.key);
+    rd = Object.assign({}, rd, { stops: U.runOrder((rd.stops || []).concat([stop]), saved.length ? saved : null, null) });
+    days[dk] = rd; dayWrites[dk] = rd;
+    added.stops.push({ route, day, key, name: stop.name, loadSeq, from });
+  }
+  // The truck drawing: kept while every number on it is still a load sequence on the route day; else the starting drawing.
+  Object.keys(dayWrites).forEach(dk => {
+    const rd = dayWrites[dk], seqs = U.seqsOf(rd.stops), map = rd.map ? U.cleanMap(rd.map) : null;
+    const fits = map && map.cells.every(r => r.every(v => !v || seqs.indexOf(v) >= 0));
+    rd.map = U.packMap(fits ? map : U.autoMap(rd.stops));
+    rd.rev = (rd.rev || 0) + 1; rd.updatedAt = stamp; rd.updatedBy = BY;
+  });
+  const writes = Object.keys(custWrites).map(k => [db.collection('udclCustomers').doc(U.customerId(plant, k)), custWrites[k]])
+    .concat(Object.keys(dayWrites).map(dk => { const rd = dayWrites[dk]; return [db.collection('udclRouteDays').doc(U.routeDayId(plant, rd.route, rd.day)), rd]; }));
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+    writes.slice(i, i + 400).forEach(([ref, v]) => batch.set(ref, v));
+    await batch.commit();
+  }
+  const counts = { renamed: added.renamed.length, customers: added.customers.length, reactivated: added.reactivated.length, routeDays: added.routeDays.length, stops: added.stops.length, already: added.already };
+  await db.collection('udclLog').add({ what: 'data load', plant, record: UDCL_OCT_ID, before: null, after: { counts }, by: BY, at: stamp });
+  await mark.set({ status: 'DONE', doneAt: stamp, what: UDCL_OCT.what, counts, added });
+  return Object.assign({ counts }, added);
+}
+
 // Every load, in order. A load that fails is tried again on the next run; the others still run.
 async function runDataLoads(db, opts) {
   const out = {};
-  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [FLEET_START_ID, loadFleetServiceStartOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce]]) {
+  for (const [id, fn] of [[RECEIVING_SUPPLIERS_ID, loadReceivingSuppliersOnce], [HTST.id, loadHtstOnce], [GARAGE_TECHS_ID, loadGarageTechsOnce], [FLEET_MILES_ID, loadFleetStartMilesOnce], [FLEET_START_ID, loadFleetServiceStartOnce], [GARAGE_ORDERS_ID, loadGarageOrdersOnce], [MAIL_CHECKINS_ID, loadMailCheckinsOnce], [HALF_READERS_ID, loadHalfGallonReadersOnce], [OTR_SEPT_ID, loadOtrSeptemberOnce], [UDCL_OCT_ID, loadCustomerListOctoberOnce]]) {
     try { out[id] = await fn(db, opts); } catch (e) { console.error('Data load ' + id + ' failed: ' + (e && e.message || e)); out[id] = { error: String(e && e.message || e) }; }
   }
   return out;
 }
 
-module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadFleetServiceStartOnce, FLEET_START_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID };
+module.exports = { runDataLoads, loadHtstOnce, HTST, loadReceivingSuppliersOnce, RECEIVING_SUPPLIERS_ID, RECEIVING_SUPPLIERS, loadGarageTechsOnce, GARAGE_TECHS_ID, GARAGE_TECHS, loadFleetStartMilesOnce, FLEET_MILES_ID, loadFleetServiceStartOnce, FLEET_START_ID, loadGarageOrdersOnce, GARAGE_ORDERS_ID, loadMailCheckinsOnce, MAIL_CHECKINS_ID, loadHalfGallonReadersOnce, HALF_READERS_ID, loadOtrHistoryOnce, loadOtrHistory, OTR_HISTORY_ID, loadOtrSeptemberOnce, OTR_SEPT_ID, OTR_SEPT, loadCustomerListOctoberOnce, UDCL_OCT_ID, UDCL_OCT };

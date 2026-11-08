@@ -769,7 +769,7 @@ export async function renderSalesEmail(box) {
   box.innerHTML = '<div class="ap"><div class="ap-bar"><button type="button" class="ap-btn" id="se-reload">Refresh</button><span id="se-switch" style="display:flex;gap:8px;align-items:center"></span>' +
     '<div class="ap-right"><button type="button" class="ap-btn" id="se-test">Send a test to me</button></div></div><div class="ap-msg" hidden></div>' +
     '<p class="ap-note">At 6:00 AM Monday through Saturday (never Sunday) the salespeople get one line per route: Route, Run and Status. ' +
-    'It lists the loads of the shift that just ended (Monday\'s also has Saturday\'s). The time a load left comes from its trailer\'s GPS, or the truck\'s when the trailer has none.</p>' +
+    'It lists the routes delivering that day, as of 6:00 AM. The time a load left comes from its dispatch truck\'s GPS, or the trailer\'s when the truck has none.</p>' +
     '<div id="se-sending"></div><div class="ap-scroll" style="padding:10px"><div class="ap-section"><h3>Who gets it</h3>' +
     '<label class="ap-field">Addresses<small>Separated by commas. Saves when you leave the box.</small><input id="se-to" placeholder="name@uniteddairy.com, second@uniteddairy.com"></label>' +
     '<small id="se-changed"></small></div></div></div>';

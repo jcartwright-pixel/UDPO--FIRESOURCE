@@ -62,7 +62,7 @@
     // like the sheet, with the year-to-date answers and a trend picture on top (his pick B).
     let view = ['dash', 'bydate', 'figures', 'report', 'cpg', 'routes'].indexOf(q.get('view')) >= 0 ? q.get('view') : 'dash';
     let compareLY = (() => { try { return localStorage.getItem('otrCompareLY') === '1'; } catch (e) { return false; } })();
-    let routes = [], picks = {}, pendingRoutes = {}, extraCols = [], colPanel = false, colFor = '', renaming = '', milesFor = '', pendingMiles = {}, runs = [], daily = [], monthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
+    let routes = [], picks = {}, pendingRoutes = {}, extraCols = [], colPanel = false, colFor = '', renaming = '', milesFor = '', pendingMiles = {}, runs = [], daily = [], monthly = [], ownMonthly = [], acctMonthly = [], monthRuns = [], comments = [], year = Number(L.operatingDay(new Date()).slice(0, 4)), copied = '';
     let ym = L.operatingDay(new Date()).slice(0, 7);
     const money = (v) => v == null ? '' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
     const cents = (v) => v == null ? '–' : '$' + Number(v).toFixed(3);
@@ -223,7 +223,8 @@
         const fuel = '<table class="otr-sheet otr-fuel"><colgroup><col style="width:130px"><col><col><col></colgroup><thead><tr><th class="l" rowspan="2">Month</th><th colspan="2">Fuel Cost By Gallon</th><th rowspan="2">Difference</th></tr><tr class="sub"><th>' + c.year + '</th><th>' + c.prior + '</th></tr></thead><tbody>' +
           c.months.map(m => '<tr><td class="l">' + m.label + '</td><td>' + f3(m.fuel[0]) + '</td><td>' + f3(m.fuel[1]) + '</td><td' + neg(m.fuelDiff) + '>' + pf(m.fuelDiff) + '</td></tr>').join('') +
           '<tr class="tot"><td class="l">Avg</td><td>' + (F ? f3(F.avg[0]) : '') + '</td><td>' + (F ? f3(F.avg[1]) : '') + '</td><td' + (F ? neg(F.avgDiff) : '') + '>' + (F ? paren(F.avgDiff, x => x.toFixed(4)) : '') + '</td></tr>' +
-          '<tr class="tot"><td class="l">total</td><td>' + (F ? f3(F.total[0]) : '') + '</td><td>' + (F ? f3(F.total[1]) : '') + '</td><td' + (F ? neg(F.totalDiff) : '') + '>' + (F ? pf(F.totalDiff) : '') + '</td></tr></tbody></table>';
+          // Joe 11-6-26: no "total" row under Avg (adding up twelve per-gallon numbers was misleading).
+          '</tbody></table>';
         sheet.innerHTML = '<div id="otr-sheet-print"><div class="otr-top">' + cardRow([
           card('Cost per gallon, year to date', Y ? c5(Y.cpg[0]) : '–', Y ? 'vs ' + c5(Y.cpg[1]) + ' in ' + c.prior : 'No months with figures in both years', Y ? chg(-Y.vari, v => '$' + v.toFixed(5), true) : null),
           card('Cost Diff, year to date', Y ? pm(Y.costDiffMoney) : '–', Y ? (Y.costDiffMoney < 0 ? 'more' : 'less') + ' than at ' + c.prior + '\'s cost per gallon' : '', null, Y && Y.costDiffMoney < 0),
@@ -249,10 +250,12 @@
               if (k === 'epg') return '<td class="strong">' + epg(cur) + gray(epg(ly)) + '</td>';
               if (k === 'cpg') return '<td class="strong">' + (O.otrCostPerGallon_(cur) == null ? '' : cents(O.otrCostPerGallon_(cur))) + gray(O.otrCostPerGallon_(ly) == null ? '' : cents(O.otrCostPerGallon_(ly))) + '</td>';
               const fmt = isMoney(k) ? dollars : commas;
-              return '<td><input class="otr-in" inputmode="decimal" data-fk="f|' + year + '|' + (i + 1) + '|' + k + '" aria-label="' + escapeHtml(m + ' ' + year + ' ' + label) + '" data-m="' + (i + 1) + '" data-k="' + k + '" value="' + escapeHtml(fmt(cur[k])) + '"' + dis + '>' + gray(ly[k] == null ? '' : (isMoney(k) ? dollars(ly[k]) : commas(ly[k]))) + '</td>';
+              // A number from the Hub's Accounting Numbers is shown, not typed here, so every app keeps the same one.
+              const hub = HUB_KEYS.indexOf(k) >= 0 && acctMonthly.some(a => Number(a.year) === year && Number(a.month) === i + 1 && a[k] != null);
+              return '<td><input class="otr-in' + (hub ? ' otr-hub' : '') + '" inputmode="decimal" data-fk="f|' + year + '|' + (i + 1) + '|' + k + '" aria-label="' + escapeHtml(m + ' ' + year + ' ' + label) + '" data-m="' + (i + 1) + '" data-k="' + k + '" value="' + escapeHtml(fmt(cur[k])) + '"' + (hub ? ' disabled title="From the Hub\'s Accounting Numbers"' : dis) + '>' + gray(ly[k] == null ? '' : (isMoney(k) ? dollars(ly[k]) : commas(ly[k]))) + '</td>';
             }).join('') + '</tr>';
           }).join('') + '</tbody></table>';
-        foot.textContent = 'Del Cost, Employee Cost and FUEL COST come from P&L Expenses by Dept; Gallons Sold from Gallon Comparison. Cost per gallon = Del Cost ÷ Gallons Sold.';
+        foot.textContent = 'Gallons Sold, Del Cost, Employee Cost and FUEL COST come from the Hub\'s Accounting Numbers (the monthly accounting package); a gray box is from there and is changed there. Cost per gallon = Del Cost ÷ Gallons Sold.';
         wireYear(); wireImport();
         document.getElementById('otr-compare').onchange = (e) => { compareLY = e.target.checked; try { localStorage.setItem('otrCompareLY', compareLY ? '1' : '0'); } catch (x) { /* private window */ } render(); };
         sheet.querySelectorAll('.otr-in').forEach(inp => { inp.onchange = () => {
@@ -454,6 +457,7 @@
       stopDaily = onSnapshot(query(collection(dbRef, 'otrDaily'), where('date', '>=', from)), s => { daily = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read otrDaily: ' + e.message));
     }
     const pendingFigures = [];
+    const HUB_KEYS = ['gallons_sold', 'distribution_cost', 'employee_cost', 'fuel_cost'];
     // Import From Accounting (the current app's OverTheRoad.html import card): drop the accounting package zip or an Excel workbook
     // (P&L Expenses by Dept, Gallon Comparison, OTR Trips By Date / Recap). The files are read here, checked, then saved together.
     let imp = null;
@@ -512,7 +516,20 @@
       watch('runs', v => { runs = v; });
       watch('otrRoutes', v => { picks = {}; v.forEach(p => { picks[p.runId] = { include: p.include === true, destination: p.destination || '', deliveredBy: p.deliveredBy || '' }; }); Object.keys(pendingRoutes).forEach(id => { picks[id] = pendingRoutes[id]; }); });
       dbRef = db; needDays();
-      watch('otrMonthly', v => { monthly = v; pendingFigures.forEach(put => put()); });
+      // Joe 11-6-26: gallons sold and the three costs come from the Hub's Accounting Numbers (accountingMonthly), read once there
+      // for every app; this screen's own months (otrMonthly) keep the rest, and those four only for a month the Hub does not have.
+      const remerge = () => {
+        const by = {};
+        monthly = ownMonthly.map(r => { const c = Object.assign({}, r); by[c.year + '-' + c.month] = c; return c; });
+        acctMonthly.forEach(a => {
+          let c = by[a.year + '-' + a.month];
+          if (!c) { c = { id: a.year + '-' + String(a.month).padStart(2, '0'), year: a.year, month: a.month }; by[a.year + '-' + a.month] = c; monthly.push(c); }
+          HUB_KEYS.forEach(k => { if (a[k] != null) c[k] = a[k]; });
+        });
+        pendingFigures.forEach(put => put());
+      };
+      watch('otrMonthly', v => { ownMonthly = v; remerge(); });
+      watch('accountingMonthly', v => { acctMonthly = v; remerge(); });
       watch('otrMonthRuns', v => { monthRuns = v; });
       watch('otrComments', v => { comments = v; });
       watch('otrColumns', v => { extraCols = v.filter(c => c.name).sort((a, b) => String(a.createdAt || '') < String(b.createdAt || '') ? -1 : 1); });

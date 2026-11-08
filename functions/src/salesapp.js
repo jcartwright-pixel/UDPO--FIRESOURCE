@@ -7,8 +7,10 @@
  *
  * Divisions: the plants (Uniontown, Charleston, Martins Ferry) that are running; each keeps its own loads in its own database.
  *
- * Which loads: the operating day that is running now (the 6 a.m. roll) and the one before it, whose trucks may still be out.
- * The status is the 6:00 AM sales email's (salesmail.js): the trailer's GPS first for when it left, else the truck's; On time /
+ * Which loads (Joe 11-6-26, "I thought this was fixed not showing older stuff"): only the loads delivering on the operating day
+ * that is running now (it rolls at 6 a.m.), the same as the 6:00 AM sales email. Nothing from an earlier delivery day carries over.
+ * The status is the 6:00 AM sales email's (salesmail.js): the dispatch tractor's GPS first for when it left, the trailer's when the tractor
+ * is not seen leaving (Joe 11-6-26); On time /
  * Left late / Not departed / Not loaded, with how far behind, counted from dispatch. Ended Up Not Running is left off.
  *
  * Where it is: the trailer's GPS unit (Verizon Connect Fleet, gpsTrucks) first, else the truck's: its last report, as words
@@ -32,9 +34,9 @@ const MOVING_MPH = 3;
 const ALL = { id: 'all', name: 'All' };
 // Joe 11/2: a GPS unit not heard from in this long has failed (or is off): Where now says Unknown.
 const SILENT_MS = 24 * 3600 * 1000, UNKNOWN = 'Unknown: GPS not reporting';
-// Joe 11/2: how far back to look for loads still to be delivered: a Load Day route is loaded the day before (Saturday for
-// Monday), and a load from an earlier delivery day that never left stays on as a leftover for LEFTOVER_DAYS.
-const LOOK_BACK = 3, LEFTOVER_DAYS = 2;
+// How far back to look for today's deliveries: a Load Day route is loaded the day before (Saturday for Monday).
+// Joe 11-6-26: no leftovers. A load from an earlier delivery day is not on the list (it showed "Not departed, 2 days behind").
+const LOOK_BACK = 3;
 const SAL_PLACE = /\bSAL\b|SAVE[\s-]*A[\s-]*LOT/i;
 const UNITS_KEEP_MS = 60 * 1000; // the 520 GPS units are read at most once a minute per server (the GPS itself is read every 5)
 const text = (v) => (v === null || v === undefined ? '' : String(v).trim());
@@ -119,18 +121,9 @@ function nameWords(name) {
   return out;
 }
 
-/** Joe 11/2: the loads delivered today, and those of the LEFTOVER_DAYS before it, whatever day they were loaded. */
+/** Joe 11-6-26: only the loads delivered today, whatever day they were loaded (salesmail deliveriesOn, the email's one rule). */
 function loadsFor(runs, today) {
-  const seen = new Set(), out = [];
-  for (let i = LOOK_BACK + LEFTOVER_DAYS; i >= 0; i--) {
-    S.loadsOn(runs, L.addDays(today, -i)).forEach(x => {
-      const k = x.runDocId + '|' + x.day;
-      if (seen.has(k) || x.deliveryDate > today || x.deliveryDate < L.addDays(today, -LEFTOVER_DAYS)) return;
-      seen.add(k);
-      out.push(x);
-    });
-  }
-  return out;
+  return S.deliveriesOn(runs, today);
 }
 
 /**
@@ -143,9 +136,8 @@ function salesScreen(input, nowMs) {
   const units = input.units || {}, spots = yardSpots(units);
   const byTruck = {};
   Object.keys(units).forEach(k => { const u = units[k], key = S.unitKey(u.tag); if (key && (!byTruck[key] || String(u.lastReport || '') > String(byTruck[key].lastReport || ''))) byTruck[key] = u; });
-  // Joe 11/2: the list is what is delivered today (by delivery date; the list rolls at 6 a.m.), plus leftovers: earlier
-  // deliveries that have not left yet, like the Driver Room kiosk. A route not delivering today is not on it. A Load Day route
-  // is loaded the day before (Monday's on Saturday), so the loads are read from LOOK_BACK load days back.
+  // Joe 11/2, 11-6-26: the list is what is delivered today (by delivery date; the list rolls at 6 a.m.), nothing older. A route
+  // not delivering today is not on it. A Load Day route is loaded the day before (Monday's on Saturday).
   const flat = loadsFor(input.runs, today);
   const trailerGps = trailerUnits(units, flat.map(x => x.trailer).filter(Boolean), runTrucks(input.runs));
   const master = {};
@@ -185,21 +177,15 @@ function salesScreen(input, nowMs) {
       return {
         id: x.runDocId + '|' + x.day, route: x.route, driver: x.driver, status: shortStatus(s.word), tone: s.tone,
         where, note, by, gpsAt: gpsWhen(seen, now),
-        lat: hasPoint ? unit.lat : null, lon: hasPoint ? unit.lon : null,
-        gone: !!((left && left.at !== null) || drop)
+        lat: hasPoint ? unit.lat : null, lon: hasPoint ? unit.lon : null
       };
   };
   const byRoute = (a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }) || a.driver.localeCompare(b.driver);
-  const strip = (r) => { const o = Object.assign({}, r); delete o.gone; return o; };
-  // Leftovers first (still here from an earlier delivery day), then today's deliveries.
-  const earlier = [...new Set(flat.filter(x => x.deliveryDate < today).map(x => x.deliveryDate))].sort();
-  const groups = earlier.map(d => ({
-    deliveryDate: d, leftover: true, label: 'Left over from ' + S.weekdayOf(d) + ' ' + S.shortDate(d),
-    rows: flat.filter(x => x.deliveryDate === d).map(rowOf).filter(r => !r.gone).sort(byRoute).map(strip)
-  })).concat([{
+  // Joe 11-6-26: today's deliveries only (no "Left over from" groups).
+  const groups = [{
     deliveryDate: today, leftover: false, label: 'Delivering today, ' + S.weekdayOf(today) + ' ' + S.shortDate(today),
-    rows: flat.filter(x => x.deliveryDate === today).map(rowOf).sort(byRoute).map(strip)
-  }]).filter(g => g.rows.length);
+    rows: flat.map(rowOf).sort(byRoute)
+  }].filter(g => g.rows.length);
   return { today, todayText: S.weekdayOf(today) + ' ' + S.shortDate(today), groups };
 }
 
@@ -215,7 +201,7 @@ async function readUnits(db, nowMs) {
 
 /** Reads what the screen needs at `nowMs` from one plant's database. */
 async function readInput(db, nowMs) {
-  const today = L.operatingDay(new Date(nowMs)), first = L.addDays(today, -(LOOK_BACK + LEFTOVER_DAYS));
+  const today = L.operatingDay(new Date(nowMs)), first = L.addDays(today, -LOOK_BACK);
   // Every week a load date or delivery date in the window falls in (a run's week is its delivery week).
   const weeks = [...new Set([0, 1, 2, 3, 4, 5, 6, 7].map(i => L.weekStart(L.addDays(first, i))).concat([L.weekStart(today)]))];
   const runs = (await db.collection('runs').where('weekStart', 'in', weeks).get()).docs.map(x => Object.assign({ id: x.id }, x.data()));
@@ -258,7 +244,7 @@ async function salesCall(divisions, dbFor, input, deps) {
   return Object.assign({ divisions: list, division: pick.id, refreshed: S.clock12(R.wallClock(nowMs)) }, screen);
 }
 
-// All divisions on one list: the groups of the same day together, leftovers first, routes in order.
+// All divisions on one list: the groups of the same day together, routes in order.
 function mergeScreens(screens) {
   const by = {};
   screens.forEach(sc => sc.groups.forEach(g => { const k = (g.leftover ? '0' : '1') + g.deliveryDate; if (!by[k]) by[k] = Object.assign({}, g, { rows: [] }); by[k].rows = by[k].rows.concat(g.rows); }));

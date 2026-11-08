@@ -70,3 +70,10 @@ table.fs-grid td.fs-cell.editing { background: #fff; cursor: default; outline: 2
 .fs-cell-edit .fs-cell-saved { font-size: 16px; min-height: 20px; }
 .fs-cell-edit .fs-cell-saved.ok { color: #1f7a4d; }
 .fs-cell-edit .fs-cell-saved.bad { color: #b42318; }
+.fs-emp { display: block; font-weight: normal; font-size: 16px; color: var(--muted, #555); }
+#sheet td .fs-emp.warn { color: var(--red, #b42318); font-weight: 700; }
+.fs-emp-pick { display: block; margin: 4px auto 0; width: min(100%, 360px); min-height: 40px; font: inherit; font-size: 16px; border: 1px solid var(--red); border-radius: 8px; padding: 0 8px; background: #fff; }
+.fs-techs { max-width: 1100px; }
+/* Joe 11-7-26: each technician's login ID in its own box on the row, changed there if it is wrong. */
+.fs-login { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; margin-right: 8px; }
+.fs-login input { width: 13ch; min-height: 40px; font: inherit; font-size: 16px; font-weight: 700; text-align: center; border: 1px solid var(--line, #c9ced6); border-radius: 8px; padding: 0 8px; background: #fff; }

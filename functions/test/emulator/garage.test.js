@@ -34,7 +34,7 @@ test('sign in with name and login ID: wrong numbers lock after five, two technic
   const r = await garageCall(db(), { op: 'read', tokens: [] }, now());
   assert.deepEqual(r.techs.map(t => t.name), ['JELLICK Tom', 'MARTIN Sean', 'MYERS John', 'NARD Jaxon']);
   assert.deepEqual(r.jobs, [], 'no jobs before someone signs in');
-  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '4821' }, now()), /5- or 6-digit login ID/);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '482' }, now()), /4- or 6-digit login ID/);
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '12345' }, now()), /no login ID yet/);
   for (let i = 0; i < 5; i++) await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JN', loginId: '99999' }, now()), /Wrong login ID/);
   await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JN', loginId: '70001' }, now()), /Too many wrong numbers/);
@@ -228,4 +228,51 @@ test('a PM or reefer service done safe records the GPS miles or hours when they 
   assert.equal((await db().collection('fleetSetup').doc('900002').get()).data().last_service_miles, '98123');
   assert.equal((await db().collection('workOrders').doc(pm.workOrderId).get()).data().odometer, 98123);
   assert.equal((await db().collection('fleetSetup').doc('T-902').get()).data().last_service_hours, '5123');
+});
+
+test('Joe 11-6-26: a login ID padded with zeros to 6 digits signs in with just its 4 real digits, or all 6', async () => {
+  for (const saved of ['123400', '001234']) {
+    await db().collection('garageLogins').doc('TECH-SM').set({ techId: 'TECH-SM', hash: loginHash('TECH-SM', saved) });
+    for (const typed of ['1234', saved]) {
+      const s = await garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: typed }, now());
+      assert.ok(s.token, saved + ' signs in with ' + typed);
+    }
+    await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '1235' }, now()), /Wrong login ID/, 'a wrong number is still wrong');
+  }
+  // A 5-digit ID stays exact apart from zeros: 48213 does not sign in as 4821.
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-JT', loginId: '4821' }, now()), /Wrong login ID/);
+});
+
+// Joe 11-6-26: a technician on the Employees list signs in with their employee ID, zeros at the front or back not typed,
+// with no login ID set; a technician added by picking them from the list keeps that employee.
+test('Joe 11-6-26: a technician signs in with their employee ID from the Employees list, zeros or not', async () => {
+  await db().collection('garageTechs').doc('TECH-PS').set({ tech_id: 'TECH-PS', name: 'SAMPLE PAT', active: 'YES' });
+  await db().collection('employees').doc('009354').set({ employeeId: '009354', name: 'SAMPLE, PAT', department: 'GARAGE', active: true });
+  for (const typed of ['9354', '009354']) assert.ok((await garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: typed }, now())).token, 'signs in with ' + typed);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: '9355' }, now()), /Wrong login ID/);
+  assert.equal((await db().collection('garageLocks').doc('TECH-PS').get()).data().count, 1, 'a wrong number still counts towards the lock');
+  // Someone else's employee ID does not sign Pat in, and a technician matching nobody still needs a login ID.
+  await db().collection('employees').doc('004444').set({ employeeId: '004444', name: 'OTHER, LEE', department: 'GARAGE', active: true });
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-PS', loginId: '4444' }, now()), /Wrong login ID/);
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-SM', loginId: '4444' }, now()), /no login ID yet/);
+  // Added by picking Lee from the list: the employee is kept on the technician and Lee signs in with 4444.
+  const added = await applyAction(db(), { email: 'manager.test@uniteddairy.com' }, { action: 'saveGarageTech', requestId: rid(), op: 'ADD', name: 'Lee Other', loginId: '004444', employeeId: '004444' });
+  const lee = (await db().collection('garageTechs').doc(added.techId || added.id || 'x').get());
+  const leeDoc = lee.exists ? lee.data() : (await db().collection('garageTechs').where('name', '==', 'LEE OTHER').get()).docs[0].data();
+  assert.equal(leeDoc.employee_id, '004444');
+  assert.ok((await garageCall(db(), { op: 'signIn', techId: leeDoc.tech_id, loginId: '4444' }, now())).token);
+});
+
+// Joe 11-7-26: a technician whose name is not found on the Employees list is picked on it; that employee ID then signs them in.
+test('Joe 11-7-26: picking an unmatched technician on the Employees list lets them sign in with that employee ID', async () => {
+  const MGR = { email: 'manager.test@uniteddairy.com' };
+  await db().collection('garageTechs').doc('TECH-TJ').set({ tech_id: 'TECH-TJ', name: 'DREW UNLISTED', active: 'YES' });
+  await db().collection('employees').doc('007311').set({ employeeId: '007311', name: 'SAMPLE, THOMAS', department: 'GARAGE', active: true });
+  await assert.rejects(garageCall(db(), { op: 'signIn', techId: 'TECH-TJ', loginId: '7311' }, now()), /no login ID yet/, 'no name match yet');
+  await assert.rejects(applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '999999' }), /not on the Employees list/);
+  await assert.rejects(applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '' }), /Pick the person/);
+  await applyAction(db(), MGR, { action: 'saveGarageTech', requestId: rid(), op: 'EMPLOYEE', techId: 'TECH-TJ', employeeId: '007311' });
+  assert.equal((await db().collection('garageTechs').doc('TECH-TJ').get()).data().employee_id, '007311');
+  assert.equal((await db().collection('garageTechs').doc('TECH-TJ').get()).data().login_set, false, 'their employee ID shows, not SET BY HAND');
+  for (const typed of ['7311', '007311']) assert.ok((await garageCall(db(), { op: 'signIn', techId: 'TECH-TJ', loginId: typed }, now())).token, 'signs in with ' + typed);
 });

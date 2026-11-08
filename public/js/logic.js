@@ -440,6 +440,41 @@
     open.repairedLast30 = written.filter(function (r) { return r.done && r.completedMs && now - r.completedMs <= 30 * DAY; }).length;
     return open;
   }
+  // Joe 11/6 ("825 was in the garage ... it should at least let me know that it's been in there"): an open write-up counts as at
+  // the garage however it got there, not only by its own Garage / To garage button. It is at the garage when a work order points
+  // at it (the Garage Station's Start on a listed write-up, or a work order made from 2 or more of the unit's write-ups), or when
+  // the same unit has a work order in the garage since the write-up: one done on or after the day it was reported, or one still
+  // open that a person sent (office, mechanic, a write-up) or a mechanic started. One the app made by itself (an engine code, a
+  // service coming due) that nobody has started does not count. Sets atGarage (and garageAt, garageBy, garageOrder, garageHow)
+  // on the rows of kind from orders (workOrders), and returns the rows.
+  var ISSUE_ORDER_KIND = { TRUCK: 'trucks', TRAILER: 'trailers', FORK_TRUCK: 'forks' };
+  function issueGarageVisits(rows, orders, kind) {
+    var kindName = ISSUE_ORDER_KIND[kind];
+    var mine = (orders || []).filter(function (o) { return o && o.work_order_id && (!o.facility_id || o.facility_id === 'fac_uniontown'); });
+    var done = function (o) { return String(o.status || 'NEW').toUpperCase() === 'DONE'; };
+    var started = function (o) { return !!o.started_at || /^(WORKING|PARTS)$/.test(String(o.status || '').toUpperCase()); };
+    var sameType = function (o) { var t = String(o.unit_type || '').toUpperCase(); return (t === 'TRAILER' || t === 'FORK_TRUCK' ? t : 'TRUCK') === kind; };
+    (rows || []).forEach(function (r) {
+      if (r.atGarage || !kindName) return;
+      var ids = r.recordIds && r.recordIds.length ? r.recordIds : [r.recordId], day = localDay(r.reported);
+      var linked = mine.filter(function (o) {
+        return o.source_kind === kindName && (ids.indexOf(o.source_id) >= 0 || (Array.isArray(o.also_ids) && o.also_ids.some(function (id) { return ids.indexOf(id) >= 0; })));
+      });
+      var visit = linked[0] || (r.unitKey ? mine.filter(function (o) {
+        if (!sameType(o) || issueUnitKey(o.unit) !== r.unitKey) return false;
+        if (done(o)) return !!o.completed_at && (!day || localDay(o.completed_at) >= day);
+        return started(o) || /^(OFFICE|TECH|WRITE_UP)$/.test(String(o.source || '').toUpperCase());
+      }).sort(function (a, b) { return (done(a) ? 1 : 0) - (done(b) ? 1 : 0) || String(b.started_at || b.created_at || '').localeCompare(String(a.started_at || a.created_at || '')); })[0] : null);
+      if (!visit) return;
+      var status = String(visit.status || 'NEW').toUpperCase();
+      r.atGarage = true;
+      r.garageOrder = String(visit.work_order_id);
+      r.garageHow = status === 'DONE' ? 'done' : status === 'PARTS' ? 'parts' : started(visit) ? 'working' : 'waiting';
+      r.garageAt = (status === 'DONE' ? visit.completed_at : visit.started_at || visit.created_at) || '';
+      r.garageBy = String(status === 'DONE' ? visit.completed_by || visit.techs || '' : visit.techs || visit.sent_by || visit.created_by || '').trim();
+    });
+    return rows;
+  }
   // The hub numbers for one kind's open list.
   function issueNumbers(open, nowMs) {
     var DAY = 86400000, now = nowMs || Date.now(), ages = open.filter(function (r) { return r.openedMs; }).map(function (r) { return (now - r.openedMs) / DAY; });
@@ -569,7 +604,7 @@
         days[prefix] = {
           date: addDays(week, i), runs: !!d.runs, loadSequence: effectiveSequence(d),
           driverId: d.driverId || '', driver: d.driver || '', truckId: d.truckId || '', truck: d.truck || '',
-          trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime,
+          trailerId: d.trailerId || '', trailer: d.trailer || '', dispatchTime: d.dispatchTime, routeHours: d.routeHours,
           intendedDriver: d.intendedDriver || '', driverExceptionStatus: d.driverExceptionStatus || '', routeOverride: yes(d.routeOverride),
           plantLoadOff: d.plantLoadOff === true
         };
@@ -867,6 +902,30 @@
     'T-876': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' }, 'T-950': { plant: 'fac_uniontown', why: 'Joe 10/28: ours (fleet list says Charleston)' } };
   // FLEET_BY_DAYS: trucks with no GPS whose PM goes by the date (every truckDaysMonths), not miles.
   var FLEET_BY_DAYS = { '688': 'Joe 10/19: yard truck, no GPS, goes by days', '9737': 'Joe 10/19: yard truck, no GPS, goes by days' };
+  // Joe 11-6-26: a garage technician is the employee on the Employees list (UDMS) with the same name, or the one picked when
+  // they were added (employee_id); their employee ID signs them in on the Garage Station. Names match whatever the order or
+  // commas ("MARTIN, SHAUN" is SHAUN MARTIN); a name two employees share matches nobody.
+  function personKey(name) { return String(name || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean).sort().join(' '); }
+  function employeeForTech(employees, tech) {
+    var list = (employees || []).filter(function (e) { return e && e.employeeId && e.active !== false && e.status !== 'GONE'; });
+    var id = String(tech && tech.employee_id || '').trim();
+    if (id) { var byId = list.filter(function (e) { return String(e.employeeId) === id; }); if (byId.length) return byId[0]; }
+    var key = personKey(tech && tech.name), hit = key ? list.filter(function (e) { return personKey(e.name) === key; }) : [];
+    if (hit.length) return hit.length === 1 ? hit[0] : null;
+    // Joe 11-7-26: a short or different spelling of the first name is still them ("TOM JELLICK" is JELLICK, THOMAS; "SEAN
+    // MARTIN" is MARTIN, SHAUN): the same last name and the same first letter of the first name, when only one employee fits.
+    var w = key ? key.split(' ') : [];
+    if (w.length < 2) return null;
+    var near = list.filter(function (e) {
+      var ew = personKey(e.name).split(' ').filter(Boolean);
+      return w.some(function (last) {
+        if (last.length < 3 || ew.indexOf(last) < 0) return false;
+        var rest = w.filter(function (x) { return x !== last; }), erest = ew.filter(function (x) { return x !== last; });
+        return rest.length > 0 && rest.every(function (x) { return erest.some(function (y) { return y.charAt(0) === x.charAt(0); }); });
+      });
+    });
+    return near.length === 1 ? near[0] : null;
+  }
   function fleetUnitKey(u) {
     var s = String(u === null || u === undefined ? '' : u).trim().toUpperCase().replace(/\s+/g, ''), m = s.match(/^([A-Z]+)-?0*(\d+)$/), n = s.match(/^0*(\d+)$/);
     return m ? m[1] + '-' + m[2] : n ? n[1] : s;
@@ -1230,8 +1289,25 @@
     if (who === 'CARRIER') return 'carrier';
     if (who === 'OPEN') return 'open';
     if (d.driverId && exceptionOn(ctx.exceptions, d.driverId, d.date)) return 'conflict';
-    if ((ctx.dup[prefix + '|' + (d.driverId || who)] || 0) > 1) return 'booked';
+    if (weeklyClash(ctx, row, prefix)) return 'booked';
     return ctx.relief[d.driverId] ? 'relief' : 'assigned';
+  }
+
+  // Joe 11/6: "percentage of all routes covered" beside the Weekly Dispatch title. Every day a run goes out that needs a United
+  // Dairy driver counts (a driver on it, NEEDS DRIVER, a driver off, a PLANT LOAD, OPEN); a day it does not run, or a carrier or
+  // outside company covers, does not. A driver who is off that day does not cover it. percent is rounded down, so 100 means
+  // every one has a driver.
+  function weeklyCoverage(rows, ctx) {
+    var have = 0, all = 0;
+    (rows || []).forEach(function (r) {
+      DAYS.forEach(function (p) {
+        var c = weeklyCellClass(r, p, ctx);
+        if (c === 'off' || c === 'coverage' || c === 'carrier') return;
+        all++;
+        if (c === 'assigned' || c === 'relief' || c === 'booked') have++;
+      });
+    });
+    return { have: have, all: all, percent: all ? Math.floor(have * 100 / all) : 100 };
   }
 
   // The Plant Route loads for one run on one day (plant scheduler copy), or null.
@@ -1262,19 +1338,56 @@
     }).join(' / ');
   }
 
-  function weeklyContext(rows, drivers, exceptions, plantLoads) {
-    var dup = {}, relief = {};
+  /*
+   * Joe 11/6/2026 ("it shows he's on the route 8301, but that route should be back by 4:30 when this one starts"; THOMAS on 6301
+   * Load 1 and Load 2 showing pink): one driver on two runs the same day is only a clash when their times on the road overlap
+   * (15 minutes' leeway at the turn, as the truck and trailer lists), or when a time is not known. Load 1 and Load 2 of the same
+   * route are one driver's normal day (one tractor pulling two loads) and never clash. A day's time on the road is its dispatch
+   * time plus its route hours from the Live week, else from Route Master (master(row, prefix) gives that run's Route Master day).
+   */
+  function weeklyWindow(row, prefix, master) {
+    var d = row.days[prefix] || {}, m = (master && master(row, prefix)) || {};
+    var pick = function (a, b) { return a !== null && a !== undefined && a !== '' ? a : b; };
+    return runWindow({ dispatchTime: pick(d.dispatchTime, m.dispatchTime), routeHours: pick(d.routeHours, m.hours) });
+  }
+  // '' when the two runs can share a driver that day, else why not: "ON 8301 UNTIL 1:30 PM" (or "RETURN TIME NOT KNOWN").
+  function driverClash(a, b, prefix, master) {
+    // A one-week extra line of the same run (Joe 10/23) is a second trip, so it goes by the times like any other run.
+    var same = routeNumber(a.route), extra = !!((a.extraOf && (a.extraOf === b.runDocId || a.extraOf === b.extraOf)) || (b.extraOf && b.extraOf === a.runDocId));
+    if (same && same === routeNumber(b.route) && !extra) return '';
+    var x = weeklyWindow(a, prefix, master), y = weeklyWindow(b, prefix, master), tol = 15;
+    var known = x.start !== null && x.end !== null && y.start !== null && y.end !== null;
+    if (known && !(x.start < y.end - tol && y.start < x.end - tol)) return '';
+    return 'ON ' + routeNumber(b.route) + (y.end !== null ? ' UNTIL ' + timeText(y.end % 1440) : ' \u2014 TIMES NOT KNOWN');
+  }
+  function weeklyContext(rows, drivers, exceptions, plantLoads, master) {
+    var byDriver = {}, relief = {}, clash = {};
     (drivers || []).forEach(function (d) { if (d.reliefDriver) relief[d.id] = true; });
-    (rows || []).forEach(function (r) {
+    (rows || []).forEach(function (r, i) {
       if (coveredRoute(r)) return;
       DAYS.forEach(function (p) {
         var d = r.days[p], who = String(d.driver || '').trim().toUpperCase();
         if (!d.runs || !who || who === 'CARRIER' || who === 'OPEN') return;
         var k = p + '|' + (d.driverId || who);
-        dup[k] = (dup[k] || 0) + 1;
+        (byDriver[k] = byDriver[k] || []).push(r);
       });
     });
-    return Object.assign(offCoverContext(drivers, exceptions), { dup: dup, relief: relief, plant: plantByRun(rows, plantLoads) });
+    Object.keys(byDriver).forEach(function (k) {
+      var p = k.split('|')[0], list = byDriver[k];
+      list.forEach(function (a) {
+        list.forEach(function (b) {
+          if (a === b) return;
+          var why = driverClash(a, b, p, master);
+          if (why) { (clash[p] = clash[p] || []).push({ row: a, why: why }); }
+        });
+      });
+    });
+    return Object.assign(offCoverContext(drivers, exceptions), { clash: clash, master: master || null, relief: relief, plant: plantByRun(rows, plantLoads) });
+  }
+  // Why this Weekly day's driver is on a run whose time on the road overlaps it, or ''.
+  function weeklyClash(ctx, row, prefix) {
+    var hit = ((ctx && ctx.clash && ctx.clash[prefix]) || []).filter(function (c) { return c.row === row; })[0];
+    return hit ? hit.why : '';
   }
   // Joe 10/14: an as-needed customer's Scheduler loads on one day (all booked on its LOAD 1 run) are Load 1, 2, 3 by pickup
   // time, and Load N goes on its LOAD N run; more loads than LOAD runs share the last one (plant-rules.js numberLoads).
@@ -1347,7 +1460,7 @@
     try { list = raw ? JSON.parse(raw) : []; } catch (e) { list = []; }
     return (Array.isArray(list) ? list : [list]).map(function (a) { return String(typeof a === 'string' ? a : a && (a.runId || a.run_id) || '').trim(); }).filter(Boolean);
   }
-  function driverBoardRows(drivers, rows, exceptions, week, backups) {
+  function driverBoardRows(drivers, rows, exceptions, week, backups, master) {
     var list = (drivers || []).filter(driverActive).map(function (d) {
       return { id: d.id, name: d.name || '', relief: !!d.reliefDriver, cells: d.cells && Object.keys(d.cells).length ? d.cells : null, seniorityDate: dateKey(d.seniorityDate) || dateKey(d.hireDate) || '9999-12-31', days: {} };
     });
@@ -1358,6 +1471,9 @@
         // Like the current board: the run's stream (SAVE-A-LOT 1, 825), else the route, plus the run when it differs.
         var runIds = [];
         (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) { routes.push(boardLabel(r)); runIds.push(String(r.runId || '').trim()); if (d.routeOverride) extra = true; } });
+        // Joe 11/6: two runs that day are pink only when their times on the road overlap (driverClash); Load 1 and Load 2 never.
+        var mine = (rows || []).filter(function (r) { var d = r.days[p]; return d.runs && d.driverId === driver.id; });
+        var overlap = mine.some(function (a) { return mine.some(function (b) { return a !== b && !!driverClash(a, b, p, master); }); });
         var off = exceptionOn(exceptions, driver.id, date);
         // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
         var regularOff = !!driver.cells && !yes(driver.cells[p + '_available']);
@@ -1370,7 +1486,7 @@
         var backup = backupOn(backups, driver.id, date);
         // Day Note (Joe 10/23): not on a route and not off; the day shows the note. A route or a day off wins.
         var dayNote = dayNoteOn(backups, driver.id, date);
-        var kind = routes.length > 1 ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayNote ? 'daynote' : backup ? 'backup' : dayOff ? 'off' : 'available';
+        var kind = overlap ? 'booked' : routes.length ? (off ? 'conflict' : 'assigned') : off ? (scheduled || /VACATION/i.test(off.type + off.reasonCode) ? 'vacation' : 'unavailable') : dayNote ? 'daynote' : backup ? 'backup' : dayOff ? 'off' : 'available';
         // extra: a day someone changed by hand (the run's route_override), light blue on the board as in the current app.
         // Joe 10/10: one run name once (8303 twice reads 8303 ×2), each on its own line, so nothing is cut or left with a stray slash.
         // Joe 10/11: a run that is not part of the driver's normal week that day is "added" (purple on the board, Joe 10/17): his Driver
@@ -1736,7 +1852,7 @@
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
     routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
-    coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
+    coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyCoverage: weeklyCoverage, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
     vacationType: vacationType, VACATION_TYPE_NAMES: VACATION_TYPE_NAMES, holidayWeeks: holidayWeeks, dayLimit: dayLimit,
     exceptionOn: exceptionOn, backupOn: backupOn, availableOn: availableOn, dayNoteOn: dayNoteOn, exceptionLabel: exceptionLabel, vacationsOn: vacationsOn,
@@ -1744,12 +1860,12 @@
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
-    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts,
-    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts, weeklyWindow: weeklyWindow, driverClash: driverClash, weeklyClash: weeklyClash,
+    fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, personKey: personKey, employeeForTech: employeeForTech, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     COLORS: COLORS, dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
     liveFlagShown: liveFlagShown, weekStart: weekStart, daysBetween: daysBetween, operatingDay: operatingDay,
-    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
+    yes: yes, optionalYes: optionalYes, masterActive: masterActive, masterFlag: masterFlag, issueRows: issueRows, repairEmailSent: repairEmailSent, issueReportKey: issueReportKey, issueText: issueText, issueNumbers: issueNumbers, issueGarageVisits: issueGarageVisits, number: number, dayOffset: dayOffset, leavesOn: leavesOn, minutesOfDay: minutesOfDay, timeText: timeText, typedTime: typedTime,
     routeNumber: routeNumber, runLabel: runLabel, runText: runText,
     loadBlocksFor: loadBlocksFor, effectiveSequence: effectiveSequence, dailyRows: dailyRows, offCover: offCover, offCoverContext: offCoverContext,
     weeksForLoadDate: weeksForLoadDate, weeklyRows: weeklyRows,

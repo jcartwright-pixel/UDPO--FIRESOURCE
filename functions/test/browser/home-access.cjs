@@ -170,7 +170,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/10: Administration like the current app's tab: every item in a menu on the left; the item opens on the right.
     await adm.waitForSelector('.adm-item.on[data-key="people"]');
     const groups = await adm.$$eval('.adm-nav-group h2', h => h.map(x => x.textContent));
-    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Texts', 'Dispatch & Fleet', 'Plant Setup', 'Products & Machines', 'Plant Maintenance Setup', 'Checks & Repairs']);
+    assert.deepEqual(groups, ['People & Access', 'Links & Codes', 'Email & Texts', 'Dispatch & Fleet', 'Plant Setup', 'Products & Machines', 'Plant Maintenance Setup', 'Fleet Maintenance Setup', 'Checks & Repairs']);
     const all = await adm.$$eval('.adm-item', t => t.length);
     // Joe 10/12: Garage Station Codes added; Driver Station, Plant Station and Phone Screens moved from System Tools to Links & Codes.
     // Joe 10/12: Location Areas added under Plant Setup.
@@ -189,8 +189,10 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // Joe 10/31 (mock-up 1): Employees added under People & Access (everyone at the plant, brought over from UDMS).
     // Joe 10/31: Sales App added under Links & Codes (the salespeople's phone app link).
     // Joe 11/1 (mock-up 1): regrouped into eight groups, nothing removed; the same 42 items.
-    assert.equal(all, 42, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
-    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Dispatch & Fleet"]) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration', 'Fleet Service Setup', 'GPS Setup']);
+    // Joe 11-7-26: Garage Technicians added under Fleet Maintenance Setup.
+    assert.equal(all, 43, 'every item from the current app\'s Administration is in the menu or on Dispatch Administration');
+    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Dispatch & Fleet"]) .adm-name', s => s.map(x => x.textContent)), ['Dispatch Administration', 'GPS Setup']);
+    assert.deepEqual(await adm.$$eval('.adm-nav-group:has(.adm-gh[data-group="Fleet Maintenance Setup"]) .adm-name', s => s.map(x => x.textContent)), ['Fleet Service Setup', 'Garage Technicians']);
     // People & Roles opens first: everyone on the Users list, read through the server for Administrators.
     await adm.waitForSelector('#people tr[data-email="super.test@uniteddairy.com"]');
     assert.match(await adm.textContent('#people tr[data-email="super.test@uniteddairy.com"]'), /Supervisor[\s\S]*Uniontown[\s\S]*Active/);
@@ -223,7 +225,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await Promise.all([adm.waitForURL(/print\.html/), adm.click('.adm-item[data-key="print"]').then(() => adm.click('#full'))]);
     assert.deepEqual(adm.errors, []);
     await adm.close();
-    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in eight groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
+    results.push('An Administrator starts on the all-plants overview (Uniontown live, Charleston and Martins Ferry being built), picks Uniontown, whose home has the six cards and the Administration header button; Administration lists every item in nine groups, finds an item by a word; People & Roles lists the Users list, every item opens inside the right panel and none says Being built');
 
     // The overview and Administration at a laptop size.
     const small = await openPage(browser, 1366, 768, '/company.html?testEmail=admin.test@uniteddairy.com');

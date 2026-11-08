@@ -16,9 +16,9 @@ const db = fakeDb({
 });
 const keys = (r) => r.tiles.map(t => t.key);
 
-test('an administrator sees all five apps, live addresses on the live project', async () => {
+test('an administrator sees all eight apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident']);
   assert.equal(r.admin, true);
   // Plant & Distribution is two cards (11-5-26), each opening its own side of the app.
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/group.html?g=plantops');
@@ -30,6 +30,12 @@ test('an administrator sees all five apps, live addresses on the live project', 
   assert.equal(r.tiles[4].url, 'https://udms-bfccd.web.app/');
   assert.equal(r.tiles[5].url, 'https://ud-distribution-routes.web.app/');
   assert.equal(r.tiles[5].name, 'Route & Trip Costs');
+  assert.equal(r.tiles[6].url, 'https://ud-distribution-route-cost.web.app/');
+  assert.equal(r.tiles[6].name, 'Route Cost Analysis');
+  assert.match(r.tiles[7].url, /^https:\/\/script\.google\.com\/a\/macros\/uniteddairy\.com\/s\/AKfyc[\w-]+\/exec$/);
+  assert.equal(r.tiles[7].name, 'Customer Statements');
+  assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
+  assert.equal(r.tiles[8].name, 'Accident & Injury Reporting');
   assert.ok(r.tiles.every(t => t.url.indexOf('sandbox') < 0), 'no live card opens a practice copy');
 });
 
@@ -43,9 +49,9 @@ test('the practice copy links to the practice copies', async () => {
   assert.match(r.tiles[5].note, /no practice copy yet/);
 });
 
-test('someone who is not an administrator sees Operations and the Customer List only', async () => {
+test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {
   const r = await H.hubCall(db, { email: 'sam.sales@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'accident']);
   assert.equal(r.admin, false);
 });
 
@@ -59,8 +65,29 @@ test('an unknown request is refused', async () => {
   await assert.rejects(H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'deleteEverything' }, {}), (e) => e.code === 'BAD_REQUEST');
 });
 
-test('Statement Center is not in the hub yet (Joe 11-2-26)', () => {
-  assert.ok(!H.apps('ud-distribution').some(a => /statement/i.test(a.key + a.name)));
+// Joe 11-7-26: "Let's add it in now." One address on the live and practice hubs.
+test('Customer Statements (the Statement Center) is on the hub for administrators, one address everywhere', () => {
+  const a = H.apps('ud-distribution').find(x => x.key === 'statements'), b = H.apps('ud-distribution-sandbox').find(x => x.key === 'statements');
+  assert.equal(a.url, H.STATEMENTS_URL);
+  assert.equal(b.url, H.STATEMENTS_URL);
+  assert.equal(a.may({ status: 'ACTIVE', roles: ['Administrator'] }), true);
+  assert.equal(a.may({ status: 'ACTIVE', roles: ['Sales'] }), false);
+});
+
+test('ticks saved before Customer Statements joined still give administrators its card, until saved again', async () => {
+  const admin = { status: 'ACTIVE', roles: ['Administrator'] }, sales = { status: 'ACTIVE', roles: ['Sales'] };
+  const old = { apps: ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident'], updatedAt: '2026-11-04T12:00:00.000Z' };
+  assert.deepEqual(H.withAdded(admin, old), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident']);
+  assert.deepEqual(H.withAdded(sales, old), old.apps, 'someone who is not an administrator does not get it from the old ticks');
+  const unticked = { apps: old.apps, updatedAt: '2026-11-07T15:00:00.000Z' };
+  assert.deepEqual(H.withAdded(admin, unticked), old.apps, 'once unticked and saved, it stays off');
+  assert.equal(H.withAdded(admin, null), null);
+  const docs = { users: { 'pat.admin@uniteddairy.com': admin }, appAccess: { 'pat.admin@uniteddairy.com': old } };
+  const mem = { collection: (c) => ({ doc: (id) => ({ get: async () => ({ exists: !!docs[c][id], data: () => docs[c][id] }) }),
+    get: async () => ({ docs: Object.keys(docs[c]).map(id => ({ id, data: () => docs[c][id] })) }) }) };
+  const pat = { email: 'pat.admin@uniteddairy.com' };
+  assert.ok(keys(await H.hubCall(mem, pat, { op: 'home' })).includes('statements'), 'Home shows the card');
+  assert.ok((await H.hubCall(mem, pat, { op: 'appAccess' })).saved['pat.admin@uniteddairy.com'].includes('statements'), 'People & Access shows it ticked');
 });
 
 test('every page in public/ has its part in help.md', () => {
@@ -80,7 +107,7 @@ test('People & Access shows the same apps as the tiles', async () => {
   for (const p of people) {
     const tiles = H.apps('ud-distribution').filter(a => a.may(p)).map(a => a.name);
     assert.deepEqual(appsFor(p), tiles, JSON.stringify(p));
-    for (const ticks of [null, [], ['fuel'], ['customers', 'udms'], ['routes'], ['operations', 'customers', 'fuel', 'udms', 'routes']]) {
+    for (const ticks of [null, [], ['fuel'], ['customers', 'udms'], ['routes'], ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost'], ['statements']]) {
       assert.deepEqual(appsFor(p, ticks), H.appsOf(p, ticks).map(k => names[k]), JSON.stringify([p, ticks]));
     }
   }
@@ -124,13 +151,28 @@ test('saved app ticks decide the tiles; only administrators change them, never t
     runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
   };
   const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers', 'accident']);
   await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
   assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
   assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'fuel']);
   assert.deepEqual((await H.hubCall(mem, pat, { op: 'appAccess' })).saved, { 'sam.sales@uniteddairy.com': ['operations', 'fuel'] });
   await assert.rejects(H.hubCall(mem, sam, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['udms'] }), /Only an administrator/);
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'pat.admin@uniteddairy.com', apps: ['fuel'] }), /from yourself/);
-  await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['statements'] }), /could not be read/);
+  await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['bookkeeping'] }), /could not be read/);
   assert.equal(Object.values(docs.actions).length, 1, 'each change is logged');
+});
+
+// Joe 11-6-26: Home's All app links, grouped, links only (no codes), on the live or practice site the hub runs on.
+test('All app links: every group has links, they point at this hub\'s Operations site, and the accident app is under Everyone', async () => {
+  const { linkGroups, ACCIDENT_URL, APPLY_URL } = await import('../../../public/js/apps.js');
+  const g = linkGroups('https://ud-distribution.web.app');
+  assert.deepEqual(g.map(x => x.name), ['Everyone', 'Managers', 'Sales', 'Drivers', 'Plant floor', 'Garage & Maintenance', 'Hiring']);
+  g.forEach(x => assert.ok(x.links.length > 0, x.name));
+  const urls = g.flatMap(x => x.links.map(l => l.url));
+  assert.ok(urls.includes('https://ud-distribution.web.app/route.html'));
+  assert.ok(urls.includes('https://ud-distribution.web.app/garage-station.html'));
+  assert.ok(g[0].links.some(l => l.url === ACCIDENT_URL));
+  assert.ok(urls.includes(APPLY_URL));
+  urls.filter(u => u !== ACCIDENT_URL && u !== APPLY_URL).forEach(u => assert.ok(u.startsWith('https://ud-distribution.web.app/'), u));
+  assert.ok(linkGroups('https://ud-distribution-sandbox.web.app/')[3].links[0].url.startsWith('https://ud-distribution-sandbox.web.app/route.html'));
 });

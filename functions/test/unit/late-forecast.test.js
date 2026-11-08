@@ -557,3 +557,60 @@ test('the DOWNTIME line under the recap: each breakdown in red with how long it 
   assert.match(none, /color:#1f7a4d">&#10003; NO DOWNTIME/);
   assert.match(none, /&#10003; NONE OPEN/);
 });
+
+// Joe 11-7-26 (option lf: "it's every day … later the routes get done earlier … they're getting pre-pushed into the cooler after
+// 4 p.m."): each hour of the night has its own speed from past nights, the same weekday first, then every night of the last 4 weeks.
+test('speed by hour of the night: a slow early evening and a fast late night move each Est. Done', () => {
+  // Past nights: three 600-case loads starting at 6 PM took 60 minutes each (slow), three starting at 1 AM took 30 (fast).
+  const at = (d, h, m) => d + 'T' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':00-04:00';
+  const timed = (d, h, mins, day) => ({ area: 'CASE', state: 'DONE', route: 'P' + h, run: '', quantity: 600, startedAt: at(day || d, h, 0), completedAt: at(day || d, h, mins) });
+  const pastNight = (d, next) => ({ date: d, loads: [timed(d, 18, 59), timed(d, 18, 58), timed(d, 18, 57), timed(next, 1, 30, next), timed(next, 1, 29, next), timed(next, 1, 28, next)] });
+  const speed = R.hourSpeeds([], [pastNight('2026-10-14', '2026-10-15')]);
+  assert.ok(speed(H(18, 30)) < 1, 'early evening is slower than the night as a whole');
+  assert.ok(speed(H(25, 10)) > 1, 'after 1 AM is faster');
+  assert.equal(speed(H(10)), 1, 'an hour with under 3 timed loads goes at the usual speed');
+  assert.equal(R.hourSpeeds([], [timedNight('2026-10-12', 500)]).used, false, 'one load is not enough for any hour');
+  // The same weekday's nights win over the other nights for an hour they cover.
+  const own = R.hourSpeeds([pastNight('2026-10-12', '2026-10-13')], [{ date: '2026-10-14', loads: [timed('2026-10-14', 18, 20), timed('2026-10-14', 18, 20), timed('2026-10-14', 18, 20), timed('2026-10-14', 20, 59), timed('2026-10-14', 20, 59), timed('2026-10-14', 20, 59)] }]);
+  assert.ok(own(H(18, 30)) < 1, 'Monday nights say 6 PM is slow, so the other nights do not count for that hour');
+  assert.ok(own(H(20, 30)) < 1, 'an hour Monday nights do not have comes from the other nights');
+  // Two loads left with nothing timed today yet (the 1,000 rule, 36 minutes for 600 cases): a load starting in the slow early evening
+  // takes longer, one starting after 1 AM is quicker, and an hour the past nights never timed keeps its plain time.
+  const left = [wait('A', '', 600, H(4)), wait('B', '', 600, H(4))];
+  const plain = R.loadForecast({ date: MON, loads: left }, NOW), hourly = R.loadForecast({ date: MON, loads: left, allNights: [pastNight('2026-10-14', '2026-10-15')] }, NOW);
+  assert.equal(plain.loads[0].minutes, 36);
+  assert.equal(plain.byHour, false);
+  assert.equal(hourly.byHour, true);
+  assert.ok(hourly.loads[0].minutes === 36, '7 PM has no timed loads in the past nights, so it keeps the plain time');
+  const evening = R.loadForecast({ date: MON, loads: left, allNights: [pastNight('2026-10-14', '2026-10-15')] }, Date.parse('2026-10-19T22:05:00Z'));
+  assert.ok(evening.loads[0].minutes > 36, 'a load starting at 6:05 PM takes longer than the plain 36 minutes');
+  const late = R.loadForecast({ date: MON, loads: left, allNights: [pastNight('2026-10-14', '2026-10-15')] }, Date.parse('2026-10-20T05:05:00Z'));
+  assert.ok(late.loads[0].minutes < 36, 'a load starting at 1:05 AM is quicker');
+  assert.match(late.paceText, /hour of the night/);
+});
+
+// Joe 11-7-26 (option lg, "let's go ahead and do both"): the email's box under the recap: the Case Loadout finish time and, for each
+// truck time, when its loads should be done and the time to spare.
+test('the email shows when all case loads are done and each truck time with its time to spare', () => {
+  const loads = tonightDone.concat(tonightLeft), forecast = R.loadForecast({ date: MON, loads, history: [] }, NOW);
+  const t = R.truckTimes(forecast);
+  const leaving = forecast.loads.filter(x => x.leaves !== null && !x.outside);
+  assert.equal(t.reduce((a, g) => a + g.loads, 0), leaving.length, 'every load with a dispatch time is under its truck time');
+  assert.deepEqual(t.map(g => g.at), [...new Set(leaving.map(x => x.leaves))].sort((a, b) => a - b), 'one line per truck time, earliest first');
+  t.forEach(g => {
+    const mine = leaving.filter(x => x.leaves === g.at);
+    assert.equal(g.done, Math.max(...mine.map(x => x.est)), 'done when the last of its loads is done');
+    assert.equal(g.late, mine.filter(x => x.late).length);
+    assert.match(g.spareText, g.late ? /^LATE / : /HR|MIN|JUST IN TIME/);
+  });
+  const html = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads, forecast }, NOW))), '');
+  assert.match(html, /CASE LOADOUT FORECAST AS OF 7:00 PM/);
+  assert.match(html, new RegExp('ALL CASE LOADS DONE ABOUT ' + forecast.allDoneWhen.toUpperCase()));
+  assert.match(html, /TIME TO SPARE/);
+  assert.match(html, t.some(g => g.late) ? /TRUCK TIMES? WILL BE LATE/ : /EVERY TRUCK READY IN TIME/);
+  // An outside carrier's load is not a truck time.
+  const outside = R.truckTimes({ loads: [{ leaves: 100, est: 50, outside: true }, { leaves: 200, est: 150 }] });
+  assert.deepEqual(outside.map(g => [g.at, g.loads, g.spareText]), [[200, 1, '50 MIN']]);
+  // With no forecast the box is not there.
+  assert.doesNotMatch(R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), ''), /CASE LOADOUT FORECAST/);
+});

@@ -141,3 +141,21 @@ test('Yard trucks 688 and 9737 (no GPS, Joe 10/19) go by days: PM every truckDay
   assert.equal(L.fleetDue(yard, [{ unit: '688', last_service_date: '2026-07-01' }], {}, [], { truckDaysMonths: 6 }, today).items.find(i => i.unit === '688' && i.key === 'PM').status, 'OK', 'the months come from the rules');
   assert.equal(L.fleetDue(yard, [{ unit: '688', last_service_date: '2026-06-20' }], {}, [], null, today).items.find(i => i.unit === '688' && i.key === 'PM').status, 'DUE_SOON', 'warned 14 days ahead');
 });
+
+// Joe 11-7-26: every garage technician on the Employees list gets their employee ID by themselves, a short or different
+// spelling of the first name too ("TOM JELLICK"-style), but only when one employee fits. Made-up people only.
+test('Joe 11-7-26: a technician matches the employee with the same last name and first letter, when only one fits', () => {
+  const L = require('../../src/logic');
+  const emp = [{ employeeId: '007311', name: 'EXAMPLE, THOMAS', active: true }, { employeeId: '009354', name: 'SAMPLE, SHAUN', active: true },
+    { employeeId: '001111', name: 'TWIN, CHRIS', active: true }, { employeeId: '002222', name: 'TWIN, CASEY', active: true }, { employeeId: '003333', name: 'GONE, TOM', active: false }];
+  const id = (name, extra) => (L.employeeForTech(emp, Object.assign({ name }, extra || {})) || {}).employeeId || null;
+  assert.equal(id('TOM EXAMPLE'), '007311', 'Tom is Thomas');
+  assert.equal(id('EXAMPLE Tom'), '007311', 'either order');
+  assert.equal(id('SEAN SAMPLE'), '009354', 'Sean is Shaun');
+  assert.equal(id('CHARLIE TWIN'), null, 'two employees fit: nobody');
+  assert.equal(id('CASEY TWIN'), '002222', 'the exact name still wins');
+  assert.equal(id('PAT EXAMPLE'), null, 'another first letter is not them');
+  assert.equal(id('TOM GONE'), null, 'someone who left is not offered');
+  assert.equal(id('EXAMPLE'), null, 'a last name alone is not enough');
+  assert.equal(id('PAT NOBODY', { employee_id: '009354' }), '009354', 'the one picked wins');
+});

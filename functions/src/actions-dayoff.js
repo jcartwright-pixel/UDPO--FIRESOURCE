@@ -29,17 +29,19 @@ async function runsForDays(tx, db, startDate, endDate) {
  * days, and the day shows who it was for (intendedDriver) and why (driverExceptionStatus, e.g. VACATION, so Weekly
  * shows "Vacation - Needs Driver"). Return Available puts them back where nobody was picked in the meantime.
  */
+// reasonCode can also be a function of the date: a reason (off), '' (back available) or null (leave that day alone).
 function freeRunsForDayOff(tx, db, req, runSnaps, driver, reasonCode, stamp, email, mode, result) {
+  const codeFor = typeof reasonCode === 'function' ? reasonCode : (date) => (date < req.startDate || date > req.endDate ? null : reasonCode);
   runSnaps.forEach(r => {
     const run = r.data(), update = {}, cells = {};
     L.DAYS.forEach((p, i) => {
-      const d = run.days && run.days[p], date = L.addDays(run.weekStart, i);
-      if (!d || !d.runs || date < req.startDate || date > req.endDate) return;
-      if (reasonCode && d.driverId === driver.id) {
+      const d = run.days && run.days[p], date = L.addDays(run.weekStart, i), code = codeFor(date);
+      if (!d || !d.runs || code === null || code === undefined) return;
+      if (code && d.driverId === driver.id) {
         Object.assign(update, { ['days.' + p + '.driverId']: '', ['days.' + p + '.driver']: '', ['days.' + p + '.intendedDriverId']: driver.id,
-          ['days.' + p + '.intendedDriver']: driver.name, ['days.' + p + '.driverExceptionStatus']: reasonCode });
+          ['days.' + p + '.intendedDriver']: driver.name, ['days.' + p + '.driverExceptionStatus']: code });
         cells[p] = { driverId: '', driver: '' };
-      } else if (!reasonCode && d.intendedDriverId === driver.id && !d.driverId) {
+      } else if (!code && d.intendedDriverId === driver.id && !d.driverId) {
         Object.assign(update, { ['days.' + p + '.driverId']: driver.id, ['days.' + p + '.driver']: driver.name, ['days.' + p + '.intendedDriverId']: '',
           ['days.' + p + '.intendedDriver']: '', ['days.' + p + '.driverExceptionStatus']: '' });
         cells[p] = { driverId: driver.id, driver: driver.name };
@@ -163,6 +165,13 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
     }
   }
   const before = existing.exists ? existing.data() : null;
+  // Joe 11/6/2026 (Kemp on vacation still on 824 Friday): an approved vacation takes the driver off his runs on those days in every
+  // week already built, the same as Driver Call-Off, so the day reads NEEDS DRIVER with who is off. Moving, shortening or
+  // cancelling it puts him back on the days no longer off, where nobody was picked in the meantime.
+  const pairNow = VACATION_EXCEPTION[req.type] || VACATION_EXCEPTION.VACATION, offNow = req.status === 'APPROVED';
+  const wasOff = before && before.status === 'APPROVED' && before.startDate ? [before.startDate, before.endDate || before.startDate] : null;
+  const from = wasOff && wasOff[0] < req.startDate ? wasOff[0] : req.startDate, to = wasOff && wasOff[1] > req.endDate ? wasOff[1] : req.endDate;
+  const runSnaps = await runsForDays(tx, db, from, to);
   const doc = { id, driverId: driver.id, startDate: req.startDate, endDate: req.endDate, status: req.status, vacationType: req.type, notes: req.notes, notificationEmail: req.email, updatedAt: stamp, updatedBy: email, testEdited: true };
   if (!existing.exists) Object.assign(doc, { createdInApp: true, createdAt: stamp, createdBy: email });
   tx.set(ref, doc, { merge: true });
@@ -174,6 +183,8 @@ async function saveVacation(tx, db, req, email, stamp, logRef, mode) {
   const { id: mirrorId, ...mirrorFields } = mirror;
   queueMaster(tx, db, mode, req.requestId, 'vsched', vsRef, mirrorId, mirrorFields, !vsSnap.exists, stamp, email);
   const result = { ok: true, requestId: req.requestId, runs: [], vacationId: id };
+  freeRunsForDayOff(tx, db, req, runSnaps, driver, (date) => offNow && date >= req.startDate && date <= req.endDate ? pairNow[1]
+    : wasOff && date >= wasOff[0] && date <= wasOff[1] ? '' : null, stamp, email, mode, result);
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, driverId: driver.id, before, after: doc, result });
   return result;
 }

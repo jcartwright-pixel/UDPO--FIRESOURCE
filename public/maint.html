@@ -79,7 +79,7 @@
     const tile = (n, label, href, cls) => '<a class="hub-tile' + (cls && parseFloat(n) > 0 ? ' ' + cls : parseFloat(n) === 0 ? ' zero' : '') + '" href="' + href + '"><b>' + n + '</b><span>' + label + '</span></a>';
 
     function render() {
-      const lists = KINDS.map(([k]) => L.issueRows(data.maintenance, k, now())), nums = lists.map(o => L.issueNumbers(o, now()));
+      const lists = KINDS.map(([k]) => L.issueGarageVisits(L.issueRows(data.maintenance, k, now()), data.workOrders, k)), nums = lists.map(o => L.issueNumbers(o, now()));
       // Repeat units counts each unit once (the current app's repeat offenders), not each repeat write-up.
       const repeatUnits = new Set(KINDS.flatMap(([k], i) => lists[i].filter(r => r.occurrences > 1).map(r => k + '|' + (r.unitKey || r.unit)))).size;
       const all = [].concat(...lists), oldest = Math.max(0, ...nums.map(n => n.oldestDays));
@@ -134,9 +134,10 @@
       onSnapshot(doc(db, 'config', 'fleetOwnership'), d => { const o = d.exists() ? d.data() : null; ownership = o && o.units ? o : null; render(); }, () => {});
       // Joe 10/18 (screen speed): the open write-ups and the recent ones the counts need, not every write-up ever made.
       watchIssueRecords(db, r => { data.maintenance = r; render(); }, e => showError('Could not read the write-ups (' + e.message + '). Some counts may be short; check the network and reload the page.'));
-      // The open work orders and this week's finished ones (the Garage card), not every work order ever made.
+      // The open work orders and the ones finished in the last 120 days (this week's for the Garage card; Joe 11/6, the rest so
+      // an open write-up whose unit was in the garage counts At garage, as on the issue lists), not every work order ever made.
       loadWaiting();
-      watchHubWorkOrders(db, L.weekStart(L.operatingDay(new Date())), r => { data.workOrders = r; render(); }, e => showError('Could not read the work orders (' + e.message + '). Some counts may be short; check the network and reload the page.'));
+      watchHubWorkOrders(db, new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10), r => { data.workOrders = r; render(); }, e => showError('Could not read the work orders (' + e.message + '). Some counts may be short; check the network and reload the page.'));
       Object.keys(data).filter(name => name !== 'maintenance' && name !== 'workOrders').forEach(name => onSnapshot(collection(db, name), s => { data[name] = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); render(); }, e => showError('Could not read the ' + ({ maintenance: 'write-ups', workOrders: 'work orders', equipment: 'truck and trailer list', fleetSetup: 'service dates', odometers: 'driver miles', gpsTrucks: 'GPS miles and hours' })[name] + ' (' + e.message + '). Some counts may be short; check the network and reload the page.')));
       render();
     });

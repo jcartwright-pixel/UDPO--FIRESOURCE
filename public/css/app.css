@@ -494,6 +494,23 @@ body.has-side #screen.home-screen .side-main { overflow: auto; }
 .weekly-page .head .title { flex: none; }
 .weekly-page .head .actions.in-head { flex-wrap: nowrap; gap: 6px; align-self: center; }
 .weekly-page .head .tabs button { white-space: nowrap; }
+.weekly-page .wk-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+/* Joe 11/6: "87% OF RUNS COVERED" beside the title, red until every run has a driver, green at 100%. */
+.wk-covered { flex: none; background: var(--red); color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .02em; line-height: 1; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+.wk-covered.full { background: var(--green); }
+/* Never wider than the screen: on a phone or tablet the box drops under the title and its words wrap, never cut. */
+.weekly-page .head .title { max-width: 100%; min-width: 0; }
+.wk-covered { max-width: 100%; }
+@media (max-width: 1024px) { .wk-covered { white-space: normal; line-height: 1.15; } }
+/* On a laptop the longer buttons go onto two lines so the figure and every button still fit on the title line. */
+@media (max-width: 1700px) {
+  .weekly-page .head .actions.in-head :is(button, a.button) { white-space: normal; max-width: 124px; line-height: 1.1; padding-left: 8px; padding-right: 8px; text-align: center; justify-content: center; }
+  .weekly-page .head .actions.in-head #publish { max-width: 160px; }
+  /* Joe 11/7 (full test at 1536): a button whose words need three lines grows to hold them instead of cutting the last line
+     off; the buttons on the row all take the tallest one's height. */
+  .weekly-page .head .actions.in-head { align-items: stretch; }
+  .weekly-page .head .actions.in-head :is(button, a.button) { height: auto; min-height: 42px; padding-top: 3px; padding-bottom: 3px; }
+}
 .weekly-page .week td { height: 40px; }
 
 /* Header shows only the user's initials; the full email is on hover. */
@@ -1191,6 +1208,7 @@ table.ops thead th, table.set thead th { position: sticky; top: 0; z-index: 2; }
 @media (max-width: 800px) { .texts-page .gps-grid { grid-template-columns: 1fr; } .texts-page .gps-card.wide { grid-column: 1; } }
 .texts-page .texts-log td { vertical-align: top; overflow-wrap: anywhere; }
 .texts-page .texts-log tr.texts-in td { background: #eef6ff; }
+.texts-page .texts-log td[data-l="Message"] { white-space: pre-line; }
 .texts-page .texts-resend { margin-top: 6px; font-size: 16px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-weight: 700; }
 .texts-page .texts-resend.armed { background: #b42318; border-color: #b42318; color: #fff; }
 /* Phones: each text is a small card (label, then the words), so nothing is squeezed into a narrow column. */
@@ -1249,6 +1267,16 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip .send-button.armed { background: #b42318; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
+.send-strip .send-hand { flex-basis: 100%; color: var(--red); }
+/* Joe 11/7 (li): the sent check on the send strip. */
+.send-strip .send-count { font-weight: 800; color: #fff; border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+.send-strip .send-count.good { background: var(--green); }
+.send-strip .send-count.bad { background: var(--red); }
+.send-strip.missing { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
+.send-strip .send-button.fix { background: var(--red); }
+.send-strip .send-hand-short { color: var(--red); white-space: nowrap; }
+.texts-page .texts-hand { margin-top: 12px; }
+.texts-page .texts-hand h3 { color: var(--red); }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
 .texts-page .texts-test select { font-size: 16px; min-width: 240px; padding: 6px 8px; }
 .texts-page .texts-week { white-space: pre-line; }

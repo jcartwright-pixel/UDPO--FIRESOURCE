@@ -39,19 +39,25 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     const page = await openPage(browser, 1920, 950, '/weekly.html?week=2026-10-11&testEmail=dispatch.test@uniteddairy.com');
     await page.waitForSelector('#rows tr td.day');
     await page.waitForFunction(() => !document.getElementById('publish').disabled);
-    assert.equal(await page.textContent('#publish'), 'Publish to Daily Dispatch');
+    assert.equal(await page.textContent('#publish'), 'PUBLISH TO WEEKLY DISPATCH');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '1-next-week-before-publish-1920.png') });
     await page.click('#publish');
     assert.match(await page.textContent('#publish'), /^Click Again: Push 10-11-26 Live$/);
     assert.match(await page.textContent('#wk-note'), /move Current to Previous, Next to Current, and create the new Next week/);
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '2-click-again-1920.png') });
-    await page.click('#publish');
-    await page.waitForFunction(() => /week=2026-10-18/.test(location.search) && /Week pushed live/.test(document.getElementById('wk-note').textContent), null, { timeout: 10000 });
+    // Joe 11/6: right after publishing, the screen switches to Weekly Dispatch, the week just published, saying what was done.
+    await Promise.all([page.waitForURL(/weekly\.html\?view=live/, { timeout: 15000 }), page.click('#publish')]);
+    await page.waitForFunction(() => document.getElementById('week-date').value === '2026-10-11' && /Week pushed live/.test(document.getElementById('wk-note').textContent), null, { timeout: 10000 });
     assert.match(await page.textContent('#wk-note'), /Week pushed live\. Current is now 10-11-26/);
+    assert.equal(await page.textContent('#page-name'), 'Weekly Dispatch');
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3-after-publish-weekly-dispatch-1920.png') });
+    // Back on the Template it opens the new Next week.
+    await Promise.all([page.waitForURL(/weekly\.html\?(?!view=live)/), page.click('#go-other')]);
+    await page.waitForFunction(() => /week=2026-10-18/.test(location.search), null, { timeout: 10000 });
     await page.waitForFunction(() => [...document.querySelectorAll('#rows tr td:first-child')].map(td => td.textContent).join() === '802,801,810', null, { timeout: 5000 });
     assert.match(await page.textContent('#rows'), /CASEY, LEE/);
     assert.ok(await page.$('#rows td.day.editable'), 'the new Next week can be edited');
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3-new-next-week-1920.png') });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '3b-template-new-next-week-1920.png') });
 
     // A week after Next: a preview from Route Master and Driver Master, view only.
     await page.click('#next');
@@ -87,6 +93,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
       assert.match(await wb.textContent('#wk-note'), /create the new Next week, here and in the Live sheet\. Click again/);
       if (SHOTS) await wb.screenshot({ path: path.join(SHOTS, '6-writeback-click-again-' + width + '.png') });
       await wb.click('#publish');
+      await wb.waitForURL(/weekly\.html\?view=live/, { timeout: 30000 });
       await wb.waitForFunction(() => /Week pushed live/.test(document.getElementById('wk-note').textContent) || !document.getElementById('error').hidden, null, { timeout: 30000 });
       assert.equal(await wb.$eval('#error', el => el.hidden ? '' : el.textContent), '', 'no refusal');
       assert.match(await wb.textContent('#wk-note'), /The Live sheet's weeks moved too\./);

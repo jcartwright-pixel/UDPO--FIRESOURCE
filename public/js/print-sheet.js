@@ -119,8 +119,13 @@ export function printPages(result, lay, st, sel) {
 // Layouts itself has the screen open behind it, it takes the sheet instead (udPrintCatch).
 export function printSaved(key) {
   if (typeof window.udPrintCatch === 'function') { window.udPrintCatch(); return; }
-  const box = document.getElementById('print');
-  const result = { html: '<div id="print">' + (box ? box.innerHTML : '') + '</div>', css: styles(document) }, st = setupFor(key);
+  printFrom(document, key);
+}
+// Prints what another screen put in its #print box (that screen open unseen in a frame here), with that sheet's saved setup.
+// Daily Dispatch's Print Weekly Schedule uses it for Weekly Dispatch's board (Joe 11/6).
+export function printFrom(from, key) {
+  const box = from.getElementById('print');
+  const result = { html: '<div id="print">' + (box ? box.innerHTML : '') + '</div>', css: styles(from) }, st = setupFor(key);
   const f = document.createElement('iframe');
   f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.style.cssText = 'position:fixed;left:-40000px;top:0;width:1200px;height:900px;border:0;visibility:hidden';
   document.body.appendChild(f);

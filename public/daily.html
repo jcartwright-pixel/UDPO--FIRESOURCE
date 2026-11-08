@@ -32,35 +32,33 @@
     </div>
     <div class="head">
       <div class="title"><h1>Daily Dispatch</h1></div>
-      <!-- Review item 57 (Joe 10/13): the buttons are words only (no printer or truck icons). -->
+      <!-- Review item 57 (Joe 10/13): the buttons are words only (no printer or truck icons).
+           Joe 11/6 (mock-up ks): the action buttons on the title line, everything that is information on one line under them. -->
       <div class="actions in-head">
         <a class="button" id="go-weekly" href="weekly.html">Weekly Dispatch</a>
-        <button type="button" class="primary" id="print-sheet">Print Dispatch Sheet</button>
+        <button type="button" class="primary" id="print-sheet">Print Daily Schedule</button>
+        <button type="button" class="primary" id="print-week">Print Weekly Schedule</button>
         <button type="button" class="warn" id="open-down">Down Trucks / Trailers</button>
-        <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
         <button type="button" class="primary" id="open-calloff">Driver Call-Off</button>
         <button type="button" class="primary" id="open-add">+ Add Route / Run</button>
       </div>
-      <div class="field">
-        <label for="week-begin">Week beginning</label>
-        <div class="stepper">
-          <button type="button" id="week-prev" aria-label="Previous week" title="Previous week">&#9664;</button>
-          <input id="week-begin" readonly tabindex="-1">
-          <button type="button" id="week-next" aria-label="Next week" title="Next week">&#9654;</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="load-day">Loadout day<span id="delivers"></span></label>
+      <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
+    </div>
+    <!-- Joe 11/6: this screen always shows the current week; the week cannot be changed here, only the day inside it. -->
+    <div class="day-info" id="day-info">
+      <div class="week-of"><small>Week of</small><span id="week-of"></span></div>
+      <span class="coverage" id="coverage"><b>-%</b><span>DRIVERS COVERED</span></span>
+      <div id="send-texts" hidden></div>
+      <div class="day-pick">
+        <label for="load-day">Loadout day</label>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous day">&#9664;</button>
           <select id="load-day"></select>
           <button type="button" id="next" aria-label="Next day">&#9654;</button>
         </div>
+        <span class="delivers" id="delivers"></span>
       </div>
-      <div class="field"><label for="delivery-day">Delivery day</label><div class="stepper"><input id="delivery-day" readonly tabindex="-1"></div></div>
-      <div class="badge-test" id="mode"><b id="mode-text">TEST COPY, READ ONLY</b><span id="copied">Waiting for the first copy from the sheets</span></div>
     </div>
-    <div id="send-texts" hidden></div>
     <div class="notice error" id="error" hidden></div>
     <div class="notice warning down-loads" id="down-loads" hidden><span id="down-loads-text"></span> <button type="button" id="down-loads-clear">Take them off these loads</button></div>
     <div class="sheet">
@@ -94,11 +92,6 @@
     <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="off-save">Save Driver Status</button></div>
   </section>
 
-  <section class="modal" id="week-panel" role="alertdialog" aria-labelledby="week-title" hidden>
-    <h2 id="week-title">Change the week?</h2>
-    <p id="week-text" class="week-warn"></p>
-    <div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="week-go">Continue</button></div>
-  </section>
 
   <section class="modal" id="add-panel" role="dialog" aria-labelledby="add-title" hidden>
     <h2 id="add-title">Add Route / Run</h2>
@@ -122,7 +115,7 @@
   <div id="print" aria-hidden="true"></div>
 
   <script type="module">
-    import { printSaved } from './js/print-sheet.js';
+    import { printSaved, printFrom } from './js/print-sheet.js';
     import { mountRowDrag } from './js/row-drag.js';
     import { start, requireSignIn, fitToWindow, escapeHtml, shortDate, showError, watchCopied } from './js/app.js';
     import { lists, watchLists, canSave, canReorder, openNote, optionsHtml, driverOptionsHtml, pickChoices, cvgOptions, pickText, saveAssignment, saveRunChange, withUnsaved, saveOrder, saveOptimistic, forScreen, modeLabel } from './js/edit.js';
@@ -130,7 +123,7 @@
     import { runArea } from './js/plant-core.js';
     forScreen('dailyDispatch');
     window.UD_QUIET_SAVES = true; // Joe 10/16: no Saving / Saved sign on this screen (a failed save still says Not saved)
-    import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
+    import { collection, doc, getDoc, query, where, onSnapshot } from './js/firebase.js';
     import { sendTextsStrip } from './js/send-texts-strip.js';
 
     const L = window.UDLogic, R = window.UDPlant;
@@ -138,6 +131,22 @@
     const routeNo = (r) => L.routeNumber(r.route), runName = (r) => L.runLabel(r.routeName, r.run, r.routeRunType), fullName = (r) => routeNo(r) + ' ' + runName(r);
     const params = new URLSearchParams(location.search);
     let loadDate = L.isDateKey(params.get('date')) ? params.get('date') : L.operatingDay(new Date());
+    // Joe 11/6: Daily Dispatch shows only the current week. Its loadout days are Saturday to Friday (they deliver Sunday to Saturday);
+    // the arrows and the day list stay inside it. Print Layouts' unseen copy (in a frame) still prints the day it was asked for.
+    // Joe 11/6 ("the week never gets changed in the daily dispatch or the weekly dispatch until I publish"): the current week is the
+    // published one (config/app liveWeeks.current), the same week Weekly Dispatch shows. The calendar never moves it, not the
+    // Saturday 6 a.m. roll either: only a Publish on the Weekly Dispatch Template does. A day in a link from another week (the
+    // Template's Daily Dispatch button on next week) opens the day kept here instead, or today when that is not in the week.
+    // On the test server a ?now= time stands for the clock; without one, the day in the link (or the day kept) counts as today
+    // and its week is the week shown.
+    const testServer = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), inFrame = window.self !== window.top;
+    const testNow = testServer && Date.parse(params.get('now') || '');
+    let testToday = testNow ? L.operatingDay(new Date(Date.parse(params.get('now')))) : '';
+    const today = () => testToday || L.operatingDay(new Date());
+    let liveCurrent = '', started = false;
+    // The loadout Saturday that starts the week shown, and a day pulled inside that week.
+    const lockBegin = () => testServer && !testNow ? weekBegin(testToday || loadDate) : L.isDateKey(liveCurrent) ? L.addDays(liveCurrent, -1) : weekBegin(today());
+    const intoWeek = (key) => { const b = lockBegin(), e = L.addDays(b, 6); return key < b ? b : key > e ? e : key; };
     let unsubscribeRuns = null, unsubscribePlant = null, unsubscribeCarrier = null, plantLoads = [], routeLoads = [], carrierLoads = [], runs = [], rows = [], editing = false, rowDrag = null, held = false, writeBack = false, editRow = null;
     const getRuns = () => runs;
     // Session-only screen state, like the current screen: rows switched to NO RUN stay in view, and OVR ticks per row.
@@ -308,8 +317,6 @@
       // Polish item 3 (Joe 10/11): a day with no loads says so instead of showing 0% covered.
       document.getElementById('coverage').firstElementChild.textContent = running.length ? Math.round(100 * covered / running.length) + '%' : '—';
       document.getElementById('coverage').lastElementChild.textContent = running.length ? 'DRIVERS COVERED' : 'NO LOADS';
-      document.getElementById('delivery-day').value = deliveryDayName(loadDate);
-      // On a laptop the Delivery day box makes room for the top line and its day shows next to Loadout day (review item 1).
       document.getElementById('delivers').textContent = 'Delivers ' + deliveryDayName(loadDate);
       const groups = new Set(rows.map(r => r.deliveryDate)).size;
       document.getElementById('count').textContent = running.length + ' loads' + (running.length - covered ? ', ' + (running.length - covered) + ' need a driver' : '');
@@ -453,7 +460,7 @@
     }, onEnd: () => { if (held) { held = false; render(); } } });
 
     /* ---------- Edit box: the same fields as the current screen; each change saves the moment it is made ---------- */
-    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel', 'week-panel'];
+    const modals = ['edit-modal', 'calloff-panel', 'add-panel', 'down-panel'];
     function openModal(id) { modals.forEach(m => { document.getElementById(m).hidden = m !== id; }); document.getElementById('modal-back').hidden = false; }
     function closeModals() { modals.forEach(m => { document.getElementById(m).hidden = true; }); document.getElementById('modal-back').hidden = true; editRow = null; }
     document.getElementById('modal-back').onclick = closeModals;
@@ -643,7 +650,7 @@
     function printSheet(only) {
       const list = (only || rows).filter(r => !r.off && !r.already);
       let html = '<h2>UNITED DAIRY &mdash; DAILY DISPATCH SHEET</h2><p>Week Beginning Sunday ' + escapeHtml(usDate(L.addDays(weekBegin(loadDate), 1))) + ' &middot; Load Day ' + escapeHtml(L.dayName(loadDate)) +
-        ' &middot; Delivery Day ' + escapeHtml(document.getElementById('delivery-day').value) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
+        ' &middot; Delivery Day ' + escapeHtml(deliveryDayName(loadDate)) + '</p><table><thead><tr><th>ROUTE</th><th>RUN</th><th>DRIVER</th><th>TRUCK</th><th>TRAILER</th><th>DEPART TIME</th>' +
         '<th>C/O</th><th>P/O</th><th>T/O</th><th>L/D</th><th>DR</th><th>CHECKED BY</th><th>JACK</th><th>DRIVER NOTES</th></tr></thead><tbody>';
       let group = '', loaded = '';
       const mixed = mixedLoads(list);
@@ -658,6 +665,18 @@
       printSaved('daily');
     }
     document.getElementById('print-sheet').onclick = () => printSheet();
+    // Joe 11/6: Print Weekly Schedule prints Weekly Dispatch's Driver Assignment Board for the live week (what Weekly's own
+    // Print Weekly Dispatch prints), without leaving this screen: Weekly opens unseen in a frame and its sheet is printed from here.
+    document.getElementById('print-week').onclick = () => {
+      const old = document.getElementById('week-print-frame');
+      if (old) old.remove();
+      const f = document.createElement('iframe');
+      f.id = 'week-print-frame'; f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;left:-40000px;top:0;width:1920px;height:1080px;border:0;visibility:hidden';
+      f.src = 'weekly.html?view=live' + (params.get('testEmail') ? '&testEmail=' + encodeURIComponent(params.get('testEmail')) : '') + '#print';
+      f.addEventListener('load', () => { f.contentWindow.udPrintCatch = () => { printFrom(f.contentDocument, 'weekly'); setTimeout(() => f.remove(), 2000); }; }, { once: true });
+      document.body.appendChild(f);
+    };
     // Print Layouts opens Daily with #print: the sheet prints once the day's runs are on screen.
     // An empty day or week still prints (a blank sheet) once the runs have been read, instead of waiting forever.
     let runsRead = false;
@@ -668,7 +687,10 @@
       const { db } = await start();
       if (unsubscribeRuns) unsubscribeRuns();
       const begin = weekBegin(loadDate);
-      document.getElementById('week-begin').value = shortDate(L.addDays(begin, 1));
+      document.getElementById('week-of').textContent = shortDate(L.addDays(begin, 1)) + ' to ' + shortDate(L.addDays(begin, 7));
+      // The arrows stop at the ends of the week; greyed, they say why.
+      const atStart = loadDate === begin, atEnd = loadDate === L.addDays(begin, 6), why = 'Daily Dispatch shows only this week';
+      Object.entries({ prev: atStart, next: atEnd }).forEach(([id, stop]) => { const b = document.getElementById(id); b.disabled = stop; b.title = stop ? why : ''; });
       document.getElementById('load-day').innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
         const key = L.addDays(begin, i);
         return '<option value="' + key + '"' + (key === loadDate ? ' selected' : '') + '>' + escapeHtml(L.dayName(key)) + '</option>';
@@ -700,24 +722,18 @@
     }
 
     // Joe 10/12: the day picked stays picked (per person, on this computer) after leaving the page and coming back, until he
-    // changes it; a move into another week asks first (Continue or Cancel).
+    // changes it, as long as it is in the current week (Joe 11/6: the week cannot be changed here).
     let dayKey = '';
     function goTo(key) {
-      if (!L.isDateKey(key) || key === loadDate) return;
-      const go = () => { closeModals(); loadDate = key; watchRuns(); };
-      if (weekBegin(key) === weekBegin(loadDate)) return go();
-      document.getElementById('week-text').textContent = 'This moves Daily Dispatch from the week beginning ' + shortDate(L.addDays(weekBegin(loadDate), 1)) +
-        ' to the week beginning ' + shortDate(L.addDays(weekBegin(key), 1)) + ' (' + L.dayName(key) + ' ' + shortDate(key) + ').';
-      document.getElementById('week-go').onclick = go;
-      openModal('week-panel');
-      document.getElementById('week-go').focus();
+      if (!L.isDateKey(key) || key === loadDate || weekBegin(key) !== weekBegin(loadDate)) return;
+      loadDate = key; watchRuns();
     }
     function move(days) { goTo(L.addDays(loadDate, days)); }
 
     requireSignIn(async (user) => {
       const { db } = await start();
       // Joe 10/31 (hx): Send Schedule Texts for the posted week (whatever week or day is showing).
-      sendTextsStrip(db, document.getElementById('send-texts'));
+      sendTextsStrip(db, document.getElementById('send-texts'), { short: true });
       onSnapshot(collection(db, 'routes'), snap => {
         routeHours = {};
         snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; });
@@ -727,6 +743,12 @@
         writeBack = !!(c.writeBack && c.writeBack.enabled === true);
         // The conflict link shows only while the write-back is on (it is the only thing that makes conflicts).
         document.getElementById('to-conflicts').hidden = !writeBack;
+        // A Publish moves the week on: the screen follows it to today, kept inside the newly published week.
+        const cur = (c.liveWeeks || {}).current;
+        if (L.isDateKey(cur) && cur !== liveCurrent) {
+          liveCurrent = cur;
+          if (started && !inFrame && weekBegin(loadDate) !== lockBegin()) { loadDate = intoWeek(today()); watchRuns(); return; }
+        }
         render();
       });
       watchCopied(db, (when) => {
@@ -736,11 +758,19 @@
       watchLists(user, render);
       document.getElementById('prev').onclick = () => move(-1);
       document.getElementById('next').onclick = () => move(1);
-      document.getElementById('week-prev').onclick = () => move(-7);
-      document.getElementById('week-next').onclick = () => move(7);
       document.getElementById('load-day').onchange = e => goTo(e.target.value);
       dayKey = 'ud.daily.day.' + String(params.get('testEmail') || (user && user.email) || '').toLowerCase();
-      if (!L.isDateKey(params.get('date'))) { try { const kept = localStorage.getItem(dayKey); if (L.isDateKey(kept)) loadDate = kept; } catch (e) { /* storage off */ } }
+      let kept = '';
+      try { kept = localStorage.getItem(dayKey) || ''; } catch (e) { /* storage off */ }
+      const linked = L.isDateKey(params.get('date'));
+      if (!linked && L.isDateKey(kept)) loadDate = kept;
+      if (testServer && !testToday) testToday = loadDate;
+      const first = await getDoc(doc(db, 'config', 'app')).then(s => ((s.data() || {}).liveWeeks || {}).current || '', () => '');
+      if (L.isDateKey(first)) liveCurrent = first;
+      if (!inFrame && weekBegin(loadDate) !== lockBegin()) loadDate = linked && L.isDateKey(kept) && weekBegin(kept) === lockBegin() ? kept : intoWeek(today());
+      started = true;
+      // Only with no published week to go by (a new copy of the app) does the calendar move the week (Saturday 6 a.m.).
+      if (!inFrame) setInterval(() => { if (weekBegin(loadDate) !== lockBegin()) { loadDate = intoWeek(today()); watchRuns(); } }, 60000);
       window.addEventListener('resize', render);
       watchRuns();
     });
