@@ -258,6 +258,10 @@ Where the office's **Daily Load By Route** comes in (administrators). The office
 
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Accounting Numbers and Driver Check-In Email). If it has not, the last-checked line says so in red.
 
+> If the file under the label has no BOL lines, the last-checked line turns red and names the file, like **Read Weekly Daily Avg Cases.xls, but it has no BOL lines: it looks like the weekly route report, not the Daily BOL. Check the email label.** The weekly route report's label (ROUTES/SALE BY ROUTE) goes on **Accounting Numbers**, not here.
+
+!> Do not type the weekly route report's label here. Daily BOL's label is ROUTES/BOL.
+
 !> Do not move the BOL emails out of the ROUTES/BOL label before the Hub has read them. An email outside the label is not picked up; add it by hand instead.
 
 ## Help
