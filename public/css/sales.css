@@ -51,12 +51,8 @@ html, body { margin: 0; background: #f4f6f9; color: #1b2430; font: 17px/1.3 Robo
 .sa-route { font-size: 17px; }
 .sa-pill { display: inline-block; padding: 2px 8px; white-space: nowrap; border-radius: 10px; font-weight: 700; font-size: 16px; }
 .sa-pill.ok { background: #e3f3e5; color: #1d7a2c; }
-<<<<<<< HEAD
 .sa-pill.late { background: #fbe3e3; color: #b42318; }
 .sa-pill.caution { background: #f5c518; color: #1c2733; }
-=======
-.sa-pill.late { background: #fbe3e3; color: #b42318; }
->>>>>>> 0055f79 (One color set: one red, one green, one yellow everywhere (rules audit line 14))
 .sa-pill.loaded { background: #e1edfb; color: #174ea6; }
 .sa-pill.waiting { background: #fff3d4; color: #9a5b00; } /* the one amber (app.css --amber, logic.js COLORS.amber); this page has no app.css */
 .sa-empty { margin: 0; padding: 16px; }

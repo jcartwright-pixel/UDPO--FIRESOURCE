@@ -1558,17 +1558,11 @@ body.yard-page .head .badge-test { order: 6; }
 .forecast-page .fc-run small.fc-why-sm { display: none; }
 .forecast-page .fc-run small { display: block; line-height: 1.1; color: #b42318; font-weight: 800; font-size: 16px; white-space: normal; }
 .forecast-page .fc-pill { font-style: normal; font-size: 16px; padding: 0 8px; border-radius: 999px; background: #ffe9b0; color: #7a4b00; }
-<<<<<<< HEAD
 .forecast-page .fc-est { font-weight: 800; color: #1f7a4d; white-space: nowrap; }
 .forecast-page .fc-row.late { background: #fde8e8; color: #b42318; }
 .forecast-page .fc-row.late .fc-est { color: #fff; background: #b42318; border-radius: 6px; padding: 1px 6px; justify-self: start; }
 .forecast-page .fc-row.late.caution { background: #fff6d6; color: #7a5200; }
 .forecast-page .fc-row.late.caution .fc-est { color: #1c2733; background: #f5c518; }
-=======
-.forecast-page .fc-est { font-weight: 800; color: #1f7a4d; white-space: nowrap; }
-.forecast-page .fc-row.late { background: #fde8e8; color: #b42318; }
-.forecast-page .fc-row.late .fc-est { color: #fff; background: #b42318; border-radius: 6px; padding: 1px 6px; justify-self: start; }
->>>>>>> 0055f79 (One color set: one red, one green, one yellow everywhere (rules audit line 14))
 .forecast-page .fc-row.loading { background: #fff8e6; }
 .forecast-page .fc-row.left > b { box-shadow: inset 6px 0 0 #e8a317; padding-left: 14px; }
 .forecast-page .fc-line { position: relative; height: 26px; margin-right: 22px; }
