@@ -257,8 +257,8 @@ details.more .controls{margin-top:10px}
   </section>
 
   <section class="panel day" aria-label="All routes">
-    <div class="panel-head"><h2>All routes</h2><span class="hint" id="dayHint">The 11/05 BOL is loaded: 25 routes, stops in BOL order. Open a route to see its orders, cases and pallets.</span></div>
-    <div class="tbl dayscroll"><table id="dayTable"></table></div>
+    <div class="panel-head"><h2>All routes</h2><button type="button" id="dayToggle" aria-expanded="true" aria-controls="dayWrap">HIDE ROUTES</button><span class="hint" id="dayHint">The 11/05 BOL is loaded: 25 routes, stops in BOL order. Open a route to see its orders, cases and pallets.</span></div>
+    <div class="tbl dayscroll" id="dayWrap"><table id="dayTable"></table></div>
   </section>
 
   <section class="panel day" aria-label="Truck load map">
@@ -358,7 +358,12 @@ function routeKey(r){
   const nm = (r && r.route) || '', m = /(\d{3,})/.exec(nm), d = /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(nm);
   if (!m || !d) return null;
   const y = d[3] ? (d[3].length === 2 ? 2000 + +d[3] : +d[3]) : 2026;
-  const day = WD[new Date(y, +d[1]-1, +d[2]).getDay()], key = m[1] + '|' + day;
+  const wd = new Date(y, +d[1]-1, +d[2]).getDay();
+  // Joe 11-8-26 (route 805 on the Friday 11-6-26 BOL; 805 runs Tuesday, Thursday and Saturday): a route that does not run on
+  // the BOL's day but runs the next day is that next day's load (loaded the day before).
+  let day = WD[wd];
+  if (!SEQS[m[1] + '|' + day] && SEQS[m[1] + '|' + WD[(wd + 1) % 7]]) day = WD[(wd + 1) % 7];
+  const key = m[1] + '|' + day;
   return {route:m[1], day, key, list:SEQS[key] || []};
 }
 const stopSeq = st => { if (st.seq != null && st.seq !== '' && !isNaN(+st.seq)) return +st.seq; const m = /\(sub-rt (\d+)\)/i.exec(st.name || ''); return m ? +m[1] : null; }; // st.seq is set from the load map; otherwise the BOL sub-rt
@@ -661,8 +666,16 @@ function render(){
   save(); window._R = R; renderDay(); renderMap(R); renderMapLine(); renderCust(R);
 }
 
+// Joe 11-8-26 ("whenever you're switching the days, it didn't reload the routes"): All routes lists only the open BOL day's
+// routes and the saved routes with no BOL day in their name (every saved route when that day has none), so Open never jumps
+// to another day.
+function shownRoutes(){
+  let on = []; try { on = DAYSEL ? dayRoutes(DAYSEL) : []; } catch(e) { on = []; } // (before the BOL days are set up)
+  const all = DB.routes.map((r, i) => ({r, i}));
+  return on.length ? on.concat(all.filter(x => !routeDate(x.r))) : all;
+}
 function renderDay(){
-  const keep = S; const rows = DB.routes.map((r, i) => {
+  const keep = S; const rows = shownRoutes().map(({r, i}) => {
     S = r; const R = plan(); S = keep;
     const c = R.stats.reduce((a,s)=>a+s.cases,0), tt = R.stats.reduce((a,s)=>a+s.totes,0);
     const tk = R.tankers.map(t => `${fmt(t.x.units)} ${/lb/i.test(t.x.size||'')?'lb':'gal'}`).join(', ');
@@ -990,7 +1003,14 @@ function printChanges(where){
   $('lmMsg').textContent = '';
   window.print();
 }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmPrintTop') printChanges('mapMsg'); else if (b.id === 'lmSave') saveMap();
+// Joe 11-8-26: "on this all routes window, I'd like it to be able to be collapsible". Remembered in this browser.
+function setRoutesShown(show){
+  const w = $('dayWrap'), t = $('dayToggle'); if (!w || !t) return;
+  w.hidden = !show; t.textContent = show ? 'HIDE ROUTES' : 'SHOW ROUTES'; t.setAttribute('aria-expanded', show ? 'true' : 'false');
+  try { localStorage.setItem('udpb-routes-hidden', show ? '' : '1'); } catch(e) {}
+}
+(() => { let hid = false; try { hid = localStorage.getItem('udpb-routes-hidden') === '1'; } catch(e) {} setRoutesShown(!hid); })();
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'dayToggle') { setRoutesShown($('dayWrap').hidden); return; } if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmPrintTop') printChanges('mapMsg'); else if (b.id === 'lmSave') saveMap();
   else if (b.id === 'dayPrev' || b.id === 'dayNext') { const i = BOLDAYS.findIndex(d => d.date === DAYSEL), j = i + (b.id === 'dayPrev' ? 1 : -1); if (BOLDAYS[j]) { pickDay(BOLDAYS[j].date, true); all(); } } });
 // Joe 11-6-26: one customer's cases on this route day, from the route map (the Customer List keeps them from the Hub's Weekly
 // Route Report): {key, stats, uses, held, canEdit} or null when the route map or the customer is not there.

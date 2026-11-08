@@ -223,6 +223,31 @@ async function openPage(ctx, url) {
     assert.equal(await hb.locator('#dayLine').evaluate(e => getComputedStyle(e).color), 'rgb(107, 120, 132)', 'and its line');
     await p.waitForTimeout(300);
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-day-before-1536.png') });
+    // Joe 11-8-26: "whenever you're switching the days, it didn't reload the routes": All routes shows only the open day's
+    // routes, Open keeps the day, and changing the day opens that day's first route.
+    const only = async (tag) => { const names = await hb.locator('#dayTable tbody tr td:first-child').allTextContents();
+      return names.filter(n => !/^All routes$/i.test(n) && /\d\/\d/.test(n)).every(n => n.includes(tag)); };
+    assert.ok(await only('11/08/26'), 'Sunday open: only Sunday\'s routes are listed');
+    // Joe 11-8-26: All routes folds up and opens again, and stays as he left it.
+    await hb.locator('#dayToggle').click();
+    assert.ok(await hb.locator('#dayWrap').isHidden()); assert.equal(await hb.locator('#dayToggle').textContent(), 'SHOW ROUTES');
+    await hb.locator('#dayToggle').click();
+    assert.ok(await hb.locator('#dayWrap').isVisible()); assert.equal(await hb.locator('#dayToggle').textContent(), 'HIDE ROUTES');
+    await hb.locator('#dayPick').selectOption('2026-11-05');
+    await hb.locator('#dayLine', { hasText: 'BOL FOR THURSDAY 11-5-26' }).waitFor();
+    assert.ok(await only('11/05'), 'Thursday open: only Thursday\'s routes are listed');
+    assert.ok(/ · 11\/05$/.test(await hb.locator('#route').inputValue()), 'and a Thursday route opens');
+    await hb.locator('#dayPick').selectOption('2026-11-09');
+    await hb.locator('#dayLine', { hasText: 'BOL FOR MONDAY 11-9-26' }).waitFor();
+    assert.ok(await only('11/09/26'), 'back on Monday: none of Thursday\'s routes are listed');
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/09/26', 'the route box goes to the new day\'s first route');
+    await hb.locator('#dayTable button.openR').first().click();
+    await p.waitForTimeout(300);
+    assert.match(await hb.locator('#dayLine').textContent(), /^BOL FOR MONDAY 11-9-26/, 'Open keeps the day');
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 6301 · 11/09/26');
+    // A route that does not run on the BOL's day but runs the next day is the next day's load (805 runs Tuesday, not Monday).
+    await hb.locator('#routePick').selectOption(await hb.locator('#routePick optgroup').first().locator('option', { hasText: '805' }).getAttribute('value'));
+    await hb.locator('#custTitle', { hasText: 'ROUTE 805 · TUESDAY' }).waitFor();
     assert.deepEqual(p.errors, []);
     await hubCtx.close();
     console.log('pallet builder browser test passed');
