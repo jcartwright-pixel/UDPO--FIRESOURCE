@@ -192,6 +192,12 @@ details.items[open]>summary{margin-bottom:8px}
 .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 18px;background:var(--bg);border-radius:8px;padding:10px 12px}
 .rules label{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:7px 0;font-size:16px;font-weight:600}
 .rules label small{display:block;font-weight:400;color:var(--muted);font-size:16px}
+/* Joe 11-8-26: the RULE SET, the rules every pallet is built by, in plain words. */
+.ruleset{background:var(--bg);border-radius:8px;padding:10px 14px;font-size:16px}
+.ruleset h3{margin:10px 0 4px;font-size:16px}
+.ruleset ol{margin:0;padding-left:22px}
+.ruleset li{margin:3px 0}
+td.rmax small{display:block;color:var(--muted);font-weight:400}
 .rules input[type=number]{width:5em;text-align:center}
 .truck i.held{background:repeating-linear-gradient(45deg,#eef2f5 0 6px,#b9c4cc 6px 12px);color:#14232f;outline:2px dashed #fff;outline-offset:-2px}
 .stk i.held{background:repeating-linear-gradient(45deg,var(--panel) 0 6px,var(--line) 6px 12px);border-style:dashed}
@@ -245,7 +251,8 @@ details.more .controls{margin-top:10px}
 
   <!-- Joe 11-6-26: at the very top, the customers on this route and day, the number each one's space is held for, and the standard. -->
   <section class="panel day" aria-label="Customers on this route" id="custPanel">
-    <div class="panel-head"><h2 id="custTitle">CUSTOMERS ON THIS ROUTE</h2><button id="rulesBtn" aria-expanded="false">PALLET RULES</button></div>
+    <div class="panel-head"><h2 id="custTitle">CUSTOMERS ON THIS ROUTE</h2><span><button id="ruleSetBtn" aria-expanded="false">RULE SET</button> <button id="rulesBtn" aria-expanded="false">PALLET RULES</button></span></div>
+    <div id="ruleSetBox" hidden></div>
     <div id="rulesBox" hidden></div>
     <p class="hint cust-hint" id="custHint"></p>
     <div class="tbl"><table id="custTable"></table></div>
@@ -344,6 +351,28 @@ function caseStats(weeks, n){
   const mid = so.length % 2 ? so[(so.length - 1) / 2] : (so[so.length / 2 - 1] + so[so.length / 2]) / 2, lastN = v.slice(0, Math.max(1, n || 5));
   return {LOW:Math.round(so[0]), MIDDLE:r1(mid), AVERAGE:r1(sum(v) / v.length), HIGH:Math.round(so[so.length - 1]), LAST:r1(sum(lastN) / lastN.length), weeks:v.length};
 }
+// Joe 11-8-26 RULE SET, the maximum: take the customer's 5 highest weeks in the last 6 months, throw out the very top one
+// ("just because") and average the other 4, rounded up to whole cases. Seasonal hold: the maximum goes up right away but
+// never comes down until it is a year old, so it is the highest that number has been in the year up to the newest week.
+// Used for sequence changes only; the pallets the builder makes each day do not change for it.
+const DAY_MS = 864e5;
+function ruleTop(w, end){
+  const e = Date.parse(end), v = w.filter(x => { const t = Date.parse(x[0]); return t <= e && t > e - 182 * DAY_MS; }).map(x => x[1]).sort((a, b) => b - a).slice(0, 5);
+  if (!v.length) return 0;
+  const keep = v.length > 1 ? v.slice(1) : v;
+  return Math.ceil(keep.reduce((t, x) => t + x, 0) / keep.length - 1e-9);
+}
+function ruleMax(weeks){
+  const w = (weeks || []).filter(x => x && +x[1] > 0 && !isNaN(Date.parse(x[0]))).map(x => [String(x[0]), +x[1]]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+  if (!w.length) return null;
+  const newest = w[w.length - 1][0], now = ruleTop(w, newest);
+  let max = 0, at = newest;
+  // A week counts toward the hold only once it has 5 weeks in its 6 months, so a customer's first weeks never set it alone.
+  const full = d => w.filter(x => Date.parse(x[0]) <= Date.parse(d) && Date.parse(x[0]) > Date.parse(d) - 182 * DAY_MS).length >= 5;
+  w.forEach(([d]) => { if (d === newest || (Date.parse(d) > Date.parse(newest) - 365 * DAY_MS && full(d))) { const r = ruleTop(w, d); if (r >= max) { max = r; at = d; } } });
+  return {MAX:max, now, at, held:max > now, weeks:w.filter(x => Date.parse(x[0]) > Date.parse(newest) - 182 * DAY_MS).length};
+}
+const shortDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${+m[2]}-${+m[3]}-${m[1].slice(2)}` : String(d || ''); };
 const heldOf = (stats, uses) => stats ? Math.ceil(stats[USES.indexOf(uses) >= 0 ? uses : RULES.standard]) : 0;
 const WD = ['SUN','MON','TUE','WED','THU','FRI','SAT'], WDN = {SUN:'Sunday',MON:'Monday',TUE:'Tuesday',WED:'Wednesday',THU:'Thursday',FRI:'Friday',SAT:'Saturday'};
 const normName = s => String(s||'').toUpperCase().replace(/\s*\(SUB-RT.*$/,'').replace(/\s*·.*$/,'').replace(/[^A-Z0-9]/g,'');
@@ -468,8 +497,8 @@ function renderMap(R){
   R.pallets.forEach(pl => { const s = seen.get(pl.tote ? null : lmLabel(palFirst(pl))); if (s) s.pals++; });
   $('lmLegend').innerHTML = (R.held ? `<span class="held" title="Space held for customers with fewer cases than their number today">HELD SPACE · ${R.held} cs</span>` : '') + [...seen.values()].sort((a, b) => a.o - b.o || a.n - b.n).map(s => `<span style="background:${seqColor(s.n)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
   const SIDES = [['', 'Auto'], ['L', 'Left'], ['R', 'Right'], ['F', 'Across front']];
-  $('lmTable').innerHTML = `<thead><tr><th class="grp"></th><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
-    const n = stopSeq(st);
+  $('lmTable').innerHTML = `<thead><tr><th class="grp"></th><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th class="r" title="Rule Set maximum: for sequence changes">Max</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
+    const n = stopSeq(st), mx = (caseInfo(st) || {}).max;
     // Joe 11-5-26 (mock-up 3): a colored bar per load sequence; a customer sharing the sequence above sits indented under it.
     const same = i > 0 && n != null && stopSeq(S.stops[i - 1]) === n, kid = st.sub && same;
     const pals = R.pallets.filter(pl => pl.stops.has(i)).length;
@@ -479,6 +508,7 @@ function renderMap(R){
       <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
       <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}${st.sub && st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>
       <td class="r num cs">${st.sub ? '' : `${fmt(R.stats[i].cases)} cs<span class="pals"> · ${pals} pallet${pals === 1 ? '' : 's'}</span>`}</td>
+      <td class="r num" title="Rule Set maximum${mx && mx.held ? ', held from ' + esc(shortDate(mx.at)) : ''}">${mx ? fmt(mx.MAX) + ' cs' : '–'}</td>
       ${kid ? `<td></td><td>${st.note ? `<span class="note">${esc(st.note)}</span>` : ''}</td></tr>` /* Joe 11-5-26: a shared customer rides on the main stop's pallets and side, so no Side or Note box */
       : `<td><select class="lside" data-i="${i}" aria-label="Truck side">${SIDES.map(([v, l]) => `<option value="${v}" ${(st.side || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td><input class="lnote" type="text" value="${esc(st.note || '')}" data-i="${i}" placeholder="Note" aria-label="Note"></td></tr>`}`;
@@ -977,14 +1007,14 @@ function caseInfo(st){
   const e = entryOf(st, baseList(rk)); if (!e) return null;
   const ms = m.stops.find(x => x.key === e.key); if (!ms) return null;
   const stats = caseStats(ms.weeks, RULES.weeks);
-  return {key:e.key, stats, uses:ms.uses || '', held:heldOf(stats, ms.uses), canEdit:!!m.canEdit};
+  return {key:e.key, stats, max:ruleMax(ms.weeks), uses:ms.uses || '', held:heldOf(stats, ms.uses), canEdit:!!m.canEdit};
 }
 let CUSTMSG = '';
 function renderCust(R){
   const t = $('custTable'); if (!t) return;
   const rk = routeKey(S), m = rk && MAP[rk.key], hint = $('custHint');
   $('custTitle').textContent = rk ? `CUSTOMERS ON ROUTE ${rk.route} · ${WDN[rk.day].toUpperCase()}` : 'CUSTOMERS ON THIS ROUTE';
-  renderRules(m);
+  renderRules(m); renderRuleSet();
   if (!rk || !m || m.loading || m.error || !m.found) {
     t.innerHTML = '';
     hint.textContent = !bridge() ? 'THE CASES COME FROM THE CUSTOMER LIST ON THE PALLET BUILDER SCREEN IN OPERATIONS.' : !rk ? 'THIS ROUTE HAS NO ROUTE NUMBER AND DATE IN ITS NAME, SO IT HAS NO CASES TO HOLD SPACE FOR.'
@@ -1001,11 +1031,34 @@ function renderCust(R){
     const pick = !c ? '<td>NOT ON THE ROUTE MAP</td>' : `<td><select class="cuses" data-key="${esc(c.key)}" aria-label="Pallet uses for ${esc(name)}"${c.canEdit ? '' : ' disabled title="Only a Manager or Administrator can change it"'}><option value="">STANDARD (${USE_NAME(RULES.standard)})</option>${USES.map(u => `<option value="${u}"${c.uses === u ? ' selected' : ''}>${USE_NAME(u)}</option>`).join('')}</select></td>`;
     const space = !c || !c.stats ? (c ? 'NO WEEKS YET' : '') : st.sub ? 'WITH LOAD SEQ ' + (n == null ? '–' : n)
       : !h ? '' : h.cases > h.held ? `<span class="over">OVER BY ${fmt(h.cases - h.held)} · SPACE ADDED</span>` : h.held > h.cases && RULES.under === 'KEEP' ? `${fmt(h.held - h.cases)} CS HELD, SHADED` : 'FULL';
-    return `<tr class="${st.sub ? 'sub' : ''}"><td class="num">${i + 1}</td><td class="num">${n == null ? '–' : n}</td><td class="l">${esc(name)}${st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>${['LOW','MIDDLE','AVERAGE','HIGH','LAST'].map(u => cell(c, u)).join('')}${pick}
+    return `<tr class="${st.sub ? 'sub' : ''}"><td class="num">${i + 1}</td><td class="num">${n == null ? '–' : n}</td><td class="l">${esc(name)}${st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>${['LOW','MIDDLE','AVERAGE','HIGH','LAST'].map(u => cell(c, u)).join('')}${maxCell(c)}${pick}
       <td class="num"><b>${c && c.stats ? fmt(c.held) : '–'}</b>${c && c.stats ? `<small> · ${Math.ceil(c.held / RULES.cratesPerStack)} STACK${Math.ceil(c.held / RULES.cratesPerStack) === 1 ? '' : 'S'}</small>` : ''}</td><td class="num">${st.sub ? '' : fmt(bol)}</td><td>${space}</td></tr>`;
   }).join('');
-  t.innerHTML = `<thead><tr><th>RUN</th><th>LOAD SEQ</th><th class="l">CUSTOMER</th><th>LOW</th><th>MIDDLE</th><th>AVERAGE</th><th>HIGH</th><th>LAST ${RULES.weeks} WEEKS</th><th>PALLET USES</th><th>HELD FOR</th><th>TODAY'S BOL</th><th>SPACE</th></tr></thead><tbody>${rows}</tbody>`;
+  t.innerHTML = `<thead><tr><th>RUN</th><th>LOAD SEQ</th><th class="l">CUSTOMER</th><th>LOW</th><th>MIDDLE</th><th>AVERAGE</th><th>HIGH</th><th>LAST ${RULES.weeks} WEEKS</th><th>RULE SET MAX</th><th>PALLET USES</th><th>HELD FOR</th><th>TODAY'S BOL</th><th>SPACE</th></tr></thead><tbody>${rows}</tbody>`;
 }
+// Joe 11-8-26: the RULE SET maximum in a table cell, with the date it was set when the seasonal hold keeps it up.
+function maxCell(c){
+  const x = c && c.max;
+  return `<td class="num rmax">${x ? `<b>${fmt(x.MAX)}</b>${x.held ? `<small>HELD FROM ${esc(shortDate(x.at))} · NOW ${fmt(x.now)}</small>` : ''}` : '–'}</td>`;
+}
+function renderRuleSet(){
+  const box = $('ruleSetBox'); if (!box || box.hidden) return;
+  box.innerHTML = `<div class="ruleset">
+    <h3>1. MAXIMUM CASES (FOR SEQUENCE CHANGES)</h3>
+    <ol><li>Take the customer's case count for every week in the last 6 months.</li><li>Pick the 5 highest weeks.</li><li>Throw out the very top one.</li><li>Average the other 4 and round up to whole cases. That is the <b>RULE SET MAX</b>.</li>
+    <li>Example: 62, 55, 54, 52 and 51 cases. Drop the 62. The average of the rest is 53, so the maximum is 53.</li></ol>
+    <h3>2. SEASONAL HOLD</h3>
+    <ol><li>The maximum goes up right away when the customer's number goes up.</li><li>It never comes down until it is 1 year old, so a seasonal customer keeps its busy-season number. The table shows <b>HELD FROM</b> the date it was set and the number it would be <b>NOW</b>.</li></ol>
+    <h3>3. WHEN THE MAXIMUM IS USED</h3>
+    <ol><li>Use it when you change load sequences, run order or merge stops, even if the customer is low this week.</li><li>The pallets the builder makes from the day's BOL do not use it.</li></ol>
+    <h3>4. BUILDING PALLETS</h3>
+    <ol><li>Never mix load sequences on a pallet. When a sequence is done its pallet stops, even if partial, and the next sequence starts a new pallet.</li>
+    <li>Each order adds its units by size into full cases, always rounding up; then the route adds up every order.</li>
+    <li>${fmt(RULES.cratesPerPallet)} crates to a pallet, ${fmt(RULES.dispensersPerPallet)} dispensers to a pallet, boxes usually 45. A tote takes ${fmt(RULES.toteSpots)} pallet spot. Tankers go by gallons, with no pallets.</li>
+    <li>Load sequence 1 goes in the nose and the numbers count up toward the doors. Odd sequences go on the left, even on the right, unless moved by hand. Sequence 0 goes across the front.</li></ol>
+  </div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#ruleSetBtn'); if (!b) return; const box = $('ruleSetBox'); box.hidden = !box.hidden; b.setAttribute('aria-expanded', String(!box.hidden)); renderRuleSet(); });
 function renderRules(m){
   const box = $('rulesBox'); if (!box || box.hidden) return;
   if (box.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
