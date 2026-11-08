@@ -130,6 +130,13 @@ async function openPage(ctx, url) {
     await f.locator('#lmSave').click();
     await f.locator('#mapMsg', { hasText: 'SAVED: 11 CUSTOMERS, THEIR LOAD SEQUENCES AND RUN ORDER AND THE TRUCK LOAD MAP' }).waitFor();
     assert.equal(sent.length, 1);
+    // Joe 11-8-26: "I want to save and print new sequence too": PRINT NEW SEQUENCE beside SAVE prints what the save changed.
+    assert.match(await f.locator('#mapMsg').textContent(), /PRESS PRINT NEW SEQUENCE TO PRINT THE CHANGES\.$/);
+    await fr.evaluate(() => { window.printedAt = 0; document.getElementById('printSheet').innerHTML = ''; });
+    await f.locator('#lmPrintTop').click();
+    assert.ok(await fr.evaluate(() => !!window.printedAt), 'it prints after the save');
+    assert.ok(/DQ RALPH/.test(await f.locator('#printSheet').textContent()), 'the saved change is on the sheet');
+    assert.equal(await f.locator('#printSheet tr.chg').count(), 1, 'the saved change is bold');
     assert.equal(sent[0].op, 'saveRouteDay'); assert.equal(sent[0].route, '813'); assert.equal(sent[0].day, 'THU'); assert.equal(sent[0].rev, 2);
     assert.deepEqual(sent[0].stops.map(s => s.key).sort(), stops.map(s => s.key).sort(), 'the same stops, none added or lost');
     const keys = sent[0].stops.map(s => s.key);

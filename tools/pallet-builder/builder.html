@@ -211,6 +211,7 @@ details.items[open]>summary{margin-bottom:8px}
 .daybad{margin:0;font-size:18px;font-weight:700;color:#b4471f}
 .savebar{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 button.save{font-size:22px;font-weight:800;padding:14px 22px;background:#1f7a4d;border-color:#1f7a4d;color:#fff}
+button.printseq{font-size:20px;font-weight:700;padding:14px 18px}
 button.save[disabled]{background:var(--line);border-color:var(--line);color:var(--muted);cursor:not-allowed}
 .savemsg{font-size:18px;font-weight:600;text-transform:uppercase}
 details.more summary{cursor:pointer;font-weight:700;font-size:16px}
@@ -233,7 +234,7 @@ details.more .controls{margin-top:10px}
     </div>
     <p class="dayline" id="dayLine"></p>
     <p class="daybad" id="dayBad" hidden></p>
-    <div class="savebar"><button class="save" id="lmSave" type="button">SAVE TO ROUTE MAP</button><span class="savemsg" id="mapMsg"></span></div>
+    <div class="savebar"><button class="save" id="lmSave" type="button">SAVE TO ROUTE MAP</button><button class="printseq" id="lmPrintTop" type="button">PRINT NEW SEQUENCE</button><span class="savemsg" id="mapMsg"></span></div>
     <details class="more"><summary>MORE ROUTE TOOLS</summary>
       <div class="controls">
         <label class="f" for="route">ROUTE NAME<input id="route" type="text" placeholder="Route name"></label>
@@ -888,9 +889,10 @@ function baseList(rk){
 }
 function entryOf(st, list){ return (st.acct && list.find(e => e.acct === String(st.acct))) || list.find(e => sameCust(e.name, st.name)) || null; }
 // Every stop with its route map entry, its sequence now, and whether that differs from the route map.
-function seqChanges(){
+// from = the route map as it was before the last SAVE (Joe 11-8-26: "I want to save and print new sequence too").
+function seqChanges(from){
   const rk = routeKey(S); if (!rk) return null;
-  const list = baseList(rk);
+  const list = from || baseList(rk);
   const rows = S.stops.map((st, i) => { const e = entryOf(st, list), n = stopSeq(st); return {st, i, e, n, changed: !!e && n != null && n !== e.seq}; });
   return {rk, list, rows, changed: rows.filter(r => r.changed), seqs: [...new Set(rows.filter(r => r.changed).map(r => r.n))].sort((a, b) => a - b), missing: rows.filter(r => !r.e && String(r.st.name || '').trim())};
 }
@@ -965,17 +967,21 @@ function renderMapLine(){
 function saveMap(){
   const w = saveWhat(), b = bridge(); if (!w || !b || !b.saveAll) return;
   const btn = $('lmSave'); btn.disabled = true; $('mapMsg').textContent = 'SAVING TO THE ROUTE MAP.';
-  const rk = w.rk;
+  const rk = w.rk, before = baseList(rk).map(x => Object.assign({}, x));
   b.saveAll(rk.route, rk.day, w.m.found ? w.m.rev : null, {stops: w.stops, map: w.map}).then(n => { MAP[rk.key] = n; DB.routes.forEach(r => { const k = routeKey(r); if (k && k.key === rk.key) { r.mapRev = null; applyMap(r, n); } });
-    SEQS[rk.key] = n.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']); save(); all();
-    $('mapMsg').textContent = `SAVED: ${w.stops.length} CUSTOMER${w.stops.length === 1 ? '' : 'S'}, THEIR LOAD SEQUENCES AND RUN ORDER${w.map ? ' AND THE TRUCK LOAD MAP' : ''}${w.added ? ' (' + w.added + ' ADDED)' : ''}. ROUTE BOOK AND TRUCK LOAD MAP IN THE CUSTOMER LIST NOW SHOW IT.`; },
+    SEQS[rk.key] = n.stops.map(x => [+x.loadSeq || 0, String(x.account || ''), x.name || '']); SAVEDFROM[rk.key] = before; save(); all();
+    $('mapMsg').textContent = `SAVED: ${w.stops.length} CUSTOMER${w.stops.length === 1 ? '' : 'S'}, THEIR LOAD SEQUENCES AND RUN ORDER${w.map ? ' AND THE TRUCK LOAD MAP' : ''}${w.added ? ' (' + w.added + ' ADDED)' : ''}. ROUTE BOOK AND TRUCK LOAD MAP IN THE CUSTOMER LIST NOW SHOW IT. PRESS PRINT NEW SEQUENCE TO PRINT THE CHANGES.`; },
     err => { if (err && err.changed) { delete MAP[rk.key]; } btn.disabled = false; $('mapMsg').textContent = String((err && err.message) || 'The route map could not be saved. Try again.').toUpperCase(); });
 }
-// One page for the office: every customer on each sequence that changed (the changed ones in bold).
-function printChanges(){
-  const c = seqChanges();
-  if (!c) { $('lmMsg').textContent = 'This route has no route number and date in its name, so there is nothing to compare.'; return; }
-  if (!c.changed.length) { $('lmMsg').textContent = 'No sequence changes to print. The load sequences match the route map.'; return; }
+// One page for the office: every customer on each sequence that changed (the changed ones in bold). Joe 11-8-26: also right
+// after SAVE (then the route map already has them): the changes that save made, from the route map as it was before it.
+const SAVEDFROM = {}; // "813|THU" -> the route map's list before the last SAVE on this visit
+function printChanges(where){
+  const say = t => { $(where || 'lmMsg').textContent = t; };
+  let c = seqChanges();
+  if (!c) { say('This route has no route number and date in its name, so there is nothing to compare.'.toUpperCase()); return; }
+  if (!c.changed.length && SAVEDFROM[c.rk.key]) c = seqChanges(SAVEDFROM[c.rk.key]);
+  if (!c.changed.length) { say('No sequence changes to print. The load sequences match the route map.'.toUpperCase()); return; }
   const chainOf = r => (r.e && r.e.chain) || '';
   const body = c.seqs.map(n => c.rows.filter(r => r.n === n).map((r, k) => `<tr class="${k ? '' : 'first'}${r.changed ? ' chg' : ''}"><td>${esc(chainOf(r))}</td><td class="num">${esc((r.e && r.e.acct) || r.st.acct || '')}</td><td>${esc((r.st.name || '').replace(/\s*\(sub-rt.*$/i, ''))}</td><td class="n">${n}</td></tr>`).join('')).join('');
   $('printSheet').innerHTML = `<h1>United Dairy · Sequence changes</h1><p class="when"><b>Date:</b> ${DT()} &nbsp;·&nbsp; <b>Route:</b> ${esc(c.rk.route)} &nbsp;·&nbsp; <b>Day:</b> ${WDN[c.rk.day]}</p>
@@ -984,7 +990,7 @@ function printChanges(){
   $('lmMsg').textContent = '';
   window.print();
 }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmSave') saveMap();
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.id === 'lmPrint') printChanges(); else if (b.id === 'lmPrintTop') printChanges('mapMsg'); else if (b.id === 'lmSave') saveMap();
   else if (b.id === 'dayPrev' || b.id === 'dayNext') { const i = BOLDAYS.findIndex(d => d.date === DAYSEL), j = i + (b.id === 'dayPrev' ? 1 : -1); if (BOLDAYS[j]) { pickDay(BOLDAYS[j].date, true); all(); } } });
 // Joe 11-6-26: one customer's cases on this route day, from the route map (the Customer List keeps them from the Hub's Weekly
 // Route Report): {key, stats, uses, held, canEdit} or null when the route map or the customer is not there.
