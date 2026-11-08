@@ -247,7 +247,7 @@ Where the office's **Daily Load By Route** comes in (administrators). The office
 3. Tick **Check every hour**. Every hour the Hub looks under that label for a new BOL and reads it.
 4. To read it now, press `CHECK EMAIL NOW`.
 5. If the BOL came another way, press `ADD A FILE BY HAND` and pick the PDF.
-6. Press a load day in **LOAD DAYS** to see its routes. Press a route to see its customers, in the order the BOL lists them.
+6. Check **LOAD DAYS**: one line for each load day the Hub has stored, with its routes, customers, quantity and the file it came from. The routes and customers themselves are not shown here; Pallet Builder in Plant & Distribution opens with the newest BOL.
 
 ### Buttons
 - `CHECK EMAIL NOW` reads the label at once (the last 10 days). An email already read is not read again.
