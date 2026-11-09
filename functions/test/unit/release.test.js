@@ -31,3 +31,15 @@ test('deploy: production still only from main, by hand or the automatic release'
   assert.match(d, /"\$REF" != refs\/heads\/main/);
   assert.match(d, /"\$CONFIRM" != 'DEPLOY PRODUCTION'/);
 });
+
+test('screen tests in parts: every test once, in the same order, each part with fresh emulators', () => {
+  const { parts } = require('../../../tools/browser-parts.cjs');
+  const script = require('../../package.json').scripts['test:browser'];
+  const p = parts(script, 3);
+  assert.equal(p.parts.length, 3);
+  assert.deepEqual(p.parts.flat(), p.cmds, 'nothing skipped, nothing moved');
+  assert.ok(p.cmds.length > 100);
+  assert.match(p.flags, /--only firestore,auth,functions,hosting --project demo-ud-distribution/);
+  assert.match(p.env, /UD_FAKE_LIVE_ROLL=1/);
+  assert.match(wf('tests.yml'), /node \.\.\/tools\/browser-parts\.cjs 3/);
+});
