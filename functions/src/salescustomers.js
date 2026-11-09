@@ -68,14 +68,19 @@ function groupsOf(rows) {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
-/** For the Sales app: the division's lines from the Customers app, sorted by name, then day of the week, each with its group's name. */
+/**
+ * For the Sales app: the division's lines, sorted by name, then day of the week, each with its group's name.
+ * Joe 11-9-26: the route customer list is read only through the Hub, so they come from the Hub's copy (hubroutes.js), active
+ * customers only. Until the Hub has written a division's record, the old read of the Customer List stays (nothing is switched
+ * off before its replacement works), and that one now also leaves out a customer marked inactive.
+ */
 async function forSales(db, plant) {
-  const l = await require('./udcl').salesRows(db, plant);
+  const l = (await require('./hubroutes').salesRows(db, plant)) || (await require('./udcl').salesRows(db, plant));
   if (!l) return { rows: [], savedAt: '' };
   const names = {};
   groupsOf(l.rows).forEach(g => { names[g.key] = g.name; });
   const rows = l.rows.map(r => Object.assign({}, r, { group: names[groupKey(r)] || NO_GROUP })).sort((a, b) => a.name.localeCompare(b.name) || DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.route.localeCompare(b.route, undefined, { numeric: true }));
-  return { rows, savedAt: l.savedAt };
+  return { rows, savedAt: l.savedAt, from: l.from || 'customer-list' };
 }
 
 module.exports = { forSales, groupKey, groupsOf, guessNames, NO_GROUP, DAYS };
