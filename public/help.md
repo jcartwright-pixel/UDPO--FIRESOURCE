@@ -965,6 +965,20 @@ screens: scheduler.html
 
 The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**). Clicking **Receiving** opens the Receiving Schedule; its **Suppliers & Products** shows beside it.
 
+In the left menu **Shipping** has a gold stripe and **Receiving** a green one; the one you are on is filled with its color. The name over the calendar (SHIPPING or RECEIVING) is in the same color.
+
+### Add a customer
+
+1. Press `+ Add Customer` (beside `+ Add Load`).
+2. Type the **Customer Name** and the **Route** number. The **Run / Destination** fills in from the name; change it if the run has its own name.
+3. Pick the **Departure Day** (Load Day or Delivery Day). **Loadout Type** and **Run By** can be picked now or later.
+4. Press `Save Customer`. The customer shows on Shipping and can be picked for a load.
+
+- The customer goes on Route Master as a new run, the same as `Add Route` in the Route Editor. Set its days and times there.
+- `+ Add Customer` is greyed for anyone who may not change the Route Editor (managers can).
+
+!> Do not add a customer that is already on Route Master under another name. Find it in the Route Editor and tick **Show in Plant** instead.
+
 - Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
 - Each load is colored by who delivers it: Uniontown truck, Branch or Carrier (an outside carrier, or a customer picking it up). It follows who covers the route on Route Master (United Dairy, a branch, an outside carrier or a customer pickup), the same rule every screen and the late count use. Holidays are marked.
 - Click a day's `+` (or `+ Add Load`) to add a load: schedule type, load type, load date, delivery date, pickup time, trailer, PO, cases, product and notes. Press `Confirm`; nothing saves until then.
@@ -982,6 +996,10 @@ id: receiving
 screens: scheduler.html?lane=receiving
 
 The calendar of loads coming in, and where you check a load in when its trailer arrives. Two tabs at the top: **Calendar** and **Suppliers & Products**. Everything opens in the screen itself; `Cancel`, `Close` or `Back` brings you back to the calendar.
+
+### Add a supplier
+
+Press `+ Add Supplier` (beside `+ Add Load`), type the **Supplier Name** (and a **Short Name** and **Code** if you want) and press `Save Supplier`. It is the same as `+ Supplier` on **Suppliers & Products**.
 
 ### Book a load
 

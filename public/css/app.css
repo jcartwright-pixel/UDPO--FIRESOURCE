@@ -866,6 +866,13 @@ table.fs-grid td.gc.DUE_SOON { border-left-color: #e5891a; }
 body:not(.side-folded) .sidemenu a { white-space: normal; line-height: 1.15; }
 body:not(.side-folded) .sidemenu a span { overflow: visible; text-overflow: clip; }
 .sidemenu a.side-name.on { border-radius: 9px; }
+/* Joe 11-9-26: Shipping and Receiving are not plain white. Each has its own color: a stripe down its left side, and the one open
+   is filled with it (Shipping gold, Receiving green, the same green as the Receiving screen). */
+.sidemenu [data-sec="shipping"], .sidemenu [data-sec="receiving"] > .side-sec-btn { border-left: 6px solid var(--sec-color); }
+.sidemenu [data-sec="shipping"] { --sec-color: var(--ud-gold); }
+.sidemenu [data-sec="receiving"] { --sec-color: var(--runs-ink); }
+.sidemenu a.on[data-sec="shipping"] { background: var(--ud-gold); color: #12263a; }
+.sidemenu .side-sec.on[data-sec="receiving"] > .side-sec-btn { background: var(--runs-ink); color: #fff; }
 
 /* Joe 10/10: every screen's action buttons sit in one row in the top line, all the same size; filters sit to their right. */
 .head .actions.in-head.top-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-left: auto; }
