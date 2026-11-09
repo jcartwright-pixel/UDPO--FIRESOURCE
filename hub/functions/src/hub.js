@@ -21,13 +21,18 @@
  * app follows the standard rule above (ADDED below); otherwise every administrator with saved ticks would lose the card.
  *
  * The addresses come from the project the server runs in: the practice copy (ud-distribution-sandbox) links to the practice
- * copies, the live one to the live apps. UDMS, the accident app and the Statement Center have one address.
+ * copies, the live one to the live apps. Employees & Compliance has its own practice copy (udms-sandbox, made-up people).
+ * Joe 11-9-26 ("a sandbox check that it goes to a test version"): an app with no practice copy (Route & Trip Costs, the
+ * Statement Center, the accident app) opens its live one from the practice hub, and its card says so (LIVE_ONLY).
+ * test/practice-links.cjs opens every practice card's address after each practice deploy.
  */
 'use strict';
 
 const ADMIN_ROLES = ['ADMINISTRATOR', 'ADMIN'];
 // Joe 11-2-26: the old Apps Script address opens "Sorry, unable to open the file"; UDMS now runs on its own Firebase site.
 const UDMS_URL = 'https://udms-bfccd.web.app/';
+// Joe 11-9-26: the practice hub's Employees & Compliance card opens UDMS's practice copy (made-up people), not the live one.
+const UDMS_PRACTICE_URL = 'https://udms-sandbox.web.app/';
 // Joe 11-6-26: the Accident & Injury Reporting app on the hub too; it has one address (its own Firebase site).
 const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
 // Joe 11-7-26: the Statement Center (repo united-dairy-statement-center) is an Apps Script web app with one address for
@@ -42,6 +47,12 @@ const isAdmin = (p) => isActive(p) && (p.roles || []).some(r => ADMIN_ROLES.inde
 const safeIdPart = (value) => String(value || '').trim().replace(/[\/\s]+/g, '_').replace(/[^A-Za-z0-9_.@\-|]/g, '').slice(0, 200);
 
 /** The apps, in the order the tiles show. */
+const isPractice = (project) => /-sandbox$/.test(String(project || ''));
+// What a practice-hub card adds when it can only open the live app.
+const LIVE_ONLY = '. It has no practice copy yet, so this opens the live one.';
+// The apps with no practice copy: the practice hub opens the live address and says so.
+const NO_PRACTICE = { routes: 'https://ud-distribution-routes.web.app/', statements: null, accident: null };
+
 function apps(project) {
   const site = (s) => 'https://' + project + (s ? '-' + s : '') + '.web.app/';
   return [
@@ -49,7 +60,7 @@ function apps(project) {
     { key: 'operations', name: 'Plant & Distribution', note: 'Dispatch, the plant floor, fleet, schedules and plant reports', url: site(''), may: isActive },
     { key: 'customers', name: 'Customers & Routes', note: 'Every customer, delivery route and day, the route book and truck load maps', url: site('customers'), may: isActive },
     { key: 'fuel', name: 'Fuel Tracking', note: 'Monthly fuel use, fuel prices, tank deliveries and trip fuel', url: site('fuel'), may: isAdmin },
-    { key: 'udms', name: 'Employees & Compliance', note: "Employee records, driver qualification, accidents, workers' comp and hiring", url: UDMS_URL, may: isAdmin },
+    { key: 'udms', name: 'Employees & Compliance', note: "Employee records, driver qualification, accidents, workers' comp and hiring", url: isPractice(project) ? UDMS_PRACTICE_URL : UDMS_URL, may: isAdmin },
     // Joe 11-5-26: the Route & Trip Estimator moved off ChatGPT into this project; its PC Miler key is on Keys & Connections.
     { key: 'routes', name: 'Route & Trip Costs', note: 'Round-trip cost for a delivery or plant transfer, with PC Miler truck miles and tolls', url: site('routes'), may: isAdmin },
     // Joe 11-6-26: route cost analysis as its own app (united-dairy-route-cost), linked from the hub.
@@ -109,10 +120,10 @@ async function hubCall(db, user, input, options) {
       if (key === 'operations') {
         tiles.push({ key: 'plant', name: 'Plant Operations', note: 'Production, the plant floor, loadout, quality, inventory and plant reports', url: url + 'group.html?g=plantops' });
         tiles.push({ key: 'distribution', name: 'Route Distribution', note: 'Dispatch, the weekly schedule, drivers, trucks, fleet and the garage', url: url + 'group.html?g=routeops' });
-      } else if (key === 'routes' && /-sandbox$/.test(project)) {
-        // Route & Trip Costs has no practice copy yet (11-5-26: its repository has no practice deploy key), so the practice
-        // hub opens the live one and says so, instead of a Site Not Found page.
-        tiles.push({ key, name, note: note + '. It has no practice copy yet, so this opens the live one.', url: 'https://ud-distribution-routes.web.app/' });
+      } else if (isPractice(project) && key in NO_PRACTICE) {
+        // Route & Trip Costs (11-5-26: its repository has no practice deploy key), the Statement Center and the accident app
+        // have no practice copy, so the practice hub opens the live one and says so, instead of a Site Not Found page.
+        tiles.push({ key, name, note: note + LIVE_ONLY, url: NO_PRACTICE[key] || url, live: true });
       } else tiles.push({ key, name, note, url });
     });
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
@@ -149,4 +160,4 @@ async function hubCall(db, user, input, options) {
   throw new HubError('BAD_REQUEST', 'Unknown request.');
 }
 
-module.exports = { hubCall, HubError, apps, appsOf, withAdded, APP_KEYS, ADDED, isActive, isAdmin, UDMS_URL, STATEMENTS_URL };
+module.exports = { hubCall, HubError, apps, appsOf, withAdded, APP_KEYS, ADDED, isActive, isAdmin, UDMS_URL, UDMS_PRACTICE_URL, STATEMENTS_URL, LIVE_ONLY, isPractice };

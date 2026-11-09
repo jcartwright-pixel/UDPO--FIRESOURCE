@@ -119,7 +119,7 @@ function drawFrame() {
   if (bar && PRACTICE && !document.getElementById('practice-band')) {
     const band = document.createElement('div');
     band.id = 'practice-band'; band.className = 'practice-band'; band.setAttribute('role', 'note');
-    band.innerHTML = '<span><b>Practice copy.</b> This is the practice hub, so its cards open the practice copies of the apps, not the live ones.</span><a href="https://ud-distribution-hub.web.app/">Open the live hub</a>';
+    band.innerHTML = '<span><b>Practice copy.</b> This is the practice hub, so its cards open the practice copies of the apps. A card for an app with no practice copy says it opens the live one.</span><a href="https://ud-distribution-hub.web.app/">Open the live hub</a>';
     bar.insertAdjacentElement('afterend', band);
   }
   if (screen && !document.getElementById('screen-loading')) {

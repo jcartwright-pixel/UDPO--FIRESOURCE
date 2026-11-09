@@ -88,3 +88,8 @@ jobs:
             echo "::warning::Could not read sign-in settings; check $site.web.app is in Authentication, Settings, Authorized domains."
           fi
           echo "### Hub: https://$site.web.app" >> "$GITHUB_STEP_SUMMARY"
+      # Joe 11-9-26: after a practice deploy, open every practice card's address (Site Not Found or a quiet live link fails).
+      - name: Check the practice hub's cards
+        if: steps.settings.outputs.ready == 'true' && (inputs.target || 'sandbox') == 'sandbox'
+        working-directory: hub/functions
+        run: node test/practice-links.cjs "${{ steps.settings.outputs.project }}"
