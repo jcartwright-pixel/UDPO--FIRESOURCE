@@ -24,13 +24,18 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="notice error" id="error" hidden></div>
-    <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub</span><h1 id="hello">Your apps</h1><p class="hub-sub">Pick an app to open it. Each one opens in its own tab.</p></div><div class="hub-head-acts"><button type="button" class="primary" id="all-links">All app links</button></div></div>
-    <div class="hub-home" id="tiles"></div>
-    <div class="admin-only">
-      <h2 class="hub-section">Administration</h2>
-      <div class="hub-home" id="admin-tiles"></div>
-    </div>
-    <div class="hub-empty" id="empty" hidden>You are on the Users list, but no app is turned on for you yet. Ask an administrator.</div>
+    <div class="home-wrap">
+      <nav class="area-menu" id="area-menu" aria-label="Areas"></nav>
+      <div class="home-main">
+        <section class="home-hero">
+          <span class="eyebrow" id="today"></span>
+          <h1 id="hello">Your apps</h1>
+          <p class="hub-sub">Pick an app to open it. Each one opens in its own tab, so the hub stays open.</p>
+          <div class="hub-head-acts"><button type="button" class="primary" id="all-links">All app links</button></div>
+        </section>
+        <div id="tiles"></div>
+        <div class="admin-only" id="admin-tiles"></div>
+        <div class="hub-empty" id="empty" hidden>You are on the Users list, but no app is turned on for you yet. Ask an administrator.</div>
     <div class="modal-back hub-back" id="links-back" hidden></div>
     <div class="modal wide-modal hub-links" id="links-box" role="dialog" aria-modal="true" aria-labelledby="links-title" hidden>
       <h2 id="links-title">All app links <small>for phones and tablets</small></h2>
@@ -43,25 +48,56 @@
       <span>It opens on this computer in its own window, with its own icon, like your other United Dairy apps.</span>
       <button type="button" class="primary" id="install">Install the app</button>
     </div>
+      </div>
+    </div>
   </div>
-  <script type="module">import { LOOK, linkGroups } from './js/apps.js';
+  <script type="module">import { LOOK, AREAS, AREA_ICON, linkGroups } from './js/apps.js';
 import { opsOrigin } from './js/links.js';
-import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall } from './js/shell.js';
+import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall, shortDate } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
-function tile(key, url, name, note, newTab) {
+function tile(key, url, name, note, newTab, attr) {
   const look = LOOK[key] || LOOK.operations;
-  return '<a class="app-tile" href="' + e(url) + '"' + (newTab ? ' target="_blank" rel="noopener"' : '') + ' data-app="' + e(key) + '" style="--app:' + look.color + '">' +
+  return '<a class="app-tile" href="' + e(url) + '"' + (newTab ? ' target="_blank" rel="noopener"' : '') + ' ' + (attr || 'data-app') + '="' + e(key) + '" style="--app:' + look.color + '">' +
     '<span class="app-icon">' + look.icon + '</span><span class="app-text"><strong>' + e(name) + '</strong><span>' + e(note) + '</span></span>' +
-    '<span class="app-open">Open' + (newTab ? ' <span aria-hidden="true">&#8599;</span><span class="sr">(opens in a new tab)</span>' : ' <span aria-hidden="true">&rarr;</span>') + '</span></a>';
+    '<span class="app-open">' + (newTab ? 'Open in a new tab <span aria-hidden="true">&#8599;</span>' : 'Open <span aria-hidden="true">&rarr;</span>') + '</span></a>';
 }
-document.getElementById('admin-tiles').innerHTML = tile('people', 'people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open', false).replace('data-app="people"', 'data-admin="people"') +
-  tile('roles', 'roles.html', 'Roles & Rights', 'What each role, like Manager or Supervisor, may do in Plant & Distribution', false).replace('data-app="roles"', 'data-admin="roles"') +
-  tile('links', 'links.html', 'Links & Codes', 'The links and codes for managers, stations, tablets and drivers\' phones', false).replace('data-app="links"', 'data-admin="links"') +
-  tile('email', 'email.html', 'Email & Texts', 'Who gets each email and text, who it comes from, and every email sent', false).replace('data-app="email"', 'data-admin="email"') +
-  tile('plant-setup', 'plant-setup.html', 'Plant Setup', 'Each plant\'s shifts, areas, menu and schedules, and the Upload Center for a new plant', false).replace('data-app="plant-setup"', 'data-admin="plant-setup"') +
-  tile('keys', 'keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each', false).replace('data-app="keys"', 'data-admin="keys"') +
-  tile('accounting', 'accounting.html', 'Accounting Numbers', 'The monthly accounting package, read once for Over the Road and cost analysis', false).replace('data-app="accounting"', 'data-admin="accounting"') +
-  tile('bol', 'bol.html', 'Daily BOL', 'The daily load by route from the office, picked up every hour from the ROUTES/BOL email label', false).replace('data-app="bol"', 'data-admin="bol"');
+// The Administration screens, each with what it is for.
+const ADMIN = {
+  people: ['people.html', 'People & Access', 'Who signs in, their role, their plants and which apps they can open'],
+  roles: ['roles.html', 'Roles & Rights', 'What each role, like Manager, Supervisor or Sales, may do'],
+  email: ['email.html', 'Email & Texts', 'Who gets each email and text, who it comes from, and every email sent'],
+  links: ['links.html', 'Links & Codes', 'The links and codes for managers, stations, tablets and drivers\' phones'],
+  'plant-setup': ['plant-setup.html', 'Plant Setup', 'Each plant\'s shifts, areas, menu and schedules, and the Upload Center for a new plant'],
+  keys: ['keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each'],
+  accounting: ['accounting.html', 'Accounting Numbers', 'The monthly accounting package, read once for Over the Road and cost analysis'],
+  bol: ['bol.html', 'Daily BOL', 'The daily load by route from the office, picked up every hour from the ROUTES/BOL email label']
+};
+// One area: its picture, name, what it holds, and its cards.
+const areaHead = (a) => '<header class="area-head"><span class="area-icon">' + AREA_ICON[a.key] + '</span><div><h2>' + e(a.name) + '</h2><p>' + e(a.note) + '</p></div></header>';
+const adminArea = AREAS.find(a => a.key === 'admin');
+document.getElementById('admin-tiles').innerHTML = '<section class="area" data-area="admin">' + areaHead(adminArea) +
+  adminArea.groups.map(g => '<h3 class="area-group">' + e(g.name) + '</h3><div class="hub-home">' + g.items.map(k => tile(k, ADMIN[k][0], ADMIN[k][1], ADMIN[k][2], false, 'data-admin')).join('') + '</div>').join('') + '</section>';
+document.getElementById('today').textContent = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'long' }).format(new Date()) + ', ' + shortDate(new Date());
+
+// The area menu: Everything, then each area this person has something in. The address keeps the pick (#area=fleet), so Back works.
+let shown = [];
+function drawMenu(admin) {
+  const count = (a) => a.admin ? Object.keys(ADMIN).length : a.apps.filter(k => shown.indexOf(k) >= 0).length;
+  const areas = AREAS.filter(a => (a.admin ? admin : count(a) > 0));
+  document.getElementById('area-menu').innerHTML = '<span class="area-menu-title">Areas</span>' +
+    [{ key: 'all', name: 'Everything', n: shown.length + (admin ? Object.keys(ADMIN).length : 0) }].concat(areas.map(a => ({ key: a.key, name: a.name, n: count(a) })))
+      .map(a => '<a href="#' + (a.key === 'all' ? '' : 'area=' + a.key) + '" data-area="' + a.key + '"><span class="area-icon">' + AREA_ICON[a.key] + '</span><span class="area-name">' + e(a.name) + '</span><span class="area-n">' + a.n + '</span></a>').join('');
+  pickArea();
+}
+function pickArea() {
+  const want = (/area=([a-z]+)/.exec(location.hash) || [])[1] || 'all';
+  const known = !!document.querySelector('#area-menu a[data-area="' + want + '"]');
+  const area = known ? want : 'all';
+  document.querySelectorAll('#area-menu a').forEach(a => { if (a.dataset.area === area) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+  document.querySelectorAll('section.area').forEach(s => { s.hidden = area !== 'all' && s.dataset.area !== area; });
+}
+window.addEventListener('hashchange', pickArea);
+
 // All app links: every phone and tablet link, grouped, with Open and Copy.
 function drawLinks() {
   document.getElementById('links-list').innerHTML = linkGroups(opsOrigin(location)).map(g => '<section class="hub-link-group"><h3>' + e(g.name) + '</h3>' +
@@ -89,11 +125,18 @@ requireSignIn(async () => {
     const d = await callServer('hub', { op: 'home' });
     // A first name only when the Users list has a real name (not an email address).
     const first = String(d.name || '').split(/\s+/)[0];
-    document.getElementById('hello').textContent = first && first.indexOf('@') < 0 ? 'Your apps, ' + first : 'Your apps';
+    document.getElementById('hello').textContent = first && first.indexOf('@') < 0 ? 'Good to see you, ' + first : 'Your apps';
     setAdmin(d.admin);
-    // Each app opens in its own tab, so the hub stays open to go to the next one.
-    document.getElementById('tiles').innerHTML = (d.tiles || []).map(t => tile(t.key, t.url, t.name, t.note, true)).join('');
-    document.getElementById('empty').hidden = (d.tiles || []).length > 0;
+    const tiles = d.tiles || [];
+    shown = tiles.map(t => t.key);
+    // Each app opens in its own tab, so the hub stays open to go to the next one. The cards are grouped by area.
+    document.getElementById('tiles').innerHTML = AREAS.filter(a => !a.admin).map(a => {
+      const mine = a.apps.map(k => tiles.find(t => t.key === k)).filter(Boolean)
+        .concat(a.key === 'plant' ? tiles.filter(t => !AREAS.some(x => (x.apps || []).indexOf(t.key) >= 0)) : []);
+      return mine.length ? '<section class="area" data-area="' + a.key + '">' + areaHead(a) + '<div class="hub-home">' + mine.map(t => tile(t.key, t.url, t.name, t.note, true)).join('') + '</div></section>' : '';
+    }).join('');
+    document.getElementById('empty').hidden = tiles.length > 0;
+    drawMenu(!!d.admin);
   } catch (err) { showError(serverText(err, 'the hub')); }
 });</script>
 </body>

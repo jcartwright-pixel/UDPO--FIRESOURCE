@@ -11,6 +11,8 @@ const DOMAIN = 'uniteddairy.com';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const HERE = location.pathname.split('/').pop() || 'index.html';
 const QS = new URLSearchParams(location.search);
+// The practice copy (ud-distribution-sandbox-hub), or ?practicetest=1 in the local tests.
+const PRACTICE = /sandbox/.test(location.hostname) || (LOCAL && QS.get('practicetest') === '1');
 
 // The screens, in the menu's order.
 export const SCREENS = [
@@ -111,6 +113,14 @@ function drawFrame() {
     nav.id = 'hub-nav'; nav.className = 'hub-nav'; nav.setAttribute('aria-label', 'Hub screens');
     nav.innerHTML = SCREENS.filter(s => s.href !== 'help.html').map(s => '<a href="' + s.href + '"' + (s.admin ? ' class="admin-only"' : '') + (s.href === hereHref() ? ' aria-current="page"' : '') + '>' + escapeHtml(s.name) + '</a>').join('');
     bar.insertAdjacentElement('afterend', nav);
+  }
+  // Joe 11-5-26 ("the card ... for my route cost is going to the sandbox"): the practice hub's cards open the practice apps,
+  // so the practice hub says so at the top, with a link to the live hub.
+  if (bar && PRACTICE && !document.getElementById('practice-band')) {
+    const band = document.createElement('div');
+    band.id = 'practice-band'; band.className = 'practice-band'; band.setAttribute('role', 'note');
+    band.innerHTML = '<span><b>Practice copy.</b> This is the practice hub, so its cards open the practice copies of the apps, not the live ones.</span><a href="https://ud-distribution-hub.web.app/">Open the live hub</a>';
+    bar.insertAdjacentElement('afterend', band);
   }
   if (screen && !document.getElementById('screen-loading')) {
     const wait = document.createElement('div');
