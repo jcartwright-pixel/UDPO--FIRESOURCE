@@ -46,11 +46,15 @@ export function sendTextsStrip(db, el, opts) {
     el.classList.toggle('sent', done && !miss.length && !changed.length);
     el.classList.toggle('missing', !!(miss.length || changed.length));
     el.classList.toggle('short', short);
+    // Daily (Joe 11-9-26 picture: the line ran over the Loadout day): once the sent check shows (25 OF 25 SENT), the when and
+    // to how many move to its hover and the words go, and the red buttons say only the count.
+    const shortSent = short && !!c;
     el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') + (keys ? '' : '. Set up Administration > Texts first') : '';
-    const chips = (changed.length ? '<button type="button" class="send-chip" data-pop>' + changed.length + ' SCHEDULE' + (changed.length === 1 ? '' : 'S') + ' CHANGED</button>' : '') +
+    const chips = (changed.length ? '<button type="button" class="send-chip" data-pop>' + changed.length + (short ? ' CHANGED' : ' SCHEDULE' + (changed.length === 1 ? '' : 'S') + ' CHANGED') + '</button>' : '') +
       (hand.length ? '<button type="button" class="send-chip" data-pop>' + hand.length + ' TO TEXT YOURSELF</button>' : '');
     const disabled = !keys || !n || busy;
-    el.innerHTML = badge + '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (miss.length ? ' fix' : '') + (armed ? ' armed' : '') + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>' +
+    const sentWhen = shortSent ? ' title="Sent ' + stamp(l.at) + ' to ' + drivers(l.drivers || 0) + (l.live ? '' : ' (test copy)') + '"' : '';
+    el.innerHTML = (sentWhen ? badge.replace('<span class="send-count', '<span' + sentWhen + ' class="send-count') : badge) + (shortSent ? '' : '<span class="send-words">' + words + '</span>') + '<button type="button" class="send-button' + (miss.length ? ' fix' : '') + (armed ? ' armed' : '') + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>' +
       chips + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
     el.querySelector('.send-button').onclick = press;
     el.querySelectorAll('[data-pop]').forEach(b => { b.onclick = () => { popOpen = true; drawPop(); }; });

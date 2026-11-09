@@ -32,7 +32,9 @@
     <div class="head">
       <!-- Joe 10/10: Shipping / Receiving right beside the dates, a little apart, the one in use lit. Review item 37 (Joe 10/13): no date
            box; This week (or Today, This month) and the arrows on the right move the dates. -->
-      <div class="title"><span class="eyebrow">Shipping &amp; Receiving · <b id="lane-name">Shipping</b></span>
+      <!-- Joe 11-9-26: the top bar already says SHIPPING & RECEIVING, so only the colored Shipping / Receiving tag stays here (room for
+           the top buttons to be one even size on a laptop). -->
+      <div class="title"><span class="eyebrow"><b id="lane-name">Shipping</b></span>
         <!-- Joe 11/1: Shipping and Receiving are separate screens (the left menu has each), so there is no Shipping | Receiving switch. -->
         <div class="sc-titleline"><h1 id="range">Shipping &amp; Receiving</h1></div></div>
       <div class="badge-test"><b id="mode-text">TEST COPY</b><span>Saves stay in the Operations test copy</span></div>
@@ -43,8 +45,8 @@
         <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
         <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
         <!-- Joe 11-9-26: an Add Customer button on Shipping and an Add Supplier button on Receiving, beside Add Load. -->
-        <button type="button" class="sc-btn sc-addwho" id="add-who">＋ Add Customer</button>
-        <button type="button" class="sc-btn" id="print">Print Monthly</button>
+        <button type="button" class="sc-btn primary" id="add-who">＋ Add Customer</button>
+        <button type="button" class="sc-btn primary" id="print">Print Monthly</button>
         <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button><button type="button" data-view="history" id="v-history" hidden>History</button></div>
         <div class="stepper">
           <button type="button" id="prev" aria-label="Previous" title="Previous">&#9664;</button>
