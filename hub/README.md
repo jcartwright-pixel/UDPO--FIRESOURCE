@@ -16,7 +16,8 @@ The plan: https://claude.ai/artifact/2yWqo77v8KfayHEUD5svJk
   list and the same save as Operations' People & Roles. Single-right changes and per-plant screens stay in Operations for now.
 - **Accounting Numbers** (`accounting.html`, administrators, Joe 11-6-26): the monthly accounting zip, read once (from email each
   morning, or added by hand) by Operations' server (`functions/src/accounting.js`) into `accountingMonthly/<yyyy-mm>`. Over the
-  Road and Joe's cost analysis app read those months; nothing else writes them.
+  Road and Joe's cost analysis app read those months; nothing else writes them. Since 11-7-26 each month also holds the P&L
+  delivery lines, garage lines, net sales, material and sales/transfer gallons (`functions/src/accounting-lines.js`).
 - **Help** (`help.html`, words in `public/help.md`). Every screen change also changes its part of `help.md`.
 
 ## Server (`functions/`)

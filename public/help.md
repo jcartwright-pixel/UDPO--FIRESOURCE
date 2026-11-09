@@ -177,8 +177,12 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
 - It always sends the posted week, even when you are looking at another week or day here.
 - `Send Again` sends the same week a second time (press it twice too).
 - Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
-- A green **21 OF 21 SENT** means every ticked driver has this week's text. A red count means some are missing: rest the mouse on the strip for who and why, and press `Text 2 Missing` twice to text only them.
-- A red **2 to text yourself** means two drivers are not signed up and their week changed: rest the mouse on it for their names and days, and text them yourself.
+- A green **21 OF 21 SENT** means every ticked driver has this week's text. A red count means some are missing.
+- When something needs you, a **Schedule Texts** pop-up comes up by itself. It can say:
+  - **1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT**: a truck, trailer, route, leave time or note changed for a driver who already has this week's text, for example **MONDAY: TRUCK 512 IS NOW 518**. Press `Send Updated Schedule` beside the driver: only that driver gets their week as it is now. Nothing is texted by itself.
+  - **1 DRIVER DOES NOT HAVE THIS WEEK'S TEXT**: who and why. Fix it on the Driver Roster, then press `Text 1 Missing` twice to text only them.
+  - **TEXT THIS DRIVER YOURSELF**: not signed up for texts, and their week is not their normal week. Text them yourself.
+- `Close` (or Esc, or a click outside it) puts the pop-up away. It comes up again only for something new. The red buttons on the line, like **1 SCHEDULE CHANGED** or **2 TO TEXT YOURSELF**, open it again.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
 
@@ -254,7 +258,7 @@ It always shows the published week, the same week as Daily Dispatch. The calenda
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
-- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. A red line under it names any driver to text yourself: not signed up for texts, and their week is not their normal week.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. When something needs you, a **Schedule Texts** pop-up comes up by itself: a driver whose truck, trailer, route, leave time or note changed after their text went out (for example **MONDAY: TRUCK 512 IS NOW 518**, with `Send Updated Schedule` to text only that driver), drivers missing this week's text, and drivers to text yourself. `Close` puts it away until something new comes up; the red buttons on the strip open it again.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
 
@@ -738,13 +742,13 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Loads will be late** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 30 minutes after it leaves: yellow up to 60 minutes, red after that. **Loaded late** works the same way: a load done within 30 minutes of its dispatch time is on time. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
 - The box under the banner is a short recap: how many loads are loaded (for example **19 of 38 loaded**), how many are left, and a bar that fills as they are loaded. Then each loadout the plant has (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout) on its own: how many are loaded and left, its own bar, and under it **On time** or about how far behind that loadout is. Case Loadout also says about when it will be done. Each bar and line is green when on time, yellow up to an hour behind and red past an hour, and the banner at the top takes the same color as the box. It names no routes (they are in the list below) and never shows cases.
-- Under the recap box is the **Case Loadout forecast** box. It gives one finish time for every case load still to load (for example **ALL CASE LOADS DONE ABOUT SUN 4:55 AM**), then one line for each truck time still ahead: how many loads leave then, about when the last of them will be done, and the **time to spare** (green) or how late (red). The line over the list says **EVERY TRUCK READY IN TIME**, or how many truck times will be late. Outside carriers are left out of the truck lines.
+- Under the recap box is the **Case Loadout forecast** box. It says only when every case load still to load should be done (for example **FORECAST TO BE DONE TUE 4:55 AM**), and a red line when a truck will be late (for example **1 TRUCK TIME WILL BE LATE**). Outside carriers are left out of the red line. In the morning the forecast has the day shift load only the trucks that leave before midnight; the trucks that leave after midnight wait for the night shift, which starts loading at 4:00 PM.
 - Right under the forecast box is the **Downtime** line. With no breakdowns it says **NO DOWNTIME** in green. Each breakdown still open, or fixed since the last report, gets one short line in red: how long the plant was down, what broke and what was wrong (for example **DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED**), then **BACK UP** with the time, **STILL DOWN SINCE** the time it went down, or **RUNNING, BEING WATCHED** for one on Monitor. The times come from **Down at** and **Back up at** on Shift Notes.
 - Lower down, **Plant breakdowns** lists the ones still open with their names in red, or **NONE OPEN** in green.
 - "About how far behind" goes by the trucks still to leave that will leave late, not by one load that is already long overdue. Only Case loads have an estimate; Boxing, Tote and Tanker are behind only when one of their trucks should already have left.
 - **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are still listed in the Routes list and counted in "X of Y loaded", but never marked late, behind or loaded late, and the forecast box leaves them out. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
 
-> Loads move up and down with what is in the cooler, so one load's own est. time in the list can be well off. Watch the finish time and the time to spare: they hold up even when the order changes.
+> Loads move up and down with what is in the cooler, so one load's own est. time in the list can be well off. Watch the forecast done time: it holds up even when the order changes.
 
 > One late route does not make the whole plant late: the recap goes by the trucks still to leave. Each late route is still red in the list below.
 
@@ -770,7 +774,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or T
 
 ### What to do
 
-1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it.
+1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it, and the time it was completed shows beside the check in **Start / End** (for example ✓ 4:52 PM).
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
 4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done, or until it is back in its place in the sheet's order (for example when the load that went past it is skipped back down). One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.
@@ -806,6 +810,7 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 - **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A load whose Est. Done is within 30 minutes of its departure is on time. 30 to 60 minutes after is yellow, more than 60 minutes after is red.
 - **How long each load takes:** 1 hour for every 1,000 cases until 3 of today's loads are timed, then today's own speed, mixed with each route's own times from the same weekday's earlier nights.
+- **The day shift and the night shift:** before 4:00 PM, the forecast has the day shift load only the trucks that leave before midnight (and loads left over from last night). The trucks that leave after midnight wait for the night shift and start at 4:00 PM, in their own order.
 - **Faster or slower by the hour of the night:** the plant does not load at one speed all night. Early evening is slower, and after product is pushed into the cooler later loads go faster. Each hour gets its own speed from the past nights (the same weekday first, then every night of the last 4 weeks), so a load that starts in a slow hour gets more time and one that starts in a fast hour gets less. An hour with fewer than 3 timed loads in the past nights goes at the usual speed.
 - **Loads due by each time** totals the loads and cases due by each hour.
 - **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
@@ -1852,7 +1857,7 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 1. Type the Twilio texting account and `Save account` (it is never shown again).
 2. Try it: type your own phone in `Send a test text to` and press `Send test text`. Only that phone gets it, even with everything off.
 3. Pick the drivers: tick **Schedule** and **Load** on the Driver Roster, or press `Ask drivers to sign up` (press it twice) to text every driver with a mobile phone who is not ticked yet. A **YES** reply ticks both; **STOP** unticks both.
-4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. If a red **Text these drivers yourself** list shows under it, those drivers are not signed up for texts (or have no mobile phone) and their posted week is not their normal week, so Send will not reach them: call or text each one yourself about the days it lists. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
+4. Schedule texts: after you publish a week, check **Who gets them** (ticked drivers on the posted week), then press `Send schedule texts` twice. Sending the same week again takes `Send again`, pressed twice. If a **TEXT THESE DRIVERS YOURSELF** pop-up comes up, those drivers are not signed up for texts (or have no mobile phone) and their posted week is not their normal week, so Send will not reach them: call or text each one yourself about the days it lists. The same button is on [Weekly Dispatch](#weekly-live) and [Daily Dispatch](#daily); all of them send the posted week, and a week sent from one shows as sent on the others.
 5. Load done texts: press `Turn On` when you want them. **Who gets them** lists the ticked drivers.
 6. To hear when a driver texts back, type your cell in **Driver replies to your cell** and press Enter. Each driver's reply is texted on to that phone, with the driver's name and number; to answer, text the driver from your own phone. Clear the box to stop.
 7. **Texts and replies** shows each text and reply with its status (a reply sent on to your cell says so).
@@ -1866,11 +1871,13 @@ Texts to drivers from the company's Twilio number. **Schedule texts** text each 
 
 > Only replies from drivers on the Driver Roster are sent on to your cell. A reply of just **STOP** unticks the driver; other words like "No problem" do not.
 
-After a send, the strip on Weekly and Daily Dispatch checks who has this week's text: green **21 OF 21 SENT** means every ticked driver got it. Red **19 OF 21 SENT · 2 MISSING** names each missing driver and why (no mobile phone, number refused, not sent yet). Fix what it says on the Driver Roster, then press `Text the 2 Missing` twice: only the missing drivers are texted. A driver ticked after the send shows as missing too.
+After a send, the strip on Weekly and Daily Dispatch checks who has this week's text: green **21 OF 21 SENT** means every ticked driver got it. Red **19 OF 21 SENT · 2 MISSING** brings up a pop-up naming each missing driver and why (no mobile phone, number refused, not sent yet). Fix what it says on the Driver Roster, then press `Text the 2 Missing` twice: only the missing drivers are texted. A driver ticked after the send shows as missing too.
 
-!> Do not think every driver was told because Send went out: a driver on the red **Text these drivers yourself** list was not texted.
+!> Do not think every driver was told because Send went out: a driver in the **TEXT THESE DRIVERS YOURSELF** pop-up was not texted.
 
 !> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.
+
+> When a driver's week changes after their text went out, a pop-up on Weekly Dispatch and Daily Dispatch says what changed and has a `Send Updated Schedule` button. It does the same as `Resend` here.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 

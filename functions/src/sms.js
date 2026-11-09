@@ -160,6 +160,69 @@ async function sendCheck(db, week, list, live) {
   return { total: list.length, sent: list.length - missing.length, missing };
 }
 
+// Joe 11/9 ("whenever I text out the schedule to a driver and something changed, whether the truck or trailer changed that
+// was previously sent to them, or a route change ... I need to have a warning to send an updated text to them"; then "a
+// warning ... for me to send"): nothing is texted by itself. For each driver ticked Schedule who has the posted week's text,
+// the week is made again the way it would be texted now and laid against the last text they got. Where a day reads
+// differently, the driver is listed with what changed (MONDAY: TRUCK 512 IS NOW 518) and the strip offers Send Updated
+// Schedule, which is Resend on that last text. Once the new week is texted, the two read the same and the driver drops off.
+const DAY_ORDER = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+function textDays(text) {
+  const blocks = String(text || '').split('\n\n'), days = {};
+  const weekNote = (blocks[0] || '').split('\n').filter(l => l.startsWith('NOTE FOR THIS WEEK: ')).map(l => l.slice(20)).join(' ');
+  blocks.slice(1).forEach(b => { const w = b.split('\n')[0].split(' ')[0]; if (DAY_ORDER.includes(w)) days[w] = b; });
+  return { weekNote, days };
+}
+function dayParts(block) {
+  const p = { what: [], truck: [], trailer: [], leaves: [], note: '' };
+  String(block || '').split('\n').slice(1).forEach(t => {
+    if (t.startsWith('NOTE: ')) { p.note = t.slice(6); return; }
+    if (/^(Truck|Trailer|Leaves) /.test(t)) {
+      t.split(' · ').forEach(b => { const m = /^(Truck|Trailer|Leaves) (.*)$/.exec(b); if (m) p[m[1].toLowerCase()].push(m[2]); });
+      return;
+    }
+    p.what.push(t);
+  });
+  return p;
+}
+// What reads differently between the text a driver got (was) and the week now (now), in plain words, a line per change.
+function scheduleChanges(was, now) {
+  const a = textDays(was), b = textDays(now), out = [];
+  if (a.weekNote !== b.weekNote) out.push('NOTE FOR THE WEEK CHANGED');
+  DAY_ORDER.forEach(day => {
+    const x = a.days[day] || '', y = b.days[day] || '';
+    if (x === y) return;
+    const p = dayParts(x), q = dayParts(y), bits = [];
+    const said = (list) => list.join(' / ');
+    const what = [said(p.what), said(q.what)];
+    if (what[0] !== what[1]) bits.push(what[0] && what[1] ? 'WAS ' + what[0] + ', NOW ' + what[1] : what[1] ? 'NOW ' + what[1] : what[0] + ' TAKEN OFF');
+    [['truck', 'TRUCK'], ['trailer', 'TRAILER'], ['leaves', 'LEAVES']].forEach(([k, w]) => {
+      const o = said(p[k]), n = said(q[k]);
+      if (o !== n) bits.push(o && n ? w + ' ' + o + ' IS NOW ' + n : n ? w + ' ' + n + ' ADDED' : w + ' ' + o + ' TAKEN OFF');
+    });
+    if (p.note !== q.note) bits.push(q.note ? 'NOTE CHANGED' : 'NOTE TAKEN OFF');
+    out.push(day + ': ' + (bits.length ? bits.join(', ') : 'CHANGED').toUpperCase());
+  });
+  return out;
+}
+async function changedCheck(db, week, rows, live) {
+  const logs = (await db.collection('textLog').where('week', '==', week).get()).docs.map(x => Object.assign({ id: x.id }, x.data()))
+    .filter(x => gotIt(x, live) && x.body).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const last = {};
+  logs.forEach(x => { last[x.driverId] = x; });
+  const ticked = (await activeDrivers(db)).filter(x => x.scheduleText && last[x.driverId]);
+  const out = [];
+  for (const x of ticked) {
+    let now = '';
+    try { now = await weekText(db, x.driverId, week, rows); } catch (e) { continue; }
+    const l = last[x.driverId];
+    if (now === l.body) continue;
+    const changes = scheduleChanges(l.body, now);
+    if (changes.length) out.push({ driverId: x.driverId, name: x.name, logId: l.id, sentAt: l.at, changes });
+  }
+  return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 // Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
 async function activeDrivers(db) {
   const [drivers, phones] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
@@ -209,9 +272,9 @@ async function smsCall(db, user, input, options) {
   if (op === 'preview') {
     const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
     const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
-    const byHand = week ? await handDrivers(db, week, await weekRows(db, week)) : [];
+    const rows = week ? await weekRows(db, week) : [], byHand = week ? await handDrivers(db, week, rows) : [];
     return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand,
-      check: week ? await sendCheck(db, week, list, liveTexts(o.env)) : null });
+      check: week ? await sendCheck(db, week, list, liveTexts(o.env)) : null, changed: week ? await changedCheck(db, week, rows, liveTexts(o.env)) : [] });
   }
   if (op === 'sendSchedule') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
@@ -556,4 +619,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };
+module.exports = { scheduleChanges, changedCheck, handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };

@@ -605,12 +605,33 @@ test('the email shows when all case loads are done and each truck time with its 
   });
   const html = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads, forecast }, NOW))), '');
   assert.match(html, /CASE LOADOUT FORECAST AS OF 7:00 PM/);
-  assert.match(html, new RegExp('ALL CASE LOADS DONE ABOUT ' + forecast.allDoneWhen.toUpperCase()));
-  assert.match(html, /TIME TO SPARE/);
-  assert.match(html, t.some(g => g.late) ? /TRUCK TIMES? WILL BE LATE/ : /EVERY TRUCK READY IN TIME/);
+  // Joe 11-9-26: the box shows only the forecast done time (and a red line when a truck will be late), no list of loads.
+  assert.match(html, new RegExp('FORECAST TO BE DONE ' + forecast.allDoneWhen.toUpperCase()));
+  assert.doesNotMatch(html, /TIME TO SPARE|TRUCK LEAVES|EVERY TRUCK READY/);
+  if (t.some(g => g.late)) assert.match(html, /TRUCK TIMES? WILL BE LATE/); else assert.doesNotMatch(html, /TRUCK TIMES? WILL BE LATE/);
   // An outside carrier's load is not a truck time.
   const outside = R.truckTimes({ loads: [{ leaves: 100, est: 50, outside: true }, { leaves: 200, est: 150 }] });
   assert.deepEqual(outside.map(g => [g.at, g.loads, g.spareText]), [[200, 1, '50 MIN']]);
   // With no forecast the box is not there.
   assert.doesNotMatch(R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), ''), /CASE LOADOUT FORECAST/);
+});
+
+// Joe 11-9-26 (8:06 AM report said every case load done by Mon 11:15 PM: "our day shift doesn't load that many trucks"): in the
+// morning, only the trucks leaving before midnight are loaded; the trucks leaving after midnight wait for the night shift (4:00 PM).
+test('in the morning the trucks leaving after midnight wait for the night shift at 4:00 PM', () => {
+  const D = '2026-11-09', E = '2026-11-10', at = Date.parse('2026-11-09T13:06:00Z'); // Monday 8:06 AM in New York
+  const w = (route, dispatch, leavesDay) => ({ id: route, route, run: '', area: 'CASE', state: 'WAITING', loadDate: D, deliveryDate: E, departureDate: leavesDay, dispatchTime: dispatch, quantity: 1000, prior: false });
+  // Sheet order: a Tuesday 5:30 AM truck sits between two Monday afternoon trucks.
+  const loads = [w('852', H(13), D), w('825', H(5, 30), E), w('856', H(15), D), w('6304', H(1), E)];
+  const f = R.loadForecast({ date: D, loads, history: [] }, at);
+  const by = {}; f.loads.forEach(x => { by[x.route] = x; });
+  const four = (Date.UTC(2026, 10, 9) / 86400000) * 1440 + H(16);
+  assert.ok(by['852'].est < four && by['856'].est < four, 'the day shift loads the Monday afternoon trucks');
+  assert.ok(by['825'].start >= four && by['6304'].start >= four, 'the trucks leaving after midnight start at 4:00 PM or later');
+  assert.ok(by['825'].start < by['6304'].start, 'the night loads keep their own order');
+  assert.ok(by['856'].start < by['825'].start, 'a Monday truck is not stuck behind a night load');
+  assert.equal(f.allDoneWhen, 'Mon 6:00 PM');
+  // After 4:00 PM nothing waits.
+  const evening = R.loadForecast({ date: D, loads, history: [] }, Date.parse('2026-11-09T22:00:00Z'));
+  assert.equal(evening.loads[0].start, (Date.UTC(2026, 10, 9) / 86400000) * 1440 + H(17));
 });

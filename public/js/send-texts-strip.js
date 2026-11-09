@@ -3,7 +3,7 @@
 // only that week whatever week or day the screen shows. First tap arms the button, a second tap within 5 seconds sends; a week
 // already sent needs Send Again. Only administrators see it (the sms call refuses anyone else, and the strip stays hidden).
 import { callServer, serverText, dateTimeText } from './app.js';
-import { doc, onSnapshot } from './firebase.js';
+import { doc, onSnapshot, collection, query, where } from './firebase.js';
 
 const addDays = (k, n) => { const [y, m, d] = String(k).split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); };
 const day = (k) => window.UDLogic.dateText(k);
@@ -14,45 +14,119 @@ const drivers = (n) => n + (n === 1 ? ' driver' : ' drivers');
 // there is the posted week, so its dates move to the button's hover. The driver count hides on a laptop (.send-more).
 export function sendTextsStrip(db, el, opts) {
   const short = !!(opts && opts.short);
-  let s = null, armed = null, busy = false, error = '', week = null;
+  let s = null, armed = null, busy = false, error = '', week = null, sending = '', runsWeek = '', stopRuns = null, again = null;
   el.className = 'send-strip';
   el.hidden = true;
   // The screens size their lists to the window: showing or hiding the strip makes them measure again.
   function show(on) { if (el.hidden === on) { el.hidden = !on; window.dispatchEvent(new Event('resize')); } }
   function render() {
-    if (!s || !s.week) { show(false); return; }
+    if (!s || !s.week) { show(false); popOpen = false; if (pop) drawPop(); return; }
     const keys = s.hasSid && s.hasToken && s.from, n = (s.drivers || []).length, l = s.lastSend, done = !!(l && l.week === s.week);
     const words = short ? 'Texts ' + (done ? '<b>sent</b> ' + stamp(l.at) + '<span class="send-more"> to ' + drivers(l.drivers || 0) + '</span>' + (l.live ? '' : ' (test copy)')
         : '<b>not sent</b><span class="send-more"> (' + drivers(n) + ' ticked)</span>') + (keys ? '' : '. Not set up yet') : 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + ': ' +
       (done ? '<b>Sent</b> ' + stamp(l.at) + (s.check && s.check.total ? '' : ' to ' + drivers(l.drivers || 0)) + (l.live ? '' : ' (test copy, written to the list only)') + '.'
         : '<b>Not sent</b> (' + drivers(n) + ' ticked on the Driver Roster).') +
       (keys ? '' : ' Save the Twilio account on Administration &gt; Texts first.');
+    // Joe 11/9 ("I don't like any of those warnings up there like that. It just takes too much room up ... just have pop-ups"):
+    // the strip stays one line. Each warning is a small red button on it, and the warnings open in a pop-up by themselves
+    // when something new needs you. Close puts it away until the warnings change; the red buttons open it again.
+    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     // Joe 11/7: drivers Send will not reach whose week is not their normal week; text them yourself.
-    const hand = s.byHand || [], esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    const handNames = hand.map(x => esc(x.name) + ' (' + esc(x.days.join(', ')) + ')').join('; ');
-    const handWords = !hand.length ? '' : short ? '<span class="send-hand-short" title="Not signed up for texts, and their week changed: ' + handNames + '"><b>' + hand.length + ' to text yourself</b></span>' : '<span class="send-hand"><b>Text ' + (hand.length === 1 ? 'this driver' : 'these ' + hand.length + ' drivers') + ' yourself</b> (not signed up, and their week changed): ' + handNames + '.</span>';
+    const hand = s.byHand || [];
     // Joe 11/7 (li): the fail-safe. Once the week is sent, a count of who has it: green 21 OF 21 SENT, or red 19 OF 21 SENT ·
-    // 2 MISSING with each missing driver and why, and the button texts only the missing ones.
+    // 2 MISSING, and the button texts only the missing ones.
     const c = done && s.check && s.check.total ? s.check : null, miss = c ? c.missing || [] : [];
-    const badge = !c ? '' : '<span class="send-count ' + (miss.length ? 'bad' : 'good') + '">' + c.sent + ' OF ' + c.total + ' SENT' + (miss.length && !short ? ' · ' + miss.length + ' MISSING' : '') + '</span>';
-    const missNames = miss.map(x => esc(x.name) + ' (' + esc(x.why) + ')').join(' · ');
-    const missWords = !miss.length || short ? '' : '<span class="send-hand"><b>Missing:</b> ' + missNames + '</span>';
+    // Joe 11/9: a driver whose truck, trailer, route, leave time or note changed after their schedule text went out, with what
+    // changed, and Send Updated Schedule texts that one driver their week as it is now. Nothing is sent by itself.
+    const changed = s.changed || [];
+    const badge = !c ? '' : '<span class="send-count ' + (miss.length ? 'bad' : 'good') + '"' + (miss.length ? ' data-pop title="Who is missing"' : '') + '>' + c.sent + ' OF ' + c.total + ' SENT' + (miss.length && !short ? ' · ' + miss.length + ' MISSING' : '') + '</span>';
     const fixLabel = short ? 'Text ' + miss.length + ' Missing' : 'Text the ' + (miss.length === 1 ? 'Missing Driver' : miss.length + ' Missing');
     const label = miss.length ? (armed ? 'Tap Again: Text ' + drivers(miss.length) : fixLabel)
       : short ? (armed ? 'Tap Again: Text ' + drivers(n) : done ? 'Send Again' : 'Send Texts') : armed ? 'Tap Again: Text ' + drivers(n) + ' for ' + day(s.week) : (done ? 'Send Again: Week of ' : 'Send Schedule Texts: Week of ') + day(s.week);
-    el.classList.toggle('sent', done && !miss.length);
-    el.classList.toggle('missing', !!miss.length);
+    el.classList.toggle('sent', done && !miss.length && !changed.length);
+    el.classList.toggle('missing', !!(miss.length || changed.length));
     el.classList.toggle('short', short);
-    el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') + (keys ? '' : '. Set up Administration > Texts first') +
-      (miss.length ? '. Missing: ' + miss.map(x => x.name + ' (' + x.why + ')').join(', ') : '') : '';
-    el.innerHTML = badge + '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (miss.length ? ' fix' : '') + (armed ? ' armed' : '') + '"' + (!keys || !n || busy ? ' disabled' : '') + '>' + label + '</button>' +
-      missWords + handWords + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
-    el.querySelector('button').onclick = press;
+    el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') + (keys ? '' : '. Set up Administration > Texts first') : '';
+    const chips = (changed.length ? '<button type="button" class="send-chip" data-pop>' + changed.length + ' SCHEDULE' + (changed.length === 1 ? '' : 'S') + ' CHANGED</button>' : '') +
+      (hand.length ? '<button type="button" class="send-chip" data-pop>' + hand.length + ' TO TEXT YOURSELF</button>' : '');
+    const disabled = !keys || !n || busy;
+    el.innerHTML = badge + '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (miss.length ? ' fix' : '') + (armed ? ' armed' : '') + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>' +
+      chips + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
+    el.querySelector('.send-button').onclick = press;
+    el.querySelectorAll('[data-pop]').forEach(b => { b.onclick = () => { popOpen = true; drawPop(); }; });
     show(true);
+    // The pop-up: what needs you, with the buttons to fix it.
+    const parts = [];
+    if (changed.length) parts.push('<h3>' + (changed.length === 1 ? '1 DRIVER\'S SCHEDULE CHANGED' : changed.length + ' DRIVERS\' SCHEDULES CHANGED') + ' AFTER THEIR TEXT WENT OUT</h3>' +
+      changed.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (texted ' + esc(stamp(x.sentAt)) + ')<br>' + x.changes.map(esc).join('<br>') + '</span><button type="button" class="send-update" data-log="' + esc(x.logId) + '"' +
+        (!keys || busy || sending ? ' disabled title="' + (!keys ? 'Save the Twilio account on Administration &gt; Texts first' : 'Sending now') + '"' : '') + '>' + (sending === x.logId ? 'Sending...' : 'Send Updated Schedule') + '</button></div>').join(''));
+    if (miss.length) parts.push('<h3>' + (miss.length === 1 ? '1 DRIVER DOES NOT HAVE THIS WEEK\'S TEXT' : miss.length + ' DRIVERS DO NOT HAVE THIS WEEK\'S TEXT') + '</h3>' +
+      miss.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (' + esc(x.why) + ')</span></div>').join('') +
+      '<div class="send-pop-row"><span>Fix what it says on the Driver Roster, then text only them.</span><button type="button" class="send-pop-fix' + (armed ? ' armed' : '') + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button></div>');
+    if (hand.length) parts.push('<h3>TEXT ' + (hand.length === 1 ? 'THIS DRIVER' : 'THESE ' + hand.length + ' DRIVERS') + ' YOURSELF</h3><p>Not signed up for texts, and their week is not their normal week.</p>' +
+      hand.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (' + esc(x.days.join(', ')) + ')</span></div>').join(''));
+    popHtml = parts.join('');
+    // It comes up by itself only for a warning not shown before (a new change, a new missing driver), not again for one closed.
+    const keys2 = [].concat(changed.map(x => 'c' + s.week + x.driverId + x.changes.join('|')), miss.map(x => 'm' + s.week + x.name + x.why), hand.map(x => 'h' + s.week + x.name + x.days.join()));
+    const was = seenList(), fresh = keys2.filter(k => !was.includes(k));
+    if (!popHtml) popOpen = false;
+    else if (fresh.length) { popOpen = true; setSeen(was.concat(fresh).slice(-200)); }
+    drawPop();
+  }
+  const SEEN = 'udSendTextsPop' + (short ? 'Daily' : 'Weekly');
+  function seenList() { try { return JSON.parse(sessionStorage.getItem(SEEN) || '[]'); } catch (e) { return seen; } }
+  function setSeen(k) { seen = k; try { sessionStorage.setItem(SEEN, JSON.stringify(k)); } catch (e) { /* kept in memory */ } }
+  let seen = [], popHtml = '', popOpen = false, pop = null, back = null;
+  function drawPop() {
+    if (!pop) {
+      back = document.createElement('div'); back.className = 'modal-back send-pop-back'; back.hidden = true;
+      pop = document.createElement('section'); pop.className = 'modal wide-modal send-pop'; pop.id = 'send-texts-pop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Schedule texts'); pop.hidden = true;
+      document.body.append(back, pop);
+      // Clicking outside it or pressing Esc closes it too.
+      back.onclick = () => { popOpen = false; drawPop(); };
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && popOpen) { popOpen = false; drawPop(); } });
+    }
+    const on = popOpen && !!popHtml;
+    back.hidden = pop.hidden = !on;
+    if (!on) return;
+    pop.innerHTML = '<h2>Schedule Texts: Week of ' + day(s.week) + '</h2>' + popHtml + (error ? '<p class="send-error">' + error.replace(/</g, '&lt;') + '</p>' : '') +
+      '<div class="modal-actions"><button type="button" class="send-pop-close">Close</button></div>';
+    pop.querySelector('.send-pop-close').onclick = () => { popOpen = false; drawPop(); };
+    pop.querySelectorAll('.send-update').forEach(b => { b.onclick = () => update(b.dataset.log); });
+    const fix = pop.querySelector('.send-pop-fix');
+    if (fix) fix.onclick = press;
   }
   async function load() {
     try { s = await callServer('sms', { op: 'preview' }); error = ''; } catch (e) { s = null; }
     render();
+    watchRuns();
+  }
+  // A change on Dispatch to the posted week's runs brings the warning up without a reload (a few seconds after the last edit).
+  function watchRuns() {
+    const w = s && s.week ? s.week : '';
+    if (w === runsWeek) return;
+    if (stopRuns) { stopRuns(); stopRuns = null; }
+    runsWeek = w;
+    if (!w) return;
+    let first = true;
+    stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', w)), () => {
+      if (first) { first = false; return; }
+      clearTimeout(again);
+      again = setTimeout(() => { if (!armed && !busy && !sending) load(); }, 4000);
+    }, () => {});
+  }
+  // Send Updated Schedule: one driver, their week as it is now (Resend on the last text they got).
+  async function update(logId) {
+    if (!logId || sending) return;
+    sending = logId; error = ''; render();
+    let failed = '';
+    try {
+      const r = await callServer('sms', { op: 'resend', logId });
+      if (r && r.resend && r.resend.status !== 'SENT' && r.resend.status !== 'NOT SENT') failed = r.resend.name + ': not sent (' + (r.resend.reason || r.resend.status) + ')';
+    } catch (e) { failed = serverText(e, 'Texts'); }
+    sending = '';
+    await load();
+    if (failed) { error = failed; render(); }
   }
   async function press() {
     if (!armed) { armed = setTimeout(() => { armed = null; render(); }, 5000); render(); return; }

@@ -109,7 +109,9 @@ test('Saturday loadout for Monday: Load Day routes leave Sunday, so they are not
   const f = R.loadForecast({ date: '2026-10-31', loads }, at('2026-10-31T18:30:00Z'));
   assert.equal(f.late, 0, 'no Monday load is late on Saturday');
   f.loads.forEach(x => assert.equal(x.late, false, x.route + ' ' + x.run + ' not late'));
-  const withSunday = loads.concat([sat.case('827', 'W', '2:00 AM', 'Delivery Day', 20000, '2026-11-01')]);
+  // Joe 11-9-26: the trucks leaving after midnight wait for the night shift at 4:00 PM, so the big Sunday load is 18,000 cases
+  // (still late) and the Monday loads after it still make their Sunday times.
+  const withSunday = loads.concat([sat.case('827', 'W', '2:00 AM', 'Delivery Day', 18000, '2026-11-01')]);
   const g = R.loadForecast({ date: '2026-10-31', loads: withSunday }, at('2026-10-31T18:30:00Z'));
   assert.deepEqual(g.loads.filter(x => x.late).map(x => x.route), ['827'], 'only the Sunday delivery can be late today');
   assert.equal(R.plantReport({ loads: loads.map(x => Object.assign({}, x, { dispatchTime: x.dispatchTime })) }, at('2026-10-31T21:30:00Z')).behind.length, 0, '5:30 PM Saturday: none behind');

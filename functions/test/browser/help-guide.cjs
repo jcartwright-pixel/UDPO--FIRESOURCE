@@ -7,6 +7,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const closeSendPop = require('./send-pop.cjs');
 const { chromium } = require('playwright');
 const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
@@ -43,6 +44,7 @@ const noSideScroll = (p) => p.evaluate(() => document.documentElement.scrollWidt
     for (const [w, h] of [[1536, 864], [1920, 1080]]) {
       const p = await openPage(browser, w, h, '/daily.html?date=2026-10-07&testEmail=' + ADMIN);
       await p.waitForSelector('#go-help');
+      await closeSendPop(p);
       // Joe 10/26 (mock-up 2): "? Help" on the right, just before Administration, and the header still fits.
       assert.equal(await p.$eval('#go-help', b => b.nextElementSibling && b.nextElementSibling.id), 'go-admin');
       assert.equal((await p.textContent('#go-help')).replace(/\s+/g, ''), '?Help');
