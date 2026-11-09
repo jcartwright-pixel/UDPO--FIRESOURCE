@@ -1025,7 +1025,9 @@ table td button.warn { font-size: 16px; }
 body .head :is(.sc-btn, .tp-btn, .sc-today):not(.small) { height: 42px; min-height: 42px; white-space: nowrap; }
 /* Polish item 7 (Joe 10/11): a zero count is plain grey, never orange or red. */
 .zero b, .hub-tile.zero b { color: #7b8794 !important; }
-body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(--top-btn-w, 140px); min-width: var(--top-btn-w, 140px); max-width: none; height: 42px; min-height: 42px; }
+/* Joe 11-9-26: a button whose words are longer than 140 (+ Add Customer) grows to fit them; evenTopButtons then gives every top
+   button that width, so they stay the same size. */
+body.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 140px); max-width: none; height: 42px; min-height: 42px; }
 .temp-page .head .actions.in-head.top-row > .tp-btn { width: var(--top-btn-w, auto); min-width: var(--top-btn-w, 0); height: 42px; min-height: 42px; }
 .head:has(#print-sheet) { flex-wrap: wrap; }
 
