@@ -179,6 +179,7 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
 - Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
 - A green **21 OF 21 SENT** means every ticked driver has this week's text. A red count means some are missing: rest the mouse on the strip for who and why, and press `Text 2 Missing` twice to text only them.
 - A red **2 to text yourself** means two drivers are not signed up and their week changed: rest the mouse on it for their names and days, and text them yourself.
+- A red **1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT** means a truck, trailer, route, leave time or note changed for a driver who already has this week's text. Each driver is listed with what changed, for example **MONDAY: TRUCK 512 IS NOW 518**. Press `Send Updated Schedule` beside the driver to text them their week as it is now. Only that driver gets it, and they drop off the list. Nothing is texted by itself.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
 
@@ -254,7 +255,7 @@ It always shows the published week, the same week as Daily Dispatch. The calenda
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
-- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. A red line under it names any driver to text yourself: not signed up for texts, and their week is not their normal week.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. A red line under it names any driver to text yourself: not signed up for texts, and their week is not their normal week. When a truck, trailer, route, leave time or note changes for a driver after their text went out, a red list shows each one with what changed (for example **MONDAY: TRUCK 512 IS NOW 518**). Press `Send Updated Schedule` beside the driver to text only them the new week.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
 
@@ -1853,6 +1854,8 @@ After a send, the strip on Weekly and Daily Dispatch checks who has this week's 
 !> Do not think every driver was told because Send went out: a driver on the red **Text these drivers yourself** list was not texted.
 
 !> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.
+
+> When a driver's week changes after their text went out, Weekly Dispatch and Daily Dispatch list them in red with what changed and a `Send Updated Schedule` button. It does the same as `Resend` here.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 

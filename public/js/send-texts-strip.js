@@ -3,7 +3,7 @@
 // only that week whatever week or day the screen shows. First tap arms the button, a second tap within 5 seconds sends; a week
 // already sent needs Send Again. Only administrators see it (the sms call refuses anyone else, and the strip stays hidden).
 import { callServer, serverText, dateTimeText } from './app.js';
-import { doc, onSnapshot } from './firebase.js';
+import { doc, onSnapshot, collection, query, where } from './firebase.js';
 
 const addDays = (k, n) => { const [y, m, d] = String(k).split('-').map(Number), t = new Date(Date.UTC(y, m - 1, d + n)); return t.toISOString().slice(0, 10); };
 const day = (k) => window.UDLogic.dateText(k);
@@ -14,7 +14,7 @@ const drivers = (n) => n + (n === 1 ? ' driver' : ' drivers');
 // there is the posted week, so its dates move to the button's hover. The driver count hides on a laptop (.send-more).
 export function sendTextsStrip(db, el, opts) {
   const short = !!(opts && opts.short);
-  let s = null, armed = null, busy = false, error = '', week = null;
+  let s = null, armed = null, busy = false, error = '', week = null, sending = '', runsWeek = '', stopRuns = null, again = null, lastChanged = 0;
   el.className = 'send-strip';
   el.hidden = true;
   // The screens size their lists to the window: showing or hiding the strip makes them measure again.
@@ -43,16 +43,56 @@ export function sendTextsStrip(db, el, opts) {
     el.classList.toggle('sent', done && !miss.length);
     el.classList.toggle('missing', !!miss.length);
     el.classList.toggle('short', short);
+    // Joe 11/9: a driver whose truck, trailer, route, leave time or note changed after their schedule text went out is listed
+    // in red with what changed, and Send Updated Schedule texts that one driver their week as it is now. Nothing is sent by
+    // itself. Once they have the new week, they drop off the list.
+    const changed = s.changed || [];
+    el.classList.toggle('changed', !!changed.length);
+    const changedWords = !changed.length ? '' : '<div class="send-changed"><b>' + (changed.length === 1 ? '1 DRIVER\'S SCHEDULE CHANGED' : changed.length + ' DRIVERS\' SCHEDULES CHANGED') +
+      ' AFTER THEIR TEXT WENT OUT. SEND THEM THE UPDATE:</b>' + changed.map(x => '<div class="send-changed-row"><span><b>' + esc(x.name) + '</b> (texted ' + esc(stamp(x.sentAt)) + '): ' +
+        esc(x.changes.join('; ')) + '</span><button type="button" class="send-update" data-log="' + esc(x.logId) + '"' + (!keys || busy || sending ? ' disabled title="' + (!keys ? 'Save the Twilio account on Administration &gt; Texts first' : 'Sending now') + '"' : '') + '>' +
+        (sending === x.logId ? 'Sending...' : 'Send Updated Schedule') + '</button></div>').join('') + '</div>';
     el.title = short ? 'Schedule texts for the posted week, ' + day(s.week) + ' to ' + day(addDays(s.week, 6)) + (done ? ', sent to ' + drivers(l.drivers || 0) : ', ' + drivers(n) + ' ticked on the Driver Roster') + (keys ? '' : '. Set up Administration > Texts first') +
       (miss.length ? '. Missing: ' + miss.map(x => x.name + ' (' + x.why + ')').join(', ') : '') : '';
     el.innerHTML = badge + '<span class="send-words">' + words + '</span><button type="button" class="send-button' + (miss.length ? ' fix' : '') + (armed ? ' armed' : '') + '"' + (!keys || !n || busy ? ' disabled' : '') + '>' + label + '</button>' +
-      missWords + handWords + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
+      missWords + handWords + changedWords + (error ? '<span class="send-error">' + error.replace(/</g, '&lt;') + '</span>' : '');
     el.querySelector('button').onclick = press;
+    el.querySelectorAll('.send-update').forEach(b => { b.onclick = () => update(b.dataset.log); });
     show(true);
+    // The warning makes the strip taller: the screens measure again.
+    if (changed.length !== lastChanged) { lastChanged = changed.length; window.dispatchEvent(new Event('resize')); }
   }
   async function load() {
     try { s = await callServer('sms', { op: 'preview' }); error = ''; } catch (e) { s = null; }
     render();
+    watchRuns();
+  }
+  // A change on Dispatch to the posted week's runs brings the warning up without a reload (a few seconds after the last edit).
+  function watchRuns() {
+    const w = s && s.week ? s.week : '';
+    if (w === runsWeek) return;
+    if (stopRuns) { stopRuns(); stopRuns = null; }
+    runsWeek = w;
+    if (!w) return;
+    let first = true;
+    stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', w)), () => {
+      if (first) { first = false; return; }
+      clearTimeout(again);
+      again = setTimeout(() => { if (!armed && !busy && !sending) load(); }, 4000);
+    }, () => {});
+  }
+  // Send Updated Schedule: one driver, their week as it is now (Resend on the last text they got).
+  async function update(logId) {
+    if (!logId || sending) return;
+    sending = logId; error = ''; render();
+    let failed = '';
+    try {
+      const r = await callServer('sms', { op: 'resend', logId });
+      if (r && r.resend && r.resend.status !== 'SENT' && r.resend.status !== 'NOT SENT') failed = r.resend.name + ': not sent (' + (r.resend.reason || r.resend.status) + ')';
+    } catch (e) { failed = serverText(e, 'Texts'); }
+    sending = '';
+    await load();
+    if (failed) { error = failed; render(); }
   }
   async function press() {
     if (!armed) { armed = setTimeout(() => { armed = null; render(); }, 5000); render(); return; }

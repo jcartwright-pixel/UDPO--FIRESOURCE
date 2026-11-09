@@ -138,6 +138,41 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await p.context().close();
     }
 
+    // Joe 11/9: Dispatch gives Casey a truck on Wednesday after his text went out. Weekly Dispatch, already open, lists him in red
+    // with what changed (no reload, nothing texted by itself), and Send Updated Schedule texts only him; then he drops off.
+    {
+      const p = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
+      await p.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
+      assert.equal(await p.locator('#send-texts .send-changed').count(), 0, 'nothing changed yet');
+      const before = (await db().collection('textLog').get()).size;
+      await db().collection('runs').doc('2026-10-11__run_t905').set({ days: { wed: { truck: '518', trailer: '905' } } }, { merge: true });
+      await p.waitForSelector('#send-texts .send-changed', { timeout: 20000 });
+      assert.match(await p.textContent('#send-texts .send-changed > b'), /^1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
+      assert.match(await p.textContent('#send-texts .send-changed-row'), /CASEY, LEE \(texted .+\): WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED/);
+      assert.equal(await p.textContent('#send-texts .send-update'), 'Send Updated Schedule');
+      assert.equal((await db().collection('textLog').get()).size, before, 'the warning never texts');
+      assert.deepEqual(await small(p), []);
+      assert.ok(await fits(p) <= 0);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-weekly-1536.png') });
+      for (const [w, h] of [[1920, 1080], [390, 844]]) {
+        const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-12&' + ADMIN);
+        await dd.waitForSelector('#send-texts .send-changed', { timeout: 15000 });
+        assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
+        assert.deepEqual(await small(dd), []);
+        if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'changed-daily-' + w + '.png') });
+        assert.deepEqual(dd.errors, []);
+        await dd.context().close();
+      }
+      await p.click('#send-texts .send-update');
+      await p.waitForFunction(() => !document.querySelector('#send-texts .send-changed'), null, { timeout: 15000 });
+      const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'RESEND');
+      assert.equal(added.length, 1);
+      assert.deepEqual([added[0].driverId, /Truck 518 · Trailer 905/.test(added[0].body)], ['drv_test_casey', true]);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-sent-1536.png') });
+      assert.deepEqual(p.errors, []);
+      await p.context().close();
+    }
+
     // Someone who is not an administrator does not see it.
     const disp = await openPage(browser, 1536, 790, '/daily.html?date=2026-10-12&testEmail=dispatch.test@uniteddairy.com');
     await disp.waitForSelector('#rows tr');

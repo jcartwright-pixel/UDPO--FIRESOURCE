@@ -1275,6 +1275,11 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip.missing { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
 .send-strip .send-button.fix { background: var(--red); }
 .send-strip .send-hand-short { color: var(--red); white-space: nowrap; }
+.send-strip.changed { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
+.send-strip .send-changed { flex-basis: 100%; color: var(--red); display: flex; flex-direction: column; gap: 6px; }
+.send-strip .send-changed-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; color: #17263c; }
+.send-strip .send-update { background: var(--red); color: #fff; border: 0; padding: 6px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.send-strip .send-update:disabled { opacity: .5; cursor: default; }
 .texts-page .texts-hand { margin-top: 12px; }
 .texts-page .texts-hand h3 { color: var(--red); }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }
