@@ -1153,7 +1153,10 @@
   // each load's time blends in its own route's real loading times from the same weekday's earlier nights (the plant's, when
   // the route has none), 10% in the week of Sun 10-18-26 and 10% more each week, up to 80% from Sun 12-6-26.
   var FORECAST = { perCase: 0.06, minLoad: 15, usualRate: 1000, minMinutes: 10, maxMinutes: 180, shiftEnd: T.DAY_ROLL, dueBy: 300, weeksBack: 4,
-    todayLoads: 3, historyStart: '2026-10-18', historyStep: 0.1, historyMax: 0.8, hourLoads: 3, hourMin: 0.5, hourMax: 2 };
+    todayLoads: 3, historyStart: '2026-10-18', historyStep: 0.1, historyMax: 0.8, hourLoads: 3, hourMin: 0.5, hourMax: 2, nightStart: 16 * 60 };
+  // Joe 11-9-26 (8:06 AM report said every case load done by Mon 11:15 PM: "our day shift doesn't load that many trucks"): a load
+  // whose truck leaves after midnight (or that has no dispatch time) is loaded by the night shift, so the forecast never starts
+  // it before nightStart (4:00 PM) on the operating day. The day shift loads only the trucks leaving before midnight, in order.
   function plainMinutes(cases) { return Math.max(FORECAST.minLoad, FORECAST.perCase * cases); }
   function forecastMinutes(cases, rate) { return plainMinutes(cases) * FORECAST.usualRate / rate; }
   // When a load was started and finished on the plant's wall clock. A start written as a time only takes the finish's day.
@@ -1264,6 +1267,8 @@
     var counted = loads.map(casesOf).filter(function (c) { return c > 0; }), sizes = usualSizes(input.history);
     var usualCases = sizes.all || (counted.length ? Math.round(counted.reduce(function (a, b) { return a + b; }, 0) / counted.length) : 600);
     var open = loads.filter(function (r) { return r.state !== 'DONE'; }), out = [], cursor = now, order = 'load order';
+    var opDay = dayNum(date) === null ? Math.floor((now - FORECAST.shiftEnd) / 1440) : dayNum(date), dueAt = (opDay + 1) * 1440 + dueBy;
+    var nightAt = opDay * 1440 + FORECAST.nightStart, midnight = (opDay + 1) * 1440;
     // `at` = when the load starts: the speed of that hour of the night (hourSpeeds). A run's own past times already carry the
     // hour it usually loads in, so only the rest is changed by the hour.
     var item = function (r, at) {
@@ -1291,7 +1296,15 @@
         var s = loadSpan({ startedAt: r.startedAt, completedAt: new Date(nowMs).toISOString() }), x = item(r, s ? s.start : now);
         x.start = s ? s.start + pausedMinutes(r, nowMs) : now; x.est = up5(Math.max(x.start + x.minutes, now + 5)); cursor = Math.max(cursor, x.est); out.push(x);
       });
-      list.filter(function (r) { return !loadingNow(r); }).forEach(function (r) { var x = item(r, cursor); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); });
+      // Before the night shift starts, the day shift loads only the trucks leaving before midnight (and last night's left-over
+      // loads); the night's loads wait, in their own order, until nightAt.
+      var waiting = list.filter(function (r) { return !loadingNow(r); }), night = function (r) { if (r.prior) return false; var l = item(r).leaves; return l === null || l >= midnight; };
+      var day = cursor < nightAt ? waiting.filter(function (r) { return !night(r); }) : [], later = cursor < nightAt ? waiting.filter(night) : waiting;
+      var put = function (r) { var x = item(r, cursor); x.start = cursor; x.est = up5(cursor + x.minutes); cursor = x.est; out.push(x); };
+      day.forEach(function (r) { if (cursor >= nightAt) { later.push(r); return; } put(r); });
+      if (day.length && later.length) later = waiting.filter(function (r) { return later.indexOf(r) >= 0; });
+      if (later.length) cursor = Math.max(cursor, nightAt);
+      later.forEach(put);
       out.forEach(function (x) {
         // Joe 10/22 ("Route 8302 being late, but the dispatch time is 9 a.m., so that's not late"): a load is late only when it is
         // done after its own dispatch time; the 6:00 AM shift end counts only for a load with no dispatch time.
@@ -1324,7 +1337,6 @@
       var rest = waiting.sort(function (p, q) { return p.l - q.l || p.i - q.i; }).map(function (w) { return w.r; });
       place(open.filter(loadingNow).concat(rest)); order = 'first to leave';
     }
-    var opDay = dayNum(date) === null ? Math.floor((now - FORECAST.shiftEnd) / 1440) : dayNum(date), dueAt = (opDay + 1) * 1440 + dueBy;
     var sum = function (list) { return list.reduce(function (a, x) { return a + x.cases; }, 0); }, last = function (list) { return list.length ? Math.max.apply(null, list.map(function (x) { return x.est; })) : null; };
     var due = out.filter(function (x) { return x.leaves !== null && x.leaves <= dueAt; }), late = out.filter(function (x) { return x.late; });
     // "Loads due by each time": every dispatch time still ahead, with the loads leaving by then.
@@ -1613,20 +1625,17 @@
             '<tr><td colspan="2" style="' + F + 'padding:2px 0 4px;font-size:18px;font-weight:800;color:' + A.fg + '">' + (a.late ? '&#9888; ' : '&#10003; ') + e(a.status) + (a.doneBy ? '<div style="font-size:16px;font-weight:700;color:' + INK + '">Done about ' + e(a.doneBy) + '</div>' : '') + '</td></tr>'; }).join('') + '</table>' : '') +
         '</div></td></tr>';
     }
-    // Joe 11-7-26 (option lg, picture lg-mockup): under the recap, the Case Loadout finish time and each truck time with when its
-    // loads should be done and the time to spare. Each load's own est. time stays in the list below as a guide.
+    // Joe 11-7-26 (option lg) and 11-9-26 ("the only thing I want to see in the forecast is just … forecasted to be done. I don't
+    // need all the loads"): under the recap, only when the Case Loadout should be done, and a red line when a truck will be late.
+    // Each load's own est. time stays in the list below.
     function truckBox() {
       var t = truckTimes(fc), lateTimes = t.filter(function (g) { return g.late; }).length;
-      if (!fc.loads || !fc.loads.length) return '';
-      var bad = lateTimes > 0, fg = bad ? RED : GREEN, bg = bad ? '#fde8e6' : '#e2f4ea', line = bad ? '#f2b8b2' : '#b9dcc8';
-      var cell = function (v, right, color, head) { return '<td' + (right ? ' align="right"' : '') + ' style="' + F + 'padding:' + (head ? '4px 4px 4px 0' : '7px 4px 7px 0') + ';font-size:' + (head ? '12px' : '16px') + ';font-weight:800;color:' + (color || (head ? GREY : INK)) + (head ? '' : ';white-space:nowrap;border-top:1px solid ' + line) + '">' + v + '</td>'; };
+      if (!fc.loads || !fc.loads.length || fc.allDone === null || fc.allDone === undefined) return '';
+      var bad = lateTimes > 0, fg = bad ? RED : GREEN, bg = bad ? '#fde8e6' : '#e2f4ea';
       return '<tr><td style="padding:12px 14px 0"><div style="' + F + 'background:' + bg + ';border-left:6px solid ' + fg + ';padding:14px">' +
-        '<div style="font-size:15px;font-weight:800;color:' + GREY + '">CASE LOADOUT FORECAST' + (fc.asOf ? ' AS OF ' + e(String(fc.asOf).toUpperCase()) : '') + '</div>' +
-        (fc.allDone === null || fc.allDone === undefined ? '' : '<div style="font-size:24px;font-weight:800;line-height:1.15;margin-top:4px;color:' + INK + '">ALL CASE LOADS DONE ABOUT ' + e(String(fc.allDoneWhen).toUpperCase()) + '</div>') +
-        (t.length ? '<div style="font-size:17px;font-weight:800;margin-top:6px;color:' + fg + '">' + (bad ? '&#9888; ' + lateTimes + ' TRUCK TIME' + (lateTimes === 1 ? '' : 'S') + ' WILL BE LATE' : '&#10003; EVERY TRUCK READY IN TIME') + '</div>' +
-          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px"><tr>' + cell('TRUCK LEAVES', 0, 0, 1) + cell('LOADS', 0, 0, 1) + cell('DONE ABOUT', 0, 0, 1) + cell('TIME TO SPARE', 1, 0, 1) + '</tr>' +
-          t.map(function (g) { return '<tr>' + cell(e(g.when)) + cell(g.loads + (g.loads === 1 ? ' LOAD' : ' LOADS')) + cell(e(g.doneText)) + cell(e(g.spareText), 1, g.late ? RED : GREEN) + '</tr>'; }).join('') + '</table>' : '') +
-        '<div style="font-size:14px;margin-top:10px;color:' + GREY + '">Loads move up and down with what is in the cooler, so each load&#39;s own time below is a guide. The finish time and time to spare are the numbers to watch.</div>' +
+        '<div style="font-size:16px;font-weight:800;color:' + GREY + '">CASE LOADOUT FORECAST' + (fc.asOf ? ' AS OF ' + e(String(fc.asOf).toUpperCase()) : '') + '</div>' +
+        '<div style="font-size:24px;font-weight:800;line-height:1.15;margin-top:4px;color:' + INK + '">FORECAST TO BE DONE ' + e(String(fc.allDoneWhen).toUpperCase()) + '</div>' +
+        (bad ? '<div style="font-size:17px;font-weight:800;margin-top:6px;color:' + RED + '">&#9888; ' + lateTimes + ' TRUCK TIME' + (lateTimes === 1 ? '' : 'S') + ' WILL BE LATE</div>' : '') +
         '</div></td></tr>';
     }
     var behind = (r.behind || []).length, total = Number(r.totalLoads) || 0, loadedCount = total - (Number(r.leftToLoad) || 0);
