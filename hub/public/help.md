@@ -38,9 +38,9 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
-> On the practice hub, **Route & Trip Costs** opens the live one, because it has no practice copy yet.
+> On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
-> A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
+> A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. A card for an app with no practice copy says it opens the live one, so take care there. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 
