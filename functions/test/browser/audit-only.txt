@@ -1,5 +1,1 @@
 Weekly board Day Note
-Load Day loads not late too early; hours behind (6.78)
-Pallet Builder case counts and a pallet (6.89)
-Pallet Builder held space, PALLET RULES and Product Sheet case columns (6.91, look only)
-Hub Daily BOL one line per load day (6.91, look only)

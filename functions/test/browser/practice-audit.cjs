@@ -1269,8 +1269,25 @@ async function writes() {
     await timed(p, rec, 'Day Note shows', () => p.click('#avail-save'), { fn: (sel) => { const td = document.querySelector(sel); return td && td.classList.contains('b-daynote') && td.textContent.trim() === 'PRACTICE TEST NOTE'; }, arg: cell });
     rec.countAfter = await count();
     if (rec.countAfter !== rec.countBefore) throw new Error('Needs Driver count changed: ' + rec.countBefore + ' -> ' + rec.countAfter);
-    await p.reload();
-    await timed(p, rec, 'still there after reload', async () => {}, { fn: (sel) => { const td = document.querySelector(sel); return td && td.classList.contains('b-daynote'); }, arg: cell }, 20000);
+    // The board reads Day Notes from the week before this one on (edit.js). The practice copy's Template week is older than that
+    // (it stopped at 10-25-26), so there the note is checked where it is kept (driverBackups) instead of on the reloaded board.
+    const r0 = require('module').createRequire(path.join(__dirname, '..', '..', 'package.json'));
+    const db0 = r0('firebase-admin/firestore').getFirestore(r0('firebase-admin').app('audit'));
+    const L0 = require(path.join(__dirname, '..', '..', 'src', 'logic.js'));
+    const cellDay = await p.evaluate((n) => { const th = document.querySelectorAll('#board thead th, #board-rows')[0] ? [...document.querySelectorAll('thead tr th')].filter(t => /\d{1,2}-\d{1,2}-\d\d/.test(t.textContent)) : []; const t = th[n - 2]; const m = t && /(\d{1,2})-(\d{1,2})-(\d\d)/.exec(t.textContent); return m ? '20' + m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') : ''; }, pick.n);
+    const cutoff = L0.addDays(L0.weekStart(operatingDay()), -7);
+    rec.cellDay = cellDay; rec.boardReadsFrom = cutoff;
+    if (cellDay && cellDay < cutoff) {
+      const kept = (await db0.collection('driverBackups').doc(pick.driver + '__' + cellDay).get()).data();
+      rec.keptNote = kept ? { kind: kept.kind, note: kept.note } : null;
+      if (!kept || kept.kind !== 'DAYNOTE' || !/Practice test note/i.test(kept.note || '')) throw new Error('the Day Note was not kept (' + JSON.stringify(rec.keptNote) + ')');
+      note('Weekly Day Note: the practice Template week (' + cellDay + ') is before what the board reads (' + cutoff + ' on), so the note was checked where it is kept, not on the reloaded board');
+      await p.reload();
+      await p.waitForSelector('#board-rows td button', { timeout: 20000 });
+    } else {
+      await p.reload();
+      await timed(p, rec, 'still there after reload', async () => {}, { fn: (sel) => { const td = document.querySelector(sel); return td && td.classList.contains('b-daynote'); }, arg: cell }, 20000);
+    }
     await shot(p, 'weekly-daynote');
     await p.click(cell + ' button');
     await p.selectOption('#avail-reason', 'AVAILABLE');
@@ -1279,6 +1296,7 @@ async function writes() {
     const bad = p.w.calls.filter(c => c.status !== 200 || c.error);
     if (bad.length) throw new Error('a save answered ' + bad[0].status + ' ' + bad[0].error.slice(0, 150));
     rec.carrierCells = await p.evaluate(() => [...document.querySelectorAll('#rows td')].filter(td => /CARRIER/.test(td.textContent)).length);
+    if (cellDay && (await db0.collection('driverBackups').doc(pick.driver + '__' + cellDay).get()).exists) throw new Error('the Day Note was not taken off when put back to Available');
   });
 
   // 6.56: Driver Station TV (?tv=1) plays its silent keep-awake video behind the board.
