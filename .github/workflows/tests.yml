@@ -49,7 +49,11 @@ jobs:
         # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
         # saves mid-test and made the Route Editor checks time out.
         # In 3 parts, fresh emulators each (tools/browser-parts.cjs): one long session ran the machine out of memory.
-        run: mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" node ../tools/browser-parts.cjs 3
+        # 11-9-26: the job kept being killed for memory part way through. Every 20 seconds the log shows the memory used and
+        # the biggest programs (lines starting MEMORY), so the next kill shows which one grew.
+        run: |
+          ( while true; do echo "MEMORY $(date -u +%T) used $(free -m | awk '/Mem/{print $3}')MB of $(free -m | awk '/Mem/{print $2}')MB: $(ps -eo rss=,comm= --sort=-rss | head -6 | awk '{printf "%s %dMB, ", $2, $1/1024}')"; sleep 20; done ) &
+          mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" node ../tools/browser-parts.cjs 3
       - name: Keep the screen pictures
         if: always()
         uses: actions/upload-artifact@v4
