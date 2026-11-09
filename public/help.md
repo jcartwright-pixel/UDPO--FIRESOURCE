@@ -770,7 +770,7 @@ The day's loads for one loadout: Case Loading, Tote Loading, Boxing Loading or T
 
 ### What to do
 
-1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it.
+1. Press the status button on a load: `Waiting`, `Loading` or `Done`. Loading starts its clock; Done stops it, and the time it was completed shows beside the check in **Start / End** (for example ✓ 4:52 PM).
 2. Type the **Trailer** and the **Cases**. Each box saves when you leave it.
 3. `Edit` on a load opens its Start Time, End Time, Temperature, Shift and Notes.
 4. `Skip` moves a load down one place, past the next load still to load, when it cannot be loaded yet. It shows a SKIPPED tag until it is Done, or until it is back in its place in the sheet's order (for example when the load that went past it is skipped back down). One load can be skipped only 2 times in a row: after that `Skip` is grey and says to load it next. Once another load starts loading, it can be skipped again.

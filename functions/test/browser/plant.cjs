@@ -109,6 +109,10 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     await loader.click(row('811') + ' button.clock');
     await watcher.waitForSelector(row('811') + '.done', { timeout: 8000 });
     results.push('End on 811: the other screen shows it Done');
+    // Joe 11-9-26: a Done load shows the time it was completed beside the check, like 4:52 PM.
+    const doneAt = await watcher.waitForSelector(row('811') + ' .tick .done-at', { timeout: 8000 }).then(e => e.textContent());
+    assert.match(doneAt, /^\d{1,2}:\d{2} [AP]M$/, 'Done load shows its complete time beside the check');
+    results.push('Done on 811 shows its complete time beside the check: ' + doneAt);
 
     // Typing a trailer number: 977 becomes T-977 (no unit matches, kept as typed like the current app).
     // CI flake (10/14 #280, 10/15 #293): the trailer was typed while 811's End save was still on its way, and the table drawn
