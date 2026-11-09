@@ -42,6 +42,8 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area + ' ' + a.querySelector('.area-n').textContent)), ['all 17', 'plant 1', 'distribution 2', 'fleet 3', 'office 1', 'people 2', 'admin 8']);
     assert.equal(await p.getAttribute('#area-menu a[data-area="all"]', 'aria-current'), 'true', 'Everything shows first');
     assert.ok(!(await p.isVisible('#practice-band')), 'the live hub has no practice band');
+    // Joe 11-9-26: the practice hub opens only when picked; administrators pick it at the bottom of Administration.
+    assert.equal(await p.getAttribute('#practice-pick a', 'href'), 'https://ud-distribution-sandbox-hub.web.app/?practice=1');
     assert.equal(await p.getAttribute('#tiles a[data-app="plant"]', 'target'), '_blank');
     assert.match(await p.getAttribute('#tiles a[data-app="plant"]', 'href'), /group\.html\?g=plantops$/, 'Plant Operations opens the plant side');
     assert.match(await p.getAttribute('#tiles a[data-app="distribution"]', 'href'), /group\.html\?g=routeops$/, 'Route Distribution opens the distribution side');

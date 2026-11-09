@@ -11,7 +11,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 1. Press `Sign in with Google` and pick your United Dairy account.
 2. Home shows your apps in areas: **Plant**, **Distribution**, **Fleet & Costs**, **Office**, **People & Safety**, and for administrators **Administration**. The **Areas** menu on the left (along the top on a phone) shows one area at a time; the number is how many cards it has. **Everything** shows them all.
 3. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
-4. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
+4. To get the hub as its own app on your computer, open the live hub (ud-distribution-hub.web.app) and press `Install the app` in Chrome or Edge.
 5. Press `All app links` (in the blue band at the top) for every phone and tablet link in one list, grouped by who uses it (Everyone, Managers, Sales, Drivers, Plant floor, Garage & Maintenance, Hiring). Press `Open`, or `Copy link` to text or email it. The codes are not on that list; an administrator gives them out from **Links & Codes**.
 
 ### The apps
@@ -40,9 +40,13 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 
 > On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
+> The hub always opens the **live** copy. The practice hub, for testing changes, opens only when you pick it: administrators press `practice hub` at the bottom of **Administration** on Home. It opens in its own tab. An old shortcut or installed app that points at the practice hub goes to the live hub instead.
+
 > A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. A card for an app with no practice copy says it opens the live one, so take care there. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
+
+!> Do not install the practice hub as your everyday app. Install the live hub; open the practice hub only to test.
 
 ## People & Access
 id: people
