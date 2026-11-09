@@ -752,7 +752,7 @@ body.yard-page .head .badge-test { order: 6; }
 /* Scheduler top line (Joe 10/10, "buttons overlapping"): the full month title, then Add Load and Print the same size on one
    line with Shipping/Receiving, Day/Week/Month, the month stepper and the date; the counts and holiday key go to the strip below. */
 .sched-page .head .title { flex: none; }
-.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: 160px; min-width: 160px; max-width: 160px; flex: none; height: 38px; min-height: 38px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
+.sched-page .head .actions.in-head.top-row .sc-ctrl > .sc-btn { width: 140px; min-width: 140px; max-width: 140px; height: 38px; min-height: 38px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
 @media screen { .sched-page .head .actions.in-head.top-row .sc-ctrl > #print { display: inline-block; } }
 .sched-page .sc-strip { display: flex; align-items: center; gap: 12px; margin: 0 16px 8px; }
 .sched-page .sc-strip .hstats { align-self: auto; gap: 8px; }
