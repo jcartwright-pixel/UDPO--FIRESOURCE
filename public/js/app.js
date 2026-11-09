@@ -476,9 +476,14 @@ function addSideMenu() {
   // menu (the first section, flatFirst) with the sections moved in (Quality Checks, Cooler Temperature, Shift Notes, Maintenance
   // Schedule) under them.
   const side = sideFor(here), groups = side ? side.sections.map(g => MENU.find(([m]) => m === g)).filter(Boolean) : [];
-  const section = ([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]) :
+  // Joe 11-9-26 ("the action buttons are both white for shipping and receiving"): a section is lit only when one of its own screens
+  // is the one open (Shipping and Receiving are the same page with different settings), and Shipping and Receiving each carry
+  // their own color (data-sec, app.css).
+  const secOn = (items) => items.some(([, href]) => best !== null ? href === best : pageOf(href) === here);
+  const secTag = (group) => ' data-sec="' + group.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '"';
+  const section = ([group, items]) => !group ? '' : items.length === 1 ? link([group, items[0][1], SECTION_ICON[group] || items[0][2]]).replace('<a ', '<a' + secTag(group) + ' ') :
       // Joe 11/4: clicking a section's name (Receiving) opens its first screen, like a plant's name does; it used to only fold.
-      '<div class="side-sec' + (items.some(([, href]) => pageOf(href) === here) ? ' on' : '') + '" data-home="' + items[0][1] + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
+      '<div class="side-sec' + (secOn(items) ? ' on' : '') + '"' + secTag(group) + ' data-home="' + items[0][1] + '"><button type="button" class="side-sec-btn" aria-haspopup="true" aria-expanded="false" title="' + group + '">' +
       svg(SECTION_ICON[group] || items[0][2]) + '<span>' + group + '</span></button>' +
       '<div class="flyout" role="menu"><div class="flyout-title">' + group + '</div>' + items.map(headed).join('') + '</div></div>';
   // Joe 10/10 evening: Back and Home sit in the header, not in the menu. The main screen (the all-plants Operations Overview)
@@ -508,6 +513,9 @@ function addSideMenu() {
     sideLink(side).replace(/class="on"/, '').replace('<a ', '<a class="side-name' + (isHome(side, here) ? ' on' : '') + '" ');
   nav.innerHTML = '<button type="button" class="side-toggle" aria-label="Fold or open the menu" title="Fold or open the menu">&#9776;</button>' + top +
     (groups.length === 1 || (side && side.flatFirst) ? groups[0][1].filter(([, href]) => href !== side.home).map(headed).join('') + groups.slice(1).map(section).join('') : groups.map(section).join(''));
+  // Only one thing in the menu is lit: when a section's screen is lit, the side's name (the same page) is not.
+  const nameLink = nav.querySelector('a.side-name.on');
+  if (nameLink && nav.querySelector('a.on:not(.side-name), .side-sec.on')) { nameLink.classList.remove('on'); nameLink.removeAttribute('aria-current'); }
   // Joe 10/11: which version this is and whether it is the test copy, at the bottom of the menu (stamped by the deploy).
   nav.insertAdjacentHTML('beforeend', '<div class="side-version" title="The version of the app on this screen"></div>');
   showVersion();

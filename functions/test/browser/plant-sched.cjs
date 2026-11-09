@@ -207,11 +207,45 @@ async function shots(page, name, w) {
     await desk.click('#yes-delete');
     await watcher.waitForFunction(() => /No loads/.test(document.querySelector('.sc-weekgrid > .sc-col:nth-child(10)').textContent), null, { timeout: 8000 });
     results.push('Delete Load (Walmart, Tuesday) after "Delete this load?": gone from the other screen');
+    // Joe 11-9-26: in the left menu only Shipping is lit (gold), not Shipping & Receiving or Receiving too; Add Customer puts a new
+    // Route Master run on Shipping, and the other screen lists it.
+    const lit = (p) => p.$$eval('.sidemenu a.on, .sidemenu .side-sec.on', els => els.map(e => e.textContent.trim()));
+    assert.deepEqual(await lit(desk), ['Shipping'], 'Shipping alone is lit on Shipping');
+    assert.equal(await desk.$eval('.sidemenu a.on', a => getComputedStyle(a).backgroundColor), 'rgb(242, 183, 5)', 'Shipping is gold, not white');
+    assert.equal(await desk.textContent('#add-who'), '＋ Add Customer');
+    await desk.click('#add-who');
+    await desk.fill('#c-name', 'Acme Foods');
+    assert.equal(await desk.inputValue('#c-run'), 'ACME FOODS', 'the run follows the name');
+    await desk.fill('#c-route', '861');
+    await desk.click('#c-save');
+    assert.match(await desk.textContent('#f-error'), /Pick the Departure Day/);
+    await desk.selectOption('#c-dep', 'Delivery Day');
+    await desk.selectOption('#c-load', 'Case Loadout');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-add-customer-1920.png'), scale: 'css' });
+    await desk.click('#c-save');
+    await watcher.waitForFunction(() => /Acme Foods[\s\S]*861 · ACME FOODS/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    const acme = (await db().collection('routes').where('route', '==', '861').get()).docs.map(d => d.data());
+    assert.equal(acme.length, 1);
+    assert.equal(acme[0].displayPlant, true);
+    assert.equal(acme[0].routeName, 'Acme Foods');
+    await desk.click('#add-who');
+    await desk.fill('#c-name', 'Acme Foods');
+    await desk.fill('#c-route', '861');
+    await desk.selectOption('#c-dep', 'Delivery Day');
+    await desk.click('#c-save');
+    assert.match(await desk.textContent('#f-error'), /already on Shipping/);
+    await desk.click('#modal [data-close]');
+    results.push('Add Customer (Acme Foods, 861): a new Route Master run shown on Shipping, on the other screen; adding it twice is refused');
     // Receiving: New Supplier.
     const receiving = (p, v) => p.goto(HOSTING + '/scheduler.html?lane=receiving&view=' + v + '&date=' + DATE + MANAGER);
     await receiving(desk, 'week'); await receiving(watcher, 'week');
     await desk.waitForSelector('.sc-wholist'); await watcher.waitForSelector('.sc-wholist');
-    await desk.click('#supplier-add');
+    // Joe 11-9-26: on Receiving only Receiving is lit (green); Add Supplier sits beside Add Load.
+    assert.deepEqual(await lit(desk), ['Receiving'], 'Receiving alone is lit on Receiving');
+    assert.equal(await desk.$eval('.sidemenu .side-sec.on > .side-sec-btn', b => getComputedStyle(b).backgroundColor), 'rgb(31, 122, 77)', 'Receiving is green, not white');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-receiving-menu-1920.png'), scale: 'css' });
+    assert.equal(await desk.textContent('#add-who'), '＋ Add Supplier');
+    await desk.click('#add-who');
     await desk.fill('#s-name', 'Ohio Valley Fruit');
     await desk.fill('#s-label', 'Ohio Fruit');
     await desk.click('#s-save');

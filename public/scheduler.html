@@ -14,6 +14,7 @@
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/scan-rules.js"></script>
+  <script src="js/upload-rules.js"></script>
 </head>
 <body class="fill issues-page plant-page sched-page">
   <div class="signin" id="signin" hidden>
@@ -41,6 +42,8 @@
       <div class="sc-ctrl" data-top>
         <!-- Joe 10/10: the buttons first, the same size, then the filters, all in the top line (data-top). -->
         <button type="button" class="sc-btn primary" id="add">＋ Add Load</button>
+        <!-- Joe 11-9-26: an Add Customer button on Shipping and an Add Supplier button on Receiving, beside Add Load. -->
+        <button type="button" class="sc-btn sc-addwho" id="add-who">＋ Add Customer</button>
         <button type="button" class="sc-btn" id="print">Print Monthly</button>
         <div class="tabs seg" id="views" role="tablist" aria-label="Schedule view"><button type="button" data-view="day">Day</button><button type="button" data-view="week">Week</button><button type="button" data-view="month">Month</button><button type="button" data-view="history" id="v-history" hidden>History</button></div>
         <div class="stepper">
@@ -179,6 +182,12 @@
       [['prev', 'Previous '], ['next', 'Next ']].forEach(([id, w]) => { const b = document.getElementById(id); b.title = w + unit; b.setAttribute('aria-label', w + unit); });
       document.getElementById('print').textContent = 'Print ' + (view === 'history' ? 'History' : view === 'week' ? 'Weekly' : view === 'day' ? 'Daily' : 'Monthly');
       document.getElementById('add').hidden = !ck;
+      // Joe 11-9-26: Add Customer on Shipping, Add Supplier on Receiving; greyed with the reason when this person cannot.
+      const addWho = document.getElementById('add-who'), recv = lane === 'RECEIVING', noCust = !recv && !mayAddCustomer();
+      addWho.textContent = recv ? '＋ Add Supplier' : '＋ Add Customer';
+      addWho.hidden = !ck || view === 'products';
+      addWho.disabled = noCust;
+      addWho.title = noCust ? 'Only a manager who may change the Route Editor can add a customer' : recv ? 'Add a supplier to Receiving' : 'Add a customer to Shipping';
       let tiles;
       if (view === 'history') { const sup = new Set(inRange.map(x => x.runId || x.run)).size, wks = new Set(inRange.map(x => L.weekStart(x.date))).size; tiles = [[inRange.length, inRange.length === 1 ? 'Past load' : 'Past loads'], [sup, sup === 1 ? 'Supplier' : 'Suppliers'], [wks, wks === 1 ? 'Week' : 'Weeks']]; }
       else if (view === 'day') { const c = inRange.filter(x => x.scheduleType === 'CARRIER').length; tiles = [[inRange.length, inRange.length === 1 ? 'Load' : 'Loads'], [c, 'Carrier'], [inRange.length - c, 'United Dairy Delivery']]; }
@@ -682,6 +691,56 @@
         } catch (e) { delete pending[x.id]; showError('Delete Load: ' + (e.message || e)); render(); }
       };
     }
+    /* ---------- Add Customer (Shipping, Joe 11-9-26) ---------- */
+    // Shipping's customers are Route Master's runs marked Show in Plant (no separate list), so a new customer is a new Route Master
+    // run, saved the same way as the Route Editor's Add Route (one record, written back to Route Master). It needs the Route
+    // Editor's right; a run already on Route Master but hidden from the plant is shown
+    // instead of added twice (a switched-off run is left to the Route Editor).
+    const mayAddCustomer = () => maySave(person, L.REORDER_ROLES, app, 'routes');
+    const U = window.UDUpload;
+    function openCustomer() {
+      const opts = (list) => '<option value=""></option>' + list.map(x => '<option>' + escapeHtml(x) + '</option>').join('');
+      openModal('<h2 id="modal-title">Add Customer</h2><p class="sc-supnote">The customer goes on Route Master as a new run, shown on Shipping. Its days and times are set in the Route Editor.</p>' +
+        '<div class="modal-grid"><label>Customer Name<input id="c-name" maxlength="80" placeholder="As it shows on the schedule"></label>' +
+        '<label>Route<input id="c-route" maxlength="20" placeholder="Route number, e.g. 861"></label>' +
+        '<label>Run / Destination<input id="c-run" maxlength="80" placeholder="e.g. ACME FOODS - DOCK 2"></label>' +
+        '<label>Loadout Type<select id="c-load">' + opts(U.LOAD_TYPES) + '</select></label>' +
+        '<label>Run By<select id="c-by">' + opts(U.RUN_BY) + '</select></label>' +
+        '<label>Departure Day<select id="c-dep">' + opts(['Load Day', 'Delivery Day']) + '</select></label></div>' +
+        '<div class="notice error sc-err" id="f-error" hidden></div>' +
+        '<div class="modal-actions"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="c-save">Save Customer</button></div>');
+      const name = document.getElementById('c-name'), run = document.getElementById('c-run');
+      // The Run / Destination follows the name (in capitals, as on Route Master) until it is typed in itself.
+      let runTyped = false;
+      run.oninput = () => { runTyped = true; };
+      name.oninput = () => { if (!runTyped) run.value = name.value.trim().replace(/\s+/g, ' ').toUpperCase(); };
+      name.focus();
+      document.getElementById('c-save').onclick = saveCustomer;
+    }
+    async function saveCustomer() {
+      const v = (id) => document.getElementById(id).value.trim().replace(/\s+/g, ' ');
+      const fields = { routeName: v('c-name'), route: v('c-route').toUpperCase(), run: v('c-run').toUpperCase(), loadType: v('c-load'), coverageOwner: v('c-by'), departureDay: v('c-dep') };
+      if (!fields.routeName) return formError('Type the customer name.');
+      if (!fields.route) return formError('Type the route number.');
+      if (!fields.run) return formError('Type the run / destination.');
+      if (!fields.departureDay) return formError('Pick the Departure Day (Load Day or Delivery Day).');
+      Object.keys(fields).forEach(k => { if (!fields[k]) delete fields[k]; });
+      const same = routeDocs.find(d => String(d.route || '').toUpperCase() === fields.route && String(d.run || '').toUpperCase() === fields.run);
+      if (same && !L.masterActive(same)) return formError('Route ' + fields.route + ' ' + fields.run + ' is on Route Master but switched off. Switch it on in the Route Editor.');
+      if (same && same.displayPlant === true) return formError('Route ' + fields.route + ' ' + fields.run + ' is already on Shipping.');
+      const go = document.getElementById('c-save');
+      modal.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      go.textContent = 'Saving…';
+      try {
+        await save('saveRoute', same ? { runId: same.runId, fields: { displayPlant: true }, days: {} } : { fields: Object.assign({ displayPlant: true }, fields), days: {} });
+        showError(''); closeModal(); render();
+      } catch (e) {
+        modal.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        go.textContent = 'Save Customer';
+        formError('Add Customer: ' + (e.message || e));
+      }
+    }
+
     // Joe 10/13: the Suppliers list (code, name, short name), each with Edit; New Supplier at the bottom.
     let listNote = '';  // what Add a List did, shown on the list until the box is opened again
     function openSuppliers() {
@@ -834,6 +893,7 @@
     document.getElementById('prev').onclick = () => setDate(step(-1));
     document.getElementById('next').onclick = () => setDate(step(1));
     document.getElementById('today').onclick = () => setDate(today());
+    document.getElementById('add-who').onclick = () => lane === 'RECEIVING' ? openSupplier() : openCustomer();
     document.getElementById('add').onclick = () => { const r = range(), t = today(); if (view === 'history') return openLoad(t, ''); openLoad(t >= r.start && t <= r.end ? t : view === 'day' ? date : r.start, ''); };
     document.getElementById('print').onclick = printView;
 
