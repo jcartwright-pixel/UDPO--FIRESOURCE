@@ -102,7 +102,19 @@ async function hubCall(db, user, input, options) {
   if (op === 'home') {
     const project = (options && options.project) || process.env.GCLOUD_PROJECT || 'demo-ud-distribution';
     const mine = appsOf(person, await ticksOf(db, email, person));
-    const tiles = apps(project).filter(a => mine.indexOf(a.key) >= 0).map(({ key, name, note, url }) => ({ key, name, note, url }));
+    const tiles = [];
+    apps(project).filter(a => mine.indexOf(a.key) >= 0).forEach(({ key, name, note, url }) => {
+      // Joe 11-5-26 ("another card just for distribution. One for plant, one for distribution"): Plant & Distribution is two
+      // cards, each opening its own side of the app (the same two cards as the app's own Home, group.html).
+      if (key === 'operations') {
+        tiles.push({ key: 'plant', name: 'Plant Operations', note: 'Production, the plant floor, loadout, quality, inventory and plant reports', url: url + 'group.html?g=plantops' });
+        tiles.push({ key: 'distribution', name: 'Route Distribution', note: 'Dispatch, the weekly schedule, drivers, trucks, fleet and the garage', url: url + 'group.html?g=routeops' });
+      } else if (key === 'routes' && /-sandbox$/.test(project)) {
+        // Route & Trip Costs has no practice copy yet (11-5-26: its repository has no practice deploy key), so the practice
+        // hub opens the live one and says so, instead of a Site Not Found page.
+        tiles.push({ key, name, note: note + '. It has no practice copy yet, so this opens the live one.', url: 'https://ud-distribution-routes.web.app/' });
+      } else tiles.push({ key, name, note, url });
+    });
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
   }
   if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can change who opens which app.');

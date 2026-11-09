@@ -34,6 +34,9 @@ export const LOOK = {
   keys: { color: '#8a2d3b', icon: path('<circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M17 5l2 2M15 7l2 2"/>') },
   bol: { color: '#8a4b14', icon: path('<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>') },
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
+  // Joe 11-5-26: Plant & Distribution is two cards on Home, Plant Operations (the plant) and Route Distribution (the truck).
+  plant: { color: '#2f6e3a', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
+  distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
 
@@ -74,3 +77,24 @@ export function linkGroups(ops) {
     ] }
   ];
 }
+
+// The Home screen's areas (Joe 11-5-26: "have a menu option to divide areas of the program"). Each app and each
+// Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
+export const AREAS = [
+  { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant'] },
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers and delivery routes', apps: ['distribution', 'customers'] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, what each trip costs and the cost of each route', apps: ['fuel', 'routes', 'routecost'] },
+  { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
+  { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
+  { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
+    { name: 'Who gets in', items: ['people', 'roles'] },
+    { name: 'Messages and links', items: ['email', 'links'] },
+    { name: 'Plants and connections', items: ['plant-setup', 'keys'] },
+    { name: 'Numbers from the office', items: ['accounting', 'bol'] }
+  ] }
+];
+// The area pictures for the menu.
+export const AREA_ICON = {
+  all: path('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
+  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, fleet: LOOK.fuel.icon, office: LOOK.statements.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
+};

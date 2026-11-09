@@ -223,9 +223,13 @@ async function checkMail(db, by, deps) {
     }
     const newest = run.files.filter(f => f.newest).pop();
     const bad = run.files.find(f => f.error);
+    // Joe 11-8-26 (the label was ROUTES/SALE BY ROUTE, the weekly route report's): a file with no BOL lines is red and says
+    // which file it was and that the label looks wrong.
+    const empty = !bad && !newest && run.files.find(f => f.days === 0);
+    if (empty) run.status = 'FAIL';
     run.message = bad ? 'Could not read ' + bad.name + ': ' + bad.error
       : newest ? 'Read ' + newest.name + ': load day ' + newest.newest + ', ' + newest.routes + ' routes.'
-        : run.files.length ? 'No BOL lines in the new file.' : 'No new BOL.';
+        : empty ? notBolText(empty.name, s.label) : 'No new BOL.';
   } catch (e) {
     run.status = 'FAIL';
     run.message = e.code === 'NOT_DELEGATED'
@@ -234,6 +238,13 @@ async function checkMail(db, by, deps) {
   }
   await lastRef(db).set(run);
   return run;
+}
+
+// What the last check says when the email's file has no BOL lines (Joe 11-8-26).
+function notBolText(file, label) {
+  const weekly = /sale|weekly|avg|average|case/i.test(String(label || '') + ' ' + String(file || ''));
+  return 'Read ' + file + ', but it has no BOL lines' + (weekly ? ': it looks like the weekly route report, not the Daily BOL' : '') +
+    '. Check the email label: the Daily BOL\'s label is ' + DEFAULT_LABEL + '.';
 }
 
 // The scheduled check: only when it is switched on.
@@ -262,4 +273,15 @@ async function recentDays(db, max) {
       lines: (st.lines || []).map(l => ({ item: String(l.item || ''), qty: Number(l.qty) || 0 })) })) })) }));
 }
 
-module.exports = { OPS, recentDays, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };
+/*
+ * Joe 11-8-26 (live Pallet Builder said THE HUB HAS NO BOL DAYS YET while a Hub showed Friday 11-6-26): with the days, the
+ * last email check on this app's Hub and whether a mailbox is set, so an empty list says plainly whether this app's Hub was
+ * ever checked (a Hub on the practice copy keeps its own BOL days).
+ */
+async function hubCheck(db) {
+  const [s, last] = await Promise.all([settingsRef(db).get(), lastRef(db).get()]);
+  const st = s.exists ? s.data() : {}, l = last.exists ? last.data() : null;
+  return { mailbox: !!st.mailbox, enabled: !!st.enabled, last: l ? { at: String(l.at || ''), status: String(l.status || ''), message: String(l.message || '').slice(0, 200) } : null };
+}
+
+module.exports = { OPS, recentDays, hubCheck, notBolText, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };

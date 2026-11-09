@@ -60,6 +60,13 @@ async function openPage(ctx, url) {
     // Joe 11-7-26: with no BOL days in the Hub it says so in red, so the built-in BOL is not taken for the newest.
     assert.match(await frame().locator('#dayBad').textContent(), /^THE HUB HAS NO BOL DAYS YET/);
     assert.ok(await frame().locator('#dayBad').isVisible());
+    // Joe 11-8-26: and what this app's Hub says about its email, so the line says what to press.
+    assert.match(await frame().locator('#dayBad').textContent(), /THIS APP'S HUB HAS NO MAILBOX SET: TYPE IT ON DAILY BOL, TICK CHECK EVERY HOUR AND PRESS CHECK EMAIL NOW\.$/);
+    // Joe 11-8-26: "That should say load sequences, not stop. Do a word wrap too", in capitals.
+    assert.equal(await frame().locator('#dayTable th').nth(1).innerText(), 'LOAD SEQUENCES');
+    assert.equal(await frame().locator('#dayTable th').nth(1).evaluate(e => getComputedStyle(e).whiteSpace), 'normal');
+    assert.ok(/^THE 11\/05 BOL IS LOADED/.test(await frame().locator('#dayHint').innerText()), 'the All routes line in capitals');
+    assert.ok(/^BOLD CUSTOMERS ARE ON THE BOL/.test(await frame().locator('section[aria-label="Truck load map"] .hint').first().innerText()), 'the Truck load map note in capitals');
     assert.match(await frame().locator('#dayLine').textContent(), /THE BOL BUILT INTO PALLET BUILDER$/);
     await frame().locator('#loadSample').click();
     await frame().locator('#tiles .tile').first().waitFor();
@@ -123,6 +130,13 @@ async function openPage(ctx, url) {
     await f.locator('#lmSave').click();
     await f.locator('#mapMsg', { hasText: 'SAVED: 11 CUSTOMERS, THEIR LOAD SEQUENCES AND RUN ORDER AND THE TRUCK LOAD MAP' }).waitFor();
     assert.equal(sent.length, 1);
+    // Joe 11-8-26: "I want to save and print new sequence too": PRINT NEW SEQUENCE beside SAVE prints what the save changed.
+    assert.match(await f.locator('#mapMsg').textContent(), /PRESS PRINT NEW SEQUENCE TO PRINT THE CHANGES\.$/);
+    await fr.evaluate(() => { window.printedAt = 0; document.getElementById('printSheet').innerHTML = ''; });
+    await f.locator('#lmPrintTop').click();
+    assert.ok(await fr.evaluate(() => !!window.printedAt), 'it prints after the save');
+    assert.ok(/DQ RALPH/.test(await f.locator('#printSheet').textContent()), 'the saved change is on the sheet');
+    assert.equal(await f.locator('#printSheet tr.chg').count(), 1, 'the saved change is bold');
     assert.equal(sent[0].op, 'saveRouteDay'); assert.equal(sent[0].route, '813'); assert.equal(sent[0].day, 'THU'); assert.equal(sent[0].rev, 2);
     assert.deepEqual(sent[0].stops.map(s => s.key).sort(), stops.map(s => s.key).sort(), 'the same stops, none added or lost');
     const keys = sent[0].stops.map(s => s.key);
@@ -212,6 +226,31 @@ async function openPage(ctx, url) {
     assert.equal(await hb.locator('#dayLine').evaluate(e => getComputedStyle(e).color), 'rgb(107, 120, 132)', 'and its line');
     await p.waitForTimeout(300);
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-day-before-1536.png') });
+    // Joe 11-8-26: "whenever you're switching the days, it didn't reload the routes": All routes shows only the open day's
+    // routes, Open keeps the day, and changing the day opens that day's first route.
+    const only = async (tag) => { const names = await hb.locator('#dayTable tbody tr td:first-child').allTextContents();
+      return names.filter(n => !/^All routes$/i.test(n) && /\d\/\d/.test(n)).every(n => n.includes(tag)); };
+    assert.ok(await only('11/08/26'), 'Sunday open: only Sunday\'s routes are listed');
+    // Joe 11-8-26: All routes folds up and opens again, and stays as he left it.
+    await hb.locator('#dayToggle').click();
+    assert.ok(await hb.locator('#dayWrap').isHidden()); assert.equal(await hb.locator('#dayToggle').textContent(), 'SHOW ROUTES');
+    await hb.locator('#dayToggle').click();
+    assert.ok(await hb.locator('#dayWrap').isVisible()); assert.equal(await hb.locator('#dayToggle').textContent(), 'HIDE ROUTES');
+    await hb.locator('#dayPick').selectOption('2026-11-05');
+    await hb.locator('#dayLine', { hasText: 'BOL FOR THURSDAY 11-5-26' }).waitFor();
+    assert.ok(await only('11/05'), 'Thursday open: only Thursday\'s routes are listed');
+    assert.ok(/ · 11\/05$/.test(await hb.locator('#route').inputValue()), 'and a Thursday route opens');
+    await hb.locator('#dayPick').selectOption('2026-11-09');
+    await hb.locator('#dayLine', { hasText: 'BOL FOR MONDAY 11-9-26' }).waitFor();
+    assert.ok(await only('11/09/26'), 'back on Monday: none of Thursday\'s routes are listed');
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 805 · 11/09/26', 'the route box goes to the new day\'s first route');
+    await hb.locator('#dayTable button.openR').first().click();
+    await p.waitForTimeout(300);
+    assert.match(await hb.locator('#dayLine').textContent(), /^BOL FOR MONDAY 11-9-26/, 'Open keeps the day');
+    assert.equal(await hb.locator('#route').inputValue(), 'RT 6301 · 11/09/26');
+    // A route that does not run on the BOL's day but runs the next day is the next day's load (805 runs Tuesday, not Monday).
+    await hb.locator('#routePick').selectOption(await hb.locator('#routePick optgroup').first().locator('option', { hasText: '805' }).getAttribute('value'));
+    await hb.locator('#custTitle', { hasText: 'ROUTE 805 · TUESDAY' }).waitFor();
     assert.deepEqual(p.errors, []);
     await hubCtx.close();
     console.log('pallet builder browser test passed');

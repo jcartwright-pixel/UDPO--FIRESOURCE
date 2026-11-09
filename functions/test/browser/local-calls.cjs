@@ -43,6 +43,12 @@ module.exports = async function localCalls(page) {
         let u = unitedDairyUser(user && { uid: user.user_id, token: user });
         if (!u && user && user.udStation) { const st = await require('../../src/stations').stationSaver(db(), user); if (st) u = { uid: user.user_id, email: 'station:' + st.key, station: st }; }
         if (!u) throw new Error('Sign in first.');
+        // index.js save's bolDays question (Pallet Builder's BOL DAY list): the local test database is the company's.
+        if (data.bolDays === true) {
+          const BOL = require('../../src/bol'), days = await BOL.recentDays(db(), data.max);
+          await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: { days, hub: days.length ? null : await BOL.hubCheck(db()) } }) });
+          return;
+        }
         const result = Array.isArray(data.checkSaves) ? { allowed: await checkSaves(db(), u, data.checkSaves) } : await applyAction(db(), u, data, data.testNow ? () => new Date(data.testNow) : undefined);
         await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
         return;
