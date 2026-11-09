@@ -1,0 +1,10 @@
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Weekly board Day Note: FAILED page.waitForFunction: Timeout 20000ms exceeded. Day Note shows 89ms
+WRITE Load Day loads not late too early; hours behind (6.78): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Pallet Builder case counts and a pallet (6.89): ok 
+NOTE Pallet Builder: after DAY BEFORE the open route is RT 805 · 11/05
+NOTE Pallet Builder: route 805 THU has no weeks of the Weekly Route Report on the practice copy, so no space is held (the table and words were checked; held shading was not seen)
+WRITE Pallet Builder held space, PALLET RULES and Product Sheet case columns (6.91, look only): ok 
+NOTE Hub Daily BOL: the practice Hub could not be read from the test (it asks to sign in), so one line per load day was not seen
+WRITE Hub Daily BOL one line per load day (6.91, look only): ok 
