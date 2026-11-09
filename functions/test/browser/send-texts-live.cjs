@@ -30,6 +30,20 @@ async function openPage(browser, width, height, url) {
 }
 const small = (p) => p.evaluate(() => [...document.querySelectorAll('#send-texts *')].filter(el => el.offsetWidth && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 15.9).map(el => el.tagName));
 const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+// Joe 11-9-26 (picture of Daily Dispatch): the texts line is one line, nothing on it runs out of it, and nothing on the
+// information line (week, Drivers Covered, texts, Loadout day) sits on top of anything else.
+const dailyLine = (p) => p.evaluate(() => {
+  const box = (e) => e.getBoundingClientRect(), bad = [];
+  const strip = document.getElementById('send-texts'), sb = box(strip);
+  if (sb.height > 54) bad.push('texts line is ' + Math.round(sb.height) + ' tall');
+  for (const k of strip.children) { const b = box(k); if (b.width && (b.left < sb.left - 1 || b.right > sb.right + 1 || b.top < sb.top - 1 || b.bottom > sb.bottom + 1)) bad.push(k.className + ' runs out of the texts line'); }
+  const parts = [...document.querySelector('.day-info').children].filter(e => e.offsetWidth);
+  for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) {
+    const a = box(parts[i]), b = box(parts[j]);
+    if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) bad.push(parts[i].className + ' on top of ' + parts[j].className);
+  }
+  return bad;
+});
 // Joe 11/9: the warnings come up in a pop-up by themselves. popText waits for it and gives its words; closePop puts it away.
 const POP = '#send-texts-pop:not([hidden])';
 const popText = async (p) => { await p.waitForSelector(POP, { timeout: 20000 }); return p.textContent(POP); };
@@ -93,15 +107,18 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     // week's dates are on its hover, and the driver count shows on a wide screen.
     for (const [w, h] of [[1920, 1080], [390, 844]]) {
       const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-20&' + ADMIN);
-      await dd.waitForFunction(() => /^Texts sent /.test((document.querySelector('#send-texts .send-words') || {}).textContent || ''), null, { timeout: 15000 });
+      await dd.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
       assert.equal(await dd.textContent('#send-texts .send-count.good'), '1 OF 1 SENT', 'Joe 11/7 (li): the sent check');
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
-      assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
+      // Joe 11-9-26: with the sent check showing, Daily drops the words; when and to how many are on the check's hover.
+      assert.equal(await dd.$('#send-texts .send-words'), null);
+      assert.match(await dd.getAttribute('#send-texts .send-count', 'title'), /^Sent .* to 1 driver \(test copy\)$/);
       assert.match(await dd.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
       assert.match(await popText(dd), /YOURSELF/);
       await closePop(dd);
       assert.equal(await dd.textContent('#send-texts button'), 'Send Again');
       assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
+      if (w > 700) assert.deepEqual(await dailyLine(dd), [], 'Daily information line at ' + w);
       assert.deepEqual(await small(dd), []);
       if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'live-send-daily-' + w + '.png') });
       if (w === 1920) {
@@ -183,10 +200,13 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       assert.deepEqual(await small(p), []);
       assert.ok(await fits(p) <= 0);
       if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-weekly-1536.png') });
-      for (const [w, h] of [[1920, 1080], [390, 844]]) {
+      for (const [w, h] of [[1920, 1080], [1536, 790], [390, 844]]) {
         const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-12&' + ADMIN);
         assert.match(await popText(dd), /SCHEDULE CHANGED/);
+        await closePop(dd);
+        assert.equal(await dd.textContent('#send-texts .send-chip'), '1 CHANGED', 'Daily: the red button says only the count');
         assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
+        if (w > 700) assert.deepEqual(await dailyLine(dd), [], 'Daily information line at ' + w);
         assert.deepEqual(await small(dd), []);
         if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'changed-daily-' + w + '.png') });
         assert.deepEqual(dd.errors, []);
