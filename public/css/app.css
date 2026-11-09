@@ -1267,19 +1267,22 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-strip .send-button.armed { background: #b42318; }
 .send-strip .send-button:disabled { opacity: .5; cursor: default; }
 .send-strip .send-error { flex-basis: 100%; color: var(--error-ink); }
-.send-strip .send-hand { flex-basis: 100%; color: var(--red); }
 /* Joe 11/7 (li): the sent check on the send strip. */
 .send-strip .send-count { font-weight: 800; color: #fff; border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
 .send-strip .send-count.good { background: var(--green); }
 .send-strip .send-count.bad { background: var(--red); }
 .send-strip.missing { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
 .send-strip .send-button.fix { background: var(--red); }
-.send-strip .send-hand-short { color: var(--red); white-space: nowrap; }
-.send-strip.changed { background: #fdecea; color: #17263c; border-color: #f0b4ad; }
-.send-strip .send-changed { flex-basis: 100%; color: var(--red); display: flex; flex-direction: column; gap: 6px; }
-.send-strip .send-changed-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; color: #17263c; }
-.send-strip .send-update { background: var(--red); color: #fff; border: 0; padding: 6px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.send-strip .send-update:disabled { opacity: .5; cursor: default; }
+.send-strip .send-chip { background: var(--red); color: #fff; border: 0; padding: 6px 12px; border-radius: 8px; font-size: 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.send-strip [data-pop] { cursor: pointer; }
+/* Joe 11/9: the send-texts warnings come up in a pop-up, not on the screen. */
+.send-pop h3 { margin: 14px 0 6px; color: var(--red); font-size: 16px; }
+.send-pop p { margin: 0 0 6px; font-size: 16px; }
+.send-pop .send-pop-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); font-size: 16px; }
+.send-pop .send-update, .send-pop .send-pop-fix { background: var(--red); color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.send-pop .send-pop-fix.armed { background: #7a1a12; }
+.send-pop button:disabled { opacity: .5; cursor: default; }
+.send-pop .send-error { color: var(--error-ink); font-weight: 700; }
 .texts-page .texts-hand { margin-top: 12px; }
 .texts-page .texts-hand h3 { color: var(--red); }
 .texts-page .texts-new { margin-top: 18px !important; padding-top: 14px; border-top: 1px solid var(--line); }

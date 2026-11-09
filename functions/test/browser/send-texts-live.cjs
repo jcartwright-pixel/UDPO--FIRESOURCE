@@ -30,6 +30,10 @@ async function openPage(browser, width, height, url) {
 }
 const small = (p) => p.evaluate(() => [...document.querySelectorAll('#send-texts *')].filter(el => el.offsetWidth && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 15.9).map(el => el.tagName));
 const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+// Joe 11/9: the warnings come up in a pop-up by themselves. popText waits for it and gives its words; closePop puts it away.
+const POP = '#send-texts-pop:not([hidden])';
+const popText = async (p) => { await p.waitForSelector(POP, { timeout: 20000 }); return p.textContent(POP); };
+const closePop = async (p) => { await p.click(POP + ' .send-pop-close'); await p.waitForSelector('#send-texts-pop', { state: 'hidden' }); };
 const lastSend = async () => ((await db().collection('private').doc('sms').get()).data() || {}).lastSend;
 
 (async () => {
@@ -54,6 +58,13 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     await wk.waitForFunction(() => /Not sent/.test(document.getElementById('send-texts').textContent) && !document.querySelector('#send-texts button').disabled, null, { timeout: 15000 });
     assert.match(await wk.textContent('#send-texts'), /Schedule texts for the posted week, 10-11-26 to 10-17-26: Not sent \(1 driver ticked on the Driver Roster\)\./);
     assert.equal(await wk.textContent('#send-texts button'), 'Send Schedule Texts: Week of 10-11-26');
+    // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week. Joe 11/9: in a pop-up.
+    const handPop = await popText(wk);
+    assert.match(handPop, /TEXT (THIS DRIVER|THESE \d+ DRIVERS) YOURSELF/);
+    assert.match(handPop, /Not signed up for texts, and their week is not their normal week\./);
+    assert.doesNotMatch(handPop, /CASEY/, 'Casey is signed up: Send reaches him');
+    if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'pop-text-yourself-1536.png') });
+    await closePop(wk);
     if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'live-send-weekly-not-sent-1536.png') });
     await wk.click('#send-texts button');
     assert.equal(await wk.textContent('#send-texts button'), 'Tap Again: Text 1 driver for 10-11-26', 'the first tap only arms it');
@@ -65,10 +76,13 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     assert.match(await wk.textContent('#send-texts'), /1 OF 1 SENT.*Sent [^.]*\(test copy, written to the list only\)\./);
     const l = await lastSend();
     assert.deepEqual([l.week, l.drivers, l.live, l.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
-    // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week are named in red.
-    await wk.waitForSelector('#send-texts .send-hand', { timeout: 15000 });
-    assert.match(await wk.textContent('#send-texts .send-hand'), /^Text (this driver|these \d+ drivers) yourself \(not signed up, and their week changed\): .+\(.+\)/);
-    assert.doesNotMatch(await wk.textContent('#send-texts .send-hand'), /CASEY/, 'Casey is signed up: Send reaches him');
+    // A warning already closed does not come up again by itself; its red button on the strip opens it.
+    await wk.waitForTimeout(1500);
+    assert.equal(await wk.isHidden('#send-texts-pop'), true, 'closed stays closed');
+    assert.match(await wk.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
+    await wk.click('#send-texts .send-chip');
+    assert.match(await popText(wk), /YOURSELF/);
+    await closePop(wk);
     assert.ok(await fits(wk) <= 0);
     assert.deepEqual(await small(wk), []);
     if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'live-send-weekly-sent-1536.png') });
@@ -83,8 +97,9 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       assert.equal(await dd.textContent('#send-texts .send-count.good'), '1 OF 1 SENT', 'Joe 11/7 (li): the sent check');
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
       assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
-      assert.match(await dd.textContent('#send-texts .send-hand-short'), /^\d+ to text yourself$/);
-      assert.match(await dd.getAttribute('#send-texts .send-hand-short', 'title'), /Not signed up for texts, and their week changed: .+/);
+      assert.match(await dd.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
+      assert.match(await popText(dd), /YOURSELF/);
+      await closePop(dd);
       assert.equal(await dd.textContent('#send-texts button'), 'Send Again');
       assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
       assert.deepEqual(await small(dd), []);
@@ -106,6 +121,8 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     // send is missing: red 1 OF 2 SENT · 1 MISSING with his name and why, and Text the Missing Driver (two taps) texts only him.
     const wk2 = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
     await wk2.waitForFunction(() => /^1 OF 1 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
+    await popText(wk2);
+    await closePop(wk2);
     if (SHOTS) await wk2.waitForTimeout(800), await wk2.screenshot({ path: path.join(SHOTS, 'check-all-sent-1536.png') });
     await wk2.context().close();
     await db().collection('driverPhones').doc('drv_test_adams').set({ driverId: 'drv_test_adams', phone: '+13305550199', scheduleText: true });
@@ -115,25 +132,34 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       const short = /daily/.test(url);
       assert.equal(await p.textContent('#send-texts .send-count'), short ? '1 OF 2 SENT' : '1 OF 2 SENT · 1 MISSING');
       assert.equal(await p.textContent('#send-texts button'), short ? 'Text 1 Missing' : 'Text the Missing Driver');
-      if (short) assert.match(await p.getAttribute('#send-texts', 'title'), /Missing: ADAMS, PAT \(not sent yet\)/);
-      else assert.equal(await p.textContent('#send-texts .send-hand'), 'Missing: ADAMS, PAT (not sent yet)');
-      assert.deepEqual(await small(p), []);
-      assert.ok(await fits(p) <= 0, 'no side scroll at ' + w);
-      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-missing-' + w + '.png') });
+      const missPop = await popText(p);
+      assert.match(missPop, /1 DRIVER DOES NOT HAVE THIS WEEK'S TEXT/);
+      assert.match(missPop, /ADAMS, PAT \(not sent yet\)/);
+      assert.equal(await p.textContent(POP + ' .send-pop-fix'), short ? 'Text 1 Missing' : 'Text the Missing Driver');
+      assert.ok(await p.$$eval(POP + ' *', els => els.filter(e => e.offsetWidth && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())).every(e => parseFloat(getComputedStyle(e).fontSize) >= 15.9)), '16 size in the pop-up');
+      assert.ok(await fits(p) <= 0, 'no side scroll with the pop-up at ' + w);
+      if (SHOTS) await p.waitForTimeout(500), await p.screenshot({ path: path.join(SHOTS, 'pop-missing-' + w + '.png') });
       if (w === 1536) {
+        // Text the Missing Driver in the pop-up: two taps, only the missing driver.
         const before = (await db().collection('textLog').get()).size;
-        await p.click('#send-texts button');
-        assert.equal(await p.textContent('#send-texts button'), 'Tap Again: Text 1 driver');
-        await p.click('#send-texts button');
+        await p.click(POP + ' .send-pop-fix');
+        assert.equal(await p.textContent(POP + ' .send-pop-fix'), 'Tap Again: Text 1 driver');
+        await p.click(POP + ' .send-pop-fix');
         await p.waitForFunction(() => /^2 OF 2 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
         const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.driverId === 'drv_test_adams');
         assert.equal((await db().collection('textLog').get()).size, before + 1, 'only the missing driver');
         assert.equal(added.length, 1);
+        assert.doesNotMatch(await p.textContent('#send-texts-pop'), /DOES NOT HAVE/, 'the missing part goes once they have it');
+        await closePop(p);
         if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-fixed-1536.png') });
         assert.deepEqual(p.errors, []);
         await p.context().close();
         break;
       }
+      await closePop(p);
+      assert.deepEqual(await small(p), []);
+      assert.ok(await fits(p) <= 0, 'no side scroll at ' + w);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-missing-' + w + '.png') });
       assert.deepEqual(p.errors, []);
       await p.context().close();
     }
@@ -143,28 +169,31 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     {
       const p = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
       await p.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
-      assert.equal(await p.locator('#send-texts .send-changed').count(), 0, 'nothing changed yet');
+      assert.doesNotMatch(await popText(p), /CHANGED/, 'nothing changed yet');
+      await closePop(p);
       const before = (await db().collection('textLog').get()).size;
       await db().collection('runs').doc('2026-10-11__run_t905').set({ days: { wed: { truck: '518', trailer: '905' } } }, { merge: true });
-      await p.waitForSelector('#send-texts .send-changed', { timeout: 20000 });
-      assert.match(await p.textContent('#send-texts .send-changed > b'), /^1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
-      assert.match(await p.textContent('#send-texts .send-changed-row'), /CASEY, LEE \(texted .+\): WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED/);
-      assert.equal(await p.textContent('#send-texts .send-update'), 'Send Updated Schedule');
+      // The new warning brings the pop-up back by itself.
+      const chPop = await popText(p);
+      assert.match(chPop, /1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
+      assert.match(await p.textContent(POP + ' .send-pop-row'), /CASEY, LEE \(texted .+\)WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED/);
+      assert.equal(await p.textContent(POP + ' .send-update'), 'Send Updated Schedule');
+      assert.equal(await p.textContent('#send-texts .send-chip'), '1 SCHEDULE CHANGED');
       assert.equal((await db().collection('textLog').get()).size, before, 'the warning never texts');
       assert.deepEqual(await small(p), []);
       assert.ok(await fits(p) <= 0);
       if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-weekly-1536.png') });
       for (const [w, h] of [[1920, 1080], [390, 844]]) {
         const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-12&' + ADMIN);
-        await dd.waitForSelector('#send-texts .send-changed', { timeout: 15000 });
+        assert.match(await popText(dd), /SCHEDULE CHANGED/);
         assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
         assert.deepEqual(await small(dd), []);
         if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'changed-daily-' + w + '.png') });
         assert.deepEqual(dd.errors, []);
         await dd.context().close();
       }
-      await p.click('#send-texts .send-update');
-      await p.waitForFunction(() => !document.querySelector('#send-texts .send-changed'), null, { timeout: 15000 });
+      await p.click(POP + ' .send-update');
+      await p.waitForFunction(() => !document.querySelector('#send-texts-pop .send-update') && !/CHANGED/.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
       const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'RESEND');
       assert.equal(added.length, 1);
       assert.deepEqual([added[0].driverId, /Truck 518 · Trailer 905/.test(added[0].body)], ['drv_test_casey', true]);

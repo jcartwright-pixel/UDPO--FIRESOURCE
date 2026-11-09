@@ -113,8 +113,8 @@ body.daily-look .day-info { display: flex; align-items: center; gap: 12px; margi
 .day-info .coverage b { font-size: 18px; }
 .day-info .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; font-size: 16px; }
 .day-info .send-strip { margin: 0; flex: 1 1 auto; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 4px 10px; flex-wrap: nowrap; gap: 10px; }
-.day-info .send-strip:has(.send-error), .day-info .send-strip:has(.send-changed) { flex-wrap: wrap; }
-.day-info .send-strip .send-words, .day-info .send-strip .send-button { white-space: nowrap; }
+.day-info .send-strip:has(.send-error) { flex-wrap: wrap; }
+.day-info .send-strip .send-words, .day-info .send-strip .send-button, .day-info .send-strip .send-chip { white-space: nowrap; }
 .day-info .send-strip .send-button { flex: none; }
 .day-info .day-pick { display: flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; flex: none; }
 .day-info .day-pick label, .day-info .delivers { font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
