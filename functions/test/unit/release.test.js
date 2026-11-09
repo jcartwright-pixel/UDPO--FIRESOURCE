@@ -43,3 +43,14 @@ test('screen tests in parts: every test once, in the same order, each part with 
   assert.match(p.env, /UD_FAKE_LIVE_ROLL=1/);
   assert.match(wf('tests.yml'), /node \.\.\/tools\/browser-parts\.cjs 3/);
 });
+
+test('merge by itself: only a green, non-draft pull request from this repository, then the main tests start', () => {
+  const a = wf('auto-merge.yml');
+  assert.match(a, /workflows: \[Distribution app tests\]/);
+  assert.match(a, /"\$draft" = true \]; then echo "Pull request \$pr is a draft: held, not merged\."; exit 0/, 'a draft is held');
+  assert.match(a, /"\$head" != "\$SHA"/, 'only the exact code that was tested');
+  assert.match(a, /completed\\t\(success\|skipped\|neutral\)\$/, 'every check finished green');
+  assert.match(a, /-f sha="\$SHA"/);
+  assert.match(a, /gh workflow run tests\.yml --repo "\$REPO" --ref main/, 'the main tests start after the merge');
+  assert.match(wf('release.yml'), /github\.event\.workflow_run\.event == 'workflow_dispatch'/, 'and the release takes that run');
+});
