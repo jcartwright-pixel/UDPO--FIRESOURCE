@@ -33,6 +33,7 @@ export const LOOK = {
   'plant-setup': { color: '#4a6b1f', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
   keys: { color: '#8a2d3b', icon: path('<circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M17 5l2 2M15 7l2 2"/>') },
   bol: { color: '#8a4b14', icon: path('<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>') },
+  changes: { color: '#1d7a46', icon: path('<path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><path d="M9.5 10.5l2 2 3.5-3.5"/>') },
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
   // Joe 11-5-26: Plant & Distribution is two cards on Home, Plant Operations (the plant) and Route Distribution (the truck).
   plant: { color: '#2f6e3a', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
@@ -90,7 +91,8 @@ export const AREAS = [
     { name: 'Who gets in', items: ['people', 'roles'] },
     { name: 'Messages and links', items: ['email', 'links'] },
     { name: 'Plants and connections', items: ['plant-setup', 'keys'] },
-    { name: 'Numbers from the office', items: ['accounting', 'bol'] }
+    { name: 'Numbers from the office', items: ['accounting', 'bol'] },
+    { name: 'Customer list', items: ['changes'] }
   ] }
 ];
 // The area pictures for the menu.
