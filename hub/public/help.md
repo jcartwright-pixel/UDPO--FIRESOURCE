@@ -215,7 +215,7 @@ screens: keys.html
 id: accounting
 screens: accounting.html
 
-Where the monthly accounting package comes in (administrators). The Hub reads the zip from accounting once and keeps each month's gallons sold, delivery cost, employee cost and fuel cost. **Over the Road** in Plant & Distribution and the cost analysis app read the numbers from here, so they always match.
+Where the monthly accounting package comes in (administrators). The Hub reads the zip from accounting once and keeps each month's gallons sold, delivery cost, employee cost and fuel cost. For **Route Cost Analysis** it also keeps each delivery line of the P&L (wages, overtime, benefits, truck rental, depreciation, insurance, repairs, parts, tires, delivery expense and the rest), the garage's share of each, net sales, cost of material, and sales and transfer gallons. **Over the Road** in Plant & Distribution and the cost analysis app read the numbers from here, so they always match.
 
 1. Type the **Mailbox the zip comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
 2. Tick **Check every morning**. Every morning at 6:00 AM the Hub looks in that mailbox for a new zip and reads it.
@@ -224,11 +224,11 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 5. Check the newest month in the table. Over the Road shows the same numbers on its Recap and Cost Per Gallon tabs.
 
 ### Buttons
-- `CHECK EMAIL NOW` reads the mailbox at once (the last 45 days). A zip already read is not read again.
+- `CHECK EMAIL NOW` reads the mailbox at once (the last 45 days). A zip already read is not read again (once, after the Hub learned the extra lines on 11-7-26, each zip is read one more time so the months already here get them).
 - `ADD A FILE BY HAND` reads a zip, or one Excel workbook, from your computer.
 - **Only from** (optional): type accounting's address, so only their zips are read.
 
-> The zip is the one accounting sends each month: P&L Expenses by Dept, Gallon Comparison and the rest. Only the month tabs (like SEPT 2026) and the Gallon Comparison are used. A month's numbers change only when a newer file has different ones.
+> The zip is the one accounting sends each month: P&L Expenses by Dept, Gallon Comparison and the rest. Only P&L Expenses by Dept's month tabs (like SEPT 2026), P&L Comparison's Net Sales and Cost of Material, and the Gallon Comparison are used. A month's numbers change only when a newer file has different ones.
 
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Driver Check-In Email). If it has not, the last-checked line says so in red.
 
