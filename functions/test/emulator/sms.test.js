@@ -424,3 +424,38 @@ test('Joe 11/7: one driver whose text cannot be made no longer stops Send; the o
   r = await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: bad.id }, live('2026-10-17T23:20:00Z'));
   assert.deepEqual(calls.slice(2), ['+13305551234']);
 });
+
+test('Joe 11/9: a truck, trailer or route changed after the schedule text went out is listed with what changed; Send Updated Schedule texts only that driver', async () => {
+  await SMS.smsCall(db(), ADMIN, { op: 'save', accountSid: SID, authToken: 'tok', fromNumber: '3305550000' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-changed-0001', driverId: 'drv_test_casey', phone: '3305551234' });
+  await applyAction(db(), ADMIN, { action: 'setDriverPhone', requestId: 'req-phone-changed-0002', driverId: 'drv_test_brook', phone: '3305558888' });
+  for (const id of ['drv_test_casey', 'drv_test_brook']) await applyAction(db(), ADMIN, { action: 'setDriverText', requestId: 'req-text-changed-' + id, driverId: id, kind: 'SCHEDULE', on: true });
+  await db().collection('runs').doc(WEEK + '__run_t905').set({ days: { mon: { truck: '512', trailer: '901' } } }, { merge: true });
+  const calls = [], fetch = async (url, init) => { calls.push(new URLSearchParams(String(init.body))); return { ok: true, status: 201, json: async () => ({}) }; };
+  const live = (t) => ({ env: { LIVE_TEXTS: '1' }, fetch, now: () => new Date(t) });
+  await post();
+  // Before any text, and right after the send: nothing to warn about.
+  assert.deepEqual((await SMS.smsCall(db(), ADMIN, { op: 'preview' }, live('2026-10-17T22:00:00Z'))).changed, []);
+  await SMS.smsCall(db(), ADMIN, { op: 'sendSchedule' }, live('2026-10-17T23:00:00Z'));
+  assert.equal(calls.length, 2);
+  assert.deepEqual((await SMS.smsCall(db(), ADMIN, { op: 'preview' }, live('2026-10-17T23:01:00Z'))).changed, []);
+  // Dispatch swaps Casey's truck on Monday: Casey is listed, Brook is not, and nothing is texted by itself.
+  await db().collection('runs').doc(WEEK + '__run_t905').set({ days: { mon: { truck: '518' } } }, { merge: true });
+  let p = await SMS.smsCall(db(), ADMIN, { op: 'preview' }, live('2026-10-17T23:05:00Z'));
+  assert.deepEqual(p.changed.map(x => [x.name, x.changes]), [['CASEY, LEE', ['MONDAY: TRUCK 512 IS NOW 518']]]);
+  assert.equal(calls.length, 2, 'the warning never texts');
+  // Then Brook's route moves from Tuesday to Wednesday: Brook is listed too.
+  await db().collection('runs').doc(WEEK + '__run_t836').set({ days: { tue: { runs: false, driverId: '', driver: '' }, wed: { runs: true, driverId: 'drv_test_brook', driver: 'BROOK' } } }, { merge: true });
+  p = await SMS.smsCall(db(), ADMIN, { op: 'preview' }, live('2026-10-17T23:06:00Z'));
+  const brook = p.changed.find(x => x.driverId === 'drv_test_brook');
+  assert.ok(brook && brook.changes.some(c => /^TUESDAY: 836 PECK TAKEN OFF|^TUESDAY: WAS 836 PECK/.test(c)) && brook.changes.some(c => /^WEDNESDAY: .*836 PECK/.test(c)), JSON.stringify(brook));
+  // Send Updated Schedule on Casey: one text, to Casey, with the new truck; Casey drops off, Brook stays.
+  const casey = p.changed.find(x => x.driverId === 'drv_test_casey');
+  const r = await SMS.smsCall(db(), ADMIN, { op: 'resend', logId: casey.logId }, live('2026-10-17T23:10:00Z'));
+  assert.equal(r.resend.status, 'SENT');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].get('To'), '+13305551234');
+  assert.match(calls[2].get('Body'), /Truck 518/);
+  p = await SMS.smsCall(db(), ADMIN, { op: 'preview' }, live('2026-10-17T23:11:00Z'));
+  assert.deepEqual(p.changed.map(x => x.name), ['BROOK, SAM']);
+});
