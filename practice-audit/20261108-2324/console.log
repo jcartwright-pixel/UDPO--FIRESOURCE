@@ -1,0 +1,378 @@
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+r1536 Home                            662   1964 -> company.html
+r1536 Route Distribution              489   1201
+r1536 Daily Dispatch                  700   2412
+r1536 Weekly Dispatch                 516   2365 SMALL 12
+r1536 Route Editor                    801   2163
+r1536 Route Week Override             623   1400
+r1536 Driver Roster                   679   1643
+r1536 Driver Weekly Template          742   2176
+r1536 Vacation Schedule               573   1262
+r1536 Fleet & Maintenance             673   2307
+r1536 Equipment                       805   1595
+r1536 Equipment Issues                616   1543
+r1536 Garage Work Orders              659   1045
+r1536 Fleet Service                   547   2018
+r1536 Driver Scorecard                503   3977
+r1536 Over the Road                   565   4368
+r1536 Trucks Today                    561   1461
+r1536 GPS Setup                       543   1101
+r1536 Driver Check-ins                484   1128
+r1536 Driver Station                  834   1536
+r1536 Sheet Conflicts                 620   1463
+r1536 Dispatch Administration         593    896
+r1536 Operational Assignments         521   1199
+r1536 Print Layouts                   634   2426
+r1536 Dispatch Settings               738   1372
+r1536 Administration                  818   2022
+r1536 Manager Center                  575   1485
+r1536 Plant Departments               586   1334
+r1536 Loadout Center                  697   1818
+r1536 Daily Boxing Loadout            468   1099
+r1536 Late Forecast                   543   1003
+r1536 Unloading & Washing             543   1577
+r1536 Product Returns                 608   1118
+r1536 Truck Washing                   519   1145
+r1536 Trailer Assignments             564   1105
+r1536 Shipping & Receiving            605   1238
+r1536 Shift Notes                     598   1255
+r1536 Quality Checks                  498   1170
+r1536 Cooler Temperature              552   1106
+r1536 Yard Checks                     491   1059
+r1536 Manager Walkthrough             529   1924
+r1536 Plant Reports                   627   1737
+r1536 Shift Reports                   508   1046
+r1536 Plant Performance TV            698   1271
+r1536 Reports                         568   1254
+r1536 Safety Walkthrough              721   1113
+r1536 Production Lines                672   1087
+r1536 Line Targets                    869   1397
+r1536 Inventory                       767   1223
+r1536 Maintenance Center              643   1157
+r1536 Machinery                       548   1008
+r1536 Work Orders (plant)             615    985
+r1536 PM Schedule                     527   1116
+r1536 MOCREO & Sensors                553   2015
+r1536 Company Overview                652   1184
+r1536 Upload Center                   890   1556
+r1536 Driver Assignment Board         478   1288 SMALL 12
+r1536 Truck Issues                    553   1575
+r1536 Trailer Issues                  463   1196
+r1536 Fork Truck Issues               485   1944
+r1536 Send Current Report             565   1421
+r1536 Loading Rundown                 630   1241
+r1536 Production TV                   712   1202
+r1536 Line Tablet                     512   1028
+r1536 Jug Trailers                    795   1364
+r1536 Maintenance Station            1170   1220
+r1536 Garage Station                  547   2167
+r1536 Plant Station                   627   2260
+r1536 Driver Room TV                  672   1298 -> driver-station.html
+r1536 Driver Check-In (phone)         517   1863
+r1536 Phone Screens                   542   1058
+r1536 Open Safety Issues              565   1049
+r1536 Fire Extinguishers              526    946
+r1536 Fire Alarm                      496   1014
+r1536 Fire Suppression                468    949
+r1536 Escape Plan                     481    894
+r1536 Past Walks                      459   1007
+r1536 Checklist Setup                 453   1027
+r1536 Products                        621   1166
+r1536 Machine Setup                   515    956
+r1536 Location Areas                  523    881
+r1536 RedZone                         723   2014 SAYS Last test 10-16-26 12:27 AM by jcartwright@uniteddairy.com: 
+r1536 Shifts                          642   1094
+r1536 Text Log                        545    807
+r1536 Sent Email Log                  714   1102
+r1536 Case Counters                   603   2049
+r1536 Role Templates                  533    996
+r1536 Repair Email                    606   1481 SAYS Not saved yet: these are the standard settings.
+r1536 Email Senders                   562   1004
+r1536 Manager Report Recipients       519    842
+r1536 Driver Check-In Email           537    988
+r1536 Refresh Rates                   689   1410
+r1536 Go-Live Switches                554    855
+r1536 Dispatch Administration (Administration)    547    815
+r1536 Fleet Service Setup             566   1866
+r1536 Blow Mold                       500    882
+r1536 Blow Mold Targets               530    987
+r1536 Blow Mold (Plant Production)    563   1051
+r1536 Plant Operations                549    926
+r1536 Route Distribution (group)      524    971
+r1536 Plant Production home           543   1048
+r1536 Plant Equipment                 574    913
+r1536 Maintenance Crew               1253   1679
+r1536 Menu Setup                      652   1030
+r1536 People & Roles                  604   1094
+r1536 Help                            642   1230
+r1536 Machine Connections             527   1042
+Signed in (1920 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+r1920 Home                            660   2937 -> company.html
+r1920 Route Distribution              518   1309
+r1920 Daily Dispatch                  623   2681
+r1920 Weekly Dispatch                 525   1394 SMALL 12
+r1920 Route Editor                    607   1506
+r1920 Fleet & Maintenance             545   1747
+r1920 Equipment Issues                469   1324
+r1920 Garage Work Orders              829   1352
+r1920 Driver Scorecard                513   4667
+r1920 Trucks Today                    528   1397
+r1920 Administration                  652   1114
+r1920 Manager Center                  576   2329
+r1920 Plant Departments               485   1228
+r1920 Loadout Center                  502   1692
+r1920 Daily Boxing Loadout            517   1163
+r1920 Late Forecast                   501    887
+r1920 Yard Checks                     681   1301
+r1920 Manager Walkthrough             540   1179
+r1920 Production Lines                576   1063
+r1920 Blow Mold                       572    993
+r1920 Blow Mold (Plant Production)    518   1037
+r1920 Plant Operations                577   1016
+r1920 Plant Production home           776   1293
+r1920 People & Roles                  764   1412
+r1920 Help                            605   1272
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+r390 Home                            590   2137 -> company.html
+r390 Weekly Dispatch                 767   1488
+r390 Fleet & Maintenance             528   1794
+r390 Loadout Center                  610   2160
+r390 Quality Checks                  548   2001
+r390 Cooler Temperature              608   1009
+r390 Yard Checks                     560   1182
+r390 Manager Walkthrough             500   1014
+r390 Driver Check-In (phone)         575   1921
+r390 Plant Operations                550    952
+r390 Help                            557   1222
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+r1024 Weekly Dispatch                 478   1451
+r1024 Loadout Center                  518   1866
+r1024 Unloading & Washing             538   1790
+r1024 Truck Washing                   511   1169
+r1024 Yard Checks                     483   1958
+r1024 Plant Station                   598   2284
+r1024 Driver Room TV                  727   1358 -> driver-station.html
+r1024 Blow Mold                       525   1022
+r1024 Blow Mold (Plant Production)    563    943
+r1536b Route Distribution              551   1484
+r1536b Daily Dispatch                  667   2282
+r1536b Weekly Dispatch                 581   1483 SMALL 12
+r1536b Manager Center                  534   1968
+r1536b Plant Departments               469   1197
+r1536b Loadout Center                  565   1699
+r1536b Late Forecast                   765   1268
+CLICK distribution.html          
+CLICK daily.html                 prev arrow 47/212ms
+CLICK weekly.html                next arrow 20/361ms, prev arrow 13/204ms
+CLICK routes.html                tab "Normal Week" -1/-1ms, tab "Holiday Week" -1/-1ms
+CLICK routeweek.html             prev arrow 13/307ms, tab "Normal Week" -1/-1ms, view "times" 34/44ms, view "miles" 30/40ms, view "hours" 29/38ms, view "offset" 34/44ms
+CLICK loadout.html               next arrow 50/1034ms, prev arrow 20/677ms
+CLICK loadout.html?area=BOXING   next arrow 22/675ms, prev arrow 24/668ms
+CLICK unloading.html             next arrow 14/346ms, prev arrow 13/198ms, tab "Check Off" 14/14ms, tab "View Only" 25/25ms
+CLICK returns.html               next arrow 43/155ms, prev arrow 9/26ms, tab "Check Off" 21/21ms, tab "View Only" 13/13ms
+CLICK washing.html               next arrow 26/244ms, prev arrow 32/204ms
+CLICK scheduler.html             next arrow 17/125ms, prev arrow 21/36ms, tab "Day" 22/87ms, tab "Week" 27/117ms, tab "Month" 19/35ms
+CLICK checkins.html              next arrow 11/23ms, prev arrow 25/38ms
+CLICK scorecard.html             next arrow 13/144ms, tab "Month" 26/26ms, tab "Week" 10/10ms, tab "Year" 23/23ms, tab "Settings" 52/63ms
+CLICK otr.html                   tab "Today" 26/26ms, tab "By Date" 32/55ms, tab "Recap" 24/30ms, tab "Month Recap" 39/62ms, tab "Cost Per Gallon" 27/37ms, tab "OTR Routes Setup" 49/82ms
+CLICK fleet.html                 tab "Due · Services & Annual Inspec" 96/96ms, tab "Work Orders 14" 74/80ms, tab "History" 74/76ms, tab "Fleet Service Setup" 78/96ms
+CLICK quality.html               tab "Current" 11/11ms, tab "24-Hour History" 11/11ms, tab "RedZone Checks" 40/82ms
+CLICK reports.html               next arrow 29/271ms, prev arrow 19/30ms
+CLICK shiftreports.html          next arrow 43/43ms, prev arrow 20/20ms
+CLICK plant-station.html         
+CLICK uploads.html               
+CLICK administration.html        
+MOVE index.html -> distribution.html          1306 shown, 1208 done (typed address (no link on the screen before))
+MOVE distribution.html -> daily.html          2004 shown, 2811 done (menu link)
+MOVE daily.html -> weekly.html                1578 shown, 2315 done (menu link)
+MOVE weekly.html -> routes.html               1714 shown, 1694 done (typed address (no link on the screen before))
+MOVE routes.html -> drivers.html              1209 shown, 1198 done (typed address (no link on the screen before))
+MOVE drivers.html -> plant.html               1204 shown, 1142 done (typed address (no link on the screen before))
+MOVE plant.html -> loadout.html               1901 shown, 1867 done (menu link)
+MOVE loadout.html -> unloading.html           1525 shown, 1472 done (typed address (no link on the screen before))
+MOVE unloading.html -> manager.html           1357 shown, 1336 done (menu link)
+MOVE manager.html -> yard.html                975 shown, 952 done (menu link)
+MOVE yard.html -> maint.html                  1830 shown, 1748 done (typed address (no link on the screen before))
+MOVE maint.html -> issues.html                1616 shown, 1562 done (menu link)
+MOVE issues.html -> fleet.html                1711 shown, 1649 done (menu link)
+MOVE fleet.html -> administration.html        859 shown, 869 done (typed address (no link on the screen before))
+WRITE Clean up after an earlier stopped run: ok 
+NOTE Load steps: no loads on the practice copy today (2026-11-08), so Start, Skip, depart time, Ended Up Not Running and same-loads ran on 2026-10-30, opened on its own day
+WRITE Loadout Start and End: ok Start 164ms, End 174ms
+WRITE Loadout put back to Not started: ok Not started 182ms
+WRITE Loadout Skip: ok put back 77ms
+WRITE Daily depart time +5 min: ok Enter 26ms
+WRITE Daily depart time put back: ok Enter 25ms
+WRITE Weekly driver change: ok pick driver 102ms
+WRITE Weekly driver put back: ok pick driver 111ms
+WRITE Route Editor start time +5 min: ok auto-save answered 1080ms
+WRITE Route Editor start time put back: ok auto-save answered 1078ms
+WRITE Box load Start and End times: ok Add Load 592ms, Save times 589ms, Put back 654ms, Delete Load 49ms
+WRITE Ended Up Not Running: ok Ended Up Not Running (second press) 176ms
+WRITE Ended Up Not Running put back: ok 
+WRITE Yard check temperature: ok Start 70ms, End 76ms, temperature saved 448ms, put back Not started 84ms
+WRITE Yard check on a reloaded trailer: ok first load Start 76ms, first load End 75ms, first load check saved 507ms, first load back to Not started 87ms, reloaded Start 64ms, reloaded End 79ms, reloaded check saved 509ms, first load back to Not started 84ms, reloaded back to Not started 86ms
+WRITE Yard Checks All Trailers in Yard tab: ok All Trailers in Yard 70ms
+WRITE Trucks Today opens: ok 
+WRITE Fleet Service rule saves when left: ok rule saved 509ms, rule put back 506ms
+WRITE Refresh Rates saves when picked: ok schedule saved 509ms, schedule put back 508ms
+WRITE Case counter columns (look only): ok 
+WRITE Weekly board Day Note: FAILED page.waitForFunction: Timeout 20000ms exceeded. Day Note shows 111ms
+WRITE Driver Station TV keep-awake video: ok video playing 15ms
+WRITE Email Senders several boxes quickly: ok filled 1 boxes quickly 3017ms, all kept after reload 0ms, put back 3014ms
+WRITE Weekly extra run line: ok extra line shows 839ms, still there after reload 761ms, removed 87ms
+WRITE Down trailers, Fleet tiles, Scorecard, Walkthrough (look only): ok 
+WRITE Weekly names 16px at 390 and 1024 (look only): ok 
+WRITE Weekly title row at 1536 and 1920 (look only): ok 
+WRITE Plant Production machine menu and Blow Mold page: ok Blow Mold page 41ms
+WRITE Truck Issues Idealease leased and route number (look only): ok Idealease truck 223893 says Leased from Idealease 0ms, routes shown as numbers (8 with a route) 0ms
+WRITE Truck Issues lessor under Emailed: ok lessor whole under Emailed at 1536 0ms, lessor whole under Emailed at 1920 0ms, lessor whole under Emailed at 390 0ms, test write-ups deleted 0ms
+WRITE Scheduler week cards name and time only (look only): ok 3 cards name and time only at 1536 0ms, 3 cards name and time only at 1920 0ms, 3 cards name and time only at 1024 0ms
+WRITE Plant reorg Home and Plant Operations cards (look only): ok cards plant, production, shipping, debag, pallets open 0ms
+NOTE Driver Scorecard: no grades yet this week (it starts today), so the week before was opened
+WRITE Scorecard grade opens its report: ok report opens 628ms, back to the scorecard 675ms
+WRITE People & Roles Home screen saves when picked: ok Home screen saved 506ms, put back 505ms
+WRITE Plant Production machine page tabs (look only): ok 
+WRITE Help guide (look only): ok 
+WRITE Shift report each delivery day once (look only): ok 6 sent reports drawn, each day once 0ms
+WRITE Shift report shows Box loads: ok Add Load 565ms, Delete Load 44ms
+WRITE Shift report Potentially Late banner (look only): ok 
+WRITE Shift report: later-day Scheduler load not BEHIND: ok Add Load 590ms, Delete Load 44ms
+WRITE Line Tablet each line and tab (look only): ok 
+WRITE Maintenance Station plant mechanics only (look only): ok 
+WRITE 6.66 screens at 1536, 1024 and 390 (look only): ok 
+NOTE Case Unloading order: no loads on the practice copy today (2026-11-08), so the test put one of its own on today's list and took it off after: 2026-11-08__practice_split_mw8hlb1i1 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-08, delivered 2026-11-08)
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Case Unloading columns, order and Add a Trailer: ok Add a Trailer 449ms, Take Off the List 44ms
+WRITE Plant Managers phone start screen (look only): ok 
+NOTE Driver Room carry-over: no load from yesterday is still unfinished on the practice copy right now
+WRITE Driver Room TV at 1920 (look only): ok 
+NOTE Driver Room View Loadout: no loads on the practice copy today (2026-11-08), so the test put one of its own on today's list and took it off after: 2026-11-08__practice_split_mw8ho9lz1 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-08, delivered 2026-11-08)
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Yesterday/today lines: no load from yesterday is still unfinished on the practice copy right now, so only "no line" was checked
+WRITE Driver Room View Loadout keeps yesterday's unfinished loads (look only): ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Tablet screens keep the screen on (look only): ok 
+NOTE Daily Dispatch red cells: no driver off on the practice copy on the days shown; the screen's own cell was looked at in place
+WRITE Daily Dispatch red cells (look only): ok 
+WRITE Same loads on Daily Dispatch, Case Loadout and the Driver Room (look only): ok 
+NOTE New phone code: no loads on the practice copy today (2026-11-08), so the test put one of its own on today's list and took it off after: 2026-11-08__practice_split_mw8hqgz61 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-08, delivered 2026-11-08)
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE New phone code opens the drivers' phone screen: ok New phone code 3261ms, Continue with the code 636ms
+WRITE Pause writing to the sheets holds the fleet list sync: ok 
+NOTE first refused call: {"fn":"sms","op":"sendSchedule","at":"2026-11-08T23:56:34.645Z","page":"https://ud-distribution-sandbox.web.app/texts.html","body":"{\"error\":{\"message\":\"Save the Twilio account first.\",\"status\":\"PERMISSION_DENIED\"}}"}
+NOTE Texts: the practice copy has no Twilio account saved, so Send schedule texts is greyed out there and the send is refused with "Save the Twilio account first" (checked); the two-tap send itself can only be pressed where an account is saved
+WRITE Texts: replies to your cell and Send schedule texts: ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Phone apps show Last refreshed, desk screens the version (look only): ok 
+WRITE Load Day loads not late too early; hours behind (6.78): FAILED no run on the practice copy to copy for the test load 
+NOTE Add Driver: every Uniontown employee is already a driver, so the picker lists none (checked it opens)
+WRITE Employees list, Add Driver and Add Person pick from it (look only): ok 
+NOTE weekly.html?view=live: this week is not sent on the practice copy, so the N OF N SENT check and Text the Missing do not show
+NOTE daily.html: this week is not sent on the practice copy, so the N OF N SENT check and Text the Missing do not show
+WRITE Send Schedule Texts strip on Weekly and Daily Dispatch (look only): ok 
+WRITE Sales Route Email recipients save: ok 
+WRITE Home screen cards open the right screens (look only): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Sales app: no routes today or yesterday for Uniontown on the practice copy
+NOTE Sales app: no Save-A-Lot drop and hook route on the practice copy right now (no routes on Sunday 11-8-26), so its Dropped line could not be looked at
+WRITE Sales app opens and a route goes on the map: ok 
+WRITE Administration Sales App has no customer list upload (look only): ok 
+WRITE GPS Setup Trip check (look only): ok 
+WRITE Go-Live Switches People list move button (look only): ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Buttons ready after opening (ms): Loadout Center 2824, 2860 (opened twice); Plant Station 836, 871, 949 (after its code, then opened again twice)
+WRITE Buttons ready after opening: Loadout Center and Plant Station (look only): ok 
+WRITE Driver Roster Delete asks twice; inactive drivers never in a drop-down: ok Yes, delete 98ms
+WRITE Texts Resend one driver's schedule text (practice: no Twilio, nothing sent): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (1536 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Sales app header at 390, 1024 and 1536 (look only): ok 
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Sales app divisions: Uniontown 0 routes. A changed-out trailer cannot be made on the practice copy, so Where now following the truck was not seen.
+NOTE Sales app: no route on the practice copy has both its GPS units silent, so "Unknown: GPS not reporting" was not seen.
+WRITE Sales app divisions, All and Where now (look only): ok 
+Signed in (600 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Outside carrier loads listed, never late; United Dairy loads still are (6.82): ok 
+NOTE Labeling Room: NEW 1/2 GALLON has no product running on the practice copy, so its tablet asks for the product first instead of naming the new label (LABELING ROOM Hold Labels (Filler Down) Pick the product running first. Nothing up next yet.)
+WRITE Labeling Room opens and saves: ok 
+NOTE Administration menu: all nine group bars fit at 1536 x 790; below them the practice copy's own Sandbox tools (not on the live app) scroll 82 px
+WRITE Administration menu: nine folding groups and Hide menu (look only): ok 
+NOTE Timing: saved words on an older shift note read "T 1 Separator Back up at 18:00 · 6:58 PM · Re" (typed before the time format, not drawn by the screen)
+Signed in (600 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Timing: saved words on an older shift note read "ator RESOLVED Back up at 18:00 · 6:58 PM PRO" (typed before the time format, not drawn by the screen)
+Signed in (390 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Timing rule: on time, yellow, red and the time format (6.84): ok 
+WRITE Scheduler Save Load trailer 014 shows T-14 (6.84): ok 
+WRITE Route Editor Default Trailer 014 and TBA (6.84): ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Plant Station START LOADING and COMPLETE register once (6.84): ok 
+WRITE Plant Station Case Loadout & Yard Services tablet (6.88): ok 
+WRITE Shift report email DOWNTIME line (6.89, look only): ok 
+NOTE GPS Setup: the trip history reports its own last error: Verizon Fleet answered 500 when running UDPO_UnitDayPoints (Verizon reference e6a43e51-0fb0-4cd6-a930-8ff310ae4ef3). { \
+WRITE GPS Setup Download driver usernames (6.89, look only): ok 
+WRITE Pallet Builder case counts and a pallet (6.89): ok 
+WRITE Over the Road September 2026 numbers and Fuel Cost By Gallon (6.91): ok 
+WRITE Sales route email departure times from the dispatch tractor (6.91, look only): ok 
+NOTE Daily Dispatch at 1200: buttons on 2 line(s), information line wrapped
+NOTE Daily Dispatch at 1024: buttons on 2 line(s), information line wrapped
+WRITE Daily Dispatch title line, one info line, week locked (6.91, look only): ok 
+NOTE Weekly Dispatch: no driver in the 6 drop-downs looked at was on an overlapping run, so "ON … UNTIL …" was not seen
+WRITE Weekly Dispatch driver times overlap (6.91, look only): ok 
+NOTE Fleet Service Setup: a technician save was seen
+WRITE Garage tablet sign-in with 4 digits and employee ID (6.91): ok 
+NOTE Unloading: no trailer in the lot or on the road on the practice copy right now (0 rows), so the GPS order could not be seen
+WRITE Texts, Sales, Pallet Builder BOL, Unloading, Issues, Template and their Help (6.91, look only): ok 
+NOTE Pallet Builder: after DAY BEFORE the open route is RT 805 · 11/05
+NOTE Pallet Builder: route 805 SAT has no weeks of the Weekly Route Report on the practice copy, so no space is held (the table and words were checked; held shading was not seen)
+WRITE Pallet Builder held space, PALLET RULES and Product Sheet case columns (6.91, look only): ok 
+Signed in (768 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+NOTE Texts: 20 driver(s) to text yourself on the practice copy
+WRITE Weekly % of runs covered, Texts list to text yourself, Late Forecast by hour and their Help (6.91, look only): ok 
+WRITE Customer List October customers and Helds 811496 on practice (6.91, look only): ok 
+NOTE Vacation Schedule: the greyed + Add Vacation for read-only people needs a read-only login; the test checked the manager's.
+WRITE Vacation Schedule Calendar + Add Vacation (6.91): ok 
+WRITE Plant Station Boxing refreshes by itself (6.90): ok 
+WRITE GPS Setup Remove drivers: Check a made-up name only (6.90, look only): ok 
+NOTE Rules: no Darden or Gordon Food load on the practice copy today, so the outside carrier rule was checked with the test's own loads (the outside carrier steps)
+WRITE Rules: loadouts, trailer numbers, loading order, reports (6.84): ok 
+NOTE Administration: app-links took more than 20 seconds to finish opening
+NOTE Administration: manager-app-codes took more than 20 seconds to finish opening
+WRITE Administration In the Hub marks; every item opens (6.85, look only): ok 
+NOTE Truck Issues: no red lessor on the practice copy, so the reason words were checked with made-up notes only
+WRITE Truck Issues red lessor says why the email did not go (6.85, look only): ok 
+WRITE Truck Issues Lessor emails now with Once a day; the box says what happened (6.85): ok 
+WRITE Inventory take out, low at, uses and labels (6.86): ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Plant Station Boxing TAKE OUT: pick, scan and put back (6.86): ok 
+WRITE Role rights after the Hub change (6.86, look only): ok 
+WRITE Blow Mold: no CIP washes and no changeovers (6.85, look only): ok 
+WRITE One color set: loadouts, Trailers, Reports, Shift Notes (6.85, look only): ok 
+Signed in (600 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Shift recap: a line per loadout, outside carrier never late (6.83): ok 
+WRITE Administration People Hub link, practice only (look only): ok 
+NOTE Shift report forecast: no loads on the practice copy today (2026-11-08), so the test put one of its own on today's list and took it off after: 2026-11-08__practice_split_mw8ii22h1 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-08, delivered 2026-11-08)
+WRITE Shift report forecast names the late trucks, no cases (look only): ok 
+WRITE Employees: a person with no ID stays Active; one DEPARTMENT list with DOCK (6.87): ok 
+WRITE Left menu: Receiving opens the Receiving Schedule (6.87, look only): ok 
+NOTE Plant Material Trailers: no United Dairy trailers added on the practice copy (the fleet list is no longer loaded onto it)
+WRITE Plant Material Trailers suppliers, added UD trailers only, Edit and drop-downs (look only): ok 
+WRITE Receiving products, a load with a PO and two products, Inventory: ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Station screens keep the screen on (look only): ok 
+Signed in (1024 wide) as {"email":"practice.audit@uniteddairy.com","verified":true}
+WRITE Garage Station on its tablet code (look only): ok 
+NOTE Trailer pick lists: no loads on the practice copy today (2026-11-08), so the test put one of its own on today's list and took it off after: 2026-11-08__practice_split_mw8ikpil1 (copies of 2026-10-25__run_08e74490506c10de1972, loaded 2026-11-08, delivered 2026-11-08)
+WRITE Trailers 533, 824, 876, 950 on Uniontown pick lists (look only): ok 
+WRITE Jug Trailers add, fill, a UD trailer stays, Left the Lot (6.87): ok Add to the Lot 521ms, Loaded 20ms, Add to the Lot (United Dairy) 571ms
+WRITE Route Run Days tabs and Weekly NEEDS DRIVER (look only): ok 
+WRITE Weekly Dispatch and Weekly Dispatch Template (look only): ok 
+WRITE Cooler temperature reading: ok reading saved 515ms
+WRITE Quality check save: ok quality check saved 507ms
+WRITE Shift note: ok note saved 522ms
+NOTE Shift Notes: the practice copy already had open handoff notes, so the Handoff button stays active k-red after the test note was resolved
+WRITE Shift Notes kinds, tiles and history: add, view and clear a test note (6.84): ok 
