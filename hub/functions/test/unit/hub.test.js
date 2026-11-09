@@ -44,9 +44,27 @@ test('the practice copy links to the practice copies', async () => {
   assert.equal(r.tiles[0].url, 'https://ud-distribution-sandbox.web.app/group.html?g=plantops');
   assert.equal(r.tiles[1].url, 'https://ud-distribution-sandbox.web.app/group.html?g=routeops');
   assert.equal(r.tiles[3].url, 'https://ud-distribution-sandbox-fuel.web.app/');
-  // Route & Trip Costs has no practice copy yet: the practice hub opens the live one and says so.
+  assert.equal(r.tiles[2].url, 'https://ud-distribution-sandbox-customers.web.app/');
+  // Joe 11-9-26: Employees & Compliance opens UDMS's practice copy (made-up people).
+  assert.equal(r.tiles[4].url, 'https://udms-sandbox.web.app/');
+  assert.equal(r.tiles[6].url, 'https://ud-distribution-sandbox-route-cost.web.app/');
+  // Route & Trip Costs, the Statement Center and the accident app have no practice copy yet: the practice hub opens the
+  // live one and says so.
   assert.equal(r.tiles[5].url, 'https://ud-distribution-routes.web.app/');
-  assert.match(r.tiles[5].note, /no practice copy yet/);
+  assert.equal(r.tiles[7].url, H.STATEMENTS_URL);
+  assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
+  for (const i of [5, 7, 8]) assert.match(r.tiles[i].note, /no practice copy yet, so this opens the live one/);
+  // Every other practice card opens a practice copy; none opens a live app without saying so.
+  for (const t of r.tiles) {
+    const practice = /sandbox/.test(t.url);
+    assert.ok(practice || /opens the live one/.test(t.note), t.name + ' opens a live app without saying so');
+    assert.ok(!practice || !/opens the live one/.test(t.note), t.name + ' says live but opens a practice copy');
+  }
+});
+
+test('the live hub never says a card opens the live one', async () => {
+  const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, {}, { project: 'ud-distribution' });
+  assert.ok(r.tiles.every(t => !/opens the live one/.test(t.note)));
 });
 
 test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {

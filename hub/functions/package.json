@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "node --test test/unit/*.test.js",
+    "test:practice-links": "node test/practice-links.cjs ud-distribution-sandbox",
     "test:browser": "firebase emulators:exec --only firestore,auth,hosting --project demo-ud-distribution \"node test/browser/hub.cjs http://127.0.0.1:5000\""
   },
   "dependencies": {
