@@ -56,23 +56,28 @@ test('the Product Sheet wins by SKU: units in a case, cases to a pallet and the 
   assert.equal(other.cpp, 54, 'a product the Product Sheet leaves blank follows Pallet Rules');
 });
 
-test('each customer\'s space is held for its number: HIGH unless PALLET USES picks another (the Customer List\'s own math)', () => {
+test('each customer\'s space is held for the HIGHEST CASES AVERAGE unless PALLET USES picks another (Joe 11-9-26)', () => {
   const box = rulesBox();
   const weeks = [['2026-10-03', 46], ['2026-10-10', 9], ['2026-10-17', 21], ['2026-10-24', 25], ['2026-10-31', 25.5]];
   const st = box.caseStats(weeks, 5);
   assert.deepEqual([st.LOW, st.MIDDLE, st.AVERAGE, st.HIGH, st.LAST, st.weeks], [9, 25, 25.3, 46, 25.3, 5]);
-  assert.equal(box.heldOf(st, ''), 46, 'the standard is HIGH');
+  // 46, 25.5, 25, 21, 9: drop the 46, (25.5 + 25 + 21 + 9) / 4 = 20.1, rounded up to 21.
+  assert.equal(st.HCA, 21, 'the highest cases average');
+  assert.equal(box.heldOf(st, ''), 21, 'the standard is the highest cases average');
+  assert.equal(box.heldOf(st, 'HIGH'), 46, 'PALLET USES can still pick HIGH');
+  assert.equal(box.caseStats([['2026-08-01', 90]].concat(weeks), 5).HCA, 21, 'a week older than 8 weeks is left out');
   assert.equal(box.heldOf(st, 'AVERAGE'), 26, 'rounded up to whole cases');
   assert.equal(box.heldOf(null, ''), 0, 'no weeks, no space held');
 });
 
-// Joe 11-8-26 RULE SET: the 5 highest weeks in 6 months, the top one thrown out, the other 4 averaged and rounded up;
+// Joe 11-8-26 RULE SET: the 5 highest weeks in 8 weeks (Joe 11-9-26; it was 6 months), the top one thrown out, the other 4 averaged and rounded up;
 // it never comes down until it is a year old (seasonal customers). For sequence changes only, not the day's pallets.
-test('RULE SET MAX: top 5 weeks of 6 months, drop the top one, average 4, rounded up (Joe 11-8-26)', () => {
+test('RULE SET MAX: top 5 weeks of the last 8 weeks, drop the top one, average 4, rounded up (Joe 11-8-26)', () => {
   const box = rulesBox();
   const weeks = [['2026-09-05', 62], ['2026-09-12', 55], ['2026-09-19', 54], ['2026-09-26', 52], ['2026-10-03', 51], ['2026-10-10', 20], ['2026-10-17', 30]];
   const r = box.ruleMax(weeks);
   assert.equal(r.MAX, 53); assert.equal(r.now, 53); assert.equal(r.held, false);
+  assert.equal(box.ruleMax([['2026-07-04', 99]].concat(weeks)).now, 53, 'a week more than 8 weeks back does not count');
   assert.equal(box.ruleMax([['2026-10-03', 10], ['2026-10-10', 11]]).MAX, 10, 'two weeks: drop the top, keep the other');
   assert.equal(box.ruleMax([['2026-10-03', 9]]).MAX, 9, 'one week: that week');
   assert.equal(box.ruleMax([]), null);
@@ -85,12 +90,13 @@ test('RULE SET seasonal hold: the maximum stays up until it is a year old, then 
   const slow = []; for (let d = new Date('2026-07-11'); d <= new Date('2027-05-01'); d.setDate(d.getDate() + 7)) slow.push([d.toISOString().slice(0, 10), 5]);
   const held = box.ruleMax(busy.concat(slow));
   assert.equal(held.MAX, 40, 'still the busy-season number in the winter'); assert.equal(held.now, 5); assert.equal(held.held, true);
-  assert.equal(held.at, '2026-11-28', 'the last week all 5 busy weeks were still in its 6 months');
+  assert.equal(held.at, '2026-07-25', 'the last week all 5 busy weeks were still in its 8 weeks');
   const later = slow.slice(); for (let d = new Date('2027-05-08'); d <= new Date('2028-01-15'); d.setDate(d.getDate() + 7)) later.push([d.toISOString().slice(0, 10), 5]);
   assert.equal(box.ruleMax(busy.concat(later)).MAX, 5, 'a year later it comes down');
   const src = fs.readFileSync(PB.SRC, 'utf8');
   assert.match(src, /<button id="ruleSetBtn" aria-expanded="false">RULE SET<\/button>/);
-  assert.match(src, /The pallets the builder makes from the day's BOL do not use it\./);
+  assert.match(src, /The pallets the builder makes each day hold space at the highest cases average\./);
+  assert.match(src, /<span>HIGHEST CASES AVERAGE, 8 WEEKS<\/span>/, 'the standard is not a choice in Pallet Rules');
   assert.match(src, /title="Rule Set maximum: for sequence changes">Max<\/th>/, 'the truck load map shows the maximum for sequence changes');
   assert.ok(!/ruleMax|\.max\b/.test(src.slice(src.indexOf('function plan(){'), src.indexOf('function plan(){') + 3000)), 'the day\'s pallets do not use it');
 });
@@ -99,7 +105,7 @@ test('held space is shaded on the truck, more cases add space, and the customers
   const src = fs.readFileSync(PB.SRC, 'utf8');
   const top = src.indexOf('aria-label="Customers on this route"'), routes = src.indexOf('aria-label="All routes"');
   assert.ok(top > 0 && top < routes, 'CUSTOMERS ON THIS ROUTE is above All routes');
-  assert.match(src, /<th>LOW<\/th><th>MIDDLE<\/th><th>AVERAGE<\/th><th>HIGH<\/th><th>LAST \$\{RULES\.weeks\} WEEKS<\/th><th>RULE SET MAX<\/th><th>PALLET USES<\/th><th>HELD FOR<\/th><th>TODAY'S BOL<\/th><th>SPACE<\/th>/);
+  assert.match(src, /<th>LOW<\/th><th>MIDDLE<\/th><th>AVERAGE<\/th><th>HIGH<\/th><th>LAST \$\{RULES\.weeks\} WEEKS<\/th><th>HIGHEST CASES AVERAGE<\/th><th>RULE SET MAX<\/th><th>PALLET USES<\/th><th>HELD FOR<\/th><th>TODAY'S BOL<\/th><th>SPACE<\/th>/);
   assert.match(src, /class="held" data-g=/, 'held stacks are drawn shaded');
   assert.match(src, /OVER BY \$\{fmt\(h\.cases - h\.held\)\} · SPACE ADDED/);
   assert.match(src, /if \(!h \|\| RULES\.under !== 'KEEP'\) return;/, 'space is held only while Pallet Rules keep it');

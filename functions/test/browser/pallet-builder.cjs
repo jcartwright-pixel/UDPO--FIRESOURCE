@@ -148,16 +148,17 @@ async function openPage(ctx, url) {
     assert.ok(sent[0].stops.every(s => s.key === '40496' || s.loadSeq === stops.find(x => x.key === s.key).loadSeq), 'no other load sequence changes');
     if (SHOTS) { await f.locator('section[aria-label="Truck load map"]').scrollIntoViewIfNeeded(); await p.screenshot({ path: path.join(SHOTS, 'pallet-builder-route-map-1536.png') }); }
 
-    // Joe 11-6-26: at the very top, the customers on the route with their cases; each one's space is held at HIGH (shaded on the
+    // Joe 11-6-26: at the very top, the customers on the route with their cases; each one's space is held at the highest cases average (shaded on the
     // truck when the BOL has fewer cases); PALLET USES and Pallet Rules save through the Customer List's own call.
     assert.equal(await f.locator('#custTitle').textContent(), 'CUSTOMERS ON ROUTE 813 · THURSDAY');
     const heads = await f.locator('#custTable thead th').allTextContents();
-    assert.deepEqual(heads, ['RUN', 'LOAD SEQ', 'CUSTOMER', 'LOW', 'MIDDLE', 'AVERAGE', 'HIGH', 'LAST 5 WEEKS', 'RULE SET MAX', 'PALLET USES', 'HELD FOR', "TODAY'S BOL", 'SPACE']);
+    assert.deepEqual(heads, ['RUN', 'LOAD SEQ', 'CUSTOMER', 'LOW', 'MIDDLE', 'AVERAGE', 'HIGH', 'LAST 5 WEEKS', 'HIGHEST CASES AVERAGE', 'RULE SET MAX', 'PALLET USES', 'HELD FOR', "TODAY'S BOL", 'SPACE']);
     const row1 = f.locator('#custTable tbody tr').first();
     assert.deepEqual((await row1.locator('td').allTextContents()).slice(3, 8), ['10', '25', '25', '40', '25']);
-    assert.equal(await row1.locator('td.chosen').textContent(), '40', 'HIGH is the standard, in yellow');
+    // Joe 11-9-26: the standard is the highest cases average (40 and 10: the top one thrown out, so 10), in yellow.
+    assert.equal(await row1.locator('td.chosen').textContent(), '10', 'the highest cases average is the standard, in yellow');
     // Joe 11-8-26 RULE SET: two weeks (40 and 10), the top one thrown out, so the maximum is 10; it is not the held number.
-    assert.equal((await row1.locator('td').nth(8).textContent()).trim(), '10', 'RULE SET MAX');
+    assert.equal((await row1.locator('td').nth(9).textContent()).trim(), '10', 'RULE SET MAX');
     assert.equal(await f.locator('#lmTable thead th').nth(7).textContent(), 'Max', 'the truck load map shows it for sequence changes');
     assert.ok(await f.locator('#truck i.held').count() > 0, 'space held for the customers is shaded on the truck');
     assert.match(await f.locator('#custTable').textContent(), /CS HELD, SHADED/);
