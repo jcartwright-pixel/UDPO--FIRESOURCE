@@ -858,6 +858,8 @@ Turns a route's orders into its true case count, its pallets and a trailer plan.
 
 > A product's **Units In A Case**, **Cases To A Pallet** and **Net Weight** on the **Product Sheet** win over the builder's own numbers and Pallet Rules for that product. A blank box leaves the builder's number.
 
+> On the truck every stack shows its load sequence number, **0** included (sequence 0 goes across the front). Each load sequence from 0 to 15 has its own color; a stop with no load sequence is grey and shows **#** and its run number.
+
 > The **RULE SET MAX** is for sequence changes only. The pallets made each day hold space at the **HIGHEST CASES AVERAGE**; when the day's BOL has more cases, space is added.
 
 !> Do not pick **LOW** for a customer that grows in summer: its pallet comes up short when it does.

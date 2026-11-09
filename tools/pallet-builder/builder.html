@@ -469,9 +469,13 @@ function orderCases(st){
 
 
 // Truck load map (like the Customer List app's Truck Load Map): spots colored by load sequence, front to back door.
-const SEQ_COLORS = ['#9fd3a8','#f4a3c4','#d9a6e6','#f7b38f','#86d0c8','#e9ef9e','#c7a7e8','#a9c8f0','#f2d48a','#b9e3a1','#f0a8a8','#a6dfe9'];
-const seqColor = n => { n = Math.abs(+n || 0); return SEQ_COLORS[(n <= 12 ? n + 11 : n * 5 + 3) % SEQ_COLORS.length]; };
-const lmLabel = i => { const n = stopSeq(S.stops[i]); return n ? String(n) : '#' + (i + 1); };
+// Joe 11-9-26: "Every single color should be different": one color per load sequence, 0 through 15, no two alike.
+const SEQ_COLORS = ['#fff176','#81c784','#f48fb1','#ba68c8','#ffb74d','#4dd0e1','#a1887f','#7986cb','#e57373','#dce775','#90caf9','#bdbdbd','#4db6ac','#f8bbd0','#ce93d8','#ffcc80'];
+const seqColor = n => SEQ_COLORS[Math.abs(Math.round(+n || 0)) % SEQ_COLORS.length];
+// A stop with no load sequence: its own grey, never a sequence's color.
+const NOSEQ_COLOR = '#e3e8ec', stopColor = (n, i) => n == null ? NOSEQ_COLOR : seqColor(n);
+// Joe 11-9-26 ("why aren't you using 0?"): load sequence 0 shows as 0; only a stop with no sequence shows #run.
+const lmLabel = i => { const n = stopSeq(S.stops[i]); return n != null ? String(n) : '#' + (i + 1); };
 let DRAG = null; const LMPICK = new Set();
 function palFirst(pl){ return [...pl.stops].sort((a, c) => a - c)[0]; }
 // Joe's truck layout: sequence 0 (sub-rt 00, or no sequence) goes side to side across the front first.
@@ -494,7 +498,7 @@ function renderMap(R){
     if (k == null) return {cells: Array(9).fill('<i class="e"></i>'), label: ''};
     const pl = R.pallets[k], first = palFirst(pl), n = stopSeq(S.stops[first]);
     const lab = pl.tote ? 'T' : lmLabel(first), used = pl.tote ? 9 : Math.max(1, Math.min(9, Math.ceil(pl.fill * 9 - 1e-9)));
-    const real = pl.items.filter(it => !it.held), cases = real.reduce((a, it) => a + it.cases, 0), held = pl.items.filter(it => it.held).reduce((a, it) => a + it.cases, 0), col = seqColor(n ? n : 5 + first);
+    const real = pl.items.filter(it => !it.held), cases = real.reduce((a, it) => a + it.cases, 0), held = pl.items.filter(it => it.held).reduce((a, it) => a + it.cases, 0), col = stopColor(n, first);
     const mine = pl.tote ? 9 : !held ? used : real.length ? Math.max(1, Math.min(used, Math.ceil((pl.fill - pl.held) * 9 - 1e-9))) : 0;
     const gk = n ? 'q' + n : 'o' + first;
     return {cells: Array.from({length: 9}, (_, j) => j < mine ? `<i style="background:${col}" data-g="${gk}" title="Pallet ${k + 1} · load seq ${esc(lab)}">${esc(lab)}</i>` : j < used ? `<i class="held" data-g="${gk}" title="Pallet ${k + 1} · space held for load seq ${esc(lab)}">${esc(lab)}</i>` : `<i class="e" title="Pallet ${k + 1}"></i>`),
@@ -508,19 +512,19 @@ function renderMap(R){
   });
   t.innerHTML = html + '<div class="tend">Back door</div>';
   const seen = new Map();
-  S.stops.forEach((st, i) => { const lab = lmLabel(i); if (!seen.has(lab)) seen.set(lab, {lab, n: stopSeq(st) || 5 + i, o: stopSeq(st) || -1, cases: 0, pals: 0}); seen.get(lab).cases += R.stats[i].cases; });
+  S.stops.forEach((st, i) => { const lab = lmLabel(i); if (!seen.has(lab)) { const q = stopSeq(st); seen.set(lab, {lab, q, n: q != null ? q : 1000 + i, o: q != null ? q : -1, cases: 0, pals: 0}); } seen.get(lab).cases += R.stats[i].cases; });
   R.pallets.forEach(pl => { const s = seen.get(pl.tote ? null : lmLabel(palFirst(pl))); if (s) s.pals++; });
-  $('lmLegend').innerHTML = (R.held ? `<span class="held" title="Space held for customers with fewer cases than their number today">HELD SPACE · ${R.held} cs</span>` : '') + [...seen.values()].sort((a, b) => a.o - b.o || a.n - b.n).map(s => `<span style="background:${seqColor(s.n)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
+  $('lmLegend').innerHTML = (R.held ? `<span class="held" title="Space held for customers with fewer cases than their number today">HELD SPACE · ${R.held} cs</span>` : '') + [...seen.values()].sort((a, b) => a.o - b.o || a.n - b.n).map(s => `<span style="background:${stopColor(s.q)}" title="${s.cases} cases on ${s.pals} pallet${s.pals === 1 ? '' : 's'}">${esc(s.lab)} · ${s.pals}p</span>`).join('');
   const SIDES = [['', 'Auto'], ['L', 'Left'], ['R', 'Right'], ['F', 'Across front']];
   $('lmTable').innerHTML = `<thead><tr><th class="grp"></th><th></th><th></th><th>Run seq</th><th>Load seq</th><th>Customer</th><th class="r">Cases</th><th class="r" title="Rule Set maximum: for sequence changes">Max</th><th>Side</th><th>Note</th></tr></thead><tbody>${S.stops.map((st, i) => {
     const n = stopSeq(st), mx = (caseInfo(st) || {}).max;
     // Joe 11-5-26 (mock-up 3): a colored bar per load sequence; a customer sharing the sequence above sits indented under it.
     const same = i > 0 && n != null && stopSeq(S.stops[i - 1]) === n, kid = st.sub && same;
     const pals = R.pallets.filter(pl => pl.stops.has(i)).length;
-    return `<tr draggable="true" data-i="${i}" data-g="${n ? 'q' + n : 'o' + i}" class="${st.sub ? 'sub' : 'main'}${kid ? ' kid' : ''}${same ? ' same' : ''}"><td class="grp" style="background:${seqColor(n ? n : 5 + i)}" aria-hidden="true"></td><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
+    return `<tr draggable="true" data-i="${i}" data-g="${n ? 'q' + n : 'o' + i}" class="${st.sub ? 'sub' : 'main'}${kid ? ' kid' : ''}${same ? ' same' : ''}"><td class="grp" style="background:${stopColor(n, i)}" aria-hidden="true"></td><td class="h" title="Drag to move" aria-hidden="true">⋮⋮</td>
       <td><input type="checkbox" class="lmPick" data-i="${i}" ${LMPICK.has(st.id) ? 'checked' : ''} aria-label="Pick ${esc(st.name || 'order ' + (i + 1))} to merge"></td>
       <td><span class="rs num">${i + 1}</span></td>
-      <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${seqColor(n ? n : 5 + i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
+      <td><input class="lseq num" type="number" min="0" step="1" value="${n == null ? '' : n}" data-i="${i}" style="background:${stopColor(n, i)}" aria-label="Load sequence for ${esc(st.name || 'order ' + (i + 1))}"></td>
       <td class="cn">${esc((st.name || 'Order ' + (i + 1)).replace(/\s*\(sub-rt.*$/i, ''))}${st.sub && st.acct ? ` <span class="note num">#${esc(st.acct)}</span>` : ''}</td>
       <td class="r num cs">${st.sub ? '' : `${fmt(R.stats[i].cases)} cs<span class="pals"> · ${pals} pallet${pals === 1 ? '' : 's'}</span>`}</td>
       <td class="r num" title="Rule Set maximum${mx && mx.held ? ', held from ' + esc(shortDate(mx.at)) : ''}">${mx ? fmt(mx.MAX) + ' cs' : '–'}</td>
@@ -684,11 +688,11 @@ function render(){
   const cells = R.pallets.map((pl, k) => {
     const stops = [...pl.stops].sort((a,b)=>a-b); const cases = pl.items.reduce((a,it)=>a+it.cases,0);
     // Route book style: each pallet is a 3 x 3 block of stacks, and each stack shows its load sequence number.
-    const sq = stopSeq(S.stops[stops[0]]); const lab = pl.tote ? 'T' : (sq ? String(sq) : '#' + (stops[0] + 1));
+    const sq = stopSeq(S.stops[stops[0]]); const lab = pl.tote ? 'T' : (sq != null ? String(sq) : '#' + (stops[0] + 1));
     const used = pl.tote ? 9 : Math.max(1, Math.min(9, Math.ceil(pl.fill * 9 - 1e-9))), mine = pl.held ? Math.min(used, Math.ceil((pl.fill - pl.held) * 9 - 1e-9)) : used;
     const stk = Array.from({length:9}, (_, j) => `<i class="${j < mine ? 'on' : j < used ? 'held' : ''}">${j < used ? lab : ''}</i>`).join('');
     return `<div class="pal ${pl.tote?'tote':''}" title="Pallet ${k+1}: ${pl.tote?'tote':cases+' cases'}, order ${stops.map(s=>s+1).join(', ')}"><div class="stk">${stk}</div>
-      <div class="ph"><span>P${k+1}${sq ? ` · seq ${sq}` : ''}</span><span class="num">${pl.tote?'Tote':cases+' cs'}</span></div>
+      <div class="ph"><span>P${k+1}${sq != null ? ` · seq ${sq}` : ''}</span><span class="num">${pl.tote?'Tote':cases+' cs'}</span></div>
       <div class="st">Order ${stops.map(s=>s+1).join(', ')}</div></div>`;
   }).join('');
   if ($('trailer')) $('trailer').innerHTML = `<div class="end">Front · nose · loaded first</div><div class="side">Left · odd pallets</div><div class="side">Right · even pallets</div>${cells || '<p class="hint" style="grid-column:1/-1">Add products to an order to see pallets.</p>'}<div class="end">Doors · loaded last</div>`;

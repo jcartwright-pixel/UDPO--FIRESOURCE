@@ -129,7 +129,7 @@ test('no separate Load sequences section: the truck load map stop list already s
 
 test('grouped stops (Joe 11-5-26, mock-up 3): a colored bar per load sequence and shared customers indented under the BOL one', () => {
   const src = fs.readFileSync(PB.SRC, 'utf8');
-  assert.match(src, /<td class="grp" style="background:\$\{seqColor\(/, 'each stop row has a bar in its sequence color');
+  assert.match(src, /<td class="grp" style="background:\$\{stopColor\(/, 'each stop row has a bar in its sequence color');
   assert.match(src, /#lmTable tr\.kid td\.cn\{padding-left:34px\}/, 'a shared customer is indented');
   assert.match(src, /\.lm-plan\{[^}]*background:var\(--accent-soft\)/, 'route totals sit in the light blue box');
 });
@@ -328,4 +328,16 @@ test('the Product Sheet keeps units in a case, cases to a pallet, stack height a
   assert.match(src, /export const SHEET_TAIL = \[[^\]]*\]\.concat\(PALLET_FIELDS\.map/, 'in the downloaded list');
   const html = fs.readFileSync(require('path').join(__dirname, '../../../public/products.html'), 'utf8');
   assert.match(html, /<th class="pm-pal" colspan="' \+ PALLET_FIELDS\.length \+ '">Cases and Pallets<\/th>/);
+});
+
+// Joe 11-9-26: "why aren't you using 0? ... Every single color should be different."
+test('load sequence 0 is labeled 0 on the truck, and every load sequence 0 to 15 has its own color (Joe 11-9-26)', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  const colors = JSON.parse(src.match(/^const SEQ_COLORS = (\[.*\]);$/m)[1].replace(/'/g, '"'));
+  assert.equal(colors.length, 16); assert.equal(new Set(colors).size, 16, 'no two sequences share a color');
+  const vm = require('vm'), box = {};
+  vm.runInNewContext(src.match(/^const SEQ_COLORS = .*$/m)[0] + '\n' + src.match(/^const seqColor = .*$/m)[0] + '\n' + src.match(/^const NOSEQ_COLOR = .*$/m)[0] + '\nthis.seqColor = seqColor; this.stopColor = stopColor;', box);
+  assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(box.seqColor)).size, 16);
+  assert.notEqual(box.stopColor(null, 3), box.seqColor(0), 'no sequence is grey, not sequence 0\'s color');
+  assert.match(src, /const lmLabel = i => \{ const n = stopSeq\(S\.stops\[i\]\); return n != null \? String\(n\) : '#' \+ \(i \+ 1\); \};/, 'sequence 0 shows 0, not #run');
 });
