@@ -397,7 +397,11 @@ exports.save = onCall({ timeoutSeconds: 120 }, async (request) => {
     // Asking, not saving: which of these saves this person may make (People & Roles counts).
     if (request.data && Array.isArray(request.data.checkSaves)) return { allowed: await checkSaves(db, user, request.data.checkSaves, request.data.facilityId) };
     // Asking, not saving (Joe 11-7-26): the newest Daily BOL load days (company-wide, Uniontown's database), for Pallet Builder.
-    if (request.data && request.data.bolDays === true) return { days: await require('./src/bol').recentDays(PLANTS.companyDb(db), request.data.max) };
+    if (request.data && request.data.bolDays === true) {
+      const BOL = require('./src/bol'), cdb = PLANTS.companyDb(db);
+      const days = await BOL.recentDays(cdb, request.data.max);
+      return { days, hub: days.length ? null : await BOL.hubCheck(cdb) };
+    }
     // Asking, not saving: the plant's people's names, for Case Unloading's "Unloaded By" (names only).
     if (request.data && request.data.plantNames === true) return { names: await require('./src/crew').plantNames(db, PLANTS.plantOf(Object.assign({}, request.data, { udPlant: user.station ? user.station.facilityId : '' }))) };
     // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.

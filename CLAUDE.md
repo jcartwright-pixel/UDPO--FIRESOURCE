@@ -1,3 +1,17 @@
+# Master context (read first)
+
+This app is one of the United Dairy apps. The source of truth for how they fit together, who owns which data and which
+chat may change which repository is `jcartwright-pixel/united-dairy-master`: `MASTER.md` and
+`projects/operations-udpo/CLAUDE.md`. Read both before changing anything here. If the master repository is checked out
+next to this one, these lines load them:
+
+@../united-dairy-master/MASTER.md
+@../united-dairy-master/projects/operations-udpo/CLAUDE.md
+
+This repository is shared by two chats: the **Operations chat** owns everything except `hub/`; the **Hub chat** owns
+`hub/` and its two workflows only (see `hub/CLAUDE.md`). Anything this app needs from another app goes in the master
+repository's `REQUESTS.md`, never as code in the other app.
+
 # Operations (UDPO--FIRESOURCE)
 
 ## Keep the Help guide up to date (Joe, 2026-10-26)

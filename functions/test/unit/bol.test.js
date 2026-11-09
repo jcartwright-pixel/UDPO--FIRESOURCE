@@ -101,6 +101,18 @@ test('the email check reads each BOL under the label once, and a newer one for t
   assert.equal(st.open.routes[0].stops[0].name, 'MADEUP GOLF CENTER');
 });
 
+test('a file with no BOL lines under the label is red and says the label looks wrong (Joe 11-8-26)', async () => {
+  const db = fakeDb();
+  await B.OPS.bolSaveSettings(db, 'pat.admin@uniteddairy.com', { mailbox: 'pat.sample@uniteddairy.com', label: 'ROUTES/SALE BY ROUTE', enabled: true }, '2026-11-08T12:00:00Z');
+  const deps = { now: () => new Date('2026-11-08T18:16:00Z'),
+    readMail: async () => [{ id: 'w1', internalDate: Date.parse('2026-11-04T17:20:00Z'), subject: 'Weekly Daily Avg Cases by Route By Store', files: [{ name: 'Weekly Daily Avg Cases.pdf', attachmentId: 'b1', size: 100 }] }],
+    readAttachment: async () => Buffer.from('%PDF-1.4') };
+  const run = await B.hourlyCheck(db, deps);
+  assert.equal(run.status, 'FAIL', 'red, not green');
+  assert.equal(run.message, 'Read Weekly Daily Avg Cases.pdf, but it has no BOL lines: it looks like the weekly route report, not the Daily BOL. Check the email label: the Daily BOL\'s label is ROUTES/BOL.');
+  assert.equal(B.notBolText('Other.pdf', 'ROUTES/OTHER'), 'Read Other.pdf, but it has no BOL lines. Check the email label: the Daily BOL\'s label is ROUTES/BOL.');
+});
+
 test('the check stays off until it is switched on, and a file added by hand is read the same', async () => {
   const db = fakeDb();
   assert.deepEqual(await B.hourlyCheck(db, { readMail: async () => { throw new Error('should not be read'); } }), { skipped: 'off' });
