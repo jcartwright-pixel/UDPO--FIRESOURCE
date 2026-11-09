@@ -130,7 +130,9 @@ test('report email: routes split by delivery day, loaded in finish order, a blan
 
 // Joe 10/20 (3:09 PM report): "it should be sorted by our load order", so moving a load on Daily Case Loadout moves it in the email.
 test('report email: not loaded routes follow the load order, not dispatch time, with a behind load where the plant has it', () => {
-  const now = Date.parse('2026-10-20T19:09:00Z'); // Tuesday 3:09 PM at the plant
+  // Joe 11-9-26: before 4:00 PM the day shift loads the trucks leaving before midnight first, so this runs at 4:09 PM, when the
+  // night shift is loading in the plant's order.
+  const now = Date.parse('2026-10-20T20:09:00Z'); // Tuesday 4:09 PM at the plant
   const L = (route, run, disp, seq) => ({ id: 'r' + route, route, run, routeName: '', area: 'CASE', state: 'WAITING', dispatchTime: disp, loadDate: '2026-10-20', deliveryDate: '2026-10-21', departureDate: '2026-10-21', loadSequence: seq, completedAt: '', truck: '', trailer: '' });
   const loads = [L('854', 'CREAMOLAND', '02:00', 1), L('852_2', 'UT JERSEY LOAD 2', '13:00', 2), L('6303', 'UT WALMART', '01:00', 3), L('824', 'UT DSD MILK', '01:00', 4)];
   loads[1].loadDate = '2026-10-20'; loads[1].deliveryDate = '2026-10-21'; loads[1].departureDate = '2026-10-20';
@@ -144,6 +146,10 @@ test('report email: not loaded routes follow the load order, not dispatch time, 
   const mins = t => { const [h, m] = t.split(/[: ]/); return (Number(h) % 12 + (/PM/.test(t) ? 12 : 0)) * 60 + Number(m); };
   const run = est.map(mins).map(m => m < 15 * 60 ? m + 1440 : m);
   assert.deepEqual(run, run.slice().sort((a, b) => a - b), 'Est. Done runs in order down the list');
+  // At 3:09 PM the Jersey truck (leaving before midnight) comes before Creamoland, which waits for the night shift.
+  const day = Date.parse('2026-10-20T19:09:00Z');
+  const early = R.reportHtml(Object.assign({}, R.plantReport({ loads, pickups: [], shiftLog: [], lines: [], temps: [], roundStart: '' }, day), { forecast: R.loadForecast({ date: '2026-10-20', loads, history: [] }, day) }), '');
+  assert.deepEqual([...early.matchAll(/font-size:16px;font-weight:800;color:[^"]*">(\d+)<\/td>/g)].map(m => m[1]), ['852', '854', '6303', '824']);
 });
 
 test('report email: loads grouped by type, Case then Box, Tote, Tanker, each with Loaded then Not loaded (Joe 10/19)', () => {
