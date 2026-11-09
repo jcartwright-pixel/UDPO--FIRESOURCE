@@ -354,7 +354,7 @@
         const skipBtn = !canSkip ? '' : R.skipsInARow(r.moveMark, date, started) >= R.SKIP_LIMIT
           ? '<button type="button" class="skip off" data-skipno="' + r.id + '" title="' + escapeHtml(R.skipWhy('Route ' + routeNo(r.route))) + '">Skip</button>'
           : '<button type="button" class="skip" data-skip="' + r.id + '" title="Move this load down one place">Skip</button>';
-        const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
+        const clockCell = st === 'DONE' ? doneTick(r) : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' ? ' end' : '') + '" data-clock="' + r.id + '">' + (st === 'LOADING' ? 'End' : 'Start') + '</button>' + skipBtn + '</span>' : '';
         // Joe 10/14 ("so it all fits in one row"): the Scheduler's PO and pickup time on a box load show on hover over the run.
         const tag = r.schedLine ? schedTag(r.schedLine) : '';
         const isMoved = !P.movedEarlier(r) && P.movedBySomeone(r, offPlace), note = P.moveNote(r);
@@ -411,6 +411,13 @@
         NOTE_ICON + '<b>Note:</b> ' + escapeHtml(text) + '</button></td></tr>';
     }
 
+    // Joe 11-9-26: a Done load shows the time it was completed beside the check ("✓ 4:52 PM"); a load marked Done with no
+    // End time shows the check alone.
+    function doneTick(r) {
+      const at = P.clock(r.completedAt);
+      return '<span class="tick">&#10003;' + (at ? ' <span class="done-at">' + escapeHtml(at) + '</span>' : '') + '</span>';
+    }
+
     function rowById(id) { return rowsNow().find(r => r.id === id); }
     const schedById = (id) => withSched(rowsNow()).find(r => r.id === id);
 
@@ -420,7 +427,7 @@
       const input = (k, v, w) => '<input data-k="' + k + '" data-id="' + escapeHtml(r.id) + '" value="' + escapeHtml(v) + '"' + (k === 'trailer' ? ' list="lo-trailers" autocomplete="off"' : '') + (w ? ' inputmode="numeric"' : '') + ' aria-label="' + k + ' for ' + escapeHtml(r.route + ' ' + r.run) + '"' + sdis + '>';
       // Its status follows Start and End (the Scheduler line has no status picker).
       const status = '<button type="button" class="state ' + (st === 'DONE' ? 'done' : r.paused ? 'paused' : st === 'LOADING' ? 'loading' : '') + '" disabled>' + (st === 'DONE' ? '&#10003; Done' : r.paused ? '&#10073;&#10073; Paused' : st === 'LOADING' ? '&#9679; Loading' : 'Waiting') + '</button>';
-      const clockCell = st === 'DONE' ? '<span class="tick">&#10003;</span>' : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' && !r.paused ? ' end' : '') + '" data-sclock="' + escapeHtml(r.id) + '">' + (st === 'LOADING' && !r.paused ? 'End' : 'Start') + '</button></span>' : '';
+      const clockCell = st === 'DONE' ? doneTick(r) : edit ? '<span class="clock-cell"><button type="button" class="clock' + (st === 'LOADING' && !r.paused ? ' end' : '') + '" data-sclock="' + escapeHtml(r.id) + '">' + (st === 'LOADING' && !r.paused ? 'End' : 'Start') + '</button></span>' : '';
       const mins = P.minutesTaken(r);
       const over = x.overSlots ? '<span class="skip-tag inline" title="Route Master has no LOAD ' + x.loadNo + ' run for this customer: add one so this load has its own line">NO LOAD ' + x.loadNo + ' RUN</span>' : '';
       const tr = '<tr class="sched-row' + (st === 'DONE' ? ' done' : st === 'LOADING' ? ' loading' : '') + '" data-row="' + escapeHtml(r.id) + '"><td class="strong">' + escapeHtml(routeNo(r.route)) + '</td>';

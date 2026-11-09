@@ -62,6 +62,7 @@
 .plant-page button.clock { min-width: 64px; height: 30px; border-radius: 8px; border: 1px solid var(--ud-blue); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 800; cursor: pointer; }
 .plant-page button.clock.end { background: var(--ud-blue); color: #fff; }
 .plant-page .tick { color: var(--runs-ink); font-weight: 800; }
+.plant-page .tick .done-at { white-space: nowrap; }
 .plant-page .running { color: var(--amber); }
 .plant-page .running::after { content: ' \25CF'; color: #e5891a; }
 .plant-page button.pu { min-width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-weight: 800; cursor: pointer; }
