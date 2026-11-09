@@ -82,6 +82,9 @@ export function sendTextsStrip(db, el, opts) {
       back = document.createElement('div'); back.className = 'modal-back send-pop-back'; back.hidden = true;
       pop = document.createElement('section'); pop.className = 'modal wide-modal send-pop'; pop.id = 'send-texts-pop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Schedule texts'); pop.hidden = true;
       document.body.append(back, pop);
+      // Clicking outside it or pressing Esc closes it too.
+      back.onclick = () => { popOpen = false; drawPop(); };
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && popOpen) { popOpen = false; drawPop(); } });
     }
     const on = popOpen && !!popHtml;
     back.hidden = pop.hidden = !on;

@@ -11,6 +11,7 @@
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const closeSendPop = require('./send-pop.cjs');
 const { chromium } = require('playwright');
 const { db, clear } = require('../emulator/helpers');
 const { runTransfer } = require('../../src/transfer');
@@ -94,6 +95,7 @@ const PAGES = [
 
     // Item 58 in use: the Down Trucks list and Operational Assignments keep the heading row on top after scrolling.
     const daily = await openPage(browser, 1536, 500, 'daily.html?date=' + D);
+    await closeSendPop(daily);
     await daily.click('#open-down');
     const stuck = await daily.evaluate(() => {
       const list = document.querySelector('#down-panel .down-list'), body = document.getElementById('down-rows');

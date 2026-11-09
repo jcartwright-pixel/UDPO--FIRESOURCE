@@ -182,7 +182,7 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
   - **1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT**: a truck, trailer, route, leave time or note changed for a driver who already has this week's text, for example **MONDAY: TRUCK 512 IS NOW 518**. Press `Send Updated Schedule` beside the driver: only that driver gets their week as it is now. Nothing is texted by itself.
   - **1 DRIVER DOES NOT HAVE THIS WEEK'S TEXT**: who and why. Fix it on the Driver Roster, then press `Text 1 Missing` twice to text only them.
   - **TEXT THIS DRIVER YOURSELF**: not signed up for texts, and their week is not their normal week. Text them yourself.
-- `Close` puts the pop-up away. It comes up again only for something new. The red buttons on the line, like **1 SCHEDULE CHANGED** or **2 TO TEXT YOURSELF**, open it again.
+- `Close` (or Esc, or a click outside it) puts the pop-up away. It comes up again only for something new. The red buttons on the line, like **1 SCHEDULE CHANGED** or **2 TO TEXT YOURSELF**, open it again.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
 
