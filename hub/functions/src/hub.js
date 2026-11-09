@@ -71,6 +71,8 @@ function apps(project) {
   ];
 }
 
+const CHANGE_OPS = { sendChange: 'any', withdrawChange: 'any', changeStatus: 'any', customerChanges: 'admin', approveChange: 'admin', turnDownChange: 'admin' };
+
 const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident'];
 const ALWAYS = 'operations';
 // When an app joined the hub after per-person ticks started (11-3-26): ticks saved before this day follow the standard rule
@@ -103,7 +105,8 @@ async function ticksOf(db, email, person) {
 
 /**
  * input.op: home (the tiles this person may open); appAccess (administrators: every person's saved ticks);
- * setApps (administrators: {email, apps} saves one person's ticks).
+ * setApps (administrators: {email, apps} saves one person's ticks); the customer list's door (src/changes.js): sendChange,
+ * withdrawChange, changeStatus (anyone active), customerChanges, approveChange, turnDownChange (administrators).
  */
 async function hubCall(db, user, input, options) {
   const op = String((input || {}).op || 'home');
@@ -127,6 +130,21 @@ async function hubCall(db, user, input, options) {
       } else tiles.push({ key, name, note, url });
     });
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
+  }
+  // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.
+  if (CHANGE_OPS[op]) {
+    if (CHANGE_OPS[op] === 'admin' && !isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can approve or turn down changes to the customer list.');
+    const C = require('./changes'), stamp = new Date().toISOString();
+    try {
+      if (op === 'sendChange') return await C.sendChange(db, email, input, stamp);
+      if (op === 'withdrawChange') return await C.withdraw(db, email, input, isAdmin(person), stamp);
+      if (op === 'changeStatus') return await C.changeStatus(db, input);
+      if (op === 'customerChanges') return await C.listChanges(db, input);
+      return await C.decide(db, email, input, op === 'approveChange', stamp);
+    } catch (err) {
+      if (err instanceof C.ChangeError) throw new HubError(err.code, err.message);
+      throw err;
+    }
   }
   if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can change who opens which app.');
   if (op === 'appAccess') {
