@@ -213,6 +213,11 @@ async function shots(page, name, w) {
     assert.deepEqual(await lit(desk), ['Shipping'], 'Shipping alone is lit on Shipping');
     assert.equal(await desk.$eval('.sidemenu a.on', a => getComputedStyle(a).backgroundColor), 'rgb(242, 183, 5)', 'Shipping is gold, not white');
     assert.equal(await desk.textContent('#add-who'), '＋ Add Customer');
+    // Joe 11-9-26 ("make them all uniform"): Add Load, Add Customer and Print are the same solid button, none cut off.
+    const looks = await desk.$$eval('.sc-ctrl > .sc-btn', bs => bs.filter(b => !b.hidden).map(b => { const c = getComputedStyle(b); return { bg: c.backgroundColor, w: b.offsetWidth, cut: b.scrollWidth > b.clientWidth }; }));
+    assert.equal(looks.length, 3);
+    assert.equal(new Set(looks.map(l => l.bg + '/' + l.w)).size, 1, 'the top buttons match: ' + JSON.stringify(looks));
+    assert.ok(looks.every(l => !l.cut), 'no top button is cut off: ' + JSON.stringify(looks));
     await desk.click('#add-who');
     await desk.fill('#c-name', 'Acme Foods');
     assert.equal(await desk.inputValue('#c-run'), 'ACME FOODS', 'the run follows the name');
