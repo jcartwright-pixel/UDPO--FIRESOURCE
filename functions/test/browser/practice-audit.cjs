@@ -2864,7 +2864,7 @@ async function writes() {
     const L = require(path.join(__dirname, '..', '..', 'src', 'logic.js'));
     for (const d of (await db.collection('runs').where('addedBy', '==', EMAIL).get()).docs.filter(x => x.data().splitTest === true)) await d.ref.delete();
     const today = operatingDay(), delivery = L.addDays(today, 2), week = L.weekStart(delivery), dp = L.dayPrefix(delivery);
-    const runs = (await db.collection('runs').where('weekStart', 'in', [L.weekStart(L.addDays(today, -7)), L.weekStart(today)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
+    const runs = (await db.collection('runs').where('weekStart', 'in', [L.weekStart(L.addDays(today, -21)), L.weekStart(L.addDays(today, -14)), L.weekStart(L.addDays(today, -7)), L.weekStart(today)]).get()).docs.map(d => Object.assign({}, d.data(), { id: d.id }));
     const base = runs.find(x => !x.extraRun && !x.splitTest && /^852/.test(String(x.route))) || runs.find(x => !x.extraRun && !x.splitTest);
     if (!base) throw new Error('no run on the practice copy to copy for the test load');
     const id = week + '__practice_loadday_' + Date.now().toString(36);
@@ -4645,6 +4645,12 @@ async function writes() {
             if (/TRUCK LOAD MAP CHANGED/.test(rec.mapChanged.msg) && !rec.mapDoc.map) bad.push('SAVE did not keep the truck load map on the route day');
             await p.waitForTimeout(800);
             rec.afterSave = (await line()).replace(/\d+-\d+-\d+ \d+:\d+ [AP]M/, 'DATE TIME');
+            // 6.91 (#702): PRINT NEW SEQUENCE beside SAVE still prints the change right after the save (window.print is stopped).
+            await fm.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; document.getElementById('printSheet').innerHTML = ''; });
+            await fr.locator('#lmPrintTop').click();
+            await p.waitForTimeout(300);
+            rec.printTop = await fm.evaluate((n) => { const s = document.getElementById('printSheet'); return { printed: window.__printed || 0, route: /Route:\s*9990/.test(s.textContent), chg: s.querySelectorAll('tr.chg').length, seq: [...s.querySelectorAll('td.n')].some(t => t.textContent.trim() === String(n)) }; }, ch.n);
+            if (rec.printTop.printed < 2 || !rec.printTop.route || rec.printTop.chg < 1 || !rec.printTop.seq) bad.push('PRINT NEW SEQUENCE after SAVE: ' + JSON.stringify(rec.printTop));
             await shot(p, 'pallet-builder-saved-to-route-map');
           }
         }
@@ -5203,6 +5209,8 @@ async function writes() {
     const dayLook = () => fm.evaluate(() => { const q = (id) => document.getElementById(id); const sv = q('lmSave'), more = document.querySelector('details.more');
       return { days: [...q('dayPick').options].map(o => o.value), picked: q('dayPick').value, line: q('dayLine').textContent.trim(), prev: { off: q('dayPrev').disabled, title: q('dayPrev').title, text: q('dayPrev').textContent.trim() },
         next: { off: q('dayNext').disabled, title: q('dayNext').title, text: q('dayNext').textContent.trim() }, route: S.route, save: sv ? sv.textContent.trim() : '', saveTop: sv ? Math.round(sv.getBoundingClientRect().top) : -1,
+        old: { sel: q('dayPick').classList.contains('old'), line: q('dayLine').classList.contains('old'), opts: [...q('dayPick').options].map(o => o.classList.contains('old')), color: getComputedStyle(q('dayLine')).color },
+        printTop: q('lmPrintTop') ? { text: q('lmPrintTop').textContent.trim(), row: Math.abs(q('lmPrintTop').getBoundingClientRect().top - sv.getBoundingClientRect().top) < 8 } : null,
         more: more ? (more.querySelector('summary') || {}).textContent.trim() : '', bad: q('dayBad') ? { hidden: q('dayBad').hidden, text: q('dayBad').textContent.trim() } : null, inMore: !!(more && more.querySelector('#newRoute') && more.querySelector('#dupRoute') && more.querySelector('#delRoute') && more.querySelector('#route')) }; });
     let d0 = await dayLook();
     // The builder reopens the day of the route that was open last (an earlier step worked on the built-in 11-5-26 day); a
@@ -5220,12 +5228,35 @@ async function writes() {
     if (d0.prev.text !== '◀ DAY BEFORE' || d0.next.text !== 'DAY AFTER ▶') bad.push('the day buttons read ' + d0.prev.text + ' / ' + d0.next.text);
     if (!d0.next.off || d0.next.title !== 'This is the newest BOL.') bad.push('DAY AFTER on the newest BOL is ' + (d0.next.off ? 'greyed, saying "' + d0.next.title + '"' : 'not greyed'));
     if (d0.save !== 'SAVE TO ROUTE MAP') bad.push('the save button reads ' + (d0.save || 'nothing'));
+    // 6.91 (#699): older BOL days are faded in the BOL DAY box; the newest is not.
+    rec.bolDay.old0 = d0.old;
+    if (d0.old.sel || d0.old.line || d0.old.opts[0] || d0.old.opts.slice(1).some(x => !x)) bad.push('on the newest BOL the faded marks read ' + JSON.stringify(d0.old));
+    // 6.91 (#702): PRINT NEW SEQUENCE beside SAVE TO ROUTE MAP (not pressed here).
+    rec.bolDay.printTop = d0.printTop;
+    if (!d0.printTop || d0.printTop.text !== 'PRINT NEW SEQUENCE' || !d0.printTop.row) bad.push('no PRINT NEW SEQUENCE beside SAVE TO ROUTE MAP (' + JSON.stringify(d0.printTop) + ')');
+    // 6.91 (#702): All routes lists the open BOL day's routes, counts LOAD SEQUENCES, and HIDE ROUTES / SHOW ROUTES.
+    const allRoutes = () => fm.evaluate(() => { const t = document.getElementById('dayTable'); return { heads: [...t.querySelectorAll('thead th')].map(x => x.innerText.trim()), names: [...t.querySelectorAll('tbody tr')].map(tr => (tr.children[0] || {}).textContent || '').filter(n => n && n !== 'All routes'),
+      toggle: (document.getElementById('dayToggle') || {}).textContent || '', hidden: !!document.getElementById('dayWrap') && document.getElementById('dayWrap').hidden }; });
+    const ar = await allRoutes(), dd0 = d0.days[0].split('-'), md = +dd0[1] + '/' + +dd0[2];
+    rec.allRoutes = { heads: ar.heads, routes: ar.names.length, otherDay: ar.names.filter(n => /\d{1,2}\/\d{1,2}/.test(n) && !new RegExp('\\b0?' + dd0[1].replace(/^0/, '') + '\\/0?' + dd0[2].replace(/^0/, '') + '\\b').test(n)).slice(0, 3), toggle: ar.toggle };
+    if (ar.heads[1] !== 'LOAD SEQUENCES') bad.push('All routes columns read ' + ar.heads.join(', '));
+    if (rec.allRoutes.otherDay.length) bad.push('All routes lists routes from another BOL day than ' + md + ': ' + rec.allRoutes.otherDay.join(', '));
+    if (ar.toggle !== 'HIDE ROUTES' || ar.hidden) bad.push('All routes opens with ' + ar.toggle + (ar.hidden ? ' (hidden)' : ''));
+    else {
+      await fr.locator('#dayToggle').click(); await p.waitForTimeout(300);
+      const ah = await allRoutes();
+      if (!ah.hidden || ah.toggle !== 'SHOW ROUTES') bad.push('HIDE ROUTES did not hide the routes (' + ah.toggle + ')');
+      await fr.locator('#dayToggle').click(); await p.waitForTimeout(300);
+      const as = await allRoutes();
+      if (as.hidden || as.toggle !== 'HIDE ROUTES') bad.push('SHOW ROUTES did not bring the routes back');
+    }
     if (d0.more !== 'MORE ROUTE TOOLS' || !d0.inMore) bad.push('New, Copy and Delete route and the route name are not under MORE ROUTE TOOLS');
     if (d0.days.length > 1) {
       if (d0.prev.off) bad.push('DAY BEFORE is greyed with ' + d0.days.length + ' BOL days');
       await fr.locator('#dayPrev').click(); await p.waitForTimeout(800);
       const d1 = await dayLook();
-      rec.bolDay.before = { picked: d1.picked, line: d1.line, route: d1.route };
+      rec.bolDay.before = { picked: d1.picked, line: d1.line, route: d1.route, old: d1.old };
+      if (!d1.old.sel || !d1.old.line || !/^rgb\(107, 120, 132\)/.test(d1.old.color)) bad.push('an older BOL day is not faded (' + JSON.stringify(d1.old) + ')');
       if (d1.picked !== d0.days[1] || /NEWEST BOL/.test(d1.line) || !/^BOL FOR /.test(d1.line)) bad.push('DAY BEFORE went to ' + d1.picked + ' ("' + d1.line + '")');
       const dd = d0.days[1].split('-'), want = '/' + dd[1] + '/' + dd[2].slice(-2);
       if (d1.route === d0.route || !String(d1.route).replace(/\b0/g, '').includes(want.replace(/\b0/g, '').slice(0, 3))) note('Pallet Builder: after DAY BEFORE the open route is ' + d1.route);
@@ -5233,6 +5264,7 @@ async function writes() {
       await fr.locator('#dayNext').click(); await p.waitForTimeout(800);
       const d2 = await dayLook();
       if (d2.picked !== d0.days[0] || !/NEWEST BOL$/.test(d2.line)) bad.push('DAY AFTER did not come back to the newest BOL (' + d2.picked + ')');
+      if (d2.old.sel || d2.old.line) bad.push('back on the newest BOL it is still faded');
     } else {
       if (!d0.prev.off || d0.prev.title !== 'There is no BOL before this day.') bad.push('DAY BEFORE with one BOL day is ' + (d0.prev.off ? 'greyed, saying "' + d0.prev.title + '"' : 'not greyed'));
       note('Pallet Builder: only one BOL day on the practice copy, so DAY BEFORE was checked greyed only');
@@ -5475,6 +5507,25 @@ async function writes() {
     if (oldOn.length) bad.push('the old Helds account 811495 is still on ' + oldOn.join(', '));
     if (rec.helds.oldActive) bad.push('the old Helds account 811495 is still active');
     if (helds.length && !newOn.length) bad.push('Helds 811496 is on no route day');
+    rec.bad = bad;
+    if (bad.length) throw new Error(bad.join('; '));
+  });
+  // 6.91 (#703, look only): the practice Hub's Daily BOL shows one line per load day and no routes list. Nothing pressed.
+  await write('Hub Daily BOL one line per load day (6.91, look only)', async (p, rec) => {
+    const bad = [];
+    const hp = await newPage({ viewport: { width: 1536, height: 790 } });
+    try {
+      await hp.goto('https://ud-distribution-sandbox-hub.web.app/bol.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await hp.waitForFunction(() => document.querySelector('#days tr[data-date]') || /sign in|signed out|log in/i.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
+      rec.hub = await hp.evaluate(() => ({ url: location.href, rows: document.querySelectorAll('#days tr[data-date]').length, routes: document.querySelectorAll('.bol-routes, .bol-route, .bol-stops').length, buttons: document.querySelectorAll('#days .bol-day').length,
+        first: ((document.querySelector('#days tr[data-date] td') || {}).textContent || '').trim(), signIn: /sign in|log in/i.test(document.body.innerText) && !document.querySelector('#days tr[data-date]'), head: [...document.querySelectorAll('#days thead th')].map(x => x.textContent.trim()) }));
+      if (rec.hub.signIn || !rec.hub.rows) note('Hub Daily BOL: the practice Hub could not be read from the test (' + (rec.hub.signIn ? 'it asks to sign in' : 'no load days shown') + '), so one line per load day was not seen');
+      else {
+        if (rec.hub.routes || rec.hub.buttons) bad.push('the Hub Daily BOL still has a routes list or day buttons');
+        if (!/^[A-Z]+DAY \d{1,2}-\d{1,2}-\d\d$/.test(rec.hub.first)) bad.push('a load day line starts ' + rec.hub.first);
+      }
+      await shot(hp, 'hub-daily-bol');
+    } finally { await hp.done(); }
     rec.bad = bad;
     if (bad.length) throw new Error(bad.join('; '));
   });
