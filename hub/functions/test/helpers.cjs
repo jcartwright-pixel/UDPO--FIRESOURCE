@@ -26,7 +26,8 @@ async function localCalls(ctx) {
     const user = unitedDairyUser(token && { uid: token.user_id, token });
     if (!user) return fail('PERMISSION_DENIED', 'Sign in with your United Dairy Google account');
     try {
-      const result = await C.hubCall(db(), user, data);
+      // Only Uniontown's database is on the emulator; the other plants' cannot be read, as before they are set up.
+      const result = await C.hubCall(db(), user, data, { dbFor: (name) => { if (name !== '(default)') throw new Error('no database'); return db(); } });
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result }) });
     } catch (e) {
       if (e instanceof C.HubError) return fail(CODES[e.code] || 'FAILED_PRECONDITION', e.message);

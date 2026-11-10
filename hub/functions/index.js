@@ -22,7 +22,7 @@ exports.hub = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!user) throw new HttpsError('permission-denied', 'Sign in with your United Dairy Google account');
   const H = require('./src/hub');
   try {
-    return await H.hubCall(db, user, request.data || {});
+    return await H.hubCall(db, user, request.data || {}, { dbFor: (name) => (!name || name === '(default)' ? db : getFirestore(name)) });
   } catch (error) {
     if (error instanceof H.HubError) throw new HttpsError(CODES[error.code] || 'failed-precondition', error.message);
     console.error('hub', error);
