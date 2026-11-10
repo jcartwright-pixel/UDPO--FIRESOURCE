@@ -35,13 +35,13 @@ test('deploy: production still only from main, by hand or the automatic release'
 test('screen tests in parts: every test once, in the same order, each part with fresh emulators', () => {
   const { parts } = require('../../../tools/browser-parts.cjs');
   const script = require('../../package.json').scripts['test:browser'];
-  const p = parts(script, 3);
-  assert.equal(p.parts.length, 3);
+  const p = parts(script, 4);
+  assert.equal(p.parts.length, 4);
   assert.deepEqual(p.parts.flat(), p.cmds, 'nothing skipped, nothing moved');
   assert.ok(p.cmds.length > 100);
   assert.match(p.flags, /--only firestore,auth,functions,hosting --project demo-ud-distribution/);
   assert.match(p.env, /UD_FAKE_LIVE_ROLL=1/);
-  assert.match(wf('tests.yml'), /node \.\.\/tools\/browser-parts\.cjs 3/);
+  assert.match(wf('tests.yml'), /node \.\.\/tools\/browser-parts\.cjs 4/);
 });
 
 test('merge by itself: only a green, non-draft pull request from this repository, then the main tests start', () => {
