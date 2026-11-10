@@ -1,0 +1,56 @@
+name: Merge by itself when every check is green
+
+# Joe 11-9-26: "set up that automatic merge in the repo" ... "a safe automatic merge that still starts the tests and deploys
+# after a merge". When "Distribution app tests" finishes green for an open pull request into main, this merges it, but only
+# when every check on that exact commit has finished green and the pull request is not a draft. A draft is how a chat holds
+# work Joe has not seen yet ("show me before anything goes live"): it is never merged here.
+# A merge made with this workflow's own key does not start other workflows by itself, so right after merging it starts
+# "Distribution app tests" on main by hand (allowed with this key). release.yml accepts that run as well as a push, so the
+# merge still goes to the practice copy and then live only once the tests pass on main.
+on:
+  workflow_run:
+    workflows: [Distribution app tests]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Merge when every check is green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          # The open pull request from this branch into main, from this repository (never a fork).
+          pr=$(gh api "repos/$REPO/pulls?state=open&base=main&head=${REPO%%/*}:$BRANCH" --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then echo "No open pull request into main from $BRANCH."; exit 0; fi
+          info=$(gh api "repos/$REPO/pulls/$pr")
+          draft=$(jq -r .draft <<<"$info"); head=$(jq -r .head.sha <<<"$info"); same=$(jq -r '.head.repo.full_name' <<<"$info")
+          if [ "$draft" = true ]; then echo "Pull request $pr is a draft: held, not merged."; exit 0; fi
+          if [ "$same" != "$REPO" ]; then echo "Pull request $pr comes from another repository: not merged."; exit 0; fi
+          if [ "$head" != "$SHA" ]; then echo "Pull request $pr has newer code ($head) than what was tested ($SHA): its own test run decides."; exit 0; fi
+          # Every check on this commit finished, and none failed (this job itself is not a check run yet).
+          checks=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv')
+          echo "$checks"
+          if grep -qvP '\tcompleted\t(success|skipped|neutral)$' <<<"$checks"; then echo "Not every check on $SHA is finished and green: not merged yet."; exit 0; fi
+          if ! out=$(gh api -X PUT "repos/$REPO/pulls/$pr/merge" -f merge_method=merge -f sha="$SHA" --jq .message 2>&1); then
+            echo "GitHub would not merge pull request $pr yet: $out"; exit 0; fi
+          echo "$out"
+          echo "Merged pull request $pr."
+          # Start the main tests by hand: the merge above cannot start them itself. release.yml goes on from their result.
+          gh workflow run tests.yml --repo "$REPO" --ref main
+          echo "Started Distribution app tests on main."

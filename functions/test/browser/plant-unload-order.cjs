@@ -91,7 +91,9 @@ async function openPage(browser, width, height, url, touch) {
       await p.waitForSelector('#work .sw-card .sw-chips i.tt');
       // The cards can be drawn before stations.css has been applied under a busy emulator (the rare "big type" miss at the size
       // check below): wait for the page's styles, so the size is read from the screen as people see it. A wrong size still fails.
-      await p.waitForFunction(() => { const t = document.querySelector('#work .sw-trailer'); return t && parseFloat(getComputedStyle(t).fontSize) >= 26; }, null, { timeout: 15000 })
+      // T-953's own card, read whole: a save just before can redraw the list, and a card caught mid-redraw has no trailer line yet.
+      await p.waitForFunction(() => [...document.querySelectorAll('#work .sw-card[data-sw] .sw-trailer')]
+        .some(t => t.textContent === 'T-953' && parseFloat(getComputedStyle(t).fontSize) >= 26), null, { timeout: 15000 })
         .catch(() => {});
       const cards = await p.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => ({
         key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
