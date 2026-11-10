@@ -1952,7 +1952,7 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 id: sales-customers
 screens: sales.html?view=customers
 
-The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app. It only shows; nothing can be changed from it.
+The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Hub's copy of the Customer List** (active customers only). It only shows; nothing can be changed from it.
 
 1. Tap **Customers by route** on the app's first screen.
 2. Pick a tab: `By route`, `By customer` or `By group`.
@@ -1963,10 +1963,11 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 - A customer given a **Group** on the Customer List's Directory is in that group. Otherwise every name starting with DQ is in **Dairy Queen**, and everyone else is grouped by the chain number on the Customer List; a customer with no chain (or chain 0), or the only one in its chain, is under **Independents**.
 - A day that says **no route** is a customer day on the Customer List with no route number yet.
 - The bottom line says when the Customer List was last changed.
+- A customer made Inactive on the Customer List is not shown.
 - A division with nothing on the Customer List yet shows no customers.
 - The arrow at the top left (Back) goes back one step: from a group to the groups, then to the two cards. `?` opens this Help inside the app.
 
-> The list changes only in the **Customer List** app, and shows here by itself. If a customer is missing or on the wrong day, tell the office.
+> The list changes only in the **Customer List** app; the Hub copies it over by itself, and it shows here. If a customer is missing or on the wrong day, tell the office.
 
 !> Do not read this list as today's loads. It is the regular route menu; for where a truck is now, use **Where the routes are**.
 
