@@ -62,7 +62,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports
           REPORTS: ${{ runner.temp }}/node-reports
-          TRACE_MODE: patch
+          TRACE_MODE: timer
         run: |
           bash ../tools/memory-guard.sh &
           mkdir -p "$RUNNER_TEMP/shots"

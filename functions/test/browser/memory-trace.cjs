@@ -7,6 +7,19 @@ const path = require('path');
 const core = path.dirname(require.resolve('playwright-core/package.json'));
 const CR = require(path.join(core, 'lib/server/chromium/crConnection.js'));
 const CL = require(path.join(core, 'lib/client/connection.js'));
+const PT = require(path.join(core, 'lib/server/pipeTransport.js'));
+const ptDispatch = PT.PipeTransport.prototype._dispatch;
+PT.PipeTransport.prototype._dispatch = function (buffer) {
+  if (buffer.indexOf('\0') === -1) {
+    const size = this._pendingBuffers.reduce((a, b) => a + b.length, 0) + buffer.length;
+    if (size > 50e6) {
+      const head = Buffer.concat(this._pendingBuffers.slice(0, 2)).slice(0, 1500).toString();
+      console.log('TRACE one browser message is over ' + Math.round(size / 1e6) + ' MB and still coming. It starts: ' + head);
+      process.exit(3);
+    }
+  }
+  return ptDispatch.call(this, buffer);
+};
 const cdp = new Map(), client = new Map();
 const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
 const MODE = process.env.TRACE_MODE || 'both';
