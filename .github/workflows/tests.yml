@@ -54,8 +54,13 @@ jobs:
         # In 3 parts, fresh emulators each (tools/browser-parts.cjs): one long session ran the machine out of memory.
         # 11-9-26: the job kept being killed for memory part way through. Every 20 seconds the log shows the memory used and
         # the biggest programs (lines starting MEMORY), so the next kill shows which one grew.
+        # 11-10-26: one node program jumps from about 250 MB to 12 GB within 40 seconds, about 10 minutes into a part (seen in
+        # plant-station-boxing and after plant-order). Every 5 seconds now, with each program's command line, and no node
+        # program may take more than 4 GB: it stops with "heap limit" and its name instead of taking the machine down.
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
-          ( while true; do echo "MEMORY $(date -u +%T) used $(free -m | awk '/Mem/{print $3}')MB of $(free -m | awk '/Mem/{print $2}')MB: $(ps -eo rss=,comm= --sort=-rss | head -6 | awk '{printf "%s %dMB, ", $2, $1/1024}')"; sleep 20; done ) &
+          ( while true; do echo "MEMORY $(date -u +%T) used $(free -m | awk '/Mem/{print $3}')MB of $(free -m | awk '/Mem/{print $2}')MB: $(ps -eo rss=,args= --sort=-rss | head -4 | awk '{a=$2" "$3" "$4" "$5; printf "%dMB %s | ", $1/1024, substr(a,1,110)}')"; sleep 5; done ) &
           mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" node ../tools/browser-parts.cjs 3
       - name: Keep the screen pictures
         if: always()
