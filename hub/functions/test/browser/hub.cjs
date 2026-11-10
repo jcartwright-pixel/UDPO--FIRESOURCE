@@ -531,7 +531,7 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     p = await open(browser, 'sam.sales@uniteddairy.com');
     await p.waitForSelector('#tiles a');
     assert.deepEqual(await p.$$eval('#tiles a', as => as.map(a => a.dataset.app)), ['plant', 'distribution', 'customers', 'sales', 'fuel', 'udms', 'accident'], 'Sam\'s Home shows the apps ticked for Sam');
-    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area)), ['all', 'plant', 'distribution', 'fleet', 'people'], 'no Administration area for Sam');
+    assert.deepEqual(await p.$$eval('#area-menu a', as => as.map(a => a.dataset.area)), ['all', 'plant', 'distribution', 'sales', 'fleet', 'people'], 'no Administration area for Sam');
     assert.ok(!(await p.isVisible('a[data-admin="people"]')), 'someone who is not an administrator does not see Administration');
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'keys.html');
     await p.waitForSelector('#error:not([hidden])');
