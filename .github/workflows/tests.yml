@@ -66,7 +66,7 @@ jobs:
           bash ../tools/memory-guard.sh &
           mkdir -p "$RUNNER_TEMP/shots"
           export SHOTS_DIR="$RUNNER_TEMP/shots"
-          UD_FAKE_LIVE_ROLL=1 npx firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution "node test/browser/stations.cjs && node test/browser/plant-station-boxing.cjs && (DEBUG=pw:api,pw:protocol node test/browser/plant-load-numbers.cjs 2>&1 | awk '/pw:api/ { print substr(\$0,1,300); next } /fulfill/ { next } length > 5000 { n++; if (n < 200) print \"BIGMSG \" length \" \" substr(\$0,1,600) }')"
+          UD_FAKE_LIVE_ROLL=1 npx firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution "node test/browser/stations.cjs && node test/browser/plant-station-boxing.cjs && node -r ./test/browser/memory-trace.cjs test/browser/plant-load-numbers.cjs"
       - name: Keep the screen pictures
         if: always()
         uses: actions/upload-artifact@v4
