@@ -129,6 +129,12 @@ async function hubCall(db, user, input, options) {
         tiles.push({ key, name, note: note + LIVE_ONLY, url: NO_PRACTICE[key] || url, live: true });
       } else tiles.push({ key, name, note, url });
     });
+    const ops = apps(project)[0];
+    if (mine.indexOf(ops.key) >= 0) {
+      // Joe 11-10-26 ("a card for the sales ... a link that goes directly to that app"): the salespeople's own phone app
+      // (UD Sales, Operations' sales.html). Any United Dairy account may open it and it only shows, so it has no tick.
+      tiles.push({ key: 'sales', name: 'Sales App', note: 'The salespeople\'s own app: where every route is now and the customers on each route. It only shows; nothing changes', url: ops.url + 'sales.html' });
+    }
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
   }
   // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.

@@ -18,7 +18,7 @@ const keys = (r) => r.tiles.map(t => t.key);
 
 test('an administrator sees all eight apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'sales']);
   assert.equal(r.admin, true);
   // Plant & Distribution is two cards (11-5-26), each opening its own side of the app.
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/group.html?g=plantops');
@@ -36,6 +36,9 @@ test('an administrator sees all eight apps, live addresses on the live project',
   assert.equal(r.tiles[7].name, 'Customer Statements');
   assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
   assert.equal(r.tiles[8].name, 'Accident & Injury Reporting');
+  // Joe 11-10-26: a card straight to the salespeople's own app (UD Sales).
+  assert.equal(r.tiles[9].url, 'https://ud-distribution.web.app/sales.html');
+  assert.equal(r.tiles[9].name, 'Sales App');
   assert.ok(r.tiles.every(t => t.url.indexOf('sandbox') < 0), 'no live card opens a practice copy');
 });
 
@@ -53,6 +56,7 @@ test('the practice copy links to the practice copies', async () => {
   assert.equal(r.tiles[5].url, 'https://ud-distribution-routes.web.app/');
   assert.equal(r.tiles[7].url, H.STATEMENTS_URL);
   assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
+  assert.equal(r.tiles[9].url, 'https://ud-distribution-sandbox.web.app/sales.html');
   for (const i of [5, 7, 8]) assert.match(r.tiles[i].note, /no practice copy yet, so this opens the live one/);
   // Every other practice card opens a practice copy; none opens a live app without saying so.
   for (const t of r.tiles) {
@@ -69,7 +73,7 @@ test('the live hub never says a card opens the live one', async () => {
 
 test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {
   const r = await H.hubCall(db, { email: 'sam.sales@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'accident']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'accident', 'sales']);
   assert.equal(r.admin, false);
 });
 
@@ -169,10 +173,10 @@ test('saved app ticks decide the tiles; only administrators change them, never t
     runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
   };
   const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers', 'accident']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers', 'accident', 'sales']);
   await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
   assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'fuel']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'fuel', 'sales']);
   assert.deepEqual((await H.hubCall(mem, pat, { op: 'appAccess' })).saved, { 'sam.sales@uniteddairy.com': ['operations', 'fuel'] });
   await assert.rejects(H.hubCall(mem, sam, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['udms'] }), /Only an administrator/);
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'pat.admin@uniteddairy.com', apps: ['fuel'] }), /from yourself/);
