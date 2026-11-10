@@ -37,6 +37,7 @@ export const LOOK = {
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
   // Joe 11-5-26: Plant & Distribution is two cards on Home, Plant Operations (the plant) and Route Distribution (the truck).
   plant: { color: '#2f6e3a', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
+  sales: { color: '#b8860b', icon: path('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>') },
   distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
@@ -84,6 +85,7 @@ export function linkGroups(ops) {
 export const AREAS = [
   { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant'] },
   { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers and delivery routes', apps: ['distribution', 'customers'] },
+  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app: where the routes are and the customers on each', apps: ['sales'] },
   { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, what each trip costs and the cost of each route', apps: ['fuel', 'routes', 'routecost'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
@@ -98,5 +100,5 @@ export const AREAS = [
 // The area pictures for the menu.
 export const AREA_ICON = {
   all: path('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, fleet: LOOK.fuel.icon, office: LOOK.statements.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
+  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, sales: LOOK.sales.icon, fleet: LOOK.fuel.icon, office: LOOK.statements.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
 };
