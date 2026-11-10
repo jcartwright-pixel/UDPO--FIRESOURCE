@@ -47,7 +47,7 @@ jobs:
       - name: Database tests on the local emulator (transfer, saves, security rules)
         run: echo diagnostic branch, database tests skipped
       - name: Install the test browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium && (which gdb || sudo apt-get install -y gdb)
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
         # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
         # saves mid-test and made the Route Editor checks time out.
@@ -60,7 +60,7 @@ jobs:
         # 11-10-26: plant-load-numbers grew past 13 GB with the 4 GB limit on, so the memory is outside the JavaScript heap.
         # tools/memory-guard.sh now stops a screen test past 3 GB and prints where it was (lines starting STUCK).
         env:
-          NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports
+          NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports --perf-basic-prof-only-functions --interpreted-frames-native-stack
           REPORTS: ${{ runner.temp }}/node-reports
           TRACE_MODE: timer
         run: |
