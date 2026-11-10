@@ -324,7 +324,10 @@ Every driver: employee ID, relief or regular, seniority, assigned truck, mobile 
 - `+ Add Driver` adds a driver: type part of a name or employee ID in **Pick an employee** and pick the person from the [Employees](#employees) list. Their name, employee ID and hire date fill in gray, and their mobile phone fills in. Pick the truck and relief, then press `Add Driver`.
 - Gray boxes come from UDMS and follow it by themselves. Change those in UDMS, not here.
 - `Edit` on a line opens the driver beside the list.
-- In the driver's box: change the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
+- In the driver's box: change the employee ID, the name and hire date (unless they are gray), the seniority date, assigned truck, relief and mobile phone. A phone is written like 330-555-1234.
+- **Employee ID** saves when you leave the box. An ID on the [Employees](#employees) list links the driver to that person, so their name and hire date turn gray and follow UDMS. Any other number is kept as typed. Clear the box to take the ID off.
+
+!> Do not type a name in the Employee ID box, or an ID another driver already has. Both are refused, and the box says why.
 - `Add accident / incident`, `Add complaint` and `Add PDA` add a record to the driver. `See all` lists them.
 - `Make Inactive` (press it twice) makes the driver Inactive. The driver stays on the list, shown as Inactive, and can be made Active again with the switch on their line.
 - An Inactive driver never shows in any driver list anywhere in Operations: Daily Dispatch, the Weekly Dispatch Template, the Vacation Schedule, the driver phone and the texts. Ticking **OVR** does not bring them back either. A driver already on a load stays on it, marked Inactive, until you pick someone else.

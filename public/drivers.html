@@ -195,8 +195,11 @@
             '<div class="panel-row"><label>Employee ID<input id="d-emp" type="text"' + gray(true) + '></label><label>Mobile phone<input id="d-phone" type="tel" inputmode="tel" maxlength="20" placeholder="330-555-1234"></label></div>' +
             '<p class="hint" id="d-udms-note">Gray boxes come from UDMS and follow it by themselves.</p>'
           : '<label>' + (emp ? 'Employee' : 'Driver name') + '<input id="d-name" type="text" maxlength="120" value="' + escapeHtml(v.name) + '"' + gray(emp) + '></label>' +
-            (emp ? '<div class="panel-row"><label>Employee ID<input id="d-emp" type="text" value="' + escapeHtml(emp.employeeId) + '"' + gray(true) + '></label><label>Position<input type="text" value="' + escapeHtml(emp.position || '') + '"' + gray(true) + '></label></div>' +
-              '<p class="hint">Gray boxes come from UDMS and follow it by themselves.</p>' : '')) +
+            // Joe 11-10-26 ("i cant edit the empoyee id"): Edit Driver's Employee ID box can always be changed. An ID on the
+            // Employees list links the driver to that employee; any other number is kept as typed.
+            (r ? '<div class="panel-row"><label>Employee ID<input id="d-emp" type="text" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="No ID" value="' + escapeHtml(emp ? emp.employeeId : employeeIdOf(r.id)) + '"></label>' +
+              (emp ? '<label>Position<input type="text" value="' + escapeHtml(emp.position || '') + '"' + gray(true) + '></label>' : '') + '</div>' : '') +
+            (emp ? '<p class="hint">Gray boxes come from UDMS and follow it by themselves.</p>' : '')) +
         '<div class="panel-row"><label>Hire date<input id="d-hire" type="date" value="' + escapeHtml(v.hireDate || '') + '"' + gray(pick || emp) + '></label>' +
         '<label>Seniority date<input id="d-seniority" type="date" value="' + escapeHtml(v.seniorityDate || '') + '"></label></div>' +
         '<label>Assigned truck<input id="d-truck" type="text" list="truck-list" maxlength="40" autocomplete="off" value="' + escapeHtml(truckUnit(v.defaultTruckId)) + '" placeholder="No truck"></label>' +
@@ -247,6 +250,13 @@
           relief: document.getElementById('d-relief').checked
         };
         const truck = findTruck(fields.truck);
+        if (r) {
+          const box = document.getElementById('d-emp'), id = box.value.trim();
+          if (id && !/\d/.test(id)) { showError('Type the employee ID as a number, like 10877.'); box.focus(); return; }
+          const twin = id && drivers.find(x => x.id !== r.id && !L.driverDeleted(x) && idKey(x.employeeId) === idKey(id));
+          if (twin) { showError(twin.name + ' already has employee ID ' + id + ' on the Driver Roster.'); box.focus(); return; }
+          Object.assign(fields, { employeeId: id, setEmployeeId: true });
+        }
         if (pick) {
           if (!picked) { showError('Pick an employee from the list.'); document.getElementById('d-pick').focus(); return; }
           const phone = document.getElementById('d-phone').value.trim(), digits = phone.replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, '');
@@ -257,11 +267,11 @@
         if (!fields.name) { showError('Type the driver\'s name.'); document.getElementById('d-name').focus(); return; }
         if (fields.truck && !truck) { showError(fields.truck + ' is not a truck in Equipment Master. Pick one from the list or leave it blank.'); document.getElementById('d-truck').focus(); return; }
         showError('');
-        return { fields, values: Object.assign({ name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief }, fields.employeeId ? { employeeId: fields.employeeId } : {}) };
+        return { fields, values: Object.assign({ name: fields.name.toUpperCase(), hireDate: fields.hireDate, seniorityDate: fields.seniorityDate, defaultTruckId: truck ? truck.id : '', reliefDriver: fields.relief }, fields.employeeId || fields.setEmployeeId ? { employeeId: fields.employeeId } : {}) };
       };
       if (r) {
         document.getElementById('panel').onchange = (ev) => {
-          if (!ev.target.closest('#d-name, #d-hire, #d-seniority, #d-truck, #d-relief')) return;
+          if (!ev.target.closest('#d-name, #d-hire, #d-seniority, #d-truck, #d-relief, #d-emp')) return;
           const got = read(), d = drivers.find(x => x.id === r.id);
           if (!got || !d) return;
           if (Object.keys(got.values).every(k => String(d[k] == null ? '' : d[k]) === String(got.values[k]))) return;
@@ -270,7 +280,10 @@
           const before = {};
           Object.keys(got.values).forEach(k => { before[k] = d[k]; });
           Object.assign(d, got.values); render();
-          driverSaving = driverSaving.then(() => saveOptimistic('saveDriver', Object.assign({ driverId: r.id }, got.fields), () => Object.assign(d, got.values), () => Object.assign(d, before), render).then(liveWarn)).catch(() => {});
+          const idChanged = idKey(before.employeeId) !== idKey(got.values.employeeId);
+          driverSaving = driverSaving.then(() => saveOptimistic('saveDriver', Object.assign({ driverId: r.id }, got.fields), () => Object.assign(d, got.values), () => Object.assign(d, before), render).then(liveWarn)
+            // A new ID may link the driver to an employee (or unlink them): the box redraws with the gray boxes that fit.
+            .then(() => { if (idChanged && panelOpen && editingId === r.id) { const nr = rows.find(x => x.id === r.id); if (nr) openPanel(nr); } })).catch(() => {});
         };
         return;
       }

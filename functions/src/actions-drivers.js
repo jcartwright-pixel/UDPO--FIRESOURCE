@@ -110,9 +110,19 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
   // Joe 10/31 (mock-ups 2 and 3): a driver with an employee ID from the Employees list (UDMS) takes the name and hire date
   // from that list; the screen shows them gray. A new driver picked from the list keeps the employee ID; the seniority date
   // starts at the hire date when it is left blank.
-  const empId = req.employeeId || (existing && existing.employeeId) || '';
+  // Joe 11-10-26 ("i cant edit the empoyee id, should be in the driver section also"): Edit Driver's Employee ID box can be
+  // changed or cleared. An ID on the Employees list links the driver to that employee (name and hire date then follow UDMS);
+  // any other ID is kept as typed. Two drivers on the roster never share one ID.
+  const changeId = !!(existing && req.setEmployeeId && EMP.idKey(req.employeeId) !== EMP.idKey(existing.employeeId));
+  const empId = changeId ? req.employeeId : (req.employeeId || (existing && existing.employeeId) || '');
   const emp = empId ? await EMP.employeeFor(tx, db, empId) : null;
-  if (req.employeeId && !emp) throw new SaveError('NOT_FOUND', 'Employee ' + req.employeeId + ' is not on the Employees list');
+  if (req.employeeId && !emp && !existing) throw new SaveError('NOT_FOUND', 'Employee ' + req.employeeId + ' is not on the Employees list');
+  if (changeId && req.employeeId) {
+    const ids = [...new Set([req.employeeId, emp ? emp.employeeId : '', EMP.idKey(req.employeeId)].filter(Boolean))];
+    const snaps = await Promise.all(ids.map(v => tx.get(db.collection(C.drivers).where('employeeId', '==', v).limit(5))));
+    const twin = snaps.flatMap(q => q.docs.map(x => x.data())).find(x => x.id !== existing.id && !L.driverDeleted(x));
+    if (twin) throw new SaveError('NOT_ALLOWED', (twin.name || 'Another driver') + ' already has employee ID ' + req.employeeId + ' on the Driver Roster');
+  }
   if (req.employeeId && !existing) {
     const twin = (await tx.get(db.collection(C.drivers).where('employeeId', '==', emp.employeeId).limit(1))).docs[0];
     // A driver deleted from the roster (Joe 11/2) can be added again: the new entry is a fresh one, the old one stays deleted.
@@ -125,6 +135,7 @@ async function saveDriver(tx, db, req, email, stamp, logRef, mode) {
   const name = emp ? emp.name : req.name, hireDate = emp ? emp.hireDate : req.hireDate;
   const after = { name, hireDate, seniorityDate: req.seniorityDate || (emp && !existing ? emp.hireDate : req.seniorityDate), defaultTruckId: truckId, reliefDriver: req.relief };
   if (emp && !existing) after.employeeId = emp.employeeId;
+  if (changeId) after.employeeId = emp ? emp.employeeId : req.employeeId;
   const result = { ok: true, requestId: req.requestId, runs: [] };
   if (existing) {
     result.liveWeeks = { updated: 0, added: 0, warnings: [] };
