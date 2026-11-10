@@ -11,6 +11,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 1. Press `Sign in with Google` and pick your United Dairy account.
 2. Home shows your apps in areas: **Plant**, **Distribution**, **Sales**, **Fleet & Costs**, **Office**, **People & Safety**, and for administrators **Administration**. The **Areas** menu on the left (along the top on a phone) shows one area at a time; the number is how many cards it has. **Everything** shows them all.
 3. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
+   - **Plant Operations** and **Route Distribution** ask **Which plant?** first when you work in more than one plant. Each plant (Uniontown, Martins Ferry, Charleston) shows its day so far beside it: loads out of today's loads, how many are loading now and waiting, and the trucks or trailers with a problem. Press `Open` beside a plant and the app opens on that plant in a new tab. A plant not running in the app yet says so. If you work in one plant only, the card opens it straight away.
 4. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
 5. Press `All app links` (in the blue band at the top) for every phone and tablet link in one list, grouped by who uses it (Everyone, Managers, Sales, Drivers, Plant floor, Garage & Maintenance, Hiring). Press `Open`, or `Copy link` to text or email it. The codes are not on that list; an administrator gives them out from **Links & Codes**.
 
@@ -43,6 +44,8 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 > On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
 > A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. A card for an app with no practice copy says it opens the live one, so take care there. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
+
+> The plant pop-up's numbers are the same as Operations' all-plants overview, read when the pop-up opens. Close it and press the card again for fresh numbers.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 

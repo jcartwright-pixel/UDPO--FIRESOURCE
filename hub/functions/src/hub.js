@@ -39,6 +39,8 @@ const ACCIDENT_URL = 'https://united-dairy-accident-app.web.app/';
 // every location (the location is picked inside it; Uniontown first).
 const STATEMENTS_URL = 'https://script.google.com/a/macros/uniteddairy.com/s/AKfycbyMvVPx0RDcDeP_OXe0kmYo3XWBYA7hQzBGgTecCn10wpszalEtyVoXLYmFMsVgnzz5/exec';
 
+const PL = require('./plants');
+
 class HubError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 const roleKey = (r) => String(r || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
@@ -104,7 +106,7 @@ async function ticksOf(db, email, person) {
 }
 
 /**
- * input.op: home (the tiles this person may open); appAccess (administrators: every person's saved ticks);
+ * input.op: home (the tiles this person may open, and their plants); plants (the plant pop-up's recap, src/plants.js); appAccess (administrators: every person's saved ticks);
  * setApps (administrators: {email, apps} saves one person's ticks); the customer list's door (src/changes.js): sendChange,
  * withdrawChange, changeStatus (anyone active), customerChanges, approveChange, turnDownChange (administrators).
  */
@@ -135,7 +137,14 @@ async function hubCall(db, user, input, options) {
       // (UD Sales, Operations' sales.html). Any United Dairy account may open it and it only shows, so it has no tick.
       tiles.push({ key: 'sales', name: 'Sales App', note: 'The salespeople\'s own app: where every route is now and the customers on each route. It only shows; nothing changes', url: ops.url + 'sales.html' });
     }
-    return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
+    // Joe 11-10-26: the Plant Operations and Route Distribution cards ask which plant when a person has more than one.
+    const plants = PL.plantsFor(person).map(id => PL.PLANTS.find(p => p.id === id)).map(p => ({ id: p.id, name: p.name }));
+    return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles, plants };
+  }
+  // The plant pop-up's recap (src/plants.js): each of this person's plants, today's loads and trucks with a problem.
+  if (op === 'plants') {
+    const dbFor = (options && options.dbFor) || (() => db);
+    return PL.plantRecap(dbFor, person, options && options.now);
   }
   // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.
   if (CHANGE_OPS[op]) {

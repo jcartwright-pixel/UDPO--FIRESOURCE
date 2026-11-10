@@ -43,6 +43,15 @@
       <div id="links-list"></div>
       <div class="modal-actions"><button type="button" id="links-close">Close</button></div>
     </div>
+    <!-- Joe 11-10-26: the Plant Operations and Route Distribution cards ask which plant, with each plant's day beside it. -->
+    <div class="modal-back hub-back" id="plant-back" hidden></div>
+    <div class="modal wide-modal plant-pick" id="plant-box" role="dialog" aria-modal="true" aria-labelledby="plant-title" hidden>
+      <h2 id="plant-title">Which plant?</h2>
+      <p class="hub-sub">Each plant's day so far. Press a plant to open it in a new tab.</p>
+      <div class="notice error" id="plant-error" hidden></div>
+      <div id="plant-list"></div>
+      <div class="modal-actions"><button type="button" id="plant-close">Close</button></div>
+    </div>
     <div class="hub-install" id="install-box" hidden>
       <b>Get the hub app</b>
       <span>It opens on this computer in its own window, with its own icon, like your other United Dairy apps.</span>
@@ -53,6 +62,7 @@
   </div>
   <script type="module">import { LOOK, AREAS, AREA_ICON, linkGroups } from './js/apps.js';
 import { opsOrigin } from './js/links.js';
+import { plantPicker } from './js/plant-pick.js';
 import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall, shortDate } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
 function tile(key, url, name, note, newTab, attr) {
@@ -138,6 +148,7 @@ requireSignIn(async () => {
     }).join('');
     document.getElementById('empty').hidden = tiles.length > 0;
     drawMenu(!!d.admin);
+    plantPicker(tiles, d.plants);
   } catch (err) { showError(serverText(err, 'the hub')); }
 });</script>
 </body>

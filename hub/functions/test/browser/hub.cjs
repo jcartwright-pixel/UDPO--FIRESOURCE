@@ -45,6 +45,19 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.equal(await p.getAttribute('#tiles a[data-app="plant"]', 'target'), '_blank');
     assert.match(await p.getAttribute('#tiles a[data-app="plant"]', 'href'), /group\.html\?g=plantops$/, 'Plant Operations opens the plant side');
     assert.match(await p.getAttribute('#tiles a[data-app="distribution"]', 'href'), /group\.html\?g=routeops$/, 'Route Distribution opens the distribution side');
+    // Joe 11-10-26: Plant Operations asks which plant, with each plant's day beside it, and opens the one picked.
+    assert.match(await p.textContent('#tiles a[data-app="plant"] .app-open'), /Pick a plant/);
+    await p.click('#tiles a[data-app="plant"]');
+    await p.waitForSelector('#plant-box:not([hidden])');
+    await p.waitForFunction(() => !/Getting/.test(document.getElementById('plant-list').textContent));
+    assert.deepEqual(await p.$$eval('#plant-list .plant-row b', b => b.map(x => x.textContent)), ['Uniontown', 'Charleston', 'Martins Ferry']);
+    assert.deepEqual(await p.$$eval('#plant-list .plant-recap', s => s.map(x => x.textContent)), ['No loads today', 'Not running in the app yet', 'Not running in the app yet']);
+    assert.match(await p.getAttribute('#plant-list a[data-plant="fac_charleston"]', 'href'), /group\.html\?g=plantops&plant=fac_charleston$/);
+    assert.equal(await p.getAttribute('#plant-list a[data-plant="fac_uniontown"]', 'target'), '_blank');
+    assert.equal(p.context().pages().length, 1, 'the card itself opened nothing');
+    await shot(p, 'hub-plant-pick-1920');
+    await p.click('#plant-close');
+    assert.ok(await p.isHidden('#plant-box'));
     assert.match(await p.getAttribute('#tiles a[data-app="sales"]', 'href'), /\/sales\.html$/, 'Sales App opens the salespeople\'s own app');
     assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant Operations', 'Route Distribution', 'Customers & Routes', 'Sales App', 'Fuel Tracking', 'Route & Trip Costs', 'Route Cost Analysis', 'Customer Statements', 'Employees & Compliance', 'Accident & Injury Reporting']);
     assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 10, 'every card has its picture');
