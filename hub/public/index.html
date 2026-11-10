@@ -53,6 +53,7 @@
   </div>
   <script type="module">import { LOOK, AREAS, AREA_ICON, linkGroups } from './js/apps.js';
 import { opsOrigin } from './js/links.js';
+import { PRACTICE_HUB } from './js/practice-gate.js';
 import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall, shortDate } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
 function tile(key, url, name, note, newTab, attr) {
@@ -77,7 +78,9 @@ const ADMIN = {
 const areaHead = (a) => '<header class="area-head"><span class="area-icon">' + AREA_ICON[a.key] + '</span><div><h2>' + e(a.name) + '</h2><p>' + e(a.note) + '</p></div></header>';
 const adminArea = AREAS.find(a => a.key === 'admin');
 document.getElementById('admin-tiles').innerHTML = '<section class="area" data-area="admin">' + areaHead(adminArea) +
-  adminArea.groups.map(g => '<h3 class="area-group">' + e(g.name) + '</h3><div class="hub-home">' + g.items.map(k => tile(k, ADMIN[k][0], ADMIN[k][1], ADMIN[k][2], false, 'data-admin')).join('') + '</div>').join('') + '</section>';
+  adminArea.groups.map(g => '<h3 class="area-group">' + e(g.name) + '</h3><div class="hub-home">' + g.items.map(k => tile(k, ADMIN[k][0], ADMIN[k][1], ADMIN[k][2], false, 'data-admin')).join('') + '</div>').join('') +
+  // Joe 11-9-26: the live hub is what opens; the practice hub only when someone picks it here (or with its ?practice=1 address).
+  (/sandbox/.test(location.hostname) ? '' : '<p class="practice-pick" id="practice-pick">To test a change first, open the <a href="' + PRACTICE_HUB + '" target="_blank" rel="noopener">practice hub</a>. It opens in its own tab, with copied or made-up data, and never changes the live apps.</p>') + '</section>';
 document.getElementById('today').textContent = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'long' }).format(new Date()) + ', ' + shortDate(new Date());
 
 // The area menu: Everything, then each area this person has something in. The address keeps the pick (#area=fleet), so Back works.
