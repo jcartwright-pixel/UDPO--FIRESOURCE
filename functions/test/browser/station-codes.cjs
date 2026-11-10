@@ -276,7 +276,7 @@ async function codeFitsPhones(p, name) {
     await Promise.all([ds.waitForURL(/route\.html\?room=1$/), ds.click('#code-box button')]);
     await ds.waitForSelector('#step-menu:not([hidden]) #m-checkin');
     assert.equal(await ds.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
-    assert.equal(await ds.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
+    assert.equal(!!(await ds.$('#go-back, #go-home, #signout')), false, 'no Back, Home or Sign out into the app');
     assert.ok(await ds.evaluate(() => localStorage.getItem('udKioskCode')), 'the existing link keeps it too');
     await shot(ds, '8-driver-kiosk-opened-1536.png');
     // Reopening the existing link (or the old driver-room.html, via the Driver Station link) goes straight back to the drivers' Check-In.

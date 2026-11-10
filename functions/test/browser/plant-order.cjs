@@ -102,14 +102,14 @@ async function keyMove(page, route, dir) {
     const watcher = await openPage(browser, desk, '/loadout.html?date=' + DATE + '&testEmail=manager.test@uniteddairy.com');
     await loader.waitForSelector(row('811') + '[data-drag]');
     assert.deepEqual((await routes(loader)).slice(0, 7), ['6303', '801', '802', '805', '808', '811', '812'], 'the route cell reads as the route; the left-over load stays on top');
-    assert.equal(await loader.$(row('6303') + '[data-drag]'), null, 'a prior-day load does not move');
-    assert.equal(await loader.$('.lo-grip, [data-grip], .lo-move, [data-move]'), null, 'Joe 10/12: no grab dots and no arrows');
+    assert.equal(!!(await loader.$(row('6303') + '[data-drag]')), false, 'a prior-day load does not move');
+    assert.equal(!!(await loader.$('.lo-grip, [data-grip], .lo-move, [data-move]')), false, 'Joe 10/12: no grab dots and no arrows');
     assert.equal(await loader.$eval(row('811') + ' td:nth-child(2)', td => getComputedStyle(td).cursor), 'grab', 'the hand shows over a line that can be dragged');
     // Joe 10/12 (as Daily Dispatch): a load already loaded (801, 802, 805 are Done in the test sheet) does not move; 808,
     // still loading, is then the first that can.
     for (const r of ['801', '802', '805']) {
       assert.equal(await loader.$eval(row(r), t => t.classList.contains('done')), true, r + ' starts Done in the test sheet');
-      assert.equal(await loader.$(row(r) + '[data-drag]'), null, r + ' is already loaded, so it does not move');
+      assert.equal(!!(await loader.$(row(r) + '[data-drag]')), false, r + ' is already loaded, so it does not move');
     }
     assert.equal(await loader.$eval('#rows tr[data-drag]', t => t.dataset.drag.split('|')[0]), '2026-10-04__run_p808', '808 is the first line that can be dragged');
     assert.deepEqual(await movedRoutes(loader), [], 'nothing is shaded as moved while the day follows the sheet\'s order');
@@ -302,7 +302,7 @@ async function keyMove(page, route, dir) {
     await loader.click('#prev');
     await loader.waitForFunction(() => document.querySelector('#load-date').value === '2026-10-07');
     await loader.waitForTimeout(300);
-    assert.equal(await loader.$('#rows tr[data-drag]'), null, 'a past day has nothing to drag');
+    assert.equal(!!(await loader.$('#rows tr[data-drag]')), false, 'a past day has nothing to drag');
     // Joe 10/12: the day picked stays picked after leaving and coming back (Go to today shows), and a move into another week
     // asks first: Cancel stays, Continue moves.
     assert.equal(await loader.isVisible('#go-today'), true, 'Go to today shows on a day that is not today');

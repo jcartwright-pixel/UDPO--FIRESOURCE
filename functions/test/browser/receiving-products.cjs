@@ -79,7 +79,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     // ---------- Receiving: no switch; Calendar | Suppliers & Products ----------
     const page = await openPage(browser, 1536, 790, '/scheduler.html?lane=receiving&view=month&date=2026-10-08&' + MANAGER);
     await page.waitForFunction(() => /Valley Farms/i.test(document.getElementById('body').textContent));
-    assert.equal(await page.$('[data-lane]'), null, 'Joe 11/1: no Shipping | Receiving switch (the left menu has each)');
+    assert.equal(!!(await page.$('[data-lane]')), false, 'Joe 11/1: no Shipping | Receiving switch (the left menu has each)');
     assert.deepEqual(await page.$$eval('#rtabs:not([hidden]) [data-rtab]', b => b.map(x => x.textContent + ':' + x.getAttribute('aria-selected'))), ['Calendar:true', 'Suppliers & Products:false']);
     await shot(page, '1-receiving-calendar-1536.png');
     await page.click('[data-rtab="products"]');
@@ -142,7 +142,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     await page.waitForSelector('.sc-month');
     await page.click('#add');
     await page.waitForSelector('#modal.sc-pagebox:not([hidden]) #f-lines');
-    assert.equal(await page.$('#f-cases'), null, 'Receiving: products on lines, not one Cases box');
+    assert.equal(!!(await page.$('#f-cases')), false, 'Receiving: products on lines, not one Cases box');
     const opt = await page.$$eval('#f-route option', o => o.map(x => [x.value, x.textContent]));
     await page.selectOption('#f-route', opt.find(o => /SILGAN/.test(o[1]))[0]);
     await page.selectOption('#f-type', 'CARRIER');
@@ -202,8 +202,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     await page.click('[data-day="2026-10-08"]');
     await page.click('#modal .sc-dayrow:has-text("Silgan") [data-edit]');
     await page.waitForSelector('#modal .sc-gotnote');
-    assert.equal(await page.$('#f-receive'), null);
-    assert.equal(await page.$('#f-scan'), null);
+    assert.equal(!!(await page.$('#f-receive')), false);
+    assert.equal(!!(await page.$('#f-scan')), false);
     await page.click('#modal [data-close]');
     assert.deepEqual(page.errors, []);
     await page.close();

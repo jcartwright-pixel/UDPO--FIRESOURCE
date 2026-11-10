@@ -61,7 +61,7 @@ const homeOf = async (email) => ((await db().collection('personRights').doc(emai
           assert.equal(await homeOf(em), pg, em + ' saved on its own');
           assert.deepEqual(await p.evaluate(() => [scrollY, document.querySelector('.ap-scroll').scrollTop]), before, 'saving never moves the page');
         }
-        assert.equal(await p.$('#p-modal:not([hidden])'), null, 'picking does not open the person');
+        assert.equal(!!(await p.$('#p-modal:not([hidden])')), false, 'picking does not open the person');
         assert.equal(await p.$eval('.ap-msg', m => m.hidden || !m.textContent.trim()), true, 'no saved message');
         // The person's own Save keeps the Home screen (its revision still matches).
         await p.click('#people tr[data-email="' + DANA + '"] td.strong');

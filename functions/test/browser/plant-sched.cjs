@@ -91,7 +91,7 @@ async function shots(page, name, w) {
       await page.waitForSelector('table.sc-table');
       // Leaving a week that holds today shows today (as the current app); step to Thursday with the arrows (review item 37,
       // Joe 10/13: no date box, the arrows move the dates).
-      assert.equal(await page.$('#pick'), null, 'no date box on the Scheduler');
+      assert.equal(!!(await page.$('#pick')), false, 'no date box on the Scheduler');
       const dayShown = () => page.evaluate(() => { const m = /(\d+)-(\d+)-(\d+)\s*$/.exec(document.getElementById('range').textContent.trim()); return m ? '20' + m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') : ''; });
       for (let i = 0; i < 400 && (await dayShown()) !== DATE; i++) { const before = await page.textContent('#range'); await page.click((await dayShown()) < DATE ? '#next' : '#prev'); await page.waitForFunction((b) => document.getElementById('range').textContent !== b, before); }
       await page.waitForFunction(() => /Thursday 10-8-26/.test(document.getElementById('range').textContent));
@@ -100,7 +100,7 @@ async function shots(page, name, w) {
       await fits(page, 'Scheduler day ' + w + 'x' + h);
       await shots(page, 'sched-day', w);
       // Receiving: the same screen with the suppliers (Joe 11/1: its own screen, opened from the menu; no switch).
-      assert.equal(await page.$('[data-lane]'), null, 'no Shipping | Receiving switch');
+      assert.equal(!!(await page.$('[data-lane]')), false, 'no Shipping | Receiving switch');
       await page.goto(HOSTING + '/scheduler.html?lane=receiving&view=day&date=' + DATE + MANAGER);
       // Joe 10/13: no sample suppliers; a load booked with one still shows its name.
       await page.waitForFunction(() => /Valley Farms Milk Co-op/.test(document.getElementById('body').textContent));

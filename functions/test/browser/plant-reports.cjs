@@ -201,8 +201,8 @@ async function seed() {
     await shots(ps, 'plant-shifts', 1920);
     // Review items 31 and 38 (Joe 10/13): no plant drop-down and no Save Shifts button; the list saves once the new shift's
     // last box is left.
-    assert.equal(await ps.$('#plant'), null, 'no plant drop-down');
-    assert.equal(await ps.$('#save'), null, 'no Save Shifts button');
+    assert.equal(!!(await ps.$('#plant')), false, 'no plant drop-down');
+    assert.equal(!!(await ps.$('#save')), false, 'no Save Shifts button');
     assert.equal(await ps.textContent('#plant-name'), 'Uniontown');
     await ps.press(last + 'input[data-k="end"]', 'Tab');
     // Audit batch 4 (Joe's rule: no save messages): the list saves quietly.

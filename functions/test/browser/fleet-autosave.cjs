@@ -29,7 +29,7 @@ const until = async (fn, what) => { for (let i = 0; i < 60; i++) { if (await fn(
     p.on('pageerror', e => errors.push(e.message));
     await p.goto(HOSTING + '/fleet.html?view=setup&testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('[data-rule="truckMiles"]');
-    assert.equal(await p.$('#rules-save'), null, 'no Save Rules button');
+    assert.equal(!!(await p.$('#rules-save')), false, 'no Save Rules button');
     await p.fill('[data-rule="truckMiles"]', '21000');
     await p.press('[data-rule="truckMiles"]', 'Tab');
     const rules = async () => ((await db().collection('config').doc(G.rulesDocFor('fac_uniontown')).get()).data() || {});

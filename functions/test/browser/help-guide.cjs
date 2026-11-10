@@ -60,7 +60,7 @@ const noSideScroll = (p) => p.evaluate(() => document.documentElement.scrollWidt
       assert.equal(await p.textContent('#help-list .help-item.on'), 'Daily Dispatch');
       assert.ok(await p.isVisible('#help-read .help-dont'), 'the part has a Do not line');
       assert.ok(await noSideScroll(p), 'the Help page fits at ' + w);
-      assert.equal(await p.$('#go-help'), null, 'no ? on the Help page itself');
+      assert.equal(!!(await p.$('#go-help')), false, 'no ? on the Help page itself');
       await shot(p, 'help-page-' + w + '.png');
       // Back comes straight back to the screen.
       await p.click('#go-back');

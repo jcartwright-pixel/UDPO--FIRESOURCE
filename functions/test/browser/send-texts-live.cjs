@@ -111,7 +111,7 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       assert.equal(await dd.textContent('#send-texts .send-count.good'), '1 OF 1 SENT', 'Joe 11/7 (li): the sent check');
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
       // Joe 11-9-26: with the sent check showing, Daily drops the words; when and to how many are on the check's hover.
-      assert.equal(await dd.$('#send-texts .send-words'), null);
+      assert.equal(!!(await dd.$('#send-texts .send-words')), false);
       assert.match(await dd.getAttribute('#send-texts .send-count', 'title'), /^Sent .* to 1 driver \(test copy\)$/);
       assert.match(await dd.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
       assert.match(await popText(dd), /YOURSELF/);

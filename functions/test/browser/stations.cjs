@@ -317,7 +317,7 @@ async function signOnce(page) {
     // Joe 10/10: the Plant Station is a tablet screen: a slim header with Back and Home, no desktop side menu.
     const tab = await openPage(browser, 1280, 800, '/plant-station.html' + MANAGER, clock);
     await tab.waitForSelector('[data-station="CASE_UNLOADING"]');
-    assert.equal(await tab.$('.sidemenu'), null, 'no desktop side menu on the Plant Station');
+    assert.equal(!!(await tab.$('.sidemenu')), false, 'no desktop side menu on the Plant Station');
     // Joe 10/27: a plant tablet goes nowhere else, so no Back or Home even while picking the station.
     assert.equal(await tab.isVisible('#go-back') || await tab.isVisible('#go-home'), false, 'no Back or Home into the app while picking the station');
     assert.ok(await fits(tab), 'the Plant Station fits a tablet');
@@ -345,7 +345,7 @@ async function signOnce(page) {
     await tab.waitForSelector('#work .sw-card');
     assert.equal(await tab.isVisible('#tabs'), false, 'one work area: no tabs, the loads straight away');
     assert.deepEqual(await managerPages(tab), [], 'no link to a manager screen from Case Loadout');
-    for (const gone of ['#load-date', '.areas', 'table', '[data-edit]', '.hdr-admin', '#go-admin']) assert.equal(await tab.$(gone), null, gone + ' is not on the station');
+    for (const gone of ['#load-date', '.areas', 'table', '[data-edit]', '.hdr-admin', '#go-admin']) assert.equal(!!(await tab.$(gone)), false, gone + ' is not on the station');
     // Joe 10/12: Case Loadout loads 2 at a time and the made-up day has 2 loading, so one is paused (with its reason) first.
     const p808 = '#work .sw-card[data-sw="2026-10-04__run_p808|fri"]';
     await tab.click(p808 + ' [data-act="pause"]');
@@ -418,13 +418,13 @@ async function signOnce(page) {
     const loNo = await openPage(browser, 1536, 864, '/loadout.html?testEmail=' + RIGHTS, clock);
     await loNo.waitForSelector('#foot:has-text("View only: rights.test@uniteddairy.com is not allowed")');
     await loNo.close();
-    assert.equal(await noGrant.$('#work .sw-card:not(.done) [data-act="start"]:not([disabled])'), null, 'no Start without the role or the right');
+    assert.equal(!!(await noGrant.$('#work .sw-card:not(.done) [data-act="start"]:not([disabled])')), false, 'no Start without the role or the right');
     await noGrant.close();
     await db().collection('personRights').doc(RIGHTS).set({ grants: ['plant.loading.write'], denials: [] });
     const granted = await asRights();
     const gStart = '#work .sw-card:not(.done):not(.run):not(.paused) [data-act="start"]:not([disabled])';
     await granted.waitForSelector(gStart, { timeout: 10000 });
-    assert.equal(await granted.$('#work .sw-note'), null, 'no View only note for an account People & Roles allows');
+    assert.equal(!!(await granted.$('#work .sw-note')), false, 'no View only note for an account People & Roles allows');
     const gid = await granted.getAttribute('#work .sw-card:not(.done):not(.run):not(.paused) >> nth=0', 'data-sw');
     await granted.click('#work .sw-card[data-sw="' + gid + '"] [data-act="start"]');
     await granted.waitForSelector('#work .sw-card[data-sw="' + gid + '"].run .sw-badge:text-is("LOADING")', { timeout: 10000 });

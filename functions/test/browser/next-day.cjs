@@ -73,7 +73,7 @@ async function openPage(browser, url, w, h, now, opts) {
       await shot(page, 'next-day-wednesday-' + w);
       const body = await page.evaluate(() => document.body.innerText);
       assert.deepEqual((await routesOn(page)).sort(), ['808', '822', '855'], 'only Wednesday\'s own loads (' + w + ')');
-      assert.equal(await page.$('.divider.prior'), null, 'no PRIOR DAY LOADS before Tuesday\'s shift is over');
+      assert.equal(!!(await page.$('.divider.prior')), false, 'no PRIOR DAY LOADS before Tuesday\'s shift is over');
       assert.match(body, /Left over\s*0/);
       assert.match(body, /Behind\s*0/);
       assert.match(body, /Loading\s*0/, 'the truck being loaded on Tuesday does not show as loading on Wednesday');

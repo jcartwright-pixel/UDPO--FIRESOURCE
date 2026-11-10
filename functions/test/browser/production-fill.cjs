@@ -130,7 +130,7 @@ function ioModule() {
     await lt.waitForSelector('#controller:not([hidden]) [data-c="brand"]');
     assert.match(await lt.textContent('#controller'), /Add-on sensors · read-only/);
     assert.deepEqual(await lt.$$eval('#controller .lt-ctable tbody th', t => t.map(x => x.textContent)), ['Motor running', 'Jugs in (infeed eye)']);
-    assert.equal(await lt.$('#ctrl-key-btn'), null, 'the add-on sensors use the label reader\'s key');
+    assert.equal(!!(await lt.$('#ctrl-key-btn')), false, 'the add-on sensors use the label reader\'s key');
     await lt.selectOption('#controller [data-c="brand"]', 'MODBUS');
     await until('brand saved', async () => ((await lineDoc(GALLON)).controller || {}).brand === 'MODBUS');
     for (const [k, v] of [['ip', '127.0.0.1'], ['port', String(mod.port)], ['runningTag', '10001'], ['infeedTag', '30001']]) {

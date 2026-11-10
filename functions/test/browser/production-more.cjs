@@ -139,7 +139,7 @@ async function pickFirstProduct(tb) {
     await tb.press('#mp-body input[data-field="temp"]', 'Tab');
     await tb.waitForFunction(() => /1 OF 3 DONE/.test(document.getElementById('mp-badge').textContent));
     // Joe 10/26: the check is a list; OK / Not OK starts with neither picked, and a tap saves it.
-    assert.equal(await tb.$('#mp-body .lb-qrow button.on[data-field="capSeal"]'), null, 'OK / Not OK starts with neither picked');
+    assert.equal(!!(await tb.$('#mp-body .lb-qrow button.on[data-field="capSeal"]')), false, 'OK / Not OK starts with neither picked');
     await tb.click('#mp-body .lb-qrow button.yes[data-field="capSeal"]');
     await tb.waitForFunction(() => /2 OF 3 DONE/.test(document.getElementById('mp-badge').textContent) && !!document.querySelector('#mp-body .lb-qrow button.yes.on[data-field="capSeal"]'));
     await tb.fill('#mp-body input[data-field="temp"]', 'cold');
@@ -221,7 +221,7 @@ async function pickFirstProduct(tb) {
     // Stop reasons for the HTST (follow-on 1): its own twelve.
     await ht.click('#state-btns [data-go="down"]');
     await ht.waitForFunction(() => document.querySelectorAll('#reasons button').length === 10 && !!document.querySelector('#reasons [data-reason="Pump or flow problem"]'));
-    assert.equal(await ht.$('#reasons [data-reason="Filler jam"]'), null, 'no filler reasons on the HTST');
+    assert.equal(!!(await ht.$('#reasons [data-reason="Filler jam"]')), false, 'no filler reasons on the HTST');
     await shot(ht, 'more-tablet-htst-stopped-1024');
     await ht.click('#reasons [data-reason="Pump or flow problem"]');
     await ht.waitForSelector('#reasons [data-reason="Pump or flow problem"].on');
@@ -333,7 +333,7 @@ async function pickFirstProduct(tb) {
     }
     const tv = await openPage(browser, 1920, 1080, '/production.html?tv=1&' + ADMIN);
     await tv.waitForFunction(() => document.querySelectorAll('.pd-tile').length === 5);
-    assert.equal(await tv.$('.pd-more'), null, 'the TV stays as it was');
+    assert.equal(!!(await tv.$('.pd-more')), false, 'the TV stays as it was');
     assert.equal(await tv.isVisible('#filters'), false);
     assert.doesNotMatch(await tv.innerText('#screen'), /efficiency/i, 'efficiency is for managers only, not the TV (Joe 10/14)');
     await shot(tv, 'more-production-tv-1920');

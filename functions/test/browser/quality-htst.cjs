@@ -42,8 +42,8 @@ async function openPage(browser, url) {
     await desk.waitForSelector('#fields .prod-output:not([disabled])');
     assert.ok(await desk.$('#fields .prod-status option[value="CHANGEOVER"]'), 'HTST offers Changeover');
     await watcher.waitForFunction(() => document.getElementById('form-title').textContent === 'BOXING Quality Check');
-    assert.equal(await watcher.$('#fields .prod-output'), null, 'Boxing has no Remaining output');
-    assert.equal(await watcher.$('#fields .prod-status option[value="CHANGEOVER"]'), null, 'nor Changeover');
+    assert.equal(!!(await watcher.$('#fields .prod-output')), false, 'Boxing has no Remaining output');
+    assert.equal(!!(await watcher.$('#fields .prod-status option[value="CHANGEOVER"]')), false, 'nor Changeover');
     await desk.selectOption('#fields .prod-status', 'CHANGEOVER');
     await desk.fill('#fields .prod-output', '300 gal');
     await desk.press('#fields .prod-output', 'Tab');

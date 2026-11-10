@@ -180,7 +180,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       if (SHOTS) await sc.screenshot({ path: path.join(SHOTS, 'after-report-cases-' + w + '.png') });
       await sc.click('.sc-report-back');
       await sc.waitForSelector('tr[data-key="DRV_S_DIAZ"] .sc-go');
-      assert.equal(await sc.$('.sc-report'), null, 'Back returns to the board');
+      assert.equal(!!(await sc.$('.sc-report')), false, 'Back returns to the board');
       // Any area: the speeding grade lists each alert; the screen's Back button closes the report first.
       await sc.click('tr[data-key="DRV_S_DIAZ"] .sc-go[data-area="speeding"]');
       await sc.waitForSelector('.sc-report');
@@ -366,7 +366,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
       if (!BEFORE) {
         assert.equal(await sc.$$eval('.sc-board tr[data-key]', r => r.length), 0, 'no driver is listed from call-offs before 11-15-26');
         assert.match(await sc.textContent('.sc-board'), /The scorecard counts from 11-15-26 \(Settings\)/);
-        assert.equal(await sc.$('#unassigned'), null, 'No driver dispatched starts at the start date');
+        assert.equal(!!(await sc.$('#unassigned')), false, 'No driver dispatched starts at the start date');
         const foot = await sc.textContent('#foot');
         assert.match(foot, /counted from 11-15-26 \(Settings\)/);
         assert.ok(!/copied Live weeks/.test(foot), 'the footer no longer talks about copied Live weeks');
@@ -404,7 +404,7 @@ const heads = (page, sel) => page.$$eval(sel, t => t.map(x => x.textContent.repl
         assert.ok(box.l >= 0 && box.r <= 1536 && box.t >= 0 && box.b <= 760 && box.font >= 16, 'the pop-up fits the window with 16px text');
         await shot(sc, 'idling-popup');
         await sc.click('.sc-pop .sc-pop-close');
-        assert.equal(await sc.$('.sc-pop'), null);
+        assert.equal(!!(await sc.$('.sc-pop')), false);
         await sc.click('#cats [data-tab="inspection"]');
         assert.ok(!/No inspection done/.test(await sc.textContent('.sc-board')), 'a miss that costs 0 is not listed');
         assert.deepEqual(sc.errors, []);

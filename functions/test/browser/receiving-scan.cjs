@@ -137,7 +137,7 @@ async function wasp(page, parts) {
     await page.waitForSelector('.scan-camera video');
     await page.evaluate(() => { window.cameraSees = '96385074'; });
     await page.waitForSelector(card + ' tr.rv-new:has-text("96385074")', { timeout: 10000 });
-    assert.equal(await page.$('.scan-camera'), null, 'the camera closes after a read');
+    assert.equal(!!(await page.$('.scan-camera')), false, 'the camera closes after a read');
     await scanned(d => d.length === 4, 'the camera scan');
     // The sum line, text sizes and fit.
     assert.match(await page.textContent(card + ' .rv-sum'), /^17 cases · 3 items · each scan saves itself$/);

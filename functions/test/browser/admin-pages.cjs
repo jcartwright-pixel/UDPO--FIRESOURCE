@@ -64,14 +64,14 @@ async function until(check, what) {
     assert.match(await p.getAttribute('#to-hub', 'href'), /^https:\/\/ud-distribution-sandbox-hub\.web\.app\/people\.html$/);
     assert.match(await p.textContent('.adm-hubnote'), /changed in the United Dairy Hub now/);
     assert.deepEqual(pills, [], 'nothing in Administration says Being built or View only: ' + pills.join(', '));
-    assert.equal(await p.$('.adm-state'), null);
+    assert.equal(!!(await p.$('.adm-state')), false);
     assert.equal(/Users sheet; editing here is being built/.test(await p.textContent('#view')), false);
     assert.deepEqual(await p.$$eval('#view .ap-bar > button', b => b.map(x => x.textContent)), ['+ Add Person', '+ Add Role', 'Refresh']);
     assert.ok(await oneLine(p));
     // Review items 51-53 (Joe 10/13): the side menu is words only; People & Roles has no info boxes; an email address never
     // breaks mid-word (each piece, before and after the @, stays on one line).
     assert.equal(await p.$$eval('.adm-nav .adm-item svg, .adm-nav .adm-item img, .adm-nav .adm-ic', x => x.length), 0);
-    assert.equal(await p.$('#view .ap-tiles'), null);
+    assert.equal(!!(await p.$('#view .ap-tiles')), false);
     assert.equal(await emailsWhole(p), true);
     // Joe 10/13: typing "conflicts" in Find a setting finds Sheet Conflicts under Diagnostics.
     await p.fill('#find', 'conflicts');
@@ -127,7 +127,7 @@ async function until(check, what) {
     assert.ok(await oneLine(p));
     await shot(p, 'role-templates-1920.png');
     // Batch 5: no Save Role Template button; a tick saves as soon as it is changed, and unticking it puts the role back.
-    assert.equal(await p.$('#rt-save'), null, 'no Save Role Template button');
+    assert.equal(!!(await p.$('#rt-save')), false, 'no Save Role Template button');
     const tick = await p.$eval('#rt-body input[data-code]:not(:checked)', i => i.dataset.code);
     const rtDoc = async () => ((await db().collection('private').doc('roleTemplates').get()).data() || {}).templates || {};
     await p.check('#rt-body input[data-code="' + tick + '"]');
@@ -178,7 +178,7 @@ async function until(check, what) {
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public', 'line']);
     assert.equal(await p.$$eval('#st-list .ap-item', l => l.length), 6); // Joe 11-4-26: + Case Loadout & Yard Services
     // The release codes moved to Manager Links: one line here points there.
-    assert.equal(await p.$('#sc-list'), null);
+    assert.equal(!!(await p.$('#sc-list')), false);
     await shot(p, 'plant-station-codes-1920.png');
     await p.click('#release-moved a');
     await p.waitForSelector('.adm-item.on[data-key="app-links"]');
@@ -191,7 +191,7 @@ async function until(check, what) {
     await p.fill('#rr-new-name', 'Plant Management');
     await p.fill('#rr-new-to', 'mgr@uniteddairy.com, gm@uniteddairy.com');
     // Batch 5: a new group keeps one Add Group button; a group already there saves when its box is left.
-    assert.equal(await p.$('#rr-save'), null, 'no Save button');
+    assert.equal(!!(await p.$('#rr-save')), false, 'no Save button');
     await p.click('#rr-add');
     await p.waitForSelector('#rr-list [data-group="Plant Management"]');
     assert.equal(await p.inputValue('#rr-new-name'), '');
@@ -301,7 +301,7 @@ async function until(check, what) {
     // Batch 2: email, schedules and diagnostics (js/admin-tools.js).
     await open('repair-email', '#re-where input');
     // Batch 5: no Save button; the box saves when it is left and the drop-down when it is picked.
-    assert.equal(await p.$('#re-save'), null, 'no Save button');
+    assert.equal(!!(await p.$('#re-save')), false, 'no Save button');
     await p.fill('[data-emails="PENSKE"]', 'repairs@penske.com');
     await p.press('[data-emails="PENSKE"]', 'Tab');
     await p.selectOption('[data-mode="PENSKE"]', 'IMMEDIATE');
@@ -317,7 +317,7 @@ async function until(check, what) {
     // The field shows before the saved settings load into it; wait for the load.
     await p.waitForFunction(() => document.getElementById('ce-from').value !== '', null, { timeout: 10000 }).catch(() => {});
     assert.equal(await p.inputValue('#ce-from'), 'callcenter@lauttamus.com');
-    assert.equal(await p.$('#ce-save'), null, 'no Save button');
+    assert.equal(!!(await p.$('#ce-save')), false, 'no Save button');
     await p.check('#ce-on');
     await p.waitForFunction(() => /^ON/.test(document.querySelector('#ce-status .ap-item').textContent));
     await p.click('#ce-now');
@@ -326,7 +326,7 @@ async function until(check, what) {
     await shot(p, 'checkin-email-1920.png');
 
     await open('refresh-rates', '#rr2-rows tr');
-    assert.equal(await p.$('[data-save="checkinMail"]'), null, 'no Save rate button');
+    assert.equal(!!(await p.$('[data-save="checkinMail"]')), false, 'no Save rate button');
     await p.selectOption('[data-minutes="checkinMail"]', '30');
     await until(async () => { const r = (await db().collection('private').doc('refreshRates').get()).data(); return r && r.jobs && r.jobs.checkinMail && r.jobs.checkinMail.minutes === 30; }, 'Refresh rate saved');
     await p.waitForFunction(() => /Saved /.test(document.getElementById('rr2-rows').textContent));

@@ -92,7 +92,7 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     // ---------- E: a supervisor opens Inventory ----------
     const sv = await openPage(browser, 1536, 790, '/inventory.html?' + SUPER);
     await sv.waitForFunction(() => /GALLON JUGS/i.test(document.getElementById('oh-rows').innerText));
-    assert.equal(await sv.$('#uc-refused'), null, 'Inventory is open to everyone in the plant');
+    assert.equal(!!(await sv.$('#uc-refused')), false, 'Inventory is open to everyone in the plant');
     await sv.close();
 
     const inv = await openPage(browser, 1536, 790, '/inventory.html?' + ADMIN);

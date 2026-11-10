@@ -69,7 +69,7 @@ const R802 = 'tr[data-id="2026-10-04__run_t802|tue"]';
       assert.equal(d.status, 'DELETED');
       assert.equal(d.name, 'BROOK, SAM', 'the name is kept for old loads');
       await p.waitForTimeout(500);
-      assert.equal(await p.$(BROOK), null, 'still off the roster after the save came back');
+      assert.equal(!!(await p.$(BROOK)), false, 'still off the roster after the save came back');
       assert.ok(await p.$(DUNN), 'the Inactive driver stays on the roster');
       await shot(p, 'roster-after-delete-' + w + '.png');
       assert.deepEqual(p.errors, []);
