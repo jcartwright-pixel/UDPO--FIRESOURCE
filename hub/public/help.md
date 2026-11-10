@@ -253,6 +253,25 @@ The same screen also reads the weekly report of cases and sales by route and sto
 
 !> Do not take the label off the report emails, or the Hub will not find the next one.
 
+## Customer Changes
+id: changes
+screens: changes.html
+
+Every change to the route customer list comes here first, from every app: Customers & Routes, the Pallet Builder, Route Cost Analysis and the others. Nothing is saved to the customer list until an administrator approves it here. Until then, the app that sent it keeps the change as its own working copy. Administrators only.
+
+1. Pick the **Plant**, or leave **Every plant**.
+2. Read each card under **Waiting**: what the change is, the plant, route and day, the app it came from, who sent it and when.
+3. Press `Approve` to let the customer list save it. The card moves to **Done** and says when the customer list has saved it.
+4. Or type why in the box and press `Turn down`. The person who sent it sees your reason.
+
+### Buttons
+- `Approve`: the customer list saves the change.
+- `Turn down`: the change is not saved. A reason is needed.
+
+> A change that the customer list could not save (for example, someone changed the same route day after it was sent) shows under **Done** as "The customer list could not save it". Send it again from the app.
+
+!> Do not approve a change you have not read. Once it is saved, the customer list and every app that reads it change.
+
 ## Daily BOL
 id: bol
 screens: bol.html

@@ -2,8 +2,11 @@ name: Distribution app tests
 
 # The new Firebase distribution app (this repository). Runs its tests against Google's local emulators with
 # made-up sheets: no Firebase project, no Google Sheets and no production data are touched.
+# A branch is tested once, through its pull request (its push ran the same tests a second time, on a second machine, at the
+# same moment, and a red push run blocked a green pull request run); main is tested on every push, which starts the release.
 on:
   push:
+    branches: [main]
     paths:
       - '**'
       - '.github/workflows/tests.yml'
@@ -44,11 +47,26 @@ jobs:
       - name: Database tests on the local emulator (transfer, saves, security rules)
         run: npm run test:emulator
       - name: Install the test browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium && (command -v gdb || sudo apt-get install -y -q gdb)
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
         # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
         # saves mid-test and made the Route Editor checks time out.
-        run: mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" npm run test:browser
+        # In parts, fresh emulators each (tools/browser-parts.cjs): one long session ran the machine out of memory.
+        # 11-9-26: the job kept being killed for memory part way through. Every 20 seconds the log shows the memory used and
+        # the biggest programs (lines starting MEMORY), so the next kill shows which one grew.
+        # 11-10-26: one node program jumps from about 250 MB to 12 GB within 40 seconds, about 10 minutes into a part (seen in
+        # plant-station-boxing and after plant-order). Every 5 seconds now, with each program's command line, and no node
+        # program may take more than 4 GB: it stops with "heap limit" and its name instead of taking the machine down.
+        # 11-10-26: plant-load-numbers grew past 13 GB with the 4 GB limit on (the memory is outside the JavaScript heap).
+        # tools/memory-guard.sh now checks every second and stops any screen test past 3 GB (lines starting STUCK).
+        # 11-10-26: in 4 parts, not 3 (shorter emulator sessions). plant-load-numbers still locks up on some runs; when it
+        # does, memory-guard.sh prints its native stack (STUCK bt) before stopping it.
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports
+          REPORTS: ${{ runner.temp }}/node-reports
+        run: |
+          bash ../tools/memory-guard.sh &
+          mkdir -p "$RUNNER_TEMP/shots" && SHOTS_DIR="$RUNNER_TEMP/shots" node ../tools/browser-parts.cjs 4
       - name: Keep the screen pictures
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,3 +75,18 @@ jobs:
           path: ${{ runner.temp }}/shots/
           if-no-files-found: ignore
           retention-days: 14
+
+  # The release (release.yml) starts when these tests finish green on main. A run started by auto-merge.yml (a merge made
+  # by the workflow's own token, so no push run) cannot start it that way: GitHub starts no workflow_run from it. So a
+  # green run that was started by hand on main starts the release itself (11-10-26: 720 and 722 merged this way and sat).
+  release:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Start the release for this tested code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "${{ github.repository }}" --ref main

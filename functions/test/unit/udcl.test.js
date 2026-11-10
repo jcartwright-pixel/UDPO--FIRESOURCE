@@ -57,7 +57,7 @@ test('the drivers\' phone gets the Route Book: stops in run order with address, 
   assert.equal(book.found, true);
   assert.equal(book.startTime, '4:00 AM');
   assert.equal(book.notes, 'Call first');
-  assert.deepEqual(book.stops.map(x => x.name), ['BEST FOODS #2', 'ACME MARKET', 'OLD STORE']);
+  assert.deepEqual(book.stops.map(x => x.name), ['BEST FOODS #2', 'ACME MARKET'], 'a customer no longer active is left off, as on the Hub\'s copy');
   assert.equal(book.stops[0].keys, 'Ring 4');
   assert.equal(book.stops[1].address, '1 MAIN ST, TOWN, PA 15401');
   assert.equal(book.stops[1].note, 'Two cases');

@@ -495,9 +495,32 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   // the route list still says "8:45 AM late" and the banner still says loaded late.
   assert.doesNotMatch(plain, /Already loaded, but late/);
   assert.match(plain, /2 of 3 loaded 1 left to load [^]*Case Loadout [^]*On time Done about 10:50 AM/);
-  assert.match(plain, /855 Save-A-Lot 1 8:45 AM late 8:00 AM/);
+  // Joe 11-9-26: the loaded-late row keeps the late color (yellow here, 45 minutes) and shows the time it was loaded, not "late".
+  assert.match(plain, /855 Save-A-Lot 1 8:45 AM 8:00 AM/);
+  assert.match(html, /background:#f5c518[^>]*>855<\/td>/);
+  assert.doesNotMatch(plain, /8:45 AM late/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
   assert.doesNotMatch(r.text, /LOADED LATE \(/);
+});
+
+// Joe 11-9-26 ("instead of late, should show the time that it was loaded in red. Just like it is"): a late row stays red.
+// Loaded, it shows the time it was loaded; not loaded yet, when it should be loaded (its est. time) instead of the word LATE.
+test('a late row stays red and shows a time instead of LATE', () => {
+  const SUN = '2026-11-01', at = Date.parse('2026-11-01T19:45:00Z'); // Sunday 2:45 PM
+  const row = (id, route, run, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', quantity: 900, dispatchTime: dispatch, prior: false, loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day' }, extra);
+  const loads = [row('s1', '855', 'SAVE-A-LOT 1', H(8), { state: 'DONE', startedAt: '2026-11-01T12:00:00Z', completedAt: '2026-11-01T15:20:00Z' }),
+    row('j1', '852', 'UT JERSEY LOAD 1', H(13), { state: 'WAITING', quantity: 300 }),
+    row('w1', '827', 'WALMART', H(23), { state: 'WAITING', quantity: 300 })];
+  const r = R.plantReport({ loads, forecast: R.loadForecast({ date: SUN, loads }, at) }, at);
+  assert.equal(r.loaded.find(x => x.route === '855').tone, 'late', 'loaded 2 hours 20 minutes after its dispatch: red');
+  assert.deepEqual(r.behind.map(x => x.route), ['852']);
+  const html = R.reportHtml(r, ''), plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const est = r.forecast.loads.find(x => x.id === 'j1').estText;
+  assert.match(html, /background:#b42318[^>]*>855<\/td>/, 'loaded late: the row stays red');
+  assert.match(plain, /855 Save-A-Lot 1 10:20 AM 8:00 AM/, 'and shows the time it was loaded');
+  assert.match(html, /background:#b42318[^>]*>852<\/td>/, 'late, not loaded: the row stays red');
+  assert.ok(plain.includes('852 Jersey L1 est. ' + est + ' 1:00 PM'), 'and shows when it should be loaded');
+  assert.doesNotMatch(plain, /\bLATE 1:00 PM|10:20 AM late/);
 });
 
 // Joe 11/3 (built-2-by-area): the recap box has one line per area, in the order Case, Boxing, Tote, Tanker, and an area
@@ -605,12 +628,33 @@ test('the email shows when all case loads are done and each truck time with its 
   });
   const html = R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads, forecast }, NOW))), '');
   assert.match(html, /CASE LOADOUT FORECAST AS OF 7:00 PM/);
-  assert.match(html, new RegExp('ALL CASE LOADS DONE ABOUT ' + forecast.allDoneWhen.toUpperCase()));
-  assert.match(html, /TIME TO SPARE/);
-  assert.match(html, t.some(g => g.late) ? /TRUCK TIMES? WILL BE LATE/ : /EVERY TRUCK READY IN TIME/);
+  // Joe 11-9-26: the box shows only the forecast done time (and a red line when a truck will be late), no list of loads.
+  assert.match(html, new RegExp('FORECAST TO BE DONE ' + forecast.allDoneWhen.toUpperCase()));
+  assert.doesNotMatch(html, /TIME TO SPARE|TRUCK LEAVES|EVERY TRUCK READY/);
+  if (t.some(g => g.late)) assert.match(html, /TRUCK TIMES? WILL BE LATE/); else assert.doesNotMatch(html, /TRUCK TIMES? WILL BE LATE/);
   // An outside carrier's load is not a truck time.
   const outside = R.truckTimes({ loads: [{ leaves: 100, est: 50, outside: true }, { leaves: 200, est: 150 }] });
   assert.deepEqual(outside.map(g => [g.at, g.loads, g.spareText]), [[200, 1, '50 MIN']]);
   // With no forecast the box is not there.
   assert.doesNotMatch(R.reportHtml(JSON.parse(JSON.stringify(R.plantReport({ loads }, NOW))), ''), /CASE LOADOUT FORECAST/);
+});
+
+// Joe 11-9-26 (8:06 AM report said every case load done by Mon 11:15 PM: "our day shift doesn't load that many trucks"): in the
+// morning, only the trucks leaving before midnight are loaded; the trucks leaving after midnight wait for the night shift (4:00 PM).
+test('in the morning the trucks leaving after midnight wait for the night shift at 4:00 PM', () => {
+  const D = '2026-11-09', E = '2026-11-10', at = Date.parse('2026-11-09T13:06:00Z'); // Monday 8:06 AM in New York
+  const w = (route, dispatch, leavesDay) => ({ id: route, route, run: '', area: 'CASE', state: 'WAITING', loadDate: D, deliveryDate: E, departureDate: leavesDay, dispatchTime: dispatch, quantity: 1000, prior: false });
+  // Sheet order: a Tuesday 5:30 AM truck sits between two Monday afternoon trucks.
+  const loads = [w('852', H(13), D), w('825', H(5, 30), E), w('856', H(15), D), w('6304', H(1), E)];
+  const f = R.loadForecast({ date: D, loads, history: [] }, at);
+  const by = {}; f.loads.forEach(x => { by[x.route] = x; });
+  const four = (Date.UTC(2026, 10, 9) / 86400000) * 1440 + H(16);
+  assert.ok(by['852'].est < four && by['856'].est < four, 'the day shift loads the Monday afternoon trucks');
+  assert.ok(by['825'].start >= four && by['6304'].start >= four, 'the trucks leaving after midnight start at 4:00 PM or later');
+  assert.ok(by['825'].start < by['6304'].start, 'the night loads keep their own order');
+  assert.ok(by['856'].start < by['825'].start, 'a Monday truck is not stuck behind a night load');
+  assert.equal(f.allDoneWhen, 'Mon 6:00 PM');
+  // After 4:00 PM nothing waits.
+  const evening = R.loadForecast({ date: D, loads, history: [] }, Date.parse('2026-11-09T22:00:00Z'));
+  assert.equal(evening.loads[0].start, (Date.UTC(2026, 10, 9) / 86400000) * 1440 + H(17));
 });

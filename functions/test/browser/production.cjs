@@ -72,7 +72,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
       const lt = await openPage(browser, w, h, '/linetargets.html?line=' + LINE + '&' + ADMIN);
       await lt.waitForFunction(() => document.querySelectorAll('#rows tr').length > 5 && document.getElementById('form-title').textContent === 'GALLON FILLER');
       // Review item 31 (Joe 10/13): no plant drop-down inside a plant.
-      assert.equal(await lt.$('#plant'), null, 'no plant drop-down on Line Targets');
+      assert.equal(!!(await lt.$('#plant')), false, 'no plant drop-down on Line Targets');
       assert.equal(await lt.textContent('#plant-name'), 'Uniontown');
       const first = await lt.$$eval('#rows tr:first-child td', t => t.map(x => x.querySelector('input') ? x.querySelector('input').value : x.textContent));
       assert.deepEqual([first[0], first[4], first[5], first[8]], ['Broughton 2% Gallon', '74', '57.3', '2,544'], 'RedZone\'s Rate/Min and Target % give 2,544 an hour');
@@ -128,13 +128,13 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     await tb.click('#enter-count');
     await tb.fill('#count-box', '1250');
     // Review item 38 (Joe 10/13): no Save Count button; leaving the box saves the count, once.
-    assert.equal(await tb.$('#count-save'), null, 'no Save Count button');
+    assert.equal(!!(await tb.$('#count-save')), false, 'no Save Count button');
     await tb.press('#count-box', 'Tab');
     await tb.waitForFunction(() => document.getElementById('made').textContent === '1,250');
     // Joe 10/26 (mock-up 3): Down starts the clock and asks why; Changeover and Sanitation / CIP are not reasons (they have their own buttons).
     await tb.click('#state-btns [data-go="down"]');
     await tb.waitForFunction(() => document.getElementById('state-name').textContent === 'DOWN' && /\d:\d\d:\d\d/.test(document.getElementById('timer').textContent) && document.querySelectorAll('#reasons button').length === 10);
-    assert.equal(await tb.$('#reasons [data-reason="Changeover"]'), null, 'no Changeover reason');
+    assert.equal(!!(await tb.$('#reasons [data-reason="Changeover"]')), false, 'no Changeover reason');
     await shot(tb, 'line-tablet-stopped-1280');
     await tb.click('#reasons button[data-reason="Caser jam"]');
     await tb.waitForFunction(() => document.querySelector('#reasons button.on') && document.querySelector('#reasons button.on').textContent === 'Caser jam');
@@ -175,7 +175,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     assert.equal(await tb.textContent('#speed'), '80 / min');
     assert.equal(await tb.textContent('#speed-flag'), 'TOO FAST');
     assert.match(await tb.textContent('#live'), /Label reader on/);
-    assert.equal(await tb.$('#enter-count:not([hidden])'), null, 'no typed count when the reader counts');
+    assert.equal(!!(await tb.$('#enter-count:not([hidden])')), false, 'no typed count when the reader counts');
     assert.match(await tb.textContent('#status-text'), /needs a reason/i);
     await shot(tb, 'line-tablet-1280');
     await tb.setViewportSize({ width: 390, height: 844 });
@@ -190,7 +190,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
       await pl.waitForFunction(() => document.querySelectorAll('.pd-tile').length === 5);
       assert.ok(await pl.$('.pd-tile.flash[data-line="' + LINE + '"]'), 'the Gallon Filler flashes');
       assert.match(await pl.textContent('.pd-tile[data-line="' + LINE + '"] .pd-speed'), /TOO FAST 80\/MIN/);
-      assert.equal(await pl.$('#plant'), null, 'no plant drop-down on Production Lines (review item 31)');
+      assert.equal(!!(await pl.$('#plant')), false, 'no plant drop-down on Production Lines (review item 31)');
       assert.deepEqual(await pl.$$eval('.sidemenu > a:not(.side-name)', a => a.map(x => x.textContent.trim())), ['Production Lines', 'Line Tablet', 'Line Targets', 'Production TV', 'Quality Checks', 'Cooler Temperature', 'Shift Notes']); // Joe 10/25: moved in; Joe 10/26: the side opens on its front page, so Production Lines is listed too
       await fits(pl, 'Production Lines at ' + w);
       await shot(pl, 'production-lines-' + w);
@@ -251,7 +251,7 @@ const gallon = async () => ((await db().collection('plantProducts').doc(LINE).ge
     for (const id of IDS) await db().collection('productionRuns').doc(P.runId(id, shiftKey)).delete();
     await lt.click('[data-line="ut_prod_boxing"]');
     await lt.waitForFunction(() => /counted by typing/.test(document.getElementById('reader').textContent));
-    assert.equal(await lt.$('#make-key'), null, 'no line key until the line is counted by a label reader');
+    assert.equal(!!(await lt.$('#make-key')), false, 'no line key until the line is counted by a label reader');
     await lt.click('#start-all');
     await lt.waitForFunction(() => /Test feed on 5 lines/.test(document.getElementById('reader').textContent));
     await lt.waitForSelector('#stop-all');

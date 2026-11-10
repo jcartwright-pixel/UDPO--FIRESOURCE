@@ -84,7 +84,7 @@ const PAGE = `<!doctype html><meta charset="utf-8"><input id="scan"><input id="n
     await page.waitForSelector('.scan-camera video');
     await page.evaluate(() => { window.cameraSees = '(01)10614141000415(10)HG-0930'; });
     assert.equal(await read, '(01)10614141000415(10)HG-0930');
-    assert.equal(await page.$('.scan-camera'), null, 'the camera closes after a read');
+    assert.equal(!!(await page.$('.scan-camera')), false, 'the camera closes after a read');
     // Close without a read.
     const none = page.evaluate(() => { window.cameraSees = ''; return window.camera(); });
     await page.click('.scan-camera-close');

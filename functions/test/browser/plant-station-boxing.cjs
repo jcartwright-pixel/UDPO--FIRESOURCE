@@ -93,7 +93,7 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     for (let i = 0; i < 100 && (await db().collection('runs').doc('2026-10-04__run_p808').get()).data().days.fri.loadStatus !== 'PAUSED'; i++) await new Promise(r => setTimeout(r, 100));
     await cs.click(cc('p811|fri') + ' [data-act="start"]');
     await cs.waitForSelector(cc('p811|fri') + '.run .sw-badge:text-is("LOADING")', { timeout: 10000 });
-    assert.equal(await cs.$(cc('p811|fri') + ' .sw-refuse'), null, 'the refusal goes once the load starts');
+    assert.equal(!!(await cs.$(cc('p811|fri') + ' .sw-refuse')), false, 'the refusal goes once the load starts');
     for (let i = 0; i < 100 && !(await db().collection('runs').doc('2026-10-04__run_p811').get()).data().days.fri.plantStartedAt; i++) await new Promise(r => setTimeout(r, 100));
     // Resuming 808 needs room: refused until one is finished.
     await cs.click(cc('p808|fri') + ' [data-act="resume"]');
@@ -137,7 +137,7 @@ const sizes = (page, sel) => page.$$eval(sel, els => els.map(e => parseFloat(get
     const card = (id) => '#work .sw-card[data-sw="' + id + '"]';
     await page.waitForSelector(card('sch:SCHED-a1') + '.by-branch', { timeout: 15000 });
     await page.waitForSelector('#work .sw-card.by-branch .route:text-is("907_1")');
-    assert.equal(await page.$(card('sch:SCHED-s1')), null, 'the Scheduler\'s Sun Valley pickup is worked on the 849 box load card');
+    assert.equal(!!(await page.$(card('sch:SCHED-s1'))), false, 'the Scheduler\'s Sun Valley pickup is worked on the 849 box load card');
     assert.equal(await page.textContent('#work .sw-card.by-carrier .route'), '849');
     assert.deepEqual(await page.$$eval('.sw-legend span', s => s.map(x => x.textContent)), ['Uniontown truck', 'Branch', 'Carrier']);
     assert.ok((await sizes(page, '.sw-legend span, .sw-who, .ps-count')).every(n => n >= 16), 'legend, labels and counts are 16px or more');

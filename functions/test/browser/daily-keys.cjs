@@ -44,7 +44,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     // A click selects the cell; no list opens.
     await p.click(R801 + ' td[data-edit="truck"]');
     assert.equal(await at(p), 'run_t801|tue truck');
-    assert.equal(await p.$('.cell-pop'), null, 'a click does not open the list');
+    assert.equal(!!(await p.$('.cell-pop')), false, 'a click does not open the list');
 
     // Down / Up / Enter move in the column; Tab / Right across; Shift+Tab back.
     await p.keyboard.press('ArrowDown');
@@ -83,7 +83,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.waitForSelector('.cell-pop [data-i].active');
     assert.equal(await p.textContent('.cell-pop [data-i].active'), 'T-901');
     await p.keyboard.press('Escape');
-    assert.equal(await p.$('.cell-pop'), null);
+    assert.equal(!!(await p.$('.cell-pop')), false);
     assert.equal(await text(p, R801, 6), 'T-902', 'Esc kept T-902');
     assert.equal(await at(p), 'run_t801|tue trailer');
     results.push('typing 901 found T-901; Esc kept T-902');
@@ -104,7 +104,7 @@ const text = (p, row, i) => p.evaluate(([s, n]) => document.querySelector(s).chi
     await p.waitForSelector('.cell-pop p');
     await p.click('.head .title h1');
     await p.waitForFunction((s) => document.querySelector(s).children[6].textContent === 'T-778', R801, { timeout: 8000 });
-    assert.equal(await p.$('.cell-pop'), null);
+    assert.equal(!!(await p.$('.cell-pop')), false);
     await p.click(R801 + ' td[data-edit="trailer"]');
     assert.equal(await at(p), 'run_t801|tue trailer');
     // An empty box still keeps the old one when the click goes elsewhere.

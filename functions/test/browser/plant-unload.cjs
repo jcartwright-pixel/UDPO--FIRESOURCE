@@ -111,7 +111,7 @@ async function shots(page, name, w) {
     await dock.click(row('812') + ' button.clock');
     await dock.waitForFunction(() => /Two trailers are unloading now .*Finish one before starting another/.test(document.getElementById('error').textContent));
     await new Promise(r => setTimeout(r, 1500));
-    assert.equal(await dock.$(row('812') + '.loading'), null, 'a third trailer does not start');
+    assert.equal(!!(await dock.$(row('812') + '.loading')), false, 'a third trailer does not start');
     assert.match(await dock.textContent('#foot'), /Up to two unloads at a time/);
     results.push('Start on 811 while 805 is unloading: both unloading; Start on 812 then: "Two trailers are unloading now (...). Finish one before starting another."');
     await dock.click(row('805') + ' button.clock.end');
@@ -131,7 +131,7 @@ async function shots(page, name, w) {
     await dock.fill('#rows [data-e="trailer"]', '977');
     if (SHOTS) await dock.screenshot({ path: path.join(SHOTS, 'unloading-edit-1920.png'), scale: 'css' });
     // Review item 38 (Joe 10/13): no Save button on the edit line; leaving the box saves it.
-    assert.equal(await dock.$('#rows [data-do="editsave"]'), null, 'no Save button on the edit line');
+    assert.equal(!!(await dock.$('#rows [data-do="editsave"]')), false, 'no Save button on the edit line');
     await dock.press('#rows [data-e="trailer"]', 'Tab');
     await watcher.waitForFunction(() => /T-977/.test(document.querySelector('tr[data-key$="|811|UT DSD MILK"]').textContent), null, { timeout: 8000 }).catch(async e => {
       console.error('DEBUG2', await dock.textContent('#error'), await dock.innerHTML(row('811')).catch(() => 'gone'), await watcher.innerHTML(row('811')).catch(() => 'gone'));

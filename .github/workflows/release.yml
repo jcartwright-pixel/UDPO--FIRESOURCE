@@ -1,0 +1,62 @@
+name: Release (automatic, practice copy then live)
+
+# Joe 11-9-26: "This needs to be pushed and deployed automatically. I shouldn't have to do anything anymore."
+# When "Distribution app tests" pass on main (unit, database and every screen test), this puts that same code on the
+# practice copy (deploy.yml, target sandbox: its own tests, the deploy, then the checks that the deployed app answers and
+# its styles applied), and only if all of that passes, on the live app (deploy.yml, target production, same checks).
+# Nothing goes live from a red test, from a branch, or from code newer than the code that was tested.
+# The live step uses the GitHub environment distribution-production: with a required reviewer there, it still waits for
+# that person's Approve; with none, it goes live by itself.
+# Run workflow here starts the same release by hand for the newest main (after a test run was only a blip, say).
+# A merge made by auto-merge.yml starts the main tests by hand (workflow_dispatch), so that run counts the same as a push.
+on:
+  workflow_run:
+    workflows: [Distribution app tests]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-distribution-app
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # Only a green test run on a push to main, and only while that tested code is still the newest main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
+    runs-on: ubuntu-24.04
+    outputs:
+      go: ${{ steps.newest.outputs.go }}
+    steps:
+      - name: Tested code is the newest main
+        id: newest
+        env:
+          TESTED: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          newest=$(git ls-remote "https://github.com/$REPO.git" refs/heads/main | cut -f1)
+          if [ "$newest" = "$TESTED" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; echo "Releasing $TESTED"
+          else echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice::Main moved on ($newest) after the tested code ($TESTED); the newer code's own test run releases it."; fi
+
+  practice-copy:
+    needs: check
+    if: needs.check.outputs.go == 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: sandbox
+    secrets: inherit
+
+  live:
+    needs: practice-copy
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: production
+      confirm: DEPLOY PRODUCTION
+    secrets: inherit

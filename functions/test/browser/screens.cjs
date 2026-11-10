@@ -120,8 +120,8 @@ async function noScroll(page) {
 
     // Joe 10/12: no grab dots and no arrows. A dispatcher cannot move lines; a manager grabs 802's line and drags it above 801,
     // and the order saves as one call.
-    assert.equal(await editor.$('#rows tr.mover'), null, 'a dispatcher cannot move lines');
-    assert.equal(await watcher.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows');
+    assert.equal(!!(await editor.$('#rows tr.mover')), false, 'a dispatcher cannot move lines');
+    assert.equal(!!(await watcher.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]')), false, 'no grab dots and no arrows');
     await watcher.waitForSelector('tr[data-id="2026-10-04__run_t802|tue"].mover');
     assert.equal(await watcher.$eval('tr[data-id="2026-10-04__run_t802|tue"] td.route', td => getComputedStyle(td).cursor), 'grab', 'the line shows the hand');
     {
@@ -320,7 +320,7 @@ async function noScroll(page) {
     await wkEdit.goBack();
     await wkEdit.waitForFunction(() => [...document.querySelectorAll('#rows tr')].some(tr => tr.children[0].textContent === '802' && tr.children[6].classList.contains('c-needs')), null, { timeout: 8000 });
     // Joe 10/10: no tab buttons; the menu's Driver Assignment Board opens Weekly at the board (the test sign-in rides on the address).
-    assert.equal(await wkEdit.$('#tab-board'), null, 'no tab buttons');
+    assert.equal(!!(await wkEdit.$('#tab-board')), false, 'no tab buttons');
     await wkEdit.$eval('.side-flyouts a[href="weekly.html#board"]', a => { a.href = 'weekly.html?week=2026-10-04&testEmail=dispatch.test@uniteddairy.com#board'; a.click(); });
     // The link reloads the page: while the new page has no body yet, keep waiting instead of failing on it.
     await wkEdit.waitForFunction(() => !!document.body && document.body.dataset.view === 'board' && !!document.getElementById('board-panel') && document.getElementById('board-panel').getBoundingClientRect().top < innerHeight, null, { timeout: 8000 });
@@ -369,8 +369,8 @@ async function noScroll(page) {
     assert.ok(rsFit.scroll <= rsFit.inner, 'Weekly still fits after Reset Week');
     if (SHOTS) await wkMgr.screenshot({ path: path.join(SHOTS, 'weekly-after-reset-1366.png') });
     // Joe 10/12 ("grab the line and move it"): Weekly lines drag too, no arrows and no dots; a dispatcher cannot move them.
-    assert.equal(await wkEdit.$('#rows tr.mover'), null, 'a dispatcher cannot move Weekly lines');
-    assert.equal(await wkMgr.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]'), null, 'no grab dots and no arrows on Weekly');
+    assert.equal(!!(await wkEdit.$('#rows tr.mover')), false, 'a dispatcher cannot move Weekly lines');
+    assert.equal(!!(await wkMgr.$('#rows [data-grip], #rows .dd-grip, #rows button[data-move]')), false, 'no grab dots and no arrows on Weekly');
     await wkMgr.waitForSelector('#rows tr.mover');
     assert.equal(await wkMgr.$eval('#rows tr.mover td', td => getComputedStyle(td).cursor), 'grab', 'the Weekly line shows the hand');
     {
@@ -384,7 +384,7 @@ async function noScroll(page) {
       await wkMgr.mouse.up();
       const want = [was[1], was[0]].concat(was.slice(2)).join(',');
       await wkMgr.waitForFunction((w) => [...document.querySelectorAll('#rows tr.mover')].map(tr => tr.children[0].textContent + '/' + tr.children[1].textContent).join(',') === w, want, { timeout: 5000 });
-      assert.equal(await wkMgr.$('.popover'), null, 'letting go of a drag does not open a day');
+      assert.equal(!!(await wkMgr.$('.popover')), false, 'letting go of a drag does not open a day');
       results.push('Weekly: a manager dragged ' + was[1] + ' above ' + was[0] + ' (no arrows, no dots); a dispatcher sees no drag');
     }
     results.push('Reset Week: a dispatcher cannot; a manager clicked twice: 802 Tuesday CARRIER went back to its standard driver CASEY, who is called off that day, so it is red as Driver Off - Needs Driver (Joe 10/11); Thursday off again; Monday still Vacation - Needs Driver');
@@ -677,7 +677,7 @@ async function noScroll(page) {
     await roster.check('#d-relief');
     await roster.fill('#d-seniority', '2025-11-15');
     // Batch 5: an existing driver has no Save Driver button; each box saves when it is left.
-    assert.equal(await roster.$('#d-save'), null, 'no Save Driver button on an existing driver');
+    assert.equal(!!(await roster.$('#d-save')), false, 'no Save Driver button on an existing driver');
     await roster.press('#d-seniority', 'Tab');
     assert.match(await roster.textContent('#rows tr[data-id="drv_test_casey"] td.name'), /CASEY, LEIGH\s*RELIEF/, 'shown at once');
     const casey = async () => (await db().collection('drivers').doc('drv_test_casey').get()).data();
@@ -794,7 +794,7 @@ async function noScroll(page) {
     // Back: closes what is open first (an opened driver), then a main screen goes Home. Home has no Back.
     const backPage = await openPage(browser, 1366, 768, '/drivers.html?testEmail=manager.test@uniteddairy.com');
     await backPage.waitForSelector('#rows tr td.name');
-    assert.equal(await backPage.$('.sidemenu a[href="index.html"]'), null, 'Back takes the place of Home');
+    assert.equal(!!(await backPage.$('.sidemenu a[href="index.html"]')), false, 'Back takes the place of Home');
     await backPage.click('#rows tr td.name');
     await backPage.waitForSelector('#d-cancel');
     await backPage.click('#go-back');
@@ -805,7 +805,7 @@ async function noScroll(page) {
     await backPage.waitForSelector('.cards');
     await Promise.all([backPage.waitForURL(/index\.html/), backPage.click('#go-back')]);
     await backPage.waitForSelector('.hq-card');
-    assert.equal(await backPage.$('#go-back'), null, 'Home has no Back');
+    assert.equal(!!(await backPage.$('#go-back')), false, 'Home has no Back');
     await backPage.close();
     results.push('Back: closes an opened driver first, then goes up to Route Distribution, then Home; Home has no Back');
 
@@ -815,7 +815,7 @@ async function noScroll(page) {
     const tpl = await openPage(browser, 1920, 950, '/template.html?testEmail=manager.test@uniteddairy.com');
     const day = (d, p) => '.tcell[data-driver="' + d + '"][data-day="' + p + '"] select[data-status]';
     await tpl.waitForSelector(day('drv_test_adams', 'tue'));
-    assert.equal(await tpl.$('#save'), null, 'batch 5: no Save Template button');
+    assert.equal(!!(await tpl.$('#save')), false, 'batch 5: no Save Template button');
     await tpl.selectOption(day('drv_test_adams', 'mon'), 'AVAILABLE');
     await tpl.selectOption(day('drv_test_adams', 'tue'), 'OFF');
     await tpl.click('tr[data-line="drv_test_adams"] td.tpl-name [data-copy]');
@@ -987,7 +987,7 @@ async function noScroll(page) {
     for (let i = 0; i < 10 && !(await otr.$('[data-miles-in="run_t801"]')); i++) { await otr.click('[data-miles="run_t801"]'); await otr.waitForTimeout(300); }
     await otr.fill('[data-miles-in="run_t801"]', '412');
     // Batch 5: no Save button; the miles save when the box is left.
-    assert.equal(await otr.$('[data-miles-save]'), null, 'no Save button by the miles');
+    assert.equal(!!(await otr.$('[data-miles-save]')), false, 'no Save button by the miles');
     await otr.press('[data-miles-in="run_t801"]', 'Tab');
     // The routes table is drawn again after the save, so the button can be missing for a moment: wait until it is back with 412.
     await otr.waitForFunction(() => (document.querySelector('[data-miles="run_t801"]') || {}).textContent === '412', null, { timeout: 5000 });
@@ -1014,7 +1014,7 @@ async function noScroll(page) {
     if (!(await otr.$('.otr-cols'))) await otr.click('#otr-cols');
     // A rename saves when its box is left (batch 5: no Save button).
     await otr.click('[data-col-rename]');
-    assert.equal(await otr.$('[data-col-save]'), null, 'no Save button by the new name');
+    assert.equal(!!(await otr.$('[data-col-save]')), false, 'no Save button by the new name');
     await otr.fill('[data-rename]', 'Darden Foods');
     await otr.press('[data-rename]', 'Tab');
     await otr.waitForFunction(() => [...document.querySelectorAll('[data-col="run_t801"] option')].some(o => o.value === 'Darden Foods'), null, { timeout: 5000 });
@@ -1052,7 +1052,7 @@ async function noScroll(page) {
     // (Administration section); the Route Editor has no Dispatch Administration button.
     const adm = await openPage(browser, 1920, 950, '/routes.html?testEmail=manager.test@uniteddairy.com');
     await adm.waitForSelector('.sidemenu .side-sec-btn[title="Administration"]');
-    assert.equal(await adm.$('#to-admin'), null, 'no Dispatch Administration button on the Route Editor');
+    assert.equal(!!(await adm.$('#to-admin')), false, 'no Dispatch Administration button on the Route Editor');
     await adm.hover('.sidemenu .side-sec-btn[title="Administration"]');
     await adm.waitForSelector('.side-flyouts .flyout.open a[href="admin.html"]', { state: 'visible' });
     await Promise.all([adm.waitForURL(/admin\.html/), adm.click('.side-flyouts .flyout.open a[href="admin.html"]')]);
@@ -1235,7 +1235,7 @@ async function noScroll(page) {
     assert.deepEqual(await eqd.$$eval('thead th.eq-day', t => t.map(x => x.textContent)), ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
     assert.equal(await eqd.$eval('#rows tr[data-id="veh_truck_900001"] td:nth-child(6)', td => td.textContent), '801', '900001 runs 801 on Monday by default');
     assert.equal(await eqd.$eval('#rows tr[data-id="veh_trailer_t_901"] td:nth-child(6)', td => td.textContent), '801');
-    assert.equal(await eqd.$('#rows tr[data-id="veh_trailer_t_904"]'), null, 'an inactive unit that is not down is left off');
+    assert.equal(!!(await eqd.$('#rows tr[data-id="veh_trailer_t_904"]')), false, 'an inactive unit that is not down is left off');
     assert.equal(/External Fleet/.test(await eqd.$eval('#rows', t => t.textContent)), false);
     assert.deepEqual(eqd.errors, []);
     await eqd.close();
@@ -1292,7 +1292,7 @@ async function noScroll(page) {
       assert.equal(await one.$eval('table.day-table tr:nth-child(2) input[data-field="tractor"]', i => i.placeholder), 'none set', '802 runs Monday with no default truck');
       const tiles = await one.$$eval('.actions.tiles > button, .actions.tiles > a.button', b => b.map(x => { const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), fits: x.scrollWidth <= x.clientWidth }; }));
       assert.equal(tiles.length, 4);
-      assert.equal(await one.$('#to-template'), null, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
+      assert.equal(!!(await one.$('#to-template')), false, 'Joe 10/10: Driver Weekly Template is on the Drivers menu, not the Route Editor');
       assert.ok(tiles.every(t => t.h === 42 && t.fits && t.top === tiles[0].top), 'one-line tiles in one row at ' + w + ': ' + JSON.stringify(tiles));
       assert.deepEqual(one.errors, []);
       await one.close();
@@ -1434,7 +1434,7 @@ async function noScroll(page) {
     // are switched on. Joe 10/12 later ("remove the old stuff like new app current app"): the cards carry no tags at all.
     const adminHome = await openPage(browser, 1366, 650, '/distribution.html?testEmail=admin.test@uniteddairy.com');
     await adminHome.waitForSelector('#card-daily');
-    assert.equal(await adminHome.$('[data-owner]'), null, 'no New app / Current app tags on the cards');
+    assert.equal(!!(await adminHome.$('[data-owner]')), false, 'no New app / Current app tags on the cards');
     assert.doesNotMatch(await adminHome.innerText('body'), /New app|Current app/);
     // Batch 8, mock-up 2 (10/23): Go-Live Switches is a card on Dispatch Administration; it opens in Administration.
     const gl = await openPage(browser, 1536, 730, '/admin.html?testEmail=admin.test@uniteddairy.com');
@@ -1487,7 +1487,7 @@ async function noScroll(page) {
     assert.deepEqual(loNew.errors, []);
     await loNew.close();
     // A screen that is on has no Switch off (audit batch 2): it stays on so it keeps saving.
-    assert.equal(await gl.$('#gl-rows [data-act="old"]'), null, 'no Switch off button on any screen');
+    assert.equal(!!(await gl.$('#gl-rows [data-act="old"]')), false, 'no Switch off button on any screen');
     // A screen not switched on is view only and says where to switch it on. Every screen is ready now (Joe 10/12) and can no
     // longer be moved back, so Driver Check-ins is set back to the current app straight in the app's settings.
     await db().collection('config').doc('app').set({ screenOwners: { checkIns: 'old' } }, { merge: true });
@@ -1504,7 +1504,7 @@ async function noScroll(page) {
     await gl.waitForSelector('#gl-rows tr[data-row="dailyDispatch"] .gl-chip.live');
     await adminHome.goto(adminHome.url().replace(/daily\.html.*$/, 'distribution.html?testEmail=admin.test@uniteddairy.com'));
     await adminHome.waitForFunction(() => document.getElementById('mode-text').textContent === 'Live');
-    assert.equal(await adminHome.$('[data-owner]'), null, 'still no tags once screens are switched on');
+    assert.equal(!!(await adminHome.$('[data-owner]')), false, 'still no tags once screens are switched on');
     const homeSize = await noScroll(adminHome);
     assert.ok(homeSize.scroll <= homeSize.inner && homeSize.width <= homeSize.innerWidth, 'home fits 1366x650');
     if (SHOTS) await adminHome.screenshot({ path: path.join(SHOTS, 'home-switch-1366.png') });

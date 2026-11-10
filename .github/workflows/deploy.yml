@@ -1,10 +1,11 @@
 name: Deploy distribution app (Firebase)
 
-# Puts the new distribution app live on Firebase. Run by hand only:
-# - sandbox: after the tests pass, to try the new screens side by side with the current app;
-# - production: only after Joe's release words for the new app. Production runs only by hand ("Run workflow"), only
-#   from main, only with "DEPLOY PRODUCTION" typed in the confirm box, and only once the production project's deploy
-#   key and name are saved in GitHub (PRODUCTION.md). Its settings come from production-settings.json, checked by
+# Puts the new distribution app live on Firebase.
+# - Automatic release (Joe 11-9-26: "This needs to be pushed and deployed automatically. I shouldn't have to do anything
+#   anymore."): release.yml calls this file, practice copy first, then live, once the full tests pass on main.
+# - By hand ("Run workflow") still works: sandbox to try the new screens; production only from main, only with
+#   "DEPLOY PRODUCTION" in the confirm box, and only once the production project's deploy key and name are saved in
+#   GitHub (PRODUCTION.md). Its settings come from production-settings.json, checked by
 #   tools/production-env.cjs: the real sheets, never the sandbox copies; writes only dispatch changes to the real Live sheet.
 # Needs, per target, the repository secret FIREBASE_SERVICE_ACCOUNT_SANDBOX / FIREBASE_SERVICE_ACCOUNT_PRODUCTION
 # (a deploy key for that Firebase project) and the variable FIREBASE_PROJECT_SANDBOX / FIREBASE_PROJECT_PRODUCTION.
@@ -21,6 +22,15 @@ on:
         options: [sandbox, production]
       confirm:
         description: For production only, type DEPLOY PRODUCTION
+        required: false
+        default: ''
+        type: string
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      confirm:
         required: false
         default: ''
         type: string
@@ -64,8 +74,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$TARGET" = production ]; then
-            # Production goes out only on purpose: by hand, from main (where the release lands), with the words typed.
-            if [ "$EVENT" != workflow_dispatch ]; then echo "::error::Production deploys only from Run workflow"; exit 1; fi
+            # Production goes out only on purpose: by hand or by the automatic release after the tests pass, from main
+            # (where the release lands), with the words given.
+            if [ "$EVENT" != workflow_dispatch ] && [ "$EVENT" != workflow_run ]; then echo "::error::Production deploys only from Run workflow or the automatic release"; exit 1; fi
             if [ "$REF" != refs/heads/main ]; then echo "::error::Production deploys only from main (this run is on $REF)"; exit 1; fi
             if [ "$CONFIRM" != 'DEPLOY PRODUCTION' ]; then echo "::error::Type DEPLOY PRODUCTION in the confirm box to deploy production"; exit 1; fi
             # The server settings are checked before anything is installed: real sheets, no sandbox copies, writes to the real Live sheet only.

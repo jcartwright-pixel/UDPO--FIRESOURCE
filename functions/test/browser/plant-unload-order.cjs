@@ -91,7 +91,9 @@ async function openPage(browser, width, height, url, touch) {
       await p.waitForSelector('#work .sw-card .sw-chips i.tt');
       // The cards can be drawn before stations.css has been applied under a busy emulator (the rare "big type" miss at the size
       // check below): wait for the page's styles, so the size is read from the screen as people see it. A wrong size still fails.
-      await p.waitForFunction(() => { const t = document.querySelector('#work .sw-trailer'); return t && parseFloat(getComputedStyle(t).fontSize) >= 26; }, null, { timeout: 15000 })
+      // T-953's own card, read whole: a save just before can redraw the list, and a card caught mid-redraw has no trailer line yet.
+      await p.waitForFunction(() => [...document.querySelectorAll('#work .sw-card[data-sw] .sw-trailer')]
+        .some(t => t.textContent === 'T-953' && parseFloat(getComputedStyle(t).fontSize) >= 26), null, { timeout: 15000 })
         .catch(() => {});
       const cards = await p.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => ({
         key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
@@ -148,7 +150,7 @@ async function openPage(browser, width, height, url, touch) {
     await o.click('[data-tab="all"]');
     await o.waitForFunction(() => { const c = document.querySelector('#rows tr[data-key*="909_1"] td.trlcell'); return c && c.textContent.trim() === 'Marietta 1'; });
     const cell = await o.$('#rows tr[data-key*="909_1"] td.trlcell');
-    assert.equal(await cell.$('input'), null, 'no Trailer # box on a drop-and-hook load');
+    assert.equal(!!(await cell.$('input')), false, 'no Trailer # box on a drop-and-hook load');
     assert.deepEqual(o.errors, []);
     results.push('office: Marietta 1 in the Trailer column');
     // T-777 (needed today, did not deliver today) is on the office list too; Take Off the List saves it as a trailer added for 812.
@@ -168,7 +170,7 @@ async function openPage(browser, width, height, url, touch) {
       if (!saved) await new Promise(r => setTimeout(r, 250));
     }
     await o.waitForTimeout(500);
-    assert.equal(await o.$('#rows tr[data-key*="ADDED"]'), null, 'T-777 stays off the list once saved');
+    assert.equal(!!(await o.$('#rows tr[data-key*="ADDED"]')), false, 'T-777 stays off the list once saved');
     assert.ok(saved && saved.payload.dropped && saved.payload.added === 'UNLOAD' && saved.payload.forRoute === 'UT DSD MILK' && saved.trailer === 'T-777', 'saved as taken off, for 812: ' + JSON.stringify(saved));
     assert.deepEqual(o.errors, []);
     results.push('office: T-777 listed for UT DSD MILK, Take Off the List saved');

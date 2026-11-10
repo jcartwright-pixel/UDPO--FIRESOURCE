@@ -169,7 +169,7 @@ One day's loads: who drives each load, on which truck and trailer, and when it l
 
 ### Send schedule texts
 
-Administrators see a short line under the buttons: **Texts not sent** or **Texts sent** with the date and time. Rest the mouse on it to see the posted week's dates and how many drivers. **Not set up yet** means the texting account is not saved: an administrator sets it up on Administration > Texts. On a laptop the line may take two lines.
+Administrators see a short line under the buttons: **Texts not sent**, or once the week is sent a green count like **25 OF 25 SENT**. Rest the mouse on the count to see when it was sent and to how many drivers, and on the line to see the posted week's dates. **Not set up yet** means the texting account is not saved: an administrator sets it up on Administration > Texts. When the line does not fit beside the week and the Loadout day, it moves under them; nothing sits on top of anything else.
 
 1. Press `Send Texts` once. It turns red and says how many drivers it will text.
 2. Press it again within 5 seconds to send. The line turns green and says when it was sent.
@@ -179,10 +179,11 @@ Administrators see a short line under the buttons: **Texts not sent** or **Texts
 - Who gets them is ticked on the Driver Roster. See [Texts](#schedule-texts).
 - A green **21 OF 21 SENT** means every ticked driver has this week's text. A red count means some are missing.
 - When something needs you, a **Schedule Texts** pop-up comes up by itself. It can say:
-  - **1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT**: a truck, trailer, route, leave time or note changed for a driver who already has this week's text, for example **MONDAY: TRUCK 512 IS NOW 518**. Press `Send Updated Schedule` beside the driver: only that driver gets their week as it is now. Nothing is texted by itself.
+  - **1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT**: a truck, trailer, route, leave time or note changed for a driver who already has this week's text, for example **MONDAY: TRUCK 512 IS NOW 518**. Press `Send Updated Schedule` beside the driver: only that driver gets their week as it is now. Or press `Text Driver`: a box opens with what changed already filled in; add your own words and press `Send` to text only that driver. After either one, that driver comes off the list until something else changes. Nothing is texted by itself.
+  - The pop-up comes up by itself only when a route is added to or taken off a driver's day. A changed truck, trailer, leave time or note shows only on the red **SCHEDULE CHANGED** button; press it to see them.
   - **1 DRIVER DOES NOT HAVE THIS WEEK'S TEXT**: who and why. Fix it on the Driver Roster, then press `Text 1 Missing` twice to text only them.
   - **TEXT THIS DRIVER YOURSELF**: not signed up for texts, and their week is not their normal week. Text them yourself.
-- `Close` (or Esc, or a click outside it) puts the pop-up away. It comes up again only for something new. The red buttons on the line, like **1 SCHEDULE CHANGED** or **2 TO TEXT YOURSELF**, open it again.
+- `Close` (or Esc, or a click outside it) puts the pop-up away. It comes up again only for something new. The red buttons on the line, like **1 SCHEDULE CHANGED** (on Daily Dispatch just **1 CHANGED**) or **2 TO TEXT YOURSELF**, open it again.
 
 !> Do not press Send before the week is published and checked. Publishing never texts anyone; this button does.
 
@@ -258,7 +259,7 @@ It always shows the published week, the same week as Daily Dispatch. The calenda
 - `Daily Dispatch` goes back to Daily Dispatch.
 - `Weekly Dispatch Template` opens next week, the week you are getting ready.
 - `Print Weekly Dispatch` prints this week's Driver Assignment Board on one page.
-- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. When something needs you, a **Schedule Texts** pop-up comes up by itself: a driver whose truck, trailer, route, leave time or note changed after their text went out (for example **MONDAY: TRUCK 512 IS NOW 518**, with `Send Updated Schedule` to text only that driver), drivers missing this week's text, and drivers to text yourself. `Close` puts it away until something new comes up; the red buttons on the strip open it again.
+- Administrators see **Schedule texts for the posted week** above the board. `Send Schedule Texts: Week of ...` texts the drivers on this week: press it once (it turns red and says how many), then again within 5 seconds. The strip then turns green with when it was sent; `Send Again` sends it a second time. When something needs you, a **Schedule Texts** pop-up comes up by itself: a driver given or taken off a route after their text went out, drivers missing this week's text, and drivers to text yourself. A changed truck, trailer, leave time or note does not bring it up; it shows on the red **SCHEDULE CHANGED** button (for example **MONDAY: TRUCK 512 IS NOW 518**). Beside each driver, `Send Updated Schedule` texts only that driver their week as it is now, and `Text Driver` opens a text with what changed filled in, for your own words, then `Send`. `Close` puts it away until something new comes up; the red buttons on the strip open it again.
 
 > To get next week ready, use the Weekly Dispatch Template, not this screen.
 
@@ -738,17 +739,17 @@ The shift report email to the managers: every loadout's loads, shift notes, yard
 - `Copy` copies the report; `Print` prints it.
 - Only what was checked since the last report went out is in it; the rest says "Not checked".
 - The loads are the ones loaded today, by loadout (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout), with how many are loaded beside each name (for example **10 of 24**). Inside each loadout, each delivery day once: the loaded loads (green), then the ones not loaded yet.
-- **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet. **Loaded late** means the load is loaded, but it finished after its dispatch time; its Done time says "late" in red.
+- **Late** means the load is not loaded and its truck should already have left. **Behind** means the load is left over from the last shift and its truck has not left yet. **Loaded late** means the load is loaded, but it finished after its dispatch time. A late load keeps its yellow or red row: once it is loaded, the row shows the time it was loaded; until then, a Case load shows about when it should be loaded (for example **est. 7:30 PM**). Boxing, Tote and Tanker loads have no estimate, so their row says LATE or BEHIND until they are loaded.
 - The banner at the top is red with **Routes late** when a truck should already have left, yellow with **Loads will be late** when none is late yet but the forecast says some loads will not be ready in time, red with **Routes behind** for loads left over from the last shift, yellow with **Loaded late** when nothing is late or behind now but a load was loaded after its dispatch time, and green only when everything is on time.
 - A load from today's shift says LATE when it is not loaded 30 minutes after it leaves: yellow up to 60 minutes, red after that. **Loaded late** works the same way: a load done within 30 minutes of its dispatch time is on time. A Plant Scheduler load leaves at its pickup time on its delivery day, so a load loaded early is not late before then.
 - The box under the banner is a short recap: how many loads are loaded (for example **19 of 38 loaded**), how many are left, and a bar that fills as they are loaded. Then each loadout the plant has (Case Loadout, Boxing Loadout, Tote Loadout, Tanker Loadout) on its own: how many are loaded and left, its own bar, and under it **On time** or about how far behind that loadout is. Case Loadout also says about when it will be done. Each bar and line is green when on time, yellow up to an hour behind and red past an hour, and the banner at the top takes the same color as the box. It names no routes (they are in the list below) and never shows cases.
-- Under the recap box is the **Case Loadout forecast** box. It gives one finish time for every case load still to load (for example **ALL CASE LOADS DONE ABOUT SUN 4:55 AM**), then one line for each truck time still ahead: how many loads leave then, about when the last of them will be done, and the **time to spare** (green) or how late (red). The line over the list says **EVERY TRUCK READY IN TIME**, or how many truck times will be late. Outside carriers are left out of the truck lines.
+- Under the recap box is the **Case Loadout forecast** box. It says only when every case load still to load should be done (for example **FORECAST TO BE DONE TUE 4:55 AM**), and a red line when a truck will be late (for example **1 TRUCK TIME WILL BE LATE**). Outside carriers are left out of the red line. In the morning the forecast has the day shift load only the trucks that leave before midnight; the trucks that leave after midnight wait for the night shift, which starts loading at 4:00 PM.
 - Right under the forecast box is the **Downtime** line. With no breakdowns it says **NO DOWNTIME** in green. Each breakdown still open, or fixed since the last report, gets one short line in red: how long the plant was down, what broke and what was wrong (for example **DOWN 2 HR 15 MIN: GALLON FILLER, SEAL BAR JAMMED**), then **BACK UP** with the time, **STILL DOWN SINCE** the time it went down, or **RUNNING, BEING WATCHED** for one on Monitor. The times come from **Down at** and **Back up at** on Shift Notes.
 - Lower down, **Plant breakdowns** lists the ones still open with their names in red, or **NONE OPEN** in green.
 - "About how far behind" goes by the trucks still to leave that will leave late, not by one load that is already long overdue. Only Case loads have an estimate; Boxing, Tote and Tanker are behind only when one of their trucks should already have left.
 - **Outside carriers** (Darden, Gordon Food Service, a customer's own truck, anything that is not a United Dairy truck) are still listed in the Routes list and counted in "X of Y loaded", but never marked late, behind or loaded late, and the forecast box leaves them out. Who hauls a route comes from Route Master (Who Runs It); a Plant Scheduler load marked Carrier is an outside carrier too. United Dairy branch routes (Fairmont, Marietta, Charleston and the others) still count.
 
-> Loads move up and down with what is in the cooler, so one load's own est. time in the list can be well off. Watch the finish time and the time to spare: they hold up even when the order changes.
+> Loads move up and down with what is in the cooler, so one load's own est. time in the list can be well off. Watch the forecast done time: it holds up even when the order changes.
 
 > One late route does not make the whole plant late: the recap goes by the trucks still to leave. Each late route is still red in the list below.
 
@@ -810,6 +811,7 @@ Will the plant be late? Every case load still to load, in the order it will be l
 
 - **Loads still to load** lists each load with its route, run, cases, departure and Est. Done. A load whose Est. Done is within 30 minutes of its departure is on time. 30 to 60 minutes after is yellow, more than 60 minutes after is red.
 - **How long each load takes:** 1 hour for every 1,000 cases until 3 of today's loads are timed, then today's own speed, mixed with each route's own times from the same weekday's earlier nights.
+- **The day shift and the night shift:** before 4:00 PM, the forecast has the day shift load only the trucks that leave before midnight (and loads left over from last night). The trucks that leave after midnight wait for the night shift and start at 4:00 PM, in their own order.
 - **Faster or slower by the hour of the night:** the plant does not load at one speed all night. Early evening is slower, and after product is pushed into the cooler later loads go faster. Each hour gets its own speed from the past nights (the same weekday first, then every night of the last 4 weeks), so a load that starts in a slow hour gets more time and one that starts in a fast hour gets less. An hour with fewer than 3 timed loads in the past nights goes at the usual speed.
 - **Loads due by each time** totals the loads and cases due by each hour.
 - **The loading order:** when every truck makes its time, the loads go in the load order. When the plant is behind (any truck would leave late), the truck that leaves first loads first, by its dispatch time, whatever day it was loaded. The heading over the loads says which order is being used.
@@ -969,6 +971,20 @@ screens: scheduler.html
 
 The calendar of loads going out. Shipping and Receiving are separate screens: open each from the menu on the left (**Shipping** or **Receiving**). Clicking **Receiving** opens the Receiving Schedule; its **Suppliers & Products** shows beside it.
 
+In the left menu **Shipping** has a gold stripe and **Receiving** a green one; the one you are on is filled with its color. The name over the calendar (SHIPPING or RECEIVING) is in the same color.
+
+### Add a customer
+
+1. Press `+ Add Customer` (beside `+ Add Load`).
+2. Type the **Customer Name** and the **Route** number. The **Run / Destination** fills in from the name; change it if the run has its own name.
+3. Pick the **Departure Day** (Load Day or Delivery Day). **Loadout Type** and **Run By** can be picked now or later.
+4. Press `Save Customer`. The customer shows on Shipping and can be picked for a load.
+
+- The customer goes on Route Master as a new run, the same as `Add Route` in the Route Editor. Set its days and times there.
+- `+ Add Customer` is greyed for anyone who may not change the Route Editor (managers can).
+
+!> Do not add a customer that is already on Route Master under another name. Find it in the Route Editor and tick **Show in Plant** instead.
+
 - Pick **Day**, **Week** or **Month**, and move with the arrows. `This month` comes back to now.
 - Each load is colored by who delivers it: Uniontown truck, Branch or Carrier (an outside carrier, or a customer picking it up). It follows who covers the route on Route Master (United Dairy, a branch, an outside carrier or a customer pickup), the same rule every screen and the late count use. Holidays are marked.
 - Click a day's `+` (or `+ Add Load`) to add a load: schedule type, load type, load date, delivery date, pickup time, trailer, PO, cases, product and notes. Press `Confirm`; nothing saves until then.
@@ -986,6 +1002,10 @@ id: receiving
 screens: scheduler.html?lane=receiving
 
 The calendar of loads coming in, and where you check a load in when its trailer arrives. Two tabs at the top: **Calendar** and **Suppliers & Products**. Everything opens in the screen itself; `Cancel`, `Close` or `Back` brings you back to the calendar.
+
+### Add a supplier
+
+Press `+ Add Supplier` (beside `+ Add Load`), type the **Supplier Name** (and a **Short Name** and **Code** if you want) and press `Save Supplier`. It is the same as `+ Supplier` on **Suppliers & Products**.
 
 ### Book a load
 
@@ -1858,7 +1878,7 @@ After a send, the strip on Weekly and Daily Dispatch checks who has this week's 
 
 !> Do not press `Send again` to reach one driver: it texts every ticked driver a second time. Use `Resend` on that driver's text.
 
-> When a driver's week changes after their text went out, a pop-up on Weekly Dispatch and Daily Dispatch says what changed and has a `Send Updated Schedule` button. It does the same as `Resend` here.
+> When a driver's week changes after their text went out, a pop-up on Weekly Dispatch and Daily Dispatch says what changed and has a `Send Updated Schedule` button (the same as `Resend` here) and a `Text Driver` button for a text in your own words. A text sent with `Text Driver` is on this list too.
 
 !> Do not change the reply setting on the number in Twilio. The other United Dairy app uses it; YES and STOP replies are picked up here by themselves.
 
@@ -1885,7 +1905,7 @@ What drivers use on their phone (and on the Driver Room tablet). The first time,
 - **Check-In** (after the route): truck, trailer and pallet jack, cases delivered and returned, over or short, refused or returned product, truck, trailer and pallet jack problems, whether the trailer needs cleaning, and notes. Then `Check In`.
 - **DVIR** (truck inspection): pick Pre-trip or Post-trip. Every item starts as no defect; tick only what is wrong and write it up. The odometer starts at the truck's GPS reading. `+ Add trailer inspection` for a second trailer. Sign, then `Submit` (or `Review inspection` first).
 - **My Schedule** shows the driver's routes for the week, Sunday to Saturday.
-- **Route Book** (on the Check-In list) shows the route book for the driver's loads that day: the stops in the order to run them, each with its load number, address (tap it for the map), keys or door code, phone and notes, then the route's instructions. It comes from the **Customer List** app's **Route Sequence**, so a change there shows here at once.
+- **Route Book** (on the Check-In list) shows the route book for the driver's loads that day: the stops in the order to run them, each with its load number, address (tap it for the map), keys or door code, phone and notes, then the route's instructions. It comes from the Hub's copy of the **Customer List** app's **Route Sequence** (active customers only), so a change there shows here by itself within a few minutes. A customer made Inactive is not on it.
 - **View Loadout** shows the route list and each load's status, updating by itself. Loads left over from yesterday that are not loaded yet are at the top under a light orange **Yesterday's loads** line; today's loads follow under a light blue **Today's loads** line. On Sunday it also shows Monday's loads that were loaded on Saturday, loaded or not, until 6 a.m. Monday.
 - With no signal, check-ins and DVIRs wait on the phone and go when the signal is back.
 - **Last refreshed** at the top says the last time this screen got fresh information (date and time). If it stays old, the phone has no signal.
@@ -1933,7 +1953,7 @@ The bar at the top has the United Dairy logo, **UD SALES** in small gold letters
 id: sales-customers
 screens: sales.html?view=customers
 
-The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Customer List** app. It only shows; nothing can be changed from it.
+The **Customers by route** card of the Sales app. It shows which customers each route delivers to on each day, from the **Hub's copy of the Customer List** (active customers only). It only shows; nothing can be changed from it.
 
 1. Tap **Customers by route** on the app's first screen.
 2. Pick a tab: `By route`, `By customer` or `By group`.
@@ -1944,10 +1964,11 @@ The **Customers by route** card of the Sales app. It shows which customers each 
 - A customer given a **Group** on the Customer List's Directory is in that group. Otherwise every name starting with DQ is in **Dairy Queen**, and everyone else is grouped by the chain number on the Customer List; a customer with no chain (or chain 0), or the only one in its chain, is under **Independents**.
 - A day that says **no route** is a customer day on the Customer List with no route number yet.
 - The bottom line says when the Customer List was last changed.
+- A customer made Inactive on the Customer List is not shown.
 - A division with nothing on the Customer List yet shows no customers.
 - The arrow at the top left (Back) goes back one step: from a group to the groups, then to the two cards. `?` opens this Help inside the app.
 
-> The list changes only in the **Customer List** app, and shows here by itself. If a customer is missing or on the wrong day, tell the office.
+> The list changes only in the **Customer List** app; the Hub copies it over by itself, and it shows here. If a customer is missing or on the wrong day, tell the office.
 
 !> Do not read this list as today's loads. It is the regular route menu; for where a truck is now, use **Where the routes are**.
 

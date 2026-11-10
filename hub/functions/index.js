@@ -7,6 +7,8 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 
 initializeApp();
 setGlobalOptions({ region: 'us-east4', maxInstances: 5 });
@@ -26,4 +28,22 @@ exports.hub = onCall({ timeoutSeconds: 30 }, async (request) => {
     console.error('hub', error);
     throw new HttpsError('internal', 'internal');
   }
+});
+
+/*
+ * The route customer list through the Hub (Joe 11-9-26): hubRouteMaster/<plant> and hubCustomers/<plant>, built from the
+ * Customer List's records (read only) and read by every other app. src/routemaster.js says how.
+ */
+// The Customer List rewrites udclRouteMaster/<plant> after every change it makes: the Hub's copy follows at once.
+exports.hubRouteMasterOnChange = onDocumentWritten({ document: 'udclRouteMaster/{plant}', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, async (event) => {
+  if (!event.data || !event.data.after || !event.data.after.exists) return;
+  await require('./src/routemaster').rebuildPlant(db, event.params.plant);
+});
+// A new week of the weekly route report changes the case columns on every plant.
+exports.hubRouteMasterOnWeek = onDocumentWritten({ document: 'routeWeekly/{week}', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
+  await require('./src/routemaster').rebuildAll(db);
+});
+// Every hour as well, in case a change reached the list some other way.
+exports.hubRouteMasterHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
+  console.log('hubRouteMaster', JSON.stringify(await require('./src/routemaster').rebuildAll(db)));
 });

@@ -54,7 +54,7 @@ const visibleCards = (p) => p.$$eval('#sides a[data-side]', a => [...new Set(a.f
       await p.click('#people tr[data-email="' + MAINT + '"]');
       await p.waitForSelector('#p-modal:not([hidden]) .sa-t');
       assert.match(await p.textContent('.sa'), /Nothing is limited yet/);
-      assert.equal(await p.$('.sa-rights[open]'), null, 'the save-by-save rights are folded');
+      assert.equal(!!(await p.$('.sa-rights[open]')), false, 'the save-by-save rights are folded');
       await p.selectOption('#p-job', 'plantMaint');
       await p.waitForSelector('.sa-t tr.sa-screen');
       const on = await p.$$eval('.sa-t input[data-sa-plant="fac_uniontown"]:checked', b => b.map(x => x.dataset.saKeys));

@@ -46,7 +46,9 @@ async function routeBook(db, plant, route, day) {
   const rd = s.data(), keys = (rd.stops || []).map(x => x.key);
   const refs = keys.map(k => db.collection(CUSTOMERS).doc(U.customerId(plant, k)));
   const cs = refs.length ? await db.getAll(...refs) : [];
-  const stops = (rd.stops || []).map((x, i) => { const c = cs[i] && cs[i].exists ? cs[i].data() : {}; return { stop: i + 1, name: c.name || x.name, account: c.account || x.account || '', loadSeq: x.loadSeq || 0, note: x.note || '',
+  // Active customers only, as the Hub's copy (a customer made Inactive is left off the driver's list).
+  const live = (rd.stops || []).map((x, i) => [x, cs[i] && cs[i].exists ? cs[i].data() : {}]).filter(([, c]) => !(c.active === false || c.inactive === true));
+  const stops = live.map(([x, c], i) => { return { stop: i + 1, name: c.name || x.name, account: c.account || x.account || '', loadSeq: x.loadSeq || 0, note: x.note || '',
     address: U.addressLine(c), phone: c.phone || '', keys: c.keys || '', notes: c.notes || '', lat: c.lat || null, lon: c.lon || null }; });
   return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops, updatedAt: rd.updatedAt || '' };
 }
@@ -58,7 +60,7 @@ async function salesRows(db, plant) {
   const d = await readPlant(db, plant);
   if (!d.routeDays.length) return null;
   const rows = [];
-  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '', group: c.group || '' }); }));
+  d.routeDays.forEach(rd => (rd.stops || []).forEach(s => { const c = d.customers[s.key] || {}; if (c.active === false || c.inactive === true) return; rows.push({ day: rd.day, route: rd.route, account: c.account || s.account || '', chain: c.chain || s.chain || '', name: c.name || s.name || '', group: c.group || '' }); }));
   ((d.meta && d.meta.unrouted) || []).forEach(x => rows.push({ day: x.day, route: '', account: x.account || '', chain: x.chain || '', name: x.name || '', group: ((d.customers[x.key] || {}).group) || '' }));
   const at = d.routeDays.map(r => r.updatedAt || '').concat(Object.values(d.customers).map(c => c.updatedAt || '')).sort().pop() || '';
   return { rows, savedAt: at };

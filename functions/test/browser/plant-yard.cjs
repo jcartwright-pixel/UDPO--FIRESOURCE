@@ -111,9 +111,9 @@ async function seed() {
       assert.equal((await page.textContent('#rows tr[data-trailer="T-704"] .yd-gps')).trim(), '—');
       assert.deepEqual(await page.$$eval('[data-pane]', b => b.map(x => x.textContent)), ['Active Yard Queue', '24-Hour History', 'All Trailers in Yard'], 'Joe 10/22: one more tab, All Trailers in Yard');
       // Joe 10/20: no list of the trailers that left the yard under the queue (it was kept until they came back).
-      assert.equal(await page.$('#road'), null, 'no left-the-yard list');
-      assert.equal(await page.$('#rows tr[data-trailer="T-707"]'), null, 'the GPS shows T-707 gone: not on the yard list though its dispatch time has not come');
-      assert.equal(await page.$('#rows tr[data-trailer="T-706"]'), null, 'T-706 left: not on the yard list');
+      assert.equal(!!(await page.$('#road')), false, 'no left-the-yard list');
+      assert.equal(!!(await page.$('#rows tr[data-trailer="T-707"]')), false, 'the GPS shows T-707 gone: not on the yard list though its dispatch time has not come');
+      assert.equal(!!(await page.$('#rows tr[data-trailer="T-706"]')), false, 'T-706 left: not on the yard list');
       assert.equal(await page.$$eval('#rows tr[data-trailer]', r => r.length), 3, 'the queue itself is unchanged');
       await fits(page, 'Yard Checks ' + w + 'x' + h);
       await shots(page, 'yard-queue', w);
@@ -132,7 +132,7 @@ async function seed() {
       assert.match(await page.textContent('#all-rows tr[data-trailer="T-703"] .yd-st small'), /^Due again \d{1,2}:\d{2} (AM|PM)$/);
       assert.match(await page.textContent('#all-rows tr[data-trailer="T-703"]'), /SUNSHINE[\s\S]*10:00 AM[\s\S]*34° \/ —/);
       assert.equal(await page.$$eval('#pane-all input, #pane-all select, #pane-all button', x => x.length), 0, 'look only');
-      assert.equal(await page.$('#all-rows tr[data-trailer="T-707"]'), null, 'T-707 has left: not listed');
+      assert.equal(!!(await page.$('#all-rows tr[data-trailer="T-707"]')), false, 'T-707 has left: not listed');
       await fits(page, 'All Trailers in Yard ' + w + 'x' + h);
       await shots(page, 'yard-all', w);
       assert.deepEqual(page.errors, []);
@@ -146,7 +146,7 @@ async function seed() {
     await desk.waitForFunction(() => document.querySelectorAll('#rows tr[data-trailer]').length === 3);
     const row = (t) => '#rows tr[data-trailer="' + t + '"]';
     // No Record button: each box saves as it is left, and T-701 stays on this screen while it is filled in.
-    assert.equal(await desk.$('[data-record]'), null, 'Yard Checks has no Record button');
+    assert.equal(!!(await desk.$('[data-record]')), false, 'Yard Checks has no Record button');
     await desk.fill(row('T-701') + ' .yd-temp', '35');
     const t0 = Date.now();
     await desk.press(row('T-701') + ' .yd-temp', 'Tab');
