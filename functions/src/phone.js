@@ -265,7 +265,12 @@ async function phoneCall(db, input, now) {
   if (op === 'schedule') return mySchedule(db, input, stamp);
   // Joe 11/1: the route book on the phone: one route day's stops in run order and its instructions, from the United Dairy
   // Customer List (udcl.js, kept in the company's database), so the driver knows the order to run and what to do at each stop.
-  if (op === 'routeBook') { const P = require('./plants'); return require('./udcl').routeBook(P.companyDb(db), P.plantOf(input), input.route, input.day); }
+  // Joe 11-9-26: the route customer list is read only through the Hub (hubroutes.js); the Customer List's own records until
+  // the Hub has written the plant (nothing switched off before its replacement works).
+  if (op === 'routeBook') {
+    const P = require('./plants'), cdb = P.companyDb(db), plant = P.plantOf(input);
+    return (await require('./hubroutes').routeBook(cdb, plant, input.route, input.day)) || require('./udcl').routeBook(cdb, plant, input.route, input.day);
+  }
   const who = await whoFor(db, input.driverId);
   const dates = allowedDates(stamp);
   if (op === 'loads') {
