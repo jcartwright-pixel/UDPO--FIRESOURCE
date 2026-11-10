@@ -67,7 +67,8 @@ async function journal(id, ok) {
   const sv = (await db().collection('runs').doc('2026-10-04__run_p849').get()).data();
   await db().collection('runs').doc('2026-10-04__run_c905_1').set(Object.assign({}, sv, { runId: 'run_c905_1', routeId: 'rte_c905', route: '905_1', run: 'ALDI - CHARLESTON LOAD 1', routeName: 'Aldi Charleston' }));
   const browser = await chromium.launch();
-  const results = [];
+  // Each check prints as it passes, so a run that stops part way shows how far it got.
+  const results = { push: (r) => console.log('LOADS ' + r) };
   try {
     // The Scheduler: Friday's three Aldi loads are Load 1, 2, 3 by pickup time, the whole name on the card.
     for (const [w, h] of [[1536, 760], [1920, 950]]) {
@@ -214,5 +215,4 @@ async function journal(id, ok) {
   } finally {
     await browser.close();
   }
-  results.forEach(r => console.log('LOADS ' + r));
 })().catch(e => { console.error(e); process.exit(1); });
