@@ -1290,6 +1290,16 @@ body.ud-phone-app .hdr-version .hv-fresh { display: inline; }
 .send-pop .send-pop-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); font-size: 16px; }
 .send-pop .send-update, .send-pop .send-pop-fix { background: var(--red); color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .send-pop .send-pop-fix.armed { background: #7a1a12; }
+/* Joe 11-10-26: Text Driver beside Send Updated Schedule, and its box over the warning pop-up. */
+.send-pop .send-note { background: #fff; color: var(--ud-blue); border: 2px solid var(--ud-blue); padding: 6px 12px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.send-note-back { z-index: 30; }
+.send-note-pop { z-index: 31; }
+.send-note-pop h2 { margin: 0 0 6px; font-size: 20px; }
+.send-note-pop p { margin: 0 0 8px; font-size: 16px; }
+.send-note-pop textarea { width: 100%; min-height: 200px; box-sizing: border-box; font: inherit; font-size: 16px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+.send-note-pop .send-note-send { background: var(--ud-blue); color: #fff; border: 0; padding: 8px 18px; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.send-note-pop .send-note-send:disabled { opacity: .5; cursor: default; }
+.send-note-pop .send-error { color: var(--error-ink); font-weight: 700; }
 .send-pop button:disabled { opacity: .5; cursor: default; }
 .send-pop .send-error { color: var(--error-ink); font-weight: 700; }
 .texts-page .texts-hand { margin-top: 12px; }
