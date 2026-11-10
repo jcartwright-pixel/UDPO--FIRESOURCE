@@ -8,6 +8,7 @@ name: Release (automatic, practice copy then live)
 # The live step uses the GitHub environment distribution-production: with a required reviewer there, it still waits for
 # that person's Approve; with none, it goes live by itself.
 # Run workflow here starts the same release by hand for the newest main (after a test run was only a blip, say).
+# A merge made by auto-merge.yml starts the main tests by hand (workflow_dispatch), so that run counts the same as a push.
 on:
   workflow_run:
     workflows: [Distribution app tests]
@@ -28,7 +29,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event == 'push')
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
     runs-on: ubuntu-24.04
     outputs:
       go: ${{ steps.newest.outputs.go }}
