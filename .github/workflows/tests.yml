@@ -43,9 +43,9 @@ jobs:
       - name: Install
         run: npm ci
       - name: Unit tests (dispatch rules, transfer, save checks, sign-in)
-        run: echo "diagnostic branch: unit tests skipped"
+        run: echo diagnostic branch, unit tests skipped
       - name: Database tests on the local emulator (transfer, saves, security rules)
-        run: echo "diagnostic branch: database tests skipped"
+        run: echo diagnostic branch, database tests skipped
       - name: Install the test browser
         run: npx playwright install --with-deps chromium
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
