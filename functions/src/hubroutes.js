@@ -52,4 +52,30 @@ async function salesRows(db, plant) {
   return { rows, savedAt: rm.sourceAt || rm.builtAt || '', from: 'hub' };
 }
 
-module.exports = { readRecord, routeMaster, customers, salesRows, ROUTE_MASTER, CUSTOMERS };
+/**
+ * The drivers' Route Book from the Hub: one route day's stops in run order, with each customer's address, phone, keys, notes
+ * and map point, and the day's start time, notes and load map. Same answer as udcl.routeBook; null when the Hub has no record
+ * for the plant yet (the caller keeps its old path then). Active customers only.
+ */
+async function routeBook(db, plant, route, day) {
+  const U = require('./udcl-rules');
+  route = U.numText(require('./logic').routeNumber(route || ''), U.LIMITS.route); day = U.dayOf(day);
+  if (!route || !day) return { found: false };
+  const [rm, cu] = await Promise.all([routeMaster(db, plant), customers(db, plant)]);
+  if (!rm || !cu) return null;
+  const has = (r) => rm.days.some(d => String(d.route) === r && d.dayName === day);
+  // Dispatch may name a route with words around its number ("803 PITTSBURGH"): the number alone, then.
+  const num = (/\d{3,}/.exec(route) || [])[0];
+  if (!has(route) && num && num !== route) route = num;
+  const rd = rm.days.find(d => String(d.route) === route && d.dayName === day);
+  if (!rd) return { found: false, route, day };
+  const who = {};
+  cu.customers.forEach(c => { who[c.key] = c; });
+  const stops = rm.rows.filter(r => String(r.route) === route && r.dayName === day).sort((a, b) => a.stop - b.stop)
+    .map(r => { const c = who[r.key] || {}; return { stop: r.stop, name: r.customer || c.name || '', account: r.account || c.account || '', loadSeq: r.load || 0, note: r.note || '',
+      address: c.address || '', phone: c.phone || '', keys: c.keys || '', notes: c.notes || '', lat: c.lat === undefined ? null : c.lat, lon: c.lon === undefined ? null : c.lon }; });
+  return { found: true, route, day, dayName: U.DAY_NAMES[day], startTime: rd.startTime || '', notes: rd.notes || '', map: rd.map ? U.cleanMap(rd.map) : null, stops,
+    updatedAt: rm.sourceAt || rm.builtAt || '', from: 'hub' };
+}
+
+module.exports = { readRecord, routeMaster, customers, salesRows, routeBook, ROUTE_MASTER, CUSTOMERS };
