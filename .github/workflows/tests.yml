@@ -60,7 +60,7 @@ jobs:
         # 11-10-26: plant-load-numbers grew past 13 GB with the 4 GB limit on, so the memory is outside the JavaScript heap.
         # tools/memory-guard.sh now stops a screen test past 3 GB and prints where it was (lines starting STUCK).
         env:
-          NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports --perf-basic-prof-only-functions --interpreted-frames-native-stack
+          NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports
           REPORTS: ${{ runner.temp }}/node-reports
           TRACE_MODE: timer
         run: |
