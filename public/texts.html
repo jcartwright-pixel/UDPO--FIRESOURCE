@@ -280,7 +280,7 @@
     $('fwd-phone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('fwd-phone').blur(); } });
     // The texts and replies (textLog), newest first; the list follows new ones as they come.
     const STATUS = { SENT: 'Sent', FAILED: 'Failed', 'NOT SENT': 'Test copy, not sent', 'NO PHONE': 'No number', RECEIVED: 'Received', SENDING: 'Sending', STOPPED: 'Replied STOP' };
-    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply', SAMPLE: 'Sample to you', RESEND: 'Schedule, resent' };
+    const KIND = { LOAD_DONE: 'Load done', TEST: 'Test', ASK: 'Sign-up', SIGN_UP: 'Sign-up reply', REPLY: 'Reply', SAMPLE: 'Sample to you', RESEND: 'Schedule, resent', UPDATE: 'Schedule change' };
     const FWD = { SENT: 'Sent to your cell', FAILED: 'Not sent to your cell' };
     const phone = (v) => { const d = String(v || '').replace(/\D+/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : ''; };
     // Joe 11/2 ("wrong phone number ... can I change and then resend?"): a schedule text for the posted week has Resend, which
