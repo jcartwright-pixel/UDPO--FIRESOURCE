@@ -66,7 +66,7 @@ jobs:
           bash ../tools/memory-guard.sh &
           mkdir -p "$RUNNER_TEMP/shots"
           export SHOTS_DIR="$RUNNER_TEMP/shots"
-          UD_FAKE_LIVE_ROLL=1 npx firebase emulators:exec --only firestore,auth,functions,hosting --project demo-ud-distribution "node test/browser/stations.cjs && node -r ./test/browser/memory-trace.cjs test/browser/plant-station-boxing.cjs; node -r ./test/browser/memory-trace.cjs test/browser/plant-load-numbers.cjs"
+          node ../tools/browser-parts.cjs 3
       - name: Keep the screen pictures
         if: always()
         uses: actions/upload-artifact@v4
