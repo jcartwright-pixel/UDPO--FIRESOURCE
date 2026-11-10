@@ -89,16 +89,18 @@ async function openPage(browser, width, height, url, touch) {
       await p.waitForSelector('#work .sw-card.road');
       // Route Master (the Drop and Hook tick) is read on its own, after the loads: wait for the transfer card it makes.
       await p.waitForSelector('#work .sw-card .sw-chips i.tt');
-      // The cards can be drawn before stations.css has been applied under a busy emulator (the rare "big type" miss at the size
-      // check below): wait for the page's styles, so the size is read from the screen as people see it. A wrong size still fails.
-      // T-953's own card, read whole: a save just before can redraw the list, and a card caught mid-redraw has no trailer line yet.
-      await p.waitForFunction(() => [...document.querySelectorAll('#work .sw-card[data-sw] .sw-trailer')]
-        .some(t => t.textContent === 'T-953' && parseFloat(getComputedStyle(t).fontSize) >= 26), null, { timeout: 15000 })
-        .catch(() => {});
-      const cards = await p.$$eval('#work .sw-card[data-sw]', cs => cs.map(c => ({
-        key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
-        title: c.querySelector('.sw-title b').textContent, chips: c.querySelector('.sw-chips').textContent, badge: c.querySelector('.sw-head .sw-badge').textContent,
-        road: c.classList.contains('road'), quick: !!c.querySelector('.sw-quick [data-act="ustart"]'), size: parseFloat(getComputedStyle(c.querySelector('.sw-trailer') || c.querySelector('.sw-title b')).fontSize) })));
+      // The cards can be drawn before stations.css has been applied under a busy emulator, and a save just before can redraw
+      // the list (a card caught mid-redraw has no trailer line yet). The list is read in the same step that sees it settled
+      // (T-953's card drawn and styled), never in a second read that can land on another redraw: same checks every run,
+      // and a wrong size still fails after 15 seconds.
+      const cards = await (await p.waitForFunction(() => {
+        const list = [...document.querySelectorAll('#work .sw-card[data-sw]')].map(c => ({
+          key: c.dataset.sw, order: (c.querySelector('.sw-order') || {}).textContent || '', trailer: (c.querySelector('.sw-trailer') || {}).textContent || '',
+          title: (c.querySelector('.sw-title b') || {}).textContent || '', chips: (c.querySelector('.sw-chips') || {}).textContent || '', badge: (c.querySelector('.sw-head .sw-badge') || {}).textContent || '',
+          road: c.classList.contains('road'), quick: !!c.querySelector('.sw-quick [data-act="ustart"]'), size: parseFloat(getComputedStyle(c.querySelector('.sw-trailer') || c.querySelector('.sw-title b') || c).fontSize) }));
+        const t = list.find(c => c.trailer === 'T-953');
+        return t && t.size >= 26 && list.some(c => /Transfer trailer/.test(c.chips)) && list.some(c => c.road) ? list : false;
+      }, null, { timeout: 15000 })).jsonValue();
       const numbered = cards.filter(c => c.order), road = cards.filter(c => c.road), transfer = cards.filter(c => /Transfer trailer/.test(c.chips)), done = cards.filter(c => c.badge === 'COMPLETE');
       assert.deepEqual(numbered.map(c => c.order), numbered.map((c, i) => String(i + 1)), 'the cards back are numbered 1, 2, 3 ... in order');
       assert.ok(numbered.length >= 3, 'several trailers to unload are numbered');
