@@ -47,7 +47,7 @@ jobs:
       - name: Database tests on the local emulator (transfer, saves, security rules)
         run: npm run test:emulator
       - name: Install the test browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium && (command -v gdb || sudo apt-get install -y -q gdb)
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
         # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
         # saves mid-test and made the Route Editor checks time out.
