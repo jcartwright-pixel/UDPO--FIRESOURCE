@@ -523,21 +523,38 @@
     async function saveLoad(row, fields, shown) {
       const mine = ++saveNo;
       const p = pending[row.id] = Object.assign({}, pending[row.id]);
-      Object.keys(shown).forEach(k => { p[k] = shown[k]; (p._by = p._by || {})[k] = mine; });
+      Object.keys(shown).forEach(k => { p[k] = shown[k]; (p._by = p._by || {})[k] = mine; if (p._rev) delete p._rev[k]; });
       render();
+      let savedRev = 0;
       try {
         // Joe 10/13: a manager may load past the limit here (the server checks the person; Plant Station tablets stay limited).
-        await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields, overLimit: true });
+        const out = await save('savePlantLoad', { runDocId: row.runDocId, day: row.day, fields, overLimit: true });
+        savedRev = Number((((out && out.runs) || []).find(x => x.runDocId === row.runDocId) || {}).rev) || 0;
         showError('');
       } catch (e) {
         showError(row.route + ' ' + row.run + ': ' + (e.message || e));
       }
+      // The server can answer before the live copy of the loads has the save. What was shown then stays until the live copy
+      // holds the saved version (settlePending), so a Done load does not flick back to Loading for a moment (11-10-26: the
+      // SKIPPED tag came back on a Done load for that moment). A refused save goes back at once.
       const now = pending[row.id];
-      if (now) {
-        Object.keys(shown).forEach(k => { if (now._by && now._by[k] === mine) { delete now[k]; delete now._by[k]; } });
-        if (!Object.keys(now).some(k => k !== '_by')) delete pending[row.id];
-      }
+      if (now) Object.keys(shown).forEach(k => {
+        if (!now._by || now._by[k] !== mine) return;
+        if (savedRev) (now._rev = now._rev || {})[k] = savedRev;
+        else { delete now[k]; delete now._by[k]; }
+      });
+      settlePending();
       render();
+    }
+    function settlePending() {
+      Object.keys(pending).forEach(id => {
+        const p = pending[id];
+        if (p._rev) {
+          const run = runs.find(x => x.id === id.split('|')[0]), rev = run ? Number(run.rev || 0) : Infinity;
+          Object.keys(p._rev).forEach(k => { if (rev >= p._rev[k]) { delete p[k]; if (p._by) delete p._by[k]; delete p._rev[k]; } });
+        }
+        if (!Object.keys(p).some(k => k[0] !== '_')) delete pending[id];
+      });
     }
 
     // Status picker: Waiting / Loading / Done.
@@ -945,7 +962,7 @@
       while (unsubs.length) unsubs.pop()();
       unloadDocs = null;
       const weeks = [...new Set(L.weeksForLoadDate(date).concat(L.weeksForLoadDate(L.addDays(date, -1))))];
-      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = withShownOrder(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); render(); }, e => showError('Could not read the loads: ' + e.message)));
+      unsubs.push(onSnapshot(query(collection(db, 'runs'), where('weekStart', 'in', weeks)), s => { runs = withShownOrder(s.docs.map(d => Object.assign({}, d.data(), { id: d.id }))); settlePending(); render(); }, e => showError('Could not read the loads: ' + e.message)));
       const days = [-1, 0, 1, 2].map(n => L.addDays(date, n));
       unsubs.push(onSnapshot(query(collection(db, 'pickups'), where('date', 'in', days)), s => { pickups = s.docs.map(d => d.data()); render(); if (puRow && !document.getElementById('pu-modal').hidden) drawPickups(); }, e => showError('Could not read the pickups: ' + e.message)));
       // Joe 10/18 (screen speed): the Shipping schedule's entries from 14 days before the shown day on, as the Plant Station
