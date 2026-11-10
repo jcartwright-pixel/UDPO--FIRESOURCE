@@ -169,13 +169,29 @@ const PEOPLE = [
     for (let i = 0; i < 75 && !kemp; i++) { const q = await db().collection('drivers').where('employeeId', '==', '10877').get(); kemp = q.empty ? null : q.docs[0].data(); if (!kemp) await new Promise(r => setTimeout(r, 200)); }
     assert.ok(kemp, 'Kemp is saved on the Driver Roster with his employee ID');
     assert.equal(kemp.hireDate, '2026-10-20');
+    // Joe 11-10-26: Edit Driver's Employee ID box can be changed; the new ID is saved and shows on the line.
+    await d.waitForSelector('#rows tr[data-id="' + kemp.id + '"] .edit', { timeout: 15000 });
+    await d.click('#rows tr[data-id="' + kemp.id + '"] .edit');
+    await d.waitForSelector('#d-emp');
+    assert.equal(await d.$eval('#d-emp', x => x.readOnly), false, 'the Employee ID box can be typed in');
+    await d.fill('#d-emp', '55577');
+    await d.press('#d-emp', 'Tab');
+    let moved = null;
+    for (let i = 0; i < 75 && !moved; i++) { const q = await db().collection('drivers').where('employeeId', '==', '55577').get(); moved = q.empty ? null : q.docs[0].data(); if (!moved) await new Promise(r => setTimeout(r, 200)); }
+    assert.ok(moved && moved.id === kemp.id, 'the new employee ID is saved on the driver');
+    await d.waitForFunction(() => /55577/.test(document.querySelector('#rows').textContent), null, { timeout: 15000 });
+    await shot(d, '3b-edit-driver-employee-id-1536.png');
+    await d.fill('#d-emp', '10877');
+    await d.press('#d-emp', 'Tab');
+    for (let i = 0; i < 75; i++) { const x = (await db().collection('drivers').doc(kemp.id).get()).data(); if (x.employeeId === '10877') break; await new Promise(r => setTimeout(r, 200)); }
+    await d.click('#d-cancel');
     await d.click('#add');
     await d.fill('#d-pick', 'ke');
     await d.waitForSelector('#d-picks p');
     assert.equal(await d.$$eval('#d-picks [data-emp]', b => b.length), 0, 'a driver is not offered twice');
     assert.deepEqual(d.errors, []);
     await d.close();
-    results.push('+ Add Driver: pick Kemp by typing "ke"; name, ID, hire date (gray) and phone fill in; Add Driver saves him with his ID; he is not offered again');
+    results.push('+ Add Driver: pick Kemp by typing "ke"; name, ID, hire date (gray) and phone fill in; Add Driver saves him with his ID; Edit Driver changes his employee ID and puts it back; he is not offered again');
 
     // 4. Plant Schedule Setup's + Add Person.
     const c = await openPage(browser, 1536, 790, '/crew.html?view=setup&tab=people&plant=fac_uniontown&' + MANAGER);

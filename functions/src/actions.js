@@ -228,6 +228,9 @@ function validate(input) {
     out.driverId = text(input.driverId);
     // Joe 10/31 (mock-ups 2 and 3): a new driver is picked from the Employees list; the server fills the name and hire date.
     out.employeeId = text(input.employeeId, 20);
+    // Joe 11-10-26: Edit Driver's Employee ID box (blank clears it); an ID is a number, never a name typed in the box.
+    out.setEmployeeId = input.setEmployeeId === true && !!out.driverId;
+    if (out.setEmployeeId && out.employeeId && !/\d/.test(out.employeeId)) throw new SaveError('BAD_REQUEST', 'Type the employee ID as a number, like 10877');
     out.name = text(input.name, 120).toUpperCase();
     if (!out.name && !out.employeeId) throw new SaveError('BAD_REQUEST', 'Enter the driver name, or pick an employee');
     out.hireDate = dateOrBlank(input.hireDate, 'Hire date');
