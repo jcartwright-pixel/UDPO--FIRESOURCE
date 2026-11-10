@@ -134,6 +134,9 @@ async function hubCall(db, user, input, options) {
       // Joe 11-10-26 ("a card for the sales ... a link that goes directly to that app"): the salespeople's own phone app
       // (UD Sales, Operations' sales.html). Any United Dairy account may open it and it only shows, so it has no tick.
       tiles.push({ key: 'sales', name: 'Sales App', note: 'The salespeople\'s own app: where every route is now and the customers on each route. It only shows; nothing changes', url: ops.url + 'sales.html' });
+      // Joe 11-10-26 ("I need a card in the hub under plant just for inventory"): straight to Inventory (Operations'
+      // inventory.html), the supplies and milk products for each plant. Its screen keeps its own save rights, so no tick.
+      tiles.push({ key: 'inventory', name: 'Inventory', note: 'Supplies and milk products for each plant: what is on hand, counts, what came in and every change', url: ops.url + 'inventory.html' });
     }
     return { name: String(person.name || person.displayName || '').trim(), admin: isAdmin(person), tiles };
   }

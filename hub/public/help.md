@@ -24,9 +24,10 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Customer Statements** (the Statement Center): email, mail and print customer statements for every location, and keep the statement customer list. Pick the location at the top once it opens.
 - **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
 - **Sales App** (UD Sales): the salespeople's own app: where every route is now, with a map, and the customers on each route. It only shows; nothing can be changed from it. On a phone, add it to the home screen as **UD Sales**.
+- **Inventory**: the supplies and milk products for each plant: what is on hand, counts, what came in (the receiving log) and every change. It opens the Inventory screen in Plant & Distribution. Everyone active sees the card; who may count or change stock is set by their role there.
 
 ### The areas
-- **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory).
+- **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory), and **Inventory**, its own card for the plant's stock.
 - **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), and Customers & Routes.
 - **Sales**: the **Sales App**, the salespeople's own app.
 - **Fleet & Costs**: Fuel Tracking, Route & Trip Costs and Route Cost Analysis.
@@ -35,7 +36,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL).
 
 ### Which cards you see
-- **Plant & Distribution**, **Customers & Routes**, the **Sales App** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App has nothing to tick in People & Access: any United Dairy account may open it.
+- **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App and Inventory have nothing to tick in People & Access: any United Dairy account may open it.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis** and **Customer Statements**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
