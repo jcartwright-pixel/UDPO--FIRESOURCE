@@ -44,9 +44,17 @@ const dailyLine = (p) => p.evaluate(() => {
   }
   return bad;
 });
-// Joe 11/9: the warnings come up in a pop-up by themselves. popText waits for it and gives its words; closePop puts it away.
+// Joe 11-10-26 ("I don't want it"): the warnings never pop up by themselves; a red button on the strip opens them. popText
+// checks it did not come up by itself, presses a red button and gives its words; closePop puts it away.
 const POP = '#send-texts-pop:not([hidden])';
-const popText = async (p) => { await p.waitForSelector(POP, { timeout: 20000 }); return p.textContent(POP); };
+const popText = async (p) => {
+  await p.waitForSelector('#send-texts [data-pop]', { timeout: 20000 });
+  await p.waitForTimeout(500);
+  assert.equal(await p.isVisible('#send-texts-pop'), false, 'nothing pops up by itself');
+  await p.click('#send-texts [data-pop]');
+  await p.waitForSelector(POP, { timeout: 5000 });
+  return p.textContent(POP);
+};
 const closePop = async (p) => { await p.click(POP + ' .send-pop-close'); await p.waitForSelector('#send-texts-pop', { state: 'hidden' }); };
 const lastSend = async () => ((await db().collection('private').doc('sms').get()).data() || {}).lastSend;
 
@@ -90,11 +98,8 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     assert.match(await wk.textContent('#send-texts'), /1 OF 1 SENT.*Sent [^.]*\(test copy, written to the list only\)\./);
     const l = await lastSend();
     assert.deepEqual([l.week, l.drivers, l.live, l.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
-    // A warning already closed does not come up again by itself; its red button on the strip opens it.
-    await wk.waitForTimeout(1500);
-    assert.equal(await wk.isHidden('#send-texts-pop'), true, 'closed stays closed');
+    // After the send it still does not come up by itself; its red button on the strip opens it.
     assert.match(await wk.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
-    await wk.click('#send-texts .send-chip');
     assert.match(await popText(wk), /YOURSELF/);
     await closePop(wk);
     assert.ok(await fits(wk) <= 0);
@@ -182,9 +187,8 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     }
 
     // Joe 11/9: Dispatch gives Casey a truck on Wednesday after his text went out. Weekly Dispatch, already open, lists him in red
-    // with what changed (no reload, nothing texted by itself). Joe 11-10-26: a truck or trailer is a small change, so the pop-up
-    // does not come up by itself; the red button opens it. Text Driver opens a text with the changes filled in for his own words,
-    // and he drops off once it is sent. A route added to his week does bring the pop-up up, and Send Updated Schedule texts only him.
+    // with what changed (no reload, nothing texted by itself). Joe 11-10-26: nothing pops up by itself; the red button opens it
+    // (Joe 11-10-26: no Text Driver either). A route added to his week shows too, and Send Updated Schedule texts only him.
     {
       const p = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
       await p.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
@@ -196,11 +200,12 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       await p.waitForTimeout(500);
       assert.equal(await p.isVisible('#send-texts-pop'), false, 'a truck or trailer change does not bring the pop-up up');
       await p.click('#send-texts .send-chip');
-      const chPop = await popText(p);
+      await p.waitForSelector(POP);
+      const chPop = await p.textContent(POP);
       assert.match(chPop, /1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
       assert.match(await p.textContent(POP + ' .send-pop-row'), /CASEY, LEE \(texted .+\)WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED/);
       assert.equal(await p.textContent(POP + ' .send-update'), 'Send Updated Schedule');
-      assert.equal(await p.textContent(POP + ' .send-note'), 'Text Driver');
+      assert.equal(!!(await p.$(POP + ' .send-note')), false, 'no Text Driver button (Joe 11-10-26)');
       assert.equal(await p.textContent('#send-texts .send-chip'), '1 SCHEDULE CHANGED');
       assert.equal((await db().collection('textLog').get()).size, before, 'the warning never texts');
       assert.deepEqual(await small(p), []);
@@ -209,40 +214,25 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       for (const [w, h] of [[1920, 1080], [1536, 790], [390, 844]]) {
         const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-12&' + ADMIN);
         await dd.waitForFunction(() => /1 CHANGED/.test((document.getElementById('send-texts') || {}).textContent || ''), null, { timeout: 20000 });
-        // A new page has not shown this week's other warnings yet (drivers to text yourself), so they may bring it up: close it.
         await dd.waitForTimeout(500);
-        if (await dd.isVisible('#send-texts-pop')) await closePop(dd);
+        assert.equal(await dd.isVisible('#send-texts-pop'), false, 'Daily: nothing pops up by itself');
         assert.equal(await dd.textContent('#send-texts .send-chip'), '1 CHANGED', 'Daily: the red button says only the count');
         assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
         if (w > 700) assert.deepEqual(await dailyLine(dd), [], 'Daily information line at ' + w);
         assert.deepEqual(await small(dd), []);
-        await dd.click('#send-texts .send-chip');
         assert.match(await popText(dd), /SCHEDULE CHANGED/);
         if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'changed-daily-' + w + '.png') });
         await closePop(dd);
         assert.deepEqual(dd.errors, []);
         await dd.context().close();
       }
-      // Text Driver: the changes filled in, Joe's words added, Send texts only Casey; then he is off the list.
-      await p.click(POP + ' .send-note');
-      await p.waitForSelector('#send-note-pop:not([hidden]) textarea');
-      const filled = await p.inputValue('#send-note-pop textarea');
-      assert.match(filled, /^SCHEDULE UPDATE, WEEK OF .+:\nWEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED\n\n$/);
-      await p.focus('#send-note-pop textarea');
-      await p.keyboard.type('Park by door 3.');
-      assert.deepEqual(await small(p), []);
-      if (SHOTS) await p.waitForTimeout(500), await p.screenshot({ path: path.join(SHOTS, 'changed-text-driver-1536.png') });
-      await p.click('#send-note-pop .send-note-send');
-      await p.waitForSelector('#send-note-pop', { state: 'hidden', timeout: 15000 });
-      await p.waitForFunction(() => !/CHANGED/.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
-      const told = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'UPDATE');
-      assert.equal(told.length, 1);
-      assert.equal(told[0].driverId, 'drv_test_casey');
-      assert.match(told[0].body, /WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED\n\nPark by door 3\.$/);
-      // A route added on Thursday: the pop-up, closed, comes up again by itself.
-      if (await p.isVisible('#send-texts-pop')) await closePop(p);
+      // A route added on Thursday: it joins his changes; the pop-up still does not come up by itself.
+      await closePop(p);
       await db().collection('runs').doc('2026-10-11__run_t905').set({ days: { thu: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE' } } }, { merge: true });
-      await p.waitForSelector(POP + ' .send-update', { timeout: 20000 });
+      await p.waitForTimeout(6000);
+      assert.equal(await p.isVisible('#send-texts-pop'), false, 'a route added does not pop up by itself either');
+      await p.click('#send-texts .send-chip');
+      await p.waitForFunction(() => /THURSDAY: WAS OFF/.test((document.querySelector('#send-texts-pop:not([hidden]) .send-pop-row') || {}).textContent || ''), null, { timeout: 20000 });
       assert.match(await p.textContent(POP), /1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
       assert.match(await p.textContent(POP + ' .send-pop-row'), /THURSDAY: WAS OFF, NOW 905 UT DSD MILK/);
       await p.click(POP + ' .send-update');

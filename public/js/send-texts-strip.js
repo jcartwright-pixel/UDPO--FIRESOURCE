@@ -28,8 +28,7 @@ export function sendTextsStrip(db, el, opts) {
         : '<b>Not sent</b> (' + drivers(n) + ' ticked on the Driver Roster).') +
       (keys ? '' : ' Save the Twilio account on Administration &gt; Texts first.');
     // Joe 11/9 ("I don't like any of those warnings up there like that. It just takes too much room up ... just have pop-ups"):
-    // the strip stays one line. Each warning is a small red button on it, and the warnings open in a pop-up by themselves
-    // when something new needs you. Close puts it away until the warnings change; the red buttons open it again.
+    // the strip stays one line. Each warning is a small red button on it, and the button opens them in a pop-up.
     const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     // Joe 11/7: drivers Send will not reach whose week is not their normal week; text them yourself.
     const hand = s.byHand || [];
@@ -63,31 +62,18 @@ export function sendTextsStrip(db, el, opts) {
     const parts = [];
     if (changed.length) parts.push('<h3>' + (changed.length === 1 ? '1 DRIVER\'S SCHEDULE CHANGED' : changed.length + ' DRIVERS\' SCHEDULES CHANGED') + ' AFTER THEIR TEXT WENT OUT</h3>' +
       changed.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (texted ' + esc(stamp(x.sentAt)) + ')<br>' + x.changes.map(esc).join('<br>') + '</span><button type="button" class="send-update" data-log="' + esc(x.logId) + '"' +
-        (!keys || busy || sending ? ' disabled title="' + (!keys ? 'Save the Twilio account on Administration &gt; Texts first' : 'Sending now') + '"' : '') + '>' + (sending === x.logId ? 'Sending...' : 'Send Updated Schedule') + '</button>' +
-        // Joe 11-10-26: one click opens a text to this driver with what changed filled in; he adds his words and sends it.
-        '<button type="button" class="send-note" data-driver="' + esc(x.driverId) + '"' + (!keys || busy || sending ? ' disabled title="' + (!keys ? 'Save the Twilio account on Administration &gt; Texts first' : 'Sending now') + '"' : '') + '>Text Driver</button></div>').join(''));
+        (!keys || busy || sending ? ' disabled title="' + (!keys ? 'Save the Twilio account on Administration &gt; Texts first' : 'Sending now') + '"' : '') + '>' + (sending === x.logId ? 'Sending...' : 'Send Updated Schedule') + '</button></div>').join(''));
     if (miss.length) parts.push('<h3>' + (miss.length === 1 ? '1 DRIVER DOES NOT HAVE THIS WEEK\'S TEXT' : miss.length + ' DRIVERS DO NOT HAVE THIS WEEK\'S TEXT') + '</h3>' +
       miss.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (' + esc(x.why) + ')</span></div>').join('') +
       '<div class="send-pop-row"><span>Fix what it says on the Driver Roster, then text only them.</span><button type="button" class="send-pop-fix' + (armed ? ' armed' : '') + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button></div>');
     if (hand.length) parts.push('<h3>TEXT ' + (hand.length === 1 ? 'THIS DRIVER' : 'THESE ' + hand.length + ' DRIVERS') + ' YOURSELF</h3><p>Not signed up for texts, and their week is not their normal week.</p>' +
       hand.map(x => '<div class="send-pop-row"><span><b>' + esc(x.name) + '</b> (' + esc(x.days.join(', ')) + ')</span></div>').join(''));
     popHtml = parts.join('');
-    // It comes up by itself only for a warning not shown before (a new change, a new missing driver), not again for one closed.
-    // Joe 11-10-26 ("It should only pop up if there's added a route or removed the route"): a changed truck, trailer, leave time
-    // or note shows only on the red button; a route or run added or taken off brings the pop-up up.
-    const ckey = (x) => 'c' + s.week + x.driverId + x.changes.join('|');
-    const loud = [].concat(changed.filter(x => x.big).map(ckey), miss.map(x => 'm' + s.week + x.name + x.why), hand.map(x => 'h' + s.week + x.name + x.days.join()));
-    const quiet = changed.filter(x => !x.big).map(ckey);
-    const was = seenList(), fresh = loud.filter(k => !was.includes(k)), freshQuiet = quiet.filter(k => !was.includes(k));
+    // Joe 11-10-26 ("I don't want it"): the pop-up never comes up by itself. The red buttons on the line open it.
     if (!popHtml) popOpen = false;
-    else if (fresh.length) popOpen = true;
-    if (fresh.length || freshQuiet.length) setSeen(was.concat(fresh, freshQuiet).slice(-200));
     drawPop();
   }
-  const SEEN = 'udSendTextsPop' + (short ? 'Daily' : 'Weekly');
-  function seenList() { try { return JSON.parse(sessionStorage.getItem(SEEN) || '[]'); } catch (e) { return seen; } }
-  function setSeen(k) { seen = k; try { sessionStorage.setItem(SEEN, JSON.stringify(k)); } catch (e) { /* kept in memory */ } }
-  let seen = [], popHtml = '', popOpen = false, pop = null, back = null;
+  let popHtml = '', popOpen = false, pop = null, back = null;
   function drawPop() {
     if (!pop) {
       back = document.createElement('div'); back.className = 'modal-back send-pop-back'; back.hidden = true;
@@ -95,7 +81,7 @@ export function sendTextsStrip(db, el, opts) {
       document.body.append(back, pop);
       // Clicking outside it or pressing Esc closes it too.
       back.onclick = () => { popOpen = false; drawPop(); };
-      document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (note) { note = null; drawNote(); } else if (popOpen) { popOpen = false; drawPop(); } });
+      document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (popOpen) { popOpen = false; drawPop(); } });
     }
     const on = popOpen && !!popHtml;
     back.hidden = pop.hidden = !on;
@@ -104,49 +90,8 @@ export function sendTextsStrip(db, el, opts) {
       '<div class="modal-actions"><button type="button" class="send-pop-close">Close</button></div>';
     pop.querySelector('.send-pop-close').onclick = () => { popOpen = false; drawPop(); };
     pop.querySelectorAll('.send-update').forEach(b => { b.onclick = () => update(b.dataset.log); });
-    pop.querySelectorAll('.send-note').forEach(b => { b.onclick = () => openNote(b.dataset.driver); });
     const fix = pop.querySelector('.send-pop-fix');
     if (fix) fix.onclick = press;
-  }
-  // Text Driver (Joe 11-10-26): a box over the warning, filled in with the driver's changes, for Joe's own words. Send texts
-  // that one driver; Cancel keeps nothing.
-  let note = null;
-  function openNote(driverId) {
-    const x = ((s && s.changed) || []).find(r => r.driverId === driverId);
-    if (!x) return;
-    note = { driverId, name: x.name, text: 'SCHEDULE UPDATE, WEEK OF ' + day(s.week) + ':\n' + x.changes.join('\n') + '\n\n', error: '', busy: false };
-    drawNote();
-  }
-  let noteBack = null, notePop = null;
-  function drawNote() {
-    if (!notePop) {
-      noteBack = document.createElement('div'); noteBack.className = 'modal-back send-note-back'; noteBack.hidden = true;
-      notePop = document.createElement('section'); notePop.className = 'modal send-note-pop'; notePop.id = 'send-note-pop'; notePop.setAttribute('role', 'dialog'); notePop.setAttribute('aria-label', 'Text a driver'); notePop.hidden = true;
-      document.body.append(noteBack, notePop);
-    }
-    noteBack.hidden = notePop.hidden = !note;
-    if (!note) return;
-    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    notePop.innerHTML = '<h2>Text ' + esc(note.name) + '</h2><p>What changed is filled in. Add your words, then Send.</p>' +
-      '<textarea class="send-note-text" rows="9" maxlength="1500" aria-label="Text to the driver">' + esc(note.text) + '</textarea>' +
-      (note.error ? '<p class="send-error">' + esc(note.error) + '</p>' : '') +
-      '<div class="modal-actions"><button type="button" class="send-note-cancel">Cancel</button><button type="button" class="send-note-send"' + (note.busy ? ' disabled' : '') + '>' + (note.busy ? 'Sending...' : 'Send') + '</button></div>';
-    const box = notePop.querySelector('.send-note-text');
-    box.oninput = () => { note.text = box.value; };
-    if (!note.busy) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
-    notePop.querySelector('.send-note-cancel').onclick = () => { note = null; drawNote(); };
-    notePop.querySelector('.send-note-send').onclick = sendNote;
-  }
-  async function sendNote() {
-    if (!note || note.busy) return;
-    if (!note.text.trim()) { note.error = 'Type the text first.'; drawNote(); return; }
-    note.busy = true; note.error = ''; drawNote();
-    try {
-      const r = await callServer('sms', { op: 'textUpdate', driverId: note.driverId, body: note.text });
-      if (r && r.update && r.update.status !== 'SENT' && r.update.status !== 'NOT SENT') { note.busy = false; note.error = r.update.name + ': not sent (' + (r.update.reason || r.update.status) + ')'; drawNote(); return; }
-    } catch (e) { note.busy = false; note.error = serverText(e, 'Texts'); drawNote(); return; }
-    note = null; drawNote();
-    await load();
   }
   async function load() {
     try { s = await callServer('sms', { op: 'preview' }); error = ''; } catch (e) { s = null; }
