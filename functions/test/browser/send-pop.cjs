@@ -1,7 +1,7 @@
 'use strict';
 /*
- * Joe 11-9-26: on Daily and Weekly Dispatch the schedule texts warnings come up in a pop-up by themselves for an
- * administrator. A test that goes on to use the screen closes it first (Esc), the way a person would.
+ * Joe 11-10-26: the schedule texts pop-up on Daily and Weekly Dispatch no longer comes up by itself. This stays as a safety:
+ * a test that goes on to use the screen closes it first (Esc) if it is open.
  */
 module.exports = async function closeSendPop(page) {
   await page.waitForSelector('#send-texts:not([hidden])', { timeout: 15000 });
