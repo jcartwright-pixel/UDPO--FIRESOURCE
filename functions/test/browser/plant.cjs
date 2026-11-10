@@ -158,7 +158,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
     if (SHOTS) await loader.screenshot({ path: path.join(SHOTS, 'loadout-edit-1920.png'), scale: 'css' });
     await loader.fill('#edit-notes', 'Short 2 cases of buttermilk');
     // Review item 38 (Joe 10/13): no Save Times & Notes button; leaving the box saves it, then Close.
-    assert.equal(await loader.$('#edit-save'), null, 'no Save button on the Edit Load box');
+    assert.equal(!!(await loader.$('#edit-save')), false, 'no Save button on the Edit Load box');
     await loader.click('#edit-modal [data-close]');
     for (let i = 0; ; i++) {
       const days = (await db().collection('runs').get()).docs.flatMap(d => Object.values(d.data().days || {}));
@@ -251,7 +251,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       await tab.waitForFunction(([x, b]) => { const rows = [...document.querySelectorAll('#rows tr[data-row]')].map(r => r.dataset.row); return rows.indexOf(x) === rows.indexOf(b) + 1; }, [id, below2], { timeout: 8000 });
       const twice = await place();
       const last = await tab.$eval('#rows tr[data-row]:last-child', t => t.dataset.row);
-      assert.equal(await tab.$('tr[data-row="' + last + '"] button.skip'), null, 'the last load to load has no Skip (it stays where it is)');
+      assert.equal(!!(await tab.$('tr[data-row="' + last + '"] button.skip')), false, 'the last load to load has no Skip (it stays where it is)');
       if (SHOTS) {
         await tab.screenshot({ path: path.join(SHOTS, 'loadout-skip-tablet-1280.png'), scale: 'css' });
         await tab.$eval('.sheet.scroll-list', el => { el.scrollTop = el.scrollHeight; });
@@ -265,7 +265,7 @@ const row = (route) => 'tr[data-row^="2026-10-04__run_p' + route + '|"]';
       results.push('Skip: each press moved the load down one place, marked SKIPPED with who pressed it, kept after a reload; the last load has no Skip');
       await tab.click(sel + ' button.clock');
       await tab.waitForSelector(sel + '.loading', { timeout: 8000 });
-      assert.equal(await tab.$(sel + ' button.skip'), null, 'a load loading has no Skip');
+      assert.equal(!!(await tab.$(sel + ' button.skip')), false, 'a load loading has no Skip');
       results.push('Start on the skipped load takes its Skip button off');
       assert.deepEqual(tab.errors, []);
       await tab.close();

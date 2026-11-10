@@ -93,7 +93,7 @@ async function openPage(browser, width, height, url, touch) {
     const wash = await o.$('#rows tr[data-key$="ADDED|902"]');
     assert.match(await wash.$eval('td.rr', c => c.textContent), /Wash only/);
     assert.ok(await wash.$('button[data-do="wash"]'), 'a wash-only trailer has a Wash button');
-    assert.equal(await wash.$('button[data-do="start"]'), null, 'and no Start');
+    assert.equal(!!(await wash.$('button[data-do="start"]')), false, 'and no Start');
     const order = await o.$$eval('#rows tr[data-key]', rs => rs.map(r => r.dataset.key));
     const o850 = order.findIndex(k => /850/.test(k));
     assert.ok(o850 >= 0 && order.slice(o850 + 1, o850 + 3).some(k => /ADDED\|640$/.test(k)) && order.slice(o850 + 1, o850 + 3).some(k => /ADDED\|902$/.test(k)), 'yesterday\'s, then the added trailers: ' + order.join(', '));
@@ -122,7 +122,7 @@ async function openPage(browser, width, height, url, touch) {
     await o.waitForFunction(() => !/from yesterday/.test(document.getElementById('banner').textContent));
     await o.reload();
     await o.waitForSelector('#rows tr[data-key]', { timeout: 15000 });
-    assert.equal(await o.$('#rows tr.prior'), null, 'still off the list after a refresh');
+    assert.equal(!!(await o.$('#rows tr.prior')), false, 'still off the list after a refresh');
     assert.deepEqual(o.errors, []);
     results.push('office: banner, T-902 wash only (Wash, no Start) then done, T-888 taken off the list');
     await o.close();

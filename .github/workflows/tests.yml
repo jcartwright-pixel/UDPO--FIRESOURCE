@@ -47,7 +47,7 @@ jobs:
       - name: Database tests on the local emulator (transfer, saves, security rules)
         run: npm run test:emulator
       - name: Install the test browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium && (command -v gdb || sudo apt-get install -y -q gdb)
       - name: Screen tests on the local emulator (Daily, Weekly, fit to one page, live update)
         # Pictures go outside functions/: the emulator reloads the server when a file appears there, which slowed
         # saves mid-test and made the Route Editor checks time out.
@@ -59,8 +59,8 @@ jobs:
         # program may take more than 4 GB: it stops with "heap limit" and its name instead of taking the machine down.
         # 11-10-26: plant-load-numbers grew past 13 GB with the 4 GB limit on (the memory is outside the JavaScript heap).
         # tools/memory-guard.sh now checks every second and stops any screen test past 3 GB (lines starting STUCK).
-        # 11-10-26: in 4 parts, not 3. plant-load-numbers locked up only late in a long part (43rd of 44 tests); run with a few
-        # tests on fresh emulators it passed every time, so each part is shorter and it now runs 10th in part 2.
+        # 11-10-26: in 4 parts, not 3 (shorter emulator sessions). plant-load-numbers still locks up on some runs; when it
+        # does, memory-guard.sh prints its native stack (STUCK bt) before stopping it.
         env:
           NODE_OPTIONS: --max-old-space-size=4096 --report-on-signal --report-signal=SIGUSR2 --report-directory=${{ runner.temp }}/node-reports
           REPORTS: ${{ runner.temp }}/node-reports
@@ -75,3 +75,18 @@ jobs:
           path: ${{ runner.temp }}/shots/
           if-no-files-found: ignore
           retention-days: 14
+
+  # The release (release.yml) starts when these tests finish green on main. A run started by auto-merge.yml (a merge made
+  # by the workflow's own token, so no push run) cannot start it that way: GitHub starts no workflow_run from it. So a
+  # green run that was started by hand on main starts the release itself (11-10-26: 720 and 722 merged this way and sat).
+  release:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Start the release for this tested code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "${{ github.repository }}" --ref main

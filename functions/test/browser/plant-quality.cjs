@@ -64,7 +64,7 @@ async function shots(page, name, w) {
       assert.equal(await page.textContent('#form-title'), 'BOXING Quality Check');
       assert.equal(await page.inputValue('.prod-product'), '', 'the boxes start empty');
       assert.match(await page.textContent('#fields'), /Last: 1% Chocolate milk/, 'the line\'s last check shows small and grey');
-      assert.equal(await page.$('.prod-cycle'), null, 'Boxing records no cycle time');
+      assert.equal(!!(await page.$('.prod-cycle')), false, 'Boxing records no cycle time');
       await page.click('[data-line="ut_prod_blow_mold"]');
       await page.waitForFunction(() => document.getElementById('form-title').textContent === 'BLOW MOLD Quality Check');
       assert.equal(await page.$$eval('.prod-head', x => x.length), 6);
@@ -109,7 +109,7 @@ async function shots(page, name, w) {
         // Joe 10/15: the run's last check stays with it, read only, so nothing is typed in again.
         await page.waitForSelector('#fields .qc-run-last');
         assert.match(await page.textContent('#fields .qc-run-last'), new RegExp('Last check of the run[\\s\\S]*Product' + pick.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-        assert.equal(await page.$('#fields .qc-run-last input, #fields .qc-run-last select'), null, 'the run\'s last check is read only');
+        assert.equal(!!(await page.$('#fields .qc-run-last input, #fields .qc-run-last select')), false, 'the run\'s last check is read only');
         assert.ok(await page.isVisible(doneTile), 'the line says DONE in the list');
         assert.equal(await page.isVisible('#run-done'), false);
         for (let i = 0; i < 50 && ((await lastGallon()) || {}).status !== 'FINISHED'; i++) await page.waitForTimeout(100);
@@ -117,7 +117,7 @@ async function shots(page, name, w) {
         if (SHOTS) await page.screenshot({ path: path.join(SHOTS, 'quality-run-complete-1920.png'), scale: 'css' });
         await page.click('[data-undo-done]');
         await page.waitForSelector('#fields select.prod-product');
-        assert.equal(await page.$(doneTile), null, 'Undo: the line is open again');
+        assert.equal(!!(await page.$(doneTile)), false, 'Undo: the line is open again');
         for (let i = 0; i < 50 && !((await lastGallon()).payload || {}).undone; i++) await page.waitForTimeout(100);
         assert.equal((await lastGallon()).payload.undone, true, 'the mistaken press is marked undone');
         await page.click('#run-done');
@@ -125,7 +125,7 @@ async function shots(page, name, w) {
         await page.click('[data-next]');
         await page.waitForSelector('#fields select.prod-product');
         assert.equal(await page.inputValue('select.prod-product'), '', 'Start Next Run: the boxes start empty');
-        assert.equal(await page.$(doneTile), null);
+        assert.equal(!!(await page.$(doneTile)), false);
         results.push('Run Complete: the line shows done until 6 a.m. with the run\'s last check read only, no form and DONE in the list; Undo opens it again (check marked undone); Start Next Run starts empty boxes');
       }
       await page.click('[data-pane="history"]');
@@ -139,7 +139,7 @@ async function shots(page, name, w) {
     await desk.waitForFunction(() => document.getElementById('form-title').textContent === 'TOTES Quality Check');
     await watcher.waitForSelector('#pane-history:not([hidden])');
     const before = await watcher.$$eval('#history tr:not(:has(td.empty))', r => r.length);
-    assert.equal(await desk.$('.prod-weights'), null, 'Totes records no weight');
+    assert.equal(!!(await desk.$('.prod-weights')), false, 'Totes records no weight');
     // Joe 10/10 (typed): the product is picked from the machine's own drop-down; one not on it goes under Other (type it).
     await desk.focus('.prod-product');
     await desk.selectOption('.prod-product', '__other__');

@@ -46,7 +46,7 @@ const ADMIN = '?testEmail=admin.test@uniteddairy.com';
         await p.click(btn);
         await p.waitForFunction(() => /In Operations/.test(document.querySelector('tr[data-row="sheet-users"]').textContent));
         assert.match(await p.textContent('tr[data-row="sheet-users"]'), /Moved \d{1,2}-\d{1,2}-\d{2}\b/);
-        assert.equal(await p.$('button[data-sheet="users"]'), null);
+        assert.equal(!!(await p.$('button[data-sheet="users"]')), false);
         const c = (await db().collection('config').doc('app').get()).data();
         assert.equal(c.offSheets.users.by, 'admin.test@uniteddairy.com');
       }

@@ -146,7 +146,7 @@ async function until(what, fn) {
       // Joe 10/26: the Boxing page's Jugs and boxes tab; no Fill weight tab (Boxing has no fill weight check).
       const dv = await openPage(browser, w, w === 1536 ? 960 : 1080, '/production.html?line=' + BOXING + '&tab=boxing&' + ADMIN);
       await dv.waitForFunction(() => /Jugs in/.test((document.querySelector('#detail .pm-tabbody') || {}).textContent || '') && !!document.querySelector('#pmtabs [data-pmtab="boxing"]'));
-      assert.equal(await dv.$('#pmtabs [data-pmtab="fill"]'), null, 'no Fill weight tab on Boxing');
+      assert.equal(!!(await dv.$('#pmtabs [data-pmtab="fill"]')), false, 'no Fill weight tab on Boxing');
       const d = (await dv.textContent('#detail .pm-tabbody')).replace(/ /g, ' ');
       assert.match(d, /Jugs in 450\s+Boxes 100 × 4 = 400 jugs boxed\s+Not boxed 50/);
       await fits(dv, 'the Boxing shift view at ' + w);

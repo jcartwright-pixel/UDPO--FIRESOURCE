@@ -37,7 +37,7 @@ const until = async (fn, what) => { for (let i = 0; i < 60; i++) { if (await fn(
     p.on('pageerror', e => errors.push(e.message));
     await p.goto(HOSTING + '/fleet.html?view=techs&testEmail=manager.test@uniteddairy.com');
     await p.waitForSelector('#tech-name');
-    assert.equal(await p.$('[data-rule]'), null, 'only the technicians: no service rules');
+    assert.equal(!!(await p.$('[data-rule]')), false, 'only the technicians: no service rules');
     assert.equal(await p.$eval('#tech-name', e => e.getBoundingClientRect().bottom <= innerHeight), true, 'the add box is on screen without scrolling');
     const people = await p.$$eval('#tech-people option', o => o.map(x => x.value));
     assert.ok(people.indexOf('THOMAS EXAMPLE') >= 0 && people.indexOf('SAM NEWHIRE') >= 0 && Math.max(people.indexOf('THOMAS EXAMPLE'), people.indexOf('SAM NEWHIRE')) < people.indexOf('ALEX DRIVER'), 'the Employees list, GARAGE first');

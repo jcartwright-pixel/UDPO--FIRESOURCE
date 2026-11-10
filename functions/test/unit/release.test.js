@@ -60,3 +60,12 @@ test('a branch is tested once, through its pull request; main on every push', ()
   assert.match(t, /^on:\n(?:#.*\n)*  push:\n    branches: \[main\]\n/m, 'a push tests main only');
   assert.match(t, /^  pull_request:\n/m, 'a pull request is tested');
 });
+
+test('a merge made by auto-merge.yml still releases: its green main run starts the release itself', () => {
+  const t = wf('tests.yml');
+  const job = t.slice(t.indexOf('\n  release:'));
+  assert.match(job, /needs: test/, 'only after every test passed');
+  assert.match(job, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && github\.actor == 'github-actions\[bot\]'/);
+  assert.match(job, /actions: write/);
+  assert.match(job, /gh workflow run release\.yml --repo "\$\{\{ github\.repository \}\}" --ref main/);
+});

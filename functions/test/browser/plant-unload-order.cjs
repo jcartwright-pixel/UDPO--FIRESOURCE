@@ -150,7 +150,7 @@ async function openPage(browser, width, height, url, touch) {
     await o.click('[data-tab="all"]');
     await o.waitForFunction(() => { const c = document.querySelector('#rows tr[data-key*="909_1"] td.trlcell'); return c && c.textContent.trim() === 'Marietta 1'; });
     const cell = await o.$('#rows tr[data-key*="909_1"] td.trlcell');
-    assert.equal(await cell.$('input'), null, 'no Trailer # box on a drop-and-hook load');
+    assert.equal(!!(await cell.$('input')), false, 'no Trailer # box on a drop-and-hook load');
     assert.deepEqual(o.errors, []);
     results.push('office: Marietta 1 in the Trailer column');
     // T-777 (needed today, did not deliver today) is on the office list too; Take Off the List saves it as a trailer added for 812.
@@ -170,7 +170,7 @@ async function openPage(browser, width, height, url, touch) {
       if (!saved) await new Promise(r => setTimeout(r, 250));
     }
     await o.waitForTimeout(500);
-    assert.equal(await o.$('#rows tr[data-key*="ADDED"]'), null, 'T-777 stays off the list once saved');
+    assert.equal(!!(await o.$('#rows tr[data-key*="ADDED"]')), false, 'T-777 stays off the list once saved');
     assert.ok(saved && saved.payload.dropped && saved.payload.added === 'UNLOAD' && saved.payload.forRoute === 'UT DSD MILK' && saved.trailer === 'T-777', 'saved as taken off, for 812: ' + JSON.stringify(saved));
     assert.deepEqual(o.errors, []);
     results.push('office: T-777 listed for UT DSD MILK, Take Off the List saved');

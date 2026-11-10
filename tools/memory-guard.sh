@@ -14,6 +14,9 @@ while true; do
     [ -z "$rss" ] && continue
     if [ "$rss" -gt 3000000 ]; then
       echo "STUCK $(date -u +%T) $(ps -o args= -p "$p") at $((rss / 1024)) MB: asking for its report, then stopping it"
+      # The program's native stack (its JavaScript can be stuck where no report or timer runs): a few samples of the main
+      # thread, so the loop shows by name (lines starting STUCK bt).
+      for i in 1 2 3; do sudo gdb -p "$p" -batch -ex "bt 40" 2>/dev/null | grep -E '^#' | sed 's/^/STUCK bt /' | cut -c1-220; echo "STUCK bt ---"; sleep 0.3; done
       kill -USR2 "$p" 2>/dev/null
       sleep 4
       f=$(ls -t "$REPORTS"/*.json 2>/dev/null | head -1)

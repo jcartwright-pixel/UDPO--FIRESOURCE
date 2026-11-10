@@ -94,7 +94,7 @@ async function until(what, fn) {
     const strip = await nw.textContent('#date-check');
     assert.match(strip, /Broughton Chocolate Half Gallon/, 'the UPC picked the product');
     assert.match(await nw.textContent('#prod-pill'), /READ FROM JUG LABEL \(UPC\)/);
-    assert.equal(await nw.$('#fill-box[hidden]'), null, 'the fill weight check stays');
+    assert.equal(!!(await nw.$('#fill-box[hidden]')), false, 'the fill weight check stays');
     await nw.close();
     const runNew = (await runsOf(NEW_HALF))[0];
     assert.deepEqual([runNew.product, runNew.count], ['Broughton Chocolate Half Gallon', 120]);

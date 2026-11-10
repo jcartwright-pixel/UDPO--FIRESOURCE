@@ -65,7 +65,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
       assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Down at', 'What happened?', 'What fixed it', 'Back up at', 'Notes / Follow-up', 'Follow-up']);
       // Joe 10/12: "We should just be able to type in what's broke ... Not a list": a plain box, no machine list under it.
       assert.equal(await page.$eval('.sn-equip', x => x.getAttribute('list')), null, 'What broke is a plain typing box');
-      assert.equal(await page.$('datalist'), null, 'no machine list');
+      assert.equal(!!(await page.$('datalist')), false, 'no machine list');
       await page.selectOption('.sn-type', 'Maintenance Request');
       assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'What broke', 'Shift', 'Can it wait?', 'What\'s wrong?', 'Notes / Follow-up', 'Follow-up']);
       assert.equal(await page.inputValue('.sn-urgency'), '', 'Can it wait starts blank');
@@ -74,7 +74,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
       await page.selectOption('.sn-type', 'Handoff');
       assert.deepEqual(await page.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Equipment / area', 'Shift', 'Reading Time', 'Entry / Measurements', 'Notes / Follow-up', 'Follow-up'], 'the other kinds keep the form they had');
       await page.selectOption('.sn-type', 'Breakdown');
-      assert.equal(await page.$('#record'), null, 'Shift Notes has no Save button');
+      assert.equal(!!(await page.$('#record')), false, 'Shift Notes has no Save button');
       assert.match(await page.inputValue('#shift-now'), /^(FIRST|SECOND|THIRD) SHIFT$/);
       await fits(page, 'Shift Notes ' + w + 'x' + h);
       await shots(page, 'shiftnotes-current', w);
@@ -148,7 +148,7 @@ const cards = (page) => page.$$eval('#history .sn-card', c => c.length);
     await phone.selectOption('.sn-type', 'Handoff');
     assert.deepEqual(await phone.$$eval('#fields label', l => l.map(x => x.childNodes[0].textContent.trim())), ['Type', 'Shift', 'Equipment / area', 'What happened?', 'Next steps Optional', 'Follow-up']);
     await phone.selectOption('.sn-type', 'Breakdown');
-    assert.equal(await phone.$('#record'), null, 'no Save button on the phone');
+    assert.equal(!!(await phone.$('#record')), false, 'no Save button on the phone');
     if (SHOTS) await phone.screenshot({ path: path.join(SHOTS, 'shiftnotes-phone-412.png'), scale: 'css' });
     assert.equal(await phone.isVisible('[data-pane="history"]'), false, 'no log tab on the phone');
     // Joe 10/18: long cooler track got what fixed it but no back up time and kept counting as down. Typing what fixed it fills
