@@ -2,8 +2,11 @@ name: Distribution app tests
 
 # The new Firebase distribution app (this repository). Runs its tests against Google's local emulators with
 # made-up sheets: no Firebase project, no Google Sheets and no production data are touched.
+# A branch is tested once, through its pull request (its push ran the same tests a second time, on a second machine, at the
+# same moment, and a red push run blocked a green pull request run); main is tested on every push, which starts the release.
 on:
   push:
+    branches: [main]
     paths:
       - '**'
       - '.github/workflows/tests.yml'

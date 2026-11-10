@@ -54,3 +54,9 @@ test('merge by itself: only a green, non-draft pull request from this repository
   assert.match(a, /gh workflow run tests\.yml --repo "\$REPO" --ref main/, 'the main tests start after the merge');
   assert.match(wf('release.yml'), /github\.event\.workflow_run\.event == 'workflow_dispatch'/, 'and the release takes that run');
 });
+
+test('a branch is tested once, through its pull request; main on every push', () => {
+  const t = wf('tests.yml');
+  assert.match(t, /^on:\n(?:#.*\n)*  push:\n    branches: \[main\]\n/m, 'a push tests main only');
+  assert.match(t, /^  pull_request:\n/m, 'a pull request is tested');
+});
