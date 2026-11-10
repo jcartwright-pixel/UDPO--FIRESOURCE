@@ -495,9 +495,32 @@ test('a load loaded after its dispatch time shows as loaded late', () => {
   // the route list still says "8:45 AM late" and the banner still says loaded late.
   assert.doesNotMatch(plain, /Already loaded, but late/);
   assert.match(plain, /2 of 3 loaded 1 left to load [^]*Case Loadout [^]*On time Done about 10:50 AM/);
-  assert.match(plain, /855 Save-A-Lot 1 8:45 AM late 8:00 AM/);
+  // Joe 11-9-26: the loaded-late row keeps the late color (yellow here, 45 minutes) and shows the time it was loaded, not "late".
+  assert.match(plain, /855 Save-A-Lot 1 8:45 AM 8:00 AM/);
+  assert.match(html, /background:#f5c518[^>]*>855<\/td>/);
+  assert.doesNotMatch(plain, /8:45 AM late/);
   assert.doesNotMatch(plain, /856 Save-A-Lot 2 [^ ]+ AM late/, 'Save-A-Lot 2 was loaded before its 9:30 AM dispatch');
   assert.doesNotMatch(r.text, /LOADED LATE \(/);
+});
+
+// Joe 11-9-26 ("instead of late, should show the time that it was loaded in red. Just like it is"): a late row stays red.
+// Loaded, it shows the time it was loaded; not loaded yet, when it should be loaded (its est. time) instead of the word LATE.
+test('a late row stays red and shows a time instead of LATE', () => {
+  const SUN = '2026-11-01', at = Date.parse('2026-11-01T19:45:00Z'); // Sunday 2:45 PM
+  const row = (id, route, run, dispatch, extra) => Object.assign({ id, route, run, area: 'CASE', quantity: 900, dispatchTime: dispatch, prior: false, loadDate: SUN, deliveryDate: SUN, departureDate: SUN, leavesOn: 'Load Day' }, extra);
+  const loads = [row('s1', '855', 'SAVE-A-LOT 1', H(8), { state: 'DONE', startedAt: '2026-11-01T12:00:00Z', completedAt: '2026-11-01T15:20:00Z' }),
+    row('j1', '852', 'UT JERSEY LOAD 1', H(13), { state: 'WAITING', quantity: 300 }),
+    row('w1', '827', 'WALMART', H(23), { state: 'WAITING', quantity: 300 })];
+  const r = R.plantReport({ loads, forecast: R.loadForecast({ date: SUN, loads }, at) }, at);
+  assert.equal(r.loaded.find(x => x.route === '855').tone, 'late', 'loaded 2 hours 20 minutes after its dispatch: red');
+  assert.deepEqual(r.behind.map(x => x.route), ['852']);
+  const html = R.reportHtml(r, ''), plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const est = r.forecast.loads.find(x => x.id === 'j1').estText;
+  assert.match(html, /background:#b42318[^>]*>855<\/td>/, 'loaded late: the row stays red');
+  assert.match(plain, /855 Save-A-Lot 1 10:20 AM 8:00 AM/, 'and shows the time it was loaded');
+  assert.match(html, /background:#b42318[^>]*>852<\/td>/, 'late, not loaded: the row stays red');
+  assert.ok(plain.includes('852 Jersey L1 est. ' + est + ' 1:00 PM'), 'and shows when it should be loaded');
+  assert.doesNotMatch(plain, /\bLATE 1:00 PM|10:20 AM late/);
 });
 
 // Joe 11/3 (built-2-by-area): the recap box has one line per area, in the order Case, Boxing, Tote, Tanker, and an area
