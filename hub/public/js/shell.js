@@ -6,6 +6,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+import { practiceGate, LIVE_HUB } from './practice-gate.js';
 
 const DOMAIN = 'uniteddairy.com';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -13,6 +14,11 @@ const HERE = location.pathname.split('/').pop() || 'index.html';
 const QS = new URLSearchParams(location.search);
 // The practice copy (ud-distribution-sandbox-hub), or ?practicetest=1 in the local tests.
 const PRACTICE = /sandbox/.test(location.hostname) || (LOCAL && QS.get('practicetest') === '1');
+// Joe 11-9-26: the live hub is the one that opens; the practice hub only when chosen (practice-gate.js).
+const GO_LIVE = practiceGate(location, window.sessionStorage);
+if (GO_LIVE) location.replace(GO_LIVE);
+// The practice hub installs under its own name, so it is never mistaken for the live one.
+if (PRACTICE) { const m = document.querySelector('link[rel="manifest"]'); if (m) m.href = 'manifest-practice.webmanifest'; }
 
 // The screens, in the menu's order.
 export const SCREENS = [
@@ -120,7 +126,7 @@ function drawFrame() {
   if (bar && PRACTICE && !document.getElementById('practice-band')) {
     const band = document.createElement('div');
     band.id = 'practice-band'; band.className = 'practice-band'; band.setAttribute('role', 'note');
-    band.innerHTML = '<span><b>Practice copy.</b> This is the practice hub, so its cards open the practice copies of the apps. A card for an app with no practice copy says it opens the live one.</span><a href="https://ud-distribution-hub.web.app/">Open the live hub</a>';
+    band.innerHTML = '<span><b>Practice copy.</b> You chose the practice hub, for testing. Its cards open the practice copies of the apps. A card for an app with no practice copy says it opens the live one.</span><a href="' + LIVE_HUB + '/">Open the live hub</a>';
     bar.insertAdjacentElement('afterend', band);
   }
   if (screen && !document.getElementById('screen-loading')) {

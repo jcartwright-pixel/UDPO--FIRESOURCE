@@ -363,6 +363,8 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 /* The practice hub says so at the top (11-5-26). */
 .practice-band { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; background: #fff4cc; border-bottom: 1px solid #e5c95c; color: #5a4300; }
 .practice-band a { margin-left: auto; font-weight: 800; color: var(--ud-blue); }
+.practice-pick { margin: 18px 0 0; color: var(--muted, #4a5b6b); }
+.practice-pick a { font-weight: 800; color: var(--ud-blue); }
 /* Accounting Numbers (accounting.html) */
 .acc { padding: 8px 16px 30px; max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .acc-card, .acc > * { min-width: 0; }
