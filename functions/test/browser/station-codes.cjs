@@ -91,7 +91,8 @@ async function codeFitsPhones(p, name) {
 
     await open('station-codes');
     assert.deepEqual(await p.$$eval('.ap-link', l => l.map(x => x.dataset.link)), ['plant', 'public', 'line']);
-    // Joe 10/28: the line tablets' code sits under the Plant Stations.
+    // Joe 10/28: the line tablets' code sits under the Plant Stations (its list is drawn from its own read, a moment after the stations').
+    await p.waitForSelector('#lt-list .ap-item b');
     assert.deepEqual(await p.$$eval('#lt-list .ap-item b', b => b.map(x => x.textContent)), ['Line Tablet']);
     // Joe 10/12: the no-account link is built now (it was "Being built"), with its On / Off.
     assert.match(await p.textContent('.ap-link[data-link="public"]'), /Code, no account/);
