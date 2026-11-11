@@ -25,6 +25,10 @@ const excel = () => { if (!XLSX) XLSX = require('@e965/xlsx'); return XLSX; };
 const MAX_BYTES = 15 * 1024 * 1024;
 const EMAIL = /^[^\s@<>(),;:"[\]\\]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const DEFAULT_LABEL = 'ROUTES/BOL';
+// The office's email subject (Vicki, sent every afternoon at 4:00 PM). Gmail does not put the label on by itself, so the
+// check also finds the email by its subject; from 11-7-26 to 11-11-26 the BOLs sat in the inbox with no label and were
+// never read (Joe 11-11-26: "This has not picked up a new BOL since Friday").
+const OFFICE_SUBJECT = 'Daily Load Data';
 const FILES = /\.(pdf|xlsx?|csv)$/i;
 
 const fail = (code, message) => require('./admin').fail(code, message);
@@ -184,6 +188,10 @@ async function upload(db, email, input, stamp) {
 // Gmail's search words for a label: "ROUTES/BOL" -> label:routes-bol.
 const labelQuery = (label) => 'label:' + String(label || DEFAULT_LABEL).trim().toLowerCase().replace(/[\s/]+/g, '-').replace(/[^a-z0-9&_.-]/g, '');
 
+// What the email check searches for: the label OR the office's subject, with a file, the last 10 days, never sent mail.
+const mailQuery = (s) => '{' + labelQuery(s.label) + ' subject:"' + OFFICE_SUBJECT.toLowerCase() + '"} has:attachment newer_than:10d -in:sent' +
+  (s.sender ? ' from:' + s.sender.replace(/^@/, '') : '');
+
 /*
  * The email check. deps: readMail, readAttachment (src/mail.js), now. Reads the last 10 days of messages under the label with
  * a file attached (only from the sender, when one is set); a message already read is skipped.
@@ -196,7 +204,7 @@ async function checkMail(db, by, deps) {
   const MAIL = require('./mail');
   const readMail = d.readMail || MAIL.readMail, readAttachment = d.readAttachment || MAIL.readAttachment;
   try {
-    const query = labelQuery(s.label) + ' has:attachment newer_than:10d' + (s.sender ? ' from:' + s.sender.replace(/^@/, '') : '');
+    const query = mailQuery(s);
     const messages = await readMail({ owner: s.mailbox, query, max: 30 });
     // Oldest first, so the newest file for a load day is the one kept.
     for (const m of messages.sort((a, b) => a.internalDate - b.internalDate)) {
@@ -284,4 +292,4 @@ async function hubCheck(db) {
   return { mailbox: !!st.mailbox, enabled: !!st.enabled, last: l ? { at: String(l.at || ''), status: String(l.status || ''), message: String(l.message || '').slice(0, 200) } : null };
 }
 
-module.exports = { OPS, recentDays, hubCheck, notBolText, readBol, orderLines, groupDays, dayOf, labelQuery, status, checkMail, hourlyCheck, DEFAULT_LABEL };
+module.exports = { OPS, recentDays, hubCheck, notBolText, readBol, orderLines, groupDays, dayOf, labelQuery, mailQuery, OFFICE_SUBJECT, status, checkMail, hourlyCheck, DEFAULT_LABEL };
