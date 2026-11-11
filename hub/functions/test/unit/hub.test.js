@@ -18,7 +18,7 @@ const keys = (r) => r.tiles.map(t => t.key);
 
 test('an administrator sees all eight apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'sales', 'inventory']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'sales', 'inventory', 'maint']);
   assert.equal(r.admin, true);
   // Plant & Distribution is two cards (11-5-26), each opening its own side of the app.
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/group.html?g=plantops');
@@ -77,7 +77,7 @@ test('the live hub never says a card opens the live one', async () => {
 
 test('someone who is not an administrator sees Operations, the Customer List and Accident Reporting only', async () => {
   const r = await H.hubCall(db, { email: 'sam.sales@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'accident', 'sales', 'inventory']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'accident', 'sales', 'inventory', 'maint']);
   assert.equal(r.admin, false);
 });
 
@@ -177,10 +177,10 @@ test('saved app ticks decide the tiles; only administrators change them, never t
     runTransaction: async (fn) => fn({ get: (r) => r.get(), set: (r, v) => { docs[r.c][r.id] = v; } })
   };
   const pat = { email: 'pat.admin@uniteddairy.com' }, sam = { email: 'sam.sales@uniteddairy.com' };
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers', 'accident', 'sales', 'inventory']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'customers', 'accident', 'sales', 'inventory', 'maint']);
   await H.hubCall(mem, pat, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['fuel'] });
   assert.deepEqual(docs.appAccess['sam.sales@uniteddairy.com'].apps, ['operations', 'fuel']);
-  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'fuel', 'sales', 'inventory']);
+  assert.deepEqual(keys(await H.hubCall(mem, sam, { op: 'home' })), ['plant', 'distribution', 'fuel', 'sales', 'inventory', 'maint']);
   assert.deepEqual((await H.hubCall(mem, pat, { op: 'appAccess' })).saved, { 'sam.sales@uniteddairy.com': ['operations', 'fuel'] });
   await assert.rejects(H.hubCall(mem, sam, { op: 'setApps', email: 'sam.sales@uniteddairy.com', apps: ['udms'] }), /Only an administrator/);
   await assert.rejects(H.hubCall(mem, pat, { op: 'setApps', email: 'pat.admin@uniteddairy.com', apps: ['fuel'] }), /from yourself/);

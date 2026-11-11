@@ -41,6 +41,8 @@ export const LOOK = {
   inventory: { color: '#6b4f1d', icon: path('<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="M3.29 7 12 12l8.71-5"/><path d="m7.5 4.27 9 5.15"/>') },
   sales: { color: '#b8860b', icon: path('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>') },
   distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
+  // Joe 11-11-26: Fleet & Maintenance under Fleet & Costs (Lucide "wrench").
+  maint: { color: '#4b5563', icon: path('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>') },
   // Lucide "list".
   customerlist: { color: '#1d7a46', icon: path('<path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
@@ -94,7 +96,7 @@ export const AREAS = [
   // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
   { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app and the complete customer list', apps: ['sales'],
     copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
-  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and the cost of each route', apps: ['fuel', 'routecost'] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, the cost of each route, and the trucks, trailers and garage', apps: ['fuel', 'routecost', 'maint'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
