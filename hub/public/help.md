@@ -30,8 +30,8 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 ### The areas
 - **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory), and **Inventory**, its own card for the plant's stock.
 - **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), Customers & Routes, and Route & Trip Costs.
-- **Sales**: the **Sales App**, the salespeople's own app, Route Cost Analysis, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
-- **Fleet & Costs**: Fuel Tracking.
+- **Sales**: the **Sales App**, the salespeople's own app, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
+- **Fleet & Costs**: Fuel Tracking and Route Cost Analysis.
 - **Office**: Customer Statements.
 - **People & Safety**: Employees & Compliance and Accident & Injury Reporting.
 - **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) is in the hub's menu, not on Home.

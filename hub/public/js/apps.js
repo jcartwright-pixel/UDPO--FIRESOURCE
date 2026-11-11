@@ -88,13 +88,13 @@ export function linkGroups(ops) {
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
   { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant', 'inventory'] },
-  // Joe 11-10-26: Route & Trip Costs under Distribution; Route Cost Analysis and a Customer List card under Sales ("it can lead
+  // Joe 11-10-26: Route & Trip Costs under Distribution; a Customer List card under Sales. Route Cost Analysis under Fleet & Costs (Joe 11-11-26) ("it can lead
   // to our complete customer list"). Customer Changes stays in the hub's menu for administrators.
   { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'routes'] },
   // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
-  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app, the cost of each route and the complete customer list', apps: ['sales', 'routecost'],
+  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app and the complete customer list', apps: ['sales'],
     copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
-  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and trip fuel', apps: ['fuel'] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and the cost of each route', apps: ['fuel', 'routecost'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
