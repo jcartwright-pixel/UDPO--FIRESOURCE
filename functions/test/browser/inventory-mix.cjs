@@ -381,10 +381,11 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     await until(async () => (await moves()).some(m => m.itemId === 'ITEM-caps' && m.qty === -1), 'the put back');
     await tab.waitForFunction(() => [...document.querySelectorAll('.to-table tr')].some(r => /GALLON CAPS/.test(r.innerText) && r.cells[1].innerText.trim().indexOf('1 ') === 0));
     // By hand on the tablet.
+    const bagsUsed = (await item('Dispenser bags, 5 gallon')).usedSince || 0;   // the Count Walk above started it over
     await tab.selectOption('[data-to="pick"]', 'ITEM-bags');
     await tab.fill('[data-to="qty"]', '25');
     await tab.click('[data-to="take"]');
-    await until(async () => (await item('Dispenser bags, 5 gallon')).usedSince === 525, 'the hand take out');
+    await until(async () => (await item('Dispenser bags, 5 gallon')).usedSince === bagsUsed + 25, 'the hand take out');
     results.push('B: the tablet\'s TAKE OUT: our label scanned takes 1 jug out; a new barcode named once then counted; − puts one back; 25 bags by hand');
 
     // ---------- D: RECEIVED on the tablet goes into Inventory ----------
