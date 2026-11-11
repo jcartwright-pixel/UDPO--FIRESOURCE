@@ -29,12 +29,12 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 
 ### The areas
 - **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory), and **Inventory**, its own card for the plant's stock.
-- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), and Customers & Routes.
-- **Sales**: the **Sales App**, the salespeople's own app.
-- **Fleet & Costs**: Fuel Tracking, Route & Trip Costs and Route Cost Analysis.
+- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), Customers & Routes, and Route & Trip Costs.
+- **Sales**: the **Sales App**, the salespeople's own app, Route Cost Analysis, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
+- **Fleet & Costs**: Fuel Tracking.
 - **Office**: Customer Statements.
 - **People & Safety**: Employees & Compliance and Accident & Injury Reporting.
-- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL).
+- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) is in the hub's menu, not on Home.
 
 ### Which cards you see
 - **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App and Inventory have nothing to tick in People & Access: any United Dairy account may open it.
@@ -263,7 +263,7 @@ The same screen also reads the weekly report of cases and sales by route and sto
 id: changes
 screens: changes.html
 
-Every change to the route customer list comes here first, from every app: Customers & Routes, the Pallet Builder, Route Cost Analysis and the others. Nothing is saved to the customer list until an administrator approves it here. Until then, the app that sent it keeps the change as its own working copy. Administrators only.
+Every change to the route customer list comes here first, from every app: Customers & Routes, the Pallet Builder, Route Cost Analysis and the others. Nothing is saved to the customer list until an administrator approves it here. Until then, the app that sent it keeps the change as its own working copy. Administrators only. Open it from **Customer Changes** in the hub's menu at the top; it has no card on Home.
 
 1. Pick the **Plant**, or leave **Every plant**.
 2. Read each card under **Waiting**: what the change is, the plant, route and day, the app it came from, who sent it and when.
