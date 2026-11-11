@@ -30,6 +30,32 @@ async function openPage(browser, width, height, url) {
 }
 const small = (p) => p.evaluate(() => [...document.querySelectorAll('#send-texts *')].filter(el => el.offsetWidth && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 15.9).map(el => el.tagName));
 const fits = (p) => p.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+// Joe 11-9-26 (picture of Daily Dispatch): the texts line is one line, nothing on it runs out of it, and nothing on the
+// information line (week, Drivers Covered, texts, Loadout day) sits on top of anything else.
+const dailyLine = (p) => p.evaluate(() => {
+  const box = (e) => e.getBoundingClientRect(), bad = [];
+  const strip = document.getElementById('send-texts'), sb = box(strip);
+  if (sb.height > 54) bad.push('texts line is ' + Math.round(sb.height) + ' tall');
+  for (const k of strip.children) { const b = box(k); if (b.width && (b.left < sb.left - 1 || b.right > sb.right + 1 || b.top < sb.top - 1 || b.bottom > sb.bottom + 1)) bad.push(k.className + ' runs out of the texts line'); }
+  const parts = [...document.querySelector('.day-info').children].filter(e => e.offsetWidth);
+  for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) {
+    const a = box(parts[i]), b = box(parts[j]);
+    if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) bad.push(parts[i].className + ' on top of ' + parts[j].className);
+  }
+  return bad;
+});
+// Joe 11-10-26 ("I don't want it"): the warnings never pop up by themselves; a red button on the strip opens them. popText
+// checks it did not come up by itself, presses a red button and gives its words; closePop puts it away.
+const POP = '#send-texts-pop:not([hidden])';
+const popText = async (p) => {
+  await p.waitForSelector('#send-texts [data-pop]', { timeout: 20000 });
+  await p.waitForTimeout(500);
+  assert.equal(await p.isVisible('#send-texts-pop'), false, 'nothing pops up by itself');
+  await p.click('#send-texts [data-pop]');
+  await p.waitForSelector(POP, { timeout: 5000 });
+  return p.textContent(POP);
+};
+const closePop = async (p) => { await p.click(POP + ' .send-pop-close'); await p.waitForSelector('#send-texts-pop', { state: 'hidden' }); };
 const lastSend = async () => ((await db().collection('private').doc('sms').get()).data() || {}).lastSend;
 
 (async () => {
@@ -54,6 +80,13 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     await wk.waitForFunction(() => /Not sent/.test(document.getElementById('send-texts').textContent) && !document.querySelector('#send-texts button').disabled, null, { timeout: 15000 });
     assert.match(await wk.textContent('#send-texts'), /Schedule texts for the posted week, 10-11-26 to 10-17-26: Not sent \(1 driver ticked on the Driver Roster\)\./);
     assert.equal(await wk.textContent('#send-texts button'), 'Send Schedule Texts: Week of 10-11-26');
+    // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week. Joe 11/9: in a pop-up.
+    const handPop = await popText(wk);
+    assert.match(handPop, /TEXT (THIS DRIVER|THESE \d+ DRIVERS) YOURSELF/);
+    assert.match(handPop, /Not signed up for texts, and their week is not their normal week\./);
+    assert.doesNotMatch(handPop, /CASEY/, 'Casey is signed up: Send reaches him');
+    if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'pop-text-yourself-1536.png') });
+    await closePop(wk);
     if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'live-send-weekly-not-sent-1536.png') });
     await wk.click('#send-texts button');
     assert.equal(await wk.textContent('#send-texts button'), 'Tap Again: Text 1 driver for 10-11-26', 'the first tap only arms it');
@@ -65,10 +98,10 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     assert.match(await wk.textContent('#send-texts'), /1 OF 1 SENT.*Sent [^.]*\(test copy, written to the list only\)\./);
     const l = await lastSend();
     assert.deepEqual([l.week, l.drivers, l.live, l.by], ['2026-10-11', 1, false, 'admin.test@uniteddairy.com']);
-    // Joe 11/7: drivers Send will not reach (not signed up) whose posted week is not their normal week are named in red.
-    await wk.waitForSelector('#send-texts .send-hand', { timeout: 15000 });
-    assert.match(await wk.textContent('#send-texts .send-hand'), /^Text (this driver|these \d+ drivers) yourself \(not signed up, and their week changed\): .+\(.+\)/);
-    assert.doesNotMatch(await wk.textContent('#send-texts .send-hand'), /CASEY/, 'Casey is signed up: Send reaches him');
+    // After the send it still does not come up by itself; its red button on the strip opens it.
+    assert.match(await wk.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
+    assert.match(await popText(wk), /YOURSELF/);
+    await closePop(wk);
     assert.ok(await fits(wk) <= 0);
     assert.deepEqual(await small(wk), []);
     if (SHOTS) await wk.screenshot({ path: path.join(SHOTS, 'live-send-weekly-sent-1536.png') });
@@ -79,14 +112,18 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     // week's dates are on its hover, and the driver count shows on a wide screen.
     for (const [w, h] of [[1920, 1080], [390, 844]]) {
       const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-20&' + ADMIN);
-      await dd.waitForFunction(() => /^Texts sent /.test((document.querySelector('#send-texts .send-words') || {}).textContent || ''), null, { timeout: 15000 });
+      await dd.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
       assert.equal(await dd.textContent('#send-texts .send-count.good'), '1 OF 1 SENT', 'Joe 11/7 (li): the sent check');
       assert.match(await dd.getAttribute('#send-texts', 'title'), /posted week, 10-11-26 to 10-17-26, sent to 1 driver/);
-      assert.match(await dd.textContent('#send-texts .send-words'), /^Texts sent .* to 1 driver \(test copy\)$/);
-      assert.match(await dd.textContent('#send-texts .send-hand-short'), /^\d+ to text yourself$/);
-      assert.match(await dd.getAttribute('#send-texts .send-hand-short', 'title'), /Not signed up for texts, and their week changed: .+/);
+      // Joe 11-9-26: with the sent check showing, Daily drops the words; when and to how many are on the check's hover.
+      assert.equal(!!(await dd.$('#send-texts .send-words')), false);
+      assert.match(await dd.getAttribute('#send-texts .send-count', 'title'), /^Sent .* to 1 driver \(test copy\)$/);
+      assert.match(await dd.textContent('#send-texts .send-chip'), /^\d+ TO TEXT YOURSELF$/);
+      assert.match(await popText(dd), /YOURSELF/);
+      await closePop(dd);
       assert.equal(await dd.textContent('#send-texts button'), 'Send Again');
       assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
+      if (w > 700) assert.deepEqual(await dailyLine(dd), [], 'Daily information line at ' + w);
       assert.deepEqual(await small(dd), []);
       if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'live-send-daily-' + w + '.png') });
       if (w === 1920) {
@@ -106,6 +143,8 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
     // send is missing: red 1 OF 2 SENT · 1 MISSING with his name and why, and Text the Missing Driver (two taps) texts only him.
     const wk2 = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
     await wk2.waitForFunction(() => /^1 OF 1 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
+    await popText(wk2);
+    await closePop(wk2);
     if (SHOTS) await wk2.waitForTimeout(800), await wk2.screenshot({ path: path.join(SHOTS, 'check-all-sent-1536.png') });
     await wk2.context().close();
     await db().collection('driverPhones').doc('drv_test_adams').set({ driverId: 'drv_test_adams', phone: '+13305550199', scheduleText: true });
@@ -115,25 +154,93 @@ const lastSend = async () => ((await db().collection('private').doc('sms').get()
       const short = /daily/.test(url);
       assert.equal(await p.textContent('#send-texts .send-count'), short ? '1 OF 2 SENT' : '1 OF 2 SENT · 1 MISSING');
       assert.equal(await p.textContent('#send-texts button'), short ? 'Text 1 Missing' : 'Text the Missing Driver');
-      if (short) assert.match(await p.getAttribute('#send-texts', 'title'), /Missing: ADAMS, PAT \(not sent yet\)/);
-      else assert.equal(await p.textContent('#send-texts .send-hand'), 'Missing: ADAMS, PAT (not sent yet)');
-      assert.deepEqual(await small(p), []);
-      assert.ok(await fits(p) <= 0, 'no side scroll at ' + w);
-      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-missing-' + w + '.png') });
+      const missPop = await popText(p);
+      assert.match(missPop, /1 DRIVER DOES NOT HAVE THIS WEEK'S TEXT/);
+      assert.match(missPop, /ADAMS, PAT \(not sent yet\)/);
+      assert.equal(await p.textContent(POP + ' .send-pop-fix'), short ? 'Text 1 Missing' : 'Text the Missing Driver');
+      assert.ok(await p.$$eval(POP + ' *', els => els.filter(e => e.offsetWidth && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())).every(e => parseFloat(getComputedStyle(e).fontSize) >= 15.9)), '16 size in the pop-up');
+      assert.ok(await fits(p) <= 0, 'no side scroll with the pop-up at ' + w);
+      if (SHOTS) await p.waitForTimeout(500), await p.screenshot({ path: path.join(SHOTS, 'pop-missing-' + w + '.png') });
       if (w === 1536) {
+        // Text the Missing Driver in the pop-up: two taps, only the missing driver.
         const before = (await db().collection('textLog').get()).size;
-        await p.click('#send-texts button');
-        assert.equal(await p.textContent('#send-texts button'), 'Tap Again: Text 1 driver');
-        await p.click('#send-texts button');
+        await p.click(POP + ' .send-pop-fix');
+        assert.equal(await p.textContent(POP + ' .send-pop-fix'), 'Tap Again: Text 1 driver');
+        await p.click(POP + ' .send-pop-fix');
         await p.waitForFunction(() => /^2 OF 2 SENT$/.test((document.querySelector('#send-texts .send-count.good') || {}).textContent || ''), null, { timeout: 15000 });
         const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.driverId === 'drv_test_adams');
         assert.equal((await db().collection('textLog').get()).size, before + 1, 'only the missing driver');
         assert.equal(added.length, 1);
+        assert.doesNotMatch(await p.textContent('#send-texts-pop'), /DOES NOT HAVE/, 'the missing part goes once they have it');
+        await closePop(p);
         if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-fixed-1536.png') });
         assert.deepEqual(p.errors, []);
         await p.context().close();
         break;
       }
+      await closePop(p);
+      assert.deepEqual(await small(p), []);
+      assert.ok(await fits(p) <= 0, 'no side scroll at ' + w);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'check-missing-' + w + '.png') });
+      assert.deepEqual(p.errors, []);
+      await p.context().close();
+    }
+
+    // Joe 11/9: Dispatch gives Casey a truck on Wednesday after his text went out. Weekly Dispatch, already open, lists him in red
+    // with what changed (no reload, nothing texted by itself). Joe 11-10-26: nothing pops up by itself; the red button opens it
+    // (Joe 11-10-26: no Text Driver either). A route added to his week shows too, and Send Updated Schedule texts only him.
+    {
+      const p = await openPage(browser, 1536, 790, '/weekly.html?view=live&' + ADMIN);
+      await p.waitForSelector('#send-texts .send-count.good', { timeout: 15000 });
+      assert.doesNotMatch(await popText(p), /CHANGED/, 'nothing changed yet');
+      await closePop(p);
+      const before = (await db().collection('textLog').get()).size;
+      await db().collection('runs').doc('2026-10-11__run_t905').set({ days: { wed: { truck: '518', trailer: '905' } } }, { merge: true });
+      await p.waitForFunction(() => /1 SCHEDULE CHANGED/.test(document.getElementById('send-texts').textContent), null, { timeout: 20000 });
+      await p.waitForTimeout(500);
+      assert.equal(await p.isVisible('#send-texts-pop'), false, 'a truck or trailer change does not bring the pop-up up');
+      await p.click('#send-texts .send-chip');
+      await p.waitForSelector(POP);
+      const chPop = await p.textContent(POP);
+      assert.match(chPop, /1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
+      assert.match(await p.textContent(POP + ' .send-pop-row'), /CASEY, LEE \(texted .+\)WEDNESDAY: TRUCK 518 ADDED, TRAILER 905 ADDED/);
+      assert.equal(await p.textContent(POP + ' .send-update'), 'Send Updated Schedule');
+      assert.equal(!!(await p.$(POP + ' .send-note')), false, 'no Text Driver button (Joe 11-10-26)');
+      assert.equal(await p.textContent('#send-texts .send-chip'), '1 SCHEDULE CHANGED');
+      assert.equal((await db().collection('textLog').get()).size, before, 'the warning never texts');
+      assert.deepEqual(await small(p), []);
+      assert.ok(await fits(p) <= 0);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-weekly-1536.png') });
+      for (const [w, h] of [[1920, 1080], [1536, 790], [390, 844]]) {
+        const dd = await openPage(browser, w, h, '/daily.html?date=2026-10-12&' + ADMIN);
+        await dd.waitForFunction(() => /1 CHANGED/.test((document.getElementById('send-texts') || {}).textContent || ''), null, { timeout: 20000 });
+        await dd.waitForTimeout(500);
+        assert.equal(await dd.isVisible('#send-texts-pop'), false, 'Daily: nothing pops up by itself');
+        assert.equal(await dd.textContent('#send-texts .send-chip'), '1 CHANGED', 'Daily: the red button says only the count');
+        assert.ok(await fits(dd) <= 0, 'no side scroll on Daily Dispatch at ' + w);
+        if (w > 700) assert.deepEqual(await dailyLine(dd), [], 'Daily information line at ' + w);
+        assert.deepEqual(await small(dd), []);
+        assert.match(await popText(dd), /SCHEDULE CHANGED/);
+        if (SHOTS) await dd.waitForTimeout(800), await dd.screenshot({ path: path.join(SHOTS, 'changed-daily-' + w + '.png') });
+        await closePop(dd);
+        assert.deepEqual(dd.errors, []);
+        await dd.context().close();
+      }
+      // A route added on Thursday: it joins his changes; the pop-up still does not come up by itself.
+      await closePop(p);
+      await db().collection('runs').doc('2026-10-11__run_t905').set({ days: { thu: { runs: true, driverId: 'drv_test_casey', driver: 'CASEY, LEE' } } }, { merge: true });
+      await p.waitForTimeout(6000);
+      assert.equal(await p.isVisible('#send-texts-pop'), false, 'a route added does not pop up by itself either');
+      await p.click('#send-texts .send-chip');
+      await p.waitForFunction(() => /THURSDAY: WAS OFF/.test((document.querySelector('#send-texts-pop:not([hidden]) .send-pop-row') || {}).textContent || ''), null, { timeout: 20000 });
+      assert.match(await p.textContent(POP), /1 DRIVER'S SCHEDULE CHANGED AFTER THEIR TEXT WENT OUT/);
+      assert.match(await p.textContent(POP + ' .send-pop-row'), /THURSDAY: WAS OFF, NOW 905 UT DSD MILK/);
+      await p.click(POP + ' .send-update');
+      await p.waitForFunction(() => !document.querySelector('#send-texts-pop .send-update') && !/CHANGED/.test(document.getElementById('send-texts').textContent), null, { timeout: 15000 });
+      const added = (await db().collection('textLog').get()).docs.map(x => x.data()).filter(x => x.kind === 'RESEND');
+      assert.equal(added.length, 1);
+      assert.deepEqual([added[0].driverId, /Truck 518 · Trailer 905/.test(added[0].body), /THURSDAY/.test(added[0].body)], ['drv_test_casey', true, true]);
+      if (SHOTS) await p.waitForTimeout(800), await p.screenshot({ path: path.join(SHOTS, 'changed-sent-1536.png') });
       assert.deepEqual(p.errors, []);
       await p.context().close();
     }

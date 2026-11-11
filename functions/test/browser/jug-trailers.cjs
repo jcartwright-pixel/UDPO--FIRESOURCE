@@ -87,7 +87,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.waitForFunction(() => /No trailers in the lot yet/.test(document.querySelector('#rows').textContent));
     assert.deepEqual(await p.$$eval('.pm-table th', a => a.map(x => x.textContent)), ['Supplier', 'Unit', 'Status', 'Product', 'How Many', 'Counted In', 'Location', ''], 'Joe 11/4: the heading names Inventory uses');
     assert.equal(await p.$eval('.pm-table th', th => getComputedStyle(th).color), 'rgb(255, 255, 255)', 'white words on the blue heading bar, like Inventory');
-    assert.equal(await p.$('#show'), null, 'the All trailers drop-down is gone');
+    assert.equal(!!(await p.$('#show')), false, 'the All trailers drop-down is gone');
     assert.match(await p.$eval('#products', a => a.getAttribute('href')), /^scheduler\.html\?lane=receiving&view=products/);
     assert.equal(await p.$eval('.head h1', h => getComputedStyle(h).textTransform), 'uppercase', 'everything in capitals');
     const rowsText = () => p.$$eval('#rows tr[data-id]', rs => rs.map(r => r.cells[1].querySelector('b').textContent + ':' + r.cells[6].textContent));
@@ -203,7 +203,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.click('#rows tr[data-id="fac_uniontown_METRO_5307"] td:first-child');
     await p.waitForTimeout(600);
     assert.equal(await p.$eval('.notice.error', n => n.hidden), true, 'no error');
-    assert.equal(await p.$('.mach-saved, .saved-msg'), null, 'no saved message');
+    assert.equal(!!(await p.$('.mach-saved, .saved-msg')), false, 'no saved message');
     const font = await p.$$eval('#rows td, #card input, #card select, #card button, #card li, .jt-sum span', els => Math.min(...els.map(x => parseFloat(getComputedStyle(x).fontSize))));
     assert.ok(font >= 16, 'text at least 16px, was ' + font);
     await shot(p, '4-jug-trailers-1536.png');
@@ -227,7 +227,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.match(ud.text, /Protected/);
     assert.deepEqual((await row('CKS')).dels, [], 'CKS 4737 is in the lot, so neither it nor CKS can be deleted yet');
     assert.deepEqual((await row('Duval')).dels, ['Delete Duval']);
-    assert.equal(await p.$('#card .jt-del[data-list="location"][data-value="DEBAG"]'), null, 'the four places stay');
+    assert.equal(!!(await p.$('#card .jt-del[data-list="location"][data-value="DEBAG"]')), false, 'the four places stay');
     await shot(p, '5-edit-lists-1536.png');
     await p.click('#card .jt-del[data-list="company"][data-value="Duval"]');
     await until(async () => !(await lists()).companies.some(c => c.name === 'Duval'), 'Duval deleted');
@@ -237,7 +237,7 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     await p.waitForSelector('#card .jt-del[data-list="unit"][data-value="3113"]');
     await p.click('#card .jt-del[data-list="unit"][data-value="3113"]');
     await until(async () => (await lists()).companies.find(c => c.name === 'Compass').units.length === 0, 'Compass 3113 deleted');
-    assert.equal(await p.$('#card .jt-del[data-list="item"][data-value="Clear Qt"]'), null, 'an item on a trailer in the lot waits');
+    assert.equal(!!(await p.$('#card .jt-del[data-list="item"][data-value="Clear Qt"]')), false, 'an item on a trailer in the lot waits');
     await p.click('#card .jt-del[data-list="item"][data-value="White 1/2"]');
     await until(async () => !(await lists()).items.includes('White 1/2'), 'White 1/2 deleted');
     await p.fill('#card [data-add-list="location"]', 'Back Fence');

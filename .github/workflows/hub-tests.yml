@@ -24,5 +24,7 @@ jobs:
           java-version: '21'
       - run: npm install --no-audit --no-fund
       - run: npm test
+      - name: Every practice card opens a practice copy, or says it is live
+        run: npm run test:practice-links
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser

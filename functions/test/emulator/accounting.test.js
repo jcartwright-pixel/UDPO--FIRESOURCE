@@ -70,3 +70,50 @@ test('The reader finds the month tab and the Gallon Comparison in the zip and le
   assert.deepEqual(read.months.map(m => m.month), [8, 9]);
   assert.ok(read.tabs.some(t => /SEPT 2026/.test(t)));
 });
+
+// Joe 11-7-26: the route cost app needs more of the P&L than three numbers. The extra lines ride on the same month document.
+test('The extra P&L lines are kept with each month: delivery and garage lines, net sales, material, sales and transfer gallons', async () => {
+  await clear(); await admins();
+  await adminCall(db(), ADMIN, { op: 'accountingUpload', fileName: 'pl.zip', base64: (await septemberZip()).toString('base64') }, { now: tick });
+  const sep = (await db().collection('accountingMonthly').doc('2026-09').get()).data();
+  assert.equal(sep.delivery_lines['Hourly Wages'], 150000);
+  assert.equal(sep.delivery_lines['Truck Rental'], 80000);
+  assert.equal(sep.delivery_lines['Repairs & Maint.'], 15000, 'names trimmed');
+  assert.equal(Object.values(sep.delivery_lines).reduce((a, b) => a + b, 0), 516000, 'every line not 0, and no heading or TOTALS');
+  assert.deepEqual(sep.garage_lines, { 'Hourly Wages': 14000, 'Repairs & Maint.': 2000 });
+  assert.equal(sep.delivery_garage_cost, 16000);
+  assert.deepEqual([sep.net_sales, sep.material_cost], [6200000.5, 4100000]);
+  assert.deepEqual([sep.gallons_sales, sep.gallons_transfers, sep.gallons_sold], [1470000, 630000, 2100000]);
+  assert.deepEqual([sep.distribution_cost, sep.employee_cost, sep.fuel_cost], [600000, 325000, 96000], 'the four numbers as before');
+  const aug = (await db().collection('accountingMonthly').doc('2026-08').get()).data();
+  assert.deepEqual([aug.net_sales, aug.gallons_sales, aug.delivery_lines], [6400000.25, 1400000, undefined], 'August sales from the September tab\'s last-month column');
+  // A corrected file: a line that is gone leaves the map, a changed sales number replaces the old one.
+  const out = await adminCall(db(), ADMIN, { op: 'accountingUpload', fileName: 'fixed.zip', base64: (await septemberZip({ noRepairs: true, sales: 6210000 })).toString('base64') }, { now: tick });
+  assert.equal(out.saved.changed, 1);
+  const fixed = (await db().collection('accountingMonthly').doc('2026-09').get()).data();
+  assert.equal(fixed.delivery_lines['Repairs & Maint.'], undefined);
+  assert.deepEqual(fixed.garage_lines, { 'Hourly Wages': 14000 });
+  assert.deepEqual([fixed.net_sales, fixed.file, fixed.delivery_garage_cost], [6210000, 'fixed.zip', 14000]);
+});
+
+test('Months saved before the extra lines get them: an old copy (only four numbers) is filled in by the same file by hand', async () => {
+  await clear(); await admins();
+  await db().collection('accountingMonthly').doc('2026-09').set({ year: 2026, month: 9, gallons_sold: 2100000, distribution_cost: 600000, employee_cost: 325000, fuel_cost: 96000, file: 'old.zip', source: 'EMAIL' });
+  const out = await adminCall(db(), ADMIN, { op: 'accountingUpload', fileName: 'pl.zip', base64: (await septemberZip()).toString('base64') }, { now: tick });
+  assert.ok(out.saved.changedMonths.includes('Sep 2026'));
+  assert.equal((await db().collection('accountingMonthly').doc('2026-09').get()).data().delivery_garage_cost, 16000);
+});
+
+test('From email: a zip read before the extra lines is read once more, then skipped as before', async () => {
+  await clear(); await admins();
+  await adminCall(db(), ADMIN, { op: 'accountingSaveSettings', mailbox: 'pat.sample@uniteddairy.com', enabled: true });
+  await db().collection('accountingMonthly').doc('2026-09').set({ year: 2026, month: 9, gallons_sold: 2100000, distribution_cost: 600000, employee_cost: 325000, fuel_cost: 96000 });
+  await db().collection('accountingMail').doc('m1').set({ at: '2026-11-06T11:00:00Z', files: [{ name: 'p.zip', months: 2 }] }); // no reader: read before 11-7-26
+  const zip = await septemberZip();
+  const deps = { now: tick, readMail: async () => [{ id: 'm1', internalDate: 1, files: [{ name: 'p.zip', attachmentId: 'a', size: zip.length }] }], readAttachment: async () => zip };
+  const run = await A.morningCheck(db(), deps);
+  assert.deepEqual([run.status, run.read], ['OK', 1]);
+  assert.equal((await db().collection('accountingMonthly').doc('2026-09').get()).data().net_sales, 6200000.5);
+  assert.equal((await db().collection('accountingMail').doc('m1').get()).data().reader, A.READER);
+  assert.equal((await A.morningCheck(db(), deps)).skipped, 1);
+});

@@ -105,8 +105,8 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     const docOf = async (c, id) => ((await db().collection(c).doc(id).get()).data() || {});
     const waitDoc = async (c, id, ok) => { let d = null; for (let i = 0; i < 60 && !ok(d = await docOf(c, id)); i++) await admin.waitForTimeout(250); return d; };
     // Review item 31 (Joe 10/13): no plant drop-down inside a plant; the title names the plant.
-    assert.equal(await admin.$('#plant'), null, 'no plant drop-down');
-    assert.equal(await admin.$('#reset'), null, 'no Starting List button');
+    assert.equal(!!(await admin.$('#plant')), false, 'no plant drop-down');
+    assert.equal(!!(await admin.$('#reset')), false, 'no Starting List button');
     assert.equal(await admin.textContent('#page-title'), 'Uniontown Product Sheet');
     assert.equal(await admin.textContent('#template'), 'Download Product List');
     assert.deepEqual(await admin.$$eval('#sheet thead tr:last-child th.pm-m', t => t.map(x => x.textContent)), ['BOXING', 'TOTES', 'HTST #1', 'GALLON FILLER', 'BLOW MOLD', 'CASES', 'TANKER'], 'a column for each machine, then the plant\'s own areas');
@@ -298,7 +298,7 @@ const lastQuality = async (id) => (await db().collection('plantJournal').where('
     await admin.fill('#setup-areas input:last-of-type >> nth=-1', 'DOCK');
     await shots(admin, 'products-areas-groups', 1920);
     // Batch 5: no Save Areas & Groups button; the box saves when it is left, and Close goes back to the list.
-    assert.equal(await admin.$('#setup-save'), null, 'no Save Areas & Groups button');
+    assert.equal(!!(await admin.$('#setup-save')), false, 'no Save Areas & Groups button');
     await admin.press('#setup-areas input:last-of-type >> nth=-1', 'Tab');
     await admin.waitForFunction(() => [...document.querySelectorAll('#area option')].some(o => /^DOCK/.test(o.textContent)));
     await admin.click('#setup-close');

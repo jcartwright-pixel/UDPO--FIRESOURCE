@@ -9,9 +9,10 @@ screens: index.html
 The **United Dairy Hub** is the one place to sign in and open every United Dairy app. Sign in with the same United Dairy Google account as Operations. You see a tile for each app you are allowed to use.
 
 1. Press `Sign in with Google` and pick your United Dairy account.
-2. Home shows your apps in areas: **Plant**, **Distribution**, **Fleet & Costs**, **Office**, **People & Safety**, and for administrators **Administration**. The **Areas** menu on the left (along the top on a phone) shows one area at a time; the number is how many cards it has. **Everything** shows them all.
+2. Home shows your apps in areas: **Plant**, **Distribution**, **Sales**, **Fleet & Costs**, **Office**, **People & Safety**, and for administrators **Administration**. The **Areas** menu on the left (along the top on a phone) shows one area at a time; the number is how many cards it has. **Everything** shows them all.
 3. Press an app's card. It opens in a new tab, so the hub stays open for the next one.
-4. To get the hub as its own app on your computer, press `Install the app` in Chrome or Edge.
+   - **Plant Operations** and **Route Distribution** ask **Which plant?** first when you work in more than one plant. Each plant (Uniontown, Martins Ferry, Charleston) shows its day so far beside it: loads out of today's loads, how many are loading now and waiting, and the trucks or trailers with a problem. Press `Open` beside a plant and the app opens on that plant in a new tab. A plant not running in the app yet says so. If you work in one plant only, the card opens it straight away.
+4. To get the hub as its own app on your computer, open the live hub (ud-distribution-hub.web.app) and press `Install the app` in Chrome or Edge.
 5. Press `All app links` (in the blue band at the top) for every phone and tablet link in one list, grouped by who uses it (Everyone, Managers, Sales, Drivers, Plant floor, Garage & Maintenance, Hiring). Press `Open`, or `Copy link` to text or email it. The codes are not on that list; an administrator gives them out from **Links & Codes**.
 
 ### The apps
@@ -23,26 +24,35 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Route Cost Analysis**: each month's delivery cost by route and stop: cost per case, per stop and per day on the road.
 - **Customer Statements** (the Statement Center): email, mail and print customer statements for every location, and keep the statement customer list. Pick the location at the top once it opens.
 - **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
+- **Sales App** (UD Sales): the salespeople's own app: where every route is now, with a map, and the customers on each route. It only shows; nothing can be changed from it. On a phone, add it to the home screen as **UD Sales**.
+- **Inventory**: the supplies and milk products for each plant: what is on hand, counts, what came in (the receiving log) and every change. It opens the Inventory screen in Plant & Distribution. Everyone active sees the card; who may count or change stock is set by their role there.
 
 ### The areas
-- **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory).
-- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), and Customers & Routes.
-- **Fleet & Costs**: Fuel Tracking, Route & Trip Costs and Route Cost Analysis.
+- **Plant**: **Plant Operations**, the plant side of Plant & Distribution (production, the plant floor, loadout, quality and inventory), and **Inventory**, its own card for the plant's stock.
+- **Distribution**: **Route Distribution**, the distribution side of Plant & Distribution (dispatch, drivers, trucks, fleet and the garage), Customers & Routes, and Route & Trip Costs.
+- **Sales**: the **Sales App**, the salespeople's own app, Route Cost Analysis, and **Customer List**, which opens the complete customer list in Customers & Routes (anyone who has the Customers & Routes card sees it).
+- **Fleet & Costs**: Fuel Tracking.
 - **Office**: Customer Statements.
 - **People & Safety**: Employees & Compliance and Accident & Injury Reporting.
-- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL).
+- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) is in the hub's menu, not on Home.
 
 ### Which cards you see
-- **Plant & Distribution**, **Customers & Routes** and **Accident & Injury Reporting**: everyone who is active on the Users list.
+- **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App and Inventory have nothing to tick in People & Access: any United Dairy account may open it.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis** and **Customer Statements**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
 > Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
-> On the practice hub, **Route & Trip Costs** opens the live one, because it has no practice copy yet.
+> On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
-> A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
+> The hub always opens the **live** copy. The practice hub, for testing changes, opens only when you pick it: administrators press `practice hub` at the bottom of **Administration** on Home. It opens in its own tab. An old shortcut or installed app that points at the practice hub goes to the live hub instead.
+
+> A yellow **Practice copy** line at the top means you are on the practice hub: its cards open the practice copies of the apps, with made-up or copied data. A card for an app with no practice copy says it opens the live one, so take care there. Press `Open the live hub` to go to the real one (ud-distribution-hub.web.app).
+
+> The plant pop-up's numbers are the same as Operations' all-plants overview, read when the pop-up opens. Close it and press the card again for fresh numbers.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
+
+!> Do not install the practice hub as your everyday app. Install the live hub; open the practice hub only to test.
 
 ## People & Access
 id: people
@@ -215,7 +225,7 @@ screens: keys.html
 id: accounting
 screens: accounting.html
 
-Where the monthly accounting package comes in (administrators). The Hub reads the zip from accounting once and keeps each month's gallons sold, delivery cost, employee cost and fuel cost. **Over the Road** in Plant & Distribution and the cost analysis app read the numbers from here, so they always match.
+Where the monthly accounting package comes in (administrators). The Hub reads the zip from accounting once and keeps each month's gallons sold, delivery cost, employee cost and fuel cost. For **Route Cost Analysis** it also keeps each delivery line of the P&L (wages, overtime, benefits, truck rental, depreciation, insurance, repairs, parts, tires, delivery expense and the rest), the garage's share of each, net sales, cost of material, and sales and transfer gallons. **Over the Road** in Plant & Distribution and the cost analysis app read the numbers from here, so they always match.
 
 1. Type the **Mailbox the zip comes to** (for example pat.sample@uniteddairy.com). It saves by itself.
 2. Tick **Check every morning**. Every morning at 6:00 AM the Hub looks in that mailbox for a new zip and reads it.
@@ -224,11 +234,11 @@ Where the monthly accounting package comes in (administrators). The Hub reads th
 5. Check the newest month in the table. Over the Road shows the same numbers on its Recap and Cost Per Gallon tabs.
 
 ### Buttons
-- `CHECK EMAIL NOW` reads the mailbox at once (the last 45 days). A zip already read is not read again.
+- `CHECK EMAIL NOW` reads the mailbox at once (the last 45 days). A zip already read is not read again (once, after the Hub learned the extra lines on 11-7-26, each zip is read one more time so the months already here get them).
 - `ADD A FILE BY HAND` reads a zip, or one Excel workbook, from your computer.
 - **Only from** (optional): type accounting's address, so only their zips are read.
 
-> The zip is the one accounting sends each month: P&L Expenses by Dept, Gallon Comparison and the rest. Only the month tabs (like SEPT 2026) and the Gallon Comparison are used. A month's numbers change only when a newer file has different ones.
+> The zip is the one accounting sends each month: P&L Expenses by Dept, Gallon Comparison and the rest. Only P&L Expenses by Dept's month tabs (like SEPT 2026), P&L Comparison's Net Sales and Cost of Material, and the Gallon Comparison are used. A month's numbers change only when a newer file has different ones.
 
 > The first time, Google Workspace has to let the app read the mailbox (the same permission as Driver Check-In Email). If it has not, the last-checked line says so in red.
 
@@ -248,6 +258,25 @@ The same screen also reads the weekly report of cases and sales by route and sto
 > One file can hold several weeks. Each week is kept, and a newer copy of a week takes the older one's place.
 
 !> Do not take the label off the report emails, or the Hub will not find the next one.
+
+## Customer Changes
+id: changes
+screens: changes.html
+
+Every change to the route customer list comes here first, from every app: Customers & Routes, the Pallet Builder, Route Cost Analysis and the others. Nothing is saved to the customer list until an administrator approves it here. Until then, the app that sent it keeps the change as its own working copy. Administrators only. Open it from **Customer Changes** in the hub's menu at the top; it has no card on Home.
+
+1. Pick the **Plant**, or leave **Every plant**.
+2. Read each card under **Waiting**: what the change is, the plant, route and day, the app it came from, who sent it and when.
+3. Press `Approve` to let the customer list save it. The card moves to **Done** and says when the customer list has saved it.
+4. Or type why in the box and press `Turn down`. The person who sent it sees your reason.
+
+### Buttons
+- `Approve`: the customer list saves the change.
+- `Turn down`: the change is not saved. A reason is needed.
+
+> A change that the customer list could not save (for example, someone changed the same route day after it was sent) shows under **Done** as "The customer list could not save it". Send it again from the app.
+
+!> Do not approve a change you have not read. Once it is saved, the customer list and every app that reads it change.
 
 ## Daily BOL
 id: bol

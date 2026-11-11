@@ -277,7 +277,7 @@ const phone390 = () => ({ viewport: { width: 390, height: 844 }, hasTouch: true,
     await cool.context().close();
     const plain = await openPage(browser, { viewport: { width: 1920, height: 950 } }, '/temps.html?' + MANAGER);
     await plain.waitForSelector('#rows [data-location]');
-    assert.equal(await plain.$('#walk-bar'), null, 'no bar when Coolers is opened from the menu');
+    assert.equal(!!(await plain.$('#walk-bar')), false, 'no bar when Coolers is opened from the menu');
     await plain.context().close();
     results.push('Yard, Coolers and Production from the walkthrough: the bar with Walkthrough, the stop and Next / Done; none from the menu');
 

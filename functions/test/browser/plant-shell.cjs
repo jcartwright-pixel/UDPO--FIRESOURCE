@@ -62,7 +62,7 @@ const SCREENS = [
     const hrefs = await side.$$eval('.sidemenu a[href], .side-flyouts a[href]', a => a.map(x => x.getAttribute('href').split(/[?#]/)[0]));
     // Joe 10/25: Quality Checks and Cooler Temperature moved to Plant Production's menu. Joe 10/26 (ej): the scheduler is Shipping & Receiving's.
     for (const [page] of SCREENS) if (['quality.html', 'temps.html', 'scheduler.html'].indexOf(page) < 0) assert.ok(hrefs.indexOf(page) >= 0, page + ' is reachable from the Plant Distribution side menu: ' + JSON.stringify(hrefs));
-    assert.equal(await side.$('.mc-menu, aside'), null, 'Manager Center has no menu of its own');
+    assert.equal(!!(await side.$('.mc-menu, aside')), false, 'Manager Center has no menu of its own');
     const grid = await side.$eval('#grid', g => g.getBoundingClientRect().left - document.querySelector('.sidemenu').getBoundingClientRect().right);
     assert.ok(grid < 40, 'the Manager Center cards start right beside the side menu: ' + grid);
     // Joe 10/26: Send Current Report on the left with the four department cards two by two beside it, then the Manager
@@ -98,7 +98,7 @@ const SCREENS = [
     await sch.waitForURL(/lane=receiving/);
     await Promise.all([sch.waitForURL(u => /scheduler\.html$/.test(u.pathname) && !/lane=/.test(u.search)), sch.click('.sidemenu a[href="scheduler.html"]')]);
     await sch.waitForSelector('.sc-day');
-    assert.equal(await sch.$('[data-lane]'), null, 'Joe 11/1: no Shipping | Receiving switch');
+    assert.equal(!!(await sch.$('[data-lane]')), false, 'Joe 11/1: no Shipping | Receiving switch');
     assert.equal(await sch.getAttribute('[data-view="month"]', 'aria-selected'), 'true', 'the Scheduler menu link opens the month');
     assert.equal(await sch.textContent('#lane-name'), 'Shipping');
     await sch.close();
@@ -126,7 +126,7 @@ const SCREENS = [
         }
         if (page === 'scheduler.html') {
           // Joe 11/1: the dates stand alone on the title line (Shipping and Receiving are separate screens, no switch).
-          assert.equal(await p.$('.sc-titleline [data-lane]'), null, 'scheduler.html ' + w + ': no Shipping | Receiving switch beside the dates');
+          assert.equal(!!(await p.$('.sc-titleline [data-lane]')), false, 'scheduler.html ' + w + ': no Shipping | Receiving switch beside the dates');
           assert.ok(await p.isVisible('.sc-titleline #range'), 'scheduler.html ' + w + ': the dates on the title line');
         }
         // The shared top line (data-top): the action buttons are one even row and none is left down in the screen.

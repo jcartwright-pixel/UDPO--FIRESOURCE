@@ -106,15 +106,17 @@ table.daily td.unit-down::before, table.daily td.unit-down::after { content: non
    week, it cannot be changed here), Drivers Covered, the short schedule-texts line and, on the right, the Loadout day with the
    day it delivers. The table starts right under it. */
 body.daily-look .head:has(#print-sheet) { padding-bottom: 6px; }
-body.daily-look .day-info { display: flex; align-items: center; gap: 12px; margin: 0 16px 8px; flex-wrap: nowrap; }
+/* Joe 11-9-26 (picture: the texts line squeezed into a tall column and its red button ran over the Loadout day): the texts
+   line never shrinks or overlaps; when it does not fit beside the week and the Loadout day it moves under them. */
+body.daily-look .day-info { display: flex; align-items: center; gap: 8px 12px; margin: 0 16px 8px; flex-wrap: wrap; }
 .day-info .week-of { display: flex; align-items: center; height: 42px; padding: 0 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 18px; font-weight: 800; color: #0f2747; white-space: nowrap; text-transform: uppercase; }
 .day-info .week-of small { font-size: 16px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin-right: 8px; }
 .day-info .coverage { flex-direction: row; align-items: center; gap: 6px; height: 42px; padding: 1px 10px; border-radius: 10px; box-sizing: border-box; flex: none; }
 .day-info .coverage b { font-size: 18px; }
 .day-info .coverage span { white-space: normal; width: 76px; line-height: 1; text-align: left; letter-spacing: 0; font-size: 16px; }
-.day-info .send-strip { margin: 0; flex: 1 1 auto; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 4px 10px; flex-wrap: nowrap; gap: 10px; }
+.day-info .send-strip { margin: 0; flex: 0 0 auto; min-width: max-content; min-height: 42px; box-sizing: border-box; padding: 4px 10px; flex-wrap: nowrap; gap: 10px; }
 .day-info .send-strip:has(.send-error) { flex-wrap: wrap; }
-.day-info .send-strip .send-words, .day-info .send-strip .send-button { white-space: nowrap; }
+.day-info .send-strip .send-words, .day-info .send-strip .send-button, .day-info .send-strip .send-chip { white-space: nowrap; }
 .day-info .send-strip .send-button { flex: none; }
 .day-info .day-pick { display: flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; flex: none; }
 .day-info .day-pick label, .day-info .delivers { font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
@@ -135,12 +137,9 @@ body.daily-look .day-info { display: flex; align-items: center; gap: 12px; margi
   body.daily-look .head:has(#print-sheet) .actions.in-head { flex-wrap: wrap; }
   body.daily-look .day-info { flex-wrap: wrap; row-gap: 8px; }
 }
-@media (min-width: 701px) and (max-width: 1899px) {
-  .day-info .send-strip .send-words { flex: 0 1 auto; min-width: 0; white-space: normal; line-height: 1.15; }
-}
 @media (max-width: 700px) {
   body.daily-look .day-info { flex-wrap: wrap; gap: 8px; }
-  .day-info .send-strip { flex-basis: 100%; flex-wrap: wrap; }
+  .day-info .send-strip { flex-basis: 100%; flex-wrap: wrap; min-width: 0; }
   .day-info .send-strip .send-words { white-space: normal; }
   .day-info .day-pick { margin-left: 0; flex-wrap: wrap; }
 }

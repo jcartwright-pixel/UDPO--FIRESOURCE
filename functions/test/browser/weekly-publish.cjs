@@ -64,7 +64,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     await page.waitForFunction(() => /preloaded from Route Master/.test(document.getElementById('wk-note').textContent) && document.querySelectorAll('#rows tr td.day').length > 0, null, { timeout: 8000 });
     assert.deepEqual(await routesShown(page), ['802', '801', '810']);
     assert.equal(await page.textContent('#publish'), 'Publish Stored Next Week First');
-    assert.equal(await page.$('#rows td.day.editable'), null, 'a preview cannot be edited');
+    assert.equal(!!(await page.$('#rows td.day.editable')), false, 'a preview cannot be edited');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '4-future-preview-1920.png') });
 
     // A week before Previous: view only.
@@ -72,7 +72,7 @@ const routesShown = (page) => page.$$eval('#rows tr td:first-child', tds => tds.
     await page.dispatchEvent('#week-date', 'change');
     await page.waitForFunction(() => /older than the Live weeks/.test(document.getElementById('wk-note').textContent) && document.querySelectorAll('#rows tr td.day').length > 0, null, { timeout: 8000 });
     assert.equal(await page.$eval('#publish', b => b.disabled), true);
-    assert.equal(await page.$('#rows td.day.editable'), null, 'an older week cannot be edited');
+    assert.equal(!!(await page.$('#rows td.day.editable')), false, 'an older week cannot be edited');
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, '5-older-week-1920.png') });
     assert.deepEqual(page.errors, []);
 

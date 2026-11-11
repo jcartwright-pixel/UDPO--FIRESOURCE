@@ -70,7 +70,7 @@ async function shots(page, name, w) {
     await desk.waitForFunction(() => document.querySelectorAll('#rows [data-location]').length === 2);
     const row = '[data-location="ut_temp_cooler_north"]';
     // Joe 10/10: no Save button; each box saves as it is left. Notes alone do not make a reading.
-    assert.equal(await desk.$('[data-save]'), null, 'Temperatures has no Save button');
+    assert.equal(!!(await desk.$('[data-save]')), false, 'Temperatures has no Save button');
     await desk.fill(row + ' .tp-notes', 'Door left open');
     await desk.press(row + ' .tp-notes', 'Tab');
     await desk.waitForFunction((r) => /Enter the temperature to save/.test(document.querySelector(r + ' .tp-act').textContent), row);

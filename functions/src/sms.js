@@ -160,6 +160,79 @@ async function sendCheck(db, week, list, live) {
   return { total: list.length, sent: list.length - missing.length, missing };
 }
 
+// Joe 11/9 ("whenever I text out the schedule to a driver and something changed, whether the truck or trailer changed that
+// was previously sent to them, or a route change ... I need to have a warning to send an updated text to them"; then "a
+// warning ... for me to send"): nothing is texted by itself. For each driver ticked Schedule who has the posted week's text,
+// the week is made again the way it would be texted now and laid against the last text they got. Where a day reads
+// differently, the driver is listed with what changed (MONDAY: TRUCK 512 IS NOW 518) and the strip offers Send Updated
+// Schedule, which is Resend on that last text. Once the new week is texted, the two read the same and the driver drops off.
+const DAY_ORDER = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+function textDays(text) {
+  const blocks = String(text || '').split('\n\n'), days = {};
+  const weekNote = (blocks[0] || '').split('\n').filter(l => l.startsWith('NOTE FOR THIS WEEK: ')).map(l => l.slice(20)).join(' ');
+  blocks.slice(1).forEach(b => { const w = b.split('\n')[0].split(' ')[0]; if (DAY_ORDER.includes(w)) days[w] = b; });
+  return { weekNote, days };
+}
+function dayParts(block) {
+  const p = { what: [], truck: [], trailer: [], leaves: [], note: '' };
+  String(block || '').split('\n').slice(1).forEach(t => {
+    if (t.startsWith('NOTE: ')) { p.note = t.slice(6); return; }
+    if (/^(Truck|Trailer|Leaves) /.test(t)) {
+      t.split(' · ').forEach(b => { const m = /^(Truck|Trailer|Leaves) (.*)$/.exec(b); if (m) p[m[1].toLowerCase()].push(m[2]); });
+      return;
+    }
+    p.what.push(t);
+  });
+  return p;
+}
+// What reads differently between the text a driver got (was) and the week now (now), in plain words, a line per change.
+function scheduleChanges(was, now) {
+  const a = textDays(was), b = textDays(now), out = [];
+  if (a.weekNote !== b.weekNote) out.push('NOTE FOR THE WEEK CHANGED');
+  DAY_ORDER.forEach(day => {
+    const x = a.days[day] || '', y = b.days[day] || '';
+    if (x === y) return;
+    const p = dayParts(x), q = dayParts(y), bits = [];
+    const said = (list) => list.join(' / ');
+    const what = [said(p.what), said(q.what)];
+    if (what[0] !== what[1]) bits.push(what[0] && what[1] ? 'WAS ' + what[0] + ', NOW ' + what[1] : what[1] ? 'NOW ' + what[1] : what[0] + ' TAKEN OFF');
+    [['truck', 'TRUCK'], ['trailer', 'TRAILER'], ['leaves', 'LEAVES']].forEach(([k, w]) => {
+      const o = said(p[k]), n = said(q[k]);
+      if (o !== n) bits.push(o && n ? w + ' ' + o + ' IS NOW ' + n : n ? w + ' ' + n + ' ADDED' : w + ' ' + o + ' TAKEN OFF');
+    });
+    if (p.note !== q.note) bits.push(q.note ? 'NOTE CHANGED' : 'NOTE TAKEN OFF');
+    out.push(day + ': ' + (bits.length ? bits.join(', ') : 'CHANGED').toUpperCase());
+  });
+  return out;
+}
+// Joe 11-10-26 ("It should only pop up if there's added a route or removed the route"): a change that adds or takes off a
+// route or run on a day is big (the pop-up comes up by itself); a truck, trailer, leave time or note is small (the red button only).
+function routeChanged(was, now) {
+  const a = textDays(was), b = textDays(now);
+  return DAY_ORDER.some(day => dayParts(a.days[day]).what.join(' / ') !== dayParts(b.days[day]).what.join(' / '));
+}
+// A text Joe typed himself from the warning (kind UPDATE, Joe 11-10-26) tells the driver what changed: from then on the week
+// as it was when he sent it is what the driver knows, so the warning goes until something else changes.
+const toldIt = (x, live) => x.direction === 'out' && x.kind === 'UPDATE' && x.covers && (x.status === 'SENT' || (!live && x.status === 'NOT SENT'));
+async function changedCheck(db, week, rows, live) {
+  const logs = (await db.collection('textLog').where('week', '==', week).get()).docs.map(x => Object.assign({ id: x.id }, x.data()))
+    .filter(x => (gotIt(x, live) && x.body) || toldIt(x, live)).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const last = {}, known = {};
+  logs.forEach(x => { if (x.kind === 'UPDATE') { if (last[x.driverId]) known[x.driverId] = { text: x.covers, at: x.at }; return; }
+    last[x.driverId] = x; known[x.driverId] = { text: x.body, at: x.at }; });
+  const ticked = (await activeDrivers(db)).filter(x => x.scheduleText && last[x.driverId]);
+  const out = [];
+  for (const x of ticked) {
+    let now = '';
+    try { now = await weekText(db, x.driverId, week, rows); } catch (e) { continue; }
+    const l = last[x.driverId], k = known[x.driverId];
+    if (now === k.text) continue;
+    const changes = scheduleChanges(k.text, now);
+    if (changes.length) out.push({ driverId: x.driverId, name: x.name, logId: l.id, sentAt: k.at, changes, big: routeChanged(k.text, now) });
+  }
+  return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 // Every active driver on the Driver Roster, with the number he would be texted at and his Texts ticks (Schedule, Load).
 async function activeDrivers(db) {
   const [drivers, phones] = await Promise.all([db.collection(C.drivers).get(), db.collection('driverPhones').get()]);
@@ -179,7 +252,8 @@ const status = (d, env, project) => ({ replyAddress: project ? replyAddress(proj
 /* input.op: status | save {accountSid, authToken, fromNumber} | clear | preview | sendSchedule {again}
  *           | doneList | setDoneOn {on} | test {phone} | doneAsk   (Load Done Texts, below; the drivers are ticked on the Driver Roster)
  *           | setForward {phone}   (driver replies sent on to that phone; blank turns it off)
- *           | resend {logId}   (one driver's schedule text again, at the Driver Roster's number now) */
+ *           | resend {logId}   (one driver's schedule text again, at the Driver Roster's number now)
+ *           | textUpdate {driverId, body}   (a text Joe types himself to one driver about the posted week's changes) */
 async function smsCall(db, user, input, options) {
   input = input || {};
   const o = Object.assign({ now: () => new Date(), env: process.env, fetch: (...a) => fetch(...a), project: process.env.GCLOUD_PROJECT || JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId || '' }, options || {});
@@ -209,9 +283,9 @@ async function smsCall(db, user, input, options) {
   if (op === 'preview') {
     const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
     const ticked = (await activeDrivers(db)).filter(x => x.scheduleText).length, list = week ? await weekDrivers(db, week) : [];
-    const byHand = week ? await handDrivers(db, week, await weekRows(db, week)) : [];
+    const rows = week ? await weekRows(db, week) : [], byHand = week ? await handDrivers(db, week, rows) : [];
     return Object.assign(status(d, o.env, o.project), { week, ticked, message: WEEK_TEXT_WORDS, drivers: list.map(x => ({ name: x.name, phone: phoneText(x.phone) })), byHand,
-      check: week ? await sendCheck(db, week, list, liveTexts(o.env)) : null });
+      check: week ? await sendCheck(db, week, list, liveTexts(o.env)) : null, changed: week ? await changedCheck(db, week, rows, liveTexts(o.env)) : [] });
   }
   if (op === 'sendSchedule') {
     if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
@@ -295,6 +369,34 @@ async function smsCall(db, user, input, options) {
     }
     await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '')).set(log);
     return Object.assign(status(d, o.env, o.project), { resend: { name: x.name, to: phoneText(x.phone), status: log.status, reason: log.reason || '' } });
+  }
+  // Joe 11-10-26 ("a one click pops up ... It would already have all the pre-filled changes, but then like a place to send the
+  // note"): Text Driver on a changed schedule opens a box with what changed, Joe adds his words and sends it to that one driver.
+  // Only the posted week, only a driver still ticked for schedule texts with a mobile phone. Written to the list as kind UPDATE,
+  // with the week as it reads now (covers), so the warning for that driver goes away until something else changes.
+  if (op === 'textUpdate') {
+    if (!(d.accountSid && d.authToken && d.fromNumber)) throw new SmsError('NOT_ALLOWED', 'Save the Twilio account first.');
+    const body = String(input.body || '').replace(/\r/g, '').trim();
+    if (!body) throw new SmsError('BAD_REQUEST', 'Type the text first.');
+    if (body.length > 1500) throw new SmsError('BAD_REQUEST', 'That text is too long (1,500 letters at most).');
+    const week = (((await db.collection(C.config).doc('app').get()).data() || {}).liveWeeks || {}).current || '';
+    if (!week) throw new SmsError('NOT_ALLOWED', 'No week is posted yet.');
+    const x = (await activeDrivers(db)).find(r => r.driverId === String(input.driverId || ''));
+    if (!x) throw new SmsError('NOT_ALLOWED', 'That driver is not on the Driver Roster.');
+    if (!x.scheduleText) throw new SmsError('NOT_ALLOWED', x.name + ' is not ticked for schedule texts on the Driver Roster.');
+    if (!x.phone) throw new SmsError('NOT_ALLOWED', 'Type ' + x.name + '\'s mobile phone on the Driver Roster first.');
+    let covers = '';
+    try { covers = await weekText(db, x.driverId, week); } catch (e) { covers = ''; }
+    const log = { direction: 'out', kind: 'UPDATE', week, driverId: x.driverId, name: x.name, to: x.phone, body, covers, at: stamp, by: email };
+    if (!liveTexts(o.env)) Object.assign(log, { status: 'NOT SENT', reason: 'Test copy: not sent (the test copy never texts anyone).' });
+    else {
+      let r;
+      try { r = await sendOne(d, x.phone, body, o.fetch); } catch (e) { r = { ok: false, reason: String(e && e.message || e).slice(0, 200) }; }
+      Object.assign(log, r.ok ? { status: 'SENT', reason: '' } : { status: r.stopped ? 'STOPPED' : 'FAILED', reason: r.reason });
+      if (r.stopped) await db.collection('driverPhones').doc(safeIdPart(x.driverId)).set({ driverId: x.driverId, scheduleText: false, loadText: false, stoppedAt: stamp }, { merge: true });
+    }
+    await db.collection('textLog').doc(week + '_' + safeIdPart(x.driverId) + '_' + stamp.replace(/[^0-9]/g, '') + '_u').set(log);
+    return Object.assign(status(d, o.env, o.project), { update: { name: x.name, to: phoneText(x.phone), status: log.status, reason: log.reason || '' } });
   }
   if (op === 'doneList') {
     const list = await activeDrivers(db);
@@ -556,4 +658,4 @@ async function replyCheck(db, options) {
   return { yes, stop, forwarded };
 }
 
-module.exports = { handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };
+module.exports = { scheduleChanges, routeChanged, changedCheck, handDrivers, TEST_TEXT, forwardMessage, weekText, smsCall, loadDoneCheck, replyCheck, ASK, doneMessage, handleReply, twilioSignature, replyAddress, weekDrivers, phoneE164, phoneText, SmsError, liveTexts };

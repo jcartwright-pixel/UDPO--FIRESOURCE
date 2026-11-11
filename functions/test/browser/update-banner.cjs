@@ -52,7 +52,7 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
       const p = await openPage(browser, w, h, url, V1);
       await p.waitForSelector(ready);
       await p.evaluate(() => window.UD_checkForUpdate());
-      assert.equal(await p.$('#update-ready'), null, name + ': the same version shows no banner');
+      assert.equal(!!(await p.$('#update-ready')), false, name + ': the same version shows no banner');
       await shot(p, 'update-before-' + name + '.png');
 
       // A newer version is published while the screen is open: the banner shows under the header, and nothing reloads.
@@ -85,7 +85,7 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
       await p.waitForSelector(ready);
       assert.equal(await p.evaluate(() => window.udStillHere), undefined, name + ': Refresh reloaded the screen');
       await p.evaluate(() => window.UD_checkForUpdate());
-      assert.equal(await p.$('#update-ready'), null, name + ': after Refresh the screen is on the new version');
+      assert.equal(!!(await p.$('#update-ready')), false, name + ': after Refresh the screen is on the new version');
       assert.deepEqual(p.errors, []);
       await p.close();
       results.push(name + ': a newer version shows "Update ready" under the header with a Refresh button; it reloads only when pressed');
@@ -162,7 +162,7 @@ const V2 = { label: 'Version 6.17 · 10-15-26', release: '6.17', date: '10-15-26
     await l.waitForSelector('#screen:not([hidden]) .topbar .brand');
     l.published = V2;
     await l.evaluate(() => window.UD_checkForUpdate());
-    assert.equal(await l.$('#update-ready'), null);
+    assert.equal(!!(await l.$('#update-ready')), false);
     await l.close();
     results.push('a local copy (no commit) never shows the banner');
   } finally {

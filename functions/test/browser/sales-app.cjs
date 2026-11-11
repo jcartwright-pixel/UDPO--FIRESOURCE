@@ -33,7 +33,7 @@ const MENU = [
 // that leaves the page; Back (and the phone's back) comes back to the screen it was pressed on.
 async function insideHelp(pg, title, from) {
   const before = pg.url();
-  assert.equal(await pg.$('#sa-help[href], a#sa-help'), null, 'the ? is a button, not a link out');
+  assert.equal(!!(await pg.$('#sa-help[href], a#sa-help')), false, 'the ? is a button, not a link out');
   await pg.click('#sa-help');
   await pg.waitForSelector('#v-help:not([hidden]) .sa-helpread h2');
   assert.equal(await pg.textContent('#sa-help-read h2'), title);

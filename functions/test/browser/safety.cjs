@@ -360,7 +360,7 @@ async function cameraShot(page, color) {
     await la.press('#rows tr[data-newsub][data-a="2"] input', 'Tab');
     await laUntil(l => l[2].subs[l[2].subs.length - 1].name === 'Conference Room', 'a sub-area is added at the end of Office');
     // Joe 10/12: the order changes by grabbing the line and dragging it; no Move up / Move down, no arrows, no dots.
-    assert.equal(await la.$('[data-la-up], [data-la-down], .lo-grip, [data-grip]'), null, 'no Move up / Move down buttons and no grab dots');
+    assert.equal(!!(await la.$('[data-la-up], [data-la-down], .lo-grip, [data-grip]')), false, 'no Move up / Move down buttons and no grab dots');
     const conf = '#rows tr.sw-sub-row[data-drag]:has(input[value="Conference Room"])';
     await la.waitForSelector(conf);
     assert.equal(await la.$eval(conf + ' td.la-order', td => getComputedStyle(td).cursor), 'grab', 'the hand shows over a line');

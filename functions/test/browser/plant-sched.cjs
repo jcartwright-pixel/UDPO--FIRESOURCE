@@ -91,7 +91,7 @@ async function shots(page, name, w) {
       await page.waitForSelector('table.sc-table');
       // Leaving a week that holds today shows today (as the current app); step to Thursday with the arrows (review item 37,
       // Joe 10/13: no date box, the arrows move the dates).
-      assert.equal(await page.$('#pick'), null, 'no date box on the Scheduler');
+      assert.equal(!!(await page.$('#pick')), false, 'no date box on the Scheduler');
       const dayShown = () => page.evaluate(() => { const m = /(\d+)-(\d+)-(\d+)\s*$/.exec(document.getElementById('range').textContent.trim()); return m ? '20' + m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0') : ''; });
       for (let i = 0; i < 400 && (await dayShown()) !== DATE; i++) { const before = await page.textContent('#range'); await page.click((await dayShown()) < DATE ? '#next' : '#prev'); await page.waitForFunction((b) => document.getElementById('range').textContent !== b, before); }
       await page.waitForFunction(() => /Thursday 10-8-26/.test(document.getElementById('range').textContent));
@@ -100,7 +100,7 @@ async function shots(page, name, w) {
       await fits(page, 'Scheduler day ' + w + 'x' + h);
       await shots(page, 'sched-day', w);
       // Receiving: the same screen with the suppliers (Joe 11/1: its own screen, opened from the menu; no switch).
-      assert.equal(await page.$('[data-lane]'), null, 'no Shipping | Receiving switch');
+      assert.equal(!!(await page.$('[data-lane]')), false, 'no Shipping | Receiving switch');
       await page.goto(HOSTING + '/scheduler.html?lane=receiving&view=day&date=' + DATE + MANAGER);
       // Joe 10/13: no sample suppliers; a load booked with one still shows its name.
       await page.waitForFunction(() => /Valley Farms Milk Co-op/.test(document.getElementById('body').textContent));
@@ -207,11 +207,50 @@ async function shots(page, name, w) {
     await desk.click('#yes-delete');
     await watcher.waitForFunction(() => /No loads/.test(document.querySelector('.sc-weekgrid > .sc-col:nth-child(10)').textContent), null, { timeout: 8000 });
     results.push('Delete Load (Walmart, Tuesday) after "Delete this load?": gone from the other screen');
+    // Joe 11-9-26: in the left menu only Shipping is lit (gold), not Shipping & Receiving or Receiving too; Add Customer puts a new
+    // Route Master run on Shipping, and the other screen lists it.
+    const lit = (p) => p.$$eval('.sidemenu a.on, .sidemenu .side-sec.on', els => els.map(e => e.textContent.trim()));
+    assert.deepEqual(await lit(desk), ['Shipping'], 'Shipping alone is lit on Shipping');
+    assert.equal(await desk.$eval('.sidemenu a.on', a => getComputedStyle(a).backgroundColor), 'rgb(242, 183, 5)', 'Shipping is gold, not white');
+    assert.equal(await desk.textContent('#add-who'), '＋ Add Customer');
+    // Joe 11-9-26 ("make them all uniform"): Add Load, Add Customer and Print are the same solid button, none cut off.
+    const looks = await desk.$$eval('.sc-ctrl > .sc-btn', bs => bs.filter(b => !b.hidden).map(b => { const c = getComputedStyle(b); return { bg: c.backgroundColor, w: b.offsetWidth, cut: b.scrollWidth > b.clientWidth }; }));
+    assert.equal(looks.length, 3);
+    assert.equal(new Set(looks.map(l => l.bg + '/' + l.w)).size, 1, 'the top buttons match: ' + JSON.stringify(looks));
+    assert.ok(looks.every(l => !l.cut), 'no top button is cut off: ' + JSON.stringify(looks));
+    await desk.click('#add-who');
+    await desk.fill('#c-name', 'Acme Foods');
+    assert.equal(await desk.inputValue('#c-run'), 'ACME FOODS', 'the run follows the name');
+    await desk.fill('#c-route', '861');
+    await desk.click('#c-save');
+    assert.match(await desk.textContent('#f-error'), /Pick the Departure Day/);
+    await desk.selectOption('#c-dep', 'Delivery Day');
+    await desk.selectOption('#c-load', 'Case Loadout');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-add-customer-1920.png'), scale: 'css' });
+    await desk.click('#c-save');
+    await watcher.waitForFunction(() => /Acme Foods[\s\S]*861 · ACME FOODS/.test(document.querySelector('.sc-wholist').textContent), null, { timeout: 8000 });
+    const acme = (await db().collection('routes').where('route', '==', '861').get()).docs.map(d => d.data());
+    assert.equal(acme.length, 1);
+    assert.equal(acme[0].displayPlant, true);
+    assert.equal(acme[0].routeName, 'Acme Foods');
+    await desk.click('#add-who');
+    await desk.fill('#c-name', 'Acme Foods');
+    await desk.fill('#c-route', '861');
+    await desk.selectOption('#c-dep', 'Delivery Day');
+    await desk.click('#c-save');
+    assert.match(await desk.textContent('#f-error'), /already on Shipping/);
+    await desk.click('#modal [data-close]');
+    results.push('Add Customer (Acme Foods, 861): a new Route Master run shown on Shipping, on the other screen; adding it twice is refused');
     // Receiving: New Supplier.
     const receiving = (p, v) => p.goto(HOSTING + '/scheduler.html?lane=receiving&view=' + v + '&date=' + DATE + MANAGER);
     await receiving(desk, 'week'); await receiving(watcher, 'week');
     await desk.waitForSelector('.sc-wholist'); await watcher.waitForSelector('.sc-wholist');
-    await desk.click('#supplier-add');
+    // Joe 11-9-26: on Receiving only Receiving is lit (green); Add Supplier sits beside Add Load.
+    assert.deepEqual(await lit(desk), ['Receiving'], 'Receiving alone is lit on Receiving');
+    assert.equal(await desk.$eval('.sidemenu .side-sec.on > .side-sec-btn', b => getComputedStyle(b).backgroundColor), 'rgb(31, 122, 77)', 'Receiving is green, not white');
+    if (SHOTS) await desk.screenshot({ path: path.join(SHOTS, 'sched-receiving-menu-1920.png'), scale: 'css' });
+    assert.equal(await desk.textContent('#add-who'), '＋ Add Supplier');
+    await desk.click('#add-who');
     await desk.fill('#s-name', 'Ohio Valley Fruit');
     await desk.fill('#s-label', 'Ohio Fruit');
     await desk.click('#s-save');

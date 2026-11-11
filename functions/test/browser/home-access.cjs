@@ -50,7 +50,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     // on its group's card with its main screens under it in light blue (Inventory is now inside Shipping & Receiving).
     assert.deepEqual(await sup.$$eval('.hq-card > strong', c => c.map(x => x.textContent)), ['Plant Operations', 'Plant Maintenance', 'Shipping & Receiving', 'Route Distribution', 'Reports & Safety']);
     assert.deepEqual(await sup.$$eval('.hq-main', c => c.map(x => x.dataset.side)), ['plant', 'production', 'debag', 'pallets', 'shipping', 'distribution', 'fleet', 'garage', 'reports', 'safety']);
-    assert.equal(await sup.$('#go-back'), null, 'nothing above the plant home');
+    assert.equal(!!(await sup.$('#go-back')), false, 'nothing above the plant home');
     assert.equal(await sup.isVisible('#go-admin'), false, 'no Administration button');
     if (SHOTS) await sup.screenshot({ path: path.join(SHOTS, 'home-one-plant-1920.png') });
     // Joe 10/11: Under Construction modules open only for Administrators. A supervisor sees both cards with the banner, says
@@ -85,11 +85,11 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await sup.goto(HOSTING + '/inventory.html?testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('#oh-rows');
     await sup.waitForFunction(() => !document.getElementById('screen').hidden);
-    assert.equal(await sup.$('#uc-refused'), null, 'Inventory is not under construction');
+    assert.equal(!!(await sup.$('#uc-refused')), false, 'Inventory is not under construction');
     // Any other being-built screen still opens for everyone.
     await sup.goto(HOSTING + '/soon.html?what=trucks-today&testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('#screen:not([hidden]) .soon-card');
-    assert.equal(await sup.$('#uc-refused'), null);
+    assert.equal(!!(await sup.$('#uc-refused')), false);
     await sup.goto(HOSTING + '/company.html?testEmail=super.test@uniteddairy.com');
     await sup.waitForSelector('.co-plant');
     assert.deepEqual(await sup.$$eval('.co-plant', c => c.map(x => x.dataset.plant)), ['fac_uniontown'], 'the overview shows a one-plant user their plant only');
@@ -161,7 +161,7 @@ const noSideScroll = (p) => p.evaluate(() => document.scrollingElement.scrollWid
     await adm.waitForSelector('#go-back');
     // Joe 10/10 evening: Administration is a header button on the main screens, not a menu item.
     assert.equal(await adm.isVisible('#go-admin'), true, 'Administration is in an Administrator\'s header');
-    assert.equal(await adm.$('.sidemenu a[href="administration.html"]'), null, 'Administration is not in the menu');
+    assert.equal(!!(await adm.$('.sidemenu a[href="administration.html"]')), false, 'Administration is not in the menu');
     if (SHOTS) await adm.screenshot({ path: path.join(SHOTS, 'home-admin-uniontown-1920.png') });
     await Promise.all([adm.waitForURL(/company\.html/), adm.click('#go-back')]);
     await adm.waitForSelector('.co-plant[data-plant="fac_uniontown"]');

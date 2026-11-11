@@ -33,10 +33,16 @@ export const LOOK = {
   'plant-setup': { color: '#4a6b1f', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
   keys: { color: '#8a2d3b', icon: path('<circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M17 5l2 2M15 7l2 2"/>') },
   bol: { color: '#8a4b14', icon: path('<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>') },
+  changes: { color: '#1d7a46', icon: path('<path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><path d="M9.5 10.5l2 2 3.5-3.5"/>') },
   accounting: { color: '#2f6f4e', icon: path('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2"/>') },
   // Joe 11-5-26: Plant & Distribution is two cards on Home, Plant Operations (the plant) and Route Distribution (the truck).
   plant: { color: '#2f6e3a', icon: path('<path d="M3 21V10l6-4v4l6-4v4l6-4v15z"/><path d="M7 17h2M12 17h2M17 17h1"/>') },
+  // Joe 11-10-26: a card just for Inventory under Plant (Lucide "package").
+  inventory: { color: '#6b4f1d', icon: path('<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="M3.29 7 12 12l8.71-5"/><path d="m7.5 4.27 9 5.15"/>') },
+  sales: { color: '#b8860b', icon: path('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>') },
   distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
+  // Lucide "list".
+  customerlist: { color: '#1d7a46', icon: path('<path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
 
@@ -81,9 +87,14 @@ export function linkGroups(ops) {
 // The Home screen's areas (Joe 11-5-26: "have a menu option to divide areas of the program"). Each app and each
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
-  { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant'] },
-  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers and delivery routes', apps: ['distribution', 'customers'] },
-  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, what each trip costs and the cost of each route', apps: ['fuel', 'routes', 'routecost'] },
+  { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant', 'inventory'] },
+  // Joe 11-10-26: Route & Trip Costs under Distribution; Route Cost Analysis and a Customer List card under Sales ("it can lead
+  // to our complete customer list"). Customer Changes stays in the hub's menu for administrators.
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'routes'] },
+  // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
+  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app, the cost of each route and the complete customer list', apps: ['sales', 'routecost'],
+    copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and trip fuel', apps: ['fuel'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
@@ -96,5 +107,5 @@ export const AREAS = [
 // The area pictures for the menu.
 export const AREA_ICON = {
   all: path('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, fleet: LOOK.fuel.icon, office: LOOK.statements.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
+  plant: LOOK['plant-setup'].icon, distribution: LOOK.distribution.icon, sales: LOOK.sales.icon, fleet: LOOK.fuel.icon, office: LOOK.statements.icon, people: LOOK.udms.icon, admin: LOOK.people.icon
 };

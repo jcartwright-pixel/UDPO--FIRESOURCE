@@ -79,7 +79,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     // ---------- Receiving: no switch; Calendar | Suppliers & Products ----------
     const page = await openPage(browser, 1536, 790, '/scheduler.html?lane=receiving&view=month&date=2026-10-08&' + MANAGER);
     await page.waitForFunction(() => /Valley Farms/i.test(document.getElementById('body').textContent));
-    assert.equal(await page.$('[data-lane]'), null, 'Joe 11/1: no Shipping | Receiving switch (the left menu has each)');
+    assert.equal(!!(await page.$('[data-lane]')), false, 'Joe 11/1: no Shipping | Receiving switch (the left menu has each)');
     assert.deepEqual(await page.$$eval('#rtabs:not([hidden]) [data-rtab]', b => b.map(x => x.textContent + ':' + x.getAttribute('aria-selected'))), ['Calendar:true', 'Suppliers & Products:false']);
     await shot(page, '1-receiving-calendar-1536.png');
     await page.click('[data-rtab="products"]');
@@ -142,7 +142,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     await page.waitForSelector('.sc-month');
     await page.click('#add');
     await page.waitForSelector('#modal.sc-pagebox:not([hidden]) #f-lines');
-    assert.equal(await page.$('#f-cases'), null, 'Receiving: products on lines, not one Cases box');
+    assert.equal(!!(await page.$('#f-cases')), false, 'Receiving: products on lines, not one Cases box');
     const opt = await page.$$eval('#f-route option', o => o.map(x => [x.value, x.textContent]));
     await page.selectOption('#f-route', opt.find(o => /SILGAN/.test(o[1]))[0]);
     await page.selectOption('#f-type', 'CARRIER');
@@ -202,8 +202,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     await page.click('[data-day="2026-10-08"]');
     await page.click('#modal .sc-dayrow:has-text("Silgan") [data-edit]');
     await page.waitForSelector('#modal .sc-gotnote');
-    assert.equal(await page.$('#f-receive'), null);
-    assert.equal(await page.$('#f-scan'), null);
+    assert.equal(!!(await page.$('#f-receive')), false);
+    assert.equal(!!(await page.$('#f-scan')), false);
     await page.click('#modal [data-close]');
     assert.deepEqual(page.errors, []);
     await page.close();
@@ -216,7 +216,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
       await inv.waitForFunction(() => (document.getElementById('oh-rows').textContent.match(/Silgan Closures/g) || []).length === 2);
       // The words are read as shown (ALL CAPS comes from the page's style), so wait until the screen is showing and drawn.
       await inv.waitForFunction(() => !document.getElementById('screen').hidden && !document.body.classList.contains('ud-drawing'));
-      const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
+      // Joe 11-10-26: where it is kept shows under its name (.inv-place); it is read apart.
+      const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => { const pl = c.querySelector('.inv-place'); return (pl ? c.innerText.replace('\n' + pl.innerText, '') : c.innerText).replace(/\n/g, ' '); }).join(' | ')));
       // 1536 first (before the Count), then 1920 (after it: the count is the new starting point).
       // Joe 11-3-26: ALL CAPS on screens (Inventory shows its words in capitals).
       assert.ok(rows.includes(w === 1536 ? '38MM WHITE CAPS | SILGAN CLOSURES | CASES | NOT COUNTED YET | +40 | 0 | 40' : '38MM WHITE CAPS | SILGAN CLOSURES | CASES | 38 ON ' + countDay + ' | 0 | 0 | 38'), rows.join('\n'));

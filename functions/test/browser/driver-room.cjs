@@ -89,7 +89,7 @@ async function touchPage(browser, width, height, url, mobile) {
       await p.waitForSelector('#step-menu:not([hidden]) #m-checkin');
       assert.equal(await p.textContent('.phone-top b'), 'Uniontown Driver Room Check-In Station');
       assert.deepEqual(await p.$$eval('#step-menu .drv-card b', b => b.map(x => x.textContent)), ['View Loadout', 'DVIR', 'Check-In', 'My Schedule']);
-      assert.equal(await p.$('#go-back, #go-home, #signout'), null, 'no Back, Home or Sign out into the app');
+      assert.equal(!!(await p.$('#go-back, #go-home, #signout')), false, 'no Back, Home or Sign out into the app');
       assert.ok(await p.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth), 'no side scroll');
       await shot(p, 'driver-room-2-choices-' + tag + '.png');
       // Check-In asks for the name, then his loads; Done signs him out, back to the choices.

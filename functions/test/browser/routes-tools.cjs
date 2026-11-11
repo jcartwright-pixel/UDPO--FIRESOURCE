@@ -218,7 +218,7 @@ const clip = (p, type, text) => p.evaluate(([type, text]) => {
     await p.waitForTimeout(500);
     const order = () => p.$$eval('table.routes tbody tr[data-i]', t => t.map(x => x.dataset.id));
     const before = await order();
-    assert.equal(await p.$('table.routes button[data-move], table.routes .seq-move'), null, 'no up / down arrows');
+    assert.equal(!!(await p.$('table.routes button[data-move], table.routes .seq-move')), false, 'no up / down arrows');
     await shot(p, 'routes-load-order-before-1920.png');
     const box = async (i, f) => { const b = await p.$eval('table.routes tr[data-i="' + i + '"] td:nth-child(3)', td => { const r = td.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }); return { x: b.x + b.w / 2, y: b.y + b.h * f }; };
     const from = await box(0, 0.5), to = await box(1, 0.8);

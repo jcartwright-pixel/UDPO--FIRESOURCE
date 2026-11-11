@@ -43,6 +43,15 @@
       <div id="links-list"></div>
       <div class="modal-actions"><button type="button" id="links-close">Close</button></div>
     </div>
+    <!-- Joe 11-10-26: the Plant Operations and Route Distribution cards ask which plant, with each plant's day beside it. -->
+    <div class="modal-back hub-back" id="plant-back" hidden></div>
+    <div class="modal wide-modal plant-pick" id="plant-box" role="dialog" aria-modal="true" aria-labelledby="plant-title" hidden>
+      <h2 id="plant-title">Which plant?</h2>
+      <p class="hub-sub">Each plant's day so far. Press a plant to open it in a new tab.</p>
+      <div class="notice error" id="plant-error" hidden></div>
+      <div id="plant-list"></div>
+      <div class="modal-actions"><button type="button" id="plant-close">Close</button></div>
+    </div>
     <div class="hub-install" id="install-box" hidden>
       <b>Get the hub app</b>
       <span>It opens on this computer in its own window, with its own icon, like your other United Dairy apps.</span>
@@ -53,6 +62,8 @@
   </div>
   <script type="module">import { LOOK, AREAS, AREA_ICON, linkGroups } from './js/apps.js';
 import { opsOrigin } from './js/links.js';
+import { plantPicker } from './js/plant-pick.js';
+import { PRACTICE_HUB } from './js/practice-gate.js';
 import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall, shortDate } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
 function tile(key, url, name, note, newTab, attr) {
@@ -70,22 +81,26 @@ const ADMIN = {
   'plant-setup': ['plant-setup.html', 'Plant Setup', 'Each plant\'s shifts, areas, menu and schedules, and the Upload Center for a new plant'],
   keys: ['keys.html', 'Keys & Connections', 'The Verizon Connect, RedZone, MOCREO and Twilio sign-ins, and a test for each'],
   accounting: ['accounting.html', 'Accounting Numbers', 'The monthly accounting package, read once for Over the Road and cost analysis'],
+  changes: ['changes.html', 'Customer Changes', 'Changes to the route customer list sent from every app, waiting for approval before they are saved'],
   bol: ['bol.html', 'Daily BOL', 'The daily load by route from the office, picked up every hour from the ROUTES/BOL email label']
 };
 // One area: its picture, name, what it holds, and its cards.
 const areaHead = (a) => '<header class="area-head"><span class="area-icon">' + AREA_ICON[a.key] + '</span><div><h2>' + e(a.name) + '</h2><p>' + e(a.note) + '</p></div></header>';
 const adminArea = AREAS.find(a => a.key === 'admin');
 document.getElementById('admin-tiles').innerHTML = '<section class="area" data-area="admin">' + areaHead(adminArea) +
-  adminArea.groups.map(g => '<h3 class="area-group">' + e(g.name) + '</h3><div class="hub-home">' + g.items.map(k => tile(k, ADMIN[k][0], ADMIN[k][1], ADMIN[k][2], false, 'data-admin')).join('') + '</div>').join('') + '</section>';
+  adminArea.groups.map(g => '<h3 class="area-group">' + e(g.name) + '</h3><div class="hub-home">' + g.items.map(k => tile(k, ADMIN[k][0], ADMIN[k][1], ADMIN[k][2], false, 'data-admin')).join('') + '</div>').join('') +
+  // Joe 11-9-26: the live hub is what opens; the practice hub only when someone picks it here (or with its ?practice=1 address).
+  (/sandbox/.test(location.hostname) ? '' : '<p class="practice-pick" id="practice-pick">To test a change first, open the <a href="' + PRACTICE_HUB + '" target="_blank" rel="noopener">practice hub</a>. It opens in its own tab, with copied or made-up data, and never changes the live apps.</p>') + '</section>';
 document.getElementById('today').textContent = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'long' }).format(new Date()) + ', ' + shortDate(new Date());
 
 // The area menu: Everything, then each area this person has something in. The address keeps the pick (#area=fleet), so Back works.
 let shown = [];
+const copiesFor = (a) => (a.copies || []).filter(c => shown.indexOf(c.of) >= 0);
 function drawMenu(admin) {
-  const count = (a) => a.admin ? Object.keys(ADMIN).length : a.apps.filter(k => shown.indexOf(k) >= 0).length;
+  const count = (a) => a.admin ? a.groups.reduce((n, g) => n + g.items.length, 0) : a.apps.filter(k => shown.indexOf(k) >= 0).length + copiesFor(a).length;
   const areas = AREAS.filter(a => (a.admin ? admin : count(a) > 0));
   document.getElementById('area-menu').innerHTML = '<span class="area-menu-title">Areas</span>' +
-    [{ key: 'all', name: 'Everything', n: shown.length + (admin ? Object.keys(ADMIN).length : 0) }].concat(areas.map(a => ({ key: a.key, name: a.name, n: count(a) })))
+    [{ key: 'all', name: 'Everything', n: shown.length + AREAS.reduce((n, a) => n + copiesFor(a).length, 0) + (admin ? count(adminArea) : 0) }].concat(areas.map(a => ({ key: a.key, name: a.name, n: count(a) })))
       .map(a => '<a href="#' + (a.key === 'all' ? '' : 'area=' + a.key) + '" data-area="' + a.key + '"><span class="area-icon">' + AREA_ICON[a.key] + '</span><span class="area-name">' + e(a.name) + '</span><span class="area-n">' + a.n + '</span></a>').join('');
   pickArea();
 }
@@ -133,10 +148,13 @@ requireSignIn(async () => {
     document.getElementById('tiles').innerHTML = AREAS.filter(a => !a.admin).map(a => {
       const mine = a.apps.map(k => tiles.find(t => t.key === k)).filter(Boolean)
         .concat(a.key === 'plant' ? tiles.filter(t => !AREAS.some(x => (x.apps || []).indexOf(t.key) >= 0)) : []);
-      return mine.length ? '<section class="area" data-area="' + a.key + '">' + areaHead(a) + '<div class="hub-home">' + mine.map(t => tile(t.key, t.url, t.name, t.note, true)).join('') + '</div></section>' : '';
+      // A second card for an app the person already has (Customer List in Sales opens Customers & Routes).
+      const extra = (a.copies || []).map(c => [c, tiles.find(t => t.key === c.of)]).filter(x => x[1]).map(x => tile(x[0].key, x[1].url, x[0].name, x[0].note, true));
+      return mine.length || extra.length ? '<section class="area" data-area="' + a.key + '">' + areaHead(a) + '<div class="hub-home">' + mine.map(t => tile(t.key, t.url, t.name, t.note, true)).concat(extra).join('') + '</div></section>' : '';
     }).join('');
     document.getElementById('empty').hidden = tiles.length > 0;
     drawMenu(!!d.admin);
+    plantPicker(tiles, d.plants);
   } catch (err) { showError(serverText(err, 'the hub')); }
 });</script>
 </body>

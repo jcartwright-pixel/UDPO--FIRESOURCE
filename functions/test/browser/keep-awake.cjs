@@ -80,7 +80,7 @@ async function open(browser, url, opts) {
       await page.evaluate(() => document.body.dispatchEvent(new MouseEvent('click', { bubbles: true })));
       await page.waitForTimeout(300);
       assert.equal(await page.evaluate(() => window.udLockAsks), before, 'a tap while the screen is kept on asks nothing more');
-      assert.equal(await page.$('#keep-awake'), null, 'no video while the browser keeps the screen on');
+      assert.equal(!!(await page.$('#keep-awake')), false, 'no video while the browser keeps the screen on');
       assert.deepEqual(errors.filter(e => /awake|wakeLock/i.test(e)), []);
       results.push('the screen is asked for again after the browser lets it go');
       await ctx.close();
@@ -103,7 +103,7 @@ async function open(browser, url, opts) {
     {
       const { ctx, page } = await open(browser, 'driver-station.html?tv=1', { noLock: true });
       await page.waitForFunction(() => document.documentElement.dataset.awake === 'video');
-      assert.equal(await page.$('#keep-awake'), null, 'the TV plays only its own video');
+      assert.equal(!!(await page.$('#keep-awake')), false, 'the TV plays only its own video');
       results.push('the Driver Room TV keeps its own video');
       await ctx.close();
     }

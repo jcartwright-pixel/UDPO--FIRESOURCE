@@ -148,7 +148,7 @@ async function newPage(context) {
     await mgr.goto(HOST + '/distribution.html?testEmail=manager.test@uniteddairy.com');
     await mgr.waitForSelector('#screen:not([hidden])');
     await mgr.waitForTimeout(2500);
-    assert.equal(await mgr.$('a[href="diagnostics.html"]'), null, 'no Diagnostics link for a manager');
+    assert.equal(!!(await mgr.$('a[href="diagnostics.html"]')), false, 'no Diagnostics link for a manager');
     await mgr.goto(HOST + '/diagnostics.html');
     await mgr.waitForSelector('#error:not([hidden])');
     assert.match(await mgr.textContent('#error'), /administrators only/);

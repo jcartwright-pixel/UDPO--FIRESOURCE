@@ -75,6 +75,35 @@ test('Add Driver picks an employee: the name, ID and hire date come from the lis
   assert.equal((await db().collection('drivers').doc(out.driverId).get()).data().hireDate, '2026-10-21');
 });
 
+test('Edit Driver changes the employee ID: an Employees list ID links the driver, another number is kept, a twin or a name is refused', async () => {
+  await udms().collection('people').doc('p1').set(person('10877', 'Riley', 'Kemp'));
+  await sync();
+  const added = await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), name: 'TEST DRIVER ONE', hireDate: '2020-05-01', seniorityDate: '2020-05-01', truck: '', relief: false });
+  const edit = (fields) => applyAction(db(), MANAGER, Object.assign({ action: 'saveDriver', requestId: rid(), driverId: added.driverId, name: 'TEST DRIVER ONE', hireDate: '2020-05-01', seniorityDate: '2020-05-01', truck: '', relief: false, setEmployeeId: true }, fields));
+  const now = async () => (await db().collection('drivers').doc(added.driverId).get()).data();
+  // A number not on the Employees list is kept as typed; the name stays.
+  await edit({ employeeId: '55501' });
+  let d = await now();
+  assert.equal(d.employeeId, '55501');
+  assert.equal(d.name, 'TEST DRIVER ONE');
+  // An ID on the Employees list links the driver: the name and hire date follow UDMS.
+  await edit({ employeeId: '10877' });
+  d = await now();
+  assert.deepEqual([d.employeeId, d.name, d.hireDate], ['10877', 'KEMP, RILEY', '2026-10-20']);
+  // Blank clears it.
+  await edit({ employeeId: '', name: 'KEMP, RILEY' });
+  assert.equal((await now()).employeeId, '');
+  // A name typed in the box is refused; so is another driver's ID.
+  await assert.rejects(edit({ employeeId: 'KEMP' }), /as a number/);
+  const other = await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), name: 'TEST DRIVER TWO', hireDate: '', seniorityDate: '', truck: '', relief: false });
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: other.driverId, name: 'TEST DRIVER TWO', hireDate: '', seniorityDate: '', truck: '', relief: false, setEmployeeId: true, employeeId: '55502' });
+  await assert.rejects(edit({ employeeId: '055502' }), /TEST DRIVER TWO already has employee ID/);
+  assert.equal((await now()).employeeId, '');
+  // Saving the other boxes without the ID box leaves the ID alone.
+  await applyAction(db(), MANAGER, { action: 'saveDriver', requestId: rid(), driverId: other.driverId, name: 'TEST DRIVER TWO', hireDate: '', seniorityDate: '', truck: '', relief: true });
+  assert.equal((await db().collection('drivers').doc(other.driverId).get()).data().employeeId, '55502');
+});
+
 test('+ Add Person picks an employee for the plant schedule; the picked boxes follow UDMS', async () => {
   await udms().collection('people').doc('p2').set(person('10881', 'Casey', 'Lane'));
   await sync();

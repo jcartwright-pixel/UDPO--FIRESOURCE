@@ -371,7 +371,7 @@ const OTHERS = [
       await t.fill('#code-box input', codes.CASE);
       await t.click('#code-box button[type="submit"]');
       await t.waitForSelector('body.station-locked #change:not([hidden])');
-      assert.equal(await t.$('#admin-home'), null, 'a manager\'s tablet has no Operations button');
+      assert.equal(!!(await t.$('#admin-home')), false, 'a manager\'s tablet has no Operations button');
       await t.click('#change');
       await t.waitForSelector('#release:not([hidden])');
       await t.fill('#release-code', release);

@@ -190,11 +190,11 @@ function controller() {
       await bm.waitForFunction(() => /FROM THE SHOT COUNTER/.test(document.getElementById('kind-cards').textContent) && /% OF JUGS MOLDED/.test(document.getElementById('kind-cards').textContent));
       assert.deepEqual(await bm.$$eval('#kind-cards .lb-card .eyebrow', e => e.map(x => x.textContent)), ['Making now', 'Jugs molded', 'Jugs on the Alpine', 'Tester kick-outs']);
       assert.match(await bm.textContent('#kind-cards'), /shots × 6 jugs/);
-      assert.equal(await bm.$('#kind-cards [data-act="count"]'), null, 'no Enter Count: the machine counts');
+      assert.equal(!!(await bm.$('#kind-cards [data-act="count"]')), false, 'no Enter Count: the machine counts');
       assert.match(await bm.textContent('#live'), /Counts from the machine/);
       // Joe 10/14: the Blow Mold makes only gallon jugs, so its one product is running with nothing to pick.
       assert.match(await bm.textContent('#kind-cards'), /Making now\s*Gallon Jug/);
-      assert.equal(await bm.$('#kind-cards [data-act="product"]'), null, 'no Pick Product on the Blow Mold');
+      assert.equal(!!(await bm.$('#kind-cards [data-act="product"]')), false, 'no Pick Product on the Blow Mold');
       assert.doesNotMatch(await bm.textContent('#status-text'), /pick the product/);
       // The bottle check: one jug from each of the six heads, in grams; a head outside 55 to 59 g is flagged.
       assert.deepEqual(await bm.$$eval('#check-inline .lb-field', f => f.map(x => x.firstChild.textContent.trim())), ['Head 1 g', 'Head 2 g', 'Head 3 g', 'Head 4 g', 'Head 5 g', 'Head 6 g', 'Top load']);
@@ -240,7 +240,7 @@ function controller() {
     await rec.selectOption('#check-inline select[data-field="topLoad"]', 'OK');
     await rec.waitForFunction(() => /Last check/.test(document.getElementById('check-inline').textContent));
     assert.match(await rec.textContent('#check-inline'), /Last check \d+:\d\d [AP]M by admin\.test: Head 2, Head 5 OUT · next check due \d+:\d\d [AP]M/);
-    assert.equal(await rec.$('#check-inline input[data-save="check"]'), null, 'no boxes with the old numbers');
+    assert.equal(!!(await rec.$('#check-inline input[data-save="check"]')), false, 'no boxes with the old numbers');
     assert.equal(await rec.$eval('#check-inline .lb-box', e => e.classList.contains('lb-flashbox')), false);
     assert.match(await rec.textContent('#check-inline'), /60\.2 HEAVY/, 'the numbers are in Earlier this shift');
     await bigText(rec, '#check-inline', 'the recorded check');
@@ -270,7 +270,7 @@ function controller() {
       const tables = await dv.$$eval('#detail .pd-bm table.pd-t', ts => ts.map(t => ({ heads: [...t.querySelectorAll('thead th')].map(x => x.textContent), rows: t.querySelectorAll('tbody tr').length })));
       assert.deepEqual(tables[0], { heads: ['Started', 'Resin lot', 'Color', 'Jugs molded', 'On the Alpine', 'Kick-outs', 'Annealer temp', 'Belt RPM', 'Room temp'], rows: 3 });
       assert.deepEqual(tables[1].heads, ['Hour', 'Resin lot · color', 'Jugs molded', 'On the Alpine', 'Target', '%', 'Kick-outs', 'Annealer temp', 'Belt RPM', 'Room temp', 'Stopped']);
-      assert.equal(await dv.$('#detail .pd-pill.n'), null, 'every sensor is reading: nothing says WAITING FOR SENSOR');
+      assert.equal(!!(await dv.$('#detail .pd-pill.n')), false, 'every sensor is reading: nothing says WAITING FOR SENSOR');
       await fits(dv, 'the line shift view at ' + w);
       await shot(dv, 'controller-line-shift-' + w);
       assert.deepEqual(dv.errors, []);

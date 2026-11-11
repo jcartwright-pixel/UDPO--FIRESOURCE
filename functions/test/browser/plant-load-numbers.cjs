@@ -67,7 +67,8 @@ async function journal(id, ok) {
   const sv = (await db().collection('runs').doc('2026-10-04__run_p849').get()).data();
   await db().collection('runs').doc('2026-10-04__run_c905_1').set(Object.assign({}, sv, { runId: 'run_c905_1', routeId: 'rte_c905', route: '905_1', run: 'ALDI - CHARLESTON LOAD 1', routeName: 'Aldi Charleston' }));
   const browser = await chromium.launch();
-  const results = [];
+  // Each check prints as it passes, so a run that stops part way shows how far it got.
+  const results = { push: (r) => console.log('LOADS ' + r) };
   try {
     // The Scheduler: Friday's three Aldi loads are Load 1, 2, 3 by pickup time, the whole name on the card.
     for (const [w, h] of [[1536, 760], [1920, 950]]) {
@@ -171,24 +172,27 @@ async function journal(id, ok) {
     await lo.waitForSelector(row('2026-10-04__run_p812|fri'));
     assert.equal(await lo.getAttribute(row('2026-10-04__run_p812|fri') + ' .lo-run', 'title'), 'UT DSD MILK · Scheduler: PO 1015262 · 8:05 AM');
     assert.deepEqual(await lo.$$eval('#rows tr[data-row]', trs => trs.filter(t => t.children[0].textContent === '812').length), 1, 'Peck Load 1 shows once on Case Loadout');
-    assert.equal(await lo.$('#rows tr[data-row^="sch:"]'), null, 'no Scheduler-only lines on Case Loadout');
+    assert.equal(!!(await lo.$('#rows tr[data-row^="sch:"]')), false, 'no Scheduler-only lines on Case Loadout');
     await shot(lo, 'case-loadout-scheduler-1536.png');
     await lo.click('#areas [data-area="TOTES"]');
     await lo.waitForSelector(row('sch:SCHED-k2'));
     assert.equal(await lo.$eval(row('sch:SCHED-k2'), t => [0, 1, 2].map(i => t.children[i].textContent).join(' | ')), '812 | UT DSD MILK Load 2 | PO PK-2');
     await lo.click('#areas [data-area="TANKER"]');
     await lo.waitForSelector('#rows tr[data-row]');
-    assert.equal(await lo.$('#rows tr[data-row^="sch:"]'), null, 'no Scheduler loads on Tanker Loadout');
+    assert.equal(!!(await lo.$('#rows tr[data-row^="sch:"]')), false, 'no Scheduler loads on Tanker Loadout');
     assert.deepEqual(lo.errors, []);
     results.push('Daily Boxing Loadout: + Add Load saves a Scheduler load for the next day, loaded today; it shows as Load 4');
 
     // Plant Station, Boxing: Load 2, 3 and 4 show; Load 1 is worked on Aldi's box load card.
     const st = await openPage(browser, 1024, 768, '/plant-station.html?' + MANAGER + '&station=BOXING', true);
     const card = (id) => '#work .sw-card[data-sw="' + id + '"]';
+    // Wait for both lists (Scheduler loads and box loads) before checking what is hidden, so a slow one is not a failure.
     await st.waitForSelector(card('sch:SCHED-a3'), { timeout: 15000 });
-    assert.equal(await st.$(card('sch:SCHED-a1')), null, 'Load 1 is worked on the LOAD 1 box load card');
-    assert.ok(await st.$(card('2026-10-04__run_c905_1|fri')), 'the LOAD 1 box load is on the list');
-    assert.deepEqual([await st.$(card('sch:SCHED-k1')), await st.$(card('sch:SCHED-k2'))], [null, null], 'case and tote Scheduler loads are not on the Boxing list');
+    await st.waitForSelector(card('2026-10-04__run_c905_1|fri'), { timeout: 15000 });
+    // Compare yes/no, never a page element: printing a failed check that holds one runs the test out of memory.
+    const has = async (id) => !!(await st.$(card(id)));
+    assert.equal(await has('sch:SCHED-a1'), false, 'Load 1 is worked on the LOAD 1 box load card');
+    assert.deepEqual([await has('sch:SCHED-k1'), await has('sch:SCHED-k2')], [false, false], 'case and tote Scheduler loads are not on the Boxing list');
     // Who takes it shows once Route Master is read (Aldi is a branch run).
     await st.waitForSelector(card('sch:SCHED-a2') + '.by-branch', { timeout: 10000 });
     assert.equal(await st.textContent(card('sch:SCHED-a2') + ' .sw-head .run'), 'ALDI - CHARLESTON Load 2' + 'BRANCH');
@@ -214,5 +218,4 @@ async function journal(id, ok) {
   } finally {
     await browser.close();
   }
-  results.forEach(r => console.log('LOADS ' + r));
-})().catch(e => { console.error(e); process.exit(1); });
+})().catch(e => { console.error(e && e.stack || e); process.exit(1); });

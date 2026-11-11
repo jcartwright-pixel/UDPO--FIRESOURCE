@@ -50,7 +50,7 @@ async function smallest(page, what) {
 }
 // Joe 10/12: "Once I'm in Uniontown I shouldn't need to select": no plant picker, the plant's name is in the header.
 async function plantInHeader(page, what, name) {
-  assert.equal(await page.$('#plant'), null, what + ': no plant picker');
+  assert.equal(!!(await page.$('#plant')), false, what + ': no plant picker');
   await page.waitForFunction(n => document.getElementById('plant-name').textContent === n, name || 'Uniontown');
   assert.match(await page.textContent('.head .eyebrow'), new RegExp('Plant Maintenance · ' + (name || 'Uniontown')));
 }

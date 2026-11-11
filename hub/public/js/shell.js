@@ -6,6 +6,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithPopup, signInWithCredential, signOut, GoogleAuthProvider, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-functions.js';
+import { practiceGate, LIVE_HUB } from './practice-gate.js';
 
 const DOMAIN = 'uniteddairy.com';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -13,6 +14,11 @@ const HERE = location.pathname.split('/').pop() || 'index.html';
 const QS = new URLSearchParams(location.search);
 // The practice copy (ud-distribution-sandbox-hub), or ?practicetest=1 in the local tests.
 const PRACTICE = /sandbox/.test(location.hostname) || (LOCAL && QS.get('practicetest') === '1');
+// Joe 11-9-26: the live hub is the one that opens; the practice hub only when chosen (practice-gate.js).
+const GO_LIVE = practiceGate(location, window.sessionStorage);
+if (GO_LIVE) location.replace(GO_LIVE);
+// The practice hub installs under its own name, so it is never mistaken for the live one.
+if (PRACTICE) { const m = document.querySelector('link[rel="manifest"]'); if (m) m.href = 'manifest-practice.webmanifest'; }
 
 // The screens, in the menu's order.
 export const SCREENS = [
@@ -24,6 +30,7 @@ export const SCREENS = [
   { href: 'plant-setup.html', name: 'Plant Setup', note: 'Administrators: each plant\'s shifts, areas, menu, schedules and new plant data', admin: true },
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
   { href: 'accounting.html', name: 'Accounting Numbers', note: 'Administrators: the monthly accounting package, read once for Over the Road and cost analysis', admin: true },
+  { href: 'changes.html', name: 'Customer Changes', note: 'Administrators: changes to the route customer list from every app, approved here before they are saved', admin: true },
   { href: 'bol.html', name: 'Daily BOL', note: 'Administrators: the daily load by route from the office, picked up from the ROUTES/BOL email label', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];
@@ -119,7 +126,7 @@ function drawFrame() {
   if (bar && PRACTICE && !document.getElementById('practice-band')) {
     const band = document.createElement('div');
     band.id = 'practice-band'; band.className = 'practice-band'; band.setAttribute('role', 'note');
-    band.innerHTML = '<span><b>Practice copy.</b> This is the practice hub, so its cards open the practice copies of the apps, not the live ones.</span><a href="https://ud-distribution-hub.web.app/">Open the live hub</a>';
+    band.innerHTML = '<span><b>Practice copy.</b> You chose the practice hub, for testing. Its cards open the practice copies of the apps. A card for an app with no practice copy says it opens the live one.</span><a href="' + LIVE_HUB + '/">Open the live hub</a>';
     bar.insertAdjacentElement('afterend', band);
   }
   if (screen && !document.getElementById('screen-loading')) {

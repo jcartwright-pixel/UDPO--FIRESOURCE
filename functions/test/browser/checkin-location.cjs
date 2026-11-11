@@ -56,7 +56,7 @@ const shot = async (p, name, clip) => { if (SHOTS) await p.screenshot(Object.ass
     await p.fill('#ce-to', 'chdrivercheckin@uniteddairy.com');
     await p.press('#ce-to', 'Tab');
     // Batch 5: no Save button; the box saves when it is left.
-    assert.equal(await p.$('#ce-save'), null, 'no Save button');
+    assert.equal(!!(await p.$('#ce-save')), false, 'no Save button');
     // Joe 10/26: Charleston's settings are kept in Charleston's own database.
     const chDoc = () => plantDb('fac_charleston').collection('private').doc('checkinEmail_fac_charleston').get();
     for (let i = 0; i < 100; i++) { const c = (await chDoc()).data(); if (c && c.recipient === 'chdrivercheckin@uniteddairy.com') break; await new Promise(r => setTimeout(r, 200)); }
