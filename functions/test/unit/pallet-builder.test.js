@@ -341,3 +341,8 @@ test('load sequence 0 is labeled 0 on the truck, and every load sequence 0 to 15
   assert.notEqual(box.stopColor(null, 3), box.seqColor(0), 'no sequence is grey, not sequence 0\'s color');
   assert.match(src, /const lmLabel = i => \{ const n = stopSeq\(S\.stops\[i\]\); return n != null \? String\(n\) : '#' \+ \(i \+ 1\); \};/, 'sequence 0 shows 0, not #run');
 });
+
+test('soft margarine 41823 is 18 to a case (Joe 11-11-26)', () => {
+  const box = rulesBox();
+  assert.equal(box.BY.get('41823').upc, 18);
+});
