@@ -260,13 +260,14 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     assert.doesNotMatch(inv.url(), /type=/, 'back on Plant Supplies');
     assert.equal(await inv.getAttribute('[data-type="supplies"]', 'aria-selected'), 'true');
     await inv.click('#ed-cancel');
-    // A barcode not known yet: the pop-up ties it to a product, once.
-    await inv.fill('#oh-search', '4006381333931');
+    // A barcode not known yet: the pop-up ties it to a product, once. (Another barcode than the tablet's below, which must still
+    // be unknown there.)
+    await inv.fill('#oh-search', '5901234123457');
     await inv.press('#oh-search', 'Enter');
     await inv.waitForTimeout(300);
     assert.equal(await inv.isVisible('#pop'), false, 'a typed number that no product has just finds by name');
     await inv.fill('#oh-search', '');
-    await wasp(inv, '4006381333931');
+    await wasp(inv, '5901234123457');
     await inv.waitForSelector('#pop:not([hidden]) #tie-item');
     assert.equal(await inv.innerText('#pop-title'), 'BARCODE NOT KNOWN YET');
     await inv.selectOption('#tie-item', 'ITEM-bags');
