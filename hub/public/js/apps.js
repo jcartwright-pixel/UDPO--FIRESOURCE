@@ -41,6 +41,8 @@ export const LOOK = {
   inventory: { color: '#6b4f1d', icon: path('<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="M3.29 7 12 12l8.71-5"/><path d="m7.5 4.27 9 5.15"/>') },
   sales: { color: '#b8860b', icon: path('<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>') },
   distribution: { color: '#075b9c', icon: path('<path d="M2 7h12v9H2z"/><path d="M14 10h4l3.5 3.5V16H14"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/>') },
+  // Lucide "list".
+  customerlist: { color: '#1d7a46', icon: path('<path d="M3 5h.01M3 12h.01M3 19h.01M8 5h13M8 12h13M8 19h13"/>') },
   people: { color: '#3a5068', icon: path('<path d="M12 3l8 3v5.5c0 5-3.5 8.3-8 9.5-4.5-1.2-8-4.5-8-9.5V6z"/><path d="M9 12l2 2 4-4"/>') }
 };
 
@@ -86,17 +88,20 @@ export function linkGroups(ops) {
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
   { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant', 'inventory'] },
-  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers and delivery routes', apps: ['distribution', 'customers'] },
-  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app: where the routes are and the customers on each', apps: ['sales'] },
-  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, what each trip costs and the cost of each route', apps: ['fuel', 'routes', 'routecost'] },
+  // Joe 11-10-26: Route & Trip Costs under Distribution; Route Cost Analysis and a Customer List card under Sales ("it can lead
+  // to our complete customer list"). Customer Changes stays in the hub's menu for administrators.
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'routes'] },
+  // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
+  { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app, the cost of each route and the complete customer list', apps: ['sales', 'routecost'],
+    copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
+  { key: 'fleet', name: 'Fleet & Costs', note: 'Fuel use, fuel prices, tank deliveries and trip fuel', apps: ['fuel'] },
   { key: 'office', name: 'Office', note: 'Customer statements', apps: ['statements'] },
   { key: 'people', name: 'People & Safety', note: 'Employee records, drivers, hiring, and reporting an accident or injury', apps: ['udms', 'accident'] },
   { key: 'admin', name: 'Administration', note: 'Who gets in and how everything is set up', admin: true, groups: [
     { name: 'Who gets in', items: ['people', 'roles'] },
     { name: 'Messages and links', items: ['email', 'links'] },
     { name: 'Plants and connections', items: ['plant-setup', 'keys'] },
-    { name: 'Numbers from the office', items: ['accounting', 'bol'] },
-    { name: 'Customer list', items: ['changes'] }
+    { name: 'Numbers from the office', items: ['accounting', 'bol'] }
   ] }
 ];
 // The area pictures for the menu.
