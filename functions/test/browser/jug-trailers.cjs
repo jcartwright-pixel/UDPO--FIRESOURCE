@@ -148,6 +148,17 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
     assert.deepEqual(await rowsText(), ['T-601:DEBAG', 'T-985:UPPER LOT'], 'only the two we added; T-980 is not listed');
     results.push('Edit on a line: a trailer moves to the place picked');
 
+    // Joe 11-11-26: a double-click on a line opens its location drop-down without pressing Edit; Esc puts it back.
+    await p.dblclick('#rows tr[data-id="fac_uniontown_T-985"] td:nth-child(2)');
+    await p.waitForSelector('#rows tr[data-id="fac_uniontown_T-985"] select[data-loc]');
+    assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.dataset.loc), 'fac_uniontown_T-985', 'the drop-down has the focus');
+    assert.equal(await p.$$eval('#rows select[data-loc]', s => s.length), 1);
+    // The first Esc closes the open list of places; the next puts the line back.
+    await p.keyboard.press('Escape');
+    if (await p.$('#rows select[data-loc]')) await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('#rows select[data-loc]'));
+    results.push('Double-click on a line opens its location drop-down, the same as Edit');
+
     // Another supplier's trailer: Metro, typed.
     await p.click('#add');
     await p.selectOption('#add-company', 'Metro');
@@ -303,6 +314,22 @@ const unit = (id, number, location, notes, facilityId) => db().collection('equip
       console.log('list width at ' + w + ': ' + fit.join(' in '));
       assert.ok(fit[0] <= fit[1] + 1, 'the list fits at ' + w + ' (' + fit.join(' > ') + ')');
       await shot(v, '4-jug-trailers-' + w + '.png');
+      // Joe 11-11-26: the location drop-down is wide enough for every place (IN THE LOT was cut off).
+      await v.click('#rows tr[data-id] button[data-edit]');
+      await v.waitForSelector('#rows select[data-loc]');
+      const cut = await v.evaluate(() => {
+        const s = document.querySelector('#rows select[data-loc]'), cs = getComputedStyle(s), c = document.createElement('canvas').getContext('2d');
+        c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        const room = s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 20;
+        return [...s.options, { textContent: 'IN THE LOT' }].map(o => o.textContent).filter(t => c.measureText(t.toUpperCase()).width > room);
+      });
+      await shot(v, '6-location-open-' + w + '.png');
+      // (A phone has no room for it beside the unit and Save; there the drop-down stays as it was.)
+      if (w >= 768) assert.deepEqual(cut, [], 'the location drop-down cuts off nothing at ' + w);
+      const open = await v.evaluate(() => { const s = document.querySelector('#rows').closest('.pm-scroll'), d = document.querySelector('#rows select[data-loc]'); return [s.scrollWidth, s.clientWidth, d.offsetWidth, d.parentElement.clientWidth, document.querySelector('#rows button[data-save]').offsetWidth, document.querySelector('#rows button[data-save]').parentElement.clientWidth]; });
+      assert.ok(open[0] <= open[1] + 1, 'the list still fits with the drop-down open at ' + w + ' (' + open.join(' ') + ')');
+      await v.keyboard.press('Escape');
+      if (await v.$('#rows select[data-loc]')) await v.keyboard.press('Escape');
       assert.deepEqual(v.errors, []);
       await v.close();
     }

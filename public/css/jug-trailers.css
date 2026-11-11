@@ -47,7 +47,7 @@
 .jt-page .jt-edit { font: inherit; font-size: 16px; font-weight: 900; color: var(--ud-blue); background: #fff; border: 1px solid var(--ud-blue); border-radius: 6px; padding: 3px 12px; cursor: pointer; }
 .jt-page .jt-edit.save { background: var(--ud-blue); color: #fff; }
 .jt-page .jt-edit:disabled { opacity: .5; cursor: default; }
-.jt-page select.jt-loc { min-width: 150px; height: 36px; min-height: 36px; }
+.jt-page select.jt-loc { min-width: 170px; height: 36px; min-height: 36px; }
 .jt-page .jt-editcell { text-align: right; }
 .jt-page.mach-page #rows td:nth-child(4) { white-space: normal; min-width: 140px; }
 /* Joe 11/4: the list looks like Inventory: a blue heading bar with white words, lines between the columns. */
@@ -85,16 +85,22 @@
   .jt-page.pm-page table.pm-table thead th:nth-child(2) { width: 78px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(3) { width: 134px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(5) { width: 78px; }
-  .jt-page.pm-page table.pm-table thead th:nth-child(7) { width: 140px; }
+  /* Joe 11-11-26: the location drop-down was not quite wide enough (IN THE LOT was cut off). */
+  .jt-page.pm-page table.pm-table thead th:nth-child(7) { width: 184px; }
   .jt-page.pm-page table.pm-table thead th:nth-child(8) { width: 76px; }
   .jt-page.mach-page #rows td:nth-child(4) { min-width: 0; }
   .jt-page select.jt-loc { min-width: 0; width: 100%; }
+  /* Save is wider than Edit: it keeps inside its column too. */
+  .jt-page .jt-edit { padding: 3px 8px; }
 }
 /* Under 1200 wide the trailer card goes under the list, so every column of the list still shows. */
 @media (max-width: 1200px) {
   .jt-page .mach-split { display: block; }
   .jt-page .mach-split > .pm-panel { margin-bottom: 12px; }
   .jt-page .mach-split .pm-scroll { max-height: 60vh; }
+}
+@media (max-width: 600px) {
+  .jt-page select.jt-loc { max-width: 112px !important; }
 }
 @media (max-width: 900px) {
   .jt-page .jt-big button { font-size: 18px; }
@@ -117,7 +123,8 @@
   .jt-page .jt-phone-what { display: block !important; font-size: 16px; font-weight: 600; margin-top: 4px; }
   .jt-page .jt-pair, .jt-page .jt-prod { grid-template-columns: 1fr; }
   .jt-page select.jt-loc { min-width: 0; width: 100%; }
-  .jt-page select.jt-loc { max-width: 112px; }
+  /* Joe 11-11-26: wide enough for every place on a tablet; a phone has no room beside the unit and Save. */
+  .jt-page select.jt-loc { max-width: 150px; }
   .jt-page.pm-page table.pm-table th { letter-spacing: 0; }
   .jt-page .jt-edit { padding: 3px 8px; }
   .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
