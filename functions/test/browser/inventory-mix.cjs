@@ -107,7 +107,8 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     assert.equal(await placeOf(inv, 'ITEM-jugs'), 'NO AREA YET');
     // Its own window: the header names Inventory and the menu lists only Inventory's screens.
     assert.match(await inv.innerText('#screen > .topbar .brand small'), /INVENTORY$/);
-    assert.deepEqual(await inv.$$eval('.sidemenu a', a => a.map(x => x.innerText.trim()).filter(Boolean)).then(l => l.slice(0, 2)), ['INVENTORY', 'RAW MILK']);
+    // (Read as written: the menu may be folded, which hides its words.)
+    assert.deepEqual((await inv.$$eval('.sidemenu a', a => a.map(x => x.textContent.trim()).filter(Boolean))).slice(0, 2), ['Inventory', 'Raw Milk']);
     assert.equal(await inv.$eval('#tabs', t => getComputedStyle(t).textTransform), 'uppercase', 'ALL CAPS');
 
     // ---------- A: TAKE OUT by hand ----------
