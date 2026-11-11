@@ -71,3 +71,38 @@ test('Code 128 barcodes for the Zebra labels', () => {
   assert.match(C.svg('UD7WRGL7'), /^<svg [^>]*aria-label="Barcode UD7WRGL7"/);
   assert.throws(() => C.values('é'), /plain letters/);
 });
+
+// Joe 11-10-26 ("three, maybe four separations"): Raw Milk, Cooler, Plant Supplies and Maintenance, each with its areas.
+test('four inventories, picked by kind, each with its own areas', () => {
+  assert.deepEqual(R.INVENTORY_SECTIONS.map(s => s.name), ['Raw Milk', 'Cooler', 'Plant Supplies', 'Maintenance']);
+  assert.equal(R.inventorySection({ kind: 'Raw Milk' }), 'raw');
+  assert.equal(R.inventorySection({ kind: R.MILK_KIND }), 'milk');
+  assert.equal(R.inventorySection({ kind: 'Packaging' }), 'supplies');
+  assert.equal(R.inventorySection({ kind: '' }), 'supplies', 'a product with no kind stays where it was');
+  assert.equal(R.inventorySection({ kind: 'Maintenance Part' }), 'maint');
+  assert.equal(R.inventorySection({ kind: 'Safety' }), 'maint');
+  // Every kind but our own milk products can be picked on Receiving, and each sits in exactly one inventory.
+  R.INVENTORY_KINDS.concat([R.MILK_KIND]).forEach(k => assert.equal(R.INVENTORY_SECTIONS.filter(s => s.kinds.indexOf(k) >= 0).length, 1, k));
+  // A new area typed on a product is offered too (a plant adds areas without new code), once, after the usual ones.
+  const items = [{ kind: 'Ingredient', area: 'Back Dock' }, { kind: 'Chemical', area: 'back dock' }, { kind: 'Safety', area: 'Locker' }, { kind: 'Ingredient', area: 'Dry Storage' }];
+  assert.deepEqual(R.inventoryAreas(items, 'supplies').slice(-2), ['Freezer', 'Back Dock']);
+  assert.equal(R.inventoryAreas(items, 'supplies').filter(a => /dock/i.test(a)).length, 1);
+  assert.ok(R.inventoryAreas(items, 'maint').indexOf('Locker') >= 0);
+  assert.ok(R.inventoryAreas([], 'supplies').indexOf('Dry Storage') >= 0);
+});
+
+test('where a product is kept, and the Count Walk, are checked before saving', () => {
+  assert.deepEqual(v({ op: 'setPlace', itemId: 'A', area: '  Dry   Storage ', spot: 'Aisle 3' }), { lane: 'RECEIVING', op: 'setPlace', itemId: 'A', area: 'Dry Storage', spot: 'Aisle 3' });
+  assert.throws(() => v({ op: 'setPlace', area: 'Dry Storage' }), /Pick the product/);
+  assert.deepEqual(v({ op: 'countMany', counts: [{ itemId: 'A', qty: '1,200' }, { itemId: 'B', qty: '0' }], area: 'Cooler' }).counts, [{ itemId: 'A', qty: 1200 }, { itemId: 'B', qty: 0 }]);
+  assert.throws(() => v({ op: 'countMany', counts: [] }), /at least one/);
+  assert.throws(() => v({ op: 'countMany', counts: [{ itemId: 'A', qty: '1' }, { itemId: 'A', qty: '2' }] }), /once/);
+  assert.throws(() => v({ op: 'countMany', counts: [{ itemId: 'A', qty: '2.5' }] }), /whole number/);
+  assert.throws(() => v({ op: 'countMany', counts: Array.from({ length: R.MAX_COUNT_WALK + 1 }, (x, i) => ({ itemId: 'I' + i, qty: '1' })) }), /up to/);
+  // A product added on Inventory keeps its area; one edited on Receiving (no area sent) keeps what it has.
+  const add = v({ op: 'addProduct', name: 'Bearing 6204', kind: 'Maintenance Part', unit: 'Each', area: 'Parts Room', spot: 'Bin 12' });
+  assert.equal(add.area, 'Parts Room'); assert.equal(add.spot, 'Bin 12');
+  const edit = v({ op: 'editProduct', itemId: 'A', name: 'Bearing 6204', kind: 'Maintenance Part', unit: 'Each' });
+  assert.equal(edit.area, undefined); assert.equal(edit.spot, undefined);
+  assert.throws(() => v({ op: 'addProduct', name: 'X', kind: 'Spare' }), /Kind must be/);
+});

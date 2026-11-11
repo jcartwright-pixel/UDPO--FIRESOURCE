@@ -146,7 +146,9 @@
   // A Receiving load carries several products, each with what was ordered and what came in. A product is a receivingItems
   // record (the same list the Boxing tablet names barcodes into), and belongs to one supplier. Inventory keeps, on each product,
   // its last count and what was received (and later used) since then, so "Should have" = last count + received - used.
-  var INVENTORY_KINDS = ['Ingredient', 'Packaging', 'Chemical', 'Other'];
+  // Joe 11-10-26 ("three, maybe four separations"): Raw Milk, Maintenance Part and Safety are kinds too, so a product of one of
+  // them sits in its own inventory (INVENTORY_SECTIONS below).
+  var INVENTORY_KINDS = ['Ingredient', 'Packaging', 'Chemical', 'Other', 'Raw Milk', 'Maintenance Part', 'Safety'];
   var INVENTORY_UNITS = ['Cases', 'Each', 'Pallets', 'Pounds', 'Gallons', 'Bags', 'Boxes', 'Bundles', 'Rolls', 'Drums', 'Pails', 'Totes'];
   var MAX_LOAD_LINES = 40;
   function wholeOrNull(v) { var t = text(v); if (!t) return null; var n = Number(t); return Number.isInteger(n) && n >= 0 ? n : null; }
@@ -162,6 +164,30 @@
   var MILK_KIND = 'Milk Product';
   var MAX_USES = 30;
   function isMilk(item) { return text(item && item.kind) === MILK_KIND; }
+  // Joe 11-10-26 ("separate the raw and the cooler products ... the maintenance products would actually be separated also ...
+  // three, maybe four separations"): four inventories, each its own tab, picked by the product's kind. Each has the areas a
+  // dairy keeps it in; a product's area is typed or picked, so a plant can use a new area without new code.
+  var INVENTORY_SECTIONS = [
+    { key: 'raw', name: 'Raw Milk', kinds: ['Raw Milk'], areas: ['Silos', 'Tankers'] },
+    { key: 'milk', name: 'Cooler', kinds: [MILK_KIND], areas: ['Cooler', 'Freezer', 'Dock'] },
+    { key: 'supplies', name: 'Plant Supplies', kinds: ['Ingredient', 'Packaging', 'Chemical', 'Other'],
+      areas: ['Dry Storage', 'Cardboard & Cases', 'Packaging', 'Chemicals', 'Lab & Quality', 'Totes, Crates & Pallets', 'Freezer'] },
+    { key: 'maint', name: 'Maintenance', kinds: ['Maintenance Part', 'Safety'], areas: ['Parts Room', 'Filters & Oils', 'Safety Gear', 'Shop'] }
+  ];
+  var MAX_AREA = 40, MAX_SPOT = 40, MAX_COUNT_WALK = 300;
+  function inventorySection(item) {
+    var k = text(item && item.kind);
+    for (var i = 0; i < INVENTORY_SECTIONS.length; i++) if (INVENTORY_SECTIONS[i].kinds.indexOf(k) >= 0) return INVENTORY_SECTIONS[i].key;
+    return 'supplies';
+  }
+  // The areas offered for one inventory: its own, then any other typed on its products (in capitals, once each).
+  function inventoryAreas(items, key) {
+    var sec = INVENTORY_SECTIONS.filter(function (s) { return s.key === key; })[0], seen = {}, out = [];
+    function add(a) { a = text(a); var k = a.toUpperCase(); if (a && !seen[k]) { seen[k] = true; out.push(a); } }
+    (sec ? sec.areas : []).forEach(add);
+    (items || []).filter(function (i) { return inventorySection(i) === key; }).map(function (i) { return text(i.area); }).sort().forEach(add);
+    return out;
+  }
   function shouldHave(item) {
     item = item || {};
     return round3((Number(item.countQty) || 0) + (Number(item.receivedSince) || 0) + (Number(item.madeSince) || 0) - (Number(item.usedSince) || 0));
@@ -1767,7 +1793,8 @@
 
   return { caseCompare: caseCompare, pausedMinutes: pausedMinutes, nextPauseMark: nextPauseMark, FORECAST: FORECAST, loadForecast: loadForecast, nightPace: nightPace, hourSpeeds: hourSpeeds, historyShare: historyShare, cleanMinutes: cleanMinutes, forecastNights: forecastNights, forecastLateText: forecastLateText, forecastBehind: forecastBehind, forecastSummary: forecastSummary, truckTimes: truckTimes, unloadKey: unloadKey, unitKey: unitKey, trailerText: trailerText, latestUnloads: latestUnloads, MAX_UNLOADING: MAX_UNLOADING, unloadingFull: unloadingFull, washesDone: washesDone, washOpen: washOpen, when: when,
     LOAD_TYPE: LOAD_TYPE, SUPPLIER_TYPE: SUPPLIER_TYPE, numberLoads: numberLoads, loadNumberName: loadNumberName, STARTING_SUPPLIERS: STARTING_SUPPLIERS, lane: lane, newestRecords: newestRecords, time24: time24,
-    INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MILK_KIND: MILK_KIND, MAX_USES: MAX_USES, isMilk: isMilk, madeByProduct: madeByProduct, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
+    INVENTORY_KINDS: INVENTORY_KINDS, INVENTORY_UNITS: INVENTORY_UNITS, MILK_KIND: MILK_KIND, INVENTORY_SECTIONS: INVENTORY_SECTIONS, inventorySection: inventorySection, inventoryAreas: inventoryAreas,
+    MAX_AREA: MAX_AREA, MAX_SPOT: MAX_SPOT, MAX_COUNT_WALK: MAX_COUNT_WALK, MAX_USES: MAX_USES, isMilk: isMilk, madeByProduct: madeByProduct, MAX_LOAD_LINES: MAX_LOAD_LINES, loadLines: loadLines, shouldHave: shouldHave, inventoryLow: inventoryLow, supplierProducts: supplierProducts, wholeOrNull: wholeOrNull,
     leaveFirst: leaveFirst, inLoadingOrder: inLoadingOrder, scheduleEntries: scheduleEntries, scheduleCustomers: scheduleCustomers, scheduleRoutes: scheduleRoutes, scheduleLoadsOn: scheduleLoadsOn, withScheduleLoads: withScheduleLoads, reportLoads: reportLoads, LOAD_TYPES: LOAD_TYPES, loadArea: loadArea, routeLoadType: routeLoadType, scheduleArea: scheduleArea, scheduleSuppliers: scheduleSuppliers, holidayName: holidayName, scheduleCheck: scheduleCheck, dayText: dayText, routeTime: routeTime, dispatchClock: dispatchClock, withDispatchTimes: withDispatchTimes, loadTrailer: loadTrailer, defaultLoadTime: defaultLoadTime,
     YARD_LOCK_MINUTES: YARD_LOCK_MINUTES, YARD_GPS_LOW: YARD_GPS_LOW, YARD_GPS_HIGH: YARD_GPS_HIGH, YARD_GPS_STUCK_MINUTES: YARD_GPS_STUCK_MINUTES, yardGpsCover: yardGpsCover, FUEL_LEVELS: FUEL_LEVELS, yardTrailer: yardTrailer, wallMinutes: wallMinutes, wallClock: wallClock, departWall: departWall, yardHolds: yardHolds, yardDeparted: yardDeparted,
     yardQueue: yardQueue, yardAll: yardAll, yardHistory: yardHistory, yardLockLeft: yardLockLeft, REEFER_OFF_BY: REEFER_OFF_BY, REEFER_STALE_MINUTES: REEFER_STALE_MINUTES, yardGps: yardGps, REEFER_STOP_MINUTES: REEFER_STOP_MINUTES, yardOut: yardOut, yardGone: yardGone,

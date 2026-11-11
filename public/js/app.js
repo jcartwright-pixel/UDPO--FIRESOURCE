@@ -192,7 +192,9 @@ export const MENU = [
   // Joe 10/13: Inventory, starting with Receiving scan-in (scanned on the Boxing station's Receiving tab; mock-up E is the office log).
   // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
   // Joe 11/1 ("a nice little module for the inventory"): On Hand, what the plant should have of each product, first.
-  ['Inventory', [['On Hand', 'inventory.html', 'day'], ['Milk Products', 'inventory.html?type=milk', 'day'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
+  // Joe 11-10-26 ("three, maybe four separations"): the four inventories, then the Count Walk, the Receiving Log and History.
+  ['Inventory', [['Plant Supplies', 'inventory.html', 'day'], ['Raw Milk', 'inventory.html?type=raw', 'day'], ['Cooler', 'inventory.html?type=milk', 'day'], ['Maintenance', 'inventory.html?type=maint', 'day'],
+    ['Count Walk', 'inventory.html?tab=walk', 'check'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['History', 'inventory.html?tab=history', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
   // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
   ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
   // Joe 11-5-26: the Pallet Builder is its own menu option, under Debag / Labeling Room (it was in Plant Distribution Departments).
@@ -254,6 +256,18 @@ export const GROUPS = [
 ];
 export const groupSides = (key) => SIDES.filter(s => s.group === key);
 const pageOf = (href) => String(href).split(/[?#]/)[0];
+// Joe 11-10-26 ("the inventory menu button automatically go open up a new window basically its own window instead of a shared
+// window with shipping and receiving. But it can link it from here"): Inventory opens in its own window (a new tab) from any
+// other screen, with its own name in the header and only its own screens in the menu. Inside that window its links stay put.
+// Who may open it is unchanged (it is still the Shipping & Receiving area's screen). This is the one exception, besides
+// Administration's Launch, to the one-window rule (Joe 10/9); same-window.test.js allows only the pages listed here.
+export const OWN_WINDOWS = { 'inventory.html': { name: 'Inventory', home: 'inventory.html', sections: ['Inventory'], flatFirst: true } };
+const herePage = () => location.pathname.split('/').pop() || 'index.html';
+const opensOwnWindow = (href) => !!OWN_WINDOWS[pageOf(href)] && !OWN_WINDOWS[herePage()] && !/^[a-z]+:/i.test(href);
+// A press that is not on a link (a menu section's name) opens it the same way: through a link, so the click rule below applies.
+function openOwnWindow(href) { const a = document.createElement('a'); a.href = href; a.hidden = true; document.body.appendChild(a); a.click(); a.remove(); }
+// The side a screen shows: its own when it has its own window.
+const viewSide = (page) => { const s = sideFor(page), own = OWN_WINDOWS[page]; return s && own ? Object.assign({}, s, own) : s; };
 // Joe 10/25 (mock-up 7): each plant's own menu order from Administration > Menu Setup (logic.js menuArrange), kept on this
 // computer so the menu draws at once; it is read again after sign-in and a change shows on the next screen opened.
 // baseSections is where the app puts each section, which decides what is Under Construction wherever a plant moves it.
@@ -475,7 +489,7 @@ function addSideMenu() {
   // A side's sections in its own order. Joe 10/25: Plant Production and Plant Maintenance keep their own screens straight in the
   // menu (the first section, flatFirst) with the sections moved in (Quality Checks, Cooler Temperature, Shift Notes, Maintenance
   // Schedule) under them.
-  const side = sideFor(here), groups = side ? side.sections.map(g => MENU.find(([m]) => m === g)).filter(Boolean) : [];
+  const side = viewSide(here), groups = side ? side.sections.map(g => MENU.find(([m]) => m === g)).filter(Boolean) : [];
   // Joe 11-9-26 ("the action buttons are both white for shipping and receiving"): a section is lit only when one of its own screens
   // is the one open (Shipping and Receiving are the same page with different settings), and Shipping and Receiving each carry
   // their own color (data-sec, app.css).
@@ -559,6 +573,7 @@ function addSideMenu() {
       if (sec.classList.contains('open') && Date.now() - hoverAt > 400) {
         if (!sec.dataset.home) { close(); return; }
         if (sec.dataset.plant) try { sessionStorage.setItem('udPlant', sec.dataset.plant); } catch (x) { /* no storage */ }
+        if (opensOwnWindow(sec.dataset.home)) { openOwnWindow(sec.dataset.home); return; }
         location.href = sec.dataset.home;
       } else openSec(sec);
     });
@@ -635,7 +650,7 @@ addSideMenu();
 (function headerSide() {
   const small = document.querySelector('#screen > .topbar .brand small');
   if (!small || !document.body.classList.contains('has-side')) return;
-  const here = location.pathname.split('/').pop() || 'index.html', side = sideFor(here);
+  const here = location.pathname.split('/').pop() || 'index.html', side = viewSide(here);
   const grp = here === 'group.html' ? GROUPS.find(g => g.key === new URLSearchParams(location.search).get('g')) : null;
   small.innerHTML = 'UNITED DAIRY' + (grp ? ' &middot; ' + grp.name.toUpperCase() : side ? ' &middot; ' + (side.key === 'crew' ? side.short : side.name).toUpperCase() : '');
 })();
@@ -760,8 +775,17 @@ function holdUntilDrawn() {
 // started its own reads and drew while another screen was in use, and showed what it had drawn then when it was clicked.
 // Standing rule (Joe, 10/9): every link opens in this window; a link that asks for a new tab is opened here instead.
 document.addEventListener('click', e => {
-  const a = e.target.closest && e.target.closest('a[target]');
-  if (a && a.target !== '_self') a.removeAttribute('target');
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  // Joe 11-10-26: Inventory opens in its own window, on the plant this screen is on.
+  if (opensOwnWindow(a.getAttribute('href'))) {
+    const u = new URL(a.href);
+    if (!u.searchParams.get('plant') && currentPlant()) u.searchParams.set('plant', currentPlant());
+    a.href = u.href;
+    a.target = '_blank'; a.rel = 'noopener'; // own-window
+    return;
+  }
+  if (a.target && a.target !== '_self') a.removeAttribute('target');
 }, true);
 
 // Polish 16: when the tablet or computer loses its connection a yellow bar says so at the top, so nobody thinks a press was
@@ -810,7 +834,7 @@ export function goBack() {
   let fromHere = false;
   try { fromHere = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) { /* no referrer */ }
   // Up one level: a side's screen goes to that side's first page, and the side's first page goes Home.
-  const side = sideFor(here), up = side && !isHome(side, here) ? side.home : here === 'index.html' && multiPlant() ? 'company.html' : 'index.html';
+  const side = viewSide(here), up = side && !isHome(side, here) ? side.home : here === 'index.html' && multiPlant() ? 'company.html' : 'index.html';
   if ((here === 'company.html' || (!main && side && !isHome(side, here))) && fromHere && history.length > 1) history.back();
   else location.href = up;
 }

@@ -74,6 +74,37 @@
 .inv-page table.inv-history tr.mv-count td:nth-child(4) { color: var(--ud-blue); font-weight: 800; }
 .inv-page table.inv-history tr.mv-received td:nth-child(5) { color: var(--runs-ink); }
 .inv-page .inv-err[hidden] { display: none; }
+/* Joe 11-10-26: the four inventories, the Count Walk, scan or type, and the pop-ups (Low stock, a barcode not known yet, Reset). */
+.inv-page #types-bar[hidden] { display: none; }
+.inv-page .inv-types button { min-height: 44px; padding: 0 16px; font-size: 16px; font-weight: 800; }
+.inv-page .inv-types button[aria-selected="true"] { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-filters { flex-wrap: wrap; }
+.inv-page .inv-filters > button { min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.inv-page .inv-filters > button.primary { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
+.inv-page .inv-filters > button:disabled { opacity: .55; cursor: not-allowed; }
+.inv-page .inv-filters > button[hidden] { display: none; }
+.inv-page .inv-filters > button.inv-lowpop { background: #b42318; border-color: #b42318; color: #fff; }
+.inv-page table.inv-onhand td small.inv-place { color: var(--muted); font-weight: 600; }
+.inv-page table.inv-walk input { width: 100%; max-width: 140px; min-height: 40px; border: 2px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 18px; text-align: right; }
+.inv-page table.inv-walk input:disabled { border-color: var(--line); background: #eef2f6; }
+.inv-page table.inv-walk td.inv-off { color: #b42318; }
+.inv-page table.inv-walk td.inv-same { color: var(--runs-ink); }
+.inv-page .inv-acts input.wide { width: 220px; text-align: left; }
+.inv-page .inv-add-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; max-width: 1000px; }
+.inv-page .inv-add-form label { display: grid; gap: 4px; font-size: 16px; font-weight: 700; color: var(--muted); }
+.inv-page .inv-add-form input, .inv-page .inv-add-form select { min-height: 44px; font: inherit; font-size: 16px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.inv-page .inv-add-form .inv-panel-foot, .inv-page .inv-add-form .inv-help { grid-column: 1 / -1; }
+.inv-pop { text-transform: uppercase; }
+.inv-pop p { font-size: 16px; }
+.inv-pop select, .inv-pop input { text-transform: none; min-height: 44px; }
+.inv-pop h3 { margin: 12px 0 6px; font-size: 16px; color: var(--ud-blue-dark); }
+.inv-pop .inv-lowlist { max-height: calc(100vh - 300px); overflow: auto; }
+.inv-pop table.inv-log { width: 100%; font-size: 16px; border-collapse: collapse; }
+.inv-pop table.inv-log th, .inv-pop table.inv-log td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.inv-pop table.inv-log .num { text-align: right; }
+.inv-pop .inv-pop-err { color: #b42318; font-weight: 700; margin: 6px 0 0; }
+.inv-pop .inv-pop-err:empty { display: none; }
+.inv-pop .modal-actions button { min-height: 44px; font-size: 16px; }
 .inv-items .inv-help { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
 .inv-items table { width: 100%; font-size: 16px; }
 .inv-items td { padding: 8px; vertical-align: middle; }

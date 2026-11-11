@@ -1054,12 +1054,38 @@ The plant's own list of suppliers and everything they send: ingredients, packagi
 id: inventory
 screens: inventory.html
 
-What the plant should have of everything it keeps: the supplies it receives (jugs, caps, bags, ingredients) and its own milk products. Everyone in the plant can open it. Two types at the top: **Supplies** and **Milk Products**. Every change goes through here, and each one is a line in **History**.
+Everything the plant keeps, in **four inventories**, each its own tab at the top: **Raw Milk**, **Cooler** (our own milk products), **Plant Supplies** (ingredients, cardboard, packaging, chemicals, lab supplies, totes and pallets) and **Maintenance** (parts, filters, oils and safety gear). Everyone in the plant can open it. Every change goes through here, and each one is a line in **History**.
 
-- **On Hand** lists each product: its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
+Inventory opens in **its own window** (a new tab) from the menu, from the Shipping & Receiving card and from the Hub, so it can stay open beside the other screens. Its menu lists only Inventory's screens.
+
+- A product's **kind** decides which inventory it is in: Raw Milk; Milk Product (Cooler); Ingredient, Packaging, Chemical or Other (Plant Supplies); Maintenance Part or Safety (Maintenance).
+- **On Hand** lists each product: where it is kept (its **area** and spot, under its name), its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
 - **Should have** is the last count, plus what was received since, minus what was taken out since.
 - Stock comes **in** when a load is marked received on Receiving, or when the Boxing tablet presses `RECEIVED` on a delivery it scanned.
-- Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Milk Products).
+- Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Cooler).
+
+### Find a product: type it or scan it
+
+1. Type part of its name, area or supplier in **Find or scan a product**, or
+2. Scan its barcode with the scanner (no need to tap anything first), or press `Scan with camera` on a tablet.
+3. A scan finds the product, opens the inventory it is in and opens its `Count` box.
+
+- A barcode no product has yet opens a pop-up: pick the product in **Tie it to** and press `Tie barcode`. From then on a scan of it finds that product.
+
+### Add a product
+
+1. Open the inventory it belongs in and press `Add product`.
+2. Type its **Name**, pick its **Kind** and what it is **Counted in**. A **Supplier** is optional (a maintenance part need not have one).
+3. Pick or type its **Area** and its **Spot** (aisle, shelf or silo), and a **Low at** number if you want one.
+4. Press `Add product`.
+
+- Products that come on a supplier's truck can also be added on Receiving > Suppliers & Products (`Edit products`).
+
+### Areas
+
+- Press `Area` on a product's line, pick an area or type a new one, type its **Spot**, and press `Save area`.
+- The usual areas are offered for each inventory: **Silos** and **Tankers** (Raw Milk); **Cooler**, **Freezer** and **Dock** (Cooler); **Dry Storage**, **Cardboard & Cases**, **Packaging**, **Chemicals**, **Lab & Quality**, **Totes, Crates & Pallets** and **Freezer** (Plant Supplies); **Parts Room**, **Filters & Oils**, **Safety Gear** and **Shop** (Maintenance). A new area typed on one product is offered for the rest.
+- Pick an area on the right to see only what is kept there.
 
 ### Take stock out by hand
 
@@ -1069,8 +1095,10 @@ What the plant should have of everything it keeps: the supplies it receives (jug
 
 ### Count the shelf
 
-1. Press `Count` on the product's line.
+1. Press `Count` on the product's line (or scan it).
 2. Type what is really on the shelf and press `Save count` (or Enter). That becomes the new starting point.
+
+- To count a whole area at once, use the **Count Walk** tab.
 
 ### Low stock
 
@@ -1078,6 +1106,7 @@ What the plant should have of everything it keeps: the supplies it receives (jug
 2. Type the number where it should turn red and press Enter. Leave it empty to take the mark off.
 
 - A product below its Low at number is red. `Low only` shows just the red ones, with how many there are.
+- When a product goes low, a **Low stock** pop-up comes up by itself, listed by supplier so it is the list to reorder from. `Close` puts it away until another product goes low; the red `Low stock` button at the top opens it again. `Show low only` shows the red ones; `Print` prints the list.
 
 ### Zebra labels
 
@@ -1085,12 +1114,12 @@ What the plant should have of everything it keeps: the supplies it receives (jug
 2. Type **How many labels** and a **Lot** if you want one on the label.
 3. Press `Print labels`. The print window opens: pick the Zebra printer and print. Each label is 4 x 6 inches, one per page, with the product, its supplier, the date, the lot and the product's own barcode.
 
-- The barcode is the product's own code (it starts with UD). A scan of it on the Boxing tablet's **Take Out** tab takes one of that product out.
+- The barcode is the product's own code (it starts with UD). A scan of it here finds the product; on the Boxing tablet's **Take Out** tab it takes one of that product out.
 
 ### The other buttons
 
 - `History` on a line shows every change to that product: each load received, each take out, what was made, each count, with who did it and what it was for.
-- Pick a **kind** or a **supplier** on the right to narrow the list; type in **Find a product** to search.
+- Pick an **area**, a **kind** or a **supplier** on the right to narrow the list.
 - `Edit products` opens Receiving's Suppliers & Products. `Print` prints the list.
 
 > Count a product in what you take it out in. If the tablet scans one case at a time, count that product in cases.
@@ -1099,20 +1128,65 @@ What the plant should have of everything it keeps: the supplies it receives (jug
 
 !> Do not take stock out twice: what the tablet scanned out is already off Inventory.
 
-## Milk Products
+## Raw Milk
+id: inventory-raw
+screens: inventory.html?type=raw
+
+The raw milk the plant holds, in the **Raw Milk** inventory: each silo and any tanker waiting to unload, in pounds (or gallons).
+
+1. Press `Add product` once for each silo or tanker spot, for example SILO 1, with kind **Raw Milk**, counted in **Pounds**, area **Silos** or **Tankers**.
+2. Press `Count` on a silo (or use the **Count Walk**) and type what is in it now.
+3. Set a **Low at** to be warned when a silo runs low.
+
+- Everything else works as on **Inventory**: Take out, Area, Low at, Label and History.
+
+!> Do not mix pounds and gallons on one silo. Pick one when you add it and keep it.
+
+## Maintenance
+id: inventory-maint
+screens: inventory.html?type=maint
+
+Maintenance parts and safety gear, in their own inventory, apart from what the plant makes and receives for production: bearings, belts, gaskets, filters, food-grade oil, gloves, hairnets and boots.
+
+1. Press `Add product`, pick kind **Maintenance Part** or **Safety**, what it is counted in, and its area (**Parts Room**, **Filters & Oils**, **Safety Gear** or **Shop**) and bin or shelf.
+2. A supplier is optional.
+3. Take a part out with `Take out` (or scan it), and count the parts room with the **Count Walk**.
+
+- Everything else works as on **Inventory**.
+
+> Print a `Label` for each bin: a scan of the label finds the part.
+
+## Count Walk
+id: inventory-walk
+screens: inventory.html?tab=walk
+
+Counting a whole area at once: walk it top to bottom and type or scan each count, then save them all together.
+
+1. Pick the inventory at the top (Raw Milk, Cooler, Plant Supplies or Maintenance).
+2. Pick the **area** you are counting, or **Every area**. The list is in area and spot order, the way you walk it.
+3. Type each count in its **Counted** box and press Enter to go to the next one. Or scan a product's barcode (with the scanner, in **Scan or type a barcode**, or `Scan with camera`): its box opens and you type the count.
+4. **Difference** shows beside each count: **Same**, or how many more or fewer than Inventory said, in red.
+5. Press `Save counts`. Each count becomes that product's new starting point, the same as one Count, and is a line in History.
+
+- The counts stay on this computer until you press `Save counts`, even if the page is closed. Counts in other areas of the same inventory are saved with them.
+- `Reset` asks first: "Clear everything not sent yet?" `Reset` clears every count not saved; `Cancel` keeps them. Saved counts are not touched.
+
+!> Do not count a product in a different unit than it is counted in (shown beside it).
+
+## Cooler (Milk Products)
 id: inventory-milk
 screens: inventory.html?type=milk
 
-The plant's own milk products, kept as their own type on Inventory. The Production Lines put them in, and they take out what each one uses by themselves.
+The plant's own milk products, kept in the **Cooler** inventory on Inventory (it was called Milk Products). The Production Lines put them in, and they take out what each one uses by themselves.
 
 1. The first time, press `Bring in our milk products`. Every product on the plant's Products list comes in once, counted in cases (Raw Milk stays out). Press it again after a new product is added to the Products list.
 2. Press `Uses` on a milk product and list what one of it uses: for example 1 gallon jug, 1 cap and 1 label. A part works for a share, like 0.25 of a crate. Press `Save uses`.
-3. From then on, each case counted on the Production Lines goes in as **Made**, and takes its uses out of the Supplies by itself.
+3. From then on, each case counted on the Production Lines goes in as **Made**, and takes its uses out of Plant Supplies by itself.
 4. Press `Count` to set what is really in the cooler; that becomes the new starting point.
 
 - **Made** shows in place of Received. **Should have** is the last count, plus what was made since, minus what was taken out.
 - When a line's count is fixed (typed lower), the difference comes back off Made, and its uses go back into the Supplies.
-- `Take out`, `Low at`, `Label` and `History` work the same as on Supplies.
+- `Take out`, `Area`, `Low at`, `Label` and `History` work the same as on Plant Supplies. The Cooler's areas are **Cooler**, **Freezer** and **Dock**.
 
 > Set the Uses once for each product; it is all the app needs to take the jugs, caps and labels out by itself.
 
@@ -1132,7 +1206,7 @@ Every pallet scanned in on the Boxing station's Receiving tab: date, time, suppl
 id: jug-trailers
 screens: jug-trailers.html
 
-Part of **Inventory**, under Shipping & Receiving (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
+Part of **Inventory**, under Shipping & Receiving and in Inventory's own menu (on the Home screen it is under **Inventory** on the Shipping & Receiving card). The dry box trailers parked in the plant's lot with plant material on them (jugs, cardboard, empty crates and more): how full each one is and what is on it, so the plant knows which trailers are out there and which one to use next. Across the top: how many trailers are in the lot and how many are **Loaded**, **Half Full** and **Empty**. The list is on the left; the trailer you pick opens on the right.
 
 Everything on this screen is in capitals.
 

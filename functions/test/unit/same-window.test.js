@@ -13,11 +13,20 @@ test('no screen or link opens a new tab or window', () => {
   files(PUBLIC).filter(f => /\.(html|js)$/.test(f)).forEach(f => {
     // Joe 10/12: the one exception is Launch on Administration > Links & Codes (marked data-launch), which tests a station,
     // phone, TV or kiosk screen in a new window so Administration stays where it was.
-    const text = fs.readFileSync(f, 'utf8').split('\n').filter(l => !/data-launch/.test(l)).join('\n');
+    // Joe 11-10-26: and Inventory, which opens in its own window (a line marked own-window, app.js OWN_WINDOWS).
+    const text = fs.readFileSync(f, 'utf8').split('\n').filter(l => !/data-launch|\/\/ own-window$/.test(l)).join('\n');
     if (/target\s*=\s*["']?_blank/i.test(text) || /\.target\s*=\s*['"]_blank/.test(text)) bad.push(path.relative(PUBLIC, f) + ': target _blank');
     if (/window\.open\s*\(/.test(text)) bad.push(path.relative(PUBLIC, f) + ': window.open');
   });
   assert.deepEqual(bad, []);
+});
+
+test('only Inventory has its own window (Joe 11-10-26)', () => {
+  const app = fs.readFileSync(path.join(PUBLIC, 'js/app.js'), 'utf8');
+  const own = app.match(/export const OWN_WINDOWS = \{([^\n]*)\};/);
+  assert.ok(own, 'OWN_WINDOWS is on one line');
+  assert.deepEqual([...own[1].matchAll(/'([a-z-]+\.html)':/g)].map(m => m[1]), ['inventory.html']);
+  assert.equal(app.split('\n').filter(l => /\/\/ own-window$/.test(l)).length, 1, 'one line opens it');
 });
 
 test('moving between screens is set up to look like one app', () => {
