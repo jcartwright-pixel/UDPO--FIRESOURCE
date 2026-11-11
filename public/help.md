@@ -1213,7 +1213,7 @@ Everything on this screen is in capitals.
 Our **United Dairy** trailers come first: only the ones someone put on the list with `+ Add Trailer`. Once on the list they stay: in the lot, or **NOT HERE** (in grey, at the bottom) after they leave. The fleet list is not loaded onto the screen. **Other suppliers** is the other suppliers' trailers in the lot. The list looks like **Inventory**: a blue heading bar with the same names. Each line shows the **Supplier**, the **Unit** number, the **Status** (how full it is), the **Product** on it, **How Many** and what they are **Counted In** (one line for each product), and its **Location**, with an `Edit` button.
 
 1. One of our trailers pulls in for the first time: press `+ Add Trailer`, pick **United Dairy** and type its number (below). One that is already on the list as NOT HERE: press `Edit` on its line, pick where it is parked (**UPPER LOT**, **LOWER LOT**, **DEBAG** or **HOLD**) and press `Save`. It goes in as Empty.
-2. A trailer moves: press `Edit` on its line, pick the new place and press `Save`.
+2. A trailer moves: press `Edit` on its line (or double-click the line), pick the new place and press `Save`.
 3. A trailer leaves: press `Edit`, pick **NOT HERE** and press `Save` (or press `Left the Lot` on the trailer). Ours stays on the list as NOT HERE; another supplier's comes off the list.
 4. Adding a trailer: press `+ Add Trailer`. The **Supplier** and **Unit number** are side by side. Pick the supplier (Receiving's suppliers are on the list too), then type the unit number. A supplier that is not on the list: pick `+ New supplier` and type its name. For **United Dairy**, type the number: the T- goes on by itself (98 shows T-980, T-985 and the rest; 014 looks for T-14), and only our dry box trailers that are not in the lot come up. Tap the one you mean.
 5. On `+ Add Trailer`, pick **What is on it** and type **How many** (in what the product is counted in, for example bundles). Press `Add to the Lot`. It goes in at UPPER LOT, Loaded when something is on it.
@@ -1223,6 +1223,7 @@ Our **United Dairy** trailers come first: only the ones someone put on the list 
 
 - What is on it comes from **Suppliers & Products** (Receiving), grouped by supplier, with what each one is counted in. A product that is not there: press `+ Add Product` or the `Suppliers & Products` button at the top, add it there and come back.
 - Every box saves when you leave it, and `Edit` saves with `Save`; there are no other Save buttons.
+- Double-click a line to open its location drop-down without pressing `Edit`. Pick the place and press `Save` (or Enter); Esc puts it back.
 - `Edit Lists` (top right) adds to and deletes from the drop-down lists: suppliers and their unit numbers, other items and locations. Type in an Add box and press `Add`; press `Delete` to take one off. Press `Done` to go back.
 - **United Dairy** is protected: it cannot be deleted, and its unit numbers come from the fleet list. UPPER LOT, LOWER LOT, DEBAG and HOLD always stay on the Locations list.
 - Anything a trailer in the lot is using shows **In the lot** instead of `Delete`. It can be deleted after that trailer leaves the lot.
