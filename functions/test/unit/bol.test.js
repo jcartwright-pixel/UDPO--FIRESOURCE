@@ -46,6 +46,8 @@ test('dates, label search words and files that are not a BOL', () => {
   assert.equal(B.dayOf('2026-11-06'), '2026-11-06');
   assert.equal(B.labelQuery('ROUTES/BOL'), 'label:routes-bol');
   assert.equal(B.labelQuery('Routes / Sale By Route'), 'label:routes-sale-by-route');
+  assert.equal(B.mailQuery({ label: 'ROUTES/BOL', sender: '@uniteddairy.com' }),
+    '{label:routes-bol subject:"daily load data"} has:attachment newer_than:10d -in:sent from:uniteddairy.com');
   assert.deepEqual(B.readBol(Buffer.from('%PDF-1.4 nothing here'), 'x.pdf').days, []);
   assert.throws(() => B.readBol(Buffer.from('hello'), 'notes.txt'), /Pick the BOL/);
   assert.throws(() => B.readBol(Buffer.alloc(0), 'x.pdf'), /empty/);
@@ -85,7 +87,8 @@ test('the email check reads each BOL under the label once, and a newer one for t
   };
   const run = await B.hourlyCheck(db, deps);
   assert.equal(asked[0].owner, 'pat.sample@uniteddairy.com');
-  assert.equal(asked[0].query, 'label:routes-bol has:attachment newer_than:10d');
+  // The label OR the office's subject: the office's email comes in with no label (11-7-26 to 11-11-26 were missed).
+  assert.equal(asked[0].query, '{label:routes-bol subject:"daily load data"} has:attachment newer_than:10d -in:sent');
   assert.equal(run.status, 'OK');
   assert.equal(run.read, 2);
   assert.match(run.message, /load day 11-9-26, 3 routes/);
