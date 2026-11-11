@@ -124,7 +124,7 @@
   .jt-page .jt-pair, .jt-page .jt-prod { grid-template-columns: 1fr; }
   .jt-page select.jt-loc { min-width: 0; width: 100%; }
   /* Joe 11-11-26: wide enough for every place on a tablet; a phone has no room beside the unit and Save. */
-  .jt-page select.jt-loc { max-width: 150px; }
+  .jt-page select.jt-loc { max-width: 170px; }
   .jt-page.pm-page table.pm-table th { letter-spacing: 0; }
   .jt-page .jt-edit { padding: 3px 8px; }
   .jt-page .jt-phone-co { display: block !important; font-weight: 800; color: var(--ud-blue); margin: 0 0 2px; }
