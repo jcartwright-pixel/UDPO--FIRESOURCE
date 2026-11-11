@@ -472,8 +472,11 @@
         canCount() ? [['Tie barcode', async () => {
           const id = document.getElementById('tie-item').value;
           if (!id) return false;
-          try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'linkBarcode', itemId: id, raw: String(raw) }); onScanLater = String(raw); }
-          catch (e) { document.querySelector('#pop .inv-pop-err').textContent = 'Not tied (' + (e.message || e) + ').'; return false; }
+          // Set before the save: the list can show the new barcode before the save answers.
+          onScanLater = String(raw);
+          try { await save('savePlantSchedule', { lane: 'RECEIVING', op: 'linkBarcode', itemId: id, raw: String(raw) }); }
+          catch (e) { onScanLater = ''; document.querySelector('#pop .inv-pop-err').textContent = 'Not tied (' + (e.message || e) + ').'; return false; }
+          if (onScanLater && findByCode(onScanLater)) { const r = onScanLater; onScanLater = ''; setTimeout(() => onScan(r), 0); }
         }, 'primary'], ['Close']] : [['Close']]);
     }
     // After a barcode is tied, the product opens once the list shows its new barcode.
