@@ -10,6 +10,10 @@
  *   F  LABEL: our own barcode, printed one to a 4 x 6 inch label (window.print is caught here).
  *   B  the Boxing tablet's TAKE OUT tab: a scan of our label takes one out; a new barcode is named once; − puts one back.
  *   D  RECEIVED on the Boxing tablet puts what was scanned on the delivery into Inventory, once.
+ *   Joe 11-10-26 (four inventories, its own window): Raw Milk, Cooler, Plant Supplies and Maintenance; Add product with its area;
+ *      Area on a line; a scan (or a typed code) finds a product and opens its Count; a barcode not known is tied once in a pop-up;
+ *      the Count Walk (type or scan, the difference in red, Save counts, Reset asks first); Low stock comes up in a pop-up by
+ *      itself; Inventory opens in its own window from Shipping & Receiving's menu, with only its own menu.
  * Text 16px and up, no sideways scroll at 1536 and 1920 (and the tablet at 1024). Pictures go to SHOTS.
  */
 const assert = require('node:assert/strict');
@@ -70,7 +74,9 @@ async function wasp(page, code) {
   await page.keyboard.type(code, { delay: 3 });
   await page.keyboard.press('Enter');
 }
-const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r.find(t => t.cells[0] && t.cells[0].textContent.toUpperCase().indexOf(n.toUpperCase()) === 0); return x ? [...x.cells].slice(0, 8).map(c => c.innerText.replace(/\n/g, ' ')).join(' | ') : ''; }, name);
+// A line's cells as read, without the area under the name (checked on its own).
+const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r.find(t => t.cells[0] && t.cells[0].textContent.toUpperCase().indexOf(n.toUpperCase()) === 0); return x ? [...x.cells].slice(0, 8).map(c => { const pl = c.querySelector('.inv-place'); return (pl ? c.innerText.replace('\n' + pl.innerText, '') : c.innerText).replace(/\n/g, ' '); }).join(' | ') : ''; }, name);
+const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-place', e => e.innerText);
 
 (async () => {
   await clear();
@@ -97,7 +103,12 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
 
     const inv = await openPage(browser, 1536, 790, '/inventory.html?' + ADMIN);
     await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
-    assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.innerText + ':' + x.getAttribute('aria-selected'))), ['SUPPLIES:true', 'MILK PRODUCTS:false']);
+    assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.innerText + ':' + x.getAttribute('aria-selected'))), ['RAW MILK:false', 'COOLER:false', 'PLANT SUPPLIES:true', 'MAINTENANCE:false']);
+    assert.equal(await placeOf(inv, 'ITEM-jugs'), 'NO AREA YET');
+    // Its own window: the header names Inventory and the menu lists only Inventory's screens.
+    assert.match(await inv.innerText('#screen > .topbar .brand small'), /INVENTORY$/);
+    // (Read as written: the menu may be folded, which hides its words.)
+    assert.deepEqual((await inv.$$eval('.sidemenu a', a => a.map(x => x.textContent.trim()).filter(Boolean))).slice(0, 2), ['Inventory', 'Raw Milk']);
     assert.equal(await inv.$eval('#tabs', t => getComputedStyle(t).textTransform), 'uppercase', 'ALL CAPS');
 
     // ---------- A: TAKE OUT by hand ----------
@@ -121,6 +132,20 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     await inv.press('#ed-qty', 'Enter');
     await until(async () => (await item('Gallon caps, blue')).low === 450, 'the low mark');
     await inv.waitForFunction(() => [...document.querySelectorAll('#oh-rows tr.low')].some(r => /GALLON CAPS/.test(r.innerText)));
+    // Joe 11-9-26: a new low product brings up the Low stock pop-up by itself, listed by supplier; Close puts it away until
+    // something new goes low, and the red Low stock button opens it again.
+    await inv.waitForSelector('#pop:not([hidden])');
+    assert.equal(await inv.innerText('#pop-title'), 'LOW STOCK');
+    assert.match(await inv.innerText('#pop'), /GALLON CAPS, BLUE[\s\S]*PLANT SUPPLIES[\s\S]*400 EACH[\s\S]*450/);
+    assert.ok(await smallest(inv, '#pop *') >= 16, 'text 16px and up');
+    await shot(inv, 'G-low-stock-pop-up-1536.png');
+    await inv.click('#pop [data-pop="2"]');
+    await inv.waitForSelector('#pop', { state: 'hidden' });
+    assert.equal(await inv.innerText('#low-pop'), 'LOW STOCK (1)');
+    await inv.reload();
+    await inv.waitForFunction(() => /GALLON CAPS/.test(document.getElementById('oh-rows').innerText));
+    await inv.waitForTimeout(500);
+    assert.equal(await inv.isVisible('#pop'), false, 'not again until something new goes low');
     assert.equal(await inv.innerText('#oh-low'), 'LOW ONLY (1)');
     await inv.click('#oh-low');
     await inv.waitForFunction(() => document.querySelectorAll('#oh-rows tr').length === 1);
@@ -138,9 +163,9 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     await until(async () => (await items()).filter(R.isMilk).length === 2, 'the milk products');
     assert.deepEqual((await items()).filter(R.isMilk).map(i => i.name + ':' + i.unit).sort(), ['Gallon 2% Milk:Cases', 'Gallon Whole Milk:Cases'], 'every product once, not Raw Milk');
     await inv.waitForFunction(() => document.querySelectorAll('#oh-rows tr').length === 2);
-    assert.deepEqual(await inv.$$eval('#oh-rows tr', r => r.map(x => x.cells[0].innerText)), ['GALLON 2% MILK', 'GALLON WHOLE MILK']);
+    assert.deepEqual(await inv.$$eval('#oh-rows tr', r => r.map(x => x.cells[0].innerText.split('\n')[0])), ['GALLON 2% MILK', 'GALLON WHOLE MILK']);
     assert.equal(await inv.innerText('#oh-col5'), 'MADE');
-    results.push('Milk Products: Bring in our milk products adds the 2 on the Products list (not Raw Milk), counted in cases');
+    results.push('Cooler: Bring in our milk products adds the 2 on the Products list (not Raw Milk), counted in cases');
 
     // ---------- C: USES, then the line's count takes them out by itself ----------
     const whole = await item('Gallon Whole Milk');
@@ -193,6 +218,110 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     assert.ok((await item('Gallon jugs')).barcodes.includes('TEXT:' + code), 'a scan of the label finds the product');
     results.push('F: Print labels gives Gallon jugs its own code ' + code + ' and prints 3 labels (4 x 6, one each)');
 
+    // ---------- Joe 11-10-26: Area, Add product, scan or type, the Count Walk ----------
+    await inv.click('#p-back');   // the labels screen back to the list
+    await inv.waitForSelector('#oh-sheet:not([hidden])');
+    await inv.click('[data-place="ITEM-jugs"]');
+    await inv.waitForSelector('#ed-spot');
+    assert.ok((await inv.$$eval('#area-list option', o => o.map(x => x.value))).includes('Dry Storage'));
+    await inv.fill('#ed-qty', 'Packaging');
+    await inv.fill('#ed-spot', 'Aisle 3');
+    await inv.press('#ed-spot', 'Enter');
+    await until(async () => (await item('Gallon jugs')).area === 'Packaging', 'the area');
+    await inv.waitForFunction(() => /AISLE 3/.test((document.querySelector('[data-row="ITEM-jugs"] .inv-place') || {}).innerText || ''));
+    assert.equal(await placeOf(inv, 'ITEM-jugs'), 'PACKAGING · AISLE 3');
+    // Maintenance: a part with no supplier, added here with its area.
+    await inv.click('[data-type="maint"]');
+    await inv.waitForFunction(() => /NOTHING IN MAINTENANCE YET/.test(document.getElementById('oh-rows').innerText));
+    assert.match(inv.url(), /type=maint/);
+    await inv.click('#item-add');
+    await inv.waitForSelector('[data-af="name"]');
+    await inv.fill('[data-af="name"]', 'Bearing 6204');
+    await inv.selectOption('[data-af="kind"]', 'Maintenance Part');
+    await inv.selectOption('[data-af="unit"]', 'Each');
+    await inv.fill('[data-af="area"]', 'Parts Room');
+    await inv.fill('[data-af="spot"]', 'Bin 12');
+    await inv.fill('[data-af="low"]', '4');
+    assert.ok(await smallest(inv, '#oh-panel *') >= 16, 'text 16px and up');
+    await shot(inv, 'H-add-maintenance-part-1536.png');
+    await inv.click('#a-save');
+    await until(async () => !!(await item('Bearing 6204')), 'the part');
+    const part = await item('Bearing 6204');
+    assert.deepEqual([part.kind, part.unit, part.area, part.spot, part.low, part.supplierId], ['Maintenance Part', 'Each', 'Parts Room', 'Bin 12', 4, '']);
+    await inv.waitForFunction(() => /BEARING 6204/.test(document.getElementById('oh-rows').innerText));
+    // It has a Low at and nothing counted yet, so it is low: the pop-up comes up by itself, under No supplier.
+    await inv.waitForSelector('#pop:not([hidden])');
+    assert.match(await inv.innerText('#pop'), /NO SUPPLIER[\s\S]*BEARING 6204[\s\S]*MAINTENANCE/);
+    await inv.click('#pop [data-pop="2"]');
+    assert.equal(await inv.innerText('#low-pop'), 'LOW STOCK (2)');
+    // A scan with nothing being typed finds the jugs, opens Plant Supplies and its Count.
+    await wasp(inv, JUG_UPC);
+    await inv.waitForFunction(() => !!document.querySelector('#oh-rows tr.counting[data-row="ITEM-jugs"]'));
+    assert.doesNotMatch(inv.url(), /type=/, 'back on Plant Supplies');
+    assert.equal(await inv.getAttribute('[data-type="supplies"]', 'aria-selected'), 'true');
+    await inv.click('#ed-cancel');
+    // A barcode not known yet: the pop-up ties it to a product, once. (Another barcode than the tablet's below, which must still
+    // be unknown there.)
+    await inv.fill('#oh-search', '5901234123457');
+    await inv.press('#oh-search', 'Enter');
+    await inv.waitForTimeout(300);
+    assert.equal(await inv.isVisible('#pop'), false, 'a typed number that no product has just finds by name');
+    await inv.fill('#oh-search', '');
+    await wasp(inv, '5901234123457');
+    await inv.waitForSelector('#pop:not([hidden]) #tie-item');
+    assert.equal(await inv.innerText('#pop-title'), 'BARCODE NOT KNOWN YET');
+    await inv.selectOption('#tie-item', 'ITEM-bags');
+    await inv.click('#pop [data-pop="0"]');
+    await until(async () => (await item('Dispenser bags, 5 gallon')).barcodes.length === 1, 'the tied barcode');
+    await inv.waitForFunction(() => !!document.querySelector('#oh-rows tr.counting[data-row="ITEM-bags"]'));
+    await inv.click('#ed-cancel');
+    results.push('Joe 11-10-26: Area on the jugs (Packaging, Aisle 3); Add product puts Bearing 6204 in Maintenance with no supplier; a scan opens the jugs\' Count; an unknown barcode is tied to the bags in a pop-up');
+
+    // The Count Walk: Plant Supplies, every area; type two counts, scan the third.
+    await inv.click('[data-tab="walk"]');
+    await inv.waitForFunction(() => document.querySelectorAll('#w-rows [data-walk]').length === 3);
+    assert.equal(await inv.isVisible('#types-bar'), true);
+    assert.equal(await inv.isDisabled('#w-save'), true, 'nothing to save yet');
+    const caps = await item('Gallon caps, blue'), bags = await item('Dispenser bags, 5 gallon');
+    await inv.fill('[data-walk="ITEM-caps"]', String(R.shouldHave(caps)));
+    await inv.fill('[data-walk="ITEM-bags"]', String(R.shouldHave(bags) - 15));
+    await inv.waitForFunction(() => document.querySelector('[data-diff="ITEM-bags"]').innerText === '−15');
+    assert.equal(await inv.innerText('[data-diff="ITEM-caps"]'), 'SAME');
+    assert.equal(await inv.$eval('[data-diff="ITEM-bags"]', e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'a difference is red');
+    await inv.evaluate(() => document.activeElement.blur());
+    await wasp(inv, JUG_UPC);
+    await inv.waitForFunction(() => document.activeElement && document.activeElement.dataset.walk === 'ITEM-jugs');
+    await inv.keyboard.type('300');
+    await inv.keyboard.press('Enter');
+    assert.equal(await inv.innerText('#w-save'), 'SAVE COUNTS (3)');
+    // The counts survive a reload (kept until they are sent); Reset asks first, Cancel keeps them.
+    await inv.reload();
+    await inv.waitForFunction(() => document.querySelectorAll('#w-rows [data-walk]').length === 3);
+    assert.equal(await inv.inputValue('[data-walk="ITEM-jugs"]'), '300');
+    await inv.click('#w-reset');
+    await inv.waitForSelector('#pop:not([hidden])');
+    assert.match(await inv.innerText('#pop'), /CLEAR EVERYTHING NOT SENT YET\?/);
+    await inv.click('#pop [data-pop="1"]');
+    assert.equal(await inv.inputValue('[data-walk="ITEM-jugs"]'), '300', 'Cancel keeps them');
+    assert.ok(await smallest(inv, '#tab-walk *') >= 16, 'text 16px and up');
+    await shot(inv, 'I-count-walk-1536.png');
+    const jugsWas = R.shouldHave(await item('Gallon jugs'));
+    await inv.click('#w-save');
+    await until(async () => (await item('Gallon jugs')).countQty === 300 && (await item('Dispenser bags, 5 gallon')).countQty === R.shouldHave(bags) - 15, 'the walk');
+    const walked = (await moves()).filter(m => m.how === 'WALK');
+    assert.deepEqual(walked.map(m => m.itemId + ':' + m.change).sort(), ['ITEM-bags:-15', 'ITEM-caps:0', 'ITEM-jugs:' + (300 - jugsWas)].sort());
+    await inv.waitForSelector('#pop:not([hidden])');
+    assert.equal(await inv.innerText('#pop-title'), 'COUNTS SAVED');
+    await inv.click('#pop [data-pop="0"]');
+    await inv.waitForFunction(() => document.getElementById('w-save').disabled);
+    // Reset clears counts not sent.
+    await inv.fill('[data-walk="ITEM-caps"]', '1');
+    await inv.click('#w-reset');
+    await inv.click('#pop [data-pop="0"]');
+    await inv.waitForFunction(() => document.querySelector('[data-walk="ITEM-caps"]').value === '');
+    assert.equal(await inv.evaluate(() => Object.keys(localStorage).filter(k => /^udInvWalk_/.test(k)).length), 0, 'nothing kept');
+    results.push('Count Walk: caps the same, bags 15 short (red), jugs scanned and typed; kept through a reload; Reset asks first; Save counts saves all 3 as counts');
+
     // History: every way in and out.
     await inv.click('[data-tab="history"]');
     await inv.waitForFunction(() => document.querySelectorAll('#h-rows tr').length >= 8);
@@ -202,7 +331,7 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     assert.ok(hist.includes('GALLON JUGS | PUT BACK BY THE PRODUCTION LINES | +10'), hist.join('\n'));
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
       await inv.setViewportSize({ width: w, height: h });
-      for (const t of ['onhand', 'history']) {
+      for (const t of ['onhand', 'walk', 'history']) {
         await inv.click('[data-tab="' + t + '"]');
         await inv.waitForTimeout(200);
         assert.ok(await smallest(inv, '#tab-' + t + ' *, .inv-tabs *') >= 16, 'text 16px and up');
@@ -212,6 +341,17 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     }
     assert.deepEqual(inv.errors, []);
     await inv.close();
+
+    // ---------- Its own window (Joe 11-10-26) ----------
+    const sr = await openPage(browser, 1536, 790, '/scheduler.html?lane=receiving&' + ADMIN);
+    await sr.waitForSelector('.side-flyouts a[href="inventory.html"]', { state: 'attached' });
+    const [own] = await Promise.all([sr.waitForEvent('popup'), sr.evaluate(() => document.querySelector('.side-flyouts a[href="inventory.html"]').click())]);
+    await own.waitForLoadState();
+    assert.match(own.url(), /\/inventory\.html\?.*plant=fac_uniontown/);
+    assert.match(sr.url(), /scheduler\.html/, 'Shipping & Receiving stays where it was');
+    await own.close();
+    await sr.close();
+    results.push('Its own window: Inventory in Shipping & Receiving\'s menu opens a new tab on the same plant');
 
     // ---------- B: the Boxing tablet's TAKE OUT tab ----------
     const tab = await openPage(browser, 1024, 768, '/plant-station.html?' + MANAGER, true);
@@ -241,10 +381,11 @@ const rowOf = (page, name) => page.$$eval('#oh-rows tr', (r, n) => { const x = r
     await until(async () => (await moves()).some(m => m.itemId === 'ITEM-caps' && m.qty === -1), 'the put back');
     await tab.waitForFunction(() => [...document.querySelectorAll('.to-table tr')].some(r => /GALLON CAPS/.test(r.innerText) && r.cells[1].innerText.trim().indexOf('1 ') === 0));
     // By hand on the tablet.
+    const bagsUsed = (await item('Dispenser bags, 5 gallon')).usedSince || 0;   // the Count Walk above started it over
     await tab.selectOption('[data-to="pick"]', 'ITEM-bags');
     await tab.fill('[data-to="qty"]', '25');
     await tab.click('[data-to="take"]');
-    await until(async () => (await item('Dispenser bags, 5 gallon')).usedSince === 525, 'the hand take out');
+    await until(async () => (await item('Dispenser bags, 5 gallon')).usedSince === bagsUsed + 25, 'the hand take out');
     results.push('B: the tablet\'s TAKE OUT: our label scanned takes 1 jug out; a new barcode named once then counted; − puts one back; 25 bags by hand');
 
     // ---------- D: RECEIVED on the tablet goes into Inventory ----------

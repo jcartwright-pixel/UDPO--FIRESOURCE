@@ -216,7 +216,8 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
       await inv.waitForFunction(() => (document.getElementById('oh-rows').textContent.match(/Silgan Closures/g) || []).length === 2);
       // The words are read as shown (ALL CAPS comes from the page's style), so wait until the screen is showing and drawn.
       await inv.waitForFunction(() => !document.getElementById('screen').hidden && !document.body.classList.contains('ud-drawing'));
-      const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => c.innerText.replace(/\n/g, ' ')).join(' | ')));
+      // Joe 11-10-26: where it is kept shows under its name (.inv-place); it is read apart.
+      const rows = await inv.$$eval('#oh-rows tr', r => r.map(x => [...x.cells].slice(0, 7).map(c => { const pl = c.querySelector('.inv-place'); return (pl ? c.innerText.replace('\n' + pl.innerText, '') : c.innerText).replace(/\n/g, ' '); }).join(' | ')));
       // 1536 first (before the Count), then 1920 (after it: the count is the new starting point).
       // Joe 11-3-26: ALL CAPS on screens (Inventory shows its words in capitals).
       assert.ok(rows.includes(w === 1536 ? '38MM WHITE CAPS | SILGAN CLOSURES | CASES | NOT COUNTED YET | +40 | 0 | 40' : '38MM WHITE CAPS | SILGAN CLOSURES | CASES | 38 ON ' + countDay + ' | 0 | 0 | 38'), rows.join('\n'));

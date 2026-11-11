@@ -26,7 +26,9 @@ const text = (v, max) => String(v === null || v === undefined ? '' : v).replace(
 // Joe 11-4-26 (mock-ups A to F, "a mix of everything"): use takes stock out (by hand on Inventory, or a scan on the plant tablet's
 // TAKE OUT tab); setLow sets a product's LOW AT; setUses keeps what one of our milk products uses; label gives a product its own
 // barcode for the Zebra labels; addMilkProducts brings the plant's milk products (its Products list) into Inventory.
-const STOCK_OPS = ['use', 'setLow', 'setUses', 'label', 'addMilkProducts'];
+// Joe 11-10-26 (the four inventories): setPlace keeps where a product is kept (its area and spot); countMany is the Count Walk,
+// every count typed or scanned in one area saved at once, each the same as one Count.
+const STOCK_OPS = ['use', 'setLow', 'setUses', 'label', 'addMilkProducts', 'setPlace', 'countMany'];
 const PRODUCT_OPS = ['addProduct', 'editProduct', 'removeProduct', 'linkBarcode', 'count'].concat(STOCK_OPS);
 const OPS = PRODUCT_OPS.concat(['receive']);
 const MAX_QTY = 9999999;
@@ -71,6 +73,19 @@ function validate(input, out, SaveError) {
     return out;
   }
   if (out.op === 'addMilkProducts') return out;
+  if (out.op === 'countMany') {
+    if (!Array.isArray(input.counts) || !input.counts.length) throw new SaveError('BAD_REQUEST', 'Type or scan at least one count.');
+    if (input.counts.length > R.MAX_COUNT_WALK) throw new SaveError('BAD_REQUEST', 'Save up to ' + R.MAX_COUNT_WALK + ' counts at a time.');
+    const seen = new Set();
+    out.counts = input.counts.map(c => {
+      const itemId = text(c && c.itemId, 80);
+      if (!itemId || seen.has(itemId)) throw new SaveError('BAD_REQUEST', 'Each product can be counted once.');
+      seen.add(itemId);
+      return { itemId, qty: whole(c.qty, 'the count', SaveError) };
+    });
+    out.area = text(input.area, R.MAX_AREA);
+    return out;
+  }
   if (out.op !== 'addProduct') { out.itemId = text(input.itemId, 80); if (!out.itemId) throw new SaveError('BAD_REQUEST', 'Pick the product.'); }
   if (out.op === 'use') {
     const t = text(input.qty, 20).replace(/,/g, ''), n = Number(t);
@@ -84,6 +99,7 @@ function validate(input, out, SaveError) {
   }
   if (out.op === 'setLow') { out.low = whole(input.low, 'the low mark', SaveError, true); return out; }
   if (out.op === 'label') return out;
+  if (out.op === 'setPlace') { out.area = text(input.area, R.MAX_AREA); out.spot = text(input.spot, R.MAX_SPOT); return out; }
   if (out.op === 'setUses') {
     if (!Array.isArray(input.uses) || input.uses.length > R.MAX_USES) throw new SaveError('BAD_REQUEST', 'A product can use up to ' + R.MAX_USES + ' things.');
     const seen = new Set();
@@ -113,6 +129,9 @@ function validate(input, out, SaveError) {
   out.unit = text(input.unit, 20);
   if (out.unit && R.INVENTORY_UNITS.indexOf(out.unit) < 0) throw new SaveError('BAD_REQUEST', 'Counted in must be ' + R.INVENTORY_UNITS.join(', '));
   out.low = whole(input.low, 'the low mark', SaveError, true);
+  // Where it is kept (Joe 11-10-26). Receiving's own form does not send these, so an edit there keeps what the product has.
+  if (input.area !== undefined) out.area = text(input.area, R.MAX_AREA);
+  if (input.spot !== undefined) out.spot = text(input.spot, R.MAX_SPOT);
   return out;
 }
 
@@ -142,10 +161,12 @@ async function saveProduct(tx, db, req, email, stamp, logRef, mode, SaveError) {
   let id = req.itemId, after, move = null;
   if (req.op === 'addProduct') {
     id = 'ITEM-' + req.requestId.replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
-    after = { name: req.name, supplierId: req.supplierId, kind: req.kind, unit: req.unit, low: req.low, barcodes: [], status: 'ACTIVE',
+    after = { name: req.name, supplierId: req.supplierId, kind: req.kind, unit: req.unit, low: req.low, area: req.area || '', spot: req.spot || '', barcodes: [], status: 'ACTIVE',
       countQty: null, countAt: '', countBy: '', receivedSince: 0, usedSince: 0, createdAt: stamp, createdBy: email, editedAt: stamp, editedBy: email };
   } else if (req.op === 'editProduct') {
     after = Object.assign({}, was, { name: req.name, supplierId: req.supplierId, kind: req.kind, unit: req.unit, low: req.low, editedAt: stamp, editedBy: email });
+    if (req.area !== undefined) after.area = req.area;
+    if (req.spot !== undefined) after.spot = req.spot;
   } else if (req.op === 'removeProduct') {
     after = Object.assign({}, was, { status: 'REMOVED', editedAt: stamp, editedBy: email });
   } else if (req.op === 'linkBarcode') {
@@ -203,6 +224,25 @@ async function stockOp(tx, db, items, all, req, email, stamp, logRef, mode, Save
     });
     result = { ok: true, requestId: req.requestId, added: Math.min(add.length, MAX_MILK_ADD), more: Math.max(0, add.length - MAX_MILK_ADD) };
     log = { added: add.slice(0, MAX_MILK_ADD).map(p => p.name) };
+  } else if (req.op === 'countMany') {
+    // The Count Walk: each count is what is really on the shelf, the new starting point, the same as one Count.
+    const counted = req.counts.map(c => {
+      const was = all.find(x => x.id === c.itemId);
+      if (!was) throw new SaveError('NOT_FOUND', 'A product counted is no longer on the list. The list was refreshed; count it again.');
+      return { c, was };
+    });
+    const moves = counted.map(({ c, was }, n) => {
+      const before = R.shouldHave(was), next = Object.assign({}, was, { countQty: c.qty, countAt: stamp, countBy: email, receivedSince: 0, madeSince: 0, usedSince: 0, editedAt: stamp, editedBy: email });
+      delete next.id;
+      tx.set(items.doc(c.itemId), next);
+      const move = { itemId: c.itemId, itemName: was.name, kind: 'COUNT', qty: c.qty, change: c.qty - before, before, after: c.qty, date: L.operatingDay(new Date(stamp)), at: stamp, by: email,
+        how: 'WALK', area: req.area || text(was.area, R.MAX_AREA), loadId: '', poNumber: '', supplierId: was.supplierId || '', unit: was.unit || '' };
+      writeMove(tx, db, moveId(req, n), move);
+      return move;
+    });
+    const off = moves.filter(m => m.change !== 0).length;
+    result = { ok: true, requestId: req.requestId, counted: moves.length, different: off };
+    log = { area: req.area, moves };
   } else {
     const was = all.find(x => x.id === req.itemId);
     if (!was) throw new SaveError('NOT_FOUND', 'That product is no longer on the list. The list was refreshed.');
@@ -215,6 +255,8 @@ async function stockOp(tx, db, items, all, req, email, stamp, logRef, mode, Save
       writeMove(tx, db, moveId(req, 0), move);
     } else if (req.op === 'setLow') {
       after = Object.assign({}, before, { low: req.low, editedAt: stamp, editedBy: email });
+    } else if (req.op === 'setPlace') {
+      after = Object.assign({}, before, { area: req.area, spot: req.spot, editedAt: stamp, editedBy: email });
     } else if (req.op === 'setUses') {
       if (!R.isMilk(was)) throw new SaveError('BAD_REQUEST', 'Only our milk products have a list of what they use.');
       const uses = req.uses.map(u => {
