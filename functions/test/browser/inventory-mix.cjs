@@ -219,6 +219,8 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     results.push('F: Print labels gives Gallon jugs its own code ' + code + ' and prints 3 labels (4 x 6, one each)');
 
     // ---------- Joe 11-10-26: Area, Add product, scan or type, the Count Walk ----------
+    await inv.click('#p-back');   // the labels screen back to the list
+    await inv.waitForSelector('#oh-sheet:not([hidden])');
     await inv.click('[data-place="ITEM-jugs"]');
     await inv.waitForSelector('#ed-spot');
     assert.ok((await inv.$$eval('#area-list option', o => o.map(x => x.value))).includes('Dry Storage'));
