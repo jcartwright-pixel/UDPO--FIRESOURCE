@@ -14,6 +14,7 @@
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
   <script src="js/scan-rules.js"></script>
+  <script src="js/jug-rules.js"></script>
 </head>
 <body class="fill issues-page inv-page">
   <div class="signin" id="signin" hidden>
@@ -160,6 +161,9 @@
     let plant = params.get('plant') || '', period = '30', search = '', supplier = '', person = null, app = {}, db = null;
     let ohSearch = '', ohKind = '', ohSupplier = '', ohLow = false, editing = null, panel = null, hProduct = params.get('product') || '';
     let ohType = TYPES.indexOf(params.get('type')) >= 0 ? params.get('type') : 'supplies', lineNames = [], ohArea = '', wArea = '';
+    // Joe 11-11-26: what sits on the trailers in the lot (Plant Material Trailers), by product, shown under each product.
+    let trailers = [], trailerLists = null;
+    const onTrailers = () => window.UDJug.stockOnTrailers(trailers, window.UDJug.lists(trailerLists).companies.map(c => c.name));
     let scans = null, items = null, moves = null, deliveries = {}, supplierDocs = [], stops = [];
     const today = () => L.operatingDay(new Date());
     const timeOf = (iso) => window.UDTiming.clockOf(iso);
@@ -257,11 +261,12 @@
       document.getElementById('oh-sheet').hidden = !!panel;
       document.getElementById('oh-panel').hidden = !panel;
       if (panel) { renderPanel(); }
+      const trail = onTrailers();
       document.getElementById('oh-rows').innerHTML = list.map(i => {
         if (editing && editing.id === i.id) return editRow(i);
         const counted = i.countQty !== null && i.countQty !== undefined && i.countQty !== '', low = U.inventoryLow(i), inQty = milk ? i.madeSince : i.receivedSince;
         const lowCell = ck ? '<button type="button" class="inv-lowat" data-low="' + escapeHtml(i.id) + '" aria-label="Low at">' + (i.low === null || i.low === undefined ? 'Set' : num(i.low)) + '</button>' : (i.low === null || i.low === undefined ? '—' : num(i.low));
-        return '<tr class="' + (low ? 'low' : '') + '" data-row="' + escapeHtml(i.id) + '"><td class="strong">' + escapeHtml(i.name) + (low ? '<small>Low</small>' : '') + '<small class="inv-place">' + escapeHtml(placeOf(i) || 'No area yet') + '</small></td><td>' + escapeHtml(col2(i)) + '</td>' +
+        return '<tr class="' + (low ? 'low' : '') + '" data-row="' + escapeHtml(i.id) + '"><td class="strong">' + escapeHtml(i.name) + (low ? '<small>Low</small>' : '') + '<small class="inv-place">' + escapeHtml(placeOf(i) || 'No area yet') + '</small>' + trailText(trail[String(i.name).toUpperCase()], i) + '</td><td>' + escapeHtml(col2(i)) + '</td>' +
           '<td>' + escapeHtml(unitWord(i) || '—') + '</td><td class="num">' + (counted ? num(i.countQty) + ' <small>on ' + escapeHtml(dayOf(i.countAt)) + '</small>' : 'Not counted yet') + '</td>' +
           '<td class="num">' + (Number(inQty) ? (inQty > 0 ? '+' : '−') + num(Math.abs(inQty)) : '0') + '</td><td class="num">' + (Number(i.usedSince) ? (i.usedSince > 0 ? '−' : '+') + num(Math.abs(i.usedSince)) : '0') + '</td>' +
           '<td class="num strong big">' + num(U.shouldHave(i)) + '</td><td class="num">' + lowCell + '</td><td><div class="inv-acts">' + rowActs(i, ck) + '</div></td></tr>';
@@ -271,6 +276,7 @@
       const box = document.getElementById('ed-qty');
       if (box && !box.dataset.focused) { box.dataset.focused = '1'; box.focus(); }
     }
+    const trailText = (t, i) => !t ? '' : '<small class="inv-trail">On trailers' + (t.qty ? ': ' + num(t.qty) + (i.unit ? ' ' + escapeHtml(unitWord(i)) : '') : '') + ' · ' + escapeHtml(t.trailers.join(', ')) + '</small>';
     function ohError(t) { const b = document.getElementById('oh-error'); b.textContent = t; b.hidden = !t; }
     async function saveEdit() {
       const box = document.getElementById('ed-qty'), t = box.value.replace(/,/g, '').trim(), w = editing.what;
@@ -685,6 +691,8 @@
       const since = L.addDays(today(), -Number(period));
       const fail = (what) => (e) => showError('Could not read ' + what + ' (' + e.message + '). Check the network and reload the page.');
       stops = [
+        onSnapshot(query(collection(db, 'jugTrailers'), where('facilityId', '==', plant), where('inLot', '==', true)), s => { trailers = s.docs.map(d => d.data()); render(); }, () => { trailers = []; }),
+        onSnapshot(doc(db, 'jugTrailerLists', plant), s => { trailerLists = s.exists() ? s.data() : null; render(); }, () => {}),
         onSnapshot(query(collection(db, 'receivingScans'), where('date', '>=', since)), s => { scans = s.docs.map(d => d.data()); render(); }, fail('the Receiving Log')),
         onSnapshot(query(collection(db, 'plantJournal'), where('type', '==', U.LOAD_TYPE.RECEIVING), where('date', '>=', since)), s => {
           deliveries = {};

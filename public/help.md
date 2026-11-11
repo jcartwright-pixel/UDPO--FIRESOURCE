@@ -1086,6 +1086,8 @@ Inventory opens in **its own window** (a new tab) from the menu, from the Shippi
 - Press `Area` on a product's line, pick an area or type a new one, type its **Spot**, and press `Save area`.
 - The usual areas are offered for each inventory: **Silos** and **Tankers** (Raw Milk); **Cooler**, **Freezer** and **Dock** (Cooler); **Dry Storage**, **Cardboard & Cases**, **Packaging**, **Chemicals**, **Lab & Quality**, **Totes, Crates & Pallets** and **Freezer** (Plant Supplies); **Parts Room**, **Filters & Oils**, **Safety Gear** and **Shop** (Maintenance). A new area typed on one product is offered for the rest.
 - Pick an area on the right to see only what is kept there.
+- **Dry storage is in trailers**, each carrying one kind of thing: file a product under **Jug Trailers**, **Cap Trailers**, **Cardboard Trailers**, **Crate Trailers** or **Label Trailers**, with the trailer number as its spot if it stays on one.
+- **On trailers** under a product's name (in blue) is what the trailers in the lot have on them right now, and which trailers, as typed on **Plant Material Trailers** (What is on it and How Many). It is shown beside Should have, not added to it.
 
 ### Take stock out by hand
 

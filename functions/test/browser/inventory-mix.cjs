@@ -91,6 +91,9 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     products: [{ name: 'Gallon Whole Milk', sku: '1001' }, { name: 'Gallon 2% Milk', sku: '1002' }] });
   await db().collection('plantProducts').doc('ut_prod_htst_1').set({ operationId: 'ut_prod_htst_1', line: 'HTST #1', facilityId: 'fac_uniontown', products: [{ name: 'Raw Milk' }, { name: 'Gallon Whole Milk', sku: '1001' }] });
   await db().collection('productionLines').doc('ut_prod_gallon_filler').set({ operationId: 'ut_prod_gallon_filler', name: 'GALLON FILLER', line: 'GALLON FILLER', facilityId: 'fac_uniontown' });
+  // Joe 11-11-26: a jug trailer in the lot with just jugs on it (Plant Material Trailers).
+  await db().collection('jugTrailers').doc('fac_uniontown_T-980').set({ facilityId: 'fac_uniontown', company: 'United Dairy', unit: 'T-980', number: 'T-980', inLot: true, location: 'UPPER LOT',
+    items: [{ item: 'Gallon jugs', pallets: '1,200', unit: 'Each' }] });
   await db().collection('users').doc('super.test@uniteddairy.com').set({ name: 'Test Supervisor', status: 'ACTIVE', roles: ['SUPERVISOR'], facilities: ['fac_uniontown'] });
   const browser = await chromium.launch();
   const results = [];
@@ -105,6 +108,9 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
     assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.innerText + ':' + x.getAttribute('aria-selected'))), ['RAW MILK:false', 'COOLER:false', 'PLANT SUPPLIES:true', 'MAINTENANCE:false']);
     assert.equal(await placeOf(inv, 'ITEM-jugs'), 'NO AREA YET');
+    await inv.waitForSelector('#oh-rows [data-row="ITEM-jugs"] .inv-trail');
+    assert.equal(await inv.innerText('#oh-rows [data-row="ITEM-jugs"] .inv-trail'), 'ON TRAILERS: 1,200 EACH · T-980', 'what the jug trailer in the lot carries');
+    assert.ok((await inv.$$eval('#oh-area option', o => o.map(x => x.textContent))).includes('Jug Trailers'));
     // Its own window: the header names Inventory and the menu lists only Inventory's screens.
     assert.match(await inv.innerText('#screen > .topbar .brand small'), /INVENTORY$/);
     // (Read as written: the menu may be folded, which hides its words.)

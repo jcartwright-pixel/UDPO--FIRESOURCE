@@ -107,5 +107,23 @@
   // The list order: United Dairy first, then by company, then by unit number.
   const order = (a, b) => (a.unitedDairy ? 0 : 1) - (b.unitedDairy ? 0 : 1) || byText(a.company, b.company) || byText(a.unit, b.unit);
 
-  return { UD, SEED, LOCATIONS, NOT_HERE, udUnit, dryBox, parts, lists, deleteBlock, number, order, same, text, companyName };
+  // Joe 11-11-26 ("for Dry storage trailers i have jug trailer they have just jugs so forth"): what is sitting on the trailers
+  // in the lot, by product, for Inventory. { 'GALLON JUGS': { qty: 2400, trailers: ['T-980', 'METRO 4579'] } }, by the product's
+  // name in capitals; a line whose How Many is not a number still names its trailer.
+  function stockOnTrailers(trailers, companies) {
+    const out = {};
+    (trailers || []).filter(t => t && t.inLot !== false).forEach(t => {
+      const p = parts(t, companies), label = number(p.company, p.unit);
+      p.items.forEach(x => {
+        const key = text(x.item).toUpperCase();
+        if (!key) return;
+        const n = Number(text(x.pallets).replace(/,/g, '')), row = out[key] || (out[key] = { qty: 0, trailers: [] });
+        if (isFinite(n) && n > 0) row.qty += n;
+        if (row.trailers.indexOf(label) < 0) row.trailers.push(label);
+      });
+    });
+    return out;
+  }
+
+  return { UD, SEED, LOCATIONS, NOT_HERE, udUnit, dryBox, parts, lists, deleteBlock, number, order, same, text, companyName, stockOnTrailers };
 });

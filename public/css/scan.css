@@ -85,6 +85,7 @@
 .inv-page .inv-filters > button[hidden] { display: none; }
 .inv-page .inv-filters > button.inv-lowpop { background: #b42318; border-color: #b42318; color: #fff; }
 .inv-page table.inv-onhand td small.inv-place { color: var(--muted); font-weight: 600; }
+.inv-page table.inv-onhand td small.inv-trail { color: var(--ud-blue); font-weight: 700; }
 .inv-page table.inv-walk input { width: 100%; max-width: 140px; min-height: 40px; border: 2px solid var(--ud-blue); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 18px; text-align: right; }
 .inv-page table.inv-walk input:disabled { border-color: var(--line); background: #eef2f6; }
 .inv-page table.inv-walk td.inv-off { color: #b42318; }

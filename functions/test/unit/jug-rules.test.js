@@ -71,3 +71,17 @@ test('United Dairy numbers, dry boxes, the four places and NOT HERE', () => {
   assert.throws(() => v({ op: 'edit', trailerId: 'fac_uniontown_METRO_1', fields: { items: [{ item: 'Caps', pallets: '2.5' }] } }), /whole number/);
   assert.throws(() => v({ op: 'edit', trailerId: 'fac_uniontown_METRO_1', fields: { items: [{ item: 'Caps', pallets: '2', unit: 'B4' }] } }), /counted in/);
 });
+
+// Joe 11-11-26 ("for Dry storage trailers i have jug trailer they have just jugs so forth"): Inventory shows what is on the
+// trailers in the lot, by product.
+test('what the trailers in the lot carry, by product', () => {
+  const trailers = [
+    { company: 'United Dairy', unit: 'T-980', inLot: true, items: [{ item: 'Gallon jugs', pallets: '1,200', unit: 'Each' }] },
+    { number: 'METRO 4579', inLot: true, items: [{ item: 'gallon jugs', pallets: '800' }, { item: 'Gallon caps, blue', pallets: '' }] },
+    { company: 'United Dairy', unit: 'T-985', inLot: false, items: [{ item: 'Gallon jugs', pallets: '999' }] }
+  ];
+  const got = J.stockOnTrailers(trailers, ['Metro']);
+  assert.deepEqual(got['GALLON JUGS'], { qty: 2000, trailers: ['T-980', 'METRO 4579'] });
+  assert.deepEqual(got['GALLON CAPS, BLUE'], { qty: 0, trailers: ['METRO 4579'] }, 'a line with no number still names its trailer');
+  assert.deepEqual(J.stockOnTrailers([], []), {});
+});
