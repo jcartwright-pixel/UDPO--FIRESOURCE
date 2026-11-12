@@ -56,6 +56,7 @@ exports.hubRouteMasterHourly = onSchedule({ schedule: 'every 60 minutes', timeZo
 const costRebuild = () => require('./src/costrules').rebuild(db);
 exports.hubCostRulesOnRates = onDocumentWritten({ document: 'routeCostRates/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
 exports.hubCostRulesOnRules = onDocumentWritten({ document: 'routeCostRules/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnHubRates = onDocumentWritten({ document: 'hubCostRates/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
 exports.hubCostRulesOnQuote = onDocumentWritten({ document: 'fuelQuotes/{id}', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
 exports.hubCostRulesHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
   console.log('hubCostRules', JSON.stringify(await costRebuild()));

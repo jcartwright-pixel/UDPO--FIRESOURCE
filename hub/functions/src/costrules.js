@@ -8,6 +8,9 @@
  *                          it came from (the P&L months behind it, the fuel month, the trucks' GPS month)
  *   hubCostRuleSet/current Joe's rule set once it is saved through the Hub (op saveCostRules, administrators). Until then the
  *                          rule set is copied from Route Cost's routeCostRules/current, as saved on its Rule sets tab.
+ *   hubCostRates/current   Route Cost's rates once it publishes them through the Hub (op publishCostRates, after each new
+ *                          P&L month). Until then they are copied from Route Cost's routeCostRates/current.
+ *   Each save also keeps a dated copy beside it (hubCostRuleSet/<time>, hubCostRates/<time>), the newest 12, with who and when.
  *
  * Where each part comes from (read only; the Hub never writes another app's records):
  *   routeCostRates/current  Route Cost's rates (12 newest real P&L months, its own math; Joe 11-2-26: do not redo the apps'
@@ -31,6 +34,8 @@
 const OUT = 'hubCostRules';
 const SAVED = 'hubCostRuleSet';
 const RATES = 'routeCostRates';
+const HUB_RATES = 'hubCostRates';
+const KEEP = 12;
 const RULES = 'routeCostRules';
 const QUOTES = 'fuelQuotes';
 const TRIPS = 'gpsTripFuel';
@@ -118,7 +123,7 @@ const monthName = (m) => { if (!/^\d{4}-\d{2}$/.test(text(m))) return ''; const 
  * quotes: [fuelQuotes], trips: [gpsTripFuel] }; today: 'yyyy-mm' (New York).
  */
 function build(src, today) {
-  const rates = (src && src.rates) || null;
+  const rates = (src && (src.hubRates || src.rates)) || null;
   const saved = src && src.saved;
   const ruleSource = saved ? 'hub' : src && src.routeRules ? 'routeCost' : 'start';
   const rawRules = saved || (src && src.routeRules) || {};
@@ -149,6 +154,8 @@ function build(src, today) {
   }
   return {
     today, builtFrom: { rates: rates ? text(rates.savedAt) || text(rates.month) : '', rules: ruleSource },
+    rates: rates ? Object.fromEntries(Object.keys(rates).filter(k => k !== 'by').map(k => [k, rates[k]])) : null,
+    rateSource: src && src.hubRates ? 'hub' : rates ? 'routeCost' : 'none',
     rules, ruleSource, mileRun: Object.assign({}, MILE_RUN, { rule: '1 hour plus 1 hour a stop (Joe 11-12-26)' }),
     shortRun: SHORT_RUN,
     fuelRule: 'the month before, until the month is over (Joe 11-12-26)',
@@ -163,16 +170,39 @@ const nyMonth = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New
 async function rebuild(db, stamp) {
   const data = async (col, id) => { try { const s = await db.collection(col).doc(id).get(); return s.exists ? s.data() : null; } catch (e) { console.warn(col + ' not readable', e && e.message); return null; } };
   const list = async (q, col) => { try { return (await q.get()).docs.map(d => d.data()); } catch (e) { console.warn(col + ' not readable', e && e.message); return []; } };
-  const [rates, routeRules, saved, quotes, trips] = await Promise.all([
-    data(RATES, 'current'), data(RULES, 'current'), data(SAVED, 'current'),
+  const [hubRates, rates, routeRules, saved, quotes, trips] = await Promise.all([
+    data(HUB_RATES, 'current'), data(RATES, 'current'), data(RULES, 'current'), data(SAVED, 'current'),
     list(db.collection(QUOTES), QUOTES), list(db.collection(TRIPS).select('day', 'miles', 'fuelUsed'), TRIPS)
   ]);
-  const rec = Object.assign(build({ rates, routeRules, saved, quotes, trips }, nyMonth()), { builtAt: stamp || new Date().toISOString() });
+  const rec = Object.assign(build({ hubRates, rates, routeRules, saved, quotes, trips }, nyMonth()), { builtAt: stamp || new Date().toISOString() });
   await db.collection(OUT).doc('current').set(rec);
   return { amounts: Object.keys(rec.amounts).length, ruleSource: rec.ruleSource, today: rec.today };
 }
 
 class CostError extends Error { constructor(code, message) { super(message); this.code = code; } }
+
+/** Keeps a dated copy of a save beside current, and only the newest KEEP of them. */
+async function keepCopy(db, col, rec, stamp) {
+  await db.collection(col).doc(stamp.replace(/[^0-9TZ]/g, '')).set(rec);
+  try {
+    const old = (await db.collection(col).get()).docs.map(d => d.id).filter(id => id !== 'current').sort();
+    for (const id of old.slice(0, Math.max(0, old.length - KEEP))) await db.collection(col).doc(id).delete();
+  } catch (e) { console.warn(col + ' old copies not cleared', e && e.message); }
+}
+
+/** Administrators (Route Cost, after each new P&L month): publish Route Cost's rates through the Hub, then rebuild. */
+async function publishRates(db, email, input, stamp) {
+  const v = input && input.rates;
+  if (!v || typeof v !== 'object' || !Number.isFinite(Number(v.driverBaseWeek)) || !Number.isFinite(Number(v.truckBaseWeek)))
+    throw new CostError('BAD_REQUEST', 'The rates could not be read. Reload the page and try again.');
+  const rec = {};
+  Object.keys(v).slice(0, 80).forEach(k => { const x = v[k]; if (/^[A-Za-z][A-Za-z0-9]{0,40}$/.test(k) && (typeof x === 'number' ? Number.isFinite(x) : typeof x === 'string')) rec[k] = typeof x === 'string' ? x.slice(0, 40) : x; });
+  Object.assign(rec, { savedAt: stamp, savedBy: email, from: text(input.from).slice(0, 40) || 'route-cost' });
+  await db.collection(HUB_RATES).doc('current').set(rec);
+  await keepCopy(db, HUB_RATES, rec, stamp);
+  await rebuild(db, stamp);
+  return { ok: true, rates: rec };
+}
 
 /** Administrators: save the rule set through the Hub (both apps' Rule sets screens call this), then rebuild at once. */
 async function saveRules(db, email, input, stamp) {
@@ -180,6 +210,7 @@ async function saveRules(db, email, input, stamp) {
   if (!v || typeof v !== 'object') throw new CostError('BAD_REQUEST', 'The rule set could not be read. Reload the page and try again.');
   const rules = Object.assign(cleanRules(v), { savedAt: stamp, savedBy: email, from: text(input.from).slice(0, 40) || 'hub' });
   await db.collection(SAVED).doc('current').set(rules);
+  await keepCopy(db, SAVED, rules, stamp);
   await db.collection('actions').doc('hub-' + require('crypto').randomBytes(8).toString('hex')).set({ action: 'saveCostRules', by: email, at: stamp, after: rules });
   await rebuild(db, stamp);
   return { ok: true, rules };
@@ -193,4 +224,4 @@ async function read(db) {
   return (await db.collection(OUT).doc('current').get()).data();
 }
 
-module.exports = { build, cleanRules, dayShare, fuelMonths, fuelFor, rebuild, saveRules, read, CostError, OUT, SAVED, RATES, RULES, QUOTES, START, MILE_RUN, SHORT_RUN };
+module.exports = { build, cleanRules, dayShare, fuelMonths, fuelFor, rebuild, saveRules, publishRates, HUB_RATES, read, CostError, OUT, SAVED, RATES, RULES, QUOTES, START, MILE_RUN, SHORT_RUN };

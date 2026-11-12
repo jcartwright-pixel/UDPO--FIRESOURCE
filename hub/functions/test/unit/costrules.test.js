@@ -55,9 +55,9 @@ test('a short run pays thirds of a day in every app (Joe 11-12-26); a Hub save w
 
 function fakeDb(cols) {
   const docRef = (col, id) => ({ get: async () => ({ exists: !!(cols[col] || {})[id], data: () => cols[col][id] }),
-    set: async (v) => { (cols[col] = cols[col] || {})[id] = JSON.parse(JSON.stringify(v)); } });
+    set: async (v) => { (cols[col] = cols[col] || {})[id] = JSON.parse(JSON.stringify(v)); }, delete: async () => { delete cols[col][id]; } });
   return { cols, collection: (col) => ({ doc: (id) => docRef(col, id),
-    get: async () => ({ docs: Object.values(cols[col] || {}).map(v => ({ data: () => v })) }),
+    get: async () => ({ docs: Object.entries(cols[col] || {}).map(([id, v]) => ({ id, data: () => v })) }),
     select: () => ({ get: async () => ({ docs: Object.values(cols[col] || {}).map(v => ({ data: () => v })) }) }) }) };
 }
 
@@ -72,4 +72,18 @@ test('anyone active reads it; only an administrator saves the rule set, and the 
   assert.equal(r.rules.savedBy, 'pat.admin@uniteddairy.com');
   assert.equal(db.cols.hubCostRules.current.ruleSource, 'hub');
   assert.equal(db.cols.hubCostRules.current.each.driverDay.value, 350);
+});
+
+test('Route Cost publishes its rates through the Hub; the Hub copy wins and the newest 12 saves are kept', async () => {
+  const db = fakeDb({ users: { 'pat.admin@uniteddairy.com': { status: 'ACTIVE', roles: ['Administrator'] }, 'sam.driver@uniteddairy.com': { status: 'ACTIVE', roles: ['Driver'] } },
+    routeCostRates: { current: rates } });
+  await assert.rejects(H.hubCall(db, { email: 'sam.driver@uniteddairy.com' }, { op: 'publishCostRates', rates }, {}), (e) => e.code === 'NOT_ALLOWED');
+  await assert.rejects(H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'publishCostRates', rates: { month: '2026-11' } }, {}), (e) => e.code === 'BAD_REQUEST');
+  const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'publishCostRates', rates: Object.assign({}, rates, { driverBaseWeek: 1500, 'bad key': 1 }) }, {});
+  assert.equal(r.rates['bad key'], undefined);
+  const out = db.cols.hubCostRules.current;
+  assert.equal(out.rateSource, 'hub'); assert.equal(out.amounts.driverBaseWeek.value, 1500); assert.equal(out.rates.driverBaseWeek, 1500);
+  for (let i = 0; i < 14; i++) db.cols.hubCostRates['2026111' + String(i).padStart(2, '0') + 'T'] = { x: i };
+  await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'publishCostRates', rates }, {});
+  assert.equal(Object.keys(db.cols.hubCostRates).filter(k => k !== 'current').length, 12);
 });
