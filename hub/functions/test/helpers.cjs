@@ -148,4 +148,16 @@ async function localKeys(ctx) {
     catch (e) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ error: { status: CODES[e.code] || 'INTERNAL', message: e.message } }) }); }
   });
 }
-module.exports = { PROJECT, db, clear, localCalls, localAdmin, localKeys };
+/*
+ * The Route Estimator's key call (routeEstimator, area key) lives in the Route & Trip repository, so the tests answer it here:
+ * nothing saved, and every request is kept so a test can check which provider each card asked for.
+ */
+const estimatorAsked = [];
+async function localEstimator(ctx) {
+  await ctx.route(/:5001\/[^/]+\/[^/]+\/routeEstimator$/, async (route) => {
+    const data = (route.request().postDataJSON() || {}).data || {};
+    estimatorAsked.push(data);
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ result: { hasKey: false } }) });
+  });
+}
+module.exports = { PROJECT, db, clear, localCalls, localAdmin, localKeys, localEstimator, estimatorAsked };

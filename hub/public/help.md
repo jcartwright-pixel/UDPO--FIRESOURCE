@@ -41,7 +41,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory**, **Fleet & Maintenance** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App, Inventory and Fleet & Maintenance have nothing to tick in People & Access: any United Dairy account may open it.
 - **Fuel Tracking**, **Employees & Compliance**, **Route & Trip Costs**, **Route Cost Analysis** and **Customer Statements**: administrators, and anyone an administrator ticks for it in **People & Access**. Employees & Compliance keeps its own access list too, so it checks again when it opens.
 
-> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio and PC Miler, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
+> Administrators also see **Administration** on Home: **People & Access** is where people are added and changed, **Roles & Rights** is what each role may do, **Links & Codes** has every link and code for managers, stations and drivers' phones, **Email & Texts** is who gets each email and text, **Plant Setup** opens each plant's set-up screens, and **Keys & Connections** holds the sign-ins for Verizon Connect, RedZone, MOCREO, Twilio, PC Miler and HERE, **Accounting Numbers** reads the monthly accounting package for Over the Road and cost analysis and the weekly route report for Route Cost Analysis, and **Daily BOL** picks up the office's daily load by route.
 
 > On the practice hub, **Route & Trip Costs**, **Customer Statements** and **Accident & Injury Reporting** open the live ones, because they have no practice copy yet. Their cards say so. **Employees & Compliance** opens its practice copy, with made-up people.
 
@@ -202,10 +202,10 @@ screens: plant-setup.html
 id: keys
 screens: keys.html
 
-**Keys & Connections** holds the sign-ins the apps use to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts** for Plant & Distribution, and **PC Miler (Trimble)** for Route & Trip Costs. They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
+**Keys & Connections** holds the sign-ins the apps use to reach other companies: **Verizon Connect GPS**, **RedZone**, **MOCREO thermometers** and **Twilio texts** for Plant & Distribution, and **PC Miler (Trimble)** and **HERE** for Route & Trip Costs (HERE is the second choice for miles, drive time, tolls and addresses). They are the same keys as before, kept in the same place, so nothing has to be set up again. Administrators only.
 
 1. Each card says what the sign-in is for, what is saved, and how its last test went.
-2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong. For PC Miler, the test looks up the Uniontown plant and routes a truck to Martins Ferry.
+2. To check one, press `Test Connection`. A green line says it works; a red line says what went wrong. For PC Miler, the test looks up the Uniontown plant and routes a truck to Martins Ferry. For HERE, the test checks the key with HERE and says what came back.
 3. To replace a key, open **Replace**, paste only what changes (an empty box keeps what is saved), and press `Save`. Then press `Test Connection`.
 4. For Twilio, type a phone number and press `Send test text`. The practice copy never sends texts, so there it says "not sent".
 5. To take a key away, press `Remove key`, then press it again. That connection stops until a key is saved again.
@@ -220,7 +220,7 @@ screens: keys.html
 
 !> Do not paste a key into a chat, an email or a text. Paste it only into this screen.
 
-!> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or PC Miler miles and tolls stop until the key is saved again.
+!> Do not press `Remove key` to test something. The trucks, products, thermometers, texts or the PC Miler or HERE miles and tolls stop until the key is saved again.
 
 ## Accounting Numbers
 id: accounting

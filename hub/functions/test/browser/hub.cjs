@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
-const { db, clear, localCalls, localAdmin, localKeys } = require('../helpers.cjs');
+const { db, clear, localCalls, localAdmin, localKeys, localEstimator, estimatorAsked } = require('../helpers.cjs');
 const R = require('../../../../functions/src/rights');
 
 const HOSTING = process.argv[2] || 'http://127.0.0.1:5000';
@@ -20,6 +20,7 @@ async function open(browser, email, size, page) {
   await localCalls(ctx);
   await localAdmin(ctx);
   await localKeys(ctx);
+  await localEstimator(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => { throw e; });
   await p.goto(HOSTING + '/' + (page || 'index.html') + ((page || '').indexOf('?') >= 0 ? '&' : '?') + 'testEmail=' + email);
@@ -313,7 +314,12 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await db().collection('private').doc('mocreo').set({ apiKey: 'made-up-key-0000-1234', assetId: 'asset-77', savedAt: '2026-10-01T12:00:00Z', savedBy: 'pat.admin@uniteddairy.com' });
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'keys.html');
     await p.waitForSelector('.key-card[data-key="mocreo"]');
-    assert.equal(await p.$$eval('.key-card', c => c.length), 5);
+    assert.equal(await p.$$eval('.key-card', c => c.length), 6);
+    // HERE has its own card, asked through the Route Estimator's call with provider here (PC Miler's asks with none).
+    await p.waitForSelector('.key-card[data-key="here"] .pill');
+    assert.match(await p.textContent('.key-card[data-key="here"]'), /HERE \(Route & Trip: miles, drive time, tolls and addresses\)[\s\S]*Not set up/);
+    assert.ok(estimatorAsked.some(d => d.area === 'key' && d.provider === 'here' && d.op === 'status'), 'the HERE card asks for provider here');
+    assert.ok(estimatorAsked.some(d => d.area === 'key' && !d.provider && d.op === 'status'), 'the PC Miler card still asks as before');
     const mocreo = await p.textContent('.key-card[data-key="mocreo"]');
     assert.match(mocreo, /ends in 1234/);
     assert.ok(mocreo.indexOf('made-up-key') < 0 && (await p.content()).indexOf('made-up-key') < 0, 'the saved key never reaches the page');
