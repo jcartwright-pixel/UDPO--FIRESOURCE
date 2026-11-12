@@ -123,7 +123,8 @@ async function mayUseApp(db, email, app) {
  * input.op: home (the tiles this person may open, and their plants); plants (the plant pop-up's recap, src/plants.js); appAccess (administrators: every person's saved ticks);
  * setApps (administrators: {email, apps} saves one person's ticks); the customer list's door (src/changes.js): sendChange,
  * withdrawChange, changeStatus (anyone active), customerChanges, approveChange, turnDownChange (administrators); the shared cost
- * rules (src/costrules.js): costRules (anyone active), saveCostRules ({rules, from}) and publishCostRates ({rates, from}), administrators.
+ * rules (src/costrules.js): costRules (anyone active), saveCostRules ({rules, from}) and publishCostRates ({rates, from}), administrators;
+ * the plants' map points (src/hubplants.js): plantLocations (anyone active), savePlantLocation ({id, name, address, lat, lon, active}), administrators.
  */
 async function hubCall(db, user, input, options) {
   const op = String((input || {}).op || 'home');
@@ -176,6 +177,14 @@ async function hubCall(db, user, input, options) {
     if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can change the rule sets or the rates.');
     try { return await (op === 'saveCostRules' ? K.saveRules : K.publishRates)(db, email, input, new Date().toISOString()); }
     catch (err) { if (err instanceof K.CostError) throw new HubError(err.code, err.message); throw err; }
+  }
+  // The plants' own map points (MapMaker 11-12-26, src/hubplants.js): anyone active reads; administrators save on Plant Setup.
+  if (op === 'plantLocations' || op === 'savePlantLocation') {
+    const L = require('./hubplants');
+    if (op === 'plantLocations') { if (!(await L.read(db)).plants.length) await L.fill(db, { fetchFn: options && options.fetchFn }); return L.read(db); }
+    if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can change where a plant is.');
+    try { return await L.save(db, email, input, { fetchFn: options && options.fetchFn }); }
+    catch (err) { if (err instanceof L.PlantError) throw new HubError(err.code, err.message); throw err; }
   }
   // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.
   if (CHANGE_OPS[op]) {

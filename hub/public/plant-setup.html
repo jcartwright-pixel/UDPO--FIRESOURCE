@@ -29,6 +29,12 @@
       <div class="lc-bar"><label>Plant <select id="plant" aria-label="Plant"></select></label></div>
       <div class="list-msg bad" id="practice" hidden>Practice copy: the screens open the practice copy of Plant &amp; Distribution.</div>
       <div id="setup" class="ps"></div>
+      <section class="lc-main" id="where">
+        <h2>Where each plant is</h2>
+        <p class="muted">The MapMaker shows each plant as a pin and works out Miles from a plant from here. Type the street address and press Save: the map point is found for you. Or type the map point yourself.</p>
+        <div id="plant-places" class="lc-cards"></div>
+        <div class="lc-acts"><button type="button" id="add-plant">Add a plant</button></div>
+      </section>
     </div>
   </div>
   <script type="module">import { requireSignIn } from './js/shell.js';
