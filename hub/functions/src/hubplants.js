@@ -81,6 +81,16 @@ async function fill(db, options) {
   const saved = rt.exists ? rt.data() || {} : {};
   const locations = Array.isArray(saved.list) && saved.list.length ? saved.list : ROUTE_TRIP_DEFAULT;
   const byId = new Map(have.map(p => [p.id, p]));
+  have.forEach(p => { if (!ids.has(p.id)) ids.set(p.id, text(p.name) || p.id); });
+  // A Route & Trip starting point that is not a plant yet (a DC such as a made-up Sampleton) is kept too, so the address
+  // check can tell how far a customer is from the DC that serves it.
+  const known = new Set([...ids.values()].concat(have.map(p => text(p.name))).map(n => n.toLowerCase()));
+  for (const l of locations) {
+    const name = text(l && l.name).replace(/^united dairy\s+/i, '');
+    const id = 'fac_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!name || known.has(name.toLowerCase()) || ids.has(id) || !/^fac_[a-z0-9_]{1,60}$/.test(id)) continue;
+    ids.set(id, name); known.add(name.toLowerCase());
+  }
   const out = { added: [], filled: [], kept: [] };
   for (const [id, opsName] of ids) {
     const was = byId.get(id);

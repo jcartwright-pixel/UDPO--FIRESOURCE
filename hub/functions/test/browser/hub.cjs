@@ -565,6 +565,23 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);
     assert.equal(await p.$$eval('.lc-card', c => c.length), 0);
+    // Address Check (Joe 11-12-26): the customers whose address needs a look, with why. Administrators only.
+    await db().collection('hubCustomers').doc('fac_uniontown').set({ plant: 'fac_uniontown', customers: [
+      { plant: 'fac_uniontown', key: 'fac_uniontown__901', account: '901', name: 'SAMPLE BOX STORE', dcName: 'Uniontown', address: 'PO Box 9, Sampletown, PA', addressCheck: 'check', addressCheckWhy: 'The address is a PO box, not where the store is.' },
+      { plant: 'fac_uniontown', key: 'fac_uniontown__902', account: '902', name: 'SAMPLE GOOD STORE', dcName: 'Uniontown', address: '2 Made-Up Rd, Sampletown, PA', addressCheck: 'good' }] });
+    p = await open(browser, 'pat.admin@uniteddairy.com', null, 'addresses.html');
+    await p.waitForSelector('#list tr[data-key]');
+    assert.equal(await p.$$eval('#list tr[data-key]', r => r.length), 1);
+    assert.match(await p.textContent('#list tr[data-key="fac_uniontown__901"]'), /PO box/);
+    assert.match(await p.textContent('#counts'), /1 to check, 1 good, out of 2/);
+    await p.fill('#find', 'nothing like it');
+    assert.match(await p.textContent('#list'), /Nothing to check/);
+    p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'addresses.html');
+    await p.waitForSelector('#list tr[data-key]');
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Address Check: no sideways page scroll on a phone');
+    p = await open(browser, 'sam.sales@uniteddairy.com', null, 'addresses.html');
+    await p.waitForSelector('#error:not([hidden])');
+    assert.match(await p.textContent('#error'), /Only an administrator/);
     p = await open(browser, 'sam.sales@uniteddairy.com', null, 'email.html');
     await p.waitForSelector('#error:not([hidden])');
     assert.match(await p.textContent('#error'), /Only an administrator/);

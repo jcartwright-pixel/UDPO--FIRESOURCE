@@ -92,7 +92,7 @@ test('rebuildPlant reads only the Customer List and writes only the two Hub reco
   assert.deepEqual(written.map(w => w[0] + '/' + w[1]), ['hubRouteMaster/fac_uniontown', 'hubCustomers/fac_uniontown']);
   assert.equal(written[0][2].builtAt, '2026-11-09T20:00:00Z');
   assert.equal(written[0][2].plantName, 'Uniontown');
-  assert.deepEqual([...read].sort(), ['hubAddressFill', 'private', 'routeWeekly', 'udclCustomers', 'udclRouteDays', 'udclRouteMaster']);
+  assert.deepEqual([...read].sort(), ['hubAddressFill', 'hubPlants', 'private', 'routeWeekly', 'udclCustomers', 'udclRouteDays', 'udclRouteMaster']);
 });
 
 // Joe 11-12-26 ("everything should be listed by DC, and that's how the filter should work"): each customer's DC, by the
@@ -111,4 +111,24 @@ test('each customer carries its DC and DC name, by the Customer List rule', () =
   assert.deepEqual(d.routeMaster.rows.map(r => r.dc), ['30', '9']);
   // No DC set: both blank.
   assert.deepEqual([b.customers.customers[0].dc, b.customers.customers[0].dcName], ['', '']);
+});
+
+// Joe 11-12-26: "flag each address if something's just not connecting, whether it's serviced out of a location that's nowhere
+// close ... or if it's a PO box".
+test('the address check: PO box, far from its DC, and what the lookup found', () => {
+  const cs = [
+    { key: 'k1', account: '1', name: 'BOX STORE', address: 'PO Box 12', city: 'Sampletown', dc: '30', lat: 39.9, lon: -79.7 },
+    { key: 'k2', account: '2', name: 'FAR STORE', address: '9 Made-Up Rd', city: 'Farville', dc: '30', lat: 42.9, lon: -79.7 },
+    { key: 'k3', account: '3', name: 'NEAR STORE', address: '1 Made-Up Rd', city: 'Sampletown', dc: '30', lat: 39.95, lon: -79.75 },
+    { key: 'k4', account: '4', name: 'PART MATCH', address: '4 Made-Up Rd', city: 'Sampletown', dc: '61', lat: 39.9, lon: -79.7 }
+  ];
+  const fills = { k4: { from: 'check', verdict: 'check', why: 'HERE matched only part of the address (60 out of 100).' } };
+  const places = { uniontown: { lat: 39.9, lon: -79.72 } };
+  const b = R.build('fac_uniontown', 'Uniontown', { customers: cs, routeDays: [], weekly: [], meta: null, fills, places });
+  const by = (n) => b.customers.customers.find(x => x.name === n);
+  assert.equal(by('BOX STORE').addressCheck, 'check');
+  assert.match(by('BOX STORE').addressCheckWhy, /PO box/);
+  assert.match(by('FAR STORE').addressCheckWhy, /^It is 2\d\d miles from Uniontown, the DC that serves it\.$/);
+  assert.deepEqual([by('NEAR STORE').addressCheck, by('NEAR STORE').addressCheckWhy], ['good', '']);
+  assert.match(by('PART MATCH').addressCheckWhy, /60 out of 100/);
 });
