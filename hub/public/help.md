@@ -24,7 +24,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Route Cost Analysis**: each month's delivery cost by route and stop: cost per case, per stop and per day on the road.
 - **Customer Statements** (the Statement Center): email, mail and print customer statements for every location, and keep the statement customer list. Pick the location at the top once it opens.
 - **Accident & Injury Reporting**: report an accident or injury from a phone, tablet or computer.
-- **MapMaker**: every customer and plant on one map. Pins are colored by route, delivery day or plant, with the stop number in the pin; search, filter and sort the list beside the map; upload an Excel or CSV list and every row is pinned. Until its site is on the web the card says **Not on the web yet** and opens nothing.
+- **MapMaker**: every customer and plant on one map. Pins are colored by route, delivery day or plant, with the stop number in the pin; search, filter and sort the list beside the map; upload an Excel or CSV list and every row is pinned.
 - **Sales App** (UD Sales): the salespeople's own app: where every route is now, with a map, and the customers on each route. It only shows; nothing can be changed from it. On a phone, add it to the home screen as **UD Sales**.
 - **Fleet & Maintenance**: tractors, trucks and trailers, their issues, garage work orders and fleet service. It opens the Fleet & Maintenance screen in Plant & Distribution. Everyone active sees the card; what they may do there is set by their role.
 - **Inventory**: the supplies and milk products for each plant: what is on hand, counts, what came in (the receiving log) and every change. It opens the Inventory screen in Plant & Distribution. Everyone active sees the card; who may count or change stock is set by their role there.
@@ -52,7 +52,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 
 > The plant pop-up's numbers are the same as Operations' all-plants overview, read when the pop-up opens. Close it and press the card again for fresh numbers.
 
-!> Do not keep pressing a card that says **Not on the web yet**: that app is still being set up and opens here once it is on the web.
+> A card that says **Not on the web yet** is an app still being set up; it opens nothing until it is on the web.
 
 !> Do not share the hub's link with anyone outside United Dairy: only United Dairy Google accounts can sign in.
 

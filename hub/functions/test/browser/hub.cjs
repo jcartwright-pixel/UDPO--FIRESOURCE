@@ -63,9 +63,9 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     assert.ok(await p.isHidden('#plant-box'));
     assert.match(await p.getAttribute('#tiles a[data-app="sales"]', 'href'), /\/sales\.html$/, 'Sales App opens the salespeople\'s own app');
     assert.match(await p.getAttribute('#tiles a[data-app="inventory"]', 'href'), /\/inventory\.html$/, 'Inventory opens the Inventory screen');
-    // Joe 11-12-26: the MapMaker's card is under Distribution; until its site is on the web it says so and opens nothing.
-    assert.equal(await p.getAttribute('#tiles a[data-app="mapmaker"]', 'href'), null, 'MapMaker opens nothing until it is on the web');
-    assert.match(await p.textContent('#tiles a[data-app="mapmaker"] .app-open'), /Not on the web yet/);
+    // Joe 11-12-26: the MapMaker's card is under Distribution and opens the map in a new tab.
+    assert.match(await p.getAttribute('#tiles a[data-app="mapmaker"]', 'href'), /-map\.web\.app\/$/, 'MapMaker opens the map');
+    assert.equal(await p.getAttribute('#tiles a[data-app="mapmaker"]', 'target'), '_blank');
     assert.deepEqual(await p.$$eval('#tiles a strong', s => s.map(x => x.textContent)), ['Plant Operations', 'Inventory', 'Route Distribution', 'Customers & Routes', 'MapMaker', 'Route & Trip Costs', 'Sales App', 'Customer List', 'Fuel Tracking', 'Route Cost Analysis', 'Fleet & Maintenance', 'Customer Statements', 'Employees & Compliance', 'Accident & Injury Reporting']);
     assert.equal(await p.$$eval('#tiles a .app-icon svg', s => s.length), 14, 'every card has its picture');
     await shot(p, 'hub-admin-1920');

@@ -55,10 +55,9 @@ const isPractice = (project) => /-sandbox$/.test(String(project || ''));
 const LIVE_ONLY = '. It has no practice copy yet, so this opens the live one.';
 // The apps with no practice copy: the practice hub opens the live address and says so.
 const NO_PRACTICE = { routes: 'https://ud-distribution-routes.web.app/', statements: null, accident: null };
-// Joe 11-12-26 ("We added the map ... that's where I want it so everything can access it"): the MapMaker's card. Its site
-// goes on the web only once Joe adds its two Firebase deploy keys to united-dairy-locations-map; until then the card shows
-// but says so and opens nothing (no Site Not Found page). Set to true in the pull request after its first deploy.
-const NOT_ON_WEB = { mapmaker: true };
+// An app whose site is not on the web yet: its card shows but says so and opens nothing (no Site Not Found page).
+// MapMaker was the first (Joe 11-12-26); it went up the same day once its deploy keys were in, practice and live.
+const NOT_ON_WEB = {};
 const NOT_ON_WEB_NOTE = '. Not on the web yet: it opens here once its deploy keys are in.';
 
 function apps(project) {

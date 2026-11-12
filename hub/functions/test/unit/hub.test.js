@@ -37,11 +37,10 @@ test('an administrator sees all eight apps, live addresses on the live project',
   assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
   assert.equal(r.tiles[8].name, 'Accident & Injury Reporting');
   // Joe 11-10-26: a card straight to the salespeople's own app (UD Sales).
-  // Joe 11-12-26: the MapMaker, not on the web until its deploy keys are in, so the card says so and opens nothing.
+  // Joe 11-12-26: the MapMaker, one map of every customer and plant.
   assert.equal(r.tiles[9].url, 'https://ud-distribution-map.web.app/');
   assert.equal(r.tiles[9].name, 'MapMaker');
-  assert.equal(r.tiles[9].soon, true);
-  assert.match(r.tiles[9].note, /Not on the web yet/);
+  assert.ok(!r.tiles[9].soon);
   assert.equal(r.tiles[10].url, 'https://ud-distribution.web.app/sales.html');
   assert.equal(r.tiles[10].name, 'Sales App');
   // Joe 11-10-26: a card just for Inventory, under Plant.
