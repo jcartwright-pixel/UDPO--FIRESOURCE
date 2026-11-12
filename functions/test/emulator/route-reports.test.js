@@ -67,7 +67,8 @@ test('From email: the labelled report is read once and named for the day it came
   await adminCall(db(), ADMIN, { op: 'routeReportSaveSettings', mailbox: 'pat.sample@uniteddairy.com', label: 'ROUTES/SALE BY ROUTE', enabled: true });
   const run = await R.dailyCheck(db(), deps);
   assert.deepEqual([run.status, run.read, run.saved], ['OK', 1, 1]);
-  assert.match(asked[0].query, /^label:routes-sale-by-route has:attachment/);
+  // The label OR the office's subject: the 11-11-26 report came in with no label and was missed at 2:00 PM.
+  assert.equal(asked[0].query, '{label:routes-sale-by-route subject:"weekly daily avg cases by route by store"} has:attachment newer_than:60d -in:sent');
   const wk = (await db().collection('routeWeekly').doc('2026-10-31').get()).data();
   assert.deepEqual([wk.source, wk.received], ['EMAIL', '2026-11-04T17:20:07.000Z'], 'Route Cost Analysis names it for the day it came');
   assert.match(run.message, /newest week ending 10-31-26/);
