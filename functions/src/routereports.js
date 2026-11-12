@@ -170,6 +170,12 @@ async function upload(db, email, input, stamp) {
 // Gmail's search words for a label: "ROUTES/SALE BY ROUTE" is label:routes-sale-by-route.
 const labelQuery = (label) => 'label:' + String(label || DEFAULT_LABEL).trim().toLowerCase().replace(/[\s/]+/g, '-').replace(/[^a-z0-9&_.-]/g, '');
 
+// The office's email subject. Gmail does not put the label on by itself: on 11-11-26 the report came in at 12:20 PM with no
+// label, the 2:00 PM check found nothing, and week ending 11-7-26 was only read after the label was put on by hand (Joe
+// 11-11-26: "what about the weekly sales also is supposed to pull?"). So the check also finds the email by its subject.
+const OFFICE_SUBJECT = 'Weekly Daily Avg Cases by Route By Store';
+const mailQuery = (s) => '{' + labelQuery(s.label) + ' subject:"' + OFFICE_SUBJECT.toLowerCase() + '"} has:attachment newer_than:60d -in:sent';
+
 /*
  * The email check. deps: readMail, readAttachment (src/mail.js), now. Reads the last 60 days of labelled messages with a
  * file attached; a message already read is skipped, one that could not be read is tried again next time.
@@ -182,7 +188,7 @@ async function checkMail(db, by, deps) {
   const MAIL = require('./mail');
   const readMail = d.readMail || MAIL.readMail, readAttachment = d.readAttachment || MAIL.readAttachment;
   try {
-    const messages = await readMail({ owner: s.mailbox, query: labelQuery(s.label) + ' has:attachment newer_than:60d', max: 30 });
+    const messages = await readMail({ owner: s.mailbox, query: mailQuery(s), max: 30 });
     for (const m of messages.sort((a, b) => a.internalDate - b.internalDate)) {
       const seen = db.collection('routeReportMail').doc(String(m.id).replace(/[^A-Za-z0-9_-]/g, '_'));
       if ((await seen.get()).exists) { run.skipped++; continue; }
@@ -230,4 +236,4 @@ const OPS = {
   routeReportCheckNow: async (db, email, input, stamp, d) => Object.assign({ run: await checkMail(db, email, d) }, await status(db))
 };
 
-module.exports = { OPS, readReport, checkTotals, saveWeek, saveReport, status, checkMail, dailyCheck, labelQuery, DAYS, TITLE };
+module.exports = { OPS, readReport, checkTotals, saveWeek, saveReport, status, checkMail, dailyCheck, labelQuery, mailQuery, OFFICE_SUBJECT, DAYS, TITLE };
