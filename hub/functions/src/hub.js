@@ -108,7 +108,8 @@ async function ticksOf(db, email, person) {
 /**
  * input.op: home (the tiles this person may open, and their plants); plants (the plant pop-up's recap, src/plants.js); appAccess (administrators: every person's saved ticks);
  * setApps (administrators: {email, apps} saves one person's ticks); the customer list's door (src/changes.js): sendChange,
- * withdrawChange, changeStatus (anyone active), customerChanges, approveChange, turnDownChange (administrators).
+ * withdrawChange, changeStatus (anyone active), customerChanges, approveChange, turnDownChange (administrators); the shared cost
+ * rules (src/costrules.js): costRules (anyone active), saveCostRules ({rules, from}) and publishCostRates ({rates, from}), administrators.
  */
 async function hubCall(db, user, input, options) {
   const op = String((input || {}).op || 'home');
@@ -151,6 +152,14 @@ async function hubCall(db, user, input, options) {
   if (op === 'plants') {
     const dbFor = (options && options.dbFor) || (() => db);
     return PL.plantRecap(dbFor, person, options && options.now);
+  }
+  // The shared cost rules (Joe 11-12-26, src/costrules.js): Route Cost and Route & Trip read one record; administrators save the rule set.
+  if (op === 'costRules' || op === 'saveCostRules' || op === 'publishCostRates') {
+    const K = require('./costrules');
+    if (op === 'costRules') return K.read(db);
+    if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can change the rule sets or the rates.');
+    try { return await (op === 'saveCostRules' ? K.saveRules : K.publishRates)(db, email, input, new Date().toISOString()); }
+    catch (err) { if (err instanceof K.CostError) throw new HubError(err.code, err.message); throw err; }
   }
   // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.
   if (CHANGE_OPS[op]) {
