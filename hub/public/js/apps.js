@@ -5,13 +5,14 @@ export const isAdminRole = (roles) => (roles || []).some(r => ['ADMINISTRATOR', 
 export const APPS = [
   { key: 'operations', name: 'Plant & Distribution' }, { key: 'customers', name: 'Customers & Routes' },
   { key: 'fuel', name: 'Fuel Tracking' }, { key: 'udms', name: 'Employees & Compliance' }, { key: 'routes', name: 'Route & Trip Costs' },
-  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'statements', name: 'Customer Statements' }, { key: 'accident', name: 'Accident & Injury Reporting' }
+  { key: 'routecost', name: 'Route Cost Analysis' }, { key: 'statements', name: 'Customer Statements' }, { key: 'accident', name: 'Accident & Injury Reporting' },
+  { key: 'mapmaker', name: 'MapMaker' }
 ];
 // ticks = the apps saved for this person in People & Access (appAccess), or null for the standard rule. Plant & Distribution
 // always stays on for an Enabled person.
 export function appKeysFor(p, ticks) {
   if (!p || String(p.status || '').trim().toUpperCase() !== 'ACTIVE') return [];
-  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost', 'statements'] : []).concat(['accident']);
+  if (!Array.isArray(ticks)) return ['operations', 'customers'].concat(isAdminRole(p.roles) ? ['fuel', 'udms', 'routes', 'routecost', 'statements'] : []).concat(['accident']).concat(isAdminRole(p.roles) ? ['mapmaker'] : []);
   return APPS.map(a => a.key).filter(k => k === 'operations' || ticks.indexOf(k) >= 0);
 }
 export const appsFor = (p, ticks) => appKeysFor(p, ticks).map(k => APPS.find(a => a.key === k).name);
@@ -26,6 +27,8 @@ export const LOOK = {
   routes: { color: '#9c2a3a', icon: path('<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M8 18.5h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>') },
   routecost: { color: '#2f6f8f', icon: path('<path d="M3 20h18"/><path d="M6 20V11M11 20V6M16 20v-6M21 20V9"/>') },
   statements: { color: '#7b3f6e', icon: path('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h7M9 15.5h7M9 19h4"/>') },
+  // Joe 11-12-26: the MapMaker (Lucide "map").
+  mapmaker: { color: '#0b6e8a', icon: path('<path d="M14.1 5.1a2 2 0 0 0 1.8 0l3.7-1.9A1 1 0 0 1 21 4.1v12.8a1 1 0 0 1-.6.9l-4.5 2.3a2 2 0 0 1-1.8 0l-4.2-2.1a2 2 0 0 0-1.8 0l-3.7 1.9A1 1 0 0 1 3 19V6.1a1 1 0 0 1 .6-.9l4.5-2.3a2 2 0 0 1 1.8 0z"/><path d="M15 5.8v15M9 3.2v15"/>') },
   accident: { color: '#b3261e', icon: path('<path d="M12 3l9 16H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>') },
   roles: { color: '#7a4b12', icon: path('<circle cx="8" cy="8" r="3"/><path d="M2.5 19c0-3 2.5-5.5 5.5-5.5"/><path d="M14 11h7M14 15h7M14 19h7"/><path d="M11.5 11l.8.8 1.4-1.6"/>') },
   links: { color: '#0f6b5c', icon: path('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>') },
@@ -90,9 +93,10 @@ export function linkGroups(ops) {
 // Administration screen sits in one area; the menu on Home shows one area at a time, or Everything.
 export const AREAS = [
   { key: 'plant', name: 'Plant', note: 'Production, the plant floor, loadout, quality and inventory', apps: ['plant', 'inventory'] },
+  // Joe 11-12-26: MapMaker under Distribution, beside Customers & Routes (every customer and plant on one map).
   // Joe 11-10-26: Route & Trip Costs under Distribution; a Customer List card under Sales. Route Cost Analysis under Fleet & Costs (Joe 11-11-26) ("it can lead
   // to our complete customer list"). Customer Changes stays in the hub's menu for administrators.
-  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'routes'] },
+  { key: 'distribution', name: 'Distribution', note: 'Dispatch, drivers, trucks, customers, delivery routes and what each trip costs', apps: ['distribution', 'customers', 'mapmaker', 'routes'] },
   // copies: a second card in this area that opens another app's card's address, shown only to people who have that card.
   { key: 'sales', name: 'Sales', note: 'The salespeople\'s own app and the complete customer list', apps: ['sales'],
     copies: [{ key: 'customerlist', of: 'customers', name: 'Customer List', note: 'The complete customer list: every customer, its route and day, in Customers & Routes' }] },
