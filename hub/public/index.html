@@ -66,11 +66,12 @@ import { plantPicker } from './js/plant-pick.js';
 import { PRACTICE_HUB } from './js/practice-gate.js';
 import { requireSignIn, callServer, escapeHtml as e, showError, serverText, setAdmin, installed, installApp, canInstall, shortDate } from './js/shell.js';
 // One app card: its picture in its colour, its name, what it is for, and Open.
-function tile(key, url, name, note, newTab, attr) {
+// soon: the app is not on the web yet (its card says so), so the card opens nothing.
+function tile(key, url, name, note, newTab, attr, soon) {
   const look = LOOK[key] || LOOK.operations;
-  return '<a class="app-tile" href="' + e(url) + '"' + (newTab ? ' target="_blank" rel="noopener"' : '') + ' ' + (attr || 'data-app') + '="' + e(key) + '" style="--app:' + look.color + '">' +
+  return '<a class="app-tile' + (soon ? ' app-soon' : '') + '"' + (soon ? ' aria-disabled="true"' : ' href="' + e(url) + '"' + (newTab ? ' target="_blank" rel="noopener"' : '')) + ' ' + (attr || 'data-app') + '="' + e(key) + '" style="--app:' + look.color + '">' +
     '<span class="app-icon">' + look.icon + '</span><span class="app-text"><strong>' + e(name) + '</strong><span>' + e(note) + '</span></span>' +
-    '<span class="app-open">' + (newTab ? 'Open in a new tab <span aria-hidden="true">&#8599;</span>' : 'Open <span aria-hidden="true">&rarr;</span>') + '</span></a>';
+    '<span class="app-open">' + (soon ? 'Not on the web yet' : newTab ? 'Open in a new tab <span aria-hidden="true">&#8599;</span>' : 'Open <span aria-hidden="true">&rarr;</span>') + '</span></a>';
 }
 // The Administration screens, each with what it is for.
 const ADMIN = {
@@ -150,7 +151,7 @@ requireSignIn(async () => {
         .concat(a.key === 'plant' ? tiles.filter(t => !AREAS.some(x => (x.apps || []).indexOf(t.key) >= 0)) : []);
       // A second card for an app the person already has (Customer List in Sales opens Customers & Routes).
       const extra = (a.copies || []).map(c => [c, tiles.find(t => t.key === c.of)]).filter(x => x[1]).map(x => tile(x[0].key, x[1].url, x[0].name, x[0].note, true));
-      return mine.length || extra.length ? '<section class="area" data-area="' + a.key + '">' + areaHead(a) + '<div class="hub-home">' + mine.map(t => tile(t.key, t.url, t.name, t.note, true)).concat(extra).join('') + '</div></section>' : '';
+      return mine.length || extra.length ? '<section class="area" data-area="' + a.key + '">' + areaHead(a) + '<div class="hub-home">' + mine.map(t => tile(t.key, t.url, t.name, t.note, true, null, t.soon)).concat(extra).join('') + '</div></section>' : '';
     }).join('');
     document.getElementById('empty').hidden = tiles.length > 0;
     drawMenu(!!d.admin);

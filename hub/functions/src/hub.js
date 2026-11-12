@@ -9,6 +9,7 @@
  *   Employees & Compliance (UDMS)           Administrators for now: UDMS keeps its own access list and checks again
  *   Route & Trip Costs (Route Estimator)    Administrators only (the same rule as routeEstimator), like Fuel Tracking
  *   Route Cost Analysis                     Administrators only (the same rule as routeCost), like Fuel Tracking
+ *   MapMaker (the customer and plant map)   Administrators only (the same rule as the MapMaker's own mapMaker call), Joe 11-12-26
  *   Customer Statements (Statement Center)  Administrators by default (Joe 11-7-26: "Let's add it in now"). It is an Apps Script
  *                                           app open to United Dairy accounts, so its tick only shows or hides the card
  * Joe 11-3-26 ("tick ... which apps each person is allowed to see and use ... pre-tick" what they have now): People & Access
@@ -54,6 +55,11 @@ const isPractice = (project) => /-sandbox$/.test(String(project || ''));
 const LIVE_ONLY = '. It has no practice copy yet, so this opens the live one.';
 // The apps with no practice copy: the practice hub opens the live address and says so.
 const NO_PRACTICE = { routes: 'https://ud-distribution-routes.web.app/', statements: null, accident: null };
+// Joe 11-12-26 ("We added the map ... that's where I want it so everything can access it"): the MapMaker's card. Its site
+// goes on the web only once Joe adds its two Firebase deploy keys to united-dairy-locations-map; until then the card shows
+// but says so and opens nothing (no Site Not Found page). Set to true in the pull request after its first deploy.
+const NOT_ON_WEB = { mapmaker: true };
+const NOT_ON_WEB_NOTE = '. Not on the web yet: it opens here once its deploy keys are in.';
 
 function apps(project) {
   const site = (s) => 'https://' + project + (s ? '-' + s : '') + '.web.app/';
@@ -69,17 +75,19 @@ function apps(project) {
     { key: 'routecost', name: 'Route Cost Analysis', note: 'Monthly delivery cost by route and stop: cost per case, per stop and per day on the road', url: site('route-cost'), may: isAdmin },
     { key: 'statements', name: 'Customer Statements', note: 'Email, mail and print customer statements for every location, and keep the statement customer list', url: STATEMENTS_URL, may: isAdmin },
     // Joe 11-6-26: "You don't have the link to the accident app." Anyone enabled can report an accident or injury.
-    { key: 'accident', name: 'Accident & Injury Reporting', note: 'Report an accident or injury from a phone, tablet or computer', url: ACCIDENT_URL, may: isActive }
+    { key: 'accident', name: 'Accident & Injury Reporting', note: 'Report an accident or injury from a phone, tablet or computer', url: ACCIDENT_URL, may: isActive },
+    // Joe 11-12-26: one interactive map of every customer and plant (united-dairy-locations-map), a card under Distribution.
+    { key: 'mapmaker', name: 'MapMaker', note: 'Every customer and plant on one map: pins by route, day or plant, and pin any list you upload', url: site('map'), may: isAdmin }
   ];
 }
 
 const CHANGE_OPS = { sendChange: 'any', withdrawChange: 'any', changeStatus: 'any', customerChanges: 'admin', approveChange: 'admin', turnDownChange: 'admin' };
 
-const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident'];
+const APP_KEYS = ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'mapmaker'];
 const ALWAYS = 'operations';
 // When an app joined the hub after per-person ticks started (11-3-26): ticks saved before this day follow the standard rule
 // for it until they are saved again.
-const ADDED = { statements: '2026-11-07T00:00:00Z' };
+const ADDED = { statements: '2026-11-07T00:00:00Z', mapmaker: '2026-11-12T00:00:00Z' };
 
 /** Saved ticks with any app added since they were saved filled in by the standard rule. */
 function withAdded(person, saved) {
@@ -126,6 +134,8 @@ async function hubCall(db, user, input, options) {
       if (key === 'operations') {
         tiles.push({ key: 'plant', name: 'Plant Operations', note: 'Production, the plant floor, loadout, quality, inventory and plant reports', url: url + 'group.html?g=plantops' });
         tiles.push({ key: 'distribution', name: 'Route Distribution', note: 'Dispatch, the weekly schedule, drivers, trucks, fleet and the garage', url: url + 'group.html?g=routeops' });
+      } else if (NOT_ON_WEB[key]) {
+        tiles.push({ key, name, note: note + NOT_ON_WEB_NOTE, url, soon: true });
       } else if (isPractice(project) && key in NO_PRACTICE) {
         // Route & Trip Costs (11-5-26: its repository has no practice deploy key), the Statement Center and the accident app
         // have no practice copy, so the practice hub opens the live one and says so, instead of a Site Not Found page.

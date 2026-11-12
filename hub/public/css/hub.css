@@ -68,7 +68,9 @@ body.waiting .screen-loading { display: block; position: fixed; left: 0; right: 
 .hub-sub { margin: 4px 0 0; color: var(--muted); font-size: 16px; }
 .hub-home { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; max-width: 1400px; }
 .hub-home a.app-tile { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: 1fr auto; gap: 6px 16px; padding: 20px 20px 16px; border: 1px solid var(--line); border-top: 4px solid var(--app); border-radius: 14px; background: #fff; color: var(--ink); text-decoration: none; box-shadow: 0 1px 3px rgba(16, 40, 70, .08); transition: box-shadow .15s, transform .15s, border-color .15s; min-height: 150px; }
-.hub-home a.app-tile:hover, .hub-home a.app-tile:focus-visible { box-shadow: 0 8px 22px rgba(16, 40, 70, .14); transform: translateY(-2px); border-color: var(--app); outline: none; }
+.hub-home a.app-tile.app-soon { cursor: default; opacity: .75; }
+.hub-home a.app-tile.app-soon .app-open { color: var(--muted, #5b6b7b); }
+.hub-home a.app-tile:not(.app-soon):hover, .hub-home a.app-tile:focus-visible { box-shadow: 0 8px 22px rgba(16, 40, 70, .14); transform: translateY(-2px); border-color: var(--app); outline: none; }
 .app-icon { grid-row: 1 / span 2; width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; color: var(--app); background: color-mix(in srgb, var(--app) 12%, #fff); }
 .app-text strong { display: block; font-size: 21px; line-height: 1.2; color: var(--ud-blue-dark); margin: 2px 0 6px; }
 .app-text span { display: block; font-size: 15px; line-height: 1.4; color: #3d4f60; }

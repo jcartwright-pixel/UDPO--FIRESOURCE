@@ -24,6 +24,13 @@ async function open(url) {
   const { tiles } = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project });
   let bad = 0;
   for (const t of tiles) {
+    // A card for an app not on the web yet opens nothing (index.html draws it with no address) and says so.
+    if (t.soon) {
+      const ok = /Not on the web yet/.test(t.note);
+      console.log((ok ? 'OK      ' : 'PROBLEM ') + t.name + ': not on the web yet' + (ok ? ', the card says so' : ' - the card does not say so'));
+      if (!ok) bad++;
+      continue;
+    }
     const practice = /sandbox/.test(t.url), saysLive = /opens the live one/.test(t.note);
     const r = await open(t.url);
     const problems = [];

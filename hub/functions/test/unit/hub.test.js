@@ -18,7 +18,7 @@ const keys = (r) => r.tiles.map(t => t.key);
 
 test('an administrator sees all eight apps, live addresses on the live project', async () => {
   const r = await H.hubCall(db, { email: 'pat.admin@uniteddairy.com' }, { op: 'home' }, { project: 'ud-distribution' });
-  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'sales', 'inventory', 'maint']);
+  assert.deepEqual(keys(r), ['plant', 'distribution', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'mapmaker', 'sales', 'inventory', 'maint']);
   assert.equal(r.admin, true);
   // Plant & Distribution is two cards (11-5-26), each opening its own side of the app.
   assert.equal(r.tiles[0].url, 'https://ud-distribution.web.app/group.html?g=plantops');
@@ -37,11 +37,16 @@ test('an administrator sees all eight apps, live addresses on the live project',
   assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
   assert.equal(r.tiles[8].name, 'Accident & Injury Reporting');
   // Joe 11-10-26: a card straight to the salespeople's own app (UD Sales).
-  assert.equal(r.tiles[9].url, 'https://ud-distribution.web.app/sales.html');
-  assert.equal(r.tiles[9].name, 'Sales App');
+  // Joe 11-12-26: the MapMaker, not on the web until its deploy keys are in, so the card says so and opens nothing.
+  assert.equal(r.tiles[9].url, 'https://ud-distribution-map.web.app/');
+  assert.equal(r.tiles[9].name, 'MapMaker');
+  assert.equal(r.tiles[9].soon, true);
+  assert.match(r.tiles[9].note, /Not on the web yet/);
+  assert.equal(r.tiles[10].url, 'https://ud-distribution.web.app/sales.html');
+  assert.equal(r.tiles[10].name, 'Sales App');
   // Joe 11-10-26: a card just for Inventory, under Plant.
-  assert.equal(r.tiles[10].url, 'https://ud-distribution.web.app/inventory.html');
-  assert.equal(r.tiles[10].name, 'Inventory');
+  assert.equal(r.tiles[11].url, 'https://ud-distribution.web.app/inventory.html');
+  assert.equal(r.tiles[11].name, 'Inventory');
   assert.ok(r.tiles.every(t => t.url.indexOf('sandbox') < 0), 'no live card opens a practice copy');
 });
 
@@ -59,8 +64,9 @@ test('the practice copy links to the practice copies', async () => {
   assert.equal(r.tiles[5].url, 'https://ud-distribution-routes.web.app/');
   assert.equal(r.tiles[7].url, H.STATEMENTS_URL);
   assert.equal(r.tiles[8].url, 'https://united-dairy-accident-app.web.app/');
-  assert.equal(r.tiles[9].url, 'https://ud-distribution-sandbox.web.app/sales.html');
-  assert.equal(r.tiles[10].url, 'https://ud-distribution-sandbox.web.app/inventory.html');
+  assert.equal(r.tiles[9].url, 'https://ud-distribution-sandbox-map.web.app/');
+  assert.equal(r.tiles[10].url, 'https://ud-distribution-sandbox.web.app/sales.html');
+  assert.equal(r.tiles[11].url, 'https://ud-distribution-sandbox.web.app/inventory.html');
   for (const i of [5, 7, 8]) assert.match(r.tiles[i].note, /no practice copy yet, so this opens the live one/);
   // Every other practice card opens a practice copy; none opens a live app without saying so.
   for (const t of r.tiles) {
@@ -103,10 +109,13 @@ test('Customer Statements (the Statement Center) is on the hub for administrator
 test('ticks saved before Customer Statements joined still give administrators its card, until saved again', async () => {
   const admin = { status: 'ACTIVE', roles: ['Administrator'] }, sales = { status: 'ACTIVE', roles: ['Sales'] };
   const old = { apps: ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'accident'], updatedAt: '2026-11-04T12:00:00.000Z' };
-  assert.deepEqual(H.withAdded(admin, old), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident']);
+  assert.deepEqual(H.withAdded(admin, old), ['operations', 'customers', 'fuel', 'udms', 'routes', 'routecost', 'statements', 'accident', 'mapmaker']);
   assert.deepEqual(H.withAdded(sales, old), old.apps, 'someone who is not an administrator does not get it from the old ticks');
-  const unticked = { apps: old.apps, updatedAt: '2026-11-07T15:00:00.000Z' };
+  const unticked = { apps: old.apps, updatedAt: '2026-11-12T15:00:00.000Z' };
   assert.deepEqual(H.withAdded(admin, unticked), old.apps, 'once unticked and saved, it stays off');
+  // MapMaker joined 11-12-26: ticks saved between the two days get MapMaker only.
+  const between = { apps: old.apps, updatedAt: '2026-11-08T15:00:00.000Z' };
+  assert.deepEqual(H.withAdded(admin, between), old.apps.concat(['mapmaker']));
   assert.equal(H.withAdded(admin, null), null);
   const docs = { users: { 'pat.admin@uniteddairy.com': admin }, appAccess: { 'pat.admin@uniteddairy.com': old } };
   const mem = { collection: (c) => ({ doc: (id) => ({ get: async () => ({ exists: !!docs[c][id], data: () => docs[c][id] }) }),
