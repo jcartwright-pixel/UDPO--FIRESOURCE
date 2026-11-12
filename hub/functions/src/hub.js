@@ -112,6 +112,13 @@ async function ticksOf(db, email, person) {
   return s.exists ? withAdded(person, s.data()) : null;
 }
 
+/** Whether this person may use an app (its tick, or the standard rule): the porter's check (src/porter.js). */
+async function mayUseApp(db, email, app) {
+  const person = await personOf(db, String(email || '').toLowerCase());
+  if (!isActive(person)) throw new HubError('NOT_ALLOWED', 'You are not on the Users list. Ask an administrator to add you.');
+  return appsOf(person, await ticksOf(db, String(email || '').toLowerCase(), person)).indexOf(app) >= 0;
+}
+
 /**
  * input.op: home (the tiles this person may open, and their plants); plants (the plant pop-up's recap, src/plants.js); appAccess (administrators: every person's saved ticks);
  * setApps (administrators: {email, apps} saves one person's ticks); the customer list's door (src/changes.js): sendChange,
@@ -217,4 +224,4 @@ async function hubCall(db, user, input, options) {
   throw new HubError('BAD_REQUEST', 'Unknown request.');
 }
 
-module.exports = { hubCall, HubError, apps, appsOf, withAdded, APP_KEYS, ADDED, isActive, isAdmin, UDMS_URL, UDMS_PRACTICE_URL, STATEMENTS_URL, LIVE_ONLY, isPractice };
+module.exports = { hubCall, mayUseApp, HubError, apps, appsOf, withAdded, APP_KEYS, ADDED, isActive, isAdmin, UDMS_URL, UDMS_PRACTICE_URL, STATEMENTS_URL, LIVE_ONLY, isPractice };

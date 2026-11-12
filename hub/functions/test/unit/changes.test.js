@@ -91,3 +91,18 @@ test('only the sender takes back a change, and only before it is approved', asyn
   assert.equal((await H.hubCall(db, sam, { op: 'withdrawChange', id })).status, 'withdrawn');
   await assert.rejects(H.hubCall(db, pat, { op: 'approveChange', id }), /withdrawn already/);
 });
+
+// Joe 11-12-26: the MapMaker sends a customer's map point (and its address when found by name) the same way.
+test('the MapMaker sends a map point: checked, tidied and waiting as sent', async () => {
+  const db = fakeDb(people);
+  const r = await H.hubCall(db, pat, { op: 'sendChange', plant: 'fac_uniontown', from: 'mapmaker', kind: 'mapPoint',
+    input: { account: '1234', chain: '0', plant: 'fac_uniontown', lat: 39.9012345678, lon: -79.7, source: 'search', address: '12 Made-Up Rd, Sampletown, PA' },
+    summary: 'Address and map point for 1234 Made-Up Market' });
+  const c = db.cols.hubCustomerChanges[r.id];
+  assert.equal(c.fromName, 'MapMaker');
+  assert.deepEqual(c.input, { op: 'setMapPoint', account: '1234', chain: '0', lat: 39.901235, lon: -79.7, source: 'search', address: '12 Made-Up Rd, Sampletown, PA', plant: 'fac_uniontown' });
+  assert.equal(c.summary, 'Address and map point for 1234 Made-Up Market: 12 Made-Up Rd, Sampletown, PA');
+  const bad = (input) => H.hubCall(db, pat, { op: 'sendChange', plant: 'fac_uniontown', from: 'mapmaker', kind: 'mapPoint', input, summary: 'Map point' });
+  await assert.rejects(bad({ account: '1234', lat: 'x', lon: 1 }), /Place the pin again/);
+  await assert.rejects(bad({ lat: 39, lon: -79 }), /which customer/);
+});
