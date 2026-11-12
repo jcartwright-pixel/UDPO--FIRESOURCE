@@ -3,7 +3,8 @@
  * The sign-ins Plant & Distribution already uses, kept exactly where they are (Firestore private/gpsFleet, private/redzone,
  * private/mocreo, private/sms) and changed through Operations' own server calls (gps with kind fleet, redzone, mocreo, sms:
  * status, save, clear, test). The PC Miler key (Joe 11-5-26) is kept in private/pcmiler and changed through the Route
- * Estimator's own call (routeEstimator with area key: status, save, clear, test), in the same way. Nothing is moved, copied or set up again. A saved key never comes back to the browser: the calls
+ * Estimator's own call (routeEstimator with area key: status, save, clear, test), in the same way; the HERE key (11-11-26)
+ * is kept in private/here and goes through the same call with provider here. Nothing is moved, copied or set up again. A saved key never comes back to the browser: the calls
  * answer only whether it is saved (and, for some, its last four letters), and a box left empty keeps what is saved.
  */
 import { callServer, escapeHtml as e, showError, serverText, shortDate, setAdmin } from './shell.js';
@@ -26,6 +27,9 @@ export const KEYS = [
     fields: [['accountSid', 'Account SID (starts with AC)', false], ['authToken', 'Auth token', true], ['fromNumber', 'Twilio phone number', false]],
     saved: (s) => [['Account SID', s.hasSid], ['Auth token', s.hasToken], ['Phone number', s.from || '']] },
   { key: 'pcmiler', call: 'routeEstimator', extra: { area: 'key' }, name: 'PC Miler (Trimble)', what: 'Route & Trip Costs gets truck miles, drive time, tolls and address suggestions from PC Miler with this key. Test Connection looks up the Uniontown plant and routes a truck to Martins Ferry.',
+    fields: [['apiKey', 'API key', true]],
+    saved: (s) => [['API key', s.hasKey && (s.keyEnds ? 'ends in ' + s.keyEnds : true)]] },
+  { key: 'here', call: 'routeEstimator', extra: { area: 'key', provider: 'here' }, name: 'HERE (Route & Trip: miles, drive time, tolls and addresses)', what: 'Route & Trip Costs can get truck miles, drive time, tolls and address suggestions from HERE instead of PC Miler with this key. Test Connection checks the key with HERE and says what came back.',
     fields: [['apiKey', 'API key', true]],
     saved: (s) => [['API key', s.hasKey && (s.keyEnds ? 'ends in ' + s.keyEnds : true)]] }
 ];
