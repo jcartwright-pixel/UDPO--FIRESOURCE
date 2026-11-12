@@ -92,7 +92,7 @@ test('rebuildPlant reads only the Customer List and writes only the two Hub reco
   assert.deepEqual(written.map(w => w[0] + '/' + w[1]), ['hubRouteMaster/fac_uniontown', 'hubCustomers/fac_uniontown']);
   assert.equal(written[0][2].builtAt, '2026-11-09T20:00:00Z');
   assert.equal(written[0][2].plantName, 'Uniontown');
-  assert.deepEqual([...read].sort(), ['private', 'routeWeekly', 'udclCustomers', 'udclRouteDays', 'udclRouteMaster']);
+  assert.deepEqual([...read].sort(), ['hubAddressFill', 'private', 'routeWeekly', 'udclCustomers', 'udclRouteDays', 'udclRouteMaster']);
 });
 
 // Joe 11-12-26 ("everything should be listed by DC, and that's how the filter should work"): each customer's DC, by the

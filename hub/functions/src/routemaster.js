@@ -12,7 +12,8 @@
  *   hubRouteMaster/<plant>   every stop on every route day in run order, active customers only, every row with its plant,
  *                            each stop's PALLET USES and case columns (LOW / MIDDLE / AVERAGE / HIGH / LAST 5 WKS), and each
  *                            route day's start time, notes and load map
- *   hubCustomers/<plant>     each active customer's details (chain, account, group, DC (dc, dcName), address, phone, keys, notes, map point),
+ *   hubCustomers/<plant>     each active customer's details (chain, account, group, DC (dc, dcName), address, phone, keys, notes, map point;
+ *                            a street address or map point the Customer List lacks is filled from src/addressfill.js and marked),
  *                            the route days it is on, and the active customers on no route
  *
  * They are rebuilt when the Customer List rewrites udclRouteMaster/<plant>, when a week of the weekly route report lands
@@ -92,6 +93,22 @@ function weeksByStop(weeklyDocs) {
   return by;
 }
 
+/*
+ * What the Hub found for a customer the Customer List has no street address or no map point for (src/addressfill.js): shown only
+ * where the Customer List has none, and marked so every app can tell (addressFrom 'map point', pointFrom 'address lookup').
+ */
+function withFill(row, c, f) {
+  if (!f) return row;
+  const hasPoint = row.lat !== null && row.lon !== null && !(row.lat === 0 && row.lon === 0);
+  if (!text(c.address) && f.from === 'map point' && text(f.address)) {
+    const city = row.city || text(f.city), state = row.state || text(f.state), zip = row.zip || text(f.zip);
+    Object.assign(row, { address: [text(f.address), [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+      city, state, zip, addressFrom: 'map point' });
+  }
+  if (!hasPoint && f.from === 'address' && isFinite(Number(f.lat)) && isFinite(Number(f.lon)) && f.lat !== null) Object.assign(row, { lat: Number(f.lat), lon: Number(f.lon), pointFrom: 'address lookup' });
+  return row;
+}
+
 /**
  * The two Hub records for one plant, from the Customer List's records as read.
  * customers: [udclCustomers docs], routeDays: [udclRouteDays docs], meta: private/udcl_<plant> (unrouted), weekly: [routeWeekly docs].
@@ -124,10 +141,10 @@ function build(plant, plantName, src) {
     if (stop) days.push({ plant, route, day, dayName: rd.day, stops: stop, startTime: text(rd.startTime), notes: text(rd.notes), map: rd.map || null });
   });
   const people = Object.keys(customers).filter(k => !isOff(customers[k])).sort((a, b) => text(customers[a].name).localeCompare(text(customers[b].name)))
-    .map(k => { const c = customers[k], dc = branchOf(c.dc); return { plant, key: k, account: text(c.account), chain: text(c.chain), name: text(c.name), group: text(c.group), dc, dcName: dcNameOf(dc),
+    .map(k => { const c = customers[k], dc = branchOf(c.dc); const row = { plant, key: k, account: text(c.account), chain: text(c.chain), name: text(c.name), group: text(c.group), dc, dcName: dcNameOf(dc),
       address: addressLine(c), city: text(c.city), state: text(c.state), zip: text(c.zip), phone: text(c.phone), keys: text(c.keys), notes: text(c.notes),
       lat: isFinite(Number(c.lat)) && c.lat !== null && c.lat !== '' ? Number(c.lat) : null, lon: isFinite(Number(c.lon)) && c.lon !== null && c.lon !== '' ? Number(c.lon) : null,
-      routes: onRoutes[k] || [] }; });
+      routes: onRoutes[k] || [] }; return withFill(row, c, (src.fills || {})[k]); });
   const unrouted = ((src.meta && src.meta.unrouted) || []).filter(x => !isOff(customers[x.key] || {}))
     .map(x => { const dc = branchOf((customers[x.key] || {}).dc); return { plant, key: text(x.key), account: text(x.account), chain: text(x.chain), name: text(x.name), day: text(x.day), dc, dcName: dcNameOf(dc) }; });
   const routes = new Set(rows.map(r => r.route));
@@ -157,15 +174,16 @@ const nameOf = (plant) => String(plant).replace(/^fac_/, '').split('_').map(w =>
 
 /** Reads one plant's Customer List records and writes hubRouteMaster/<plant> and hubCustomers/<plant>. */
 async function rebuildPlant(db, plant, stamp, weeklyDocs) {
-  const [cs, rs, meta, source] = await Promise.all([
+  const [cs, rs, meta, source, fills] = await Promise.all([
     db.collection(CUSTOMERS).where('plant', '==', plant).get(),
     db.collection(ROUTE_DAYS).where('plant', '==', plant).get(),
     db.collection('private').doc('udcl_' + plant).get(),
-    db.collection(SOURCE).doc(plant).get()
+    db.collection(SOURCE).doc(plant).get(),
+    require('./addressfill').readPlant(db, plant).catch(() => ({}))
   ]);
   const weekly = weeklyDocs || (await db.collection(WEEKLY).get()).docs.map(d => Object.assign({ id: d.id }, d.data()));
   const name = (source.exists && source.data().plantName) || nameOf(plant);
-  const b = build(plant, name, { customers: cs.docs.map(d => d.data()), routeDays: rs.docs.map(d => d.data()), meta: meta.exists ? meta.data() : null, weekly });
+  const b = build(plant, name, { customers: cs.docs.map(d => d.data()), routeDays: rs.docs.map(d => d.data()), meta: meta.exists ? meta.data() : null, weekly, fills });
   const at = stamp || new Date().toISOString();
   const writes = parts(plant, Object.assign(b.routeMaster, { builtAt: at }), ['rows', 'days']).map(([id, r]) => [HUB_ROUTE_MASTER, id, r])
     .concat(parts(plant, Object.assign(b.customers, { builtAt: at }), ['customers', 'unrouted']).map(([id, r]) => [HUB_CUSTOMERS, id, r]));
