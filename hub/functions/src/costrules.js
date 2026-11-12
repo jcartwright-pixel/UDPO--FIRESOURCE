@@ -20,8 +20,9 @@
  *   - diesel and miles a gallon come from the month before, until the month is over (Joe: "if I'm in October, it should use
  *     our September's costing for fuel"); each falls back one more month; 6.2 and $4.87 stand in when there is nothing
  *   - a mileage run pays 1 hour plus 1 hour a stop (Joe: "only one hour, and then each stop is 1 hour")
- *   - a run shorter than a day: a setting (shortRun) until Joe picks one rule for both apps. Today Route Cost pays half a day
- *     for 6 hours or less, and Route & Trip pays its hours ÷ the hours a day.
+ *   - a run shorter than a day pays part of a driver day and a truck day in thirds, in every app (Joe 11-12-26: "4 hours is
+ *     a third of a day. 8 hours is 2/3. Anything over 8 hours is a full day ... everything we do should base that"):
+ *     4 hours or less a third, over 4 up to 8 hours two thirds, over 8 hours a full day
  *
  * Rebuilt when any of those records change, and every hour (the truck trips change all day).
  */
@@ -41,10 +42,16 @@ const LIMITS = [['driverDaysWeek', 1, 7], ['dayCabDaysWeek', 1, 7], ['sleeperRun
   ['sleeperDriverDays', 1, 7], ['hoursDay', 1, 24], ['milesDay', 0, 3000], ['sleeperMiles', 0, 5000], ['sleeperNights', 0, 7]];
 // Joe 11-12-26: a mileage run pays 1 hour plus 1 hour a stop.
 const MILE_RUN = { firstHours: 1, perStopHours: 1 };
-// The two short-run rules on the table until Joe picks one (MASTER.md section 5). Today's behavior is the starting value.
-const SHORT_RUN = { hours: 'its hours ÷ the hours a day of a driver day and a truck day (a full day at most)',
-  halfDay: 'half a driver day and half a truck day for 6 hours or less, a full day above that' };
-const SHORT_START = { routeCost: 'halfDay', routeTrip: 'hours' };
+// Joe 11-12-26, every app: a run of 4 hours or less pays a third of a driver day and a truck day, over 4 up to 8 hours two
+// thirds, over 8 hours a full day.
+const SHORT_RUN = { steps: [{ upToHours: 4, share: 1 / 3 }, { upToHours: 8, share: 2 / 3 }, { upToHours: null, share: 1 }],
+  rule: '4 hours or less: a third of a day; over 4 up to 8 hours: two thirds; over 8 hours: a full day (Joe 11-12-26)' };
+/** The part of a driver day and a truck day a run of `hours` pays (Joe 11-12-26). */
+function dayShare(hours) {
+  const h = Number(hours);
+  if (!(h > 0)) return 0;
+  return (SHORT_RUN.steps.find(st => st.upToHours === null || h <= st.upToHours)).share;
+}
 const FUEL_START = { mpg: 6.2, price: 4.87, minMpg: 2, maxMpg: 25 };
 // Every dollar amount Route Cost publishes, with where it comes from in plain words.
 const RATE_FROM = {
@@ -71,9 +78,6 @@ function cleanRules(v) {
   o.extras = (Array.isArray(v && v.extras) ? v.extras : []).slice(0, 30)
     .map(e => ({ name: text(e && e.name).slice(0, 60), amount: Number(e && e.amount) || 0, per: per.indexOf(e && e.per) >= 0 ? e.per : 'week' }))
     .filter(e => e.name && e.amount);
-  const sr = Object.assign({}, SHORT_START);
-  if (v && v.shortRun && typeof v.shortRun === 'object') ['routeCost', 'routeTrip'].forEach(k => { if (SHORT_RUN[v.shortRun[k]]) sr[k] = v.shortRun[k]; });
-  o.shortRun = sr;
   return o;
 }
 
@@ -146,7 +150,7 @@ function build(src, today) {
   return {
     today, builtFrom: { rates: rates ? text(rates.savedAt) || text(rates.month) : '', rules: ruleSource },
     rules, ruleSource, mileRun: Object.assign({}, MILE_RUN, { rule: '1 hour plus 1 hour a stop (Joe 11-12-26)' }),
-    shortRun: { routeCost: rules.shortRun.routeCost, routeTrip: rules.shortRun.routeTrip, choices: SHORT_RUN, decided: rules.shortRun.routeCost === rules.shortRun.routeTrip },
+    shortRun: SHORT_RUN,
     fuelRule: 'the month before, until the month is over (Joe 11-12-26)',
     amounts, each, fuelMonths: months,
     rateMonth: rates ? text(rates.month) : '', hasRates: !!rates
@@ -189,4 +193,4 @@ async function read(db) {
   return (await db.collection(OUT).doc('current').get()).data();
 }
 
-module.exports = { build, cleanRules, fuelMonths, fuelFor, rebuild, saveRules, read, CostError, OUT, SAVED, RATES, RULES, QUOTES, START, MILE_RUN, SHORT_RUN };
+module.exports = { build, cleanRules, dayShare, fuelMonths, fuelFor, rebuild, saveRules, read, CostError, OUT, SAVED, RATES, RULES, QUOTES, START, MILE_RUN, SHORT_RUN };

@@ -40,14 +40,17 @@ test('P&L amounts say which months they come from; the day costs follow the rule
   assert.deepEqual([b.mileRun.firstHours, b.mileRun.perStopHours], [1, 1]);
 });
 
-test('the short-run rule is a setting until Joe picks; a Hub save wins over Route Cost\'s', () => {
-  const today = K.build({ rates }, '2026-11');
-  assert.deepEqual([today.shortRun.routeCost, today.shortRun.routeTrip, today.shortRun.decided], ['halfDay', 'hours', false]);
-  const saved = K.build({ rates, routeRules: { driverDaysWeek: 4 }, saved: { driverDaysWeek: 3, shortRun: { routeCost: 'hours', routeTrip: 'hours' } } }, '2026-11');
-  assert.equal(saved.ruleSource, 'hub'); assert.equal(saved.rules.driverDaysWeek, 3); assert.equal(saved.shortRun.decided, true);
-  assert.equal(K.cleanRules({ driverDaysWeek: 99, hoursDay: '', shortRun: { routeCost: 'whatever' } }).driverDaysWeek, 5);
+test('a short run pays thirds of a day in every app (Joe 11-12-26); a Hub save wins over Route Cost\'s', () => {
+  assert.equal(K.dayShare(0), 0);
+  assert.equal(K.dayShare(2), 1 / 3); assert.equal(K.dayShare(4), 1 / 3);
+  assert.equal(K.dayShare(4.5), 2 / 3); assert.equal(K.dayShare(8), 2 / 3);
+  assert.equal(K.dayShare(8.25), 1); assert.equal(K.dayShare(14), 1);
+  const b = K.build({ rates }, '2026-11');
+  assert.equal(b.shortRun.steps.length, 3);
+  const saved = K.build({ rates, routeRules: { driverDaysWeek: 4 }, saved: { driverDaysWeek: 3 } }, '2026-11');
+  assert.equal(saved.ruleSource, 'hub'); assert.equal(saved.rules.driverDaysWeek, 3);
+  assert.equal(K.cleanRules({ driverDaysWeek: 99 }).driverDaysWeek, 5);
   assert.equal(K.cleanRules({ hoursDay: '' }).hoursDay, 12);
-  assert.equal(K.cleanRules({ shortRun: { routeCost: 'whatever' } }).shortRun.routeCost, 'halfDay');
 });
 
 function fakeDb(cols) {
