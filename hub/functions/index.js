@@ -47,3 +47,16 @@ exports.hubRouteMasterOnWeek = onDocumentWritten({ document: 'routeWeekly/{week}
 exports.hubRouteMasterHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
   console.log('hubRouteMaster', JSON.stringify(await require('./src/routemaster').rebuildAll(db)));
 });
+
+/*
+ * The shared cost rules (Joe 11-12-26): hubCostRules/current, read by Route Cost Analysis and the Route & Trip Estimator.
+ * src/costrules.js says how. Rebuilt when Route Cost's rates or rule set, a saved Hub rule set or a fuel quote changes, and
+ * every hour (the truck trips change all day).
+ */
+const costRebuild = () => require('./src/costrules').rebuild(db);
+exports.hubCostRulesOnRates = onDocumentWritten({ document: 'routeCostRates/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnRules = onDocumentWritten({ document: 'routeCostRules/current', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesOnQuote = onDocumentWritten({ document: 'fuelQuotes/{id}', timeoutSeconds: 120, memory: '512MiB', maxInstances: 1 }, costRebuild);
+exports.hubCostRulesHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
+  console.log('hubCostRules', JSON.stringify(await costRebuild()));
+});
