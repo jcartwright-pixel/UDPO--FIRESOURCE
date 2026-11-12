@@ -31,6 +31,26 @@ exports.hub = onCall({ timeoutSeconds: 30 }, async (request) => {
 });
 
 /*
+ * The Hub's porter (Joe 11-10-26): one door for outside calls; the key never reaches a browser. src/porter.js says how.
+ * First service: HERE for the MapMaker (map pictures, address lookup, suggestions, find by name), 11-12-26.
+ */
+exports.porter = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+  const user = unitedDairyUser(request.auth);
+  if (!user) throw new HttpsError('permission-denied', 'Sign in with your United Dairy Google account');
+  const H = require('./src/hub'), P = require('./src/porter');
+  try {
+    return await P.porterCall(db, user.email, request.data || {}, (app) => H.mayUseApp(db, user.email, app));
+  } catch (error) {
+    if (error instanceof H.HubError || error instanceof P.PorterError) {
+      const code = { NOT_ALLOWED: 'permission-denied', BAD_REQUEST: 'invalid-argument', NO_KEY: 'failed-precondition', OUTSIDE: 'unavailable', NOT_FOUND_PLACE: 'failed-precondition' }[error.code];
+      throw new HttpsError(code || 'failed-precondition', error.message);
+    }
+    console.error('porter', error);
+    throw new HttpsError('internal', 'internal');
+  }
+});
+
+/*
  * The route customer list through the Hub (Joe 11-9-26): hubRouteMaster/<plant> and hubCustomers/<plant>, built from the
  * Customer List's records (read only) and read by every other app. src/routemaster.js says how.
  */
