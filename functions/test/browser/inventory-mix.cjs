@@ -96,19 +96,29 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
   const results = [];
   try {
     // ---------- E: a supervisor opens Inventory ----------
-    const sv = await openPage(browser, 1536, 790, '/inventory.html?' + SUPER);
+    const sv = await openPage(browser, 1536, 790, '/inventory.html?tab=onhand&' + SUPER);
     await sv.waitForFunction(() => /GALLON JUGS/i.test(document.getElementById('oh-rows').innerText));
     assert.equal(!!(await sv.$('#uc-refused')), false, 'Inventory is open to everyone in the plant');
     await sv.close();
 
     const inv = await openPage(browser, 1536, 790, '/inventory.html?' + ADMIN);
+    // Joe 11-12-26: Inventory opens on its lists: each inventory, the kinds in it, and the plant's own lists; one product list.
+    await inv.waitForFunction(() => /ALL PLANT SUPPLIES/.test(document.getElementById('lists-body').innerText));
+    assert.equal(await inv.getAttribute('[data-tab="lists"]', 'aria-selected'), 'true');
+    assert.deepEqual(await inv.$$eval('.inv-list-group h2', h => h.map(x => x.innerText)), ['RAW MILK', 'COOLER', 'PLANT SUPPLIES', 'MAINTENANCE', 'MY LISTS']);
+    assert.match(await inv.innerText('[data-group="own"]'), /NO LISTS OF YOUR OWN YET/);
+    assert.ok(await smallest(inv, '#tab-lists *') >= 16, 'text 16px and up');
+    assert.ok(await fits(inv), 'no sideways scroll on Lists');
+    await shot(inv, 'inventory-lists-1536.png');
+    await inv.click('[data-pick-type="supplies"]:not([data-pick-kind])');
     await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
+    assert.match(inv.url(), /tab=onhand/);
     assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.innerText + ':' + x.getAttribute('aria-selected'))), ['RAW MILK:false', 'COOLER:false', 'PLANT SUPPLIES:true', 'MAINTENANCE:false']);
     assert.equal(await placeOf(inv, 'ITEM-jugs'), 'NO AREA YET');
     // Its own window: the header names Inventory and the menu lists only Inventory's screens.
     assert.match(await inv.innerText('#screen > .topbar .brand small'), /INVENTORY$/);
     // (Read as written: the menu may be folded, which hides its words.)
-    assert.deepEqual((await inv.$$eval('.sidemenu a', a => a.map(x => x.textContent.trim()).filter(Boolean))).slice(0, 2), ['Inventory', 'Raw Milk']);
+    assert.deepEqual((await inv.$$eval('.sidemenu a', a => a.map(x => x.textContent.trim()).filter(Boolean))).slice(0, 3), ['Inventory', 'Plant Supplies', 'Raw Milk']);
     assert.equal(await inv.$eval('#tabs', t => getComputedStyle(t).textTransform), 'uppercase', 'ALL CAPS');
 
     // ---------- A: TAKE OUT by hand ----------
@@ -153,6 +163,24 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     await shot(inv, 'E-low-only-1536.png');
     await inv.click('#oh-low');
     results.push('E: LOW AT 450 on the caps turns the row red; Low only shows just it');
+
+    // ---------- The plant's own lists (Joe 11-12-26) ----------
+    await inv.click('[data-lists="ITEM-caps"]');
+    await inv.fill('#ed-qty', 'caps, Gallon  line');
+    await inv.click('#ed-save');
+    await until(async () => JSON.stringify((await item('Gallon caps, blue')).lists) === JSON.stringify(['caps', 'Gallon line']), 'the lists');
+    await inv.waitForFunction(() => !document.getElementById('ed-qty'));
+    await inv.click('[data-tab="lists"]');
+    await inv.waitForSelector('[data-pick-list="caps"]');
+    assert.match(await inv.innerText('[data-pick-list="caps"]'), /CAPS\s+1 PRODUCT · 1 LOW/);
+    await inv.click('[data-pick-list="caps"]');
+    await inv.waitForFunction(() => document.querySelectorAll('#oh-rows tr').length === 1 && /GALLON CAPS/.test(document.getElementById('oh-rows').innerText));
+    assert.equal(await inv.innerText('#oh-list'), 'LIST: CAPS · SHOW ALL');
+    assert.match(inv.url(), /list=caps/);
+    await inv.click('#oh-list');
+    await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
+    assert.doesNotMatch(inv.url(), /list=/);
+    results.push('Lists: Inventory opens on its lists; CAPS typed on the blue caps makes a list of its own showing only them');
 
     // ---------- Milk Products: its own type ----------
     await inv.click('[data-type="milk"]');
@@ -331,7 +359,7 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     assert.ok(hist.includes('GALLON JUGS | PUT BACK BY THE PRODUCTION LINES | +10'), hist.join('\n'));
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
       await inv.setViewportSize({ width: w, height: h });
-      for (const t of ['onhand', 'walk', 'history']) {
+      for (const t of ['lists', 'onhand', 'walk', 'history']) {
         await inv.click('[data-tab="' + t + '"]');
         await inv.waitForTimeout(200);
         assert.ok(await smallest(inv, '#tab-' + t + ' *, .inv-tabs *') >= 16, 'text 16px and up');

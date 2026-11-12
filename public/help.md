@@ -1058,11 +1058,30 @@ Everything the plant keeps, in **four inventories**, each its own tab at the top
 
 Inventory opens in **its own window** (a new tab) from the menu, from the Shipping & Receiving card and from the Hub, so it can stay open beside the other screens. Its menu lists only Inventory's screens.
 
+- Inventory opens on **Lists** (see below). The menu's Plant Supplies, Raw Milk, Cooler and Maintenance open straight to that inventory.
 - A product's **kind** decides which inventory it is in: Raw Milk; Milk Product (Cooler); Ingredient, Packaging, Chemical or Other (Plant Supplies); Maintenance Part or Safety (Maintenance).
 - **On Hand** lists each product: where it is kept (its **area** and spot, under its name), its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
 - **Should have** is the last count, plus what was received since, minus what was taken out since.
 - Stock comes **in** when a load is marked received on Receiving, or when the Boxing tablet presses `RECEIVED` on a delivery it scanned.
 - Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Cooler).
+
+### Lists: see only the part you want
+
+Every product is on **one product list**. The **Lists** tab, where Inventory opens, shows it in parts, a card for each, with how many products are on it and how many are low (in red):
+
+- Each inventory (**All Raw Milk**, **All Cooler**, **All Plant Supplies**, **All Maintenance**), and the kinds in it: **Ingredients**, **Packaging**, **Chemicals** and **Other supplies** in Plant Supplies; **Parts** and **Safety gear** in Maintenance.
+- **My lists**: the plant's own lists, for example CAPS, LABELS or BOXES. A list is there as long as a product is on it.
+
+1. Press a card. **On Hand** opens showing only that list.
+2. On one of your own lists, the blue `List: ... · Show all` button at the top goes back to the whole inventory.
+
+To put a product on one of your own lists:
+
+1. On **On Hand**, press `Lists` on the product's line.
+2. Type the list names with a comma between them, for example CAPS, GALLON LINE. A list already made is offered as you type.
+3. Press `Save lists`. Blank takes it off every list. A product can be on up to 8 lists.
+
+> Lists only change what you see. Counts, take outs and History are the same whichever list you open it from.
 
 ### Find a product: type it or scan it
 

@@ -106,3 +106,18 @@ test('where a product is kept, and the Count Walk, are checked before saving', (
   assert.equal(edit.area, undefined); assert.equal(edit.spot, undefined);
   assert.throws(() => v({ op: 'addProduct', name: 'X', kind: 'Spare' }), /Kind must be/);
 });
+
+test('the plant\'s own lists: on the product, tidied, and read back one list at a time (Joe 11-12-26)', () => {
+  assert.deepEqual(v({ op: 'setLists', itemId: 'A', lists: ['  caps ', 'Labels', 'CAPS', ''] }).lists, ['caps', 'Labels']);
+  assert.deepEqual(v({ op: 'setLists', itemId: 'A', lists: 'Caps,  Gallon   line ,' }).lists, ['Caps', 'Gallon line']);
+  assert.deepEqual(v({ op: 'setLists', itemId: 'A', lists: [] }).lists, []);
+  assert.throws(() => v({ op: 'setLists', lists: ['Caps'] }), /Pick the product/);
+  assert.throws(() => v({ op: 'setLists', itemId: 'A', lists: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] }), /up to 8 lists/);
+  assert.equal(R.listName('x'.repeat(50)).length, R.MAX_LIST);
+  const items = [{ name: 'Red caps', lists: ['Caps'] }, { name: 'Blue caps', lists: ['caps', 'Gallon line'] }, { name: 'Jugs' }];
+  assert.deepEqual(R.inventoryLists(items).map(l => l.name + ':' + l.items.length), ['Caps:2', 'Gallon line:1']);
+  assert.equal(R.onList(items[1], 'CAPS'), true);
+  assert.equal(R.onList(items[2], 'Caps'), false);
+  assert.equal(R.onList(items[0], ''), false);
+  assert.ok(INV.STOCK_OPS.indexOf('setLists') >= 0);
+});

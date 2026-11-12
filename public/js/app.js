@@ -193,7 +193,8 @@ export const MENU = [
   // Joe 10/31: Plant Material Trailers moved into Inventory (what is on the trailers in the lot is inventory too); it left Debag.
   // Joe 11/1 ("a nice little module for the inventory"): On Hand, what the plant should have of each product, first.
   // Joe 11-10-26 ("three, maybe four separations"): the four inventories, then the Count Walk, the Receiving Log and History.
-  ['Inventory', [['Plant Supplies', 'inventory.html', 'day'], ['Raw Milk', 'inventory.html?type=raw', 'day'], ['Cooler', 'inventory.html?type=milk', 'day'], ['Maintenance', 'inventory.html?type=maint', 'day'],
+  // Joe 11-12-26 ("whenever I pull up the inventory, it'll actually show me the different lists"): Lists first.
+  ['Inventory', [['Lists', 'inventory.html', 'check'], ['Plant Supplies', 'inventory.html?type=supplies', 'day'], ['Raw Milk', 'inventory.html?type=raw', 'day'], ['Cooler', 'inventory.html?type=milk', 'day'], ['Maintenance', 'inventory.html?type=maint', 'day'],
     ['Count Walk', 'inventory.html?tab=walk', 'check'], ['Receiving Log', 'inventory.html?tab=log', 'day'], ['History', 'inventory.html?tab=history', 'day'], ['Plant Material Trailers', 'jug-trailers.html', 'materials']]],
   // Joe 10/31 (End Zone): the Labeling Room, where the bottles get their labels on the way to the fillers.
   ['Debag / Labeling Room', [['Labeling Room', 'labeling.html', 'production.webp']]],
