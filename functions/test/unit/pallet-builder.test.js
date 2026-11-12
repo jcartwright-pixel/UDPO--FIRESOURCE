@@ -31,7 +31,7 @@ function rulesBox(sheet) {
   const src = fs.readFileSync(PB.SRC, 'utf8'), vm = require('vm');
   const at = src.indexOf('const RULES0'), end = src.indexOf("const WD = ['SUN'");
   const code = src.match(/^const P = .*$/m)[0] + '\n' + src.match(/^const IN_CRATE = .*$/m)[0] + '\n' + src.match(/^const BY = .*$/m)[0] + '\n' +
-    src.slice(at, end) + '\nthis.BY = BY; this.applyRules = applyRules; this.caseStats = caseStats; this.heldOf = heldOf; this.set = (r) => { RULES = Object.assign({}, RULES0, r); applyRules(); };';
+    src.slice(at, end) + '\nthis.BY = BY; this.applyRules = applyRules; this.caseStats = caseStats; this.heldOf = heldOf; this.ruleMax = ruleMax; this.set = (r) => { RULES = Object.assign({}, RULES0, r); applyRules(); };';
   const box = { window: { parent: { udProducts: sheet || {} } } }; box.window.parent.parent = box.window.parent; vm.runInNewContext(code, box);
   return box;
 }
@@ -56,21 +56,56 @@ test('the Product Sheet wins by SKU: units in a case, cases to a pallet and the 
   assert.equal(other.cpp, 54, 'a product the Product Sheet leaves blank follows Pallet Rules');
 });
 
-test('each customer\'s space is held for its number: HIGH unless PALLET USES picks another (the Customer List\'s own math)', () => {
+test('each customer\'s space is held for the HIGHEST CASES AVERAGE unless PALLET USES picks another (Joe 11-9-26)', () => {
   const box = rulesBox();
   const weeks = [['2026-10-03', 46], ['2026-10-10', 9], ['2026-10-17', 21], ['2026-10-24', 25], ['2026-10-31', 25.5]];
   const st = box.caseStats(weeks, 5);
   assert.deepEqual([st.LOW, st.MIDDLE, st.AVERAGE, st.HIGH, st.LAST, st.weeks], [9, 25, 25.3, 46, 25.3, 5]);
-  assert.equal(box.heldOf(st, ''), 46, 'the standard is HIGH');
+  // 46, 25.5, 25, 21, 9: drop the 46, (25.5 + 25 + 21 + 9) / 4 = 20.1, rounded up to 21.
+  assert.equal(st.HCA, 21, 'the highest cases average');
+  assert.equal(box.heldOf(st, ''), 21, 'the standard is the highest cases average');
+  assert.equal(box.heldOf(st, 'HIGH'), 46, 'PALLET USES can still pick HIGH');
+  assert.equal(box.caseStats([['2026-08-01', 90]].concat(weeks), 5).HCA, 21, 'a week older than 8 weeks is left out');
   assert.equal(box.heldOf(st, 'AVERAGE'), 26, 'rounded up to whole cases');
   assert.equal(box.heldOf(null, ''), 0, 'no weeks, no space held');
+});
+
+// Joe 11-8-26 RULE SET: the 5 highest weeks in 8 weeks (Joe 11-9-26; it was 6 months), the top one thrown out, the other 4 averaged and rounded up;
+// it never comes down until it is a year old (seasonal customers). For sequence changes only, not the day's pallets.
+test('RULE SET MAX: top 5 weeks of the last 8 weeks, drop the top one, average 4, rounded up (Joe 11-8-26)', () => {
+  const box = rulesBox();
+  const weeks = [['2026-09-05', 62], ['2026-09-12', 55], ['2026-09-19', 54], ['2026-09-26', 52], ['2026-10-03', 51], ['2026-10-10', 20], ['2026-10-17', 30]];
+  const r = box.ruleMax(weeks);
+  assert.equal(r.MAX, 53); assert.equal(r.now, 53); assert.equal(r.held, false);
+  assert.equal(box.ruleMax([['2026-07-04', 99]].concat(weeks)).now, 53, 'a week more than 8 weeks back does not count');
+  assert.equal(box.ruleMax([['2026-10-03', 10], ['2026-10-10', 11]]).MAX, 10, 'two weeks: drop the top, keep the other');
+  assert.equal(box.ruleMax([['2026-10-03', 9]]).MAX, 9, 'one week: that week');
+  assert.equal(box.ruleMax([]), null);
+  assert.equal(box.ruleMax([['2026-01-03', 1], ['2026-01-10', 2], ['2026-01-17', 3], ['2026-01-24', 4], ['2026-01-31', 5]].map(x => x)).MAX, 3, '(4+3+2+1)/4 = 2.5 rounds up to 3');
+});
+
+test('RULE SET seasonal hold: the maximum stays up until it is a year old, then comes down (Joe 11-8-26)', () => {
+  const box = rulesBox();
+  const busy = [['2026-06-06', 40], ['2026-06-13', 40], ['2026-06-20', 40], ['2026-06-27', 40], ['2026-07-04', 40]];
+  const slow = []; for (let d = new Date('2026-07-11'); d <= new Date('2027-05-01'); d.setDate(d.getDate() + 7)) slow.push([d.toISOString().slice(0, 10), 5]);
+  const held = box.ruleMax(busy.concat(slow));
+  assert.equal(held.MAX, 40, 'still the busy-season number in the winter'); assert.equal(held.now, 5); assert.equal(held.held, true);
+  assert.equal(held.at, '2026-07-25', 'the last week all 5 busy weeks were still in its 8 weeks');
+  const later = slow.slice(); for (let d = new Date('2027-05-08'); d <= new Date('2028-01-15'); d.setDate(d.getDate() + 7)) later.push([d.toISOString().slice(0, 10), 5]);
+  assert.equal(box.ruleMax(busy.concat(later)).MAX, 5, 'a year later it comes down');
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  assert.match(src, /<button id="ruleSetBtn" aria-expanded="false">RULE SET<\/button>/);
+  assert.match(src, /The pallets the builder makes each day hold space at the highest cases average\./);
+  assert.match(src, /<span>HIGHEST CASES AVERAGE, 8 WEEKS<\/span>/, 'the standard is not a choice in Pallet Rules');
+  assert.match(src, /title="Rule Set maximum: for sequence changes">Max<\/th>/, 'the truck load map shows the maximum for sequence changes');
+  assert.ok(!/ruleMax|\.max\b/.test(src.slice(src.indexOf('function plan(){'), src.indexOf('function plan(){') + 3000)), 'the day\'s pallets do not use it');
 });
 
 test('held space is shaded on the truck, more cases add space, and the customers on the route sit at the very top', () => {
   const src = fs.readFileSync(PB.SRC, 'utf8');
   const top = src.indexOf('aria-label="Customers on this route"'), routes = src.indexOf('aria-label="All routes"');
   assert.ok(top > 0 && top < routes, 'CUSTOMERS ON THIS ROUTE is above All routes');
-  assert.match(src, /<th>LOW<\/th><th>MIDDLE<\/th><th>AVERAGE<\/th><th>HIGH<\/th><th>LAST \$\{RULES\.weeks\} WEEKS<\/th><th>PALLET USES<\/th><th>HELD FOR<\/th><th>TODAY'S BOL<\/th><th>SPACE<\/th>/);
+  assert.match(src, /<th>LOW<\/th><th>MIDDLE<\/th><th>AVERAGE<\/th><th>HIGH<\/th><th>LAST \$\{RULES\.weeks\} WEEKS<\/th><th>HIGHEST CASES AVERAGE<\/th><th>RULE SET MAX<\/th><th>PALLET USES<\/th><th>HELD FOR<\/th><th>TODAY'S BOL<\/th><th>SPACE<\/th>/);
   assert.match(src, /class="held" data-g=/, 'held stacks are drawn shaded');
   assert.match(src, /OVER BY \$\{fmt\(h\.cases - h\.held\)\} · SPACE ADDED/);
   assert.match(src, /if \(!h \|\| RULES\.under !== 'KEEP'\) return;/, 'space is held only while Pallet Rules keep it');
@@ -94,7 +129,7 @@ test('no separate Load sequences section: the truck load map stop list already s
 
 test('grouped stops (Joe 11-5-26, mock-up 3): a colored bar per load sequence and shared customers indented under the BOL one', () => {
   const src = fs.readFileSync(PB.SRC, 'utf8');
-  assert.match(src, /<td class="grp" style="background:\$\{seqColor\(/, 'each stop row has a bar in its sequence color');
+  assert.match(src, /<td class="grp" style="background:\$\{stopColor\(/, 'each stop row has a bar in its sequence color');
   assert.match(src, /#lmTable tr\.kid td\.cn\{padding-left:34px\}/, 'a shared customer is indented');
   assert.match(src, /\.lm-plan\{[^}]*background:var\(--accent-soft\)/, 'route totals sit in the light blue box');
 });
@@ -293,4 +328,21 @@ test('the Product Sheet keeps units in a case, cases to a pallet, stack height a
   assert.match(src, /export const SHEET_TAIL = \[[^\]]*\]\.concat\(PALLET_FIELDS\.map/, 'in the downloaded list');
   const html = fs.readFileSync(require('path').join(__dirname, '../../../public/products.html'), 'utf8');
   assert.match(html, /<th class="pm-pal" colspan="' \+ PALLET_FIELDS\.length \+ '">Cases and Pallets<\/th>/);
+});
+
+// Joe 11-9-26: "why aren't you using 0? ... Every single color should be different."
+test('load sequence 0 is labeled 0 on the truck, and every load sequence 0 to 15 has its own color (Joe 11-9-26)', () => {
+  const src = fs.readFileSync(PB.SRC, 'utf8');
+  const colors = JSON.parse(src.match(/^const SEQ_COLORS = (\[.*\]);$/m)[1].replace(/'/g, '"'));
+  assert.equal(colors.length, 16); assert.equal(new Set(colors).size, 16, 'no two sequences share a color');
+  const vm = require('vm'), box = {};
+  vm.runInNewContext(src.match(/^const SEQ_COLORS = .*$/m)[0] + '\n' + src.match(/^const seqColor = .*$/m)[0] + '\n' + src.match(/^const NOSEQ_COLOR = .*$/m)[0] + '\nthis.seqColor = seqColor; this.stopColor = stopColor;', box);
+  assert.equal(new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(box.seqColor)).size, 16);
+  assert.notEqual(box.stopColor(null, 3), box.seqColor(0), 'no sequence is grey, not sequence 0\'s color');
+  assert.match(src, /const lmLabel = i => \{ const n = stopSeq\(S\.stops\[i\]\); return n != null \? String\(n\) : '#' \+ \(i \+ 1\); \};/, 'sequence 0 shows 0, not #run');
+});
+
+test('soft margarine 41823 is 18 to a case (Joe 11-11-26)', () => {
+  const box = rulesBox();
+  assert.equal(box.BY.get('41823').upc, 18);
 });
