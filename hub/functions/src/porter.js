@@ -198,4 +198,4 @@ async function porterCall(db, email, input, may, options) {
   return answer;
 }
 
-module.exports = { porterCall, PorterError, SERVICES, STYLES, TILE_CACHE };
+module.exports = { porterCall, PorterError, SERVICES, STYLES, TILE_CACHE, hereKey, geocodeOne };

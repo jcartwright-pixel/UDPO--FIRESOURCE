@@ -513,12 +513,22 @@ const shot = async (p, name) => { if (SHOTS) await p.screenshot({ path: path.joi
     // Plant Setup: each set-up screen opens in Plant & Distribution on the plant picked.
     p = await open(browser, 'pat.admin@uniteddairy.com', null, 'plant-setup.html');
     await p.waitForSelector('.lc-card[data-page="shifts.html"] a');
-    assert.equal(await p.$$eval('.lc-card', c => c.length), 7);
+    assert.equal(await p.$$eval('#setup .lc-card', c => c.length), 7);
     assert.match(await p.getAttribute('.lc-card[data-page="shifts.html"] a', 'href'), /\/shifts\.html$/);
     await p.selectOption('#plant', 'fac_charleston');
     assert.match(await p.getAttribute('.lc-card[data-page="crew.html?view=setup"] a', 'href'), /\/crew\.html\?view=setup&plant=fac_charleston$/);
     assert.match(await p.textContent('.lc-card[data-page="uploads.html"] a'), /Open for Charleston/);
     assert.equal(await p.getAttribute('.lc-card[data-page="uploads.html"] a', 'target'), '_blank');
+    // Where each plant is (hubPlants): the hub fills in every plant; an administrator types a map point and saves.
+    await p.waitForSelector('#plant-places [data-place]');
+    assert.ok(await p.$$eval('#plant-places [data-place]', c => c.length) >= 3, 'every plant has a card');
+    const up = await p.$$eval('#plant-places [data-place]', cs => cs.findIndex(c => /Uniontown/.test(c.querySelector('h3').textContent)));
+    await p.fill('[data-place="' + up + '"] [data-f="lat"]', '39.9');
+    await p.fill('[data-place="' + up + '"] [data-f="lon"]', '-79.7');
+    await p.click('[data-save-place="' + up + '"]');
+    await p.waitForFunction((i) => /Saved by pat\.admin/.test(document.querySelector('[data-place="' + i + '"]').textContent), up);
+    const savedPlant = (await db().collection('hubPlants').doc('fac_uniontown').get()).data();
+    assert.deepEqual([savedPlant.lat, savedPlant.lon, savedPlant.source], [39.9, -79.7, 'hub']);
     await shot(p, 'hub-plant-setup-1920');
     p = await open(browser, 'pat.admin@uniteddairy.com', { width: 390, height: 844 }, 'plant-setup.html');
     await p.waitForSelector('.lc-card a');

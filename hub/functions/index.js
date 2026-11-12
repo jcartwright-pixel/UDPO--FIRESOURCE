@@ -81,3 +81,13 @@ exports.hubCostRulesOnQuote = onDocumentWritten({ document: 'fuelQuotes/{id}', t
 exports.hubCostRulesHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 }, async () => {
   console.log('hubCostRules', JSON.stringify(await costRebuild()));
 });
+
+/*
+ * The plants' own map points (MapMaker 11-12-26): hubPlants/<plant>, every plant. src/hubplants.js says how. Filled when Route &
+ * Trip's starting points change and every hour (a new plant on the customer list), never over a plant saved on Plant Setup.
+ */
+const plantFill = () => require('./src/hubplants').fill(db);
+exports.hubPlantsOnLocations = onDocumentWritten({ document: 'routeEstimator/locations', timeoutSeconds: 120, maxInstances: 1 }, plantFill);
+exports.hubPlantsHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
+  console.log('hubPlants', JSON.stringify(await plantFill()));
+});

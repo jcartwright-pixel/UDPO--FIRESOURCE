@@ -187,7 +187,7 @@ screens: email.html
 id: plant-setup
 screens: plant-setup.html
 
-**Plant Setup** opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
+**Plant Setup** says where each plant is on the map, and opens Plant & Distribution's set-up screens for one plant: the **Upload Center**, **Plant Shifts**, **Location Areas**, **Menu Setup**, the **Plant Schedule Setup**, and Plant Maintenance's **Maintenance Schedule Setup** and **Maintenance Equipment**. The screens stay in Plant & Distribution and save there as they always have. Administrators only.
 
 1. Pick the **Plant** at the top.
 2. Press `Open for` on a screen's card. It opens in Plant & Distribution on that plant, in a new tab, so the hub stays open.
@@ -200,6 +200,18 @@ screens: plant-setup.html
 > A new plant (Charleston, Martins Ferry) starts in the **Upload Center**: download the workbook, fill it in, upload it, check every row, then save.
 
 !> Do not set up one plant's screen with another plant picked. Check the plant's name on the button before you open it.
+
+### Where each plant is
+Under the set-up screens, **Where each plant is** has a card for every plant with its street address and map point. The **MapMaker** shows each plant as a pin from here, and works out **Miles from a plant** from it. The hub fills these in by itself from Route & Trip's starting points and adds any new plant it finds on the customer list.
+
+1. To fix a plant's place, change its **Street address** and press `Save`. The map point is found for you.
+2. If the address is not found, type the **Map point** yourself (north, then west with a minus, like 39.9 and -79.7) and press `Save`.
+3. To add a plant, press `Add a plant`, type its name and address, and press `Save`.
+4. Untick **On the map** to hide a plant and its customers from the MapMaker.
+
+> A plant you save here is kept as you saved it; the hub never fills it in again.
+
+!> Do not untick **On the map** for a plant that still has customers you want to see on the MapMaker.
 
 ## Keys & Connections
 id: keys
