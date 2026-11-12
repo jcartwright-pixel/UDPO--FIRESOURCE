@@ -212,7 +212,7 @@ const receivingLoads = async () => (await db().collection('plantJournal').where(
     // ---------- Inventory: On Hand, Count, History ----------
     let countDay = '';
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
-      const inv = await openPage(browser, w, h, '/inventory.html?' + ADMIN);
+      const inv = await openPage(browser, w, h, '/inventory.html?tab=onhand&' + ADMIN);
       await inv.waitForFunction(() => (document.getElementById('oh-rows').textContent.match(/Silgan Closures/g) || []).length === 2);
       // The words are read as shown (ALL CAPS comes from the page's style), so wait until the screen is showing and drawn.
       await inv.waitForFunction(() => !document.getElementById('screen').hidden && !document.body.classList.contains('ud-drawing'));
