@@ -94,3 +94,21 @@ test('rebuildPlant reads only the Customer List and writes only the two Hub reco
   assert.equal(written[0][2].plantName, 'Uniontown');
   assert.deepEqual([...read].sort(), ['private', 'routeWeekly', 'udclCustomers', 'udclRouteDays', 'udclRouteMaster']);
 });
+
+// Joe 11-12-26 ("everything should be listed by DC, and that's how the filter should work"): each customer's DC, by the
+// Customer List's own rule (a route number in the DC column is Marietta's books, route 815 is Uniontown's).
+test('each customer carries its DC and DC name, by the Customer List rule', () => {
+  assert.deepEqual(['30', '030', 30, '30.0', '1', '50', '9', '61', '103', '815', '0', '12', '', null, 'abc'].map(R.branchOf),
+    ['30', '30', '30', '30', '1', '50', '9', '61', '9', '30', '9', '9', '', '', '']);
+  assert.deepEqual(['30', '1', '50', '9', '61', ''].map(R.dcNameOf), ['Uniontown', 'Martins Ferry', 'Charleston', 'Marietta', 'DC 61', '']);
+  const withDc = customers.map(c => Object.assign({}, c, { dc: { '1522|10': '030', '1522|20': '107', '88': '50' }[c.key] }));
+  const d = R.build('fac_uniontown', 'Uniontown', { customers: withDc, routeDays, weekly, meta });
+  const by = (n) => d.customers.customers.find(x => x.name === n);
+  assert.deepEqual([by('MAPLE MARKET').dc, by('MAPLE MARKET').dcName], ['30', 'Uniontown']);
+  assert.deepEqual([by('OAK CORNER').dc, by('OAK CORNER').dcName], ['9', 'Marietta']);
+  assert.deepEqual([by('CEDAR STOP').dc, by('CEDAR STOP').dcName], ['50', 'Charleston']);
+  assert.deepEqual(d.customers.unrouted.map(x => [x.name, x.dc, x.dcName]), [['CEDAR STOP', '50', 'Charleston']]);
+  assert.deepEqual(d.routeMaster.rows.map(r => r.dc), ['30', '9']);
+  // No DC set: both blank.
+  assert.deepEqual([b.customers.customers[0].dc, b.customers.customers[0].dcName], ['', '']);
+});
