@@ -115,3 +115,17 @@ test('unknown services and requests, no key saved, and a turned-down key all say
   await assert.rejects(call(db, { service: 'here', op: 'geocode', rows: [{ id: 'a', address: '1 Made-Up St' }] }, fakeFetch(() => ({ status: 401 }))), /turned down the key/);
   assert.ok(!JSON.stringify(db.logs).includes(KEY), 'the key is never written to the log');
 });
+
+test('who may use the porter for the map: the MapMaker tick, or administrators while no ticks are saved', async () => {
+  const H = require('../../src/hub');
+  const docs = {
+    users: { 'pat.admin@uniteddairy.com': { status: 'ACTIVE', roles: ['Administrator'] }, 'sam.sales@uniteddairy.com': { status: 'ACTIVE', roles: ['Sales'] },
+      'kim.ticked@uniteddairy.com': { status: 'ACTIVE', roles: ['Sales'] }, 'lee.gone@uniteddairy.com': { status: 'INACTIVE', roles: ['Administrator'] } },
+    appAccess: { 'kim.ticked@uniteddairy.com': { apps: ['operations', 'mapmaker'], updatedAt: '2026-11-12T13:00:00Z' } }
+  };
+  const db = { collection: (c) => ({ doc: (id) => ({ get: async () => ({ exists: !!(docs[c] || {})[id], data: () => (docs[c] || {})[id] }) }) }) };
+  assert.equal(await H.mayUseApp(db, 'pat.admin@uniteddairy.com', 'mapmaker'), true);
+  assert.equal(await H.mayUseApp(db, 'sam.sales@uniteddairy.com', 'mapmaker'), false);
+  assert.equal(await H.mayUseApp(db, 'kim.ticked@uniteddairy.com', 'mapmaker'), true);
+  await assert.rejects(H.mayUseApp(db, 'lee.gone@uniteddairy.com', 'mapmaker'), /Users list/);
+});
