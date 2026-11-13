@@ -194,7 +194,8 @@
     }
     const getRuns = () => runs;
     // That run's Route Master day (dispatch time, hours), for a day on the week that has none of its own.
-    const masterDay = (row, p) => { const r = routeList && row.runId && routeList.find(x => x.id === row.runId); return r && r.days ? r.days[p] : null; };
+    // Joe 11-12-26: with the route's Sleeper tick, so a sleeper run's time on the road includes the 10-hour sleeper break.
+    const masterDay = (row, p) => { const r = routeList && row.runId && routeList.find(x => x.id === row.runId); return r && r.days ? Object.assign({ sleeper: !!r.sleeper }, r.days[p]) : null; };
     const SPECIAL = { __CARRIER__: 'CARRIER', __OPEN__: 'OPEN' };
 
     function headCells(first) {
@@ -297,6 +298,8 @@
       // Joe 11/6 (Cooney on 8301, back before this run leaves): a driver on another run that day is only left out when its time on
       // the road overlaps this one (L.driverClash); Load 1 and Load 2 of the same route never block each other.
       rows.forEach(r => { const x = r.days[day]; if (r === row || !x.runs || !x.driverId || busy[x.driverId]) return; const why = L.driverClash(row, r, day, masterDay); if (why) busy[x.driverId] = why; });
+      // Joe 11-12-26: a sleeper run back the next day (852 leaving Monday 1:00 PM is back Tuesday 1:00 PM) holds its driver into that day.
+      L.nextDays(day).forEach(q => rows.forEach(r => { const x = r.days[q]; if (r === row || !x || !x.runs || !x.driverId || busy[x.driverId]) return; const why = L.driverClash(row, r, day, masterDay, q); if (why) busy[x.driverId] = why; }));
       const who = String(d.driver || '').toUpperCase();
       // Joe 10/13 (836 PECK): a plant load can be marked Not running here too, and put back to needing a driver.
       const plant = !d.runs && L.plantFor(plantCtx, row, day), plantOpen = plant && d.plantLoadOff !== true, plantOff = plant && d.plantLoadOff === true, pickup = plant && (L.plantCarrier(plant) || L.coveredRoute(row));
