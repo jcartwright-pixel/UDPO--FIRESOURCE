@@ -34,7 +34,7 @@
     'redzoneChecks', 'redzoneData', 'redzoneRuns', 'repairItems', 'reportGroups', 'routeReportMail', 'routeWeekly', 'routes', 'runDays',
     'runs', 'safetyIssues', 'safetyPhotos', 'safetySetup', 'safetyWalks', 'scorecard', 'scorecardExcuses',
     'scorecardRatings', 'sensors', 'sentEmails', 'stationAccess', 'tempLocations', 'textLog', 'transfers',
-    'udclCustomers', 'udclLog', 'udclRouteDays', 'users', 'vacations', 'walkPhotoData', 'walkPhotos', 'weeks', 'windowTests', 'workOrders',
+    'udclCustomers', 'udclLog', 'udclRouteDays', 'users', 'vacations', 'walkPhotoData', 'walkPhotos', 'weekPlans', 'weeks', 'windowTests', 'workOrders',
     'workOrdersDeleted'
   ]);
   const KNOWN = new Set(NAMES);

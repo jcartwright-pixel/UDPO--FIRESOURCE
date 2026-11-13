@@ -304,13 +304,28 @@ screens: routeweek.html
 
 Which days each route runs for **one week only** (a holiday week, for example). The normal week stays in Route Master.
 
-1. Pick the week with the arrows.
+1. Pick the week with the arrows. You can go forward up to a year, to plan a holiday week ahead.
 2. Click a route's day to turn it on or off for this week. Each click saves at once.
 3. Pick the **Holiday this week** if there is one, and type a **Reason for this week's changes**.
 
 - `Changed Only` shows only the routes changed this week; `All Routes` shows them all.
 - The `Normal Week` tab at the top goes back to Route Days, the days every week runs.
 - `Reset Week to Normal` puts the week back to the normal days.
+
+### Plan a holiday week ahead
+
+The screen knows the holidays. The `Next holiday` button (for example "Next holiday: Thanksgiving · Thu 11-26-26") opens that week.
+
+1. Press `Next holiday`, or step forward with the arrows. A week after next week says **Planned ahead: used when this week is built**.
+2. The holiday's column is gold and named. Each load that runs on the holiday is listed on the right with a **Suggested** day: the nearest day that route does not already run, the day before first, never another holiday.
+3. Press `Use Suggested Moves` to move every load to its suggested day, or pick a day in each load's **Move to** box. Click any day in the grid to change it.
+4. Type the reason, or leave it: it fills in with the holiday's name.
+
+- A planned week changes nothing else: not this week, not next week, not Route Master, not the Live sheet.
+- When the week before it is published, that week is built from Route Master with your planned days, and the reason comes with it. From then on it is changed like any other week.
+- `Reset Week to Normal` on a planned week clears the plan.
+
+> The suggestion is only a starting point. Check each load before the week is built.
 
 !> Do not use this screen to change a route for good. Change the route in the Route Editor instead.
 

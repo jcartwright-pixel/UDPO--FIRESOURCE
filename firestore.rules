@@ -79,6 +79,8 @@ service cloud.firestore {
     // Thermometer locations changed in Administration > MOCREO & Sensors (the server writes them; the key stays in private/).
     match /tempLocations/{id} { allow read: if activeUser(); }
     match /weeks/{id} { allow read: if activeUser(); }
+    // Joe 11-12-26: weeks planned ahead on Route Week Override (the server writes them).
+    match /weekPlans/{id} { allow read: if activeUser(); }
     match /runs/{id} { allow read: if activeUserOrStation() || tvStation(); }
     // Joe 10/19: one record per run and day (functions/src/rundays.js), read like the runs they come from.
     match /runDays/{id} { allow read: if activeUserOrStation() || tvStation(); }

@@ -51,6 +51,8 @@
           <div><b id="week-label">-</b><small id="week-kind"></small></div>
           <button type="button" id="next" aria-label="Next week">&#9654;</button>
         </div>
+        <!-- Joe 11-12-26: the next holiday, one click to its week, so it can be planned ahead. -->
+        <button type="button" class="rw-next-hol" id="next-hol" hidden></button>
         <label class="rw-reason" id="hol-pick-box" hidden>Holiday this week<select id="hol-pick"></select></label>
         <label class="rw-reason">Reason for this week's changes<textarea id="reason" maxlength="300" rows="2" placeholder="Holiday week, plant shutdown, customer closed..."></textarea></label>
         <div class="rw-counts"><div><b id="n-over">0</b><span>Overrides this week</span></div><div><b id="n-routes">0</b><span>Routes affected</span></div></div>
@@ -61,6 +63,7 @@
         <div class="rw-list" id="change-list"></div>
         <!-- Joe 10/22: in a holiday week the side lists every load on the holiday, each with where it moves to. -->
         <div class="rw-hol-head" id="hol-head" hidden></div>
+        <button type="button" class="rw-suggest" id="hol-suggest" hidden>Use Suggested Moves</button>
         <div class="rw-list rw-hol-list" id="hol-list" hidden></div>
         <button type="button" class="warn" id="reset" data-top>Reset Week to Normal</button>
       </aside>
@@ -79,6 +82,11 @@
     const asked = (() => { const w = new URLSearchParams(location.search).get('week'); return L.isDateKey(w) ? L.weekStart(w) : ''; })();
     let db = null, week = '', weeks = [], runs = [], routes = {}, weekDoc = null, show = 'all', stopRuns = null, stopWeek = null, typing = false;
     let holPick = '';
+    // Joe 11-12-26: a week after the Live Next week is planned ahead (weekPlans/<week>); nothing else changes until Publish
+    // builds that week from Route Master with the plan's days. `plan` is that week's plan, `planSaving` the plan saves still out.
+    let plan = null, planSaving = 0, live = {};
+    const PLAN_WEEKS = 52;
+    const isFuture = () => !!(live.next && week > live.next);
     const getRuns = () => runs;
     // The normal week: Route Master's day switches for the run (routes/{runId}).
     const normal = (r) => { const m = routes[r.runId]; return m && m.days ? m.days : null; };
@@ -95,6 +103,32 @@
     const movedTo = (r, h) => L.DAYS.find(p => p !== h.p && isOver(r, p) && runsOn(r, p)) || '';
     const dayText = (p) => NAME(p).slice(0, 3) + ' ' + shortDate(L.addDays(week, L.DAYS.indexOf(p)));
 
+    // The planned week: every Route Master run, each day as Route Master has it unless the plan says otherwise.
+    function planRuns() {
+      const list = Object.values(routes).filter(r => r.id && (r.route || r.routeId)), ctx = L.weekBuildContext([], [], [], list, []);
+      return list.map(r => {
+        const run = Object.assign(L.buildWeekRun(L.plannedRoute(r, plan), week, ctx), { id: week + '__' + r.id, rev: 0 }), want = (plan && plan.days && plan.days[r.id]) || {};
+        L.DAYS.forEach(p => { run.days[p].runs = typeof want[p] === 'boolean' ? want[p] : !!(r.days && r.days[p] && r.days[p].active); });
+        return run;
+      });
+    }
+    // The week's reason: the planned week's on its plan, a Live week's on the week.
+    const reasonDoc = () => isFuture() ? (plan || { overrideReason: '' }) : weekDoc;
+    const saveReason = (reason) => save(isFuture() ? 'setWeekPlan' : 'setWeekReason', { weekStart: week, reason });
+    // The next holiday from today on (the same list the Scheduler's calendar marks).
+    function nextHoliday() {
+      const today = L.operatingDay(new Date());
+      for (let i = 0; i < 400; i++) { const key = L.addDays(today, i), name = R.holidayName(key); if (name) return { key, name }; }
+      return null;
+    }
+    // Joe 11-12-26 ("it should show and try to predetermine what we're going to do with it"): where a load on the holiday
+    // could go: the nearest day of that week the route does not run and that is not a holiday too, the day before first.
+    function suggestDay(r, hol) {
+      const i = L.DAYS.indexOf(hol.p), off = new Set(weekHolidays().map(h => h.p)), order = [];
+      for (let k = 1; k < 7; k++) { if (i - k >= 0) order.push(L.DAYS[i - k]); if (i + k < 7) order.push(L.DAYS[i + k]); }
+      return order.find(p => !off.has(p) && !runsOn(r, p)) || 'off';
+    }
+
     function shown() {
       // Every run Weekly shows for the week, in Weekly's order.
       const ids = new Set(L.weeklyRows(runs, week).map(x => x.runDocId));
@@ -102,11 +136,15 @@
     }
 
     function render() {
+      if (isFuture()) runs = planRuns();
       const edit = canSave(), list = shown(), over = list.filter(overRow);
       document.getElementById('mode-text').textContent = modeLabel(edit ? 'TEST COPY: SAVES STAY IN OPERATIONS' : 'TEST COPY, READ ONLY');
-      const live = lists.app.liveWeeks || {};
       document.getElementById('week-label').textContent = week ? 'Week of ' + shortDate(week) : '-';
-      document.getElementById('week-kind').textContent = week === live.current ? 'This week' : week === live.next ? 'Next week' : week === live.previous ? 'Last week' : '';
+      document.getElementById('week-kind').textContent = week === live.current ? 'This week' : week === live.next ? 'Next week' : week === live.previous ? 'Last week'
+        : isFuture() ? 'Planned ahead: used when this week is built' : '';
+      const nh = nextHoliday(), nhWeek = nh ? L.weekStart(nh.key) : '', nhBox = document.getElementById('next-hol');
+      nhBox.hidden = !nh || nhWeek === week || weeks.indexOf(nhWeek) < 0;
+      if (nh) { nhBox.dataset.week = nhWeek; nhBox.innerHTML = 'Next holiday: ' + escapeHtml(nh.name) + ' · <span class="nw">' + NAME(L.DAYS[new Date(nh.key + 'T12:00:00Z').getUTCDay()]).slice(0, 3) + ' ' + escapeHtml(shortDate(nh.key)) + '</span>'; }
       document.getElementById('prev').disabled = weeks.indexOf(week) <= 0;
       document.getElementById('next').disabled = weeks.indexOf(week) >= weeks.length - 1;
       const hol = holiday(), hp = hol ? hol.p : '';
@@ -126,9 +164,9 @@
       document.getElementById('change-list').innerHTML = over.map(r => L.DAYS.filter(p => isOver(r, p)).map(p => { const on = r.days[p].runs;
         return '<div><span><b>' + escapeHtml(r.route) + '</b> &middot; ' + escapeHtml(r.run || '') + '</span><span>' + NAME(p).slice(0, 3) + ' <em class="' + (on ? 'on' : 'off') + '">' + (on ? 'RUNS' : 'DOES NOT RUN') + '</em></span></div>'; }).join('')).join('') || '<div class="empty">Every route runs its normal week.</div>';
       document.querySelectorAll('[data-show]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.show === show)));
-      const box = document.getElementById('reason');
+      const box = document.getElementById('reason'), rd = reasonDoc();
       box.disabled = !edit;
-      if (!typing) box.value = weekDoc && weekDoc.overrideReason || '';
+      if (!typing) box.value = rd && rd.overrideReason || '';
       document.getElementById('reset').disabled = !edit || !over.length;
       renderHoliday(list, hol, edit);
     }
@@ -136,8 +174,10 @@
     // The holiday list: each load on the holiday (red until moved) and each one moved off it (green), with a Move to drop-down:
     // a day that route does not already run, or Not running.
     function renderHoliday(list, hol, edit) {
-      const pickBox = document.getElementById('hol-pick-box'), head = document.getElementById('hol-head'), box = document.getElementById('hol-list');
+      const pickBox = document.getElementById('hol-pick-box'), head = document.getElementById('hol-head'), box = document.getElementById('hol-list'), sug = document.getElementById('hol-suggest');
       pickBox.hidden = head.hidden = box.hidden = !hol;
+      sug.hidden = !hol || !list.some(r => runsOn(r, hol.p));
+      sug.disabled = !edit;
       document.getElementById('rw-filter').hidden = document.getElementById('change-list').hidden = !!hol;
       if (!hol) return;
       document.getElementById('hol-pick').innerHTML = weekHolidays().map(h => '<option value="' + h.p + '"' + (h.p === hol.p ? ' selected' : '') + '>' + escapeHtml(h.name) + ' &middot; ' + dayText(h.p) + '</option>').join('');
@@ -147,23 +187,43 @@
         const on = runsOn(r, hol.p), to = on ? null : movedTo(r, hol);
         const opts = '<option value=""></option>' + L.DAYS.filter(p => p !== hol.p && (!runsOn(r, p) || p === to)).map(p => '<option value="' + p + '"' + (p === to ? ' selected' : '') + '>' + dayText(p) + '</option>').join('') +
           '<option value="off"' + (to === '' ? ' selected' : '') + '>Not running</option>';
-        return '<div class="' + (on ? 'need' : 'done') + '" data-id="' + escapeHtml(r.id) + '"><span><b>' + escapeHtml(r.route) + '</b> &middot; ' + escapeHtml(r.run || r.routeName || '') + '</span><select aria-label="Move to"' + (edit ? '' : ' disabled') + '>' + opts + '</select></div>';
+        const tip = on ? suggestDay(r, hol) : '', tipText = tip ? '<small class="rw-tip">Suggested: <span>' + (tip === 'off' ? 'Not running' : dayText(tip)) + '</span></small>' : '';
+        return '<div class="' + (on ? 'need' : 'done') + '" data-id="' + escapeHtml(r.id) + '"><span><b>' + escapeHtml(r.route) + '</b> &middot; ' + escapeHtml(r.run || r.routeName || '') + tipText + '</span><select aria-label="Move to"' + (edit ? '' : ' disabled') + '>' + opts + '</select></div>';
       }).join('') || '<div class="empty">No loads run on ' + escapeHtml(hol.name) + '.</div>';
     }
 
     function toggle(r, p) {
       const on = !(r.days[p] && r.days[p].runs);
+      if (isFuture()) return planDay(r, p, on);
       return saveRunChange(getRuns, r.id, p, 'setRuns', { runs: on }, x => { x.runs = on; x.routeOverride = 'TRUE'; }, render);
+    }
+
+    // A planned week's day: shown at once, saved to the plan; a failed save puts it back and says why.
+    async function planDay(r, p, on) {
+      const w = week, was = JSON.parse(JSON.stringify(plan || { days: {}, overrideReason: '' }));
+      plan = JSON.parse(JSON.stringify(was)); plan.days = plan.days || {};
+      plan.days[r.runId] = Object.assign({}, plan.days[r.runId] || {}, { [p]: on });
+      planSaving++; render();
+      try { await save('setWeekPlan', { weekStart: w, runId: r.runId, day: p, runs: on }); }
+      catch (e) { if (week === w) { plan = was; render(); } showError('The planned day was not saved (' + (e.message || String(e)) + '). Click it again.'); throw e; }
+      finally { planSaving--; }
     }
 
     document.getElementById('rows').addEventListener('click', e => {
       const b = e.target.closest('button[data-day]');
       if (!b) return;
       const r = runs.find(x => x.id === b.closest('tr').dataset.id);
-      if (r) toggle(r, b.dataset.day);
+      if (r) Promise.resolve(toggle(r, b.dataset.day)).catch(() => {});
     });
     document.getElementById('tab-normal').onclick = () => { location.href = 'routes.html' + (week ? '?week=' + encodeURIComponent(week) : ''); };
     document.getElementById('hol-pick').onchange = (e) => { holPick = e.target.value; render(); };
+    document.getElementById('next-hol').onclick = (e) => { const w = e.currentTarget.dataset.week; if (w && weeks.indexOf(w) >= 0) setWeek(w); };
+    // Use Suggested Moves: every load still on the holiday goes to its suggested day (or Not running), one at a time.
+    document.getElementById('hol-suggest').onclick = () => {
+      const hol = holiday();
+      if (!hol || !canSave()) return;
+      shown().filter(r => runsOn(r, hol.p)).forEach(r => { const want = suggestDay(r, hol), id = r.id; holChain = holChain.then(() => movePick(id, hol, want)).catch(() => {}); });
+    };
     // Move to: the load comes off the holiday and runs on the day picked (Not running: off only). Changing it again puts
     // the old day back first; the blank choice puts the load back on the holiday. One save per day changed, as the boxes do.
     // Picks made quickly one after another are worked out one at a time, each from the load as it is shown then (a second pick
@@ -188,9 +248,11 @@
         if (want !== 'off') await setDay(id, want, true);
       } catch (err) { return; /* the save puts the day back and shows why */ }
       // The week's reason, when none is typed yet, becomes the holiday's name.
-      if (weekDoc && !weekDoc.overrideReason && !typing) {
-        weekDoc.overrideReason = hol.name; render();
-        try { await save('setWeekReason', { weekStart: week, reason: hol.name }); } catch (err) { weekDoc.overrideReason = ''; render(); showError('The week reason was not saved (' + (err.message || String(err)) + '). Type it in the Reason box.'); }
+      const rd = reasonDoc();
+      if (rd && !rd.overrideReason && !typing) {
+        if (isFuture() && !plan) plan = rd;
+        rd.overrideReason = hol.name; render();
+        try { await saveReason(hol.name); } catch (err) { rd.overrideReason = ''; render(); showError('The week reason was not saved (' + (err.message || String(err)) + '). Type it in the Reason box.'); }
       }
     }
     document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { show = b.dataset.show; render(); });
@@ -207,6 +269,11 @@
         return;
       }
       disarm();
+      if (isFuture()) {
+        const was = plan; plan = { days: {}, overrideReason: '' }; render();
+        try { await save('setWeekPlan', { weekStart: week, clear: true }); } catch (err) { plan = was; render(); showError('The plan was not cleared (' + (err.message || String(err)) + '). Try again.'); }
+        return;
+      }
       const work = [];
       shown().forEach(r => L.DAYS.forEach(p => { if (isOver(r, p)) work.push([r, p]); }));
       for (const [r, p] of work) await toggle(r, p);
@@ -215,16 +282,25 @@
     box.addEventListener('focus', () => { typing = true; });
     box.addEventListener('blur', async () => {
       typing = false;
-      const was = weekDoc && weekDoc.overrideReason || '', now = box.value.trim();
+      const doc0 = reasonDoc(), was = doc0 && doc0.overrideReason || '', now = box.value.trim();
       if (now === was) return;
-      if (weekDoc) weekDoc.overrideReason = now;
-      try { await save('setWeekReason', { weekStart: week, reason: now }); } catch (e) { if (weekDoc) weekDoc.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
+      if (isFuture() && !plan) plan = doc0;
+      if (doc0) doc0.overrideReason = now;
+      try { await saveReason(now); } catch (e) { if (doc0) doc0.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
     });
     function setWeek(w) {
       if (w !== week) { disarm(); holPick = ''; }
       week = w;
       if (stopRuns) stopRuns();
       if (stopWeek) stopWeek();
+      stopRuns = stopWeek = null;
+      if (isFuture()) {
+        // A planned week: Route Master's runs with the plan's days; the plan is read live (kept as shown while a save is out).
+        runs = []; plan = null;
+        stopWeek = onSnapshot(doc(db, 'weekPlans', week), s => { if (planSaving) return; plan = s.exists() ? s.data() : null; render(); }, e => showError('Could not read the planned week (' + e.message + '). Reload the page.'));
+        render();
+        return;
+      }
       stopRuns = onSnapshot(query(collection(db, 'runs'), where('weekStart', '==', week)), s => { runs = s.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); }, e => showError('Could not read the week (' + e.message + '). Check the network and reload the page.'));
       stopWeek = onSnapshot(doc(db, 'weeks', week), s => { weekDoc = s.exists() ? s.data() : null; render(); }, e => showError('Could not read the week reason (' + e.message + '). Reload the page.'));
       render();
@@ -235,12 +311,15 @@
     requireSignIn(async (user) => {
       db = (await start()).db;
       watchLists(user, () => {
-        const live = lists.app.liveWeeks || {}, list = [live.previous, live.current, live.next].filter(Boolean);
+        live = lists.app.liveWeeks || {};
+        const list = [live.previous, live.current, live.next].filter(Boolean);
+        // Joe 11-12-26: and every week after Next for a year, to plan ahead.
+        if (live.next) for (let k = 1; k <= PLAN_WEEKS; k++) list.push(L.addDays(live.next, 7 * k));
         if (!list.length && !week) setWeek(asked || L.weekStart(L.operatingDay(new Date())));
         if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(weeks.indexOf(asked) >= 0 ? asked : live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
         render();
       });
-      onSnapshot(collection(db, 'routes'), s => { routes = {}; s.docs.forEach(d => { const r = d.data(); routes[r.id || d.id] = r; }); render(); });
+      onSnapshot(collection(db, 'routes'), s => { routes = {}; s.docs.forEach(d => { const r = d.data(); routes[r.id || d.id] = Object.assign({ id: r.id || d.id }, r); }); render(); });
     });
   </script>
 </body>

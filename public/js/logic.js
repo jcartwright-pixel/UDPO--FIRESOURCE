@@ -1654,11 +1654,14 @@
     DAYS.forEach(function (p, i) {
       var rd = (route.days && route.days[p]) || {}, date = addDays(week, i), box = boxLoadRun(route);
       var offset = T.loadDayOffset(rd.loadDayOffset);
-      var day = { runs: box ? !!(ctx.plant && ctx.plant[route.id + '|' + date]) : !!rd.active, loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
+      // Joe 11-12-26: a day planned ahead on Route Week Override (plannedRoute) runs or not as planned, box loads too.
+      var planned = rd.planned === true || rd.planned === false;
+      var day = { runs: planned ? rd.planned : box ? !!(ctx.plant && ctx.plant[route.id + '|' + date]) : !!rd.active, loadSequence: rd.loadOrder === undefined ? null : rd.loadOrder, loadSequenceOverride: null, loadDayOffset: offset,
         deliveryDate: date, dispatchDate: date, departureDate: date, loadDate: addDays(date, offset),
         dispatchTime: rd.dispatchTime === undefined ? null : rd.dispatchTime, startTime: rd.dispatchTime === undefined ? null : rd.dispatchTime,
         routeHours: routeHours(rd.hours), miles: rd.miles === undefined ? null : rd.miles,
         driverId: '', driver: '', intendedDriverId: '', intendedDriver: '', driverExceptionStatus: '', truckId: '', truck: '', trailerId: '', trailer: '' };
+      if (planned) day.routeOverride = 'TRUE';
       if (day.runs) {
         var d = ctx.slots[route.id + '|' + p], off = d ? exceptionOn(ctx.exceptions, d.id, date) : null;
         if (d && !off) { day.driverId = d.id; day.driver = d.name; }
@@ -1672,6 +1675,33 @@
     });
     return days;
   }
+  /*
+   * Joe 11-12-26 ("I want to predetermine what the holiday week's going to run like ... not change any other until it's time"):
+   * a week planned ahead on Route Week Override, weekPlans/<week> { days: { <run ID>: { thu: false, wed: true } } }. Only the days
+   * that differ from Route Master are kept. plannedRoute is the run's Route Master row with the plan's days put over it (marked
+   * planned, so buildRunDays runs them as planned and marks them changed by hand); a day turned on that has no time of its own
+   * borrows the time, hours, miles and load day of the run's first normal day, as a one-week extra line does.
+   */
+  var PLAN_LEND = ['dispatchTime', 'hours', 'miles', 'loadDayOffset', 'tractor', 'trailer'];
+  function planDaysOf(plan, runId) { var d = plan && plan.days && plan.days[runId]; return d && typeof d === 'object' ? d : null; }
+  function plannedRoute(route, plan) {
+    var want = route && planDaysOf(plan, route.id);
+    if (!want) return route;
+    var days = route.days || {}, lend = DAYS.map(function (p) { return days[p] || {}; }).filter(function (d) { return d.active; })[0] || {};
+    var out = Object.assign({}, route, { days: {} });
+    DAYS.forEach(function (p) {
+      var d = Object.assign({}, days[p] || {});
+      if (want[p] === true || want[p] === false) {
+        d.planned = want[p];
+        if (want[p] && !d.active) PLAN_LEND.forEach(function (f) { if ((d[f] === undefined || d[f] === null || d[f] === '') && lend[f] !== undefined) d[f] = lend[f]; });
+      }
+      out.days[p] = d;
+    });
+    return out;
+  }
+  // The days of a run the plan changes, in week order.
+  function plannedDays(plan, runId) { var want = planDaysOf(plan, runId); return want ? DAYS.filter(function (p) { return want[p] === true || want[p] === false; }) : []; }
+
   // One whole run for one week, shaped like a run copied from a Live tab.
   function buildWeekRun(route, week, ctx) {
     var flag = function (v) { return v === true || v === false ? v : null; };
@@ -1896,7 +1926,7 @@
     areaAllowed: areaAllowed, pageAllowed: pageAllowed, homeChoices: homeChoices,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
-    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, bookHours: bookHours, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
+    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, bookHours: bookHours, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun, plannedRoute: plannedRoute, plannedDays: plannedDays,
     AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyCoverage: weeklyCoverage, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,

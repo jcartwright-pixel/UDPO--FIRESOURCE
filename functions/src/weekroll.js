@@ -132,20 +132,27 @@ const shortDate = L.dateText;
 async function planRoll(tx, db, live, stamp, email) {
   const weeks = { previous: live.current, current: live.next, next: L.addDays(live.next, 7) };
   const today = L.operatingDay(new Date(stamp));
-  const [nextRuns, curRuns, nextWeekSnap] = await Promise.all([tx.get(db.collection(C.runs).where('weekStart', '==', weeks.next)),
-    tx.get(db.collection(C.runs).where('weekStart', '==', weeks.current)), tx.get(db.collection(C.weeks).doc(weeks.next))]);
+  const [nextRuns, curRuns, nextWeekSnap, planSnap] = await Promise.all([tx.get(db.collection(C.runs).where('weekStart', '==', weeks.next)),
+    tx.get(db.collection(C.runs).where('weekStart', '==', weeks.current)), tx.get(db.collection(C.weeks).doc(weeks.next)), tx.get(db.collection(C.weekPlans).doc(weeks.next))]);
+  // Joe 11-12-26: the new Next week was maybe planned ahead on Route Week Override; its runs are built with those days.
+  const plan = planSnap.exists ? planSnap.data() : null;
   const m = await readMasters(tx, db, weeks.current);
 
   // The new Next week: every Route Master run not already there (a week the sheet already holds keeps its rows).
   const have = new Set(nextRuns.docs.map(s => s.data().runId)), nextCtx = contextOf(m), built = {};
   nextRuns.docs.forEach(s => bookExisting(nextCtx, s.data(), m.routes[s.data().runId]));
-  routeOrder(m.routes).forEach(route => { if (!have.has(route.id)) built[M.runDocId(weeks.next, route.id)] = runDoc(route, weeks.next, nextCtx, stamp, email); });
+  routeOrder(m.routes).forEach(route => {
+    if (have.has(route.id)) return;
+    const run = runDoc(L.plannedRoute(route, plan), weeks.next, nextCtx, stamp, email), planned = L.plannedDays(plan, route.id);
+    if (planned.length) run.plannedDays = planned;
+    built[M.runDocId(weeks.next, route.id)] = run;
+  });
 
   // The new Current week: blank drivers, trucks and trailers filled (the current app's fill-only pass).
   const curCtx = contextOf(m), fills = [];
   curRuns.docs.forEach(s => bookExisting(curCtx, s.data(), m.routes[s.data().runId]));
   curRuns.docs.forEach(s => { const run = s.data(), days = fillBlanks(run, m.routes[run.runId], curCtx, today); if (Object.keys(days).length) fills.push([s, run, days]); });
-  return { weeks, built, fills, have, nextWeekSnap, routes: m.routes, nextRuns };
+  return { weeks, built, fills, have, nextWeekSnap, routes: m.routes, nextRuns, plan };
 }
 
 /*
@@ -157,7 +164,7 @@ async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveEr
   // the write-back on, actions.js first moves the Live sheet's weeks (liveroll.js) and marks the request sheetRolled.
   if (mode.writeBack && !req.sheetRolled) throw new SaveError('NOT_ALLOWED', 'The Live sheet could not be reached from here, so the weeks were not moved. Press Publish again in a minute; if it still says this, ask the administrator.');
   if (!live.current || !live.next || L.addDays(live.current, 7) !== live.next) throw new SaveError('CHANGED', 'The Live weeks are not in order (Current ' + (live.current || '?') + ', Next ' + (live.next || '?') + '). Refresh Weekly Dispatch before publishing.');
-  const { weeks, built, fills, have, nextWeekSnap } = await planRoll(tx, db, live, stamp, email);
+  const { weeks, built, fills, have, nextWeekSnap, plan } = await planRoll(tx, db, live, stamp, email);
   if (Object.keys(built).length + fills.length + 4 > TX_WRITES) throw new SaveError('NOT_ALLOWED', 'Publish would change more than ' + TX_WRITES + ' runs at once; ask the administrator.');
 
   Object.keys(built).forEach(id => tx.set(db.collection(C.runs).doc(id), built[id]));
@@ -168,8 +175,11 @@ async function publishRoll(tx, db, req, email, stamp, logRef, mode, live, SaveEr
   // "built" is never a sheet row's fingerprint, so when the sheet holds this week the copy replaces these runs with its own rows.
   // A week the sheet copy already holds keeps its own record (the added runs stay beside its rows).
   const sheetWeek = !!nextWeek && nextWeek.sourceTab && nextWeek.sourceTab !== BUILT_TAB;
-  tx.set(db.collection(C.weeks).doc(weeks.next), sheetWeek ? { builtAt: stamp, builtBy: email } : Object.assign({ weekStart: weeks.next, sourceTab: BUILT_TAB, rowHashes: hashes, rows: have.size + Object.keys(built).length, builtAt: stamp, builtBy: email },
-    nextWeek ? {} : { publishedAt: '', publishedBy: '' }), { merge: true });
+  // The plan's reason becomes the week's reason (Route Week Override's box), unless the week already has one.
+  const planReason = plan && plan.overrideReason && !(nextWeek && nextWeek.overrideReason) ? { overrideReason: plan.overrideReason, overrideReasonBy: plan.updatedBy || email, overrideReasonAt: stamp } : {};
+  tx.set(db.collection(C.weeks).doc(weeks.next), Object.assign(sheetWeek ? { builtAt: stamp, builtBy: email } : Object.assign({ weekStart: weeks.next, sourceTab: BUILT_TAB, rowHashes: hashes, rows: have.size + Object.keys(built).length, builtAt: stamp, builtBy: email },
+    nextWeek ? {} : { publishedAt: '', publishedBy: '' }), planReason), { merge: true });
+  if (plan) tx.set(db.collection(C.weekPlans).doc(weeks.next), { usedAt: stamp, usedBy: email }, { merge: true });
   tx.set(db.collection(C.weeks).doc(weeks.current), { weekStart: weeks.current, publishedAt: stamp, publishedBy: email }, { merge: true });
   tx.set(db.collection(C.config).doc('app'), { liveWeeks: weeks, weekRoll: Object.assign({}, weeks, { at: stamp, by: email, before: live }) }, { merge: true });
   const filled = fills.reduce((n, f) => n + Object.keys(f[2]).length, 0);
