@@ -25,11 +25,11 @@
     <div class="notice error" id="error" hidden></div>
     <div class="head"><div class="title"><span class="eyebrow">United Dairy Hub &middot; Administration</span><h1>Address Check</h1></div></div>
     <div class="keys">
-      <p class="muted">Every customer's address is looked up on the map once, and again when it changes. The ones below need a look: the address was not found or only partly matched, it is far from the customer's own map point, it is far from the DC that serves it, or it is a PO box. Fix the address in Customers &amp; Routes.</p>
+      <p class="muted">Every customer's address is looked up on the map once, and again when it changes. The ones below need a look: the address was not found or only partly matched, it is far from the customer's own map point, it is far from the DC that serves it, or it is a PO box. When the hub finds a better address at the customer's map point, it shows it here and sends it to Customer Changes; approve it there and it writes over the old address.</p>
       <div class="lc-bar"><label>Plant <select id="plant" aria-label="Plant"><option value="">Every plant</option></select></label>
         <label>Find <input id="find" type="search" placeholder="Name, account or address" aria-label="Find"></label></div>
       <p id="counts" class="muted"></p>
-      <div class="table-wrap"><table class="lc-table" id="list"><thead><tr><th>Customer</th><th>Account</th><th>DC</th><th>Address</th><th>Why</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table class="lc-table" id="list"><thead><tr><th>Customer</th><th>Account</th><th>DC</th><th>Address</th><th>Better address</th><th>Why</th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
   <script type="module">import { requireSignIn } from './js/shell.js';
