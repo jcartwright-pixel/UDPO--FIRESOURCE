@@ -32,7 +32,8 @@ const COLLECTIONS = Object.freeze({
   // Joe 10/31: each plant's Employees list, brought over from UDMS (src/employees.js).
   employees: 'employees',
   // Joe 11-12-26: weeks planned ahead on Route Week Override (app only; used when Publish builds that week).
-  weekPlans: 'weekPlans'
+  weekPlans: 'weekPlans',
+  weekStopMoves: 'weekStopMoves'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });

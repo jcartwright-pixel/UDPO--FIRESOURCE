@@ -402,6 +402,15 @@ exports.save = onCall({ timeoutSeconds: 120 }, async (request) => {
       const days = await BOL.recentDays(cdb, request.data.max);
       return { days, hub: days.length ? null : await BOL.hubCheck(cdb) };
     }
+    // Asking, not saving (Joe 11-13-26, mock-up ll): Route Week Override's Move Stops for This Week: the normal week's stops from
+    // the Hub with their last 3 weeks of cases, Joe's case limits and the week's saved changes. Only for someone who may save them.
+    if (request.data && request.data.holidayStops === true) {
+      const allowed = await checkSaves(db, user, ['setWeekStopMoves'], request.data.facilityId);
+      if (!allowed.setWeekStopMoves) throw new HttpsError('permission-denied', 'You may not change this week\'s stops');
+      const weekStart = String(request.data.weekStart || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) throw new HttpsError('invalid-argument', 'Pick the week');
+      return require('./src/weekstops').weekStops(db, PLANTS.companyDb(db), PLANTS.plantOf(request.data), weekStart);
+    }
     // Asking, not saving: the plant's people's names, for Case Unloading's "Unloaded By" (names only).
     if (request.data && request.data.plantNames === true) return { names: await require('./src/crew').plantNames(db, PLANTS.plantOf(Object.assign({}, request.data, { udPlant: user.station ? user.station.facilityId : '' }))) };
     // Local test database only: a browser test can set the server's clock (?testNow) to its made-up day.

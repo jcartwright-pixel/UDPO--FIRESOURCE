@@ -36,7 +36,7 @@ const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily'
 const { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, deleteDriver, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
-const { reorderWeek, publishWeek, setWeekReason, setWeekPlan, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
+const { reorderWeek, publishWeek, setWeekReason, setWeekPlan, setWeekStopMoves, saveHolidayStopRules, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
 const LIVEROLL = require('./liveroll');
 const { saveOtr, otrColumnKey } = require('./actions-otr');
 
@@ -87,6 +87,9 @@ const ACTIONS = Object.freeze({
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   // Joe 11-12-26: Route Week Override plans a week after Next ahead of time (weekPlans; used when Publish builds that week).
   setWeekPlan: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  // Joe 11-13-26 (mock-up ll): Move Stops for This Week: the week's stop changes, and the case limits behind them.
+  setWeekStopMoves: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  saveHolidayStopRules: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   // Joe 10/23 (two Venturas one day): a second line for a run, this week only (not in Route Master), and taking it off again.
   addExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   removeExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
@@ -515,6 +518,24 @@ function validate(input) {
     if (!out.runDocId) throw new SaveError('BAD_REQUEST', 'Pick the run');
     return out;
   }
+  if (action === 'setWeekStopMoves') {
+    if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
+    out.weekStart = input.weekStart;
+    if (input.clear === true) { out.clear = true; return out; }
+    out.changes = require('./holiday-stops').cleanChanges(input.changes);
+    if (!out.changes) throw new SaveError('BAD_REQUEST', 'Each change needs its route, customer, day and where it goes');
+    out.rules = require('./holiday-stops').rules(input.rules);
+    return out;
+  }
+  if (action === 'saveHolidayStopRules') {
+    const H = require('./holiday-stops');
+    for (const k of H.RULE_KEYS) {
+      const v = Number(input[k]);
+      if (input[k] === undefined || input[k] === null || String(input[k]).trim() === '' || !isFinite(v) || v < 0 || v > 9999) throw new SaveError('BAD_REQUEST', 'Type a number of cases from 0 to 9999 in every box');
+    }
+    out.rules = H.rules(input);
+    return out;
+  }
   if (action === 'setWeekPlan') {
     if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
     out.weekStart = input.weekStart;
@@ -927,6 +948,8 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekPlan') return setWeekPlan(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setWeekStopMoves') return setWeekStopMoves(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'saveHolidayStopRules') return saveHolidayStopRules(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'addExtraRun') return addExtraRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'removeExtraRun') return removeExtraRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);
