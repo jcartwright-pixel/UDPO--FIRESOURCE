@@ -428,6 +428,24 @@ test('Weekly: a sleeper run counts the 10-hour sleeper break and holds its drive
   assert.equal(board[0].days.tue.kind, 'booked');
 });
 
+test('Daily trucks and trailers, and the week build: a sleeper is out for the 10-hour sleeper break, into the next day (Joe 11-12-26)', () => {
+  // 852 delivers Tuesday 11-17-26, leaves 1:00 PM for 14 hours on truck 501: back Wednesday 1:00 PM with the break.
+  const s852 = { id: 's', route: '852', runId: 'r852', deliveryDate: '2026-11-17', dispatchTime: 13 * 60, routeHours: 14, truckId: '501' };
+  const sleeperFor = (r) => r.runId === 'r852';
+  const sameDay = { id: 't', route: '822', deliveryDate: '2026-11-17', dispatchTime: 13 * 60 + 30, routeHours: 2 };
+  assert.deepEqual(L.unitConflicts([s852, sameDay], sameDay, 'truck', null, sleeperFor), { 501: 'ON ROAD UNTIL WED 1:00 PM (852)' });
+  // Wednesday: a 6:00 AM run cannot have 501; a 1:30 PM run can. Without the Sleeper tick it is back 3:00 AM.
+  const wedEarly = { id: 'u', route: '844', deliveryDate: '2026-11-18', dispatchTime: 6 * 60, routeHours: 8 };
+  const wedLate = { id: 'v', route: '845', deliveryDate: '2026-11-18', dispatchTime: 13 * 60 + 30, routeHours: 8 };
+  assert.deepEqual(L.unitConflicts([s852, wedEarly], wedEarly, 'truck', null, sleeperFor), { 501: 'ON ROAD UNTIL 1:00 PM (852)' });
+  assert.deepEqual(L.unitConflicts([s852, wedLate], wedLate, 'truck', null, sleeperFor), {});
+  assert.deepEqual(L.unitConflicts([s852, wedEarly], wedEarly, 'truck', null, () => false), {});
+  // Booking standard trucks for the week: 14 route hours on a sleeper route book 24.
+  assert.equal(L.bookHours(14, { sleeper: true }), 24);
+  assert.equal(L.bookHours(14, { sleeper: false }), 14);
+  assert.equal(L.bookHours(null, { sleeper: true }), null);
+});
+
 test('Weekly: a driver on two runs is pink only when their times on the road overlap; Load 1 and Load 2 of one route never (Joe 11-6-26)', () => {
   const day = (o) => Object.fromEntries(L.DAYS.map((p, i) => [p, Object.assign({ date: L.addDays('2026-11-08', i), runs: false }, p === 'wed' ? o : {})]));
   // Times as the Live week keeps them: dispatch in minutes of the day, route hours.

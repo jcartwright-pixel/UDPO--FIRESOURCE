@@ -190,6 +190,8 @@ Administrators see a short line under the buttons: **Texts not sent**, or once t
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
 
+A truck or trailer on a **sleeper route** (Sleeper ticked in Route Master) is on the road its route hours **plus the 10-hour sleeper break**, so one leaving at 1:00 PM for 14 hours shows **ON ROAD UNTIL WED 1:00 PM** and is not offered the next day until it is back.
+
 In the driver list, OVR also offers drivers who are off that day. Inactive drivers are never in the list, OVR or not. To use one, make them Active on the [Driver Roster](#drivers) first.
 
 The lists show only this plant's units, using the plant the fleet list gives each one. A few trailers the fleet list puts at another plant (533, 824, 876 and 950) are counted as Uniontown's. If a trailer you use is missing from the list, check its location on the fleet list.

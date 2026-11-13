@@ -63,12 +63,13 @@ function routeOrder(routes) {
 }
 
 // The units already on a week's runs are booked first, so a filled blank never doubles them up.
-function bookExisting(ctx, run) {
+function bookExisting(ctx, run, route) {
   L.DAYS.forEach(p => {
     const d = run.days && run.days[p];
     if (!d || !d.runs) return;
-    if (d.truckId || d.truck) L.bookUnit(ctx, p, 'TRUCK', d.truckId || d.truck, d.dispatchTime, d.routeHours);
-    if (d.trailerId || d.trailer) L.bookUnit(ctx, p, 'TRAILER', d.trailerId || d.trailer, d.dispatchTime, d.routeHours);
+    // Joe 11-12-26: a sleeper route's truck and trailer are out for the 10-hour sleeper break too.
+    if (d.truckId || d.truck) L.bookUnit(ctx, p, 'TRUCK', d.truckId || d.truck, d.dispatchTime, L.bookHours(d.routeHours, route));
+    if (d.trailerId || d.trailer) L.bookUnit(ctx, p, 'TRAILER', d.trailerId || d.trailer, d.dispatchTime, L.bookHours(d.routeHours, route));
   });
 }
 
@@ -95,11 +96,11 @@ function fillBlanks(run, route, ctx, today) {
     }
     if (!d.truck && !d.truckId) {
       const own = driverId && ctx.driversById[driverId] ? ctx.findUnit(ctx.driversById[driverId].defaultTruckId, 'TRUCK') : null, t = own || ctx.findUnit(rd.tractor, 'TRUCK');
-      if (t && L.bookUnit(ctx, p, 'TRUCK', t.id, d.dispatchTime, d.routeHours)) Object.assign(want, { truckId: t.id, truck: t.unit });
+      if (t && L.bookUnit(ctx, p, 'TRUCK', t.id, d.dispatchTime, L.bookHours(d.routeHours, route))) Object.assign(want, { truckId: t.id, truck: t.unit });
     }
     if (!d.trailer && !d.trailerId) {
       const t = ctx.findUnit(rd.trailer, 'TRAILER');
-      if (t && L.bookUnit(ctx, p, 'TRAILER', t.id, d.dispatchTime, d.routeHours)) Object.assign(want, { trailerId: t.id, trailer: t.unit });
+      if (t && L.bookUnit(ctx, p, 'TRAILER', t.id, d.dispatchTime, L.bookHours(d.routeHours, route))) Object.assign(want, { trailerId: t.id, trailer: t.unit });
     }
     if (Object.keys(want).length) out[p] = want;
   });
@@ -137,12 +138,12 @@ async function planRoll(tx, db, live, stamp, email) {
 
   // The new Next week: every Route Master run not already there (a week the sheet already holds keeps its rows).
   const have = new Set(nextRuns.docs.map(s => s.data().runId)), nextCtx = contextOf(m), built = {};
-  nextRuns.docs.forEach(s => bookExisting(nextCtx, s.data()));
+  nextRuns.docs.forEach(s => bookExisting(nextCtx, s.data(), m.routes[s.data().runId]));
   routeOrder(m.routes).forEach(route => { if (!have.has(route.id)) built[M.runDocId(weeks.next, route.id)] = runDoc(route, weeks.next, nextCtx, stamp, email); });
 
   // The new Current week: blank drivers, trucks and trailers filled (the current app's fill-only pass).
   const curCtx = contextOf(m), fills = [];
-  curRuns.docs.forEach(s => bookExisting(curCtx, s.data()));
+  curRuns.docs.forEach(s => bookExisting(curCtx, s.data(), m.routes[s.data().runId]));
   curRuns.docs.forEach(s => { const run = s.data(), days = fillBlanks(run, m.routes[run.runId], curCtx, today); if (Object.keys(days).length) fills.push([s, run, days]); });
   return { weeks, built, fills, have, nextWeekSnap, routes: m.routes, nextRuns };
 }

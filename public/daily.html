@@ -327,8 +327,10 @@
 
     // Joe 10/10: trucks and trailers on the road on another run at the same time (or down) are left out of the list
     // unless OVR is ticked; with OVR they show why. Route Master's hours stand in when the Live row has none.
-    let routeHours = {};
+    let routeHours = {}, routeSleeper = {};
     const rmHours = (r) => { const d = routeHours[r.runId]; return d && d[r.day]; };
+    // Joe 11-12-26: a sleeper route's truck and trailer are out for its route hours plus the 10-hour sleeper break.
+    const rmSleeper = (r) => !!routeSleeper[r.runId];
     // Every load delivered the same day as this row, whichever day it loaded (the sheet shows only the loadout day's loads,
     // but a unit out on a load from the day before is still in use).
     // Joe 10/12: "that day" is the loadout day too: a unit on any load on this loadout sheet (855 / 856 deliver Monday but load
@@ -358,7 +360,10 @@
       const out = {}, key = kind === 'truck' ? 'truckId' : 'trailerId';
       // Joe 10/12: a driver on two loads that day keeps his truck on both, so his own other loads do not block it.
       day.forEach(r => { if (r !== row && !r.off && r[key] && !out[r[key]] && !(kind === 'truck' && r.driverId && r.driverId === row.driverId)) out[r[key]] = 'ON ' + routeNo(r); });
-      return Object.assign(out, L.unitConflicts(day, row, kind, rmHours));
+      // The day before's loads too, for a sleeper still out after midnight (only its time on the road counts, not the day).
+      const prev = L.addDays(row.deliveryDate, -1), before = [];
+      for (let k = 1; k <= 4; k++) L.dailyRows(runs, L.addDays(row.deliveryDate, -k)).forEach(r => { if (r.deliveryDate === prev && !before.some(x => x.id === r.id)) before.push(rows.find(x => x.id === r.id) || r); });
+      return Object.assign(out, L.unitConflicts(day.concat(before.filter(r => !day.some(x => x.id === r.id))), row, kind, rmHours, rmSleeper));
     }
     const pickOpts = (kind, row) => ({ override: !!ovr[row.id], date: row.deliveryDate, conflicts: kind === 'truck' || kind === 'trailer' ? unitBlocks(kind, row) : null });
 
@@ -735,8 +740,8 @@
       // Joe 10/31 (hx): Send Schedule Texts for the posted week (whatever week or day is showing).
       sendTextsStrip(db, document.getElementById('send-texts'), { short: true });
       onSnapshot(collection(db, 'routes'), snap => {
-        routeHours = {};
-        snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; });
+        routeHours = {}; routeSleeper = {};
+        snap.docs.forEach(d => { const r = d.data(), h = {}; L.DAYS.forEach(p => { h[p] = r.days && r.days[p] && r.days[p].hours; }); routeHours[d.id] = h; if (L.yes(r.sleeper)) routeSleeper[d.id] = true; });
       }, () => {});
       onSnapshot(doc(db, 'config', 'app'), snap => {
         const c = snap.data() || {};

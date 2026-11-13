@@ -842,18 +842,35 @@
    * row, e.g. "ON ROAD UNTIL 2:00 PM (802)". kind: 'truck' | 'trailer'. hoursFor(row) gives Route Master hours when the
    * Live row has none.
    */
-  function unitConflicts(rows, target, kind, hoursFor) {
-    var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
+  // Joe 11-12-26 (every sleeper run): sleeperFor(row) says the row's route has Sleeper ticked in Route Master; its time on the road
+  // then adds the 10-hour sleeper break, and a unit on a sleeper delivering the day before stays taken until it is back.
+  function unitConflicts(rows, target, kind, hoursFor, sleeperFor) {
+    var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, tol = 15;
+    var windowOf = function (r) { var w = runWindow(r, hoursFor); if (w.end !== null && sleeperFor && sleeperFor(r)) w.end += SLEEPER_BREAK_HOURS * 60; return w; };
+    var mine = windowOf(target), dayBefore = target.deliveryDate ? addDays(target.deliveryDate, -1) : '';
     rows.forEach(function (r) {
-      if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      if (r === target || r.off || !r[key] || out[r[key]]) return;
+      var cross = !!dayBefore && r.deliveryDate === dayBefore;
+      if (r.deliveryDate !== target.deliveryDate && !cross) return;
       if (kind === 'truck' && r.driverId && r.driverId === target.driverId) return; // his own other load that day (Joe 10/12)
-      var w = runWindow(r, hoursFor), busy;
-      if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
+      var w = windowOf(r), busy;
+      if (cross) {
+        // The day before: only a known return after midnight counts.
+        if (w.start === null || w.end === null || w.end <= 1440 || mine.start === null) return;
+        w = { start: w.start - 1440, end: w.end - 1440 };
+        busy = mine.start < w.end - tol;
+      } else if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
       else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
-      if (busy) out[r[key]] = 'ON ROAD' + (w.end !== null ? ' UNTIL ' + timeText(w.end % 1440) : ' \u2014 RETURN UNKNOWN') + ' (' + r.route + ')';
+      if (busy) out[r[key]] = 'ON ROAD' + (w.end !== null ? ' UNTIL ' + untilText(w.end, DAYS[(new Date(target.deliveryDate + 'T12:00:00Z')).getUTCDay()]) : ' \u2014 RETURN UNKNOWN') + ' (' + r.route + ')';
     });
     return out;
   }
+  // Route hours with the 10-hour sleeper break for a sleeper route (Joe 11-12-26), for booking a truck or trailer.
+  function bookHours(hours, route) {
+    var h = Number(hours);
+    return route && yes(route.sleeper) && h > 0 ? h + SLEEPER_BREAK_HOURS : hours;
+  }
+
 
   // A leased unit (the fleet sync writes "Lease: Idealease" into the External Fleet text): not on Fleet Service (Joe 10/10).
   function unitLeased(unit) {
@@ -1648,8 +1665,8 @@
         if (d && off) { day.intendedDriverId = d.id; day.intendedDriver = d.name; day.driverExceptionStatus = off.reasonCode || exceptionLabel(off); }
         var own = day.driverId && ctx.driversById[day.driverId] ? ctx.findUnit(ctx.driversById[day.driverId].defaultTruckId, 'TRUCK') : null;
         var truck = own || ctx.findUnit(rd.tractor, 'TRUCK'), trailer = ctx.findUnit(rd.trailer, 'TRAILER');
-        if (truck && bookUnit(ctx, p, 'TRUCK', truck.id, day.dispatchTime, day.routeHours)) { day.truckId = truck.id; day.truck = truck.unit; }
-        if (trailer && bookUnit(ctx, p, 'TRAILER', trailer.id, day.dispatchTime, day.routeHours)) { day.trailerId = trailer.id; day.trailer = trailer.unit; }
+        if (truck && bookUnit(ctx, p, 'TRUCK', truck.id, day.dispatchTime, bookHours(day.routeHours, route))) { day.truckId = truck.id; day.truck = truck.unit; }
+        if (trailer && bookUnit(ctx, p, 'TRAILER', trailer.id, day.dispatchTime, bookHours(day.routeHours, route))) { day.trailerId = trailer.id; day.trailer = trailer.unit; }
       }
       days[p] = day;
     });
@@ -1879,7 +1896,7 @@
     areaAllowed: areaAllowed, pageAllowed: pageAllowed, homeChoices: homeChoices,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
-    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
+    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, bookHours: bookHours, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyCoverage: weeklyCoverage, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
