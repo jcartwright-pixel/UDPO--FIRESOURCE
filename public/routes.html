@@ -54,7 +54,7 @@
       <button type="button" id="refresh" title="The list is live; this only redraws it">Refresh</button>
       <button type="button" class="primary" id="add-route">+ Add Route</button>
       <button type="button" class="primary" id="add-run">+ Add Run / Destination</button>
-      <a class="button" href="routeweek.html" id="to-holiday" title="Change which days routes run for one week only (holidays)">Holiday Week Editor</a>
+      <a class="button" href="routeweek.html" id="to-holiday" title="Change which days routes run in a holiday week">Holiday Week Override</a>
     </div>
     <div class="notice error" id="error" hidden></div>
     <div class="recap-totals" id="recap-totals" hidden></div>
@@ -108,7 +108,7 @@
       weekseq: ['Weekly Order', 'The runs on Weekly Dispatch in its line order. Drag a whole run line to its place (or Alt+Up / Alt+Down); Weekly shows the new order this week and next. Saved as you move it.'],
       names: ['Route Names', 'Every name a run has in Route Master. The route number is locked; click any white box, type, then press Enter or click away to save.'],
       many: ['Route Details', 'Run settings for every run shown (pick a route at the top for just its runs). Each box and list saves the moment you change it.'],
-      days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays and one-week changes: Holiday Week Editor.'],
+      days: ['Route Days', 'Click RUNS / DOES NOT RUN to change the normal week. Edit Route opens every setting for a run. Holidays: Holiday Week Override.'],
       details: ['Route Editor', 'Every setting for one run, and its normal week day by day. Each box and list saves the moment you change it.'],
       recap: ['Route Recap', 'Current route and run summary.'],
       rules: ['Show / Hide Rules', 'The same rules as the current app. Each YES / NO is the Route Master setting; click to flip it. A blank cell counts as NO (a run with a blank Active is inactive). Only Weekly looks further: when Route Master\'s Show Weekly is blank, this week\'s Live row decides.']

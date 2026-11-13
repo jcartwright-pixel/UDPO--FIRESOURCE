@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Browser check of planning a holiday week ahead on Route Week Override (Joe 11-12-26: "I want to predetermine what the holiday
+ * Browser check of planning a holiday week ahead on Holiday Week Override (Joe 11-12-26: "I want to predetermine what the holiday
  * week's going to run like. So I need to be able to switch it forward, and it actually has to know what holiday is"). The arrows
  * go past the Live Next week; a week after it shows Route Master's runs, names its holiday, suggests a day for each holiday load,
  * and every change is saved to that week's plan only (weekPlans), never to a Live week's runs.
@@ -102,6 +102,11 @@ async function openPage(browser, width, height, url) {
     await p.waitForFunction((s) => { const b = document.querySelector(s); return b && b.textContent.includes('RUNS') && b.classList.contains('over'); }, cell(3, 'sun'), { timeout: 10000 });
     assert.equal(await p.textContent(cell(0, 'sat')), '✓ RUNS');
     results.push('A clicked day saves to the plan and is still there after a reload');
+
+    // Joe 11-13-26: Weekly Dispatch's look at that week shows the plan.
+    await p.goto(HOSTING + '/weekly.html?week=' + PLANNED + '&testEmail=manager.test@uniteddairy.com');
+    await p.waitForFunction(() => /with its Holiday Week Override plan \(Thanksgiving\)/.test(document.getElementById('wk-note').textContent), null, { timeout: 15000 });
+    results.push('Weekly Dispatch shows the planned week with its Holiday Week Override plan');
     assert.deepEqual(p.errors, []);
     await p.close();
   } finally {

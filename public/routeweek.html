@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#074c84">
   <link rel="icon" href="img/app-icon/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="img/app-icon/apple-touch-icon.png">
-  <title>Route Week Override · Operations</title>
+  <title>Holiday Week Override · Operations</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/routeweek.css">
   <script src="js/timing-rules.js"></script>
@@ -17,7 +17,7 @@
 </head>
 <body class="fill routeweek-page">
   <div class="signin" id="signin" hidden>
-    <h1>Route Week Override</h1>
+    <h1>Holiday Week Override</h1>
     <p>Sign in with your United Dairy Google account.</p>
     <button id="signin-button" type="button">Sign in with Google</button>
     <div class="notice error" id="signin-error" hidden></div>
@@ -29,7 +29,7 @@
       <button id="signout" type="button">Sign out</button>
     </div>
     <div class="head">
-      <div class="title"><h1>Route Week Override</h1><small>Which days each route runs this one week; the normal week stays in Route Master</small></div>
+      <div class="title"><h1>Holiday Week Override</h1><small>Which days each route runs in a holiday week; the normal week stays in Route Master</small></div>
       <!-- Joe 10/28: the same two tabs as Route Days: Normal Week opens Route Days, Holiday Week is this screen. -->
       <div class="tabs week-tabs" role="tablist" aria-label="Which week">
         <button type="button" role="tab" aria-selected="false" id="tab-normal">Normal Week</button>
@@ -175,6 +175,9 @@
     }
     // Joe 11-12-26 ("it should show and try to predetermine what we're going to do with it"): where a load on the holiday
     // could go: the nearest day of that week the route does not run and that is not a holiday too, the day before first.
+    // Joe 11-13-26 ("say holiday week override ... the only thing it does is for a holiday"): opened from the menu, the screen
+    // goes straight to the next holiday's week.
+    function holidayWeek() { const nh = nextHoliday(), w = nh ? L.weekStart(nh.key) : ''; return weeks.indexOf(w) >= 0 ? w : ''; }
     function suggestDay(r, hol) {
       const i = L.DAYS.indexOf(hol.p), off = new Set(weekHolidays().map(h => h.p)), order = [];
       for (let k = 1; k < 7; k++) { if (i - k >= 0) order.push(L.DAYS[i - k]); if (i + k < 7) order.push(L.DAYS[i + k]); }
@@ -622,7 +625,7 @@
         // Joe 11-12-26: and every week after Next for a year, to plan ahead.
         if (live.next) for (let k = 1; k <= PLAN_WEEKS; k++) list.push(L.addDays(live.next, 7 * k));
         if (!list.length && !week) setWeek(asked || L.weekStart(L.operatingDay(new Date())));
-        if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(weeks.indexOf(asked) >= 0 ? asked : live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
+        if (list.length && list.join() !== weeks.join()) { weeks = list; if (!week || weeks.indexOf(week) < 0) setWeek(weeks.indexOf(asked) >= 0 ? asked : holidayWeek() || live.next || live.current || L.weekStart(L.operatingDay(new Date()))); }
         render();
       });
       onSnapshot(collection(db, 'routes'), s => { routes = {}; s.docs.forEach(d => { const r = d.data(); routes[r.id || d.id] = Object.assign({ id: r.id || d.id }, r); }); render(); });

@@ -239,6 +239,8 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 
 > A week after the Live Next week can be looked at, but not changed, until the week before it is published.
 
+- A week after the Live Next week that was planned on [Holiday Week Override](#routeweek) shows its planned days (for example Thanksgiving loads moved to Wednesday), and the note at the top says so.
+
 > If a box is pink and the times look wrong, fix the leave time or route hours in Route Master. With no hours, the app cannot tell when the run is back, so it stays pink.
 
 !> Do not press Reset Week to fix one driver. It rebuilds the whole week. Change the one box instead.
@@ -291,20 +293,20 @@ The list at the top picks the view: Start Times, Mileage, Hours and Return, Load
 - **Daily Order** and **Weekly Order:** grab a line and drag it up or down.
 - `+ Add Route` adds a new route; `+ Add Run / Destination` adds a run under a route.
 - `Edit Route` opens the full form for one run.
-- `Holiday Week Editor` opens Route Week Override.
-- On **Days and Visibility** (Route Days) two tabs sit at the top: `Normal Week` (this screen, every week) and `Holiday Week` (Route Week Override, one week only). Both can be changed.
+- `Holiday Week Override` opens the Holiday Week Override screen.
+- On **Days and Visibility** (Route Days) two tabs sit at the top: `Normal Week` (this screen, every week) and `Holiday Week` (Holiday Week Override, a holiday week only). Both can be changed.
 
 > The Day box is the delivery day.
 
-!> Do not make a route inactive to skip one week. Use Route Week Override for one week; the normal week stays as it is.
+!> Do not make a route inactive to skip one week. Use Holiday Week Override for a holiday week; the normal week stays as it is.
 
-## Route Week Override
+## Holiday Week Override
 id: routeweek
 screens: routeweek.html
 
-Which days each route runs for **one week only** (a holiday week, for example). The normal week stays in Route Master.
+Which days each route runs in a **holiday week**. The normal week stays in Route Master.
 
-1. Pick the week with the arrows. You can go forward up to a year, to plan a holiday week ahead.
+1. The screen opens on the next holiday's week (for example Thanksgiving). Pick another week with the arrows; you can go forward up to a year.
 2. Click a route's day to turn it on or off for this week. Each click saves at once.
 3. Pick the **Holiday this week** if there is one, and type a **Reason for this week's changes**.
 

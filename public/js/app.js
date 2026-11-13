@@ -139,7 +139,7 @@ export const ICON = {
 };
 export const MENU = [
   ['', [['Home', 'index.html', 'home']]],
-  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch Template', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Route Week Override', 'routeweek.html', 'swap']]],
+  ['Dispatch', [['Daily Dispatch', 'daily.html', 'day'], ['Weekly Dispatch Template', 'weekly.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Route Editor', 'routes.html', 'map'], ['Holiday Week Override', 'routeweek.html', 'swap']]],
   // Joe 10/10: assigning drivers their routes has a plain link here (it came off the Route Editor); the board is under Dispatch too.
   ['Drivers', [['Driver Roster', 'drivers.html', 'people'], ['Driver Weekly Template (assign routes)', 'template.html', 'week'], ['Driver Assignment Board', 'weekly.html#board', 'people'], ['Vacation Schedule', 'vacations.html', 'vacation']]],
   // Joe 10/10: the maintenance side starts on the Fleet & Maintenance hub and branches out from there, as in the current app.
