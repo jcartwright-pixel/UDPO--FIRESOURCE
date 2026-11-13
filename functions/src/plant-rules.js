@@ -171,7 +171,9 @@
     { key: 'raw', name: 'Raw Milk', kinds: ['Raw Milk'], areas: ['Silos', 'Tankers'] },
     { key: 'milk', name: 'Cooler', kinds: [MILK_KIND], areas: ['Cooler', 'Freezer', 'Dock'] },
     { key: 'supplies', name: 'Plant Supplies', kinds: ['Ingredient', 'Packaging', 'Chemical', 'Other'],
-      areas: ['Dry Storage', 'Cardboard & Cases', 'Packaging', 'Chemicals', 'Lab & Quality', 'Totes, Crates & Pallets', 'Freezer'] },
+      // Joe 11-11-26: dry storage is in trailers, each carrying one kind of thing (a jug trailer has just jugs).
+      areas: ['Dry Storage', 'Jug Trailers', 'Cap Trailers', 'Cardboard Trailers', 'Crate Trailers', 'Label Trailers', 'Cardboard & Cases', 'Packaging', 'Chemicals',
+        'Lab & Quality', 'Totes, Crates & Pallets', 'Freezer'] },
     { key: 'maint', name: 'Maintenance', kinds: ['Maintenance Part', 'Safety'], areas: ['Parts Room', 'Filters & Oils', 'Safety Gear', 'Shop'] }
   ];
   var MAX_AREA = 40, MAX_SPOT = 40, MAX_COUNT_WALK = 300;

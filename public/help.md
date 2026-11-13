@@ -1060,26 +1060,26 @@ The plant's own list of suppliers and everything they send: ingredients, packagi
 id: inventory
 screens: inventory.html
 
-Everything the plant keeps, in **four inventories**, each its own tab at the top: **Raw Milk**, **Cooler** (our own milk products), **Plant Supplies** (ingredients, cardboard, packaging, chemicals, lab supplies, totes and pallets) and **Maintenance** (parts, filters, oils and safety gear). Everyone in the plant can open it. Every change goes through here, and each one is a line in **History**.
+Everything the plant keeps, in **four inventories**, each a category under the buttons at the top: **Raw Milk**, **Cooler** (our own milk products), **Plant Supplies** (ingredients, cardboard, packaging, chemicals, lab supplies, totes and pallets) and **Maintenance** (parts, filters, oils and safety gear). Everyone in the plant can open it. Every change goes through here, and each one is a line in **History**.
 
 Inventory opens in **its own window** (a new tab) from the menu, from the Shipping & Receiving card and from the Hub, so it can stay open beside the other screens. Its menu lists only Inventory's screens.
 
-- Inventory opens on **Lists** (see below). The menu's Plant Supplies, Raw Milk, Cooler and Maintenance open straight to that inventory.
+- The buttons run in **one row across the top**: `On Hand`, `Count Walk`, `Receiving Log`, `History`, the red `Low stock` when something is low, `Edit products` and `Print`.
+- Under them are the **categories**: **Raw Milk**, **Cooler**, **Plant Supplies**, **Maintenance** and **My Lists**, each with how many products it has (and how many are low, in red). Press one and only its products show below.
+- Inventory opens on **On Hand**, Plant Supplies. The menu's Plant Supplies, Raw Milk, Cooler and Maintenance open straight to that category.
 - A product's **kind** decides which inventory it is in: Raw Milk; Milk Product (Cooler); Ingredient, Packaging, Chemical or Other (Plant Supplies); Maintenance Part or Safety (Maintenance).
 - **On Hand** lists each product: where it is kept (its **area** and spot, under its name), its supplier, what it is counted in, the **last count** and when, what was **received since**, what was **used since**, **Should have** and its **Low at** number.
 - **Should have** is the last count, plus what was received since, minus what was taken out since.
 - Stock comes **in** when a load is marked received on Receiving, or when the Boxing tablet presses `RECEIVED` on a delivery it scanned.
 - Stock goes **out** with `Take out` here, with the **Take Out** tab on the Boxing tablet, and by itself when the Production Lines count milk products made (see Cooler).
 
-### Lists: see only the part you want
+### Categories: see only the part you want
 
-Every product is on **one product list**. The **Lists** tab, where Inventory opens, shows it in parts, a card for each, with how many products are on it and how many are low (in red):
+Every product is on **one product list**. The categories under the top buttons show it in parts:
 
-- Each inventory (**All Raw Milk**, **All Cooler**, **All Plant Supplies**, **All Maintenance**), and the kinds in it: **Ingredients**, **Packaging**, **Chemicals** and **Other supplies** in Plant Supplies; **Parts** and **Safety gear** in Maintenance.
-- **My lists**: the plant's own lists, for example CAPS, LABELS or BOXES. A list is there as long as a product is on it.
-
-1. Press a card. **On Hand** opens showing only that list.
-2. On one of your own lists, the blue `List: ... · Show all` button at the top goes back to the whole inventory.
+1. Press a category: **Raw Milk**, **Cooler**, **Plant Supplies**, **Maintenance** or **My Lists**. Its products show below.
+2. Under Plant Supplies and Maintenance, a row of smaller buttons narrows it to one kind: **Ingredients**, **Packaging**, **Chemicals** and **Other supplies**; **Parts** and **Safety gear**. `All ...` shows the whole category again.
+3. Under **My Lists**, the plant's own lists show, for example CAPS, LABELS or BOXES. Press one to see only it, or `All my lists`. A list is there as long as a product is on it.
 
 To put a product on one of your own lists:
 
@@ -1111,6 +1111,8 @@ To put a product on one of your own lists:
 - Press `Area` on a product's line, pick an area or type a new one, type its **Spot**, and press `Save area`.
 - The usual areas are offered for each inventory: **Silos** and **Tankers** (Raw Milk); **Cooler**, **Freezer** and **Dock** (Cooler); **Dry Storage**, **Cardboard & Cases**, **Packaging**, **Chemicals**, **Lab & Quality**, **Totes, Crates & Pallets** and **Freezer** (Plant Supplies); **Parts Room**, **Filters & Oils**, **Safety Gear** and **Shop** (Maintenance). A new area typed on one product is offered for the rest.
 - Pick an area on the right to see only what is kept there.
+- **Dry storage is in trailers**, each carrying one kind of thing: file a product under **Jug Trailers**, **Cap Trailers**, **Cardboard Trailers**, **Crate Trailers** or **Label Trailers**, with the trailer number as its spot if it stays on one.
+- **On trailers** under a product's name (in blue) is what the trailers in the lot have on them right now, and which trailers, as typed on **Plant Material Trailers** (What is on it and How Many). It is shown beside Should have, not added to it.
 
 ### Take stock out by hand
 

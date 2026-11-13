@@ -91,6 +91,9 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     products: [{ name: 'Gallon Whole Milk', sku: '1001' }, { name: 'Gallon 2% Milk', sku: '1002' }] });
   await db().collection('plantProducts').doc('ut_prod_htst_1').set({ operationId: 'ut_prod_htst_1', line: 'HTST #1', facilityId: 'fac_uniontown', products: [{ name: 'Raw Milk' }, { name: 'Gallon Whole Milk', sku: '1001' }] });
   await db().collection('productionLines').doc('ut_prod_gallon_filler').set({ operationId: 'ut_prod_gallon_filler', name: 'GALLON FILLER', line: 'GALLON FILLER', facilityId: 'fac_uniontown' });
+  // Joe 11-11-26: a jug trailer in the lot with just jugs on it (Plant Material Trailers).
+  await db().collection('jugTrailers').doc('fac_uniontown_T-980').set({ facilityId: 'fac_uniontown', company: 'United Dairy', unit: 'T-980', number: 'T-980', inLot: true, location: 'UPPER LOT',
+    items: [{ item: 'Gallon jugs', pallets: '1,200', unit: 'Each' }] });
   await db().collection('users').doc('super.test@uniteddairy.com').set({ name: 'Test Supervisor', status: 'ACTIVE', roles: ['SUPERVISOR'], facilities: ['fac_uniontown'] });
   const browser = await chromium.launch();
   const results = [];
@@ -102,19 +105,27 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     await sv.close();
 
     const inv = await openPage(browser, 1536, 790, '/inventory.html?' + ADMIN);
-    // Joe 11-12-26: Inventory opens on its lists: each inventory, the kinds in it, and the plant's own lists; one product list.
-    await inv.waitForFunction(() => /ALL PLANT SUPPLIES/.test(document.getElementById('lists-body').innerText));
-    assert.equal(await inv.getAttribute('[data-tab="lists"]', 'aria-selected'), 'true');
-    assert.deepEqual(await inv.$$eval('.inv-list-group h2', h => h.map(x => x.innerText)), ['RAW MILK', 'COOLER', 'PLANT SUPPLIES', 'MAINTENANCE', 'MY LISTS']);
-    assert.match(await inv.innerText('[data-group="own"]'), /NO LISTS OF YOUR OWN YET/);
-    assert.ok(await smallest(inv, '#tab-lists *') >= 16, 'text 16px and up');
-    assert.ok(await fits(inv), 'no sideways scroll on Lists');
-    await shot(inv, 'inventory-lists-1536.png');
-    await inv.click('[data-pick-type="supplies"]:not([data-pick-kind])');
+    // Joe 11-12-26 ("action buttons that run across top then be able to click for the categories to see what we want to see
+    // below"): one row of buttons across the top, the categories under it with their counts, the picked one's products below.
     await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
-    assert.match(inv.url(), /tab=onhand/);
-    assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.innerText + ':' + x.getAttribute('aria-selected'))), ['RAW MILK:false', 'COOLER:false', 'PLANT SUPPLIES:true', 'MAINTENANCE:false']);
+    assert.equal(await inv.getAttribute('[data-tab="onhand"]', 'aria-selected'), 'true');
+    assert.deepEqual(await inv.$$eval('.inv-topbar > *:not([hidden])', b => b.map(x => x.id || x.className)), ['tabs', 'spacer', 'products-open', 'print'], 'the buttons in one row across the top');
+    assert.deepEqual(await inv.$$eval('#types button', b => b.map(x => x.dataset.type + ':' + x.getAttribute('aria-selected'))), ['raw:false', 'milk:false', 'supplies:true', 'maint:false', 'own:false']);
+    assert.match(await inv.innerText('[data-type="supplies"]'), /^PLANT SUPPLIES\s*\d+$/, 'each category says how many products');
+    assert.equal(await inv.innerText('#subs .inv-sub.on'), await inv.innerText('#subs .inv-sub:first-child'), 'All Plant Supplies picked');
+    assert.match(await inv.innerText('#subs'), /ALL PLANT SUPPLIES/);
+    await inv.click('[data-type="own"]');
+    await inv.waitForFunction(() => /NO LISTS OF YOUR OWN YET/.test(document.getElementById('subs').innerText));
+    assert.match(inv.url(), /type=own/);
+    assert.ok(await smallest(inv, '.inv-topbar *, #types-bar *') >= 16, 'text 16px and up');
+    assert.ok(await fits(inv), 'no sideways scroll with the categories');
+    await inv.click('[data-type="supplies"]');
+    await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
+    await shot(inv, 'inventory-categories-1536.png');
     assert.equal(await placeOf(inv, 'ITEM-jugs'), 'NO AREA YET');
+    await inv.waitForSelector('#oh-rows [data-row="ITEM-jugs"] .inv-trail');
+    assert.equal(await inv.innerText('#oh-rows [data-row="ITEM-jugs"] .inv-trail'), 'ON TRAILERS: 1,200 EACH · T-980', 'what the jug trailer in the lot carries');
+    assert.ok((await inv.$$eval('#oh-area option', o => o.map(x => x.textContent))).includes('Jug Trailers'));
     // Its own window: the header names Inventory and the menu lists only Inventory's screens.
     assert.match(await inv.innerText('#screen > .topbar .brand small'), /INVENTORY$/);
     // (Read as written: the menu may be folded, which hides its words.)
@@ -170,17 +181,17 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     await inv.click('#ed-save');
     await until(async () => JSON.stringify((await item('Gallon caps, blue')).lists) === JSON.stringify(['caps', 'Gallon line']), 'the lists');
     await inv.waitForFunction(() => !document.getElementById('ed-qty'));
-    await inv.click('[data-tab="lists"]');
-    await inv.waitForSelector('[data-pick-list="caps"]');
-    assert.match(await inv.innerText('[data-pick-list="caps"]'), /CAPS\s+1 PRODUCT · 1 LOW/);
-    await inv.click('[data-pick-list="caps"]');
+    await inv.click('[data-type="own"]');
+    await inv.waitForSelector('[data-sub-list="caps"]');
+    assert.match(await inv.innerText('[data-sub-list="caps"]'), /^CAPS\s*1\s*1 LOW$/);
+    await inv.click('[data-sub-list="caps"]');
     await inv.waitForFunction(() => document.querySelectorAll('#oh-rows tr').length === 1 && /GALLON CAPS/.test(document.getElementById('oh-rows').innerText));
-    assert.equal(await inv.innerText('#oh-list'), 'LIST: CAPS · SHOW ALL');
+    assert.equal(await inv.getAttribute('[data-sub-list="caps"]', 'aria-pressed'), 'true');
     assert.match(inv.url(), /list=caps/);
-    await inv.click('#oh-list');
+    await inv.click('[data-type="supplies"]');
     await inv.waitForFunction(() => /GALLON JUGS/.test(document.getElementById('oh-rows').innerText));
     assert.doesNotMatch(inv.url(), /list=/);
-    results.push('Lists: Inventory opens on its lists; CAPS typed on the blue caps makes a list of its own showing only them');
+    results.push('Categories: buttons across the top, categories under them; CAPS typed on the blue caps makes a list under My Lists showing only them');
 
     // ---------- Milk Products: its own type ----------
     await inv.click('[data-type="milk"]');
@@ -359,7 +370,7 @@ const placeOf = (page, id) => page.$eval('#oh-rows [data-row="' + id + '"] .inv-
     assert.ok(hist.includes('GALLON JUGS | PUT BACK BY THE PRODUCTION LINES | +10'), hist.join('\n'));
     for (const [w, h] of [[1536, 790], [1920, 1080]]) {
       await inv.setViewportSize({ width: w, height: h });
-      for (const t of ['lists', 'onhand', 'walk', 'history']) {
+      for (const t of ['onhand', 'walk', 'history']) {
         await inv.click('[data-tab="' + t + '"]');
         await inv.waitForTimeout(200);
         assert.ok(await smallest(inv, '#tab-' + t + ' *, .inv-tabs *') >= 16, 'text 16px and up');
