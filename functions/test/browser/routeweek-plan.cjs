@@ -82,7 +82,7 @@ async function openPage(browser, width, height, url) {
     let saved = null;
     for (let k = 0; k < 60; k++) {
       const s = await d.collection('weekPlans').doc(PLANNED).get(); saved = s.exists ? s.data() : null;
-      if (saved && saved.overrideReason && JSON.stringify(saved.days) === JSON.stringify(want)) break;
+      if (saved && saved.overrideReason && require('util').isDeepStrictEqual(saved.days, want)) break;
       await new Promise(r => setTimeout(r, 250));
     }
     assert.deepEqual(saved.days, want);
