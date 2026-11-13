@@ -58,3 +58,57 @@
 .routeweek-page .rw-hol-list .rw-tip { display: block; font-size: 16px; font-weight: 700; color: var(--amber); }
 .routeweek-page .rw-hol-list .rw-tip span { white-space: nowrap; }
 .routeweek-page .rw-next-hol .nw { white-space: nowrap; }
+/* Joe 11-13-26 (mock-up ll): Move Stops for This Week. The button, the pop-up with Joe's case limits and every change (any
+   stop to any route and day), and the printout. */
+.routeweek-page .rw-stops { font: inherit; font-size: 16px; font-weight: 800; border: 0; border-radius: 9px; background: #f2b632; color: #3d2a00; padding: 8px 10px; cursor: pointer; }
+.routeweek-page .rw-stops:disabled { cursor: default; opacity: .6; }
+.routeweek-page .modal.rw-stops-modal { width: min(1400px, calc(100vw - 32px)); height: calc(100vh - 40px); display: flex; flex-direction: column; gap: 10px; }
+.routeweek-page .modal.rw-stops-modal[hidden], .routeweek-page .modal.rw-confirm[hidden], .routeweek-page .modal-back[hidden] { display: none; }
+.routeweek-page .rw-stops-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.routeweek-page .rw-stops-top h2 { margin: 0; }
+.routeweek-page .rw-stops-top button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-weight: 700; cursor: pointer; }
+.routeweek-page .rw-stops-rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.routeweek-page .rw-stops-rules label { background: #f4f8fb; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; letter-spacing: 0; }
+.routeweek-page .rw-stops-rules label span { display: flex; align-items: center; gap: 6px; color: var(--ud-blue); font-weight: 800; }
+.routeweek-page .rw-stops-rules input { width: 90px; font-weight: 800; color: var(--ud-blue); }
+.routeweek-page .rw-stops-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.routeweek-page .rw-stops-bar input[type=search] { height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 16px; width: 280px; }
+.routeweek-page .rw-stops-state { font-size: 16px; font-weight: 800; color: var(--muted); }
+.routeweek-page .rw-stops-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.routeweek-page .rw-stops-table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: auto; }
+.routeweek-page .rw-stops-table td:first-child, .routeweek-page .rw-stops-table th:first-child { width: 80px; }
+.routeweek-page .rw-stops-table select[data-pick=route] { width: 140px; }
+.routeweek-page .rw-stops-table select[data-pick=day] { width: 210px; }
+.routeweek-page .rw-stops-table th { position: sticky; top: 0; background: var(--ud-blue); color: #fff; text-align: left; padding: 6px 8px; z-index: 1; }
+.routeweek-page .rw-stops-table td { border-top: 1px solid #edf1f5; padding: 4px 8px; vertical-align: middle; }
+.routeweek-page .rw-stops-table td small { display: block; color: var(--muted); font-size: 16px; }
+.routeweek-page .rw-stops-table td.goes { white-space: nowrap; }
+.routeweek-page .rw-stops-table select { height: 32px; font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; margin-right: 4px; }
+.routeweek-page .rw-stops-table tr.k-move b, .routeweek-page .rw-stops-table tr.k-hand b { color: var(--ud-blue); }
+.routeweek-page .rw-stops-table tr.k-join b, .routeweek-page .rw-stops-table tr.k-cut b { color: var(--amber); }
+.routeweek-page .rw-stops-table tr.k-skip b { color: #b42318; }
+.routeweek-page .rw-stops-table tr.same td { color: var(--muted); }
+.routeweek-page .rw-stops-table td.over { color: #b42318; font-weight: 800; }
+.routeweek-page .rw-stops-table .empty { text-align: center; color: var(--muted); padding: 18px 0; }
+.routeweek-page .rw-stops-list > .empty { text-align: center; color: var(--muted); padding: 24px 0; font-size: 16px; }
+.routeweek-page .rw-stops-actions { margin-top: 0; }
+.routeweek-page .modal-back.rw-confirm-back { z-index: 30; }
+.routeweek-page .modal.rw-confirm { z-index: 31; width: min(520px, calc(100vw - 32px)); }
+.rw-stops-printout { display: none; }
+@media (max-width: 1100px) { .routeweek-page .rw-stops-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .routeweek-page .rw-stops-rules { grid-template-columns: minmax(0, 1fr); } .routeweek-page .rw-stops-bar input[type=search] { width: 100%; } }
+@media print {
+  body.printing-stops > *:not(.rw-stops-printout) { display: none !important; }
+  body.printing-stops .rw-stops-printout { display: block; font: 12pt Arial, sans-serif; color: #000; }
+  .rw-stops-printout h1 { font-size: 16pt; margin: 0 0 4pt; }
+  .rw-stops-printout p { margin: 0 0 8pt; }
+  .rw-stops-printout table { width: 100%; border-collapse: collapse; }
+  .rw-stops-printout th, .rw-stops-printout td { border: 1px solid #888; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  .rw-stops-printout th { background: #ddd; }
+  .rw-stops-printout tr { break-inside: avoid; }
+}
+@media (max-width: 480px) {
+  body.side-rail.routeweek-page .modal.rw-stops-modal, body.side-rail.routeweek-page .modal.rw-confirm { left: calc(50% + 32px); width: calc(100vw - 64px - 16px); }
+  .routeweek-page .rw-stops-rules input { width: 70px; }
+  .routeweek-page .rw-stops-actions { flex-wrap: wrap; }
+}

@@ -13,6 +13,7 @@
   <script src="js/timing-rules.js"></script>
   <script src="js/logic.js"></script>
   <script src="js/plant-rules.js"></script>
+  <script src="js/holiday-stops.js"></script>
 </head>
 <body class="fill routeweek-page">
   <div class="signin" id="signin" hidden>
@@ -65,13 +66,50 @@
         <div class="rw-hol-head" id="hol-head" hidden></div>
         <button type="button" class="rw-suggest" id="hol-suggest" hidden>Use Suggested Moves</button>
         <div class="rw-list rw-hol-list" id="hol-list" hidden></div>
+        <!-- Joe 11-13-26 (mock-up ll): after the week's days are set, move each customer's stops to the days that run, cut
+             low-volume deliveries by Joe's case limits, review any stop to any route and day, then print. -->
+        <button type="button" class="rw-stops" id="stops-open">Move Stops for This Week</button>
         <button type="button" class="warn" id="reset" data-top>Reset Week to Normal</button>
       </aside>
     </div>
+    <div class="modal-back" id="stops-back" hidden></div>
+    <div class="modal rw-stops-modal" id="stops-modal" role="dialog" aria-modal="true" aria-labelledby="stops-title" hidden>
+      <div class="rw-stops-top">
+        <h2 id="stops-title">Move Stops for This Week <small id="stops-week"></small></h2>
+        <button type="button" id="stops-close">Close</button>
+      </div>
+      <div class="rw-stops-rules" id="stops-rules">
+        <label>No delivery this week when the last 3 weeks average under<span><input type="number" min="0" max="9999" step="1" data-rule="skipUnder"> cases a week</span></label>
+        <label>3 deliveries down to 2 when the week is under<span><input type="number" min="0" max="9999" step="1" data-rule="cutTo2Under"> cases</span></label>
+        <label>2 deliveries down to 1 when the week is under<span><input type="number" min="0" max="9999" step="1" data-rule="cutTo1Under"> cases</span></label>
+        <label>Never put more on one delivery than<span><input type="number" min="0" max="9999" step="1" data-rule="maxPerDelivery"> cases</span></label>
+      </div>
+      <div class="rw-stops-bar">
+        <div class="tabs" role="tablist" id="stops-tabs">
+          <button type="button" role="tab" data-stops="changes" aria-selected="true">Changes</button>
+          <button type="button" role="tab" data-stops="all" aria-selected="false">All Stops</button>
+        </div>
+        <input type="search" id="stops-find" placeholder="Find a route or customer" aria-label="Find a route or customer">
+        <span class="rw-stops-state" id="stops-state"></span>
+      </div>
+      <div class="rw-stops-list" id="stops-list"></div>
+      <div class="modal-actions rw-stops-actions">
+        <button type="button" id="stops-over">Start Over</button>
+        <button type="button" id="stops-print">Print</button>
+        <button type="button" class="primary" id="stops-use">Use These Changes</button>
+      </div>
+    </div>
+    <div class="modal-back rw-confirm-back" id="stops-ask-back" hidden></div>
+    <div class="modal rw-confirm" id="stops-ask" role="dialog" aria-modal="true" aria-labelledby="stops-ask-title" hidden>
+      <h2 id="stops-ask-title">Clear everything not sent yet?</h2>
+      <p>Every route and day picked by hand goes back to the suggested changes. Changes already used for this week stay until you press Use These Changes again.</p>
+      <div class="modal-actions"><button type="button" id="stops-ask-no">Cancel</button><button type="button" class="primary" id="stops-ask-yes">Reset</button></div>
+    </div>
   </div>
+  <div class="rw-stops-printout" id="stops-printout"></div>
 
   <script type="module">
-    import { start, requireSignIn, escapeHtml, shortDate, showError, save } from './js/app.js';
+    import { start, requireSignIn, escapeHtml, shortDate, showError, save, callServer } from './js/app.js';
     import { lists, watchLists, canSave, saveRunChange, forScreen, modeLabel } from './js/edit.js';
     import { collection, doc, query, where, onSnapshot } from './js/firebase.js';
     forScreen('weeklyDispatch');
@@ -169,6 +207,8 @@
       if (!typing) box.value = rd && rd.overrideReason || '';
       document.getElementById('reset').disabled = !edit || !over.length;
       renderHoliday(list, hol, edit);
+      document.getElementById('stops-open').disabled = !edit || !week;
+      if (stopsData && stopsWeek === week && !document.getElementById('stops-modal').hidden) renderStops();
     }
 
     // The holiday list: each load on the holiday (red until moved) and each one moved off it (green), with a Move to drop-down:
@@ -289,7 +329,7 @@
       try { await saveReason(now); } catch (e) { if (doc0) doc0.overrideReason = was; render(); showError('The week reason was not saved (' + (e.message || String(e)) + '). Type it again and click outside the box to retry.'); }
     });
     function setWeek(w) {
-      if (w !== week) { disarm(); holPick = ''; }
+      if (w !== week) { disarm(); holPick = ''; closeStops(); }
       week = w;
       if (stopRuns) stopRuns();
       if (stopWeek) stopWeek();
@@ -307,6 +347,155 @@
     }
     document.getElementById('prev').onclick = () => { const i = weeks.indexOf(week); if (i > 0) setWeek(weeks[i - 1]); };
     document.getElementById('next').onclick = () => { const i = weeks.indexOf(week); if (i < weeks.length - 1) setWeek(weeks[i + 1]); };
+
+    // ---- Move Stops for This Week (Joe 11-13-26, mock-up ll; the rules are in js/holiday-stops.js) ----
+    // stopsData: the normal week's stops from the Hub with their last 3 weeks of cases, Joe's case limits and the week's saved
+    // changes. picks: a route and day picked by hand for one normal delivery (route|account|day), kept until Start Over.
+    const HS = window.UDHolidayStops;
+    let stopsData = null, stopsWeek = '', picks = {}, stopsShow = 'changes', stopsBusy = false;
+    const sKey = (route, account, day) => route + '|' + account + '|' + day;
+    const DAY3 = (p) => NAME(p).slice(0, 3);
+    // Which routes run which days this week, from the grid as it is now.
+    function weekRuns() {
+      const on = {};
+      shown().forEach(r => { const k = HS.routeKey(L.routeNumber(r.route)); L.DAYS.forEach(p => { if (runsOn(r, p)) (on[k] = on[k] || {})[p] = true; }); });
+      return on;
+    }
+    // The changes now: the suggested ones, with every pick made by hand on top (a pick back to the normal day is no change).
+    function stopChanges() {
+      if (!stopsData) return [];
+      const on = weekRuns(), auto = HS.plan(stopsData.stops, (r, p) => !!(on[r] && on[r][p]), stopsData.rules), by = {};
+      auto.forEach(c => { by[sKey(c.route, c.account, c.fromDay)] = c; });
+      Object.keys(picks).forEach(k => {
+        const s = stopsData.stops.find(x => sKey(x.route, x.account, x.day) === k), p = picks[k];
+        if (!s) return;
+        if (p.toRoute === s.route && p.toDay === s.day) { delete by[k]; return; }
+        by[k] = { route: s.route, account: s.account, customer: s.customer, chain: s.chain, fromDay: s.day, toRoute: p.toDay ? p.toRoute : '', toDay: p.toDay,
+          kind: p.toDay ? 'hand' : 'skip', why: p.why || 'Picked by hand', cases: HS.average(s.weeks), weeks: s.weeks.slice(0, HS.WEEKS) };
+      });
+      return Object.keys(by).map(k => by[k]).sort((a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.customer).localeCompare(String(b.customer)) || L.DAYS.indexOf(a.fromDay) - L.DAYS.indexOf(b.fromDay));
+    }
+    const KIND = { move: 'Moves', join: 'Rides on another day', cut: 'Fewer deliveries', skip: 'No delivery this week', hand: 'Picked by hand' };
+    const sameList = (a, b) => JSON.stringify((a || []).map(c => [c.route, c.account, c.fromDay, c.toRoute, c.toDay])) === JSON.stringify((b || []).map(c => [c.route, c.account, c.fromDay, c.toRoute, c.toDay]));
+    function renderStops() {
+      if (!stopsData) return;
+      const edit = canSave(), on = weekRuns(), changes = stopChanges(), byKey = {}, R = stopsData.rules;
+      changes.forEach(c => { byKey[sKey(c.route, c.account, c.fromDay)] = c; });
+      const load = HS.deliveries(stopsData.stops, changes), find = document.getElementById('stops-find').value.trim().toUpperCase();
+      document.querySelectorAll('#stops-rules input').forEach(i => { if (document.activeElement !== i) i.value = R[i.dataset.rule]; i.disabled = !edit; });
+      const saved = stopsData.saved && stopsData.saved.changes && stopsData.saved.changes.length ? stopsData.saved.changes : null;
+      const used = saved && sameList(saved, changes);
+      document.getElementById('stops-state').textContent = !stopsData.hub ? 'The Hub has no route customer list for this plant yet'
+        : (changes.length + ' change' + (changes.length === 1 ? '' : 's') + (used ? ' · Used for this week' : saved ? ' · Not used yet (the week has ' + saved.length + ' used)' : ' · Not used yet'));
+      document.querySelectorAll('[data-stops]').forEach(b => { b.setAttribute('aria-selected', String(b.dataset.stops === stopsShow)); if (b.dataset.stops === 'changes') b.textContent = 'Changes (' + changes.length + ')'; });
+      const routesOn = Object.keys(on).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      const lines = (stopsShow === 'all' ? stopsData.stops.slice().sort((a, b) => String(a.route).localeCompare(String(b.route), undefined, { numeric: true }) || String(a.customer).localeCompare(String(b.customer)) || L.DAYS.indexOf(a.day) - L.DAYS.indexOf(b.day))
+        .map(s => byKey[sKey(s.route, s.account, s.day)] || { route: s.route, account: s.account, customer: s.customer, fromDay: s.day, toRoute: s.route, toDay: s.day, kind: '', why: '', cases: HS.average(s.weeks), weeks: s.weeks, same: true }) : changes)
+        .filter(c => !find || (c.route + ' ' + c.customer + ' ' + c.account).toUpperCase().indexOf(find) >= 0);
+      const head = '<thead><tr><th>Route</th><th>Customer</th><th>Normal Day</th><th>Goes To This Week</th><th>Why</th><th>Last 3 Weeks</th><th>On That Delivery</th></tr></thead>';
+      const body = lines.slice(0, 1500).map(c => {
+        const k = sKey(c.route, c.account, c.fromDay), toR = c.toDay ? c.toRoute : '', d = c.toDay ? load[c.toRoute + '|' + c.toDay + '|' + c.account] : null;
+        const rOpts = '<option value="">No delivery</option>' + routesOn.concat(toR && routesOn.indexOf(toR) < 0 ? [toR] : []).map(r => '<option value="' + escapeHtml(r) + '"' + (r === toR ? ' selected' : '') + '>' + escapeHtml(r) + '</option>').join('');
+        const dOpts = toR ? L.DAYS.filter(p => (on[toR] && on[toR][p]) || p === c.toDay).map(p => '<option value="' + p + '"' + (p === c.toDay ? ' selected' : '') + '>' + dayText(p) + (on[toR] && on[toR][p] ? '' : ' (not running)') + '</option>').join('') : '';
+        // Red only when something joined it took the delivery over the limit (a big store's own day is never flagged).
+        const over = d && R.maxPerDelivery && d.cases > R.maxPerDelivery && d.cases > (Number(c.cases) || 0) + 0.05;
+        return '<tr data-k="' + escapeHtml(k) + '" class="' + (c.same ? 'same' : 'k-' + c.kind) + '"><td class="strong">' + escapeHtml(c.route) + '</td><td>' + escapeHtml(c.customer) + '<small>#' + escapeHtml(c.account) + '</small></td><td>' + DAY3(c.fromDay) + '</td>' +
+          '<td class="goes"><select data-pick="route" aria-label="Route"' + (edit ? '' : ' disabled') + '>' + rOpts + '</select>' + (toR ? '<select data-pick="day" aria-label="Day"' + (edit ? '' : ' disabled') + '>' + dOpts + '</select>' : '') + '</td>' +
+          '<td>' + (c.same ? '' : '<b>' + escapeHtml(KIND[c.kind] || '') + '</b><small>' + escapeHtml(c.why || '') + '</small>') + '</td>' +
+          '<td>' + (c.weeks || []).map(v => escapeHtml(String(v))).join(', ') + '</td>' +
+          '<td class="' + (over ? 'over' : '') + '">' + (d ? escapeHtml(String(d.cases)) + ' cases' + (over ? '<small>Over ' + R.maxPerDelivery + '</small>' : '') : c.toDay ? '' : 'None') + '</td></tr>';
+      }).join('');
+      document.getElementById('stops-list').innerHTML = '<table class="rw-stops-table">' + head + '<tbody>' + (body || '<tr><td colspan="7" class="empty">' +
+        (!stopsData.hub ? 'The Hub has no route customer list for this plant yet.' : stopsShow === 'all' ? 'No stops match.' : 'No stop changes: every customer is delivered on its normal days.') + '</td></tr>') + '</tbody></table>';
+      document.getElementById('stops-use').disabled = !edit || stopsBusy || !stopsData.hub || used || (!changes.length && !saved);
+      document.getElementById('stops-over').disabled = !edit || !Object.keys(picks).length;
+      document.getElementById('stops-print').disabled = !changes.length;
+    }
+    async function openStops() {
+      document.getElementById('stops-week').textContent = 'Week of ' + shortDate(week);
+      document.getElementById('stops-back').hidden = document.getElementById('stops-modal').hidden = false;
+      if (stopsData && stopsWeek === week) { renderStops(); return; }
+      stopsData = null; picks = {}; stopsWeek = week;
+      document.getElementById('stops-list').innerHTML = '<div class="empty">Reading the route customer list and the last 3 weeks...</div>';
+      document.getElementById('stops-state').textContent = '';
+      try {
+        const w = week, data = await callServer('save', { holidayStops: true, weekStart: w });
+        if (w !== week) return;
+        stopsData = data;
+        // The week's changes as last used: each one is kept as a pick, and a suggestion that was not used stays as it was.
+        const saved = data.saved && data.saved.changes || [];
+        if (saved.length) {
+          const on = weekRuns(), auto = HS.plan(data.stops, (r, p) => !!(on[r] && on[r][p]), data.rules), have = {};
+          saved.forEach(c => { have[sKey(c.route, c.account, c.fromDay)] = true; picks[sKey(c.route, c.account, c.fromDay)] = { toRoute: c.toRoute, toDay: c.toDay, why: c.why }; });
+          auto.forEach(c => { const k = sKey(c.route, c.account, c.fromDay); if (!have[k]) picks[k] = { toRoute: c.route, toDay: c.fromDay }; });
+        }
+        renderStops();
+      } catch (e) { stopsWeek = ''; document.getElementById('stops-list').innerHTML = ''; closeStops(); showError('The stops could not be read (' + (e.message || String(e)) + '). Try again.'); }
+    }
+    function closeStops() { document.getElementById('stops-back').hidden = document.getElementById('stops-modal').hidden = true; }
+    document.getElementById('stops-open').onclick = () => { openStops(); };
+    document.getElementById('stops-close').onclick = closeStops;
+    document.getElementById('stops-back').onclick = closeStops;
+    document.querySelectorAll('[data-stops]').forEach(b => b.onclick = () => { stopsShow = b.dataset.stops; renderStops(); });
+    document.getElementById('stops-find').oninput = () => renderStops();
+    // Any stop to any route and day (Joe: "Ability to change it to a different route in a different day by reviewing before we print").
+    document.getElementById('stops-list').addEventListener('change', (e) => {
+      const sel = e.target.closest('select[data-pick]'), tr = sel && sel.closest('tr[data-k]');
+      if (!tr || !stopsData) return;
+      const k = tr.dataset.k, on = weekRuns(), cur = stopChanges().find(c => sKey(c.route, c.account, c.fromDay) === k);
+      const s = stopsData.stops.find(x => sKey(x.route, x.account, x.day) === k);
+      if (!s) return;
+      let toRoute = cur ? cur.toRoute : s.route, toDay = cur ? cur.toDay : s.day;
+      if (sel.dataset.pick === 'route') {
+        toRoute = sel.value;
+        if (!toRoute) toDay = '';
+        else if (!(on[toRoute] && on[toRoute][toDay])) toDay = [s.day].concat(L.DAYS).find(p => on[toRoute] && on[toRoute][p]) || '';
+        if (toRoute && !toDay) toRoute = '';
+      } else toDay = sel.value;
+      picks[k] = { toRoute, toDay, why: toDay ? 'Picked by hand' : 'Taken off by hand' };
+      renderStops();
+    });
+    // Joe's case limits: saved as soon as a box changes, and the suggestions are worked out again.
+    document.getElementById('stops-rules').addEventListener('change', async (e) => {
+      const i = e.target.closest('input[data-rule]');
+      if (!i || !stopsData || !canSave()) return;
+      const was = stopsData.rules, next = Object.assign({}, was, { [i.dataset.rule]: i.value });
+      const v = Number(i.value);
+      if (i.value.trim() === '' || !isFinite(v) || v < 0 || v > 9999) { i.value = was[i.dataset.rule]; showError('Type a number of cases from 0 to 9999 (0 turns that rule off).'); return; }
+      stopsData.rules = HS.rules(next); renderStops();
+      try { await save('saveHolidayStopRules', stopsData.rules); } catch (err) { stopsData.rules = was; renderStops(); showError('The case limits were not saved (' + (err.message || String(err)) + '). Type it again.'); }
+    });
+    document.getElementById('stops-use').onclick = async () => {
+      if (!stopsData || stopsBusy || !canSave()) return;
+      const changes = stopChanges(), w = week;
+      stopsBusy = true; renderStops();
+      try {
+        const out = await save('setWeekStopMoves', changes.length ? { weekStart: w, changes, rules: stopsData.rules } : { weekStart: w, clear: true });
+        if (w === week && stopsData) stopsData.saved = out && out.stopMoves || { changes };
+      } catch (err) { showError('The stop changes were not saved (' + (err.message || String(err)) + '). Press Use These Changes again.'); }
+      finally { stopsBusy = false; renderStops(); }
+    };
+    // Start Over asks first (Joe 11-10-26: Reset asks, then clears every working copy).
+    const ask = (show) => { document.getElementById('stops-ask').hidden = document.getElementById('stops-ask-back').hidden = !show; };
+    document.getElementById('stops-over').onclick = () => ask(true);
+    document.getElementById('stops-ask-no').onclick = () => ask(false);
+    document.getElementById('stops-ask-back').onclick = () => ask(false);
+    document.getElementById('stops-ask-yes').onclick = () => { picks = {}; ask(false); renderStops(); };
+    // Print: the changes, by route, on the page itself (one window).
+    document.getElementById('stops-print').onclick = () => {
+      const changes = stopChanges(), load = HS.deliveries(stopsData.stops, changes), rd = reasonDoc(), saved = stopsData.saved && stopsData.saved.changes;
+      const rows = changes.map(c => { const d = c.toDay ? load[c.toRoute + '|' + c.toDay + '|' + c.account] : null;
+        return '<tr><td>' + escapeHtml(c.route) + '</td><td>' + escapeHtml(c.customer) + ' <small>#' + escapeHtml(c.account) + '</small></td><td>' + DAY3(c.fromDay) + '</td><td><b>' +
+          (c.toDay ? (c.toRoute !== c.route ? 'Route ' + escapeHtml(c.toRoute) + ' ' : '') + dayText(c.toDay) : 'No delivery this week') + '</b></td><td>' + escapeHtml(KIND[c.kind] || '') + ': ' + escapeHtml(c.why || '') +
+          '</td><td>' + (d ? escapeHtml(String(d.cases)) : '') + '</td></tr>'; }).join('');
+      document.getElementById('stops-printout').innerHTML = '<h1>Stop Changes · Week of ' + escapeHtml(shortDate(week)) + '</h1><p>' + escapeHtml(rd && rd.overrideReason || '') +
+        (saved && sameList(saved, changes) ? '' : ' · Not used yet') + ' · ' + changes.length + ' changes · Cases are the last 3 weeks average</p>' +
+        '<table><thead><tr><th>Route</th><th>Customer</th><th>Normal Day</th><th>This Week</th><th>Why</th><th>Cases On That Delivery</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      document.body.classList.add('printing-stops');
+      const done = () => { document.body.classList.remove('printing-stops'); window.removeEventListener('afterprint', done); };
+      window.addEventListener('afterprint', done);
+      window.print();
+    };
 
     requireSignIn(async (user) => {
       db = (await start()).db;

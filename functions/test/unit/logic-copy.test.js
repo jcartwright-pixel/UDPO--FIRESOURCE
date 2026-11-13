@@ -18,8 +18,9 @@ test('the screens use the same dispatch rules as the server (run npm run sync-lo
 // The thirteenth, jug-rules.js, is Plant Material Trailers' companies, units and lists (Joe 11/1).
 // The fourteenth, timing-rules.js, is every timing rule in one place (Joe 11-3-26).
 // The fifteenth, departments.js, is the one list of departments a person can be in (Joe 11-4-26).
-test('npm run sync-logic copies all fifteen shared rule files', () => {
-  assert.deepEqual([...SHARED_FILES].sort(), ['board-rules.js', 'crew-rules.js', 'departments.js', 'jug-rules.js', 'lists.js', 'logic.js', 'otr-core.js', 'plant-rules.js',
+// The sixteenth, holiday-stops.js, is Route Week Override's Move Stops for This Week (Joe 11-13-26).
+test('npm run sync-logic copies all sixteen shared rule files', () => {
+  assert.deepEqual([...SHARED_FILES].sort(), ['board-rules.js', 'crew-rules.js', 'departments.js', 'holiday-stops.js', 'jug-rules.js', 'lists.js', 'logic.js', 'otr-core.js', 'plant-rules.js',
     'pmaint-rules.js', 'production-rules.js', 'safety-rules.js', 'sc-core.js', 'scan-rules.js', 'timing-rules.js', 'upload-rules.js']);
 });
 

@@ -156,6 +156,32 @@ async function setWeekPlan(tx, db, req, email, stamp, logRef, mode) {
 }
 
 /*
+ * Joe 11-13-26 (mock-up ll): Move Stops for This Week on Route Week Override. The week's stop changes as Joe used them, after
+ * his review (any stop to any route and day): weekStopMoves/<week> { changes, rules }. One week only: the Customer List and
+ * Route Master are never changed (the route customer list is written only through the Hub). {clear: true} takes them off.
+ */
+async function setWeekStopMoves(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.weekStopMoves).doc(req.weekStart), snap = await tx.get(ref);
+  const was = snap.exists ? snap.data() : null;
+  const after = req.clear ? { weekStart: req.weekStart, changes: [], rules: was && was.rules || null, updatedAt: stamp, updatedBy: email }
+    : { weekStart: req.weekStart, changes: req.changes, rules: req.rules, updatedAt: stamp, updatedBy: email };
+  tx.set(ref, after);
+  const result = { ok: true, requestId: req.requestId, runs: [], stopMoves: after };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before: { changes: was ? (was.changes || []).length : 0 },
+    after: { changes: after.changes.length }, result: { ok: true, requestId: req.requestId, runs: [] } });
+  return result;
+}
+
+/** Joe's case limits for Move Stops for This Week (config/holidayStopRules). */
+async function saveHolidayStopRules(tx, db, req, email, stamp, logRef, mode) {
+  const ref = db.collection(C.config).doc('holidayStopRules'), snap = await tx.get(ref);
+  const before = snap.exists ? snap.data() : null, after = Object.assign({}, req.rules, { updatedAt: stamp, updatedBy: email });
+  tx.set(ref, after);
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, before, after, result: { ok: true, requestId: req.requestId, runs: [] } });
+  return { ok: true, requestId: req.requestId, runs: [], rules: req.rules };
+}
+
+/*
  * Joe 10/23 ("this week I have an extra Ventura, so I actually have two on the same day ... a temporary, one-time thing"): a second
  * line for a run, for this week only, added from the run's name on Weekly Dispatch. It is a run of its own (own run_id), so it gets
  * its own driver on every screen, the double-booking check counts it, and it never picks up the first line's Plant Scheduler
@@ -218,4 +244,4 @@ async function removeExtraRun(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { reorderWeek, publishWeek, setWeekReason, setWeekPlan, resetWeek, addExtraRun, removeExtraRun };
+module.exports = { reorderWeek, publishWeek, setWeekReason, setWeekPlan, setWeekStopMoves, saveHolidayStopRules, resetWeek, addExtraRun, removeExtraRun };
