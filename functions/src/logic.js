@@ -1801,7 +1801,7 @@
       ['pmCrew', 'Maintenance Schedule and Vacations', ['maint-crew.html']]] },
     { key: 'distribution', name: 'Route Distribution', home: 'distribution.html', screens: [
       ['daily', 'Daily Dispatch', ['daily.html']], ['weekly', 'Weekly Dispatch Template, Weekly Dispatch and Driver Assignment Board', ['weekly.html']], ['routes', 'Route Editor', ['routes.html']],
-      ['routeWeek', 'Route Week Override', ['routeweek.html']], ['drivers', 'Driver Roster', ['drivers.html']], ['template', 'Driver Weekly Template', ['template.html']],
+      ['routeWeek', 'Holiday Week Override', ['routeweek.html']], ['drivers', 'Driver Roster', ['drivers.html']], ['template', 'Driver Weekly Template', ['template.html']],
       ['vacations', 'Vacation Schedule', ['vacations.html']], ['checkins', 'Driver Check-ins', ['checkins.html']], ['driverStation', 'Driver Station', ['driver-station.html']],
       ['conflicts', 'Sheet Conflicts', ['conflicts.html']], ['scorecard', 'Driver Scorecard', ['scorecard.html']], ['otr', 'Over the Road', ['otr.html']],
       ['trucksToday', 'Trucks Today', ['trucks.html']], ['gpsSetup', 'GPS Setup', ['gps.html']], ['dispatchAdmin', 'Dispatch Administration', ['admin.html']],

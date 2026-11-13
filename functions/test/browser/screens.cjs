@@ -1311,7 +1311,7 @@ async function noScroll(page) {
       assert.deepEqual(rd.errors, []);
       await rd.close();
     }
-    results.push('Route Days: Refresh, Add Route, Add Run and Holiday Week Editor sit together in one even row at both sizes');
+    results.push('Route Days: Refresh, Add Route, Add Run and Holiday Week Override sit together in one even row at both sizes');
     // Joe 10/10: Home is the old app's launcher, one big picture per side; each side's menu lists only its own screens.
     // Joe 10/11: six cards after picking a plant: Plant Distribution, Plant Production and Plant Maintenance (both Under
     // Construction), Route Distribution, Fleet & Maintenance and Reports. Five carry pictures; Reports has a drawn icon.

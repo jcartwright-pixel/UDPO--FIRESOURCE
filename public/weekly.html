@@ -185,12 +185,15 @@
     // The Live weeks (config/app liveWeeks; Publish moves them on). A week before Previous opens read only; a week after Next is a
     // preview built from Route Master and Driver Master, as on the current screen, until the Next week is published.
     let opened = false, live = {}, routeList = null, unsubscribeRoutes = null, loaded = false;
+    // Joe 11-13-26 ("I should be able to see the holiday schedule"): a week after Next shows its Holiday Week Override plan.
+    let weekPlan = null, unsubscribePlan = null;
+    const planned = () => !!(weekPlan && weekPlan.days && Object.keys(weekPlan.days).length);
     const weekKind = () => (!live.previous ? 'live' : week < live.previous ? 'old' : live.next && week > live.next ? 'future' : 'live');
     function previewRuns() {
       if (!routeList) return [];
       const ctx = L.weekBuildContext(lists.allDrivers, lists.exceptions, lists.fleetTrucks.concat(lists.fleetTrailers), routeList, routeLoads);
       return routeList.slice().sort((a, b) => (a.weekOrder === null || a.weekOrder === undefined ? 999999 : a.weekOrder) - (b.weekOrder === null || b.weekOrder === undefined ? 999999 : b.weekOrder) || String(a.route).localeCompare(String(b.route), undefined, { numeric: true }))
-        .map(r => Object.assign(L.buildWeekRun(r, week, ctx), { id: week + '__' + r.id, rev: 0 }));
+        .map(r => Object.assign(L.buildWeekRun(L.plannedRoute(r, weekPlan), week, ctx), { id: week + '__' + r.id, rev: 0 }));
     }
     const getRuns = () => runs;
     // That run's Route Master day (dispatch time, hours), for a day on the week that has none of its own.
@@ -532,7 +535,8 @@
     function say(text, kind) { noteText = text || ''; noteKind = kind || ''; render(); }
     function showNote(kind, preview) {
       const el = document.getElementById('wk-note');
-      const text = noteText || (preview ? 'Future week preloaded from Route Master and Driver Master. Publish the stored Next Week (' + shortDate(live.next) + ') before editing this later week.'
+      const text = noteText || (preview && planned() ? 'Future week preloaded from Route Master and Driver Master, with its Holiday Week Override plan' + (weekPlan.overrideReason ? ' (' + weekPlan.overrideReason + ')' : '') + '. Publish'
+        : preview ? 'Future week preloaded from Route Master and Driver Master. Publish the stored Next Week (' + shortDate(live.next) + ') before editing this later week.'
         : kind === 'future' ? 'This week is after the Live Next week (' + shortDate(live.next) + '): view only until that week is published.'
         : kind === 'old' ? 'This week is older than the Live weeks: view only.'
         : liveView ? 'The live week, the one Daily Dispatch is running. Changes here go straight to Daily Dispatch.' : '');
@@ -644,6 +648,9 @@
         if (jumpBoard) { jumpBoard = false; setTab('board'); }
       }, e => showError('Could not read the week: ' + e.message));
       unsubscribeWeek = onSnapshot(doc(db, 'weeks', week), snap => { weekDoc = snap.exists() ? snap.data() : null; showPublished(); });
+      if (unsubscribePlan) unsubscribePlan();
+      weekPlan = null;
+      unsubscribePlan = onSnapshot(doc(db, 'weekPlans', week), snap => { weekPlan = snap.exists() ? snap.data() : null; render(); }, () => { weekPlan = null; });
       // Plant Route loads on the Plant Operations Scheduler for this week (copied from PLANT_OPERATIONS).
       if (unsubscribePlant) unsubscribePlant();
       unsubscribePlant = onSnapshot(query(collection(db, 'plantLoads'), where('date', '>=', week), where('date', '<=', L.addDays(week, 6))), snap => {
