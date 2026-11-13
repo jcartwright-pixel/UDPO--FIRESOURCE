@@ -18,7 +18,9 @@
 
 const COLLECTION = 'hubCustomerChanges';
 // Who sends: every app that works on the route customer list (Joe 11-9-26: Customers & Routes' own saves too).
-const FROM = { customers: 'Customers & Routes', 'pallet-builder': 'Pallet Builder', operations: 'Plant & Distribution', 'route-cost': 'Route Cost Analysis', routes: 'Route & Trip Costs', mapmaker: 'MapMaker' };
+const FROM = { customers: 'Customers & Routes', 'pallet-builder': 'Pallet Builder', operations: 'Plant & Distribution', 'route-cost': 'Route Cost Analysis', routes: 'Route & Trip Costs', mapmaker: 'MapMaker',
+  // Joe 11-13-26: a better address the Hub found itself (src/addressfill.js); only the Hub writes these, never an app's send.
+  'address-check': 'Address Check (the Hub)' };
 // What kind of change: the Customer List's steps (customerList op) each kind may carry.
 const KINDS = {
   routeDay: { name: 'Route day order, load sequences and truck map', ops: ['saveRouteDay', 'placeStop'] },
@@ -54,7 +56,7 @@ function cleanMapPoint(step) {
 function cleanSend(input, email, stamp) {
   const plant = text(input.plant, 60), from = text(input.from, 40), kind = text(input.kind, 40);
   if (!plant) fail('BAD_REQUEST', 'Pick the plant the change is for.');
-  if (!FROM[from]) fail('BAD_REQUEST', 'The Hub does not know the app sending this change.');
+  if (!FROM[from] || from === 'address-check') fail('BAD_REQUEST', 'The Hub does not know the app sending this change.');
   if (!KINDS[kind]) fail('BAD_REQUEST', 'The Hub does not know that kind of change.');
   let step = input.input && typeof input.input === 'object' ? input.input : null;
   if (kind === 'mapPoint' && step) step = cleanMapPoint(step);

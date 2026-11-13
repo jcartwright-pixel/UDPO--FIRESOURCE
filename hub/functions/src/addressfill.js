@@ -14,6 +14,13 @@
  * customer's map point or address changes). The Hub's customer list (hubCustomers, src/routemaster.js) shows a found value only
  * where the Customer List has none, marked addressFrom 'map point' or pointFrom 'address lookup'; the Customer List's own value
  * always wins and is never changed here. Runs every hour, a share of the lookups at a time, until every customer is done.
+ *
+ * A better address (Joe 11-13-26: "the address I have may be wrong ... it has to be flagged that an update or a better address,
+ * because it should overwrite a bad address"): when a customer's address is to check (or is a PO box) and it has a map point,
+ * the street address at the map point is looked up too. When one is found within a quarter mile of the point and it is not the
+ * address on file, it is kept as `better` and sent to the Hub's Customer Changes (from Address Check, kind mapPoint, with the
+ * old and the new address), once per suggested address. An administrator approves it there, and the Customer List's own code
+ * then writes the better address over the old one (REQUESTS.md For the Customer List). Nothing is overwritten without that.
  */
 'use strict';
 
@@ -24,6 +31,8 @@ const PER_RUN = 800;
 const GOOD_SCORE = 0.8;      // HERE's match out of 1: below this, part of the address did not match
 const NEAR_MILES = 0.25;     // an address more than this from the customer's own map point is to check
 const MILE = 1609.344;
+const CHANGES = 'hubCustomerChanges';
+const PO_BOX = /\b(p\.?\s*o\.?\s*box|post\s+office\s+box|pob\s+\d|box\s+\d+$)/i;
 
 const text = (v) => (v === undefined || v === null ? '' : String(v).trim());
 const isOff = (c) => !c || c.inactive === true || c.active === false;
@@ -36,6 +45,11 @@ function pointOf(c) {
 }
 const addressOf = (c) => [text(c.address), text(c.address2), [text(c.city), [text(c.state), text(c.zip)].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ');
 const docId = (key) => text(key).replace(/\//g, '_').slice(0, 400);
+const isPoBox = (c) => PO_BOX.test(text(c.address)) || PO_BOX.test(text(c.address2));
+const plain = (v) => text(v).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const hash = (v) => require('crypto').createHash('sha1').update(v).digest('hex').slice(0, 10);
+/** A to-check customer with a map point has its better address looked up once. */
+const wantsBetter = (c, need, rec) => need.need === 'check' && !need.noTown && (rec.verdict === 'check' || isPoBox(c));
 
 /** What a customer needs, or null: { need: 'address', lat, lon }, { need: 'point', address } or { need: 'check', address, lat, lon }. */
 function needOf(c) {
@@ -63,8 +77,9 @@ function verdictOf(need, rec) {
   return { verdict: 'good', why: '' };
 }
 /** A kept answer still fits the customer when it was found from the same map point or the same address. */
-function stillFits(was, need) {
+function stillFits(was, need, c) {
   if (!was) return false;
+  if (need.need === 'check' && !need.noTown && !was.betterTried && (was.verdict === 'check' || (c && isPoBox(c)))) return false;
   if (need.need === 'address') return was.from === 'map point' && r5(was.fromLat) === need.lat && r5(was.fromLon) === need.lon;
   if (need.need === 'check') return was.from === 'check' && text(was.fromAddress) === need.address && (need.noTown || (r5(was.fromLat) === need.lat && r5(was.fromLon) === need.lon));
   return was.from === 'address' && text(was.fromAddress) === need.address;
@@ -78,7 +93,7 @@ async function fillPlant(db, plant, key, budget, options) {
   fs.docs.forEach(d => { kept[d.id] = d.data(); });
   const out = { plant, looked: 0, found: 0, notFound: 0, left: 0 };
   const todo = [];
-  cs.docs.forEach(d => { const c = d.data(), need = needOf(c); if (need && !stillFits(kept[docId(c.key)], need)) todo.push([c, need]); });
+  cs.docs.forEach(d => { const c = d.data(), need = needOf(c); if (need && !stillFits(kept[docId(c.key)], need, c)) todo.push([c, need]); });
   // What is missing first, then the checks of addresses that are there.
   todo.sort((a, b) => (a[1].need === 'check') - (b[1].need === 'check'));
   for (const [c, need] of todo) {
@@ -101,6 +116,12 @@ async function fillPlant(db, plant, key, budget, options) {
         } else Object.assign(rec, { from: 'address', fromAddress: need.address });
       }
       Object.assign(rec, verdictOf(need, rec));
+      if (wantsBetter(c, need, rec)) {
+        rec.betterTried = true;
+        const hit = await P.reverseOne(key, need.lat, need.lon, fetchFn);
+        if (hit && hit.street && (hit.meters === null || hit.meters === undefined || hit.meters <= NEAR_MILES * MILE) && plain(hit.street) !== plain(c.address))
+          rec.better = { address: hit.street, city: hit.city, state: hit.state, zip: hit.zip, label: hit.label, meters: hit.meters };
+      }
     } catch (e) {
       // A turned-down key or a usage limit stops the run; it carries on next hour.
       if (/key|usage limit/.test(e.message)) { out.stopped = e.message; out.left += todo.length - out.looked; out.looked--; break; }
@@ -109,8 +130,28 @@ async function fillPlant(db, plant, key, budget, options) {
     if (rec.verdict === 'check') out.toCheck = (out.toCheck || 0) + 1;
     if (rec.notFound) out.notFound++; else out.found++;
     await db.collection(FILL).doc(docId(c.key)).set(Object.assign(rec, { plant, key: text(c.key), account: text(c.account), name: text(c.name), at }));
+    if (rec.better && await suggest(db, plant, c, rec.better, need, at)) out.suggested = (out.suggested || 0) + 1;
   }
   return out;
+}
+
+/** The full address in one line: street, town, state and ZIP. */
+const oneLine = (b) => [text(b.address), [text(b.city), [text(b.state), text(b.zip)].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+
+/**
+ * Sends a better address to the Hub's Customer Changes, once per customer and suggested address (a turned-down one is not sent
+ * again). Returns true when it was sent.
+ */
+async function suggest(db, plant, c, better, need, at) {
+  const now = oneLine(better), was = addressOf(c), ref = db.collection(CHANGES).doc('addressCheck__' + docId(c.key).slice(0, 300) + '__' + hash(plain(now)));
+  if ((await ref.get()).exists) return false;
+  const who = text(c.name) + (text(c.account) ? ' (' + text(c.account) + ')' : '');
+  await ref.set({ plant, from: 'address-check', fromName: 'Address Check (the Hub)', kind: 'mapPoint', kindName: 'Map point for a customer', route: '', day: '',
+    input: { op: 'setMapPoint', plant, key: text(c.key), account: text(c.account), chain: text(c.chain), lat: need.lat, lon: need.lon, source: 'addressCheck',
+      address: now, street: text(better.address), city: text(better.city), state: text(better.state), zip: text(better.zip), oldAddress: was },
+    summary: ('Better address for ' + who + ': ' + now + ' (on file: ' + (was || 'none') + '). Found at its map point.').slice(0, 500),
+    sentBy: 'the Hub (Address Check)', sentAt: at, status: 'sent' });
+  return true;
 }
 
 /** Every plant the Customer List keeps, then the Hub's customer list rebuilt for each plant where something was found. */
@@ -153,8 +194,8 @@ async function toCheck(db, input) {
   const all = [];
   snap.docs.forEach(d => { const v = d.data() || {}; (v.customers || []).forEach(c => all.push(c)); });
   const rows = all.filter(c => c.addressCheck === 'check').map(c => ({ plant: c.plant, key: c.key, account: c.account, name: c.name, dcName: c.dcName || '',
-    address: c.address || '', why: c.addressCheckWhy || '' })).sort((a, b) => text(a.plant).localeCompare(text(b.plant)) || text(a.name).localeCompare(text(b.name)));
+    address: c.address || '', why: c.addressCheckWhy || '', better: c.betterAddress || '' })).sort((a, b) => text(a.plant).localeCompare(text(b.plant)) || text(a.name).localeCompare(text(b.name)));
   return { rows, counts: { customers: all.length, checked: all.filter(c => c.addressCheck).length, good: all.filter(c => c.addressCheck === 'good').length, toCheck: rows.length } };
 }
 
-module.exports = { fill, fillPlant, readPlant, toCheck, needOf, verdictOf, FILL };
+module.exports = { fill, fillPlant, readPlant, toCheck, needOf, verdictOf, oneLine, FILL };

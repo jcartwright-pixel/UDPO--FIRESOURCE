@@ -2,7 +2,7 @@
  * Address Check (Joe 11-12-26: "Is there any way we can check the validity of each address?" and "flag each address if
  * something's just not connecting, whether it's serviced out of a location that's nowhere close ... or if it's a PO box").
  * Lists the customers on the Hub's customer list whose address is to check, with the reason (functions/src/addressfill.js and
- * routemaster.js). Read only: addresses are fixed in Customers & Routes. Administrators.
+ * routemaster.js), and the better address found at the map point, which waits on Customer Changes (Joe 11-13-26). Administrators.
  */
 import { callServer, escapeHtml as e, showError, serverText, setAdmin } from './shell.js';
 
@@ -17,7 +17,7 @@ function draw() {
   $('#counts').textContent = c.checked ? c.toCheck + ' to check, ' + c.good + ' good, out of ' + c.checked + ' looked at so far (' + c.customers + ' customers).'
     : 'Nothing looked at yet. The check runs every hour, a share at a time.';
   $('#list tbody').innerHTML = rows.length ? rows.map(r => '<tr data-key="' + e(r.key) + '"><td>' + e(r.name) + '</td><td>' + e(r.account) + '</td><td>' + e(r.dcName) + '</td><td>' +
-    e(r.address || 'No address') + '</td><td>' + e(r.why) + '</td></tr>').join('') : '<tr><td colspan="5" class="muted">Nothing to check.</td></tr>';
+    e(r.address || 'No address') + '</td><td>' + (r.better ? e(r.better) : '<span class="muted">None found</span>') + '</td><td>' + e(r.why) + '</td></tr>').join('') : '<tr><td colspan="6" class="muted">Nothing to check.</td></tr>';
 }
 
 export async function load() {

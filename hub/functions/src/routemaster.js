@@ -135,8 +135,11 @@ function withCheck(row, c, f, places) {
     const miles = Math.round(milesApart(row, dc));
     if (miles > FAR_FROM_DC) why.push('It is ' + miles + ' miles from ' + row.dcName + ', the DC that serves it.');
   }
-  if (why.length) Object.assign(row, { addressCheck: 'check', addressCheckWhy: why.join(' ') });
-  else if ((f && f.verdict === 'good') || dc) Object.assign(row, { addressCheck: 'good', addressCheckWhy: '' });
+  if (why.length) {
+    Object.assign(row, { addressCheck: 'check', addressCheckWhy: why.join(' ') });
+    // Joe 11-13-26: a better address found at the map point, waiting on Customer Changes to write over the one on file.
+    if (f && f.better && text(f.better.address)) row.betterAddress = require('./addressfill').oneLine(f.better);
+  } else if ((f && f.verdict === 'good') || dc) Object.assign(row, { addressCheck: 'good', addressCheckWhy: '' });
   return row;
 }
 

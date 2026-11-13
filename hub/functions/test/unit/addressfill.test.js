@@ -63,7 +63,7 @@ test('a map point with no address gets the address there; an address with no map
   // Nothing new: nothing is looked up again.
   const again = await F.fill(db, { fetchFn: f, noRebuild: true });
   assert.equal(again.plants[0].looked, 0);
-  assert.equal(f.seen.length, 4);
+  assert.equal(f.seen.length, 5, 'the flagged address also had the street at its map point looked up, once');
   // A moved map point is looked up again.
   db.docs.udclCustomers.a.lat = 40.3;
   assert.equal((await F.fill(db, { fetchFn: f, noRebuild: true })).plants[0].looked, 1);
@@ -117,4 +117,32 @@ test('the address check list: only the ones to check, from the Hub customer list
   const r = await F.toCheck(db, { plant: 'fac_uniontown' });
   assert.deepEqual(r.rows.map(x => [x.name, x.why]), [['BOX STORE', 'The address is a PO box, not where the store is.']]);
   assert.deepEqual(r.counts, { customers: 3, checked: 2, good: 1, toCheck: 1 });
+});
+
+test('a wrong address on file with a good map point: the better address at the point goes to Customer Changes, once (Joe 11-13-26)', async () => {
+  const s = start();
+  s.udclCustomers = { w: base({ key: 'fac_uniontown__201', account: '201', name: 'WRONG ADDRESS MART', address: '9 Old Sample Ln', city: 'Faraway', state: 'OH', lat: 40.1, lon: -79.9 }) };
+  const db = fakeDb(s), f = fakeFetch(), at = new Date('2026-11-13T03:10:00Z');
+  const r = await F.fill(db, { fetchFn: f, noRebuild: true, now: at });
+  assert.equal(r.plants[0].suggested, 1);
+  const rec = db.docs.hubAddressFill.fac_uniontown__201;
+  assert.deepEqual([rec.verdict, rec.betterTried, rec.better.address], ['check', true, '12 Made-Up Rd']);
+  const ch = Object.values(db.docs.hubCustomerChanges);
+  assert.equal(ch.length, 1);
+  assert.deepEqual([ch[0].status, ch[0].kind, ch[0].from, ch[0].input.op, ch[0].input.source, ch[0].input.account], ['sent', 'mapPoint', 'address-check', 'setMapPoint', 'addressCheck', '201']);
+  assert.equal(ch[0].input.address, '12 Made-Up Rd, Sampletown, PA 15401');
+  assert.match(ch[0].input.oldAddress, /9 Old Sample Ln/);
+  assert.match(ch[0].summary, /on file: 9 Old Sample Ln/);
+  // The Customer List's own address is never changed here, and the Hub's list shows the better one beside it.
+  assert.equal(db.docs.udclCustomers.w.address, '9 Old Sample Ln');
+  const row = R.build('fac_uniontown', 'Uniontown', { customers: [db.docs.udclCustomers.w], routeDays: [], fills: { fac_uniontown__201: rec } }).customers.customers[0];
+  assert.deepEqual([row.address.startsWith('9 Old Sample Ln'), row.addressCheck, row.betterAddress], [true, 'check', '12 Made-Up Rd, Sampletown, PA 15401']);
+  // The next run looks nothing up again and sends nothing new.
+  const again = await F.fill(db, { fetchFn: f, noRebuild: true, now: at });
+  assert.deepEqual([again.plants[0].looked, Object.keys(db.docs.hubCustomerChanges).length], [0, 1]);
+});
+
+test('an app cannot send a change as Address Check', async () => {
+  const C = require('../../src/changes');
+  assert.throws(() => C.cleanSend({ plant: 'fac_uniontown', from: 'address-check', kind: 'mapPoint', input: { op: 'setMapPoint', account: '1', lat: 40, lon: -80 }, summary: 'x' }, 'pat@uniteddairy.com', 'now'), /does not know the app/);
 });

@@ -309,9 +309,13 @@ A customer is on the list when:
 
 1. Pick the **Plant**, or leave **Every plant**.
 2. Type in **Find** to look for a customer by name, account or address.
-3. Read **Why** on each line, then fix the address in **Customers & Routes**. The next hourly check takes it off the list.
+3. Read **Why** on each line.
+4. Look at **Better address**. When the customer has a map point, the hub looks up the street address at that point. If it is not the address on file, it shows here and is sent to **Customer Changes** by itself, with the old and the new address.
+5. Open **Customer Changes** and approve the better address, or turn it down. Once approved, it writes over the old address in the Customer List. With no better address, fix it in **Customers & Routes**. The next hourly check takes it off the list.
 
 > The first check of every customer takes a few hours, a share at a time. The line at the top says how many have been looked at so far.
+
+!> Do not approve a better address when the map point itself is wrong (the pin is on the wrong store). Turn it down and fix the pin in the MapMaker instead.
 
 !> Do not change a good address just because the map point is a little off. A store at the back of a big lot can be a few hundred feet from its street address.
 ## Daily BOL
