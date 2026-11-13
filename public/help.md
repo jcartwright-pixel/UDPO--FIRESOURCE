@@ -190,6 +190,8 @@ Administrators see a short line under the buttons: **Texts not sent**, or once t
 
 The truck and trailer lists show only units that are free. Tick **OVR** on a line to see every unit, with the reason a unit is normally left out (on another load, down, or on the road at that time).
 
+A truck or trailer on a **sleeper route** (Sleeper ticked in Route Master) is on the road its route hours **plus the 10-hour sleeper break**, so one leaving at 1:00 PM for 14 hours shows **ON ROAD UNTIL WED 1:00 PM** and is not offered the next day until it is back.
+
 In the driver list, OVR also offers drivers who are off that day. Inactive drivers are never in the list, OVR or not. To use one, make them Active on the [Driver Roster](#drivers) first.
 
 The lists show only this plant's units, using the plant the fleet list gives each one. A few trailers the fleet list puts at another plant (533, 824, 876 and 950) are counted as Uniontown's. If a trailer you use is missing from the list, check its location on the fleet list.
@@ -223,6 +225,7 @@ Weekly Dispatch Template opens on next week, the week you are getting ready. It 
 - **NEEDS DRIVER** in red means the regular driver is off that day.
 - **Pink** (Driver Times Overlap) means the driver is on two runs that day whose times on the road overlap: the first run is not back before the second one leaves. Point at the box to see which run and when it is back. A run is on the road from its leave time for its route hours, from this week or, if the week has none, from Route Master.
 - A driver can do two runs the same day when the first is back before the second leaves. The driver list offers them; a driver whose other run is still out says **ON 8301 UNTIL 1:30 PM**, and turning on `Override` lets you pick them anyway.
+- A **sleeper route** (Sleeper ticked in Route Master) is on the road its route hours **plus the 10-hour sleeper break**. 852 leaving Monday at 1:00 PM for 14 hours is back Tuesday at 1:00 PM, so the driver list says **ON 852 UNTIL TUE 1:00 PM**, and on Tuesday the driver is not offered for a run that leaves before 1:00 PM. Any run back the next day counts the same way.
 - Load 1 and Load 2 of the same route with the same driver are normal (one truck pulling two loads). They are never pink.
 - On a day that does not run, or a **PLANT LOAD** day, the driver list has `— NEEDS DRIVER —` to put the day on with no driver yet. `— PLANT LOAD —` leaves it as the plant's load.
 - Turning a day off in Route Days (the normal week) also takes it off this week and next, unless that day was changed for one week only, has a driver, or its load has started.

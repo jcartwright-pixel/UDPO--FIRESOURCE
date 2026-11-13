@@ -400,6 +400,52 @@ test('Joe 10/19: a branch box load starts the week as not running; every other r
   assert.deepEqual(ran, [['mon', 'tue'], ['tue'], []]);
 });
 
+test('Weekly: a sleeper run counts the 10-hour sleeper break and holds its driver into the next day (Joe 11-12-26)', () => {
+  const day = (o) => Object.fromEntries(L.DAYS.map((p, i) => [p, Object.assign({ date: L.addDays('2026-11-15', i), runs: false }, o[p] || {})]));
+  // 852 leaves Monday 1:00 PM for 14 hours: 3:00 AM without the break, Tuesday 1:00 PM with it.
+  const sleeper = { route: '852', runId: 'r852', days: day({ mon: { runs: true, driverId: 'g', driver: 'CARPENTER, GREGG', dispatchTime: 13 * 60, routeHours: 14 } }) };
+  const rm = (row, p) => row.runId === 'r852' ? { sleeper: true } : null;
+  assert.deepEqual(L.weeklyWindow(sleeper, 'mon', rm), { start: 780, end: 780 + 24 * 60 });
+  assert.deepEqual(L.weeklyWindow(sleeper, 'mon', () => null), { start: 780, end: 780 + 14 * 60 }, 'not ticked Sleeper: route hours only');
+  // Monday's list: a 6:00 AM Monday run is long done; a run leaving Monday 3:00 PM clashes, back Tuesday 1:00 PM.
+  const afternoon = { route: '822', runId: 'r822', days: day({ mon: { runs: true, dispatchTime: 15 * 60, routeHours: 8 } }) };
+  assert.equal(L.driverClash(afternoon, sleeper, 'mon', rm), 'ON 852 UNTIL TUE 1:00 PM');
+  // Tuesday's list: a run leaving Tuesday 6:00 AM clashes with Monday's 852 (back 1:00 PM); one leaving 1:00 PM does not.
+  const tueEarly = { route: '844', runId: 'r844', days: day({ tue: { runs: true, driverId: 'g', driver: 'CARPENTER, GREGG', dispatchTime: 6 * 60, routeHours: 8 } }) };
+  const tueLate = { route: '845', runId: 'r845', days: day({ tue: { runs: true, dispatchTime: 13 * 60, routeHours: 8 } }) };
+  assert.equal(L.driverClash(tueEarly, sleeper, 'tue', rm, 'mon'), 'ON 852 UNTIL 1:00 PM');
+  assert.equal(L.driverClash(tueLate, sleeper, 'tue', rm, 'mon'), '');
+  assert.equal(L.driverClash(tueEarly, sleeper, 'tue', () => null, 'mon'), '', 'not a sleeper: back 3:00 AM, before 6:00 AM');
+  // Unknown times on another day block nothing.
+  const unknown = { route: '856', runId: 'r856', days: day({ tue: { runs: true } }) };
+  assert.equal(L.driverClash(unknown, sleeper, 'tue', rm, 'mon'), '');
+  // The Weekly cells and the Driver Assignment Board: Tuesday 844 is pink, Tuesday is booked for Carpenter.
+  const rows = [sleeper, tueEarly];
+  const ctx = L.weeklyContext(rows, [], [], [], rm);
+  assert.equal(L.weeklyClash(ctx, tueEarly, 'tue'), 'ON 852 UNTIL 1:00 PM');
+  assert.equal(L.weeklyClash(ctx, sleeper, 'mon'), 'ON 844 UNTIL TUE 2:00 PM');
+  const board = L.driverBoardRows([{ id: 'g', name: 'g', status: 'ACTIVE' }], rows, [], '2026-11-15', [], rm);
+  assert.equal(board[0].days.tue.kind, 'booked');
+});
+
+test('Daily trucks and trailers, and the week build: a sleeper is out for the 10-hour sleeper break, into the next day (Joe 11-12-26)', () => {
+  // 852 delivers Tuesday 11-17-26, leaves 1:00 PM for 14 hours on truck 501: back Wednesday 1:00 PM with the break.
+  const s852 = { id: 's', route: '852', runId: 'r852', deliveryDate: '2026-11-17', dispatchTime: 13 * 60, routeHours: 14, truckId: '501' };
+  const sleeperFor = (r) => r.runId === 'r852';
+  const sameDay = { id: 't', route: '822', deliveryDate: '2026-11-17', dispatchTime: 13 * 60 + 30, routeHours: 2 };
+  assert.deepEqual(L.unitConflicts([s852, sameDay], sameDay, 'truck', null, sleeperFor), { 501: 'ON ROAD UNTIL WED 1:00 PM (852)' });
+  // Wednesday: a 6:00 AM run cannot have 501; a 1:30 PM run can. Without the Sleeper tick it is back 3:00 AM.
+  const wedEarly = { id: 'u', route: '844', deliveryDate: '2026-11-18', dispatchTime: 6 * 60, routeHours: 8 };
+  const wedLate = { id: 'v', route: '845', deliveryDate: '2026-11-18', dispatchTime: 13 * 60 + 30, routeHours: 8 };
+  assert.deepEqual(L.unitConflicts([s852, wedEarly], wedEarly, 'truck', null, sleeperFor), { 501: 'ON ROAD UNTIL 1:00 PM (852)' });
+  assert.deepEqual(L.unitConflicts([s852, wedLate], wedLate, 'truck', null, sleeperFor), {});
+  assert.deepEqual(L.unitConflicts([s852, wedEarly], wedEarly, 'truck', null, () => false), {});
+  // Booking standard trucks for the week: 14 route hours on a sleeper route book 24.
+  assert.equal(L.bookHours(14, { sleeper: true }), 24);
+  assert.equal(L.bookHours(14, { sleeper: false }), 14);
+  assert.equal(L.bookHours(null, { sleeper: true }), null);
+});
+
 test('Weekly: a driver on two runs is pink only when their times on the road overlap; Load 1 and Load 2 of one route never (Joe 11-6-26)', () => {
   const day = (o) => Object.fromEntries(L.DAYS.map((p, i) => [p, Object.assign({ date: L.addDays('2026-11-08', i), runs: false }, p === 'wed' ? o : {})]));
   // Times as the Live week keeps them: dispatch in minutes of the day, route hours.

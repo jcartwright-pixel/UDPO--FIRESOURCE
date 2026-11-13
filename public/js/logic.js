@@ -842,18 +842,35 @@
    * row, e.g. "ON ROAD UNTIL 2:00 PM (802)". kind: 'truck' | 'trailer'. hoursFor(row) gives Route Master hours when the
    * Live row has none.
    */
-  function unitConflicts(rows, target, kind, hoursFor) {
-    var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, mine = runWindow(target, hoursFor), tol = 15;
+  // Joe 11-12-26 (every sleeper run): sleeperFor(row) says the row's route has Sleeper ticked in Route Master; its time on the road
+  // then adds the 10-hour sleeper break, and a unit on a sleeper delivering the day before stays taken until it is back.
+  function unitConflicts(rows, target, kind, hoursFor, sleeperFor) {
+    var key = kind === 'truck' ? 'truckId' : 'trailerId', out = {}, tol = 15;
+    var windowOf = function (r) { var w = runWindow(r, hoursFor); if (w.end !== null && sleeperFor && sleeperFor(r)) w.end += SLEEPER_BREAK_HOURS * 60; return w; };
+    var mine = windowOf(target), dayBefore = target.deliveryDate ? addDays(target.deliveryDate, -1) : '';
     rows.forEach(function (r) {
-      if (r === target || r.off || r.deliveryDate !== target.deliveryDate || !r[key] || out[r[key]]) return;
+      if (r === target || r.off || !r[key] || out[r[key]]) return;
+      var cross = !!dayBefore && r.deliveryDate === dayBefore;
+      if (r.deliveryDate !== target.deliveryDate && !cross) return;
       if (kind === 'truck' && r.driverId && r.driverId === target.driverId) return; // his own other load that day (Joe 10/12)
-      var w = runWindow(r, hoursFor), busy;
-      if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
+      var w = windowOf(r), busy;
+      if (cross) {
+        // The day before: only a known return after midnight counts.
+        if (w.start === null || w.end === null || w.end <= 1440 || mine.start === null) return;
+        w = { start: w.start - 1440, end: w.end - 1440 };
+        busy = mine.start < w.end - tol;
+      } else if (w.start === null || w.end === null) busy = w.start === null || mine.end === null || mine.end > w.start;
       else busy = mine.start !== null && mine.end !== null && w.start < mine.end - tol && mine.start < w.end - tol;
-      if (busy) out[r[key]] = 'ON ROAD' + (w.end !== null ? ' UNTIL ' + timeText(w.end % 1440) : ' \u2014 RETURN UNKNOWN') + ' (' + r.route + ')';
+      if (busy) out[r[key]] = 'ON ROAD' + (w.end !== null ? ' UNTIL ' + untilText(w.end, DAYS[(new Date(target.deliveryDate + 'T12:00:00Z')).getUTCDay()]) : ' \u2014 RETURN UNKNOWN') + ' (' + r.route + ')';
     });
     return out;
   }
+  // Route hours with the 10-hour sleeper break for a sleeper route (Joe 11-12-26), for booking a truck or trailer.
+  function bookHours(hours, route) {
+    var h = Number(hours);
+    return route && yes(route.sleeper) && h > 0 ? h + SLEEPER_BREAK_HOURS : hours;
+  }
+
 
   // A leased unit (the fleet sync writes "Lease: Idealease" into the External Fleet text): not on Fleet Service (Joe 10/10).
   function unitLeased(unit) {
@@ -1345,20 +1362,45 @@
    * route are one driver's normal day (one tractor pulling two loads) and never clash. A day's time on the road is its dispatch
    * time plus its route hours from the Live week, else from Route Master (master(row, prefix) gives that run's Route Master day).
    */
+  // Joe 11-12-26 (Carpenter on 852 "until 3 a.m. ... It didn't add the 10 hours for sleeper ... he left Monday at 1 p.m., got back
+  // Tuesday at 1 p.m."): a sleeper route (Route Master Sleeper ticked) is on the road its route hours plus the driver's 10-hour
+  // sleeper break, so 852 leaving 1:00 PM for 14 hours is back 1:00 PM the next day, not 3:00 AM.
+  var SLEEPER_BREAK_HOURS = 10;
   function weeklyWindow(row, prefix, master) {
     var d = row.days[prefix] || {}, m = (master && master(row, prefix)) || {};
     var pick = function (a, b) { return a !== null && a !== undefined && a !== '' ? a : b; };
-    return runWindow({ dispatchTime: pick(d.dispatchTime, m.dispatchTime), routeHours: pick(d.routeHours, m.hours) });
+    var w = runWindow({ dispatchTime: pick(d.dispatchTime, m.dispatchTime), routeHours: pick(d.routeHours, m.hours) });
+    if (w.end !== null && yes(pick(row.sleeper, m.sleeper))) w.end += SLEEPER_BREAK_HOURS * 60;
+    return w;
+  }
+  // "1:00 PM", or "TUE 1:00 PM" when it falls on another day than prefix (end in minutes from the start of prefix's day).
+  function untilText(end, prefix) {
+    var shift = Math.floor(end / 1440), i = DAYS.indexOf(prefix);
+    return (shift && i >= 0 ? DAYS[(i + shift + 7) % 7].toUpperCase() + ' ' : '') + timeText(((end % 1440) + 1440) % 1440);
+  }
+  // The day before and after prefix in the same week.
+  function nextDays(prefix) {
+    var i = DAYS.indexOf(prefix);
+    return [DAYS[i - 1], DAYS[i + 1]].filter(Boolean);
   }
   // '' when the two runs can share a driver that day, else why not: "ON 8301 UNTIL 1:30 PM" (or "RETURN TIME NOT KNOWN").
-  function driverClash(a, b, prefix, master) {
+  // from: the day b runs when it is not prefix (the day before or after). Joe 11-12-26: a sleeper run back the next day keeps its
+  // driver until it is back ("ON 852 UNTIL TUE 1:00 PM"), so a run the day before or after counts when the times overlap. Across
+  // days only known times count; an unknown time there blocks nothing.
+  function driverClash(a, b, prefix, master, from) {
+    from = from || prefix;
+    var cross = from !== prefix;
     // A one-week extra line of the same run (Joe 10/23) is a second trip, so it goes by the times like any other run.
     var same = routeNumber(a.route), extra = !!((a.extraOf && (a.extraOf === b.runDocId || a.extraOf === b.extraOf)) || (b.extraOf && b.extraOf === a.runDocId));
-    if (same && same === routeNumber(b.route) && !extra) return '';
-    var x = weeklyWindow(a, prefix, master), y = weeklyWindow(b, prefix, master), tol = 15;
+    if (!cross && same && same === routeNumber(b.route) && !extra) return '';
+    var x = weeklyWindow(a, prefix, master), y = weeklyWindow(b, from, master), tol = 15;
+    var shift = (DAYS.indexOf(from) - DAYS.indexOf(prefix)) * 1440;
+    if (y.start !== null) y.start += shift;
+    if (y.end !== null) y.end += shift;
     var known = x.start !== null && x.end !== null && y.start !== null && y.end !== null;
+    if (cross && !known) return '';
     if (known && !(x.start < y.end - tol && y.start < x.end - tol)) return '';
-    return 'ON ' + routeNumber(b.route) + (y.end !== null ? ' UNTIL ' + timeText(y.end % 1440) : ' \u2014 TIMES NOT KNOWN');
+    return 'ON ' + routeNumber(b.route) + (y.end !== null ? ' UNTIL ' + untilText(y.end, prefix) : ' \u2014 TIMES NOT KNOWN');
   }
   function weeklyContext(rows, drivers, exceptions, plantLoads, master) {
     var byDriver = {}, relief = {}, clash = {};
@@ -1373,13 +1415,12 @@
       });
     });
     Object.keys(byDriver).forEach(function (k) {
-      var p = k.split('|')[0], list = byDriver[k];
+      var p = k.split('|')[0], who = k.slice(p.length + 1), list = byDriver[k];
       list.forEach(function (a) {
-        list.forEach(function (b) {
-          if (a === b) return;
-          var why = driverClash(a, b, p, master);
-          if (why) { (clash[p] = clash[p] || []).push({ row: a, why: why }); }
-        });
+        var hit = '';
+        list.forEach(function (b) { if (!hit && a !== b) hit = driverClash(a, b, p, master); });
+        nextDays(p).forEach(function (q) { (byDriver[q + '|' + who] || []).forEach(function (b) { if (!hit) hit = driverClash(a, b, p, master, q); }); });
+        if (hit) (clash[p] = clash[p] || []).push({ row: a, why: hit });
       });
     });
     return Object.assign(offCoverContext(drivers, exceptions), { clash: clash, master: master || null, relief: relief, plant: plantByRun(rows, plantLoads) });
@@ -1473,7 +1514,12 @@
         (rows || []).forEach(function (r) { var d = r.days[p]; if (d.runs && d.driverId === driver.id) { routes.push(boardLabel(r)); runIds.push(String(r.runId || '').trim()); if (d.routeOverride) extra = true; } });
         // Joe 11/6: two runs that day are pink only when their times on the road overlap (driverClash); Load 1 and Load 2 never.
         var mine = (rows || []).filter(function (r) { var d = r.days[p]; return d.runs && d.driverId === driver.id; });
-        var overlap = mine.some(function (a) { return mine.some(function (b) { return a !== b && !!driverClash(a, b, p, master); }); });
+        // Joe 11-12-26: a sleeper run back the next day overlaps that day's runs too.
+        var near = nextDays(p).map(function (q) { return { q: q, list: (rows || []).filter(function (r) { var d = r.days[q]; return d && d.runs && d.driverId === driver.id; }) }; });
+        var overlap = mine.some(function (a) {
+          return mine.some(function (b) { return a !== b && !!driverClash(a, b, p, master); }) ||
+            near.some(function (n) { return n.list.some(function (b) { return !!driverClash(a, b, p, master, n.q); }); });
+        });
         var off = exceptionOn(exceptions, driver.id, date);
         // OFF: Driver Master does not have the driver available that day (<day>_available), as on the current board.
         var regularOff = !!driver.cells && !yes(driver.cells[p + '_available']);
@@ -1619,8 +1665,8 @@
         if (d && off) { day.intendedDriverId = d.id; day.intendedDriver = d.name; day.driverExceptionStatus = off.reasonCode || exceptionLabel(off); }
         var own = day.driverId && ctx.driversById[day.driverId] ? ctx.findUnit(ctx.driversById[day.driverId].defaultTruckId, 'TRUCK') : null;
         var truck = own || ctx.findUnit(rd.tractor, 'TRUCK'), trailer = ctx.findUnit(rd.trailer, 'TRAILER');
-        if (truck && bookUnit(ctx, p, 'TRUCK', truck.id, day.dispatchTime, day.routeHours)) { day.truckId = truck.id; day.truck = truck.unit; }
-        if (trailer && bookUnit(ctx, p, 'TRAILER', trailer.id, day.dispatchTime, day.routeHours)) { day.trailerId = trailer.id; day.trailer = trailer.unit; }
+        if (truck && bookUnit(ctx, p, 'TRUCK', truck.id, day.dispatchTime, bookHours(day.routeHours, route))) { day.truckId = truck.id; day.truck = truck.unit; }
+        if (trailer && bookUnit(ctx, p, 'TRAILER', trailer.id, day.dispatchTime, bookHours(day.routeHours, route))) { day.trailerId = trailer.id; day.trailer = trailer.unit; }
       }
       days[p] = day;
     });
@@ -1850,7 +1896,7 @@
     areaAllowed: areaAllowed, pageAllowed: pageAllowed, homeChoices: homeChoices,
     noWriteUp: noWriteUp, NOT_RUNNING_CLEARS: NOT_RUNNING_CLEARS, dispatchDriver: dispatchDriver, plantTrailer: plantTrailer, plantByRun: plantByRun, garageSent: garageSent, garageOff: garageOff, GARAGE_OFF: GARAGE_OFF,
     plantFor: plantFor, plantCarrier: plantCarrier, carrierLoad: carrierLoad, plantTitle: plantTitle, standardDrivers: standardDrivers, resetWeekPlan: resetWeekPlan, boxLoadRun: boxLoadRun,
-    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
+    routeHours: routeHours, unitFinder: unitFinder, weekBuildContext: weekBuildContext, bookUnit: bookUnit, bookHours: bookHours, buildRunDays: buildRunDays, buildWeekRun: buildWeekRun,
     AREA_ORDER: AREA_ORDER, AREA_WORDS: AREA_WORDS, loadArea: loadArea, areaName: areaName, unitKey: unitKey, plantOf: plantOf, hauler: hauler, outsideHauler: outsideHauler, coverageName: coverageName, isLoaded: isLoaded, LOADED_WORDS: LOADED_WORDS, statusActive: statusActive, runActive: runActive, dropAndHook: dropAndHook,
     coveredRoute: coveredRoute, weeklyCellClass: weeklyCellClass, weeklyCoverage: weeklyCoverage, weeklyContext: weeklyContext, driverBoardRows: driverBoardRows,
     UNIT_OFF_STATUSES: UNIT_OFF_STATUSES, unitOff: unitOff, unitOffWhy: unitOffWhy, offUnitLoads: offUnitLoads, unitOnLoad: unitOnLoad, unitUsable: unitUsable, trailerNumber: trailerNumber, driverActive: driverActive, driverDeleted: driverDeleted, notRunningRows: notRunningRows,
@@ -1860,7 +1906,7 @@
     SAVE_ROLES: SAVE_ROLES, REORDER_ROLES: REORDER_ROLES, DRIVER_ROLES: DRIVER_ROLES, hasRole: hasRole,
     PLANTS: PLANTS, HOME_PLANT: HOME_PLANT, plantDb: plantDb, PRIMARY_ADMINS: PRIMARY_ADMINS, ADMIN_ROLES: ADMIN_ROLES, isAdmin: isAdmin, plantsFor: plantsFor,
     vacationWeeks: vacationWeeks, driverRosterRows: driverRosterRows, needsDriver: needsDriver, checkinRows: checkinRows, splitOverShort: splitOverShort, joinOverShort: joinOverShort, homeNumbers: homeNumbers, availableDrivers: availableDrivers,
-    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts, weeklyWindow: weeklyWindow, driverClash: driverClash, weeklyClash: weeklyClash,
+    unitDefaultDays: unitDefaultDays, cleanUnitNote: cleanUnitNote, hoursMinutes: hoursMinutes, unitLeased: unitLeased, unitLessor: unitLessor, opsAssignments: opsAssignments, opsKey: opsKey, OPS_DEFAULTS: OPS_DEFAULTS, runWindow: runWindow, unitConflicts: unitConflicts, weeklyWindow: weeklyWindow, driverClash: driverClash, nextDays: nextDays, SLEEPER_BREAK_HOURS: SLEEPER_BREAK_HOURS, weeklyClash: weeklyClash,
     fleetDue: fleetDue, latestReadings: latestReadings, fleetRule: fleetRule, fleetKind: fleetKind, fleetUnitKey: fleetUnitKey, personKey: personKey, employeeForTech: employeeForTech, plantOfLocation: plantOfLocation, fleetOwnedHere: fleetOwnedHere, unitAtPlant: unitAtPlant, FLEET_OFF: FLEET_OFF, FLEET_ON: FLEET_ON, FLEET_BY_DAYS: FLEET_BY_DAYS, addMonths: addMonths, FLEET_RULES: FLEET_RULES,
     COLORS: COLORS, dateText: dateText, weekText: weekText, DAYS: DAYS, DAY_NAMES: DAY_NAMES, TIME_ZONE: TIME_ZONE, DAY_ROLL_HOUR: DAY_ROLL_HOUR, localDay: localDay,
     isDateKey: isDateKey, dateKey: dateKey, addDays: addDays, dayPrefix: dayPrefix, dayName: dayName,
