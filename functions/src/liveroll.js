@@ -102,6 +102,11 @@ function seedValue(key, cells, week, built) {
   if (key === 'week_signature' || key === 'week_start' || key === 'week_start_date') return week;
   const direct = text(cells[key]);
   const day = key.match(/^(sun|mon|tue|wed|thu|fri|sat)_(.+)$/);
+  // Joe 11-12-26: a day planned ahead on Route Week Override is written as planned, and as changed by hand.
+  if (day && built && Array.isArray(built.plannedDays) && built.plannedDays.indexOf(day[1]) >= 0) {
+    if (day[2] === 'runs') return built.days && built.days[day[1]] && built.days[day[1]].runs ? 'TRUE' : 'FALSE';
+    if (day[2] === 'route_override') return 'TRUE';
+  }
   if (day && built) {
     const d = (built.days || {})[day[1]] || {}, f = Object.keys(UNIT_COLUMNS).find(k => UNIT_COLUMNS[k] === day[2]);
     if (f && d.runs && text(d[f])) return text(d[f]);

@@ -51,3 +51,10 @@
   .routeweek-page table.rw th.hol { padding-left: 0; padding-right: 0; }
   .routeweek-page table.rw th .hol-word { letter-spacing: -1px; }
 }
+/* Joe 11-12-26: plan a holiday week ahead. The next holiday's button, Use Suggested Moves, and each load's suggested day. */
+.routeweek-page .rw-next-hol, .routeweek-page .rw-suggest { font: inherit; font-size: 16px; font-weight: 800; border: 2px solid #f2b632; border-radius: 9px; background: #fff8e6; color: #3d2a00; padding: 6px 10px; cursor: pointer; }
+.routeweek-page .rw-next-hol[hidden], .routeweek-page .rw-suggest[hidden] { display: none; }
+.routeweek-page .rw-suggest:disabled { cursor: default; opacity: .6; }
+.routeweek-page .rw-hol-list .rw-tip { display: block; font-size: 16px; font-weight: 700; color: var(--amber); }
+.routeweek-page .rw-hol-list .rw-tip span { white-space: nowrap; }
+.routeweek-page .rw-next-hol .nw { white-space: nowrap; }

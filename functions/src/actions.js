@@ -36,7 +36,7 @@ const { moveRun, setUnitDown, updateIssue, reorder } = require('./actions-daily'
 const { editDriver, setDriverPhone, setDriverText, saveDriver, removeDrivers, deleteDriver, saveDriverTemplate, saveScorecard, rateTruckClean, addDriverIncident, reviewDriverIncident, excuseScorecardMiss, saveOpsAssignment } = require('./actions-drivers');
 const { saveDriverException, saveVacation } = require('./actions-dayoff');
 const { ROUTE_FIELDS, ROUTE_DAY_FIELDS, routeValue, saveRoute, routeLiveFollow, reorderRouteDay } = require('./actions-routes');
-const { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
+const { reorderWeek, publishWeek, setWeekReason, setWeekPlan, resetWeek, addExtraRun, removeExtraRun } = require('./actions-weekly');
 const LIVEROLL = require('./liveroll');
 const { saveOtr, otrColumnKey } = require('./actions-otr');
 
@@ -85,6 +85,8 @@ const ACTIONS = Object.freeze({
   reorderWeek: { roles: REORDER_ROLES, screen: 'weeklyDispatch' },
   updateIssue: { roles: SAVE_ROLES, screen: 'checkIns' },
   setWeekReason: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
+  // Joe 11-12-26: Route Week Override plans a week after Next ahead of time (weekPlans; used when Publish builds that week).
+  setWeekPlan: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   // Joe 10/23 (two Venturas one day): a second line for a run, this week only (not in Route Master), and taking it off again.
   addExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
   removeExtraRun: { roles: SAVE_ROLES, screen: 'weeklyDispatch' },
@@ -513,6 +515,22 @@ function validate(input) {
     if (!out.runDocId) throw new SaveError('BAD_REQUEST', 'Pick the run');
     return out;
   }
+  if (action === 'setWeekPlan') {
+    if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
+    out.weekStart = input.weekStart;
+    if (input.clear === true) { out.clear = true; return out; }
+    if (input.runId !== undefined) {
+      out.runId = text(input.runId, 120);
+      if (!out.runId || out.runId.indexOf('/') >= 0) throw new SaveError('BAD_REQUEST', 'Pick the run');
+      if (L.DAYS.indexOf(input.day) < 0) throw new SaveError('BAD_REQUEST', 'Pick the day');
+      if (typeof input.runs !== 'boolean') throw new SaveError('BAD_REQUEST', 'runs must be true or false');
+      out.day = input.day; out.runs = input.runs;
+      return out;
+    }
+    if (input.reason === undefined) throw new SaveError('BAD_REQUEST', 'Pick a day, type a reason or clear the plan');
+    out.reason = text(input.reason, 300);
+    return out;
+  }
   if (action === 'setWeekReason') {
     out.weekStart = text(input.weekStart);
     if (!L.isDateKey(out.weekStart)) throw new SaveError('BAD_REQUEST', 'weekStart must be yyyy-mm-dd');
@@ -908,6 +926,7 @@ async function applyAction(db, user, input, now, deps) {
     if (req.action === 'saveVacation') return saveVacation(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveDriverTemplate') return saveDriverTemplate(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'setWeekReason') return setWeekReason(tx, db, req, email, stamp, logRef, mode);
+    if (req.action === 'setWeekPlan') return setWeekPlan(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'addExtraRun') return addExtraRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'removeExtraRun') return removeExtraRun(tx, db, req, email, stamp, logRef, mode);
     if (req.action === 'saveOtr') return saveOtr(tx, db, req, email, stamp, logRef, mode);

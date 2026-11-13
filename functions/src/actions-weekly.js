@@ -120,6 +120,42 @@ async function resetWeek(tx, db, req, email, stamp, logRef, mode) {
 }
 
 /*
+ * Joe 11-12-26 ("I need to have this screen not change any other until it's time, but like I want to predetermine what the holiday
+ * week's going to run like. So I need to be able to switch it forward"): Route Week Override plans a week after the Live Next week
+ * (weekPlans/<week>). Nothing else changes: the plan is used when Publish builds that week (weekroll.planRoll). One save is one
+ * day of one run ({runId, day, runs}), the week's reason ({reason}), or the whole plan cleared ({clear: true}). A day planned back
+ * to its Route Master day is taken out of the plan.
+ */
+const PLAN_WEEKS = 52;
+async function setWeekPlan(tx, db, req, email, stamp, logRef, mode) {
+  const app = (await tx.get(db.collection(C.config).doc('app'))).data() || {}, live = app.liveWeeks || {};
+  if (!live.next) throw new SaveError('NOT_ALLOWED', 'The Live weeks are not set up yet, so no week can be planned ahead');
+  if (req.weekStart <= live.next) throw new SaveError('NOT_ALLOWED', 'The week of ' + L.dateText(req.weekStart) + ' is already built. Change its days on the week itself.');
+  if (req.weekStart > L.addDays(live.next, 7 * PLAN_WEEKS)) throw new SaveError('NOT_ALLOWED', 'A week can be planned up to a year ahead');
+  const ref = db.collection(C.weekPlans).doc(req.weekStart), snap = await tx.get(ref);
+  const was = snap.exists ? snap.data() : {}, days = JSON.parse(JSON.stringify(was.days || {}));
+  let route = null;
+  if (req.runId) {
+    const r = await tx.get(db.collection(C.routes).doc(req.runId));
+    if (!r.exists) throw new SaveError('NOT_FOUND', 'That run is no longer in Route Master');
+    route = r.data();
+  }
+  const after = { weekStart: req.weekStart, updatedAt: stamp, updatedBy: email };
+  if (req.clear) { after.days = {}; after.overrideReason = ''; }
+  else if (req.runId) {
+    const normal = !!(route.days && route.days[req.day] && route.days[req.day].active), mine = Object.assign({}, days[req.runId] || {});
+    if (req.runs === normal) delete mine[req.day]; else mine[req.day] = req.runs;
+    if (Object.keys(mine).length) days[req.runId] = mine; else delete days[req.runId];
+    after.days = days;
+  } else after.overrideReason = req.reason;
+  tx.set(ref, Object.assign({ days: was.days || {}, overrideReason: was.overrideReason || '' }, after));
+  const result = { ok: true, requestId: req.requestId, runs: [], plan: Object.assign({ days: was.days || {}, overrideReason: was.overrideReason || '' }, after) };
+  tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before: { days: was.days || {}, overrideReason: was.overrideReason || '' },
+    after: { days: result.plan.days, overrideReason: result.plan.overrideReason }, result: { ok: true, requestId: req.requestId, runs: [] } });
+  return result;
+}
+
+/*
  * Joe 10/23 ("this week I have an extra Ventura, so I actually have two on the same day ... a temporary, one-time thing"): a second
  * line for a run, for this week only, added from the run's name on Weekly Dispatch. It is a run of its own (own run_id), so it gets
  * its own driver on every screen, the double-booking check counts it, and it never picks up the first line's Plant Scheduler
@@ -182,4 +218,4 @@ async function removeExtraRun(tx, db, req, email, stamp, logRef, mode) {
   return result;
 }
 
-module.exports = { reorderWeek, publishWeek, setWeekReason, resetWeek, addExtraRun, removeExtraRun };
+module.exports = { reorderWeek, publishWeek, setWeekReason, setWeekPlan, resetWeek, addExtraRun, removeExtraRun };

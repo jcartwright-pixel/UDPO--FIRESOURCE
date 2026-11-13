@@ -30,7 +30,9 @@ const COLLECTIONS = Object.freeze({
   // Joe 10/16: drivers marked Backup for a day on the Weekly board (app only; never written to the sheets).
   backups: 'driverBackups',
   // Joe 10/31: each plant's Employees list, brought over from UDMS (src/employees.js).
-  employees: 'employees'
+  employees: 'employees',
+  // Joe 11-12-26: weeks planned ahead on Route Week Override (app only; used when Publish builds that week).
+  weekPlans: 'weekPlans'
 });
 
 const LIVE_TABS = Object.freeze({ previous: 'LIVE PREVIOUS WEEK', current: 'LIVE CURRENT WEEK', next: 'LIVE NEXT WEEK' });
