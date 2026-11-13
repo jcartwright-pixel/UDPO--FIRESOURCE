@@ -31,6 +31,7 @@ export const SCREENS = [
   { href: 'keys.html', name: 'Keys & Connections', note: 'Administrators: the Verizon Connect, RedZone, MOCREO and Twilio sign-ins', admin: true },
   { href: 'accounting.html', name: 'Accounting Numbers', note: 'Administrators: the monthly accounting package, read once for Over the Road and cost analysis', admin: true },
   { href: 'changes.html', name: 'Customer Changes', note: 'Administrators: changes to the route customer list from every app, approved here before they are saved', admin: true },
+  { href: 'addresses.html', name: 'Address Check', note: 'Administrators: customers whose address needs a look: not found, part match, far from its pin or its DC, or a PO box', admin: true },
   { href: 'bol.html', name: 'Daily BOL', note: 'Administrators: the daily load by route from the office, picked up from the ROUTES/BOL email label', admin: true },
   { href: 'help.html', name: 'Help', note: 'How the hub works' }
 ];

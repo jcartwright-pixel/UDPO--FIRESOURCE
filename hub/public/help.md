@@ -36,7 +36,7 @@ The **United Dairy Hub** is the one place to sign in and open every United Dairy
 - **Fleet & Costs**: Fuel Tracking, Route Cost Analysis and **Fleet & Maintenance**.
 - **Office**: Customer Statements.
 - **People & Safety**: Employees & Compliance and Accident & Injury Reporting.
-- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) is in the hub's menu, not on Home.
+- **Administration** (administrators): **Who gets in** (People & Access, Roles & Rights), **Messages and links** (Email & Texts, Links & Codes), **Plants and connections** (Plant Setup, Keys & Connections) and **Numbers from the office** (Accounting Numbers, Daily BOL). **Customer Changes** (changes to the route customer list from every app, waiting for approval) and **Address Check** (customers whose address needs a look) are in the hub's menu, not on Home.
 
 ### Which cards you see
 - **Plant & Distribution**, **Customers & Routes**, the **Sales App**, **Inventory**, **Fleet & Maintenance** and **Accident & Injury Reporting**: everyone who is active on the Users list. The Sales App, Inventory and Fleet & Maintenance have nothing to tick in People & Access: any United Dairy account may open it.
@@ -294,6 +294,26 @@ Every change to the route customer list comes here first, from every app: Custom
 
 !> Do not approve a change you have not read. Once it is saved, the customer list and every app that reads it change.
 
+
+## Address Check
+id: addresses
+screens: addresses.html
+
+**Address Check** lists the customers whose address needs a look. Every customer's address is looked up on the map once, and again when it changes, and the hub fills in what is missing: the street address at a customer's map point when there is no address, and the map point for an address when there is no map point. Administrators only. It is in the hub's menu.
+
+A customer is on the list when:
+- the address could not be found on the map, or only part of it matched;
+- the address is more than a quarter mile from the customer's own map point (the GPS point brought in from Verizon);
+- the customer is more than 120 miles from the DC that serves it (the DC's place is the plant location with the same name on **Plant Setup**, under **Where each plant is**);
+- the address is a PO box, which is where the mail goes, not where the store is.
+
+1. Pick the **Plant**, or leave **Every plant**.
+2. Type in **Find** to look for a customer by name, account or address.
+3. Read **Why** on each line, then fix the address in **Customers & Routes**. The next hourly check takes it off the list.
+
+> The first check of every customer takes a few hours, a share at a time. The line at the top says how many have been looked at so far.
+
+!> Do not change a good address just because the map point is a little off. A store at the back of a big lot can be a few hundred feet from its street address.
 ## Daily BOL
 id: bol
 screens: bol.html

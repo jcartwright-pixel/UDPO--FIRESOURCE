@@ -27,12 +27,13 @@ const TILE_URL = 'https://maps.hereapi.com/v3/base/mc';
 const GEOCODE_URL = 'https://geocode.search.hereapi.com/v1/geocode';
 const AUTOCOMPLETE_URL = 'https://autocomplete.search.hereapi.com/v1/autocomplete';
 const DISCOVER_URL = 'https://discover.search.hereapi.com/v1/discover';
+const REVGEOCODE_URL = 'https://revgeocode.search.hereapi.com/v1/revgeocode';
 const STYLES = { normal: 'explore.day', satellite: 'satellite.day' };
 const MAX_ROWS = 100;
 const MILE = 1609.344;
 
 // Who may use each service: the app tick it belongs to (src/hub.js appsOf).
-const SERVICES = { here: { app: 'mapmaker', ops: ['mapTile', 'geocode', 'suggest', 'findPlace'] } };
+const SERVICES = { here: { app: 'mapmaker', ops: ['mapTile', 'geocode', 'reverseGeocode', 'suggest', 'findPlace'] } };
 
 // A few hundred map pictures kept in memory, so panning back and forth does not ask HERE again.
 const TILE_CACHE = new Map();
@@ -117,6 +118,31 @@ async function geocode(key, input, fetchFn) {
   return { results };
 }
 
+/** The street address at a map point (HERE reverse lookup). null when HERE has none near it. */
+async function reverseOne(key, lat, lon, fetchFn) {
+  const p = point({ lat, lon });
+  if (!p) return null;
+  const url = new URL(REVGEOCODE_URL);
+  url.searchParams.set('at', p.lat + ',' + p.lon); url.searchParams.set('limit', '1'); url.searchParams.set('lang', 'en-US'); url.searchParams.set('apiKey', key);
+  const d = await ask(fetchFn, url, 'address lookup', 15000);
+  const it = Array.isArray(d.items) && d.items[0], a = it && it.address;
+  if (!a || !a.street) return null;
+  return { street: text([a.houseNumber, a.street].filter(Boolean).join(' '), 200), city: text(a.city, 80), state: text(a.stateCode || a.state, 20),
+    zip: text(a.postalCode, 10).slice(0, 5), label: text(a.label, 300), meters: Number.isFinite(it.distance) ? it.distance : null };
+}
+
+async function reverseGeocode(key, input, fetchFn) {
+  const rows = Array.isArray(input.rows) ? input.rows : null;
+  if (!rows || !rows.length) fail('BAD_REQUEST', 'Send the map points to look up.');
+  if (rows.length > MAX_ROWS) fail('BAD_REQUEST', 'Up to ' + MAX_ROWS + ' map points at a time. Send a long list in parts.');
+  const results = [];
+  for (const row of rows) {
+    const id = text(row && row.id, 100), hit = await reverseOne(key, row && row.lat, row && row.lon, fetchFn);
+    results.push(hit ? Object.assign({ id }, hit) : { id, notFound: true });
+  }
+  return { results };
+}
+
 async function suggest(key, input, fetchFn) {
   const q = text(input.text, 250);
   if (q.length < 3) return { results: [] };
@@ -160,7 +186,7 @@ async function findPlace(key, input, fetchFn) {
   return { results };
 }
 
-const OPS = { mapTile, geocode, suggest, findPlace };
+const OPS = { mapTile, geocode, reverseGeocode, suggest, findPlace };
 
 async function writeLog(db, email, service, op, input, ok, ms, error, now) {
   const at = now.toISOString();
@@ -171,7 +197,7 @@ async function writeLog(db, email, service, op, input, ok, ms, error, now) {
       await db.collection('hubPorterDaily').doc([day, service, op, email].join('__')).set(
         { day, email, service, op, calls: FieldValue.increment(1), failed: FieldValue.increment(ok ? 0 : 1), lastAt: at }, { merge: true });
     } else {
-      const count = op === 'geocode' && Array.isArray(input.rows) ? input.rows.length : 1;
+      const count = (op === 'geocode' || op === 'reverseGeocode') && Array.isArray(input.rows) ? input.rows.length : 1;
       await db.collection('hubPorterLog').add({ at, email, service, op, ok, ms, count, error: ok ? '' : text(error, 300) });
     }
   } catch (e) { console.error('porter log', e && e.message); }
@@ -198,4 +224,4 @@ async function porterCall(db, email, input, may, options) {
   return answer;
 }
 
-module.exports = { porterCall, PorterError, SERVICES, STYLES, TILE_CACHE, hereKey, geocodeOne };
+module.exports = { porterCall, PorterError, SERVICES, STYLES, TILE_CACHE, hereKey, geocodeOne, reverseOne };

@@ -434,3 +434,9 @@ html:has(body.hub-page), body.hub-page { height: auto; min-height: 100%; overflo
 #plant-places label { display: block; margin: 6px 0; }
 #plant-places label input:not([type="checkbox"]) { display: block; width: 100%; box-sizing: border-box; }
 #where { margin-top: 24px; }
+
+/* Address Check: one table of the customers to check. */
+.table-wrap { overflow-x: auto; }
+.lc-table { width: 100%; border-collapse: collapse; }
+.lc-table th, .lc-table td { text-align: left; padding: 8px; border-bottom: 1px solid #d9dee5; vertical-align: top; }
+.lc-table th { position: sticky; top: 0; background: #f3f6fa; }

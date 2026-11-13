@@ -186,6 +186,11 @@ async function hubCall(db, user, input, options) {
     try { return await L.save(db, email, input, { fetchFn: options && options.fetchFn }); }
     catch (err) { if (err instanceof L.PlantError) throw new HubError(err.code, err.message); throw err; }
   }
+  // The address check (Joe 11-12-26, src/addressfill.js): the customers whose address is to check. Administrators.
+  if (op === 'addressCheck') {
+    if (!isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can see the address check.');
+    return require('./addressfill').toCheck(db, input);
+  }
   // The route customer list's one door (Joe 11-9-26, src/changes.js): any app sends, administrators approve in the Hub.
   if (CHANGE_OPS[op]) {
     if (CHANGE_OPS[op] === 'admin' && !isAdmin(person)) throw new HubError('NOT_ALLOWED', 'Only an administrator can approve or turn down changes to the customer list.');

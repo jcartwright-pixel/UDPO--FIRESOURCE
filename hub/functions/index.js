@@ -91,3 +91,11 @@ exports.hubPlantsOnLocations = onDocumentWritten({ document: 'routeEstimator/loc
 exports.hubPlantsHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 120, maxInstances: 1 }, async () => {
   console.log('hubPlants', JSON.stringify(await plantFill()));
 });
+
+/*
+ * Missing street addresses and map points (Joe 11-12-26: "get the addresses and fill them in"): looked up through the porter's
+ * HERE key a share at a time every hour, kept in hubAddressFill and shown on the Hub's customer list. src/addressfill.js says how.
+ */
+exports.hubAddressFillHourly = onSchedule({ schedule: 'every 60 minutes', timeZone: 'America/New_York', timeoutSeconds: 540, memory: '512MiB', maxInstances: 1 }, async () => {
+  console.log('hubAddressFill', JSON.stringify(await require('./src/addressfill').fill(db)));
+});
