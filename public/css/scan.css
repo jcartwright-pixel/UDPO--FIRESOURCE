@@ -193,14 +193,18 @@
 .rv-inv { margin: 10px 2px 0; padding: 8px 12px; border-radius: 10px; background: #eaf6ee; color: #14532d; font-size: 18px; font-weight: 800; }
 .rv-note { margin: 8px 2px 0; font-size: 16px; font-weight: 700; color: #5a6b7d; }
 
-/* Joe 11-12-26: Inventory opens on its lists, a card for each part of the one product list. */
-.inv-page .inv-lists { overflow: auto; flex: 1 1 auto; min-height: 0; }
-.inv-page .inv-list-group { margin: 0 0 14px; }
-.inv-page .inv-list-group h2 { font-size: 18px; margin: 0 0 8px; text-transform: uppercase; }
-.inv-page .inv-list-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.inv-page .inv-list-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 72px; padding: 12px 14px; font-size: 16px; text-align: left; text-transform: uppercase; border: 1px solid var(--line, #c9d3df); border-left: 6px solid var(--ud-blue); background: #fff; border-radius: 8px; cursor: pointer; }
-.inv-page .inv-list-card strong { font-size: 18px; }
-.inv-page .inv-list-card.has-low { border-left-color: #b42318; }
-.inv-page .inv-list-card b { color: #b42318; }
+/* Joe 11-12-26: the buttons in one row across the top, the categories under them, and the kinds (or My Lists) under the one
+   picked; the products of it below. */
+.inv-page .inv-topbar { align-items: center; gap: 8px; margin: 0 0 4px; }
+.inv-page .inv-topbar .inv-tabs { margin: 0; }
+.inv-page .inv-cats { display: flex; flex-direction: column; gap: 8px; margin: 0 0 6px; }
+.inv-page .inv-cats .inv-types { flex-wrap: wrap; align-self: flex-start; }
+.inv-page .inv-types button { display: inline-flex; align-items: center; gap: 8px; }
+.inv-page .inv-n { display: inline-block; min-width: 28px; padding: 1px 8px; border-radius: 999px; background: #e6edf5; color: var(--ud-blue); font-size: 16px; font-weight: 800; text-align: center; }
+.inv-page .inv-n.low { background: #b42318; color: #fff; }
+.inv-page [aria-selected="true"] .inv-n:not(.low), .inv-page .inv-sub.on .inv-n:not(.low) { background: #fff; color: var(--ud-blue); }
+.inv-page .inv-subs { display: flex; flex-wrap: wrap; gap: 8px; }
+.inv-page .inv-subs[hidden] { display: none; }
+.inv-page .inv-sub { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.inv-page .inv-sub.on { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
 .inv-page .inv-list-none { font-size: 16px; margin: 0; }
-.inv-page .inv-filters > button.inv-onlist { background: var(--ud-blue); border-color: var(--ud-blue); color: #fff; }
