@@ -74,11 +74,11 @@ async function openPage(browser, width, height, url) {
     const day = (cust, d) => p.$eval('#stops-list tr[data-cust="' + cust + '"]', (tr, i) => { const td = tr.cells[4 + i], sp = td.querySelector('span');
       return sp ? sp.className + ':' + sp.textContent : (td.classList.contains('no') ? 'no' : ''); }, DAYS.indexOf(d));
     assert.deepEqual(await p.$eval('#stops-list thead tr', tr => [...tr.cells].map(c => c.childNodes[0].textContent)), ['Chain', 'Account', 'Customer', 'Route', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Notes']);
-    assert.deepEqual([await day('855|101', 'mon'), await day('855|101', 'wed'), await day('855|101', 'thu')], ['on:8555 cs', 'add:85510 cs', 'drop:Thu'],
+    assert.deepEqual([await day('855|101', 'mon'), await day('855|101', 'wed'), await day('855|101', 'thu')], ['on:855', 'add:855', 'drop:Thu'],
       'Thursday off: the low-volume store rides on Wednesday on route 855 (3 down to 2)');
     assert.equal(await p.$eval('#stops-list tr[data-cust="855|101"]', tr => tr.cells[8].classList.contains('no')), true, 'Thursday is striped: route 855 does not run');
     assert.deepEqual([await day('855|102', 'mon')], ['none:None'], 'no cases in the last 3 weeks: no delivery');
-    assert.deepEqual([await day('855|103', 'tue'), await day('855|103', 'wed')], ['on:855100 cs', 'add:855100 cs'], 'a busy store keeps 2 deliveries: Thursday moves to Wednesday');
+    assert.deepEqual([await day('855|103', 'tue'), await day('855|103', 'wed')], ['on:855', 'add:855'], 'a busy store keeps 2 deliveries: Thursday moves to Wednesday');
     assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 3, 'Changed shows the 3 customers that change');
     assert.match(await p.textContent('#stops-state'), /^4 changes in the plan · Not saved$/);
     results.push('Each customer on its own route, Sun to Sat: the route that delivers each day with its cases, a day taken off crossed out, NONE for no delivery');
@@ -90,7 +90,7 @@ async function openPage(browser, width, height, url) {
     await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=route]', '852');
     await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=day]', 'fri');
     await p.click('#stops-cust-close');
-    assert.deepEqual([await day('855|103', 'wed'), await day('855|103', 'fri')], ['', 'add:852100 cs'], 'Friday shows route 852');
+    assert.deepEqual([await day('855|103', 'wed'), await day('855|103', 'fri')], ['', 'add:852'], 'Friday shows route 852');
     results.push('A delivery picked by hand goes to route 852 on Friday, and Friday says 852');
 
     // Routes in my plan: untick 855 and its customers leave the list; tick it back.
@@ -136,10 +136,10 @@ async function openPage(browser, width, height, url) {
     await p.click('#stops-over');
     await p.waitForSelector('#stops-ask:not([hidden])');
     await p.click('#stops-ask-no');
-    assert.equal(await day('855|103', 'fri'), 'add:852100 cs');
+    assert.equal(await day('855|103', 'fri'), 'add:852');
     await p.click('#stops-over');
     await p.click('#stops-ask-yes');
-    assert.equal(await day('855|103', 'wed'), 'add:855100 cs');
+    assert.equal(await day('855|103', 'wed'), 'add:855');
     results.push('Start Over asks first, then puts the hand pick back to the suggestion');
 
     // Reopened after a reload: the used changes and the note come back.
@@ -148,7 +148,7 @@ async function openPage(browser, width, height, url) {
     await p.waitForSelector('#stops-open:not([disabled])');
     await p.click('#stops-open');
     await p.waitForSelector('#stops-list tr[data-cust="855|103"]', { timeout: 15000 });
-    assert.equal(await day('855|103', 'fri'), 'add:852100 cs');
+    assert.equal(await day('855|103', 'fri'), 'add:852');
     assert.equal(await p.inputValue('#stops-list input[data-note="855|102"]'), 'Closed for the season');
     assert.match(await p.textContent('#stops-state'), /Used for this week/);
     results.push('After a reload the used changes come back, the hand pick and the note included');

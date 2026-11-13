@@ -96,7 +96,7 @@
         </div>
         <input type="search" id="stops-find" placeholder="Find a customer" aria-label="Find a customer">
       </div>
-      <div class="rw-stops-key"><span class="on">12</span> delivers, cases <span class="add">14</span> moved in <span class="drop">THU</span> normal day taken off <span class="no">&nbsp;</span> route not running <span class="none">NONE</span> no delivery this week · Click a day to change that customer</div>
+      <div class="rw-stops-key"><span class="on">855</span> route that delivers <span class="add">852</span> moved in <span class="drop">THU</span> normal day taken off <span class="no">&nbsp;</span> route not running <span class="none">NONE</span> no delivery this week · Click a day to change that customer</div>
       <div class="rw-stops-list" id="stops-list"></div>
       <div class="modal-actions rw-stops-actions">
         <span class="rw-stops-state" id="stops-state"></span>
@@ -424,9 +424,9 @@
     function dayCell(row, p, on, edit) {
       const cell = row.cells[p], none = !Object.keys(row.cells).length, run = !!(on[row.route] && on[row.route][p]);
       let inner = '';
-      if (cell) inner = Object.keys(cell).sort(byRoute).map(r => '<span class="' + (cell[r].moved ? 'add' : 'on') + '"><b>' + escapeHtml(r) + '</b><small>' + escapeHtml(String(cell[r].cases)) + ' cs</small></span>').join('');
+      if (cell) inner = Object.keys(cell).sort(byRoute).map(r => '<span class="' + (cell[r].moved ? 'add' : 'on') + '" title="' + escapeHtml(String(cell[r].cases)) + ' cases">' + escapeHtml(r) + '</span>').join('');
       else if (row.normal[p]) inner = none ? '<span class="none">None</span>' : '<span class="drop">' + DAY3(p) + '</span>';
-      return '<td class="d' + (run ? '' : ' no') + '"><button type="button" data-cust="' + escapeHtml(row.key) + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' aria-label="' + escapeHtml(row.customer + ' ' + NAME(p)) + '">' + inner + '</button></td>';
+      return '<td class="d no-fit' + (run ? '' : ' no') + '"><button type="button" data-cust="' + escapeHtml(row.key) + '" data-day="' + p + '"' + (edit ? '' : ' disabled') + ' aria-label="' + escapeHtml(row.customer + ' ' + NAME(p)) + '">' + inner + '</button></td>';
     }
     function renderRoutePick(changes) {
       const all = [...new Set(stopsData.stops.map(s => s.route))].sort(byRoute), n = {};
@@ -456,13 +456,13 @@
           prior = r.route;
           const runs = L.DAYS.filter(p => on[r.route] && on[r.route][p]).map(DAY3).join(' ') || 'no day';
           const list = rows.filter(x => x.route === r.route);
-          body += '<tr class="rt"><td colspan="12">Route ' + escapeHtml(r.route) + ' · runs ' + runs + ' this week · ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + ' shown · ' + list.filter(x => x.changes.length).length + ' changed</td></tr>';
+          body += '<tr class="rt"><td colspan="12" class="no-fit">Route ' + escapeHtml(r.route) + ' · runs ' + runs + ' this week · ' + list.length + ' customer' + (list.length === 1 ? '' : 's') + ' shown · ' + list.filter(x => x.changes.length).length + ' changed</td></tr>';
         }
         const why = [...new Set(r.changes.map(c => (KIND[c.kind] || '') + (c.why && c.why !== KIND[c.kind] ? ': ' + c.why : '')))].join(' · ');
-        body += '<tr data-cust="' + escapeHtml(r.key) + '" class="' + (r.changes.length ? 'changed' : '') + '"><td>' + escapeHtml(r.chain) + '</td><td>' + escapeHtml(r.account) + '</td><td>' + escapeHtml(r.customer) + '</td><td class="strong">' + escapeHtml(r.route) + '</td>' +
+        body += '<tr data-cust="' + escapeHtml(r.key) + '" class="' + (r.changes.length ? 'changed' : '') + '"><td class="no-fit" title="' + escapeHtml(r.chain) + '">' + escapeHtml(r.chain) + '</td><td class="no-fit">' + escapeHtml(r.account) + '</td><td class="no-fit" title="' + escapeHtml(r.customer) + '">' + escapeHtml(r.customer) + '</td><td class="strong no-fit">' + escapeHtml(r.route) + '</td>' +
           L.DAYS.map(p => dayCell(r, p, on, edit)).join('') +
           '<td class="note"><input type="text" maxlength="300" data-note="' + escapeHtml(r.key) + '" value="' + escapeHtml(notes[r.key] || '') + '" placeholder="Type a note"' + (edit ? '' : ' disabled') + ' aria-label="Note for ' + escapeHtml(r.customer) + '">' +
-          '<small>' + (why ? '<b>' + escapeHtml(why) + '</b> · ' : '') + 'Last 3 weeks ' + r.weeks.join(', ') + '</small></td></tr>';
+          '<small title="' + escapeHtml((why ? why + ' · ' : '') + 'Last 3 weeks ' + r.weeks.join(', ')) + '">' + (why ? '<b>' + escapeHtml(why) + '</b> · ' : '') + 'Last 3 weeks ' + r.weeks.join(', ') + '</small></td></tr>';
       });
       document.getElementById('stops-list').innerHTML = '<table class="rw-stops-table rw-stops-grid">' + head + '<tbody>' + (body || '<tr><td colspan="12" class="empty">' +
         (!stopsData.hub ? 'The Hub has no route customer list for this plant yet.' : stopsShow === 'all' ? 'No customers match.' : 'No changes on the routes in the plan: every customer is delivered on its normal days.') + '</td></tr>') + '</tbody></table>';
