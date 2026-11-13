@@ -69,61 +69,89 @@ async function openPage(browser, width, height, url) {
     await p.waitForFunction(() => document.getElementById('week-label').textContent === 'Week of 11-22-26');
     await p.waitForSelector('#stops-open:not([disabled])');
     await p.click('#stops-open');
-    await p.waitForSelector('#stops-list tr[data-k]', { timeout: 15000 });
-    const line = (k) => p.$eval('#stops-list tr[data-k="' + k + '"]', tr => [tr.className, tr.querySelector('td.goes select[data-pick=route]').value, (tr.querySelector('td.goes select[data-pick=day]') || {}).value || '', tr.cells[5].textContent]);
-    assert.deepEqual(await line('855|101|thu'), ['k-join', '855', 'wed', '5, 5, 5'], 'Thursday off: the low-volume store rides on Wednesday (3 down to 2)');
-    assert.deepEqual(await line('855|102|mon'), ['k-skip', '', '', '0, 0, 0'], 'no cases in the last 3 weeks: no delivery');
-    assert.deepEqual(await line('855|103|thu'), ['k-move', '855', 'wed', '100, 100, 100'], 'a busy store keeps 2 deliveries: Thursday moves to Wednesday');
-    assert.equal(await p.$$eval('#stops-list tr[data-k]', t => t.length), 4);
-    assert.match(await p.textContent('#stops-state'), /^4 changes · Not used yet$/);
-    results.push('Thanksgiving off on 855: a small store joins Wednesday, a big one moves to Wednesday, a store with no cases gets none');
+    await p.waitForSelector('#stops-list tr[data-cust]', { timeout: 15000 });
+    // Each day cell: the route that delivers and its cases, or the normal day crossed out, or NONE.
+    const day = (cust, d) => p.$eval('#stops-list tr[data-cust="' + cust + '"]', (tr, i) => { const td = tr.cells[4 + i], sp = td.querySelector('span');
+      return sp ? sp.className + ':' + sp.textContent : (td.classList.contains('no') ? 'no' : ''); }, DAYS.indexOf(d));
+    assert.deepEqual(await p.$eval('#stops-list thead tr', tr => [...tr.cells].map(c => c.childNodes[0].textContent)), ['Chain', 'Account', 'Customer', 'Route', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Notes']);
+    assert.deepEqual([await day('855|101', 'mon'), await day('855|101', 'wed'), await day('855|101', 'thu')], ['on:8555 cs', 'add:85510 cs', 'drop:Thu'],
+      'Thursday off: the low-volume store rides on Wednesday on route 855 (3 down to 2)');
+    assert.equal(await p.$eval('#stops-list tr[data-cust="855|101"]', tr => tr.cells[8].classList.contains('no')), true, 'Thursday is striped: route 855 does not run');
+    assert.deepEqual([await day('855|102', 'mon')], ['none:None'], 'no cases in the last 3 weeks: no delivery');
+    assert.deepEqual([await day('855|103', 'tue'), await day('855|103', 'wed')], ['on:855100 cs', 'add:855100 cs'], 'a busy store keeps 2 deliveries: Thursday moves to Wednesday');
+    assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 3, 'Changed shows the 3 customers that change');
+    assert.match(await p.textContent('#stops-state'), /^4 changes in the plan · Not saved$/);
+    results.push('Each customer on its own route, Sun to Sat: the route that delivers each day with its cases, a day taken off crossed out, NONE for no delivery');
     if (SHOTS) await p.screenshot({ path: path.join(SHOTS, 'routeweek-stops-1536.png') });
 
-    // Any stop to any route and day, by hand.
-    await p.selectOption('#stops-list tr[data-k="855|103|thu"] select[data-pick=route]', '852');
-    await p.selectOption('#stops-list tr[data-k="855|103|thu"] select[data-pick=day]', 'fri');
-    assert.deepEqual(await line('855|103|thu'), ['k-hand', '852', 'fri', '100, 100, 100']);
-    assert.equal(await p.$eval('#stops-list tr[data-k="855|103|thu"]', tr => tr.cells[6].textContent), '100 cases', 'a big store\'s own delivery is not flagged over the limit');
-    results.push('A stop picked by hand goes to route 852 on Friday');
+    // Any delivery to any route and day, by hand: click the day, pick in the customer's pop-up.
+    await p.click('#stops-list tr[data-cust="855|103"] td:nth-child(9) button');
+    await p.waitForSelector('#stops-cust:not([hidden])');
+    await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=route]', '852');
+    await p.selectOption('#stops-cust tr[data-k="855|103|thu"] select[data-pick=day]', 'fri');
+    await p.click('#stops-cust-close');
+    assert.deepEqual([await day('855|103', 'wed'), await day('855|103', 'fri')], ['', 'add:852100 cs'], 'Friday shows route 852');
+    results.push('A delivery picked by hand goes to route 852 on Friday, and Friday says 852');
+
+    // Routes in my plan: untick 855 and its customers leave the list; tick it back.
+    await p.click('#stops-routes-btn');
+    await p.uncheck('#stops-routes input[data-route="855"]');
+    assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 0);
+    assert.match(await p.textContent('#stops-routes-btn'), /Routes in my plan: 852$/);
+    await p.check('#stops-routes input[data-route="855"]');
+    assert.equal(await p.$$eval('#stops-list tr[data-cust]', t => t.length), 3);
+    results.push('Routes in my plan ticks each route in or out');
 
     // A case limit changed saves and works the list out again.
     await p.fill('#stops-rules input[data-rule=skipUnder]', '0');
     await p.press('#stops-rules input[data-rule=skipUnder]', 'Tab');
-    await p.waitForFunction(() => !document.querySelector('#stops-list tr[data-k="855|102|mon"].k-skip'));
+    await p.waitForFunction(() => !document.querySelector('#stops-list tr[data-cust="855|102"] .none'));
     let rules = null;
     for (let k = 0; k < 40 && !(rules && rules.skipUnder === 0); k++) { rules = (await d.collection('config').doc('holidayStopRules').get()).data(); await new Promise(r => setTimeout(r, 250)); }
     assert.equal(rules.skipUnder, 0);
     await p.fill('#stops-rules input[data-rule=skipUnder]', '3');
     await p.press('#stops-rules input[data-rule=skipUnder]', 'Tab');
-    await p.waitForSelector('#stops-list tr[data-k="855|102|mon"].k-skip');
+    await p.waitForSelector('#stops-list tr[data-cust="855|102"] .none');
     results.push('The case limits save when changed and the suggestions follow them');
+
+    // A note, then Save: kept, not used yet.
+    await p.fill('#stops-list input[data-note="855|102"]', 'Closed for the season');
+    await p.click('#stops-save');
+    await p.waitForFunction(() => /Saved .*not used yet/.test(document.getElementById('stops-state').textContent), null, { timeout: 10000 });
+    let doc0 = (await d.collection('weekStopMoves').doc(PLANNED).get()).data();
+    assert.equal(doc0.draft.notes['855|102'], 'Closed for the season');
+    assert.deepEqual(doc0.changes || [], [], 'Save does not use the changes');
+    results.push('Save keeps the note and the changes without using them');
 
     await p.click('#stops-use');
     await p.waitForFunction(() => /Used for this week/.test(document.getElementById('stops-state').textContent), null, { timeout: 10000 });
     const saved = (await d.collection('weekStopMoves').doc(PLANNED).get()).data();
     assert.deepEqual(saved.changes.map(c => [c.route, c.account, c.fromDay, c.toRoute, c.toDay, c.kind]),
       [['855', '102', 'mon', '', '', 'skip'], ['855', '102', 'thu', '', '', 'skip'], ['855', '101', 'thu', '855', 'wed', 'join'], ['855', '103', 'thu', '852', 'fri', 'hand']]);
+    assert.equal(saved.notes['855|102'], 'Closed for the season');
     assert.deepEqual((await d.collection('hubRouteMaster').doc('fac_uniontown').get()).data(), hubBefore, 'the route customer list is not changed');
-    results.push('Use These Changes keeps the 4 changes with the week; the route customer list is untouched');
+    results.push('Use These Changes keeps the 4 changes and the note with the week; the route customer list is untouched');
 
     // Start Over asks first; Cancel keeps the pick.
     await p.click('#stops-over');
     await p.waitForSelector('#stops-ask:not([hidden])');
     await p.click('#stops-ask-no');
-    assert.deepEqual((await line('855|103|thu')).slice(1, 3), ['852', 'fri']);
+    assert.equal(await day('855|103', 'fri'), 'add:852100 cs');
     await p.click('#stops-over');
     await p.click('#stops-ask-yes');
-    assert.deepEqual((await line('855|103|thu')).slice(0, 3), ['k-move', '855', 'wed']);
+    assert.equal(await day('855|103', 'wed'), 'add:855100 cs');
     results.push('Start Over asks first, then puts the hand pick back to the suggestion');
 
-    // Reopened after a reload: the used changes come back.
+    // Reopened after a reload: the used changes and the note come back.
     await p.goto(HOSTING + '/routeweek.html?week=' + PLANNED + '&testEmail=manager.test@uniteddairy.com');
     await p.waitForFunction(() => document.getElementById('week-label').textContent === 'Week of 11-22-26');
     await p.waitForSelector('#stops-open:not([disabled])');
     await p.click('#stops-open');
-    await p.waitForSelector('#stops-list tr[data-k="855|103|thu"].k-hand', { timeout: 15000 });
+    await p.waitForSelector('#stops-list tr[data-cust="855|103"]', { timeout: 15000 });
+    assert.equal(await day('855|103', 'fri'), 'add:852100 cs');
+    assert.equal(await p.inputValue('#stops-list input[data-note="855|102"]'), 'Closed for the season');
     assert.match(await p.textContent('#stops-state'), /Used for this week/);
-    results.push('After a reload the used changes come back, the hand pick included');
+    results.push('After a reload the used changes come back, the hand pick and the note included');
     assert.deepEqual(p.errors, []);
     await p.close();
   } finally {

@@ -163,8 +163,12 @@ async function setWeekPlan(tx, db, req, email, stamp, logRef, mode) {
 async function setWeekStopMoves(tx, db, req, email, stamp, logRef, mode) {
   const ref = db.collection(C.weekStopMoves).doc(req.weekStart), snap = await tx.get(ref);
   const was = snap.exists ? snap.data() : null;
-  const after = req.clear ? { weekStart: req.weekStart, changes: [], rules: was && was.rules || null, updatedAt: stamp, updatedBy: email }
-    : { weekStart: req.weekStart, changes: req.changes, rules: req.rules, updatedAt: stamp, updatedBy: email };
+  // Joe 11-13-26 (mock-up lm): Save keeps the working copy (draft: changes, notes, ticked routes) and leaves the used list as it
+  // was; Use These Changes makes them the week's list and the working copy both.
+  const draft = req.clear ? null : { changes: req.changes, notes: req.notes || {}, routes: req.routes === undefined ? null : req.routes, rules: req.rules, savedAt: stamp, savedBy: email };
+  const after = req.clear ? { weekStart: req.weekStart, changes: [], notes: {}, routes: null, draft: null, rules: was && was.rules || null, updatedAt: stamp, updatedBy: email }
+    : req.draft ? Object.assign({ changes: [], notes: {}, routes: null, rules: req.rules }, was || {}, { weekStart: req.weekStart, draft, updatedAt: stamp, updatedBy: email })
+      : { weekStart: req.weekStart, changes: req.changes, notes: draft.notes, routes: draft.routes, rules: req.rules, draft, usedAt: stamp, usedBy: email, updatedAt: stamp, updatedBy: email };
   tx.set(ref, after);
   const result = { ok: true, requestId: req.requestId, runs: [], stopMoves: after };
   tx.set(logRef, { action: req.action, by: email, at: stamp, mode: mode.mode, weekStart: req.weekStart, before: { changes: was ? (was.changes || []).length : 0 },

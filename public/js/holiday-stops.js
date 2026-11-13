@@ -160,5 +160,22 @@
     return out;
   }
 
-  return { DAYS, WEEKS, DEFAULT_RULES, RULE_KEYS, rules, average, plan, deliveries, cleanChanges, routeKey };
+  /** Joe's notes, one per customer on its own route (route|account): plain text, at most 300 letters each, 3000 notes. */
+  function cleanNotes(notes) {
+    const out = {};
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) return out;
+    Object.keys(notes).slice(0, 3000).forEach(k => {
+      const key = String(k).replace(/[\u0000-\u001f/.]/g, ' ').trim().slice(0, 60), v = String(notes[k] == null ? '' : notes[k]).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 300);
+      if (key && v) out[key] = v;
+    });
+    return out;
+  }
+  /** The routes ticked to be in the plan, or null for every route. */
+  function cleanRoutes(list) {
+    if (!Array.isArray(list)) return null;
+    const seen = {};
+    return list.slice(0, 500).map(r => routeKey(String(r == null ? '' : r).trim().slice(0, 20))).filter(r => r && !seen[r] && (seen[r] = true));
+  }
+
+  return { DAYS, WEEKS, DEFAULT_RULES, RULE_KEYS, rules, average, plan, deliveries, cleanChanges, cleanNotes, cleanRoutes, routeKey };
 });
