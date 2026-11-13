@@ -522,9 +522,14 @@ function validate(input) {
     if (!L.isDateKey(input.weekStart) || L.weekStart(input.weekStart) !== input.weekStart) throw new SaveError('BAD_REQUEST', 'weekStart must be a Sunday (yyyy-mm-dd)');
     out.weekStart = input.weekStart;
     if (input.clear === true) { out.clear = true; return out; }
-    out.changes = require('./holiday-stops').cleanChanges(input.changes);
+    const H = require('./holiday-stops');
+    out.changes = H.cleanChanges(input.changes);
     if (!out.changes) throw new SaveError('BAD_REQUEST', 'Each change needs its route, customer, day and where it goes');
-    out.rules = require('./holiday-stops').rules(input.rules);
+    out.rules = H.rules(input.rules);
+    // Joe 11-13-26 (mock-up lm): Save keeps the working list, notes and ticked routes without using them yet.
+    out.draft = input.save === true;
+    out.notes = H.cleanNotes(input.notes);
+    out.routes = H.cleanRoutes(input.routes);
     return out;
   }
   if (action === 'saveHolidayStopRules') {

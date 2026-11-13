@@ -112,3 +112,57 @@
   .routeweek-page .rw-stops-rules input { width: 70px; }
   .routeweek-page .rw-stops-actions { flex-wrap: wrap; }
 }
+/* Joe 11-13-26 (mock-up lm): one row per customer on its own route, Sun to Sat with the route that delivers each day ("I need
+   to know that customer gets delivered this day with this route"), grid lines on every cell, the routes-in-my-plan drop-down. */
+.routeweek-page .rw-stops-routes { position: relative; }
+.routeweek-page .rw-stops-routes > button { min-height: 36px; min-width: 260px; text-align: left; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ud-blue); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.routeweek-page .rw-stops-routes-list { position: absolute; top: 40px; left: 0; z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px #0004; padding: 8px 12px; min-width: 260px; max-height: 50vh; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.routeweek-page .rw-stops-routes-list[hidden] { display: none; }
+.routeweek-page .rw-stops-routes-list label { display: flex; gap: 8px; align-items: center; font-size: 16px; font-weight: 700; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.routeweek-page .rw-stops-key { font-size: 16px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.routeweek-page .rw-stops-key span, .routeweek-page .rw-stops-grid td.d span { display: inline-block; min-width: 46px; padding: 1px 6px; border-radius: 6px; font-weight: 800; text-align: center; }
+.routeweek-page .rw-stops-grid { table-layout: fixed; }
+.routeweek-page .rw-stops-grid th, .routeweek-page .rw-stops-grid td { border: 1px solid #c9d3dd; }
+.routeweek-page .rw-stops-grid th.c-chain { width: 11%; } .routeweek-page .rw-stops-grid th.c-acct { width: 7%; } .routeweek-page .rw-stops-grid th.c-cust { width: 15%; }
+.routeweek-page .rw-stops-grid th.c-route { width: 5%; } .routeweek-page .rw-stops-grid th.d { width: 6.3%; text-align: center; } .routeweek-page .rw-stops-grid th.c-note { width: 18%; }
+.routeweek-page .rw-stops-grid th small { display: block; font-size: 16px; font-weight: 600; opacity: .85; }
+.routeweek-page .rw-stops-grid th.hol { background: #f2b632; color: #3d2a00; }
+.routeweek-page .rw-stops-grid td.d { padding: 2px; text-align: center; }
+.routeweek-page .rw-stops-grid td.d button { width: 100%; min-height: 40px; border: 0; background: none; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.routeweek-page .rw-stops-grid td.d button:hover:not(:disabled) { outline: 2px solid var(--ud-blue); outline-offset: -2px; border-radius: 6px; }
+.routeweek-page .rw-stops-grid td.d button:disabled { cursor: default; }
+.routeweek-page .rw-stops-grid td.d b { display: block; font-size: 16px; }
+.routeweek-page .rw-stops-grid td.d small { display: block; font-size: 16px; font-weight: 600; color: inherit; opacity: .85; }
+.routeweek-page .rw-stops-grid td.no, .routeweek-page .rw-stops-key .no, .rw-stops-printout td.no { background: repeating-linear-gradient(135deg, #f1f3f5 0 5px, #e4e8ec 5px 10px); }
+.routeweek-page .rw-stops-grid .on, .routeweek-page .rw-stops-key .on { background: #e3f5ee; color: var(--green); }
+.routeweek-page .rw-stops-grid .add, .routeweek-page .rw-stops-key .add { background: #fff3d6; color: var(--amber); box-shadow: inset 0 0 0 2px #f2b632; }
+.routeweek-page .rw-stops-grid .drop, .routeweek-page .rw-stops-key .drop { color: #b42318; text-decoration: line-through; }
+.routeweek-page .rw-stops-grid .none, .routeweek-page .rw-stops-key .none { background: #fde8e6; color: #b42318; }
+.routeweek-page .rw-stops-grid tr.rt td { background: #e8f0f7; font-weight: 800; color: var(--ud-blue-dark); border-top: 2px solid var(--ud-blue); }
+.routeweek-page .rw-stops-grid tr.changed td:not(.d):not(.no) { background: #fffbea; }
+.routeweek-page .rw-stops-grid td.note input { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font: inherit; font-size: 16px; }
+.routeweek-page .rw-stops-grid td.note small { display: block; font-size: 16px; color: var(--muted); text-transform: none; }
+.routeweek-page .rw-stops-actions { align-items: center; }
+.routeweek-page .rw-stops-actions .rw-stops-state { margin-right: auto; }
+.routeweek-page .modal.rw-stops-cust { width: min(720px, calc(100vw - 32px)); }
+.routeweek-page .modal.rw-stops-cust[hidden] { display: none; }
+.routeweek-page .rw-stops-cust select { height: 34px; }
+@media print { .rw-stops-printout s { color: #b42318; } .rw-stops-printout td { text-align: center; } .rw-stops-printout td:nth-child(-n+4), .rw-stops-printout td:last-child { text-align: left; } }
+.routeweek-page .rw-stops-grid tbody td { height: auto; overflow: visible; padding: 4px 6px; }
+.routeweek-page .rw-stops-grid tbody td.note { text-align: left; }
+.routeweek-page .rw-stops-grid tbody td.d { padding: 2px; }
+/* Joe 11-13-26: "I don't need to see the case count, and narrow up the columns a little bit more and widen the notes some. Try to
+   make it only one line": one line per customer, the note box and the reason side by side (the whole reason on hover). */
+.routeweek-page .rw-stops-grid th.c-chain { width: 9%; } .routeweek-page .rw-stops-grid th.c-acct { width: 6%; } .routeweek-page .rw-stops-grid th.c-cust { width: 14%; }
+.routeweek-page .rw-stops-grid th.c-route { width: 5%; } .routeweek-page .rw-stops-grid th.d { width: 4.6%; } .routeweek-page .rw-stops-grid th.c-note { width: 33.8%; }
+.routeweek-page .rw-stops-grid tbody td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 38px; padding: 2px 6px; }
+.routeweek-page .rw-stops-grid tbody tr.rt td { height: 30px; }
+.routeweek-page .rw-stops-grid td.d button { min-height: 32px; flex-direction: row; gap: 2px; }
+.routeweek-page .rw-stops-grid td.d span { min-width: 0; padding: 1px 4px; }
+.routeweek-page .rw-stops-grid td.note { display: table-cell; }
+.routeweek-page .rw-stops-grid td.note input { width: 48%; height: 30px; vertical-align: middle; }
+.routeweek-page .rw-stops-grid td.note small { display: inline-block; width: 50%; margin-left: 2%; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.routeweek-page .rw-stops-grid tbody td:nth-child(1), .routeweek-page .rw-stops-grid tbody td:nth-child(3) { text-align: left; }
+.routeweek-page table.rw-stops-grid tbody tr td { white-space: nowrap; overflow-wrap: normal; }
+.routeweek-page table.rw-stops-grid th.c-chain { width: 10%; } .routeweek-page table.rw-stops-grid th.c-acct { width: 7%; } .routeweek-page table.rw-stops-grid th.c-cust { width: 15%; } .routeweek-page table.rw-stops-grid th.c-note { width: 30.8%; }
+#stops-list table.rw-stops-grid tbody tr td { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
