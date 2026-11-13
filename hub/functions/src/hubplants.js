@@ -20,6 +20,14 @@ const ROUTE_TRIP_DEFAULT = [
   { name: 'United Dairy Martins Ferry', address: '300 North 5th Street, Martins Ferry, OH 43935' },
   { name: 'United Dairy Marietta', address: '1701 Greene Street, Marietta, OH 45750' }
 ];
+// Joe 11-13-26: "Look for United Dairy Charleston ... a United Dairy in Lancaster ... a United Dairy in Fairmont." The addresses
+// are United Dairy's own (drinkunited.com/locations). Used only where Route & Trip has no address for that place, and never
+// over a plant an administrator saved on Plant Setup.
+const UNITED_DAIRY_PLACES = [
+  { name: 'United Dairy Charleston', address: '508 Roane Street, Charleston, WV 25302' },
+  { name: 'United Dairy Lancaster', address: '724 South Columbus Street, Lancaster, OH 43130' },
+  { name: 'United Dairy Fairmont', address: '6 Garvin Dairy Road, Fairmont, WV 26554' }
+];
 
 class PlantError extends Error { constructor(code, message) { super(message); this.code = code; } }
 const fail = (code, message) => { throw new PlantError(code, message); };
@@ -79,7 +87,10 @@ async function fill(db, options) {
   const o = options || {}, at = (o.now || new Date()).toISOString();
   const [ids, have, rt] = await Promise.all([plantIds(db), readAll(db), db.collection('routeEstimator').doc('locations').get()]);
   const saved = rt.exists ? rt.data() || {} : {};
-  const locations = Array.isArray(saved.list) && saved.list.length ? saved.list : ROUTE_TRIP_DEFAULT;
+  const fromRt = Array.isArray(saved.list) && saved.list.length ? saved.list : ROUTE_TRIP_DEFAULT;
+  const placeName = (l) => text(l && l.name).replace(/^united dairy\s+/i, '').toLowerCase();
+  const rtNames = new Set(fromRt.map(placeName));
+  const locations = fromRt.concat(UNITED_DAIRY_PLACES.filter(u => !rtNames.has(placeName(u))));
   const byId = new Map(have.map(p => [p.id, p]));
   have.forEach(p => { if (!ids.has(p.id)) ids.set(p.id, text(p.name) || p.id); });
   // A Route & Trip starting point that is not a plant yet (a DC such as a made-up Sampleton) is kept too, so the address
@@ -133,4 +144,4 @@ async function save(db, email, input, options) {
   return Object.assign({ id }, rec);
 }
 
-module.exports = { read, fill, save, PlantError, ROUTE_TRIP_DEFAULT, COLLECTION };
+module.exports = { read, fill, save, PlantError, ROUTE_TRIP_DEFAULT, UNITED_DAIRY_PLACES, COLLECTION };
